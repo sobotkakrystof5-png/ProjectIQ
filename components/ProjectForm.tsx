@@ -1,0 +1,271 @@
+'use client'
+
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { createProject, updateProject } from '@/app/actions'
+import { STATUS_LABELS, STATUS_ORDER, type Project, type ProjectStatus } from '@/lib/types'
+import { cn } from '@/lib/utils'
+import { Loader2 } from 'lucide-react'
+
+type FormData = {
+  client_name: string
+  description: string
+  focus: string
+  status: ProjectStatus
+  progress: number
+  price: string
+  paid: boolean
+  deadline: string
+  notes: string
+  progressNote: string
+}
+
+interface ProjectFormProps {
+  project?: Project
+}
+
+const defaultData: FormData = {
+  client_name: '',
+  description: '',
+  focus: '',
+  status: 'new',
+  progress: 0,
+  price: '',
+  paid: false,
+  deadline: '',
+  notes: '',
+  progressNote: '',
+}
+
+function projectToForm(p: Project): FormData {
+  return {
+    client_name: p.client_name,
+    description: p.description ?? '',
+    focus: p.focus ?? '',
+    status: p.status,
+    progress: p.progress,
+    price: p.price !== null ? String(p.price) : '',
+    paid: p.paid,
+    deadline: p.deadline ?? '',
+    notes: p.notes ?? '',
+    progressNote: '',
+  }
+}
+
+export function ProjectForm({ project }: ProjectFormProps) {
+  const [form, setForm] = useState<FormData>(project ? projectToForm(project) : defaultData)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+  const originalProgress = project?.progress ?? 0
+  const progressChanged = project != null && form.progress !== originalProgress
+
+  function set<K extends keyof FormData>(key: K, value: FormData[K]) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    if (!form.client_name.trim()) {
+      setError('Zadej název klienta')
+      return
+    }
+
+    if (progressChanged && !form.progressNote.trim()) {
+      setError('Posunutí postupu vyžaduje popis — co jsi udělal?')
+      return
+    }
+
+    const payload = {
+      client_name: form.client_name.trim(),
+      description: form.description.trim() || null,
+      focus: form.focus.trim() || null,
+      status: form.status,
+      progress: form.progress,
+      price: form.price !== '' ? Number(form.price) : null,
+      paid: form.paid,
+      deadline: form.deadline || null,
+      notes: form.notes.trim() || null,
+    }
+
+    startTransition(async () => {
+      try {
+        if (project) {
+          await updateProject(
+            project.id,
+            payload,
+            progressChanged
+              ? { from: originalProgress, description: form.progressNote.trim() }
+              : undefined
+          )
+          router.refresh()
+        } else {
+          await createProject(payload)
+        }
+      } catch {
+        setError('Chyba při ukládání zakázky')
+      }
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {error && (
+        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <Field label="Klient *" className="sm:col-span-2">
+          <input
+            type="text"
+            value={form.client_name}
+            onChange={e => set('client_name', e.target.value)}
+            placeholder="Jméno klienta nebo firma"
+            className={inputCls}
+            required
+          />
+        </Field>
+
+        <Field label="Popis zakázky" className="sm:col-span-2">
+          <input
+            type="text"
+            value={form.description}
+            onChange={e => set('description', e.target.value)}
+            placeholder="Krátký popis co děláme"
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="Zaměření" className="sm:col-span-2">
+          <textarea
+            value={form.focus}
+            onChange={e => set('focus', e.target.value)}
+            placeholder="Co je cílem zakázky..."
+            rows={3}
+            className={cn(inputCls, 'resize-none')}
+          />
+        </Field>
+
+        <Field label="Stav">
+          <select
+            value={form.status}
+            onChange={e => set('status', e.target.value as ProjectStatus)}
+            className={inputCls}
+          >
+            {STATUS_ORDER.map(s => (
+              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label={`Postup — ${form.progress}%`} className={progressChanged ? 'sm:col-span-2' : undefined}>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={form.progress}
+              onChange={e => {
+                set('progress', Number(e.target.value))
+                if (Number(e.target.value) === originalProgress) set('progressNote', '')
+              }}
+              className="flex-1 accent-brand-800"
+            />
+          </div>
+          {progressChanged && (
+            <div className="mt-3">
+              <label className="text-xs font-medium text-amber-700 uppercase tracking-wide block mb-1.5">
+                Co jsi udělal? ({originalProgress}% → {form.progress}%) *
+              </label>
+              <textarea
+                value={form.progressNote}
+                onChange={e => set('progressNote', e.target.value)}
+                placeholder="Popiš co jsi udělal, v jaké fázi projekt je..."
+                rows={3}
+                className={cn(inputCls, 'resize-none border-amber-300 focus:ring-amber-500')}
+              />
+            </div>
+          )}
+        </Field>
+
+        <Field label="Cena (Kč)">
+          <input
+            type="number"
+            value={form.price}
+            onChange={e => set('price', e.target.value)}
+            placeholder="0"
+            min={0}
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="Termín">
+          <input
+            type="date"
+            value={form.deadline}
+            onChange={e => set('deadline', e.target.value)}
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="Poznámky (interní)" className="sm:col-span-2">
+          <textarea
+            value={form.notes}
+            onChange={e => set('notes', e.target.value)}
+            placeholder="Interní poznámky — klient neuvidí..."
+            rows={3}
+            className={cn(inputCls, 'resize-none')}
+          />
+        </Field>
+
+        <div className="sm:col-span-2 flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="paid"
+            checked={form.paid}
+            onChange={e => set('paid', e.target.checked)}
+            className="w-4 h-4 accent-brand-800"
+          />
+          <label htmlFor="paid" className="text-sm text-foreground cursor-pointer">
+            Zakázka zaplacena
+          </label>
+        </div>
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button
+          type="submit"
+          disabled={isPending}
+          className="flex items-center gap-2 brand-gradient text-white text-sm font-medium px-5 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          {isPending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
+          {project ? 'Uložit změny' : 'Přidat zakázku'}
+        </button>
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="text-sm text-muted-foreground px-5 py-2.5 rounded-lg hover:bg-muted transition-colors"
+        >
+          Zrušit
+        </button>
+      </div>
+    </form>
+  )
+}
+
+const inputCls =
+  'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow bg-white'
+
+function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
+      {children}
+    </div>
+  )
+}
