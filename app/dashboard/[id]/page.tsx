@@ -60,7 +60,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">Sdílet s klientem</h2>
           <div className="flex flex-col sm:flex-row items-start gap-6">
             <QRCodeDisplay url={publicUrl} />
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-sm text-muted-foreground mb-3">
                 Pošli klientovi odkaz — bez registrace uvidí aktuální stav zakázky.
               </p>
