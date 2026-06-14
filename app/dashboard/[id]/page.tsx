@@ -100,7 +100,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
                       <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
                         {u.progress_from}% → {u.progress_to}%
                       </span>
-                      <span className="text-xs text-muted-foreground">{formatDate((u.created_at as string).split('T')[0])}</span>
+                      <span className="text-xs text-muted-foreground">{formatDate(u.created_at as string)}</span>
                     </div>
                     <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{u.description}</p>
                   </div>

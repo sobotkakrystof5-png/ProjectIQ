@@ -94,7 +94,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
                             <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
                               {u.progress_from}% → {u.progress_to}%
                             </span>
-                            <span className="text-xs text-muted-foreground">{formatDate(new Date(u.created_at as string).toISOString().split('T')[0])}</span>
+                            <span className="text-xs text-muted-foreground">{formatDate(u.created_at as string)}</span>
                           </div>
                           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{u.description}</p>
                         </div>
@@ -116,7 +116,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
                       <li key={msg.id} className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
                         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                         <p className="text-xs text-muted-foreground mt-1.5">
-                          {formatDate(new Date(msg.created_at).toISOString().split('T')[0])}
+                          {formatDate(msg.created_at)}
                         </p>
                       </li>
                     ))}
@@ -135,7 +135,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
                 {project.updated_at && (
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <RefreshCw size={14} strokeWidth={1.5} className="text-brand-500" />
-                    <span>Aktualizováno: <strong className="text-foreground font-medium">{formatDate(new Date(project.updated_at as string).toISOString().split('T')[0])}</strong></span>
+                    <span>Aktualizováno: <strong className="text-foreground font-medium">{formatDate(project.updated_at)}</strong></span>
                   </div>
                 )}
               </div>

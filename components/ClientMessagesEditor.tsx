@@ -58,7 +58,7 @@ export function ClientMessagesEditor({ projectId, publicToken, messages }: Props
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                 <p className="text-xs text-muted-foreground mt-1.5">
-                  {formatDate(msg.created_at.split('T')[0])}
+                  {formatDate(msg.created_at)}
                 </p>
               </div>
               <button

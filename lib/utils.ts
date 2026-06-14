@@ -14,13 +14,13 @@ export function formatCurrency(amount: number | null): string {
   }).format(amount)
 }
 
-export function formatDate(date: string | null): string {
+export function formatDate(date: string | Date | null): string {
   if (!date) return '—'
   return new Intl.DateTimeFormat('cs-CZ', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(date))
+  }).format(date instanceof Date ? date : new Date(date))
 }
 
 export function getPublicUrl(token: string): string {
