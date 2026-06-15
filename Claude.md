@@ -1,4 +1,4 @@
-#ProjectIQ — CLAUDE.md (MVP)
+#ZakazIQ — CLAUDE.md (MVP)
 
 > Kontext pro Claude Code — **ČÁST 1: MVP**. Zahrnuje pouze přehled zakázek a klientský portál.
 
@@ -6,7 +6,7 @@
 
 ## Vize a cíl
 
-**ProjectIQ** je jednoduchý nástroj pro freelancery, živnostníky a řemeslníky. V první fázi jde o **osobní nástroj pro vlastní potřebu** — přehled projektů, jejich stav a sdílení s klientem přes jednoduchý link.
+**ZakazIQ** je jednoduchý nástroj pro freelancery, živnostníky a řemeslníky. V první fázi jde o **osobní nástroj pro vlastní potřebu** — přehled projektů, jejich stav a sdílení s klientem přes jednoduchý link.
 
 **Filozofie UX:** Nejlepší design je ten, který uživatel vůbec nevnímá, protože mu nepřekáží v práci. Freelanceři nemají čas bojovat se složitým softwarem. Chtějí otevřít aplikaci, jedním pohledem zjistit stav byznysu a jedním kliknutím poslat klientovi update.
 

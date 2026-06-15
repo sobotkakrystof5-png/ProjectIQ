@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                   <rect x="9" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.9" />
                 </svg>
               </div>
-              <span className="font-semibold text-brand-800 text-[15px] tracking-tight">ProjectIQ</span>
+              <span className="font-semibold text-brand-800 text-[15px] tracking-tight">ZakazIQ</span>
             </Link>
             <nav className="hidden sm:flex items-center gap-1">
               <Link

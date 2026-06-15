@@ -64,7 +64,7 @@ function buildAdminEmail(formattedTime: string, channel: string, clientWish: str
 <tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
   <tr><td style="background:linear-gradient(135deg,#1b3868 0%,#23478b 100%);padding:32px 40px;">
-    <p style="margin:0 0 6px;color:#93c5fd;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;">ProjectIQ</p>
+    <p style="margin:0 0 6px;color:#93c5fd;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;">ZakazIQ</p>
     <h1 style="margin:0;color:#fff;font-size:22px;font-weight:600;">Nová rezervace konzultace</h1>
   </td></tr>
   <tr><td style="padding:36px 40px;">
@@ -83,7 +83,7 @@ function buildAdminEmail(formattedTime: string, channel: string, clientWish: str
     <a href="${meetingLink}" style="display:inline-block;background:linear-gradient(135deg,#1b3868,#23478b);color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;">
       Připojit se ke konzultaci →
     </a>
-    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Vygenerováno automaticky — ProjectIQ</p>
+    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Vygenerováno automaticky — ZakazIQ</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -97,7 +97,7 @@ function buildClientEmail(formattedTime: string, channel: string, clientWish: st
 <tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
   <tr><td style="background:linear-gradient(135deg,#1b3868 0%,#23478b 100%);padding:32px 40px;">
-    <p style="margin:0 0 6px;color:#93c5fd;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;">ProjectIQ</p>
+    <p style="margin:0 0 6px;color:#93c5fd;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;">ZakazIQ</p>
     <h1 style="margin:0;color:#fff;font-size:22px;font-weight:600;">Vaše konzultace byla potvrzena</h1>
   </td></tr>
   <tr><td style="padding:36px 40px;">
@@ -116,7 +116,7 @@ function buildClientEmail(formattedTime: string, channel: string, clientWish: st
     <a href="${meetingLink}" style="display:inline-block;background:linear-gradient(135deg,#1b3868,#23478b);color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;">
       Připojit se ke konzultaci →
     </a>
-    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Vygenerováno automaticky — ProjectIQ</p>
+    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Vygenerováno automaticky — ZakazIQ</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -171,17 +171,17 @@ export async function submitConsultation(
         : (CHANNEL_LABEL[parsed.data.channel] ?? parsed.data.channel)
 
       await resend.emails.send({
-        from: 'ProjectIQ <noreply@projectiq.app>',
+        from: 'ZakazIQ <noreply@projectiq.app>',
         to: adminEmail,
-        subject: 'Potvrzení rezervace konzultace - ProjectIQ',
+        subject: 'Potvrzení rezervace konzultace - ZakazIQ',
         html: buildAdminEmail(formattedTime, channelName, parsed.data.clientWish, meetingLink),
       })
 
       if (parsed.data.clientEmail) {
         await resend.emails.send({
-          from: 'ProjectIQ <noreply@projectiq.app>',
+          from: 'ZakazIQ <noreply@projectiq.app>',
           to: parsed.data.clientEmail,
-          subject: 'Potvrzení rezervace konzultace – ProjectIQ',
+          subject: 'Potvrzení rezervace konzultace – ZakazIQ',
           html: buildClientEmail(formattedTime, channelName, parsed.data.clientWish, meetingLink),
         })
       }

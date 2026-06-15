@@ -193,7 +193,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
             </div>
             <div className="flex flex-col leading-tight">
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Powered by</span>
-              <span className="text-sm font-bold text-brand-800 leading-none">ProjectIQ</span>
+              <span className="text-sm font-bold text-brand-800 leading-none">ZakazIQ</span>
             </div>
           </div>
         </div>

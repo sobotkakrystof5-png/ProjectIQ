@@ -45,7 +45,7 @@ export default function LoginPage() {
               <rect x="9" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.9" />
             </svg>
           </div>
-          <span className="text-xl font-semibold text-brand-800 tracking-tight">ProjectIQ</span>
+          <span className="text-xl font-semibold text-brand-800 tracking-tight">ZakazIQ</span>
         </div>
 
         <div className="bg-white border border-border rounded-2xl p-8 shadow-sm">
