@@ -163,7 +163,7 @@ export async function submitConsultation(
       const nodemailer = await import('nodemailer')
       const transporter = nodemailer.createTransport({
         service: 'gmail',
-        auth: { user: gmailUser, pass: gmailPassword },
+        auth: { user: gmailUser, pass: gmailPassword.replace(/\s/g, '') },
       })
       const formattedTime = new Intl.DateTimeFormat('cs-CZ', {
         timeZone: 'Europe/Prague',
