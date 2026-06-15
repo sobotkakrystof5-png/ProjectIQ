@@ -136,9 +136,7 @@ export async function submitConsultation(
   const projectId = await getProjectIdByToken(token)
   if (!projectId) return { success: false, error: 'Projekt nenalezen.' }
 
-  const effectiveChannel = parsed.data.channel === 'other'
-    ? (parsed.data.channelOtherText ?? 'Jiné')
-    : parsed.data.channel
+  const effectiveChannel = parsed.data.channel
 
   const meetingLink = generateMeetingLink(parsed.data.channel, scheduledDate)
 
