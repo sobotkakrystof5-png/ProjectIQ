@@ -9,6 +9,7 @@ export const bookingSchema = z.object({
   clientWish: z.string().min(1).max(1000),
   scheduledAt: z.string().refine(s => !isNaN(Date.parse(s)), { message: 'Neplatný datum/čas' }),
   channel: z.enum(['whatsapp', 'teams', 'meet', 'phone']),
+  clientEmail: z.string().email({ message: 'Neplatný e-mail' }),
 })
 
 export type FeedbackInput = z.infer<typeof feedbackSchema>

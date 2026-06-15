@@ -36,8 +36,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
     sql`
       SELECT scheduled_at
       FROM consultation_slots
-      WHERE project_id = (SELECT id FROM projects WHERE public_token = ${params.token})
-      AND scheduled_at > now()
+      WHERE scheduled_at > now()
       ORDER BY scheduled_at
     `,
   ])

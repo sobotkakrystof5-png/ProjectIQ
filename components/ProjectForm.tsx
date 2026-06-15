@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react'
 
 type FormData = {
   client_name: string
+  client_email: string
   description: string
   focus: string
   status: ProjectStatus
@@ -26,6 +27,7 @@ interface ProjectFormProps {
 
 const defaultData: FormData = {
   client_name: '',
+  client_email: '',
   description: '',
   focus: '',
   status: 'new',
@@ -40,6 +42,7 @@ const defaultData: FormData = {
 function projectToForm(p: Project): FormData {
   return {
     client_name: p.client_name,
+    client_email: p.client_email ?? '',
     description: p.description ?? '',
     focus: p.focus ?? '',
     status: p.status,
@@ -80,6 +83,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
 
     const payload = {
       client_name: form.client_name.trim(),
+      client_email: form.client_email.trim() || null,
       description: form.description.trim() || null,
       focus: form.focus.trim() || null,
       status: form.status,
@@ -127,6 +131,16 @@ export function ProjectForm({ project }: ProjectFormProps) {
             placeholder="Jméno klienta nebo firma"
             className={inputCls}
             required
+          />
+        </Field>
+
+        <Field label="E-mail klienta (pro automatické potvrzení)" className="sm:col-span-2">
+          <input
+            type="email"
+            value={form.client_email}
+            onChange={e => set('client_email', e.target.value)}
+            placeholder="klient@email.cz"
+            className={inputCls}
           />
         </Field>
 

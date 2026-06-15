@@ -6,6 +6,7 @@ import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectCardSkeleton } from '@/components/ProjectCardSkeleton'
 import { SummaryBar } from '@/components/SummaryBar'
 import { DashboardFilters } from '@/components/DashboardFilters'
+import { UpcomingConsultations, type UpcomingConsultation } from '@/components/UpcomingConsultations'
 import type { Project } from '@/lib/types'
 import { Suspense } from 'react'
 
@@ -65,6 +66,20 @@ async function SummarySection() {
   return <SummaryBar projects={projects} />
 }
 
+async function ConsultationsSection() {
+  const rows = await sql`
+    SELECT
+      cs.id, cs.scheduled_at, cs.channel, cs.client_wish, cs.meeting_link,
+      p.client_name, p.id as project_id
+    FROM consultation_slots cs
+    JOIN projects p ON cs.project_id = p.id
+    WHERE cs.scheduled_at > now()
+    ORDER BY cs.scheduled_at
+    LIMIT 20
+  `
+  return <UpcomingConsultations consultations={rows as UpcomingConsultation[]} />
+}
+
 export default function DashboardPage({ searchParams }: PageProps) {
   const statusFilter = searchParams.status
 
@@ -90,6 +105,10 @@ export default function DashboardPage({ searchParams }: PageProps) {
         </div>
       }>
         <SummarySection />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <ConsultationsSection />
       </Suspense>
 
       <Suspense fallback={<div className="flex gap-1.5">{[0,1,2,3,4,5].map(i => <div key={i} className="h-7 w-20 bg-muted rounded-full animate-pulse" />)}</div>}>

@@ -26,13 +26,14 @@ type ProjectPayload = {
   paid: boolean
   deadline: string | null
   notes: string | null
+  client_email: string | null
 }
 
 export async function createProject(payload: ProjectPayload) {
   await requireAuth()
   const progress = clampProgress(payload.progress)
   await sql`
-    INSERT INTO projects (client_name, description, focus, status, progress, price, paid, deadline, notes)
+    INSERT INTO projects (client_name, description, focus, status, progress, price, paid, deadline, notes, client_email)
     VALUES (
       ${payload.client_name},
       ${payload.description},
@@ -42,7 +43,8 @@ export async function createProject(payload: ProjectPayload) {
       ${payload.price},
       ${payload.paid},
       ${payload.deadline},
-      ${payload.notes}
+      ${payload.notes},
+      ${payload.client_email}
     )
   `
   revalidatePath('/dashboard')
@@ -67,6 +69,7 @@ export async function updateProject(
       paid = ${payload.paid},
       deadline = ${payload.deadline},
       notes = ${payload.notes},
+      client_email = ${payload.client_email},
       updated_at = now()
     WHERE id = ${id}
   `

@@ -12,6 +12,7 @@ export interface Project {
   public_token: string
   deadline: string | null
   notes: string | null
+  client_email: string | null
   created_at: string | Date | null
   updated_at: string | Date | null
 }
@@ -77,5 +78,18 @@ export interface ConsultationSlot {
   channel: ConsultationChannel
   client_wish: string
   meeting_link: string | null
+  client_email: string | null
+  created_at: string | Date
+}
+
+export type CalendarEventType = 'manual' | 'block'
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  description: string | null
+  starts_at: string | Date
+  ends_at: string | Date
+  event_type: CalendarEventType
   created_at: string | Date
 }

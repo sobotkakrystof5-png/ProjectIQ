@@ -42,10 +42,11 @@ export function pragueSlotToISO(year: number, month: number, day: number, hour: 
 }
 
 // Return available hour slots for a given JS weekday (0=Sun, 6=Sat).
+// Weekdays: 14:00–20:00 | Weekends: 08:00–22:00
 export function getHourSlots(dowJsStyle: number): number[] {
   const isWeekend = dowJsStyle === 0 || dowJsStyle === 6
   return isWeekend
-    ? Array.from({ length: 13 }, (_, i) => i + 9)   // 09–21
+    ? Array.from({ length: 15 }, (_, i) => i + 8)   // 08–22
     : Array.from({ length: 7 }, (_, i) => i + 14)    // 14–20
 }
 

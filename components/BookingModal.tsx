@@ -35,6 +35,7 @@ const CHANNELS = [
 
 const formSchema = z.object({
   clientWish: z.string().min(1, 'Popis je povinný').max(1000, 'Maximálně 1000 znaků'),
+  clientEmail: z.string().email('Neplatný e-mail'),
   channel: z.enum(['whatsapp', 'teams', 'meet', 'phone']),
 })
 type FormValues = z.infer<typeof formSchema>
@@ -417,6 +418,27 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                         />
                         {errors.clientWish && (
                           <p className="text-xs text-red-600 mt-1">{errors.clientWish.message}</p>
+                        )}
+                      </div>
+
+                      {/* Client email */}
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                          Váš e-mail (pro potvrzení rezervace)
+                        </label>
+                        <input
+                          type="email"
+                          {...register('clientEmail')}
+                          placeholder="vas@email.cz"
+                          className={cn(
+                            'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
+                            'placeholder-muted-foreground bg-white',
+                            'focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow',
+                            errors.clientEmail && 'border-red-300 ring-1 ring-red-200',
+                          )}
+                        />
+                        {errors.clientEmail && (
+                          <p className="text-xs text-red-600 mt-1">{errors.clientEmail.message}</p>
                         )}
                       </div>
 

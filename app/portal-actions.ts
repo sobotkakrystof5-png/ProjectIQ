@@ -32,14 +32,16 @@ export async function submitFeedback(
 // ─── Consultation booking ──────────────────────────────────────────────────────
 
 function generateMeetingLink(channel: string, datetime: Date): string {
-  const ts = datetime.getTime().toString(36)
   switch (channel) {
-    case 'whatsapp':
-      return `https://wa.me/${process.env.ADMIN_PHONE ?? ''}?text=${encodeURIComponent('Konzultace ' + datetime.toISOString())}`
+    case 'whatsapp': {
+      const phone = process.env.ADMIN_PHONE ?? ''
+      const formattedTime = datetime.toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })
+      return `https://wa.me/${phone}?text=${encodeURIComponent('Konzultace ' + formattedTime)}`
+    }
     case 'teams':
-      return `https://teams.microsoft.com/l/meetup-join/mock-${ts}`
+      return process.env.TEAMS_MEETING_LINK ?? '#'
     case 'meet':
-      return `https://meet.google.com/mock-${ts}`
+      return process.env.GOOGLE_MEET_LINK ?? '#'
     case 'phone':
       return `tel:${process.env.ADMIN_PHONE ?? ''}`
     default:
@@ -47,7 +49,14 @@ function generateMeetingLink(channel: string, datetime: Date): string {
   }
 }
 
-function buildEmail(formattedTime: string, channel: string, clientWish: string, meetingLink: string): string {
+const CHANNEL_LABEL: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  teams: 'Microsoft Teams',
+  meet: 'Google Meet',
+  phone: 'Klasický hovor',
+}
+
+function buildAdminEmail(formattedTime: string, channel: string, clientWish: string, meetingLink: string): string {
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
@@ -80,9 +89,42 @@ function buildEmail(formattedTime: string, channel: string, clientWish: string, 
 </body></html>`
 }
 
+function buildClientEmail(formattedTime: string, channel: string, clientWish: string, meetingLink: string): string {
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+  <tr><td style="background:linear-gradient(135deg,#1b3868 0%,#23478b 100%);padding:32px 40px;">
+    <p style="margin:0 0 6px;color:#93c5fd;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;">ProjectIQ</p>
+    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:600;">Vaše konzultace byla potvrzena</h1>
+  </td></tr>
+  <tr><td style="padding:36px 40px;">
+    <p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;">
+      S vaší rezervací počítám a na konzultaci se důkladně připravuji.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8faff;border:1px solid #e0e7ff;border-radius:12px;margin-bottom:24px;">
+    <tr><td style="padding:24px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Datum a čas</p>
+      <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#111827;">${formattedTime}</p>
+      <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Komunikační kanál</p>
+      <p style="margin:0 0 16px;font-size:15px;color:#374151;">${channel}</p>
+      <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Vaše přání</p>
+      <p style="margin:0;font-size:15px;color:#374151;line-height:1.5;">${clientWish.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    </td></tr></table>
+    <a href="${meetingLink}" style="display:inline-block;background:linear-gradient(135deg,#1b3868,#23478b);color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;">
+      Připojit se ke konzultaci →
+    </a>
+    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Vygenerováno automaticky — ProjectIQ</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`
+}
+
 export async function submitConsultation(
   token: string,
-  rawData: { clientWish: string; scheduledAt: string; channel: string },
+  rawData: { clientWish: string; scheduledAt: string; channel: string; clientEmail: string },
 ): Promise<ActionResult> {
   const parsed = bookingSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Neplatná data.' }
@@ -97,8 +139,8 @@ export async function submitConsultation(
 
   try {
     await sql`
-      INSERT INTO consultation_slots (project_id, scheduled_at, channel, client_wish, meeting_link)
-      VALUES (${projectId}, ${scheduledDate.toISOString()}, ${parsed.data.channel}, ${parsed.data.clientWish}, ${meetingLink})
+      INSERT INTO consultation_slots (project_id, scheduled_at, channel, client_wish, meeting_link, client_email)
+      VALUES (${projectId}, ${scheduledDate.toISOString()}, ${parsed.data.channel}, ${parsed.data.clientWish}, ${meetingLink}, ${parsed.data.clientEmail})
     `
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : ''
@@ -108,7 +150,7 @@ export async function submitConsultation(
     throw err
   }
 
-  // Send confirmation email — failure must not affect DB commit
+  // Send confirmation emails — failure must not affect DB commit
   try {
     const apiKey = process.env.RESEND_API_KEY
     const adminEmail = process.env.ADMIN_EMAIL
@@ -120,15 +162,23 @@ export async function submitConsultation(
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
         hour: '2-digit', minute: '2-digit',
       }).format(scheduledDate)
-      const channelLabel: Record<string, string> = {
-        whatsapp: 'WhatsApp', teams: 'Microsoft Teams', meet: 'Google Meet', phone: 'Klasický hovor',
-      }
+      const channelName = CHANNEL_LABEL[parsed.data.channel] ?? parsed.data.channel
+
       await resend.emails.send({
         from: 'ProjectIQ <noreply@projectiq.app>',
         to: adminEmail,
         subject: 'Potvrzení rezervace konzultace - ProjectIQ',
-        html: buildEmail(formattedTime, channelLabel[parsed.data.channel] ?? parsed.data.channel, parsed.data.clientWish, meetingLink),
+        html: buildAdminEmail(formattedTime, channelName, parsed.data.clientWish, meetingLink),
       })
+
+      if (parsed.data.clientEmail) {
+        await resend.emails.send({
+          from: 'ProjectIQ <noreply@projectiq.app>',
+          to: parsed.data.clientEmail,
+          subject: 'Potvrzení rezervace konzultace – ProjectIQ',
+          html: buildClientEmail(formattedTime, channelName, parsed.data.clientWish, meetingLink),
+        })
+      }
     }
   } catch (emailErr) {
     console.error('[Email] Selhání brány Resend — konzultace uložena v DB:', emailErr)
