@@ -62,13 +62,14 @@ export interface ClientFeedback {
   created_at: string | Date
 }
 
-export type ConsultationChannel = 'whatsapp' | 'teams' | 'meet' | 'phone'
+export type ConsultationChannel = 'whatsapp' | 'teams' | 'meet' | 'phone' | 'other'
 
 export const CHANNEL_LABELS: Record<ConsultationChannel, string> = {
   whatsapp: 'WhatsApp',
   teams: 'Microsoft Teams',
   meet: 'Google Meet',
   phone: 'Klasický hovor',
+  other: 'Jiné',
 }
 
 export interface ConsultationSlot {

@@ -72,6 +72,7 @@ const CHANNEL_COLORS: Record<ConsultationChannel, { pill: string; dot: string; i
   teams:    { pill: 'bg-blue-100 text-blue-800 border-blue-200',     dot: 'bg-blue-500',   icon: 'text-blue-600' },
   meet:     { pill: 'bg-red-100 text-red-800 border-red-200',        dot: 'bg-red-500',    icon: 'text-red-600' },
   phone:    { pill: 'bg-slate-100 text-slate-700 border-slate-200',  dot: 'bg-slate-400',  icon: 'text-slate-500' },
+  other:    { pill: 'bg-gray-100 text-gray-700 border-gray-200',     dot: 'bg-gray-400',   icon: 'text-gray-500' },
 }
 
 const KIND_COLORS: Partial<Record<EventKind, { pill: string; dot: string }>> = {
@@ -251,7 +252,7 @@ function EventDetailModal({
           <div className={cn(
             'h-1.5',
             event.kind === 'consultation' && event.channel
-              ? { whatsapp: 'bg-green-500', teams: 'bg-blue-600', meet: 'bg-red-500', phone: 'bg-slate-400' }[event.channel]
+              ? { whatsapp: 'bg-green-500', teams: 'bg-blue-600', meet: 'bg-red-500', phone: 'bg-slate-400', other: 'bg-gray-400' }[event.channel]
               : event.kind === 'deadline' ? 'bg-purple-500'
               : event.kind === 'block'    ? 'bg-slate-400'
               : 'bg-amber-500'

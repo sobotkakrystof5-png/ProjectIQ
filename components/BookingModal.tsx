@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   X, ChevronLeft, ChevronRight, Phone, Monitor, Video,
-  MessageSquare, Loader2, CheckCircle2, CalendarDays,
+  MessageSquare, Loader2, CheckCircle2, CalendarDays, HelpCircle,
 } from 'lucide-react'
 import { submitConsultation } from '@/app/portal-actions'
 import {
@@ -31,12 +31,17 @@ const CHANNELS = [
   { id: 'teams'    as const, label: 'Microsoft Teams', icon: Monitor },
   { id: 'meet'     as const, label: 'Google Meet',     icon: Video },
   { id: 'phone'    as const, label: 'Klasický hovor',  icon: Phone },
+  { id: 'other'    as const, label: 'Jiné',            icon: HelpCircle },
 ]
 
 const formSchema = z.object({
   clientWish: z.string().min(1, 'Popis je povinný').max(1000, 'Maximálně 1000 znaků'),
   clientEmail: z.string().email('Neplatný e-mail'),
-  channel: z.enum(['whatsapp', 'teams', 'meet', 'phone']),
+  channel: z.enum(['whatsapp', 'teams', 'meet', 'phone', 'other']),
+  channelOtherText: z.string().max(200).optional(),
+}).refine(d => d.channel !== 'other' || (d.channelOtherText ?? '').trim().length > 0, {
+  message: 'Upřesněte prosím preferovaný kanál',
+  path: ['channelOtherText'],
 })
 type FormValues = z.infer<typeof formSchema>
 
@@ -298,9 +303,13 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
     setSlotError(null)
     setServerError(null)
     const iso = pragueSlotToISO(selectedDate.year, selectedDate.month, selectedDate.day, selectedHour)
-    const res = await submitConsultation(token, { ...data, scheduledAt: iso })
-    if (res.success) setSuccess(true)
-    else setServerError(res.error ?? 'Chyba serveru. Zkuste to prosím znovu.')
+    try {
+      const res = await submitConsultation(token, { ...data, scheduledAt: iso })
+      if (res.success) setSuccess(true)
+      else setServerError(res.error ?? 'Chyba serveru. Zkuste to prosím znovu.')
+    } catch {
+      setServerError('Chyba serveru. Zkuste to prosím znovu.')
+    }
   })
 
   return (
@@ -480,6 +489,19 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                         </div>
                         {errors.channel && (
                           <p className="text-xs text-red-600 mt-1">{errors.channel.message}</p>
+                        )}
+                        {selectedChannel === 'other' && (
+                          <div className="mt-2">
+                            <input
+                              type="text"
+                              placeholder="Napište, co vám vyhovuje…"
+                              {...register('channelOtherText')}
+                              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-white placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                            />
+                            {errors.channelOtherText && (
+                              <p className="text-xs text-red-600 mt-1">{errors.channelOtherText.message}</p>
+                            )}
+                          </div>
                         )}
                       </div>
 

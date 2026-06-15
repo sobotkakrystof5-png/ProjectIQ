@@ -20,6 +20,7 @@ const CHANNEL_BADGE: Record<ConsultationChannel, string> = {
   teams:    'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
   meet:     'bg-red-50 text-red-700 ring-1 ring-red-200',
   phone:    'bg-gray-50 text-gray-700 ring-1 ring-gray-200',
+  other:    'bg-gray-50 text-gray-600 ring-1 ring-gray-200',
 }
 
 const VISIBLE_COUNT = 5

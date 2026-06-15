@@ -54,6 +54,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   teams: 'Microsoft Teams',
   meet: 'Google Meet',
   phone: 'Klasický hovor',
+  other: 'Jiné',
 }
 
 function buildAdminEmail(formattedTime: string, channel: string, clientWish: string, meetingLink: string): string {
@@ -124,7 +125,7 @@ function buildClientEmail(formattedTime: string, channel: string, clientWish: st
 
 export async function submitConsultation(
   token: string,
-  rawData: { clientWish: string; scheduledAt: string; channel: string; clientEmail: string },
+  rawData: { clientWish: string; scheduledAt: string; channel: string; channelOtherText?: string; clientEmail: string },
 ): Promise<ActionResult> {
   const parsed = bookingSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Neplatná data.' }
@@ -135,19 +136,24 @@ export async function submitConsultation(
   const projectId = await getProjectIdByToken(token)
   if (!projectId) return { success: false, error: 'Projekt nenalezen.' }
 
+  const effectiveChannel = parsed.data.channel === 'other'
+    ? (parsed.data.channelOtherText ?? 'Jiné')
+    : parsed.data.channel
+
   const meetingLink = generateMeetingLink(parsed.data.channel, scheduledDate)
 
   try {
     await sql`
       INSERT INTO consultation_slots (project_id, scheduled_at, channel, client_wish, meeting_link, client_email)
-      VALUES (${projectId}, ${scheduledDate.toISOString()}, ${parsed.data.channel}, ${parsed.data.clientWish}, ${meetingLink}, ${parsed.data.clientEmail})
+      VALUES (${projectId}, ${scheduledDate.toISOString()}, ${effectiveChannel}, ${parsed.data.clientWish}, ${meetingLink}, ${parsed.data.clientEmail})
     `
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : ''
     if (msg.includes('unique') || (err as { code?: string })?.code === '23505') {
       return { success: false, error: 'Tento termín je již obsazen. Vyberte prosím jiný.' }
     }
-    throw err
+    console.error('[Booking] DB chyba při INSERT:', err)
+    return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
   }
 
   // Send confirmation emails — failure must not affect DB commit
@@ -162,7 +168,9 @@ export async function submitConsultation(
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
         hour: '2-digit', minute: '2-digit',
       }).format(scheduledDate)
-      const channelName = CHANNEL_LABEL[parsed.data.channel] ?? parsed.data.channel
+      const channelName = parsed.data.channel === 'other'
+        ? (parsed.data.channelOtherText ?? 'Jiné')
+        : (CHANNEL_LABEL[parsed.data.channel] ?? parsed.data.channel)
 
       await resend.emails.send({
         from: 'ProjectIQ <noreply@projectiq.app>',
