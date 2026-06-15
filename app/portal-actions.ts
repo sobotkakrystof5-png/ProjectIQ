@@ -156,11 +156,15 @@ export async function submitConsultation(
 
   // Send confirmation emails — failure must not affect DB commit
   try {
-    const apiKey = process.env.RESEND_API_KEY
+    const gmailUser = process.env.GMAIL_USER
+    const gmailPassword = process.env.GMAIL_APP_PASSWORD
     const adminEmail = process.env.ADMIN_EMAIL
-    if (apiKey && adminEmail) {
-      const { Resend } = await import('resend')
-      const resend = new Resend(apiKey)
+    if (gmailUser && gmailPassword && adminEmail) {
+      const nodemailer = await import('nodemailer')
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: gmailUser, pass: gmailPassword },
+      })
       const formattedTime = new Intl.DateTimeFormat('cs-CZ', {
         timeZone: 'Europe/Prague',
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -170,16 +174,16 @@ export async function submitConsultation(
         ? (parsed.data.channelOtherText ?? 'Jiné')
         : (CHANNEL_LABEL[parsed.data.channel] ?? parsed.data.channel)
 
-      await resend.emails.send({
-        from: 'ZakazIQ <noreply@projectiq.app>',
+      await transporter.sendMail({
+        from: `ZakazIQ <${gmailUser}>`,
         to: adminEmail,
-        subject: 'Potvrzení rezervace konzultace - ZakazIQ',
+        subject: 'Nová rezervace konzultace – ZakazIQ',
         html: buildAdminEmail(formattedTime, channelName, parsed.data.clientWish, meetingLink),
       })
 
       if (parsed.data.clientEmail) {
-        await resend.emails.send({
-          from: 'ZakazIQ <noreply@projectiq.app>',
+        await transporter.sendMail({
+          from: `ZakazIQ <${gmailUser}>`,
           to: parsed.data.clientEmail,
           subject: 'Potvrzení rezervace konzultace – ZakazIQ',
           html: buildClientEmail(formattedTime, channelName, parsed.data.clientWish, meetingLink),
@@ -187,7 +191,7 @@ export async function submitConsultation(
       }
     }
   } catch (emailErr) {
-    console.error('[Email] Selhání brány Resend — konzultace uložena v DB:', emailErr)
+    console.error('[Email] Selhání odesílání emailu — konzultace uložena v DB:', emailErr)
   }
 
   return { success: true }
