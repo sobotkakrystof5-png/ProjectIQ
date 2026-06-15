@@ -2,8 +2,10 @@ import { Briefcase, TrendingUp, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Project } from '@/lib/types'
 
+export type SummaryProject = Pick<Project, 'status' | 'price' | 'paid'>
+
 interface SummaryBarProps {
-  projects: Project[]
+  projects: SummaryProject[]
 }
 
 export function SummaryBar({ projects }: SummaryBarProps) {

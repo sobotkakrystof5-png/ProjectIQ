@@ -12,8 +12,8 @@ export interface Project {
   public_token: string
   deadline: string | null
   notes: string | null
-  created_at: string | null
-  updated_at: string | null
+  created_at: string | Date | null
+  updated_at: string | Date | null
 }
 
 export type ProjectInsert = Omit<Project, 'id' | 'public_token' | 'created_at' | 'updated_at'>
@@ -41,7 +41,7 @@ export interface ClientMessage {
   id: string
   project_id: string
   content: string
-  created_at: string
+  created_at: string | Date
 }
 
 export interface ProgressUpdate {
@@ -50,5 +50,32 @@ export interface ProgressUpdate {
   progress_from: number
   progress_to: number
   description: string
-  created_at: string
+  created_at: string | Date
+}
+
+export interface ClientFeedback {
+  id: string
+  project_id: string
+  nps: number
+  content: string | null
+  created_at: string | Date
+}
+
+export type ConsultationChannel = 'whatsapp' | 'teams' | 'meet' | 'phone'
+
+export const CHANNEL_LABELS: Record<ConsultationChannel, string> = {
+  whatsapp: 'WhatsApp',
+  teams: 'Microsoft Teams',
+  meet: 'Google Meet',
+  phone: 'Klasický hovor',
+}
+
+export interface ConsultationSlot {
+  id: string
+  project_id: string
+  scheduled_at: string | Date
+  channel: ConsultationChannel
+  client_wish: string
+  meeting_link: string | null
+  created_at: string | Date
 }

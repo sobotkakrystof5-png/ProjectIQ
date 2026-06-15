@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { Link2, Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { getPublicUrl } from '@/lib/utils'
+import { cn, getPublicUrl } from '@/lib/utils'
 
 interface ShareButtonProps {
   token: string

@@ -1,31 +1,53 @@
 import { notFound } from 'next/navigation'
 import { sql } from '@/lib/db'
 import { StatusBadge } from '@/components/StatusBadge'
+import { FeedbackBlock } from '@/components/FeedbackBlock'
+import { BookingCTA } from '@/components/BookingCTA'
 import { formatDate } from '@/lib/utils'
-import { Calendar, RefreshCw, MessageSquare, TrendingUp } from 'lucide-react'
+import { Calendar, RefreshCw, MessageSquare, TrendingUp, Star } from 'lucide-react'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/lib/types'
+
+export const revalidate = 30
 
 interface PageProps {
   params: { token: string }
 }
 
 export default async function ClientPortalPage({ params }: PageProps) {
-  const rows = await sql`
-    SELECT id, client_name, description, focus, status, progress, deadline, updated_at
-    FROM projects
-    WHERE public_token = ${params.token}
-    LIMIT 1
-  `
-
-  if (!rows.length) notFound()
-  const project = rows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at'>
-
-  const [msgRows, progressRows] = await Promise.all([
-    sql`SELECT id, content, created_at FROM client_messages WHERE project_id = ${project.id} ORDER BY created_at DESC`,
-    sql`SELECT id, progress_from, progress_to, description, created_at FROM progress_updates WHERE project_id = ${project.id} ORDER BY created_at DESC`,
+  const [projectRows, msgRows, progressRows, bookedRows] = await Promise.all([
+    sql`
+      SELECT id, client_name, description, focus, status, progress, deadline, updated_at
+      FROM projects
+      WHERE public_token = ${params.token}
+      LIMIT 1
+    `,
+    sql`
+      SELECT id, content, created_at
+      FROM client_messages
+      WHERE project_id = (SELECT id FROM projects WHERE public_token = ${params.token})
+      ORDER BY created_at DESC
+    `,
+    sql`
+      SELECT id, progress_from, progress_to, description, created_at
+      FROM progress_updates
+      WHERE project_id = (SELECT id FROM projects WHERE public_token = ${params.token})
+      ORDER BY created_at DESC
+    `,
+    sql`
+      SELECT scheduled_at
+      FROM consultation_slots
+      WHERE project_id = (SELECT id FROM projects WHERE public_token = ${params.token})
+      AND scheduled_at > now()
+      ORDER BY scheduled_at
+    `,
   ])
+
+  if (!projectRows.length) notFound()
+
+  const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at'>
   const messages = msgRows as Pick<ClientMessage, 'id' | 'content' | 'created_at'>[]
   const progressUpdates = progressRows as Pick<ProgressUpdate, 'id' | 'progress_from' | 'progress_to' | 'description' | 'created_at'>[]
+  const bookedSlots = (bookedRows as { scheduled_at: Date | string }[]).map(r => new Date(r.scheduled_at).toISOString())
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -44,7 +66,10 @@ export default async function ClientPortalPage({ params }: PageProps) {
                   )}
                 </div>
                 <div className="shrink-0 mt-0.5">
-                  <StatusBadge status={project.status as ProjectStatus} />
+                  <StatusBadge
+                    status={project.status as ProjectStatus}
+                    className="bg-white/95 text-brand-800 ring-white/60 font-semibold text-sm px-3 py-1 shadow-sm"
+                  />
                 </div>
               </div>
             </div>
@@ -54,7 +79,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
               {/* Progress */}
               <div>
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Postup prací</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Proces projektu</span>
                   <span className="text-sm font-bold text-brand-800">{project.progress}%</span>
                 </div>
                 <div className="h-2.5 bg-brand-50 rounded-full overflow-hidden border border-brand-100">
@@ -94,7 +119,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
                             <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
                               {u.progress_from}% → {u.progress_to}%
                             </span>
-                            <span className="text-xs text-muted-foreground">{formatDate(u.created_at as string)}</span>
+                            <span className="text-xs text-muted-foreground">{formatDate(u.created_at)}</span>
                           </div>
                           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{u.description}</p>
                         </div>
@@ -109,7 +134,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare size={13} strokeWidth={1.5} className="text-brand-500" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vzkazy od freelancera</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vzkazy od manažera</p>
                   </div>
                   <ul className="space-y-2.5">
                     {messages.map(msg => (
@@ -139,20 +164,38 @@ export default async function ClientPortalPage({ params }: PageProps) {
                   </div>
                 )}
               </div>
+
+              {/* ── Client actions ── */}
+              <div className="space-y-4 pt-2 border-t border-border">
+                {/* Feedback */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star size={13} strokeWidth={1.5} className="text-brand-500" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vaše zpětná vazba</p>
+                  </div>
+                  <FeedbackBlock token={params.token} />
+                </div>
+
+                {/* Booking CTA */}
+                <BookingCTA token={params.token} bookedSlots={bookedSlots} />
+              </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <div className="w-5 h-5 brand-gradient rounded-md flex items-center justify-center shadow-sm">
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.9" />
-                <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.5" />
-                <rect x="2" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.5" />
-                <rect x="9" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.9" />
+          <div className="flex items-center justify-center gap-2.5 mt-6">
+            <div className="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center shadow-md">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
+                <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.55" />
+                <rect x="2" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.55" />
+                <rect x="9" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
               </svg>
             </div>
-            <span className="text-xs text-muted-foreground">Powered by <span className="font-semibold text-brand-800">ProjectIQ</span></span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Powered by</span>
+              <span className="text-sm font-bold text-brand-800 leading-none">ProjectIQ</span>
+            </div>
           </div>
         </div>
       </div>

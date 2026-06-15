@@ -7,25 +7,31 @@ import { ShareButton } from '@/components/ShareButton'
 import { QRCodeDisplay } from '@/components/QRCodeDisplay'
 import { StatusBadge } from '@/components/StatusBadge'
 import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
+import { FeedbackFeed } from '@/components/FeedbackFeed'
+import { ConsultationCalendar } from '@/components/ConsultationCalendar'
 import { DeleteButton } from './DeleteButton'
 import { getPublicUrl, formatDate } from '@/lib/utils'
-import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/lib/types'
+import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot } from '@/lib/types'
 
 interface PageProps {
   params: { id: string }
 }
 
 export default async function ProjectDetailPage({ params }: PageProps) {
-  const [rows, msgRows, progressRows] = await Promise.all([
+  const [rows, msgRows, progressRows, feedbackRows, slotRows] = await Promise.all([
     sql`SELECT * FROM projects WHERE id = ${params.id} LIMIT 1`,
     sql`SELECT * FROM client_messages WHERE project_id = ${params.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM progress_updates WHERE project_id = ${params.id} ORDER BY created_at DESC`,
+    sql`SELECT * FROM client_feedback WHERE project_id = ${params.id} ORDER BY created_at DESC`,
+    sql`SELECT * FROM consultation_slots WHERE project_id = ${params.id} ORDER BY scheduled_at DESC`,
   ])
 
   if (!rows.length) notFound()
   const project = rows[0] as Project
   const messages = msgRows as ClientMessage[]
   const progressUpdates = progressRows as ProgressUpdate[]
+  const feedbacks = feedbackRows as ClientFeedback[]
+  const slots = slotRows as ConsultationSlot[]
   const publicUrl = getPublicUrl(project.public_token)
 
   return (
@@ -100,7 +106,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
                       <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
                         {u.progress_from}% → {u.progress_to}%
                       </span>
-                      <span className="text-xs text-muted-foreground">{formatDate(u.created_at as string)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDate(u.created_at)}</span>
                     </div>
                     <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{u.description}</p>
                   </div>
@@ -109,6 +115,28 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             </ul>
           </div>
         )}
+
+        {/* ── Feedback feed ── */}
+        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+            Zpětná vazba klienta
+          </h2>
+          <p className="text-xs text-muted-foreground mb-5">
+            NPS hodnocení a poznámky odeslané klientem přes klientský portál.
+          </p>
+          <FeedbackFeed feedbacks={feedbacks} clientName={project.client_name} />
+        </div>
+
+        {/* ── Consultation calendar ── */}
+        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+            Konzultace
+          </h2>
+          <p className="text-xs text-muted-foreground mb-5">
+            Termíny rezervované klientem. Kliknutím zobrazíš detail a odkaz na hovor.
+          </p>
+          <ConsultationCalendar slots={slots} clientName={project.client_name} />
+        </div>
 
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">Nebezpečná zóna</h2>

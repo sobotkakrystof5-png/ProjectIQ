@@ -48,17 +48,34 @@ CREATE TABLE projects (
   description text,
   focus text,
   status text DEFAULT 'new',
-  progress integer DEFAULT 0,
+  progress integer DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   price numeric,
   paid boolean DEFAULT false,
   public_token uuid DEFAULT gen_random_uuid(),
   deadline date,
   notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz
+);
+
+CREATE TABLE client_messages (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  content text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE progress_updates (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  progress_from integer NOT NULL,
+  progress_to integer NOT NULL,
+  description text NOT NULL,
   created_at timestamptz DEFAULT now()
 );
 ```
 
-### Popis polí
+### Popis polí — `projects`
 
 | Pole | Typ | Default | Popis |
 |------|-----|---------|-------|
@@ -67,13 +84,34 @@ CREATE TABLE projects (
 | description | text | — | Popis zakázky |
 | focus | text | — | Na co se zakázka zaměřuje |
 | status | text | `'new'` | new / in_progress / review / done / paid |
-| progress | integer | 0 | Procento hotovosti 0–100 |
+| progress | integer | 0 | Procento hotovosti 0–100 (CHECK constraint) |
 | price | numeric | — | Cena zakázky v Kč/EUR |
 | paid | boolean | false | Zaplaceno / nezaplaceno |
 | public_token | uuid | gen_random_uuid() | Token pro klientský portál |
 | deadline | date | — | Termín dokončení |
 | notes | text | — | Interní poznámky — klient **NEVIDÍ** |
 | created_at | timestamptz | now() | Datum vytvoření |
+| updated_at | timestamptz | — | Datum poslední úpravy (nastavuje server action) |
+
+### Popis polí — `client_messages`
+
+| Pole | Typ | Popis |
+|------|-----|-------|
+| id | uuid | Primární klíč |
+| project_id | uuid | FK → projects.id (CASCADE DELETE) |
+| content | text | Text vzkazu — klient vidí |
+| created_at | timestamptz | Datum přidání |
+
+### Popis polí — `progress_updates`
+
+| Pole | Typ | Popis |
+|------|-----|-------|
+| id | uuid | Primární klíč |
+| project_id | uuid | FK → projects.id (CASCADE DELETE) |
+| progress_from | integer | Progress před změnou |
+| progress_to | integer | Progress po změně |
+| description | text | Popis co se udělalo |
+| created_at | timestamptz | Datum záznamu |
 
 ---
 

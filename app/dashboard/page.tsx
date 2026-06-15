@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import Link from 'next/link'
 import { Plus, FolderOpen } from 'lucide-react'
 import { sql } from '@/lib/db'
@@ -12,13 +13,18 @@ interface PageProps {
   searchParams: { status?: string }
 }
 
-async function ProjectGrid({ statusFilter }: { statusFilter?: string }) {
-  const rows =
-    statusFilter && statusFilter !== 'all'
-      ? await sql`SELECT * FROM projects WHERE status = ${statusFilter} ORDER BY created_at DESC`
-      : await sql`SELECT * FROM projects ORDER BY created_at DESC`
+// Shared per-request cache — DB se zavolá jen jednou i přes dvě Suspense boundaries
+const loadAllProjects = cache(async () => {
+  const rows = await sql`SELECT * FROM projects ORDER BY created_at DESC`
+  return rows as Project[]
+})
 
-  const projects = rows as Project[]
+async function ProjectGrid({ statusFilter }: { statusFilter?: string }) {
+  const all = await loadAllProjects()
+  const projects =
+    statusFilter && statusFilter !== 'all'
+      ? all.filter(p => p.status === statusFilter)
+      : all
 
   if (projects.length === 0) {
     return (
@@ -55,8 +61,8 @@ async function ProjectGrid({ statusFilter }: { statusFilter?: string }) {
 }
 
 async function SummarySection() {
-  const rows = await sql`SELECT * FROM projects`
-  return <SummaryBar projects={rows as Project[]} />
+  const projects = await loadAllProjects()
+  return <SummaryBar projects={projects} />
 }
 
 export default function DashboardPage({ searchParams }: PageProps) {
