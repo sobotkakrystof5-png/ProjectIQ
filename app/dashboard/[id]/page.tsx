@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { sql } from '@/lib/db'
 import { ProjectForm } from '@/components/ProjectForm'
 import { ShareButton } from '@/components/ShareButton'
@@ -54,6 +54,17 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             )}
           </div>
         </div>
+        {project.project_url && (
+          <a
+            href={project.project_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors shrink-0"
+          >
+            <ExternalLink size={14} strokeWidth={1.5} />
+            Živá verze
+          </a>
+        )}
       </div>
 
       <div className="space-y-4">

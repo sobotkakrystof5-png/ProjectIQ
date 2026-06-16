@@ -11,6 +11,7 @@ type FormData = {
   client_name: string
   client_email: string
   description: string
+  project_url: string
   focus: string
   status: ProjectStatus
   progress: number
@@ -29,6 +30,7 @@ const defaultData: FormData = {
   client_name: '',
   client_email: '',
   description: '',
+  project_url: '',
   focus: '',
   status: 'new',
   progress: 0,
@@ -44,6 +46,7 @@ function projectToForm(p: Project): FormData {
     client_name: p.client_name,
     client_email: p.client_email ?? '',
     description: p.description ?? '',
+    project_url: p.project_url ?? '',
     focus: p.focus ?? '',
     status: p.status,
     progress: p.progress,
@@ -85,6 +88,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
       client_name: form.client_name.trim(),
       client_email: form.client_email.trim() || null,
       description: form.description.trim() || null,
+      project_url: form.project_url.trim() || null,
       focus: form.focus.trim() || null,
       status: form.status,
       progress: form.progress,
@@ -150,6 +154,16 @@ export function ProjectForm({ project }: ProjectFormProps) {
             value={form.description}
             onChange={e => set('description', e.target.value)}
             placeholder="Krátký popis co děláme"
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="URL projektu (živá verze na Vercel)" className="sm:col-span-2">
+          <input
+            type="url"
+            value={form.project_url}
+            onChange={e => set('project_url', e.target.value)}
+            placeholder="https://muj-projekt.vercel.app"
             className={inputCls}
           />
         </Field>

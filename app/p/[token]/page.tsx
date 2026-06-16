@@ -4,7 +4,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { FeedbackBlock } from '@/components/FeedbackBlock'
 import { BookingCTA } from '@/components/BookingCTA'
 import { formatDate } from '@/lib/utils'
-import { Calendar, RefreshCw, MessageSquare, TrendingUp, Star } from 'lucide-react'
+import { Calendar, RefreshCw, MessageSquare, TrendingUp, Star, ExternalLink } from 'lucide-react'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/lib/types'
 
 export const revalidate = 30
@@ -16,7 +16,7 @@ interface PageProps {
 export default async function ClientPortalPage({ params }: PageProps) {
   const [projectRows, msgRows, progressRows, bookedRows] = await Promise.all([
     sql`
-      SELECT id, client_name, description, focus, status, progress, deadline, updated_at
+      SELECT id, client_name, description, focus, status, progress, deadline, updated_at, project_url
       FROM projects
       WHERE public_token = ${params.token}
       LIMIT 1
@@ -43,7 +43,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
 
   if (!projectRows.length) notFound()
 
-  const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at'>
+  const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at' | 'project_url'>
   const messages = msgRows as Pick<ClientMessage, 'id' | 'content' | 'created_at'>[]
   const progressUpdates = progressRows as Pick<ProgressUpdate, 'id' | 'progress_from' | 'progress_to' | 'description' | 'created_at'>[]
   const bookedSlots = (bookedRows as { scheduled_at: Date | string }[]).map(r => new Date(r.scheduled_at).toISOString())
@@ -88,6 +88,19 @@ export default async function ClientPortalPage({ params }: PageProps) {
                   />
                 </div>
               </div>
+
+              {/* Live preview link */}
+              {project.project_url && (
+                <a
+                  href={project.project_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+                >
+                  <ExternalLink size={14} strokeWidth={1.5} />
+                  Zobrazit živou verzi projektu
+                </a>
+              )}
 
               {/* Focus */}
               {project.focus && (

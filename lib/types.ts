@@ -13,6 +13,7 @@ export interface Project {
   deadline: string | null
   notes: string | null
   client_email: string | null
+  project_url: string | null
   created_at: string | Date | null
   updated_at: string | Date | null
 }
