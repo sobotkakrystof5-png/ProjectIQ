@@ -27,16 +27,23 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
     throw new Error('Čas konce musí být po čase začátku.')
   }
 
-  await sql`
-    INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type)
-    VALUES (
-      ${payload.title.trim()},
-      ${payload.description?.trim() || null},
-      ${payload.starts_at},
-      ${payload.ends_at},
-      ${payload.event_type}
-    )
-  `
+  try {
+    await sql`
+      INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type)
+      VALUES (
+        ${payload.title.trim()},
+        ${payload.description?.trim() || null},
+        ${payload.starts_at},
+        ${payload.ends_at},
+        ${payload.event_type}
+      )
+    `
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === '23P01') {
+      throw new Error('Tento termín se překrývá s jinou událostí v kalendáři.')
+    }
+    throw err
+  }
   revalidatePath('/dashboard/calendar')
 }
 

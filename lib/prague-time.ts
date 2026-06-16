@@ -91,6 +91,21 @@ export function isSlotBooked(bookedUtcIsos: string[], year: number, month: numbe
   })
 }
 
+// Expand a [start, end) UTC range into one ISO string per whole hour it touches.
+// Used to make hour-slot pickers (BookingModal) aware of admin blocks / external
+// bookings stored as arbitrary ranges in calendar_events.
+export function expandRangeToHourlySlots(startIso: string, endIso: string): string[] {
+  const slots: string[] = []
+  const cursor = new Date(startIso)
+  cursor.setUTCMinutes(0, 0, 0)
+  const end = new Date(endIso)
+  while (cursor < end) {
+    slots.push(cursor.toISOString())
+    cursor.setUTCHours(cursor.getUTCHours() + 1)
+  }
+  return slots
+}
+
 export function formatPragueDateTime(utcIso: string): string {
   return new Intl.DateTimeFormat('cs-CZ', {
     timeZone: TZ,

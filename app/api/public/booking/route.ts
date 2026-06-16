@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { verifyApiKey, getClientIp } from '@/lib/api-auth'
 import { vizeonBookingSchema } from '@/types/booking'
-import { pragueWallClockToISO } from '@/lib/prague-time'
+import { pragueWallClockToISO, formatPragueDateTime } from '@/lib/prague-time'
+import { sendBrandedEmail } from '@/lib/email'
 
 const ALLOWED_ORIGINS = ['https://vizeon.cz', 'http://localhost:3000']
 const ENDPOINT = 'vizeon_booking'
@@ -76,6 +77,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const scheduledAtISO = pragueWallClockToISO(year, month, day, hour, minute)
   const endsAtISO = new Date(new Date(scheduledAtISO).getTime() + 60 * 60 * 1000).toISOString()
 
+  // consultation_slots and calendar_events live in separate tables, so the DB
+  // exclusion constraint on calendar_events alone can't catch a clash with an
+  // existing client-portal consultation — check that here too.
+  const conflictingConsultation = await sql`
+    SELECT 1 FROM consultation_slots WHERE scheduled_at = ${scheduledAtISO} LIMIT 1
+  `
+  if (conflictingConsultation.length) {
+    return errorResponse(origin, 409, 'Tento termín je již obsazen. Zvolte prosím jiný.', 'SLOT_TAKEN')
+  }
+
   try {
     const projectRows = await sql`
       INSERT INTO projects (client_name, client_email, description, focus, status, source)
@@ -91,11 +102,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     `
     const eventId = (eventRows[0] as { id: string }).id
 
+    const adminEmail = process.env.ADMIN_EMAIL
+    if (adminEmail) {
+      await sendBrandedEmail({
+        to: adminEmail,
+        subject: 'Nová poptávka z vizeon.cz – ZakazIQ',
+        heading: 'Nová poptávka z webu',
+        intro: 'Přes vizeon.cz dorazila nová poptávka a byla automaticky zařazena do přehledu zakázek.',
+        fields: [
+          { label: 'Klient', value: data.clientName },
+          { label: 'Email', value: data.clientEmail },
+          { label: 'Typ projektu', value: data.projectType },
+          { label: 'Navržený termín', value: formatPragueDateTime(scheduledAtISO) },
+          ...(data.message ? [{ label: 'Zpráva', value: data.message }] : []),
+        ],
+      })
+    }
+
     return NextResponse.json(
       { success: true, bookingId: projectId, eventId, message: 'Rezervace úspěšně vytvořena' },
       { headers: corsHeaders(origin) },
     )
-  } catch (err) {
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === '23P01') {
+      return errorResponse(origin, 409, 'Tento termín je již obsazen. Zvolte prosím jiný.', 'SLOT_TAKEN')
+    }
     console.error('[api/public/booking] DB chyba při vytváření zakázky/události:', err instanceof Error ? err.message : err)
     return errorResponse(origin, 500, 'Chyba serveru. Zkuste to prosím znovu.', 'SERVER_ERROR')
   }

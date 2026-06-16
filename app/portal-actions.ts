@@ -96,6 +96,18 @@ export async function submitConsultation(
 
   const meetingLink = generateMeetingLink(parsed.data.channel, scheduledDate)
 
+  // consultation_slots and calendar_events (admin blocks, vizeon.cz bookings) live in
+  // separate tables, so a single DB constraint can't span both — check here too.
+  const overlapping = await sql`
+    SELECT 1 FROM calendar_events
+    WHERE starts_at <= ${scheduledDate.toISOString()}
+      AND ends_at > ${scheduledDate.toISOString()}
+    LIMIT 1
+  `
+  if (overlapping.length) {
+    return { success: false, error: 'Tento termín je již obsazen. Vyberte prosím jiný.' }
+  }
+
   try {
     await sql`
       INSERT INTO consultation_slots (project_id, scheduled_at, channel, client_wish, meeting_link, client_email)

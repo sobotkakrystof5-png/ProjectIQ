@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import { Calendar, CreditCard, BadgeCheck } from 'lucide-react'
+import { Calendar, CreditCard, BadgeCheck, Globe } from 'lucide-react'
 import { StatusBadge } from './StatusBadge'
 import { ProgressBar } from './ProgressBar'
 import { ShareButton } from './ShareButton'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { Project, ProjectStatus } from '@/lib/types'
 
 interface ProjectCardProps {
@@ -26,6 +27,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {project.source === 'vizeon_web' && (
+            <div className={cn(
+              'inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
+              'bg-blue-50 text-blue-700 border border-blue-100'
+            )} title="Poptávka z vizeon.cz">
+              <Globe size={11} strokeWidth={1.5} />
+              <span>Vizeon</span>
+            </div>
+          )}
           <ShareButton token={project.public_token} variant="icon" />
           <StatusBadge status={project.status as ProjectStatus} />
         </div>

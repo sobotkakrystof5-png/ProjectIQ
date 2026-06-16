@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { FeedbackBlock } from '@/components/FeedbackBlock'
 import { BookingCTA } from '@/components/BookingCTA'
 import { formatDate } from '@/lib/utils'
+import { expandRangeToHourlySlots } from '@/lib/prague-time'
 import { Calendar, RefreshCw, MessageSquare, TrendingUp, Star, ExternalLink } from 'lucide-react'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/lib/types'
 
@@ -14,7 +15,7 @@ interface PageProps {
 }
 
 export default async function ClientPortalPage({ params }: PageProps) {
-  const [projectRows, msgRows, progressRows, bookedRows] = await Promise.all([
+  const [projectRows, msgRows, progressRows, bookedRows, eventRows] = await Promise.all([
     sql`
       SELECT id, client_name, description, focus, status, progress, deadline, updated_at, project_url
       FROM projects
@@ -39,6 +40,12 @@ export default async function ClientPortalPage({ params }: PageProps) {
       WHERE scheduled_at > now()
       ORDER BY scheduled_at
     `,
+    sql`
+      SELECT starts_at, ends_at
+      FROM calendar_events
+      WHERE ends_at > now()
+      ORDER BY starts_at
+    `,
   ])
 
   if (!projectRows.length) notFound()
@@ -46,7 +53,11 @@ export default async function ClientPortalPage({ params }: PageProps) {
   const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at' | 'project_url'>
   const messages = msgRows as Pick<ClientMessage, 'id' | 'content' | 'created_at'>[]
   const progressUpdates = progressRows as Pick<ProgressUpdate, 'id' | 'progress_from' | 'progress_to' | 'description' | 'created_at'>[]
-  const bookedSlots = (bookedRows as { scheduled_at: Date | string }[]).map(r => new Date(r.scheduled_at).toISOString())
+  const consultationSlots = (bookedRows as { scheduled_at: Date | string }[]).map(r => new Date(r.scheduled_at).toISOString())
+  const blockedRangeSlots = (eventRows as { starts_at: Date | string; ends_at: Date | string }[]).flatMap(r =>
+    expandRangeToHourlySlots(new Date(r.starts_at).toISOString(), new Date(r.ends_at).toISOString()),
+  )
+  const bookedSlots = [...consultationSlots, ...blockedRangeSlots]
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
