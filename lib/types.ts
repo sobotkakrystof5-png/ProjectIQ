@@ -14,6 +14,7 @@ export interface Project {
   notes: string | null
   client_email: string | null
   project_url: string | null
+  source: string | null
   created_at: string | Date | null
   updated_at: string | Date | null
 }
@@ -93,5 +94,6 @@ export interface CalendarEvent {
   starts_at: string | Date
   ends_at: string | Date
   event_type: CalendarEventType
+  project_id: string | null
   created_at: string | Date
 }

@@ -28,17 +28,22 @@ export function utcToPrague(utcDate: Date): { year: number; month: number; day: 
   return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') }
 }
 
-// Convert a Prague wall-clock slot (hour on a specific day) to a UTC ISO string.
+// Convert a Prague wall-clock moment to a UTC ISO string.
 // Works correctly across CET (UTC+1) and CEST (UTC+2) transitions.
-export function pragueSlotToISO(year: number, month: number, day: number, hour: number): string {
-  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, 0, 0))
+export function pragueWallClockToISO(year: number, month: number, day: number, hour: number, minute: number): string {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0))
   const praHour = parseInt(
     new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', hour12: false }).format(utcGuess)
   )
   let offset = praHour - hour
   if (offset > 12) offset -= 24
   if (offset < -12) offset += 24
-  return new Date(Date.UTC(year, month - 1, day, hour - offset, 0, 0)).toISOString()
+  return new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0)).toISOString()
+}
+
+// Convert a Prague wall-clock slot (hour on a specific day) to a UTC ISO string.
+export function pragueSlotToISO(year: number, month: number, day: number, hour: number): string {
+  return pragueWallClockToISO(year, month, day, hour, 0)
 }
 
 // Return available hour slots for a given JS weekday (0=Sun, 6=Sat).
