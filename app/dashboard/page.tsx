@@ -70,11 +70,23 @@ async function ConsultationsSection() {
   const rows = await sql`
     SELECT
       cs.id, cs.scheduled_at, cs.channel, cs.client_wish, cs.meeting_link,
-      p.client_name, p.id as project_id
+      p.client_name, p.id as project_id, NULL AS source
     FROM consultation_slots cs
     JOIN projects p ON cs.project_id = p.id
     WHERE cs.scheduled_at > now()
-    ORDER BY cs.scheduled_at
+
+    UNION ALL
+
+    SELECT
+      ce.id, ce.starts_at AS scheduled_at, 'other' AS channel,
+      ce.description AS client_wish, NULL AS meeting_link,
+      p.client_name, p.id as project_id, 'vizeon' AS source
+    FROM calendar_events ce
+    JOIN projects p ON ce.project_id = p.id
+    WHERE ce.starts_at > now()
+      AND ce.project_id IS NOT NULL
+
+    ORDER BY scheduled_at
     LIMIT 20
   `
   return <UpcomingConsultations consultations={rows as UpcomingConsultation[]} />

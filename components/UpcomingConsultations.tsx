@@ -13,6 +13,7 @@ export interface UpcomingConsultation {
   meeting_link: string | null
   client_name: string
   project_id: string
+  source?: string | null
 }
 
 const CHANNEL_BADGE: Record<ConsultationChannel, string> = {
@@ -58,18 +59,24 @@ export function UpcomingConsultations({ consultations }: { consultations: Upcomi
               href={`/dashboard/${c.project_id}`}
               className="flex items-center gap-3 bg-white border border-border rounded-xl px-4 py-3 hover:border-brand-200 hover:bg-brand-50 transition-colors group"
             >
-              <div className="brand-gradient w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white text-xs font-bold">
-                {formattedHour}
+              <div className="brand-gradient w-12 h-12 rounded-lg flex flex-col items-center justify-center shrink-0 text-white">
+                <span className="text-xs font-bold leading-tight">{formattedHour}</span>
+                <span className="text-[10px] opacity-80 leading-tight">{formattedDate}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate group-hover:text-brand-800">
                   {c.client_name}
                 </p>
-                <p className="text-xs text-muted-foreground">{formattedDate}</p>
+                {c.source === 'vizeon' ? (
+                  <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 ring-1 ring-violet-200 mt-0.5">
+                    vizeon.cz
+                  </span>
+                ) : (
+                  <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-0.5 ${CHANNEL_BADGE[c.channel]}`}>
+                    {CHANNEL_LABELS[c.channel]}
+                  </span>
+                )}
               </div>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${CHANNEL_BADGE[c.channel]}`}>
-                {CHANNEL_LABELS[c.channel]}
-              </span>
             </Link>
           )
         })}

@@ -89,8 +89,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const projectRows = await sql`
-      INSERT INTO projects (client_name, client_email, description, focus, status, source)
-      VALUES (${data.clientName}, ${data.clientEmail}, ${data.message ?? null}, ${data.projectType}, 'new', 'vizeon_web')
+      INSERT INTO projects (client_name, client_email, client_phone, service_type, description, status, source)
+      VALUES (${data.clientName}, ${data.clientEmail}, ${data.clientPhone ?? null}, ${data.projectType}, ${data.message ?? null}, 'new', 'vizeon_web')
       RETURNING id
     `
     const projectId = (projectRows[0] as { id: string }).id
@@ -112,7 +112,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         fields: [
           { label: 'Klient', value: data.clientName },
           { label: 'Email', value: data.clientEmail },
-          { label: 'Typ projektu', value: data.projectType },
+          ...(data.clientPhone ? [{ label: 'Telefon', value: data.clientPhone }] : []),
+          { label: 'Typ služby', value: data.projectType },
           { label: 'Navržený termín', value: formatPragueDateTime(scheduledAtISO) },
           ...(data.message ? [{ label: 'Zpráva', value: data.message }] : []),
         ],

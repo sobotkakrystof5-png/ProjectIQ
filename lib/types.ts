@@ -13,6 +13,8 @@ export interface Project {
   deadline: string | null
   notes: string | null
   client_email: string | null
+  client_phone: string | null
+  service_type: string | null
   project_url: string | null
   source: string | null
   created_at: string | Date | null

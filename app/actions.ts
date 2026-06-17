@@ -20,6 +20,9 @@ function clampProgress(value: number): number {
 
 type ProjectPayload = {
   client_name: string
+  client_email: string | null
+  client_phone: string | null
+  service_type: string | null
   description: string | null
   focus: string | null
   project_url: string | null
@@ -29,7 +32,6 @@ type ProjectPayload = {
   paid: boolean
   deadline: string | null
   notes: string | null
-  client_email: string | null
 }
 
 async function notifyClientOfProjectChange(
@@ -65,9 +67,12 @@ export async function createProject(payload: ProjectPayload) {
   await requireAuth()
   const progress = clampProgress(payload.progress)
   const rows = await sql`
-    INSERT INTO projects (client_name, description, focus, project_url, status, progress, price, paid, deadline, notes, client_email)
+    INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes)
     VALUES (
       ${payload.client_name},
+      ${payload.client_email},
+      ${payload.client_phone},
+      ${payload.service_type},
       ${payload.description},
       ${payload.focus},
       ${payload.project_url},
@@ -76,8 +81,7 @@ export async function createProject(payload: ProjectPayload) {
       ${payload.price},
       ${payload.paid},
       ${payload.deadline},
-      ${payload.notes},
-      ${payload.client_email}
+      ${payload.notes}
     )
     RETURNING public_token
   `
@@ -100,6 +104,9 @@ export async function updateProject(
   const rows = await sql`
     UPDATE projects SET
       client_name = ${payload.client_name},
+      client_email = ${payload.client_email},
+      client_phone = ${payload.client_phone},
+      service_type = ${payload.service_type},
       description = ${payload.description},
       focus = ${payload.focus},
       project_url = ${payload.project_url},
@@ -109,7 +116,6 @@ export async function updateProject(
       paid = ${payload.paid},
       deadline = ${payload.deadline},
       notes = ${payload.notes},
-      client_email = ${payload.client_email},
       updated_at = now()
     WHERE id = ${id}
     RETURNING public_token

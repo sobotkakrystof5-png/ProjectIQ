@@ -10,6 +10,8 @@ import { Loader2 } from 'lucide-react'
 type FormData = {
   client_name: string
   client_email: string
+  client_phone: string
+  service_type: string
   description: string
   project_url: string
   focus: string
@@ -29,6 +31,8 @@ interface ProjectFormProps {
 const defaultData: FormData = {
   client_name: '',
   client_email: '',
+  client_phone: '',
+  service_type: '',
   description: '',
   project_url: '',
   focus: '',
@@ -45,6 +49,8 @@ function projectToForm(p: Project): FormData {
   return {
     client_name: p.client_name,
     client_email: p.client_email ?? '',
+    client_phone: p.client_phone ?? '',
+    service_type: p.service_type ?? '',
     description: p.description ?? '',
     project_url: p.project_url ?? '',
     focus: p.focus ?? '',
@@ -87,6 +93,8 @@ export function ProjectForm({ project }: ProjectFormProps) {
     const payload = {
       client_name: form.client_name.trim(),
       client_email: form.client_email.trim() || null,
+      client_phone: form.client_phone.trim() || null,
+      service_type: form.service_type.trim() || null,
       description: form.description.trim() || null,
       project_url: form.project_url.trim() || null,
       focus: form.focus.trim() || null,
@@ -144,6 +152,26 @@ export function ProjectForm({ project }: ProjectFormProps) {
             value={form.client_email}
             onChange={e => set('client_email', e.target.value)}
             placeholder="klient@email.cz"
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="Telefonní číslo">
+          <input
+            type="tel"
+            value={form.client_phone}
+            onChange={e => set('client_phone', e.target.value)}
+            placeholder="+420 601 234 567"
+            className={inputCls}
+          />
+        </Field>
+
+        <Field label="Typ služby">
+          <input
+            type="text"
+            value={form.service_type}
+            onChange={e => set('service_type', e.target.value)}
+            placeholder="např. Web na míru, E-shop, Logo…"
             className={inputCls}
           />
         </Field>
