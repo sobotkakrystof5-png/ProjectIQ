@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProject, updateProject } from '@/app/actions'
-import { STATUS_LABELS, STATUS_ORDER, type Project, type ProjectStatus } from '@/lib/types'
+import { STATUS_LABELS, STATUS_ORDER, type Project, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 
 type FormData = {
   client_name: string
@@ -19,9 +19,17 @@ type FormData = {
   progress: number
   price: string
   paid: boolean
+  estimated_costs: string
+  deposit_amount: string
+  deposit_paid: boolean
   deadline: string
   notes: string
   progressNote: string
+  addToCompleted: boolean
+  completedType: ProjectType
+  completedAt: string
+  completedDifficulty: number
+  completedTimeInvested: string
 }
 
 interface ProjectFormProps {
@@ -40,9 +48,17 @@ const defaultData: FormData = {
   progress: 0,
   price: '',
   paid: false,
+  estimated_costs: '',
+  deposit_amount: '',
+  deposit_paid: false,
   deadline: '',
   notes: '',
   progressNote: '',
+  addToCompleted: false,
+  completedType: 'client',
+  completedAt: new Date().toISOString().slice(0, 10),
+  completedDifficulty: 5,
+  completedTimeInvested: '',
 }
 
 function projectToForm(p: Project): FormData {
@@ -58,22 +74,48 @@ function projectToForm(p: Project): FormData {
     progress: p.progress,
     price: p.price !== null ? String(p.price) : '',
     paid: p.paid,
+    estimated_costs: p.estimated_costs !== null ? String(p.estimated_costs) : '',
+    deposit_amount: p.deposit_amount !== null ? String(p.deposit_amount) : '',
+    deposit_paid: p.deposit_paid,
     deadline: p.deadline ?? '',
     notes: p.notes ?? '',
     progressNote: '',
+    addToCompleted: false,
+    completedType: 'client',
+    completedAt: new Date().toISOString().slice(0, 10),
+    completedDifficulty: 5,
+    completedTimeInvested: '',
   }
 }
 
 export function ProjectForm({ project }: ProjectFormProps) {
   const [form, setForm] = useState<FormData>(project ? projectToForm(project) : defaultData)
+  const [depositManuallySet, setDepositManuallySet] = useState(
+    project ? project.deposit_amount !== null : false
+  )
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const originalProgress = project?.progress ?? 0
   const progressChanged = project != null && form.progress !== originalProgress
 
+  useEffect(() => {
+    if (depositManuallySet) return
+    const price = Number(form.price)
+    if (form.price !== '' && price > 0) {
+      setForm(prev => ({ ...prev, deposit_amount: String(Math.round(price * 0.3)) }))
+    } else {
+      setForm(prev => ({ ...prev, deposit_amount: '' }))
+    }
+  }, [form.price, depositManuallySet])
+
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  function handleDepositChange(value: string) {
+    setDepositManuallySet(true)
+    setForm(prev => ({ ...prev, deposit_amount: value }))
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -102,9 +144,19 @@ export function ProjectForm({ project }: ProjectFormProps) {
       progress: form.progress,
       price: form.price !== '' ? Number(form.price) : null,
       paid: form.paid,
+      estimated_costs: form.estimated_costs !== '' ? Number(form.estimated_costs) : null,
+      deposit_amount: form.deposit_amount !== '' ? Number(form.deposit_amount) : null,
+      deposit_paid: form.deposit_paid,
       deadline: form.deadline || null,
       notes: form.notes.trim() || null,
     }
+
+    const completedExtra = !project && form.addToCompleted ? {
+      project_type: form.completedType,
+      completed_at: form.completedAt,
+      difficulty: form.completedDifficulty,
+      time_invested: form.completedTimeInvested ? Number(form.completedTimeInvested) : null,
+    } : undefined
 
     startTransition(async () => {
       try {
@@ -118,7 +170,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
           )
           router.refresh()
         } else {
-          await createProject(payload)
+          await createProject(payload, completedExtra)
         }
       } catch {
         setError('Chyba při ukládání zakázky')
@@ -291,6 +343,80 @@ export function ProjectForm({ project }: ProjectFormProps) {
             Zakázka zaplacena
           </label>
         </div>
+
+        {!project && (
+          <div className="sm:col-span-2">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="addToCompleted"
+                checked={form.addToCompleted}
+                onChange={e => set('addToCompleted', e.target.checked)}
+                className="w-4 h-4 accent-emerald-600"
+              />
+              <label htmlFor="addToCompleted" className="text-sm text-foreground cursor-pointer">
+                Ihned přidat do dokončených projektů
+              </label>
+            </div>
+
+            {form.addToCompleted && (
+              <div className="mt-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-4">
+                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Detail dokončeného projektu</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Typ projektu">
+                    <div className="relative">
+                      <select
+                        value={form.completedType}
+                        onChange={e => set('completedType', e.target.value as ProjectType)}
+                        className={cn(inputCls, 'appearance-none pr-8')}
+                      >
+                        <option value="client">Zakázka pro klienta</option>
+                        <option value="personal">Osobní projekt</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    </div>
+                  </Field>
+
+                  <Field label="Datum dokončení">
+                    <input
+                      type="date"
+                      value={form.completedAt}
+                      onChange={e => set('completedAt', e.target.value)}
+                      className={inputCls}
+                    />
+                  </Field>
+
+                  <Field label="Náročnost (1–10)">
+                    <div className="relative">
+                      <select
+                        value={form.completedDifficulty}
+                        onChange={e => set('completedDifficulty', Number(e.target.value))}
+                        className={cn(inputCls, 'appearance-none pr-8')}
+                      >
+                        {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    </div>
+                  </Field>
+
+                  <Field label="Čas strávený (hod., volitelné)">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={form.completedTimeInvested}
+                      onChange={e => set('completedTimeInvested', e.target.value)}
+                      placeholder="např. 12"
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 pt-2">

@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { getPublicUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
-import { STATUS_LABELS, type ProjectStatus } from '@/lib/types'
+import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
 
 async function requireAuth() {
   const session = await getServerSession(authOptions)
@@ -32,6 +32,9 @@ type ProjectPayload = {
   paid: boolean
   deadline: string | null
   notes: string | null
+  estimated_costs: number | null
+  deposit_amount: number | null
+  deposit_paid: boolean
 }
 
 async function notifyClientOfProjectChange(
@@ -63,11 +66,18 @@ async function notifyClientOfProjectChange(
   })
 }
 
-export async function createProject(payload: ProjectPayload) {
+type CompletedExtra = {
+  project_type: ProjectType
+  completed_at: string
+  difficulty: number
+  time_invested: number | null
+}
+
+export async function createProject(payload: ProjectPayload, completedExtra?: CompletedExtra) {
   await requireAuth()
   const progress = clampProgress(payload.progress)
   const rows = await sql`
-    INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes)
+    INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes, estimated_costs, deposit_amount, deposit_paid)
     VALUES (
       ${payload.client_name},
       ${payload.client_email},
@@ -81,7 +91,10 @@ export async function createProject(payload: ProjectPayload) {
       ${payload.price},
       ${payload.paid},
       ${payload.deadline},
-      ${payload.notes}
+      ${payload.notes},
+      ${payload.estimated_costs},
+      ${payload.deposit_amount},
+      ${payload.deposit_paid}
     )
     RETURNING public_token
   `
@@ -90,6 +103,23 @@ export async function createProject(payload: ProjectPayload) {
     { client_name: payload.client_name, client_email: payload.client_email, status: payload.status, progress, project_url: payload.project_url, public_token: publicToken },
     'created'
   )
+  if (completedExtra) {
+    await sql`
+      INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type)
+      VALUES (
+        ${payload.description || payload.client_name},
+        ${payload.client_name},
+        null,
+        ${completedExtra.completed_at},
+        ${payload.price ?? 0},
+        ${completedExtra.difficulty},
+        ${completedExtra.time_invested},
+        ${payload.notes},
+        ${completedExtra.project_type}
+      )
+    `
+    revalidatePath('/dashboard/dokoncene')
+  }
   revalidatePath('/dashboard')
   redirect('/dashboard')
 }
@@ -116,6 +146,9 @@ export async function updateProject(
       paid = ${payload.paid},
       deadline = ${payload.deadline},
       notes = ${payload.notes},
+      estimated_costs = ${payload.estimated_costs},
+      deposit_amount = ${payload.deposit_amount},
+      deposit_paid = ${payload.deposit_paid},
       updated_at = now()
     WHERE id = ${id}
     RETURNING public_token
@@ -155,4 +188,61 @@ export async function deleteClientMessage(messageId: string, projectId: string, 
   await sql`DELETE FROM client_messages WHERE id = ${messageId} AND project_id = ${projectId}`
   revalidatePath(`/dashboard/${projectId}`)
   revalidatePath(`/p/${publicToken}`)
+}
+
+export async function markProjectAsCompleted(
+  projectId: string,
+  extra: {
+    project_type: ProjectType
+    completed_at: string
+    difficulty: number
+    time_invested: number | null
+    include_costs: boolean
+  }
+) {
+  await requireAuth()
+  const rows = await sql`
+    SELECT client_name, description, price, notes, estimated_costs
+    FROM projects WHERE id = ${projectId} LIMIT 1
+  `
+  if (!rows.length) throw new Error('Zakázka nenalezena')
+  const p = rows[0] as {
+    client_name: string
+    description: string | null
+    price: number | null
+    notes: string | null
+    estimated_costs: number | null
+  }
+
+  await sql`
+    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type)
+    VALUES (
+      ${p.description || p.client_name},
+      ${p.client_name},
+      null,
+      ${extra.completed_at},
+      ${p.price ?? 0},
+      ${extra.difficulty},
+      ${extra.time_invested},
+      ${p.notes},
+      ${extra.project_type}
+    )
+  `
+
+  if (extra.include_costs && p.estimated_costs && p.estimated_costs > 0) {
+    await sql`
+      INSERT INTO costs (name, amount, cost_type, category, description)
+      VALUES (
+        ${'Náklady: ' + (p.description || p.client_name)},
+        ${p.estimated_costs},
+        ${'one_time'},
+        ${'client'},
+        ${'Předpokládané náklady ze zakázky ' + p.client_name}
+      )
+    `
+    revalidatePath('/dashboard/naklady')
+  }
+
+  revalidatePath('/dashboard/dokoncene')
+  revalidatePath(`/dashboard/${projectId}`)
 }

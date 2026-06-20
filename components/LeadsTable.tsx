@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown } from 'lucide-react'
-import { createLead, updateLead, deleteLead } from '@/app/calls-actions'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus } from 'lucide-react'
+import { createLead, updateLead, deleteLead, convertLeadToProject } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import { LEAD_STATUS_LABELS, LEAD_STATUS_STYLES, type ClientLead, type LeadStatus } from '@/lib/types'
 
@@ -145,11 +145,13 @@ function LeadRow({
   lead,
   onEdit,
   onDelete,
+  onConvert,
   isPending,
 }: {
   lead: ClientLead
   onEdit: () => void
   onDelete: () => void
+  onConvert: () => void
   isPending: boolean
 }) {
   const isOverdue = lead.next_action_date
@@ -216,6 +218,14 @@ function LeadRow({
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
+            onClick={onConvert}
+            disabled={isPending || lead.lead_status === 'converted'}
+            title="Převést na zakázku"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <FolderPlus size={13} strokeWidth={1.5} />
+          </button>
+          <button
             onClick={onEdit}
             className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors"
           >
@@ -270,6 +280,13 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
     startTransition(async () => {
       await deleteLead(id)
       setLeads(prev => prev.filter(l => l.id !== id))
+    })
+  }
+
+  const handleConvert = (id: string) => {
+    if (!confirm('Převést kontakt na novou zakázku? Lead bude označen jako Převeden.')) return
+    startTransition(async () => {
+      await convertLeadToProject(id)
     })
   }
 
@@ -354,6 +371,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
                     lead={lead}
                     onEdit={() => { setEditingId(lead.id); setAddingNew(false) }}
                     onDelete={() => handleDelete(lead.id)}
+                    onConvert={() => handleConvert(lead.id)}
                     isPending={isPending}
                   />
                 )
