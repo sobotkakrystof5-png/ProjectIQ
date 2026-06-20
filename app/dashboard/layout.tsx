@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, PhoneCall } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
 import { LogoutButton } from './LogoutButton'
 
@@ -38,6 +38,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
               >
                 <CalendarDays size={14} strokeWidth={1.5} />
                 Kalendář
+              </Link>
+              <Link
+                href="/dashboard/calls"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+              >
+                <PhoneCall size={14} strokeWidth={1.5} />
+                Hovory
               </Link>
             </nav>
           </div>

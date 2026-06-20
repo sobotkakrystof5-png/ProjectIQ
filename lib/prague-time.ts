@@ -7,7 +7,7 @@ export interface PragueDate {
   hour: number
   minute: number
 }
-
+ 
 export function getPragueNow(): PragueDate {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: TZ,

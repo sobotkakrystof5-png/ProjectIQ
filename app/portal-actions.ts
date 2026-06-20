@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { sql } from '@/lib/db'
 import { feedbackSchema, bookingSchema } from '@/lib/feedback-schema'
 import { sendBrandedEmail } from '@/lib/email'
@@ -40,10 +41,31 @@ export async function submitFeedback(
     return { success: false, error: 'Příliš mnoho hodnocení v krátkém čase. Zkuste to prosím později.' }
   }
 
+  const projectRows = await sql`SELECT client_name FROM projects WHERE id = ${projectId} LIMIT 1`
+  const clientName = (projectRows[0] as { client_name: string } | undefined)?.client_name ?? 'Neznámý klient'
+
   await sql`
     INSERT INTO client_feedback (project_id, nps, content)
     VALUES (${projectId}, ${parsed.data.nps}, ${parsed.data.content ?? null})
   `
+
+  revalidatePath(`/dashboard/${projectId}`)
+
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (adminEmail) {
+    sendBrandedEmail({
+      to: adminEmail,
+      subject: `Nové hodnocení od klienta – ${clientName}`,
+      heading: 'Nové hodnocení projektu',
+      intro: `Klient ${clientName} právě odeslal hodnocení přes klientský portál.`,
+      fields: [
+        { label: 'Klient', value: clientName },
+        { label: 'NPS hodnocení', value: `${parsed.data.nps} / 10` },
+        ...(parsed.data.content ? [{ label: 'Komentář', value: parsed.data.content }] : []),
+      ],
+    })
+  }
+
   return { success: true }
 }
 

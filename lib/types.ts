@@ -87,6 +87,39 @@ export interface ConsultationSlot {
   created_at: string | Date
 }
 
+export type LeadStatus = 'cold' | 'warm' | 'hot' | 'converted' | 'lost'
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  cold: 'Studený kontakt',
+  warm: 'Slabý zájem',
+  hot: 'Velký zájem',
+  converted: 'Převeden na zakázku',
+  lost: 'Ztracen',
+}
+
+export const LEAD_STATUS_STYLES: Record<LeadStatus, string> = {
+  cold: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  warm: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  hot: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
+  converted: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  lost: 'bg-red-50 text-red-600 ring-1 ring-red-200',
+}
+
+export interface ClientLead {
+  id: string
+  company_name: string
+  contact_name: string | null
+  phone: string | null
+  email: string | null
+  lead_status: LeadStatus
+  next_action: string | null
+  next_action_date: string | null
+  notes: string | null
+  estimated_value: number | null
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
 export type CalendarEventType = 'manual' | 'block'
 
 export interface CalendarEvent {
