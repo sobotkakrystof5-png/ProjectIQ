@@ -9,6 +9,7 @@ import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
 import { STATUS_LABELS } from '@/lib/types'
+import { ProfileAvatar } from '@/components/ProfileAvatar'
 
 async function loadStats() {
   const [
@@ -192,18 +193,7 @@ export default async function ProfilPage() {
       {/* Profil header */}
       <div className="bg-white border border-border rounded-2xl p-6 shadow-sm flex items-start gap-5">
         {/* Fotka */}
-        <div className="relative w-20 h-20 rounded-2xl overflow-hidden shadow-sm shrink-0 bg-brand-50">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/profile.jpg"
-            alt="Profilová fotka"
-            className="w-full h-full object-cover"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-          />
-          <div className="absolute inset-0 brand-gradient flex items-center justify-center -z-10">
-            <span className="text-white font-bold text-xl tracking-tight">{initials}</span>
-          </div>
-        </div>
+        <ProfileAvatar initials={initials} />
 
         {/* Info */}
         <div className="flex-1 min-w-0">
