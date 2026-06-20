@@ -54,7 +54,7 @@ export async function submitFeedback(
 
   const adminEmail = process.env.ADMIN_EMAIL
   if (adminEmail) {
-    sendBrandedEmail({
+    await sendBrandedEmail({
       to: adminEmail,
       subject: `Nové hodnocení od klienta – ${clientName}`,
       heading: 'Nové hodnocení projektu',
