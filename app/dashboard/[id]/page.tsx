@@ -10,6 +10,7 @@ import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
 import { DeleteButton } from './DeleteButton'
+import { MarkCompletedButton } from '@/components/MarkCompletedButton'
 import { getPublicUrl, formatDate } from '@/lib/utils'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot } from '@/lib/types'
 
@@ -147,6 +148,18 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             Termíny rezervované klientem. Kliknutím zobrazíš detail a odkaz na hovor.
           </p>
           <ConsultationCalendar slots={slots} clientName={project.client_name} />
+        </div>
+
+        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Dokončit zakázku</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Přesune zakázku do sekce Dokončené zakázky a zohledí ji v kalkulačce výdělků.
+          </p>
+          <MarkCompletedButton
+            projectId={project.id}
+            projectName={project.client_name}
+            hasEstimatedCosts={project.estimated_costs != null && Number(project.estimated_costs) > 0}
+          />
         </div>
 
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
