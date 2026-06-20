@@ -63,13 +63,13 @@ export default function EarningsCalculator({
   const oneTimeCosts = costs.filter(c => c.cost_type === 'one_time').reduce((s, c) => s + Number(c.amount), 0)
 
   const periodicCosts = fixedMonthlyCosts * months + (fixedAnnualCosts / 12) * months
-  const totalCosts = periodicCosts + oneTimeCosts + personalEarnings
+  const totalCosts = periodicCosts + oneTimeCosts
   const netEarnings = totalEarnings - totalCosts
 
   const grossHourlyRate = clientHours > 0 ? clientEarnings / clientHours : 0
-  const netHourlyRate = clientHours > 0 ? (clientEarnings - (periodicCosts + oneTimeCosts)) / clientHours : 0
+  const netHourlyRate = clientHours > 0 ? (clientEarnings - totalCosts) / clientHours : 0
 
-  const hasCosts = costs.length > 0 || personalEarnings > 0
+  const hasCosts = costs.length > 0
 
   return (
     <div className="space-y-5">
@@ -122,13 +122,7 @@ export default function EarningsCalculator({
         <StatCard
           label="Celkové náklady"
           value={hasCosts ? `${fmt(totalCosts)} Kč` : '—'}
-          sub={
-            hasCosts
-              ? personalEarnings > 0
-                ? `vč. ${fmt(personalEarnings)} Kč osobní projekty`
-                : `za ${months} měs. + jednorázové`
-              : 'Žádné náklady'
-          }
+          sub={hasCosts ? `za ${months} měs. + jednorázové` : 'Žádné náklady'}
           accent={hasCosts ? 'red' : 'default'}
         />
         <StatCard
@@ -196,12 +190,6 @@ export default function EarningsCalculator({
                 <div className="px-4 py-2.5 flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Jednorázové náklady</span>
                   <span className="font-medium text-foreground">{fmt(oneTimeCosts)} Kč</span>
-                </div>
-              )}
-              {personalEarnings > 0 && (
-                <div className="px-4 py-2.5 flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Osobní projekty</span>
-                  <span className="font-medium text-foreground">{fmt(personalEarnings)} Kč</span>
                 </div>
               )}
               <div className="px-4 py-2.5 flex justify-between items-center text-sm bg-white">

@@ -214,6 +214,12 @@ export async function markProjectAsCompleted(
     estimated_costs: number | null
   }
 
+  const title = p.description || p.client_name
+  const existing = await sql`
+    SELECT id FROM completed_projects WHERE title = ${title} AND client_name = ${p.client_name} LIMIT 1
+  `
+  if (existing.length) throw new Error('Tato zakázka již byla přidána do dokončených.')
+
   await sql`
     INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type)
     VALUES (

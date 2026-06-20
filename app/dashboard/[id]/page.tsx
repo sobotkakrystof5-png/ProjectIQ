@@ -151,9 +151,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         </div>
 
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Dokončit zakázku</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Přidat do dokončených</h2>
           <p className="text-xs text-muted-foreground mb-4">
-            Přesune zakázku do sekce Dokončené zakázky a zohledí ji v kalkulačce výdělků.
+            Přidá záznam do sekce Dokončené zakázky a zahrne ji do kalkulačky výdělků. Zakázka zůstane i v aktivním přehledu.
           </p>
           <MarkCompletedButton
             projectId={project.id}

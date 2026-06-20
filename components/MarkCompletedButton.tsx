@@ -23,20 +23,26 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
   const [timeInvested, setTimeInvested] = useState('')
   const [includeCosts, setIncludeCosts] = useState(hasEstimatedCosts)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
     startTransition(async () => {
-      await markProjectAsCompleted(projectId, {
-        project_type: type,
-        completed_at: completedAt,
-        difficulty,
-        time_invested: timeInvested ? Number(timeInvested) : null,
-        include_costs: includeCosts,
-      })
-      setDone(true)
-      setOpen(false)
+      try {
+        await markProjectAsCompleted(projectId, {
+          project_type: type,
+          completed_at: completedAt,
+          difficulty,
+          time_invested: timeInvested ? Number(timeInvested) : null,
+          include_costs: includeCosts,
+        })
+        setDone(true)
+        setOpen(false)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Chyba při přidávání zakázky')
+      }
     })
   }
 
@@ -58,10 +64,15 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
           className="flex items-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2.5 rounded-lg hover:bg-emerald-100 transition-colors"
         >
           <CheckCircle size={15} strokeWidth={1.5} />
-          Přesunout do dokončených zakázek
+          Přidat do dokončených zakázek
         </button>
       ) : (
         <form onSubmit={handleSubmit} className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-4">
+          {error && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
           <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wide">
             Dokončit zakázku — {projectName}
           </p>
@@ -149,7 +160,7 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
               className="flex items-center gap-2 bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
             >
               {isPending && <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />}
-              Dokončit a přesunout
+              Přidat do dokončených
             </button>
             <button
               type="button"
