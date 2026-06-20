@@ -23,10 +23,18 @@ export function formatDate(date: string | Date | null): string {
   }).format(date instanceof Date ? date : new Date(date))
 }
 
-export function getPublicUrl(token: string): string {
-  const base =
+function appBaseUrl(): string {
+  return (
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.NEXTAUTH_URL ||
     (typeof window !== 'undefined' ? window.location.origin : '')
-  return `${base}/p/${token}`
+  )
+}
+
+export function getPublicUrl(token: string): string {
+  return `${appBaseUrl()}/p/${token}`
+}
+
+export function getSurveyUrl(token: string): string {
+  return `${appBaseUrl()}/h/${token}`
 }

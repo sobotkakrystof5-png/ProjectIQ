@@ -150,8 +150,41 @@ export interface CompletedProject {
   time_invested: number | null
   notes: string | null
   project_type: ProjectType
+  survey_token: string
+  client_email: string | null
   created_at: string | Date
 }
+
+export interface ProjectSurvey {
+  id: string
+  completed_project_id: string
+  rating_cooperation: number
+  rating_speed: number
+  rating_design: number
+  rating_functionality: number
+  rating_reliability: number
+  rating_flexibility: number
+  reference_text: string | null
+  consent: boolean
+  created_at: string | Date
+}
+
+export type SurveyRatingKey =
+  | 'rating_cooperation'
+  | 'rating_speed'
+  | 'rating_design'
+  | 'rating_functionality'
+  | 'rating_reliability'
+  | 'rating_flexibility'
+
+export const SURVEY_CATEGORIES: { key: SurveyRatingKey; label: string }[] = [
+  { key: 'rating_cooperation', label: 'Spolupráce' },
+  { key: 'rating_speed', label: 'Rychlost' },
+  { key: 'rating_design', label: 'Design' },
+  { key: 'rating_functionality', label: 'Funkčnost stránky' },
+  { key: 'rating_reliability', label: 'Spolehlivost' },
+  { key: 'rating_flexibility', label: 'Flexibilita' },
+]
 
 export interface Cost {
   id: string

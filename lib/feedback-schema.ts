@@ -16,5 +16,19 @@ export const bookingSchema = z.object({
   path: ['channelOtherText'],
 })
 
+const rating = z.number().int().min(1).max(5)
+
+export const surveySchema = z.object({
+  rating_cooperation: rating,
+  rating_speed: rating,
+  rating_design: rating,
+  rating_functionality: rating,
+  rating_reliability: rating,
+  rating_flexibility: rating,
+  reference_text: z.string().max(3000).optional(),
+  consent: z.literal(true, { message: 'Pro odeslání je nutné potvrdit souhlas.' }),
+})
+
 export type FeedbackInput = z.infer<typeof feedbackSchema>
 export type BookingInput = z.infer<typeof bookingSchema>
+export type SurveyInput = z.infer<typeof surveySchema>

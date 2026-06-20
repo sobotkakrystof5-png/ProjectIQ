@@ -43,6 +43,18 @@ export async function getCosts() {
   return await sql`SELECT * FROM costs ORDER BY cost_type, created_at DESC`
 }
 
+export async function getProjectSurveys() {
+  const session = await getServerSession(authOptions)
+  if (!session) return []
+  return await sql`SELECT * FROM project_surveys ORDER BY created_at DESC`
+}
+
+export async function deleteProjectSurvey(id: string) {
+  await requireAuth()
+  await sql`DELETE FROM project_surveys WHERE id = ${id}`
+  revalidatePath('/dashboard/hodnoceni')
+}
+
 export async function createCompletedProject(payload: CompletedProjectPayload) {
   await requireAuth()
   await sql`

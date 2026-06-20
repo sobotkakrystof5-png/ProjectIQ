@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import { getPublicUrl } from '@/lib/utils'
+import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
 
@@ -217,11 +217,11 @@ export async function confirmVizeonBooking(projectId: string) {
   const portalUrl = getPublicUrl(p.public_token)
 
   if (p.client_email) {
-    sendBrandedEmail({
+    await sendBrandedEmail({
       to: p.client_email,
       subject: 'Váš projekt byl oficálně potvrzen – ZakazIQ',
       heading: 'Váš projekt je oficálně zahájen',
-      intro: `Dobrý den, ${p.client_name}! S radostí vám oznamujeme, že váš projekt byl oficálně potvrzen. Na základě vašeho zadání nyní začínáme pracovat.`,
+      intro: `Dobrý den, ${p.client_name}! S radostí vám oznamuji, že váš projekt byl oficálně potvrzen a podle vašeho zadání nyní začínám pracovat. Jakmile bude první ukázka hotová, pošlu vám odkaz, kde uvidíte aktuální stav projektu — budete ho moci ohodnotit, napsat zpětnou vazbu, nebo si se mnou rovnou rezervovat konzultaci a vše osobně probrat.`,
       fields: [
         { label: 'Typ projektu', value: p.service_type ?? 'Webový projekt' },
         { label: 'Stav', value: 'V řešení' },
@@ -229,11 +229,11 @@ export async function confirmVizeonBooking(projectId: string) {
       ctas: [
         { label: 'Sledovat stav projektu', href: portalUrl },
       ],
-    }).then(() => {}).catch(() => {})
+    })
   }
 
   if (adminEmail) {
-    sendBrandedEmail({
+    await sendBrandedEmail({
       to: adminEmail,
       subject: `Vizeon rezervace potvrzena – ${p.client_name}`,
       heading: 'Rezervace přesunuta do zakázek',
@@ -244,7 +244,7 @@ export async function confirmVizeonBooking(projectId: string) {
         ...(p.description ? [{ label: 'Popis', value: p.description }] : []),
       ],
       ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}/dashboard/${projectId}` }],
-    }).then(() => {}).catch(() => {})
+    })
   }
 
   revalidatePath('/dashboard/vizeon')
@@ -269,12 +269,13 @@ export async function markProjectAsCompleted(
 ) {
   await requireAuth()
   const rows = await sql`
-    SELECT client_name, description, price, notes, estimated_costs
+    SELECT client_name, client_email, description, price, notes, estimated_costs
     FROM projects WHERE id = ${projectId} LIMIT 1
   `
   if (!rows.length) throw new Error('Zakázka nenalezena')
   const p = rows[0] as {
     client_name: string
+    client_email: string | null
     description: string | null
     price: number | null
     notes: string | null
@@ -287,8 +288,8 @@ export async function markProjectAsCompleted(
   `
   if (existing.length) throw new Error('Tato zakázka již byla přidána do dokončených.')
 
-  await sql`
-    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type)
+  const inserted = await sql`
+    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type, client_email)
     VALUES (
       ${p.description || p.client_name},
       ${p.client_name},
@@ -298,9 +299,26 @@ export async function markProjectAsCompleted(
       ${extra.difficulty},
       ${extra.time_invested},
       ${p.notes},
-      ${extra.project_type}
+      ${extra.project_type},
+      ${p.client_email}
     )
+    RETURNING survey_token
   `
+  const surveyToken = (inserted[0] as { survey_token: string }).survey_token
+
+  // Děkovný email + dotazník spokojenosti — jen u klientských zakázek s emailem
+  if (extra.project_type === 'client' && p.client_email) {
+    await sendBrandedEmail({
+      to: p.client_email,
+      subject: 'Děkuji za spolupráci – ZakazIQ',
+      heading: 'Děkuji za spolupráci!',
+      intro: `Dobrý den, ${p.client_name}, projekt je hotový a moc vám děkuji za spolupráci — byla mi potěšením. Budu rád, když si najdete chvilku a vyplníte krátký dotazník spokojenosti. Pomůže mi to zlepšovat mé služby a zabere jen pár minut. Na konci můžete napsat i referenci, kterou se mnou chcete sdílet.`,
+      fields: [
+        { label: 'Projekt', value: title },
+      ],
+      ctas: [{ label: 'Vyplnit dotazník spokojenosti', href: getSurveyUrl(surveyToken) }],
+    })
+  }
 
   if (extra.include_costs && p.estimated_costs && p.estimated_costs > 0) {
     await sql`
@@ -317,5 +335,6 @@ export async function markProjectAsCompleted(
   }
 
   revalidatePath('/dashboard/dokoncene')
+  revalidatePath('/dashboard/hodnoceni')
   revalidatePath(`/dashboard/${projectId}`)
 }

@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/lib/db'
-import { feedbackSchema, bookingSchema } from '@/lib/feedback-schema'
+import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@/lib/feedback-schema'
 import { sendBrandedEmail } from '@/lib/email'
+import { SURVEY_CATEGORIES } from '@/lib/types'
 
 type ActionResult = { success: boolean; error?: string }
 
@@ -177,6 +178,57 @@ export async function submitConsultation(
       intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji.',
       fields: [...fields, { label: 'Vaše přání', value: parsed.data.clientWish }],
       ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
+    })
+  }
+
+  return { success: true }
+}
+
+// ─── Satisfaction survey (Hodnocení) ────────────────────────────────────────────
+
+export async function submitSurvey(
+  token: string,
+  rawData: Partial<SurveyInput>,
+): Promise<ActionResult> {
+  const parsed = surveySchema.safeParse(rawData)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Neplatná data.' }
+
+  const projectRows = await sql`
+    SELECT id, title, client_name FROM completed_projects WHERE survey_token = ${token} LIMIT 1
+  `
+  const cp = projectRows[0] as { id: string; title: string; client_name: string | null } | undefined
+  if (!cp) return { success: false, error: 'Dotazník nenalezen.' }
+
+  // Jeden dotazník na zakázku — existence zároveň slouží jako rate limit
+  const existing = await sql`SELECT 1 FROM project_surveys WHERE completed_project_id = ${cp.id} LIMIT 1`
+  if (existing.length) return { success: false, error: 'Tento dotazník již byl vyplněn. Děkujeme!' }
+
+  const d = parsed.data
+  await sql`
+    INSERT INTO project_surveys (
+      completed_project_id, rating_cooperation, rating_speed, rating_design,
+      rating_functionality, rating_reliability, rating_flexibility, reference_text, consent
+    )
+    VALUES (
+      ${cp.id}, ${d.rating_cooperation}, ${d.rating_speed}, ${d.rating_design},
+      ${d.rating_functionality}, ${d.rating_reliability}, ${d.rating_flexibility},
+      ${d.reference_text?.trim() || null}, ${d.consent}
+    )
+  `
+
+  revalidatePath('/dashboard/hodnoceni')
+
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (adminEmail) {
+    await sendBrandedEmail({
+      to: adminEmail,
+      subject: `Nový vyplněný dotazník – ${cp.client_name ?? cp.title}`,
+      heading: 'Nový vyplněný dotazník spokojenosti',
+      intro: `Klient ${cp.client_name ?? cp.title} právě vyplnil dotazník spokojenosti k projektu „${cp.title}".`,
+      fields: [
+        ...SURVEY_CATEGORIES.map(c => ({ label: c.label, value: `${d[c.key]} / 5` })),
+        ...(d.reference_text?.trim() ? [{ label: 'Reference', value: d.reference_text.trim() }] : []),
+      ],
     })
   }
 
