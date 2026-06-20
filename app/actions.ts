@@ -190,6 +190,73 @@ export async function deleteClientMessage(messageId: string, projectId: string, 
   revalidatePath(`/p/${publicToken}`)
 }
 
+export async function confirmVizeonBooking(projectId: string) {
+  await requireAuth()
+  const rows = await sql`
+    SELECT client_name, client_email, service_type, description, public_token, project_url
+    FROM projects WHERE id = ${projectId} AND source = 'vizeon_web' AND vizeon_confirmed = false
+    LIMIT 1
+  `
+  if (!rows.length) throw new Error('Rezervace nenalezena nebo již potvrzena')
+  const p = rows[0] as {
+    client_name: string
+    client_email: string | null
+    service_type: string | null
+    description: string | null
+    public_token: string
+    project_url: string | null
+  }
+
+  await sql`
+    UPDATE projects
+    SET vizeon_confirmed = true, status = 'in_progress', updated_at = now()
+    WHERE id = ${projectId}
+  `
+
+  const adminEmail = process.env.ADMIN_EMAIL
+  const portalUrl = getPublicUrl(p.public_token)
+
+  if (p.client_email) {
+    sendBrandedEmail({
+      to: p.client_email,
+      subject: 'Váš projekt byl oficálně potvrzen – ZakazIQ',
+      heading: 'Váš projekt je oficálně zahájen',
+      intro: `Dobrý den, ${p.client_name}! S radostí vám oznamujeme, že váš projekt byl oficálně potvrzen. Na základě vašeho zadání nyní začínáme pracovat.`,
+      fields: [
+        { label: 'Typ projektu', value: p.service_type ?? 'Webový projekt' },
+        { label: 'Stav', value: 'V řešení' },
+      ],
+      ctas: [
+        { label: 'Sledovat stav projektu', href: portalUrl },
+      ],
+    }).then(() => {}).catch(() => {})
+  }
+
+  if (adminEmail) {
+    sendBrandedEmail({
+      to: adminEmail,
+      subject: `Vizeon rezervace potvrzena – ${p.client_name}`,
+      heading: 'Rezervace přesunuta do zakázek',
+      intro: `Zakázka od klienta ${p.client_name} byla úspěšně potvrzena a přesunuta do aktivních zakázek.`,
+      fields: [
+        { label: 'Klient', value: p.client_name },
+        ...(p.service_type ? [{ label: 'Typ projektu', value: p.service_type }] : []),
+        ...(p.description ? [{ label: 'Popis', value: p.description }] : []),
+      ],
+      ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}/dashboard/${projectId}` }],
+    }).then(() => {}).catch(() => {})
+  }
+
+  revalidatePath('/dashboard/vizeon')
+  revalidatePath('/dashboard')
+}
+
+export async function deleteVizeonBooking(projectId: string) {
+  await requireAuth()
+  await sql`DELETE FROM projects WHERE id = ${projectId} AND source = 'vizeon_web' AND vizeon_confirmed = false`
+  revalidatePath('/dashboard/vizeon')
+}
+
 export async function markProjectAsCompleted(
   projectId: string,
   extra: {

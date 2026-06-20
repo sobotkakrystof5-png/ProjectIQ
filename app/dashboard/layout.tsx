@@ -1,13 +1,20 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { CalendarDays, PhoneCall, CheckCircle2, Layers, Receipt } from 'lucide-react'
+import { CalendarDays, PhoneCall, CheckCircle2, Layers, Receipt, Inbox } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
+import { sql } from '@/lib/db'
 import { LogoutButton } from './LogoutButton'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
+
+  const countRows = await sql`
+    SELECT count(*)::int AS count FROM projects
+    WHERE source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL)
+  `
+  const vizeonCount = (countRows[0] as { count: number }).count
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,6 +38,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 className="text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
               >
                 Zakázky
+              </Link>
+              <Link
+                href="/dashboard/vizeon"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+              >
+                <Inbox size={14} strokeWidth={1.5} />
+                Vizeon
+                {vizeonCount > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold leading-none">
+                    {vizeonCount > 9 ? '9+' : vizeonCount}
+                  </span>
+                )}
               </Link>
               <Link
                 href="/dashboard/projekty"

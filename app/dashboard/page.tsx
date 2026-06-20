@@ -16,7 +16,11 @@ interface PageProps {
 
 // Shared per-request cache — DB se zavolá jen jednou i přes dvě Suspense boundaries
 const loadAllProjects = cache(async () => {
-  const rows = await sql`SELECT * FROM projects ORDER BY created_at DESC`
+  const rows = await sql`
+    SELECT * FROM projects
+    WHERE NOT (source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL))
+    ORDER BY created_at DESC
+  `
   return rows as Project[]
 })
 
