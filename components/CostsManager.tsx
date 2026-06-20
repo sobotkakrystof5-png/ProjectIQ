@@ -1,21 +1,35 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, ChevronDown, TrendingDown, RefreshCw, Zap } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, ChevronDown, RefreshCw, Zap } from 'lucide-react'
 import { createCost, updateCost, deleteCost, type CostPayload } from '@/app/completed-actions'
-import { COST_TYPE_LABELS, type Cost, type CostType } from '@/lib/types'
+import { COST_TYPE_LABELS, COST_CATEGORY_LABELS, type Cost, type CostType, type CostCategory } from '@/lib/types'
 
 const COST_TYPES: CostType[] = ['fixed_monthly', 'fixed_annual', 'one_time']
+const COST_CATEGORIES: CostCategory[] = ['client', 'personal', 'all']
 
 const EMPTY_FORM = (type: CostType): CostPayload => ({
   name: '',
   amount: 0,
   cost_type: type,
+  category: 'all',
   description: null,
 })
 
 function fmt(n: number) {
   return n.toLocaleString('cs-CZ', { maximumFractionDigits: 0 })
+}
+
+const CATEGORY_STYLES: Record<CostCategory, string> = {
+  client: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
+  personal: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
+  all: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+}
+
+const CATEGORY_SHORT: Record<CostCategory, string> = {
+  client: 'Zakázky',
+  personal: 'Osobní',
+  all: 'Obecné',
 }
 
 function CostForm({
@@ -63,6 +77,20 @@ function CostForm({
           >
             {COST_TYPES.map(t => (
               <option key={t} value={t}>{COST_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+          <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        </div>
+      </td>
+      <td className="px-3 py-2">
+        <div className="relative">
+          <select
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-6 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+            value={form.category}
+            onChange={e => setForm(prev => ({ ...prev, category: e.target.value as CostCategory }))}
+          >
+            {COST_CATEGORIES.map(c => (
+              <option key={c} value={c}>{COST_CATEGORY_LABELS[c]}</option>
             ))}
           </select>
           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -124,7 +152,12 @@ function CostRow({
           {COST_TYPE_LABELS[cost.cost_type]}
         </span>
       </td>
-      <td className="px-3 py-2.5 max-w-[220px]">
+      <td className="px-3 py-2.5">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_STYLES[cost.category ?? 'all']}`}>
+          {CATEGORY_SHORT[cost.category ?? 'all']}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 max-w-[180px]">
         <span className="text-sm text-muted-foreground truncate block">{cost.description ?? ''}</span>
       </td>
       <td className="px-3 py-2.5">
@@ -202,12 +235,13 @@ function CostSection({
       </div>
       <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[600px]">
+          <table className="w-full text-left min-w-[680px]">
             <thead>
               <tr className="bg-slate-50 border-b border-border">
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Název</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Částka</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Typ</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Projekt</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Popis</th>
                 <th className="px-3 py-2.5 w-20" />
               </tr>
@@ -223,7 +257,7 @@ function CostSection({
               )}
               {costs.length === 0 && addingType === null && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Zatím žádné náklady v této kategorii.
                   </td>
                 </tr>
@@ -236,6 +270,7 @@ function CostSection({
                       name: cost.name,
                       amount: Number(cost.amount),
                       cost_type: cost.cost_type,
+                      category: cost.category ?? 'all',
                       description: cost.description,
                     }}
                     onSave={(data) => onSave(cost.id, data)}
@@ -275,6 +310,9 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
   const oneTimeSum = oneTimeCosts.reduce((s, c) => s + Number(c.amount), 0)
   const annualTotal = monthlySum * 12 + annualSum
 
+  const clientSum = costs.filter(c => c.category === 'client').reduce((s, c) => s + Number(c.amount), 0)
+  const personalSum = costs.filter(c => c.category === 'personal').reduce((s, c) => s + Number(c.amount), 0)
+
   const handleCreate = (data: CostPayload) => {
     startTransition(async () => {
       await createCost(data)
@@ -306,11 +344,12 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-3 gap-3">
+      {/* Summary bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Měsíčně</p>
           <p className="text-xl font-bold text-red-600">{fmt(monthlySum)} Kč</p>
-          <p className="text-xs text-muted-foreground mt-0.5">fixní měsíční náklady</p>
+          <p className="text-xs text-muted-foreground mt-0.5">fixní měsíční</p>
         </div>
         <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Ročně</p>
@@ -318,9 +357,14 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
           <p className="text-xs text-muted-foreground mt-0.5">měsíční × 12 + roční</p>
         </div>
         <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Jednorázové</p>
-          <p className="text-xl font-bold text-amber-600">{fmt(oneTimeSum)} Kč</p>
-          <p className="text-xs text-muted-foreground mt-0.5">celkem jednorázové</p>
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Zakázky</p>
+          <p className="text-xl font-bold text-sky-600">{fmt(clientSum)} Kč</p>
+          <p className="text-xs text-muted-foreground mt-0.5">náklady pro klienty</p>
+        </div>
+        <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Osobní</p>
+          <p className="text-xl font-bold text-violet-600">{fmt(personalSum)} Kč</p>
+          <p className="text-xs text-muted-foreground mt-0.5">osobní projekty</p>
         </div>
       </div>
 

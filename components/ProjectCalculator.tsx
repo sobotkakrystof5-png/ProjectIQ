@@ -1,53 +1,121 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, Copy, Check, Calculator } from 'lucide-react'
+import { Plus, Trash2, Copy, Check, Calculator, Briefcase, Layers } from 'lucide-react'
+
+type CalcType = 'client' | 'personal'
 
 type Preset = {
   label: string
   items: { name: string; price: number }[]
 }
 
-const PRESETS: Preset[] = [
+// VIZEON ceník — zakázky pro klienty
+const CLIENT_PRESETS: Preset[] = [
   {
-    label: 'Landing page',
+    label: 'Online Vizitka',
     items: [
-      { name: 'Design (vizuální styl + layout)', price: 5000 },
-      { name: 'Vývoj – frontend', price: 8000 },
-      { name: 'Nasazení + doména + hosting (1 rok)', price: 2000 },
+      { name: 'Online Vizitka (web)', price: 7499 },
     ],
   },
   {
-    label: 'Firemní web',
+    label: 'Promo Page',
     items: [
-      { name: 'Design (vizuální styl + více sekcí)', price: 10000 },
-      { name: 'Vývoj – frontend', price: 15000 },
-      { name: 'CMS (správa obsahu)', price: 5000 },
-      { name: 'SEO základní optimalizace', price: 3000 },
-      { name: 'Nasazení + doména + hosting (1 rok)', price: 3000 },
+      { name: 'Promo Page (web)', price: 9999 },
     ],
   },
   {
-    label: 'E-shop',
+    label: 'Pro Web',
     items: [
-      { name: 'Design (e-commerce UI)', price: 15000 },
-      { name: 'Vývoj – frontend + backend', price: 35000 },
-      { name: 'Platební brána (integrace)', price: 5000 },
-      { name: 'Správa produktů / CMS', price: 5000 },
-      { name: 'SEO základní optimalizace', price: 4000 },
-      { name: 'Nasazení + hosting (1 rok)', price: 4000 },
+      { name: 'Pro Web (kompletní web)', price: 14999 },
+    ],
+  },
+  {
+    label: 'Slide Deck Standard',
+    items: [
+      { name: 'Slide Deck Standard (prezentace)', price: 1099 },
+    ],
+  },
+  {
+    label: 'Slide Deck Premium',
+    items: [
+      { name: 'Slide Deck Premium (prezentace)', price: 3499 },
     ],
   },
 ]
 
-const ADDONS = [
-  { name: 'Copywriting (texty na web)', price: 5000 },
-  { name: 'Fotografování produktů / firmy', price: 4000 },
-  { name: 'Google Analytics + Měření konverzí', price: 2000 },
-  { name: 'SEO pokročilá optimalizace', price: 6000 },
-  { name: 'Měsíční správa / maintenance', price: 2000 },
-  { name: 'Propojení s ERP / API', price: 8000 },
-  { name: 'Vícejazyčná verze (1 jazyk navíc)', price: 5000 },
+const CLIENT_ADDONS = [
+  { name: 'Brand Logo', price: 699 },
+  { name: 'Business Card (vizitka)', price: 299 },
+  { name: 'Social Visual (1 ks)', price: 299 },
+  { name: 'Social Visual (5 ks bundle)', price: 1299 },
+  { name: 'Print Design', price: 699 },
+  { name: 'Content Blueprint', price: 499 },
+  { name: 'Web Care (1 měsíc)', price: 999 },
+  { name: 'Social Starter (1 měsíc)', price: 4999 },
+  { name: 'Social Pro (1 měsíc)', price: 7499 },
+]
+
+// Osobní projekty — aplikace, systémy, automatizace
+const PERSONAL_PRESETS: Preset[] = [
+  {
+    label: 'Landing page',
+    items: [
+      { name: 'Design (vizuální styl + layout)', price: 5000 },
+      { name: 'Vývoj — frontend', price: 8000 },
+      { name: 'Nasazení + doména + hosting (1 rok)', price: 3000 },
+    ],
+  },
+  {
+    label: 'MVP Web App',
+    items: [
+      { name: 'Design (UI/UX)', price: 8000 },
+      { name: 'Vývoj — frontend', price: 12000 },
+      { name: 'Vývoj — backend + API', price: 15000 },
+      { name: 'Databáze + migrace', price: 5000 },
+      { name: 'Nasazení + infra (1 rok)', price: 5000 },
+    ],
+  },
+  {
+    label: 'Automatizace / n8n',
+    items: [
+      { name: 'Analýza procesu + návrh', price: 3000 },
+      { name: 'n8n / Make workflow setup', price: 6000 },
+      { name: 'API integrace třetích stran', price: 4000 },
+      { name: 'Dokumentace + zaškolení', price: 2000 },
+    ],
+  },
+  {
+    label: 'SaaS produkt',
+    items: [
+      { name: 'Design (UI/UX + brand)', price: 15000 },
+      { name: 'Vývoj — fullstack', price: 40000 },
+      { name: 'Autentizace (OAuth, magic link)', price: 5000 },
+      { name: 'Platební brána (integrace)', price: 6000 },
+      { name: 'Infra + CI/CD + monitoring', price: 8000 },
+    ],
+  },
+  {
+    label: 'Interní systém',
+    items: [
+      { name: 'Analýza + architektura', price: 5000 },
+      { name: 'Vývoj (fullstack)', price: 20000 },
+      { name: 'Admin panel', price: 8000 },
+      { name: 'Dokumentace', price: 2000 },
+    ],
+  },
+]
+
+const PERSONAL_ADDONS = [
+  { name: 'Admin panel', price: 8000 },
+  { name: 'API integrace třetí strany', price: 5000 },
+  { name: 'Autentizace (OAuth, magic link)', price: 4000 },
+  { name: 'Mobilní PWA verze', price: 6000 },
+  { name: 'CI/CD pipeline', price: 3000 },
+  { name: 'Monitoring + Alerting', price: 2500 },
+  { name: 'Export (PDF/CSV/Excel)', price: 2000 },
+  { name: 'Vícejazyčná verze', price: 4000 },
+  { name: 'Databáze + migrace', price: 5000 },
 ]
 
 type LineItem = {
@@ -56,7 +124,11 @@ type LineItem = {
   price: number
 }
 
-export default function ProjectCalculator() {
+function fmt(n: number) {
+  return n.toLocaleString('cs-CZ')
+}
+
+function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: string; price: number }[] }) {
   const [items, setItems] = useState<LineItem[]>([])
   const [customName, setCustomName] = useState('')
   const [customPrice, setCustomPrice] = useState('')
@@ -98,11 +170,11 @@ export default function ProjectCalculator() {
     const lines = [
       'KALKULACE PROJEKTU',
       '==================',
-      ...items.map(i => `${i.name}: ${i.price.toLocaleString('cs-CZ')} Kč`),
+      ...items.map(i => `${i.name}: ${fmt(i.price)} Kč`),
       '==================',
       margin > 0
-        ? `Mezisoučet: ${total.toLocaleString('cs-CZ')} Kč\nMarže ${margin}%: ${(totalWithMargin - total).toLocaleString('cs-CZ')} Kč\nCelkem: ${totalWithMargin.toLocaleString('cs-CZ')} Kč`
-        : `Celkem: ${total.toLocaleString('cs-CZ')} Kč`,
+        ? `Mezisoučet: ${fmt(total)} Kč\nMarže ${margin}%: ${fmt(totalWithMargin - total)} Kč\nCelkem: ${fmt(totalWithMargin)} Kč`
+        : `Celkem: ${fmt(total)} Kč`,
     ]
     navigator.clipboard.writeText(lines.join('\n'))
     setCopied(true)
@@ -110,20 +182,12 @@ export default function ProjectCalculator() {
   }
 
   return (
-    <div className="mt-10">
-      <div className="flex items-center gap-2 mb-4">
-        <Calculator size={18} strokeWidth={1.5} className="text-brand-600" />
-        <h2 className="text-lg font-semibold text-foreground">Kalkulačka projektu</h2>
-      </div>
-      <p className="text-sm text-muted-foreground mb-5">
-        Rychlý odhad ceny pro klienta přímo při hovoru. Vyber preset, uprav položky a zkopíruj výsledek.
-      </p>
-
+    <div className="space-y-5">
       {/* Presets */}
-      <div className="mb-5">
+      <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rychlý start</p>
         <div className="flex flex-wrap gap-2">
-          {PRESETS.map(p => (
+          {presets.map(p => (
             <button
               key={p.label}
               onClick={() => loadPreset(p)}
@@ -144,7 +208,6 @@ export default function ProjectCalculator() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: items list */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Line items */}
           <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
             {items.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -186,7 +249,7 @@ export default function ProjectCalculator() {
             )}
           </div>
 
-          {/* Add custom item */}
+          {/* Custom item */}
           <div className="flex gap-2">
             <input
               className="flex-1 text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -215,9 +278,9 @@ export default function ProjectCalculator() {
 
           {/* Add-ons */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Doplňkové služby</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Doplňkové položky</p>
             <div className="flex flex-wrap gap-2">
-              {ADDONS.map(a => {
+              {addons.map(a => {
                 const added = items.some(i => i.name === a.name)
                 return (
                   <button
@@ -231,7 +294,7 @@ export default function ProjectCalculator() {
                     }`}
                   >
                     {added && <Check size={10} className="inline mr-1" />}
-                    {a.name} · {a.price.toLocaleString('cs-CZ')} Kč
+                    {a.name} · {fmt(a.price)} Kč
                   </button>
                 )
               })}
@@ -240,7 +303,7 @@ export default function ProjectCalculator() {
         </div>
 
         {/* Right: summary */}
-        <div className="space-y-4">
+        <div>
           <div className="border border-border rounded-xl bg-white shadow-sm p-4 space-y-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Shrnutí</p>
 
@@ -248,7 +311,7 @@ export default function ProjectCalculator() {
               {items.map(item => (
                 <div key={item.id} className="flex justify-between text-sm">
                   <span className="text-muted-foreground truncate mr-2">{item.name}</span>
-                  <span className="shrink-0 font-medium">{item.price.toLocaleString('cs-CZ')} Kč</span>
+                  <span className="shrink-0 font-medium">{fmt(item.price)} Kč</span>
                 </div>
               ))}
             </div>
@@ -274,14 +337,14 @@ export default function ProjectCalculator() {
                   {margin > 0 && (
                     <div className="flex justify-between text-sm text-muted-foreground">
                       <span>Mezisoučet</span>
-                      <span>{total.toLocaleString('cs-CZ')} Kč</span>
+                      <span>{fmt(total)} Kč</span>
                     </div>
                   )}
 
                   <div className="flex justify-between items-baseline">
                     <span className="font-semibold text-foreground">Celkem</span>
                     <span className="text-xl font-bold text-brand-700">
-                      {totalWithMargin.toLocaleString('cs-CZ')} Kč
+                      {fmt(totalWithMargin)} Kč
                     </span>
                   </div>
                 </div>
@@ -304,6 +367,68 @@ export default function ProjectCalculator() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+export default function ProjectCalculator() {
+  const [tab, setTab] = useState<CalcType>('client')
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center gap-2 mb-4">
+        <Calculator size={18} strokeWidth={1.5} className="text-brand-600" />
+        <h2 className="text-lg font-semibold text-foreground">Kalkulačka projektu</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Rychlý odhad ceny přímo při hovoru s klientem. Vyber typ projektu, načti preset a uprav položky.
+      </p>
+
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mb-6">
+        <button
+          onClick={() => setTab('client')}
+          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+            tab === 'client'
+              ? 'bg-white text-brand-800 shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Briefcase size={14} strokeWidth={1.5} />
+          Zakázky pro klienty
+        </button>
+        <button
+          onClick={() => setTab('personal')}
+          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+            tab === 'personal'
+              ? 'bg-white text-brand-800 shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Layers size={14} strokeWidth={1.5} />
+          Osobní projekty
+        </button>
+      </div>
+
+      {tab === 'client' && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-4 flex items-center gap-1.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 ring-1 ring-sky-200">Ceník VIZEON</span>
+            Ceny vycházejí z aktuálního ceníku vizeon.cz
+          </p>
+          <CalcPanel presets={CLIENT_PRESETS} addons={CLIENT_ADDONS} />
+        </div>
+      )}
+
+      {tab === 'personal' && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-4 flex items-center gap-1.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700 ring-1 ring-violet-200">Osobní projekty</span>
+            Aplikace, systémy, automatizace — orientační ceny
+          </p>
+          <CalcPanel presets={PERSONAL_PRESETS} addons={PERSONAL_ADDONS} />
+        </div>
+      )}
     </div>
   )
 }

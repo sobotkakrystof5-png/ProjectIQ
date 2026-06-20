@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import type { ProjectType, CostType } from '@/lib/types'
+import type { ProjectType, CostType, CostCategory } from '@/lib/types'
 
 async function requireAuth() {
   const session = await getServerSession(authOptions)
@@ -27,6 +27,7 @@ export type CostPayload = {
   name: string
   amount: number
   cost_type: CostType
+  category: CostCategory
   description: string | null
 }
 
@@ -88,8 +89,8 @@ export async function deleteCompletedProject(id: string) {
 export async function createCost(payload: CostPayload) {
   await requireAuth()
   await sql`
-    INSERT INTO costs (name, amount, cost_type, description)
-    VALUES (${payload.name}, ${payload.amount}, ${payload.cost_type}, ${payload.description})
+    INSERT INTO costs (name, amount, cost_type, category, description)
+    VALUES (${payload.name}, ${payload.amount}, ${payload.cost_type}, ${payload.category}, ${payload.description})
   `
   revalidatePath('/dashboard/naklady')
   revalidatePath('/dashboard/dokoncene')
@@ -102,6 +103,7 @@ export async function updateCost(id: string, payload: CostPayload) {
       name = ${payload.name},
       amount = ${payload.amount},
       cost_type = ${payload.cost_type},
+      category = ${payload.category},
       description = ${payload.description}
     WHERE id = ${id}
   `

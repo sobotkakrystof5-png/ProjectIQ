@@ -122,11 +122,18 @@ export interface ClientLead {
 
 export type ProjectType = 'client' | 'personal'
 export type CostType = 'fixed_monthly' | 'fixed_annual' | 'one_time'
+export type CostCategory = 'client' | 'personal' | 'all'
 
 export const COST_TYPE_LABELS: Record<CostType, string> = {
   fixed_monthly: 'Fixní měsíční',
   fixed_annual: 'Fixní roční',
   one_time: 'Jednorázový',
+}
+
+export const COST_CATEGORY_LABELS: Record<CostCategory, string> = {
+  client: 'Zakázky pro klienty',
+  personal: 'Osobní projekty',
+  all: 'Obecné',
 }
 
 export interface CompletedProject {
@@ -148,6 +155,7 @@ export interface Cost {
   name: string
   amount: number
   cost_type: CostType
+  category: CostCategory
   description: string | null
   created_at: string | Date
 }
