@@ -48,9 +48,12 @@ export default function EarningsCalculator({
   const [showBreakdown, setShowBreakdown] = useState(false)
 
   const totalEarnings = projects.reduce((s, p) => s + Number(p.amount), 0)
-  const clientEarnings = projects.filter(p => p.project_type === 'client').reduce((s, p) => s + Number(p.amount), 0)
+  const clientProjects = projects.filter(p => p.project_type === 'client')
+  const clientEarnings = clientProjects.reduce((s, p) => s + Number(p.amount), 0)
   const personalEarnings = projects.filter(p => p.project_type === 'personal').reduce((s, p) => s + Number(p.amount), 0)
   const totalHours = projects.reduce((s, p) => s + (p.time_invested != null ? Number(p.time_invested) : 0), 0)
+  const clientHours = clientProjects.reduce((s, p) => s + (p.time_invested != null ? Number(p.time_invested) : 0), 0)
+  const personalHours = totalHours - clientHours
   const avgDifficulty = projects.length > 0
     ? projects.reduce((s, p) => s + p.difficulty, 0) / projects.length
     : 0
@@ -60,13 +63,13 @@ export default function EarningsCalculator({
   const oneTimeCosts = costs.filter(c => c.cost_type === 'one_time').reduce((s, c) => s + Number(c.amount), 0)
 
   const periodicCosts = fixedMonthlyCosts * months + (fixedAnnualCosts / 12) * months
-  const totalCosts = periodicCosts + oneTimeCosts
+  const totalCosts = periodicCosts + oneTimeCosts + personalEarnings
   const netEarnings = totalEarnings - totalCosts
 
-  const grossHourlyRate = totalHours > 0 ? totalEarnings / totalHours : 0
-  const netHourlyRate = totalHours > 0 ? netEarnings / totalHours : 0
+  const grossHourlyRate = clientHours > 0 ? clientEarnings / clientHours : 0
+  const netHourlyRate = clientHours > 0 ? (clientEarnings - (periodicCosts + oneTimeCosts)) / clientHours : 0
 
-  const hasCosts = costs.length > 0
+  const hasCosts = costs.length > 0 || personalEarnings > 0
 
   return (
     <div className="space-y-5">
@@ -108,12 +111,24 @@ export default function EarningsCalculator({
         <StatCard
           label="Celkový čas"
           value={totalHours > 0 ? `${fmt(totalHours)} h` : '—'}
-          sub={avgDifficulty > 0 ? `Průměrná náročnost: ${avgDifficulty.toFixed(1)}/10` : undefined}
+          sub={
+            clientHours > 0 && personalHours > 0
+              ? `${fmt(clientHours)} h klienti · ${fmt(personalHours)} h osobní`
+              : avgDifficulty > 0
+                ? `Průměrná náročnost: ${avgDifficulty.toFixed(1)}/10`
+                : undefined
+          }
         />
         <StatCard
           label="Celkové náklady"
           value={hasCosts ? `${fmt(totalCosts)} Kč` : '—'}
-          sub={hasCosts ? `za ${months} měs. + jednorázové` : 'Žádné náklady'}
+          sub={
+            hasCosts
+              ? personalEarnings > 0
+                ? `vč. ${fmt(personalEarnings)} Kč osobní projekty`
+                : `za ${months} měs. + jednorázové`
+              : 'Žádné náklady'
+          }
           accent={hasCosts ? 'red' : 'default'}
         />
         <StatCard
@@ -124,7 +139,7 @@ export default function EarningsCalculator({
         />
       </div>
 
-      {totalHours > 0 && (
+      {clientHours > 0 && (
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
@@ -134,18 +149,18 @@ export default function EarningsCalculator({
             <p className="text-2xl font-bold text-foreground">
               {fmt(grossHourlyRate)} Kč/h
             </p>
-            <p className="text-xs text-muted-foreground mt-1">příjmy / investovaný čas</p>
+            <p className="text-xs text-muted-foreground mt-1">klientské příjmy / čas klientů</p>
           </div>
           <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Wallet size={14} className="text-emerald-500" strokeWidth={1.5} />
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hodinová sazba (čistá)</p>
             </div>
-            <p className={`text-2xl font-bold ${hasCosts && netHourlyRate >= 0 ? 'text-emerald-700' : hasCosts ? 'text-red-600' : 'text-foreground'}`}>
-              {hasCosts ? `${fmt(netHourlyRate)} Kč/h` : '—'}
+            <p className={`text-2xl font-bold ${costs.length > 0 && netHourlyRate >= 0 ? 'text-emerald-700' : costs.length > 0 ? 'text-red-600' : 'text-foreground'}`}>
+              {costs.length > 0 ? `${fmt(netHourlyRate)} Kč/h` : '—'}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {hasCosts ? 'čistý výdělek / investovaný čas' : 'Přidej náklady v sekci Náklady'}
+              {costs.length > 0 ? 'klientský výdělek po nákladech' : 'Přidej náklady v sekci Náklady'}
             </p>
           </div>
         </div>
@@ -181,6 +196,12 @@ export default function EarningsCalculator({
                 <div className="px-4 py-2.5 flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Jednorázové náklady</span>
                   <span className="font-medium text-foreground">{fmt(oneTimeCosts)} Kč</span>
+                </div>
+              )}
+              {personalEarnings > 0 && (
+                <div className="px-4 py-2.5 flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Osobní projekty</span>
+                  <span className="font-medium text-foreground">{fmt(personalEarnings)} Kč</span>
                 </div>
               )}
               <div className="px-4 py-2.5 flex justify-between items-center text-sm bg-white">

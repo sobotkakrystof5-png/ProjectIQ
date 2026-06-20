@@ -17,6 +17,9 @@ export interface Project {
   service_type: string | null
   project_url: string | null
   source: string | null
+  estimated_costs: number | null
+  deposit_amount: number | null
+  deposit_paid: boolean
   created_at: string | Date | null
   updated_at: string | Date | null
 }

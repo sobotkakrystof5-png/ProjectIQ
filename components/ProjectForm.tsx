@@ -312,6 +312,17 @@ export function ProjectForm({ project }: ProjectFormProps) {
           />
         </Field>
 
+        <Field label="Předpokládané náklady (Kč)">
+          <input
+            type="number"
+            value={form.estimated_costs}
+            onChange={e => set('estimated_costs', e.target.value)}
+            placeholder="0"
+            min={0}
+            className={inputCls}
+          />
+        </Field>
+
         <Field label="Termín">
           <input
             type="date"
@@ -331,17 +342,64 @@ export function ProjectForm({ project }: ProjectFormProps) {
           />
         </Field>
 
-        <div className="sm:col-span-2 flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="paid"
-            checked={form.paid}
-            onChange={e => set('paid', e.target.checked)}
-            className="w-4 h-4 accent-brand-800"
-          />
-          <label htmlFor="paid" className="text-sm text-foreground cursor-pointer">
-            Zakázka zaplacena
-          </label>
+        <div className="sm:col-span-2 space-y-3">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="paid"
+              checked={form.paid}
+              onChange={e => set('paid', e.target.checked)}
+              className="w-4 h-4 accent-brand-800"
+            />
+            <label htmlFor="paid" className="text-sm text-foreground cursor-pointer">
+              Zakázka zaplacena
+            </label>
+          </div>
+
+          {/* Záloha */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+              Záloha{(() => {
+                const price = Number(form.price)
+                const deposit = Number(form.deposit_amount)
+                if (form.price && price > 0 && form.deposit_amount && deposit > 0) {
+                  const pct = Math.round((deposit / price) * 100)
+                  return ` — ${pct} % z ceny`
+                }
+                return ' — 30 % z ceny (auto)'
+              })()}
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={form.deposit_amount}
+                onChange={e => handleDepositChange(e.target.value)}
+                placeholder={
+                  form.price !== '' && Number(form.price) > 0
+                    ? String(Math.round(Number(form.price) * 0.3))
+                    : '0'
+                }
+                min={0}
+                className={inputCls}
+              />
+              <span className="text-sm text-amber-700 font-medium shrink-0">Kč</span>
+            </div>
+            {!depositManuallySet && form.price !== '' && Number(form.price) > 0 && (
+              <p className="text-xs text-amber-600">Automaticky 30 % — změnou pole přepíšeš</p>
+            )}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="deposit_paid"
+                checked={form.deposit_paid}
+                onChange={e => set('deposit_paid', e.target.checked)}
+                className="w-4 h-4 accent-amber-600"
+              />
+              <label htmlFor="deposit_paid" className="text-sm text-amber-800 cursor-pointer">
+                Záloha zaplacena
+              </label>
+            </div>
+          </div>
         </div>
 
         {!project && (
