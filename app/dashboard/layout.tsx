@@ -6,6 +6,19 @@ import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { LogoutButton } from './LogoutButton'
 
+function ProfileAvatar({ email }: { email: string }) {
+  const initials = email.slice(0, 2).toUpperCase()
+  return (
+    <Link
+      href="/dashboard/profil"
+      title="Profil & statistiky"
+      className="w-8 h-8 brand-gradient rounded-full flex items-center justify-center shadow-sm hover:opacity-80 transition-opacity shrink-0"
+    >
+      <span className="text-white text-[11px] font-bold tracking-tight">{initials}</span>
+    </Link>
+  )
+}
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
@@ -95,8 +108,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </Link>
             </nav>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-muted-foreground hidden sm:block">{session.user?.email}</span>
+          <div className="flex items-center gap-3">
+            <ProfileAvatar email={session.user?.email ?? ''} />
             <LogoutButton />
           </div>
         </div>

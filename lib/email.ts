@@ -54,14 +54,14 @@ function buildLayout(opts: {
     )
     .join('')
 
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  return `<!DOCTYPE html><html lang="cs" style="color-scheme:light only;"><head><meta charset="UTF-8"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color-scheme:light only;">
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
 <tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
   <tr><td style="background:linear-gradient(135deg,#1b3868 0%,#23478b 100%);padding:32px 40px;">
-    <p style="margin:0 0 6px;color:#93c5fd;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;">ZakazIQ</p>
-    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:600;">${escapeHtml(opts.heading)}</h1>
+    <p style="margin:0 0 6px;color:#ffffff;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;opacity:0.75;">ZakazIQ</p>
+    <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">${escapeHtml(opts.heading)}</h1>
   </td></tr>
   <tr><td style="padding:36px 40px;">
     <p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;">${escapeHtml(opts.intro)}</p>

@@ -46,7 +46,7 @@ export default async function SurveyPage({ params }: PageProps) {
                   </div>
                   <p className="font-semibold text-foreground">Dotazník už byl vyplněn</p>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    Děkuji, vašeho hodnocení k tomuto projektu už mám. Vážím si toho!
+                    Děkuji za vyplnění dotazníku a za vaši spolupráci.
                   </p>
                 </div>
               ) : (
