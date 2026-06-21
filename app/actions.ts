@@ -8,6 +8,7 @@ import { sql } from '@/lib/db'
 import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
+import { createNotification } from '@/lib/notifications'
 
 async function requireAuth() {
   const session = await getServerSession(authOptions)
@@ -131,6 +132,10 @@ export async function updateProject(
 ) {
   await requireAuth()
   const progress = clampProgress(payload.progress)
+
+  const oldRows = await sql`SELECT status FROM projects WHERE id = ${id} LIMIT 1`
+  const oldStatus = (oldRows[0] as { status: string } | undefined)?.status
+
   const rows = await sql`
     UPDATE projects SET
       client_name = ${payload.client_name},
@@ -164,6 +169,16 @@ export async function updateProject(
     { client_name: payload.client_name, client_email: payload.client_email, status: payload.status, progress, project_url: payload.project_url, public_token: publicToken },
     'updated'
   )
+
+  if (oldStatus && oldStatus !== payload.status) {
+    void createNotification({
+      type: 'project_status_changed',
+      title: `Stav zakázky změněn — ${payload.client_name}`,
+      body: `${STATUS_LABELS[oldStatus as ProjectStatus] ?? oldStatus} → ${STATUS_LABELS[payload.status]}`,
+      link: `/dashboard/${id}`,
+    })
+  }
+
   revalidatePath('/dashboard')
   revalidatePath(`/dashboard/${id}`)
 }

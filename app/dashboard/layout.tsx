@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { CalendarDays, PhoneCall, CheckCircle2, Layers, Receipt, Inbox, Star } from 'lucide-react'
+import { CalendarDays, PhoneCall, CheckCircle2, Layers, Receipt, Inbox, Star, Bell } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { LogoutButton } from './LogoutButton'
@@ -23,11 +23,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
-  const countRows = await sql`
-    SELECT count(*)::int AS count FROM projects
-    WHERE source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL)
-  `
+  const [countRows, notifRows] = await Promise.all([
+    sql`
+      SELECT count(*)::int AS count FROM projects
+      WHERE source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL)
+    `,
+    sql`SELECT count(*)::int AS count FROM notifications WHERE read = false`,
+  ])
   const vizeonCount = (countRows[0] as { count: number }).count
+  const unreadNotifications = (notifRows[0] as { count: number }).count
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,6 +113,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/notifications"
+              title="Oznámení"
+              className="relative p-1.5 rounded-lg text-muted-foreground hover:text-brand-800 hover:bg-brand-50 transition-colors"
+            >
+              <Bell size={18} strokeWidth={1.5} />
+              {unreadNotifications > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold leading-none">
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </span>
+              )}
+            </Link>
             <ProfileAvatar email={session.user?.email ?? ''} />
             <LogoutButton />
           </div>

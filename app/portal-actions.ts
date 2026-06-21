@@ -5,6 +5,7 @@ import { sql } from '@/lib/db'
 import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@/lib/feedback-schema'
 import { sendBrandedEmail } from '@/lib/email'
 import { SURVEY_CATEGORIES } from '@/lib/types'
+import { createNotification } from '@/lib/notifications'
 
 type ActionResult = { success: boolean; error?: string }
 
@@ -51,6 +52,13 @@ export async function submitFeedback(
   `
 
   revalidatePath(`/dashboard/${projectId}`)
+
+  void createNotification({
+    type: 'feedback_submitted',
+    title: `Nové hodnocení od klienta — ${clientName}`,
+    body: `NPS: ${parsed.data.nps}/10${parsed.data.content ? ' · ' + parsed.data.content : ''}`,
+    link: `/dashboard/${projectId}`,
+  })
 
   const adminEmail = process.env.ADMIN_EMAIL
   if (adminEmail) {
@@ -181,6 +189,13 @@ export async function submitConsultation(
     })
   }
 
+  void createNotification({
+    type: 'consultation_booked',
+    title: 'Nová rezervace konzultace',
+    body: `${formattedTime} · ${channelName} — ${parsed.data.clientWish}`,
+    link: `/dashboard/${projectId}`,
+  })
+
   return { success: true }
 }
 
@@ -217,6 +232,13 @@ export async function submitSurvey(
   `
 
   revalidatePath('/dashboard/hodnoceni')
+
+  void createNotification({
+    type: 'survey_submitted',
+    title: `Nový dotazník spokojenosti`,
+    body: `${cp.client_name ?? cp.title}`,
+    link: `/dashboard/hodnoceni`,
+  })
 
   const adminEmail = process.env.ADMIN_EMAIL
   if (adminEmail) {

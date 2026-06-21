@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { AdminEventModal } from './AdminEventModal'
 import { deleteCalendarEvent } from '@/app/calendar-actions'
-import { CHANNEL_LABELS, type ConsultationChannel, type CalendarEventType } from '@/lib/types'
+import { CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, type ConsultationChannel, type CalendarEventType, type LeadActionType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { toMondayFirst, getDaysInMonth, getMonthStartOffset } from '@/lib/prague-time'
 
@@ -42,9 +42,18 @@ export interface RawCalendarEvent {
   event_type: CalendarEventType
 }
 
+export interface RawLead {
+  id: string
+  company_name: string
+  contact_name: string | null
+  next_action: string | null
+  next_action_type: string | null
+  action_at: string // ISO datetime (date + time combined in Prague TZ)
+}
+
 // ─── Unified event type ───────────────────────────────────────────────────────
 
-type EventKind = 'consultation' | 'deadline' | 'manual' | 'block'
+type EventKind = 'consultation' | 'deadline' | 'manual' | 'block' | 'call'
 
 interface UnifiedEvent {
   id: string
@@ -79,6 +88,7 @@ const KIND_COLORS: Partial<Record<EventKind, { pill: string; dot: string }>> = {
   deadline: { pill: 'bg-purple-100 text-purple-800 border-purple-200', dot: 'bg-purple-500' },
   manual:   { pill: 'bg-amber-100 text-amber-800 border-amber-200',    dot: 'bg-amber-500' },
   block:    { pill: 'bg-slate-100 text-slate-600 border-slate-300',    dot: 'bg-slate-400' },
+  call:     { pill: 'bg-cyan-100 text-cyan-800 border-cyan-200',       dot: 'bg-cyan-500' },
 }
 
 function getEventStyle(ev: UnifiedEvent) {
@@ -101,6 +111,7 @@ function buildUnified(
   consultations: RawConsultation[],
   deadlines: RawDeadline[],
   events: RawCalendarEvent[],
+  leads: RawLead[],
 ): UnifiedEvent[] {
   const result: UnifiedEvent[] = []
 
@@ -152,6 +163,21 @@ function buildUnified(
       label: e.title,
       sublabel: e.event_type === 'block' ? 'Blokovaný čas' : 'Událost',
       meta: { description: e.description },
+    })
+  }
+
+  for (const lead of leads) {
+    const start = new Date(lead.action_at)
+    const end = new Date(start.getTime() + 60 * 60 * 1000)
+    result.push({
+      id: `lead-${lead.id}`,
+      kind: 'call',
+      startsAt: start,
+      endsAt: end,
+      allDay: false,
+      label: lead.contact_name || lead.company_name,
+      sublabel: LEAD_ACTION_TYPE_LABELS[lead.next_action_type as LeadActionType] ?? lead.next_action_type ?? 'Akce',
+      meta: { description: lead.next_action },
     })
   }
 
@@ -342,6 +368,15 @@ function EventDetailModal({
                   className="flex-1 flex items-center justify-center text-sm font-semibold text-brand-800 border border-brand-200 py-2.5 rounded-xl hover:bg-brand-50 transition-colors"
                 >
                   Detail zakázky
+                </a>
+              )}
+
+              {event.kind === 'call' && (
+                <a
+                  href="/dashboard/calls"
+                  className="flex-1 flex items-center justify-center text-sm font-semibold text-brand-800 border border-brand-200 py-2.5 rounded-xl hover:bg-brand-50 transition-colors"
+                >
+                  Otevřít hovory
                 </a>
               )}
 
@@ -788,6 +823,10 @@ function Legend() {
         <span className="w-2 h-2 rounded-full bg-slate-400" />
         <span>Blokovaný čas</span>
       </div>
+      <div className="flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-cyan-500" />
+        <span>Plánovaná akce (Hovory)</span>
+      </div>
     </div>
   )
 }
@@ -800,10 +839,12 @@ export function SmartCalendar({
   consultations,
   deadlines,
   events: rawEvents,
+  leads,
 }: {
   consultations: RawConsultation[]
   deadlines: RawDeadline[]
   events: RawCalendarEvent[]
+  leads: RawLead[]
 }) {
   const router = useRouter()
   const today = new Date()
@@ -813,7 +854,7 @@ export function SmartCalendar({
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null)
   const [createModal, setCreateModal] = useState<{ open: boolean; date?: string; hour?: number }>({ open: false })
 
-  const unified = buildUnified(consultations, deadlines, rawEvents)
+  const unified = buildUnified(consultations, deadlines, rawEvents, leads)
 
   // Navigation helpers
   function navigate(delta: number) {

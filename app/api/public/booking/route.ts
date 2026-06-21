@@ -4,6 +4,7 @@ import { verifyApiKey, getClientIp } from '@/lib/api-auth'
 import { vizeonBookingSchema } from '@/types/booking'
 import { pragueWallClockToISO, formatPragueDateTime } from '@/lib/prague-time'
 import { sendBrandedEmail } from '@/lib/email'
+import { createNotification } from '@/lib/notifications'
 
 const ALLOWED_ORIGINS = ['https://vizeon.cz', 'http://localhost:3000']
 const ENDPOINT = 'vizeon_booking'
@@ -119,6 +120,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         ],
       })
     }
+
+    void createNotification({
+      type: 'vizeon_booking',
+      title: `Nová poptávka z vizeon.cz — ${data.clientName}`,
+      body: `${data.projectType} · ${formatPragueDateTime(scheduledAtISO)}${data.message ? ' — ' + data.message : ''}`,
+      link: `/dashboard/vizeon`,
+    })
 
     return NextResponse.json(
       { success: true, bookingId: projectId, eventId, message: 'Rezervace úspěšně vytvořena' },

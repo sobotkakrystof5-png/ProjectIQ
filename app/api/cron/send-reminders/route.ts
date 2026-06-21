@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { sendBrandedEmail } from '@/lib/email'
+import { createNotification } from '@/lib/notifications'
+
+export const dynamic = 'force-dynamic'
 
 const CHANNEL_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -168,6 +171,11 @@ export async function GET(req: NextRequest) {
     try {
       await sendConsultationReminder(slot, 'day_before')
       await sql`UPDATE consultation_slots SET reminder_day_before_sent = true WHERE id = ${slot.id}`
+      void createNotification({
+        type: 'reminder_upcoming',
+        title: `Připomínka: zítřejší konzultace`,
+        body: `${formatPrague(new Date(slot.scheduled_at))} · ${CHANNEL_LABEL[slot.channel] ?? slot.channel}`,
+      })
       results.day_before++
     } catch {
       results.errors++
@@ -178,6 +186,11 @@ export async function GET(req: NextRequest) {
     try {
       await sendConsultationReminder(slot, '2h_before')
       await sql`UPDATE consultation_slots SET reminder_2h_before_sent = true WHERE id = ${slot.id}`
+      void createNotification({
+        type: 'reminder_upcoming',
+        title: `Za 2 hodiny začíná konzultace`,
+        body: `${formatPrague(new Date(slot.scheduled_at))} · ${CHANNEL_LABEL[slot.channel] ?? slot.channel}`,
+      })
       results.two_hours++
     } catch {
       results.errors++
@@ -188,6 +201,12 @@ export async function GET(req: NextRequest) {
     try {
       await sendLeadReminder(lead, 'day_before')
       await sql`UPDATE client_leads SET reminder_day_before_sent = true WHERE id = ${lead.id}`
+      void createNotification({
+        type: 'reminder_upcoming',
+        title: `Připomínka: zítřejší akce s klientem`,
+        body: `${lead.contact_name ?? lead.company_name} · ${LEAD_ACTION_LABEL[lead.next_action_type ?? ''] ?? lead.next_action_type ?? 'Akce'} · ${formatPrague(new Date(lead.action_at))}`,
+        link: `/dashboard/calls`,
+      })
       results.lead_day_before++
     } catch {
       results.errors++
@@ -198,6 +217,12 @@ export async function GET(req: NextRequest) {
     try {
       await sendLeadReminder(lead, '2h_before')
       await sql`UPDATE client_leads SET reminder_2h_before_sent = true WHERE id = ${lead.id}`
+      void createNotification({
+        type: 'reminder_upcoming',
+        title: `Za 2 hodiny: akce s klientem`,
+        body: `${lead.contact_name ?? lead.company_name} · ${LEAD_ACTION_LABEL[lead.next_action_type ?? ''] ?? lead.next_action_type ?? 'Akce'} · ${formatPrague(new Date(lead.action_at))}`,
+        link: `/dashboard/calls`,
+      })
       results.lead_two_hours++
     } catch {
       results.errors++
