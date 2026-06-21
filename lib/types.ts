@@ -108,6 +108,17 @@ export const LEAD_STATUS_STYLES: Record<LeadStatus, string> = {
   lost: 'bg-red-50 text-red-600 ring-1 ring-red-200',
 }
 
+export type LeadActionType = 'call' | 'meeting' | 'email' | 'whatsapp' | 'online' | 'other'
+
+export const LEAD_ACTION_TYPE_LABELS: Record<LeadActionType, string> = {
+  call: 'Telefonní hovor',
+  meeting: 'Osobní setkání',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  online: 'Online schůzka',
+  other: 'Jiné',
+}
+
 export interface ClientLead {
   id: string
   company_name: string
@@ -117,8 +128,12 @@ export interface ClientLead {
   lead_status: LeadStatus
   next_action: string | null
   next_action_date: string | null
+  next_action_time: string | null
+  next_action_type: LeadActionType | null
   notes: string | null
   estimated_value: number | null
+  reminder_day_before_sent: boolean
+  reminder_2h_before_sent: boolean
   created_at: string | Date
   updated_at: string | Date | null
 }

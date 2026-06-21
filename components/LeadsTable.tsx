@@ -1,12 +1,38 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal } from 'lucide-react'
 import { createLead, updateLead, deleteLead, convertLeadToProject } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
-import { LEAD_STATUS_LABELS, LEAD_STATUS_STYLES, type ClientLead, type LeadStatus } from '@/lib/types'
+import {
+  LEAD_STATUS_LABELS,
+  LEAD_STATUS_STYLES,
+  LEAD_ACTION_TYPE_LABELS,
+  type ClientLead,
+  type LeadStatus,
+  type LeadActionType,
+} from '@/lib/types'
 
 const LEAD_STATUSES: LeadStatus[] = ['cold', 'warm', 'hot', 'converted', 'lost']
+const LEAD_ACTION_TYPES: LeadActionType[] = ['call', 'meeting', 'email', 'whatsapp', 'online', 'other']
+
+const ACTION_TYPE_ICONS: Record<LeadActionType, React.ReactNode> = {
+  call:    <PhoneCall size={11} strokeWidth={1.5} />,
+  meeting: <Users size={11} strokeWidth={1.5} />,
+  email:   <AtSign size={11} strokeWidth={1.5} />,
+  whatsapp:<MessageCircle size={11} strokeWidth={1.5} />,
+  online:  <Video size={11} strokeWidth={1.5} />,
+  other:   <MoreHorizontal size={11} strokeWidth={1.5} />,
+}
+
+const ACTION_TYPE_STYLES: Record<LeadActionType, string> = {
+  call:    'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  meeting: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
+  email:   'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  whatsapp:'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  online:  'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
+  other:   'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+}
 
 const EMPTY_FORM: LeadPayload = {
   company_name: '',
@@ -16,6 +42,8 @@ const EMPTY_FORM: LeadPayload = {
   lead_status: 'cold',
   next_action: null,
   next_action_date: null,
+  next_action_time: null,
+  next_action_type: null,
   notes: null,
   estimated_value: null,
 }
@@ -24,6 +52,15 @@ function StatusBadge({ status }: { status: LeadStatus }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${LEAD_STATUS_STYLES[status]}`}>
       {LEAD_STATUS_LABELS[status]}
+    </span>
+  )
+}
+
+function ActionTypeBadge({ type }: { type: LeadActionType }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_TYPE_STYLES[type]}`}>
+      {ACTION_TYPE_ICONS[type]}
+      {LEAD_ACTION_TYPE_LABELS[type]}
     </span>
   )
 }
@@ -95,6 +132,23 @@ function LeadForm({
           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         </div>
       </td>
+      {/* Typ akce */}
+      <td className="px-3 py-2">
+        <div className="relative">
+          <select
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+            value={form.next_action_type ?? ''}
+            onChange={e => set('next_action_type', e.target.value || null)}
+          >
+            <option value="">— typ —</option>
+            {LEAD_ACTION_TYPES.map(t => (
+              <option key={t} value={t}>{LEAD_ACTION_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+          <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        </div>
+      </td>
+      {/* Příští akce text */}
       <td className="px-3 py-2">
         <input
           className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -103,13 +157,22 @@ function LeadForm({
           onChange={e => set('next_action', e.target.value)}
         />
       </td>
+      {/* Datum + čas */}
       <td className="px-3 py-2">
-        <input
-          type="date"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          value={form.next_action_date ?? ''}
-          onChange={e => set('next_action_date', e.target.value)}
-        />
+        <div className="flex flex-col gap-1">
+          <input
+            type="date"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            value={form.next_action_date ?? ''}
+            onChange={e => set('next_action_date', e.target.value)}
+          />
+          <input
+            type="time"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            value={form.next_action_time ?? ''}
+            onChange={e => set('next_action_time', e.target.value)}
+          />
+        </div>
       </td>
       <td className="px-3 py-2">
         <input
@@ -155,8 +218,16 @@ function LeadRow({
   isPending: boolean
 }) {
   const isOverdue = lead.next_action_date
-    ? new Date(lead.next_action_date) < new Date()
+    ? new Date(lead.next_action_date) < new Date(new Date().toDateString())
     : false
+
+  const formattedDateTime = (() => {
+    if (!lead.next_action_date) return null
+    const date = new Date(lead.next_action_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })
+    if (!lead.next_action_time) return date
+    const time = lead.next_action_time.slice(0, 5)
+    return `${date} ${time}`
+  })()
 
   return (
     <tr className="border-t border-border hover:bg-slate-50/60 transition-colors group">
@@ -194,14 +265,29 @@ function LeadRow({
         <StatusBadge status={lead.lead_status} />
       </td>
       <td className="px-3 py-2.5">
+        {lead.next_action_type
+          ? <ActionTypeBadge type={lead.next_action_type} />
+          : <span className="text-muted-foreground/50">—</span>
+        }
+      </td>
+      <td className="px-3 py-2.5">
         <span className="text-sm text-foreground">{lead.next_action ?? <span className="text-muted-foreground/50">—</span>}</span>
       </td>
       <td className="px-3 py-2.5">
-        {lead.next_action_date ? (
-          <span className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-foreground'}`}>
-            {new Date(lead.next_action_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
-            {isOverdue && ' ⚠'}
-          </span>
+        {formattedDateTime ? (
+          <div className="flex flex-col gap-0.5">
+            <span className={`text-sm font-medium ${isOverdue ? 'text-red-600' : 'text-foreground'}`}>
+              {formattedDateTime}
+              {isOverdue && ' ⚠'}
+            </span>
+            {lead.next_action_time && (
+              <span className="text-xs text-muted-foreground">
+                {lead.next_action_date
+                  ? `připomínka ${lead.next_action_time.slice(0, 5) ? 'naplánována' : ''}`
+                  : ''}
+              </span>
+            )}
+          </div>
         ) : (
           <span className="text-muted-foreground/50">—</span>
         )}
@@ -257,6 +343,8 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
       const newLead: ClientLead = {
         ...data,
         id: tempId,
+        reminder_day_before_sent: false,
+        reminder_2h_before_sent: false,
         created_at: new Date(),
         updated_at: null,
       }
@@ -269,7 +357,12 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
     startTransition(async () => {
       await updateLead(id, data)
       setLeads(prev =>
-        prev.map(l => l.id === id ? { ...l, ...data, updated_at: new Date() } : l)
+        prev.map(l => l.id === id ? {
+          ...l, ...data,
+          reminder_day_before_sent: false,
+          reminder_2h_before_sent: false,
+          updated_at: new Date(),
+        } : l)
       )
       setEditingId(null)
     })
@@ -297,9 +390,9 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
           <h2 className="text-lg font-semibold text-foreground">Hovory s klienty</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {leads.length} {leads.length === 1 ? 'kontakt' : leads.length < 5 ? 'kontakty' : 'kontaktů'}
-            {leads.filter(l => l.next_action_date && new Date(l.next_action_date) < new Date()).length > 0 && (
+            {leads.filter(l => l.next_action_date && new Date(l.next_action_date) < new Date(new Date().toDateString())).length > 0 && (
               <span className="ml-2 text-red-600 font-medium">
-                · {leads.filter(l => l.next_action_date && new Date(l.next_action_date) < new Date()).length} po termínu
+                · {leads.filter(l => l.next_action_date && new Date(l.next_action_date) < new Date(new Date().toDateString())).length} po termínu
               </span>
             )}
           </p>
@@ -316,7 +409,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
 
       <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
+          <table className="w-full text-left min-w-[1060px]">
             <thead>
               <tr className="bg-slate-50 border-b border-border">
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma</th>
@@ -324,8 +417,9 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefon</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Zájem</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Typ akce</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Příští akce</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Datum</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Datum & čas</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Odhad hodnoty</th>
                 <th className="px-3 py-2.5 w-20" />
               </tr>
@@ -341,7 +435,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
               )}
               {leads.length === 0 && !addingNew && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     Zatím žádné kontakty. Klikni na&nbsp;<strong>Přidat kontakt</strong>&nbsp;a začni evidovat hovory.
                   </td>
                 </tr>
@@ -358,6 +452,8 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
                       lead_status: lead.lead_status,
                       next_action: lead.next_action,
                       next_action_date: lead.next_action_date,
+                      next_action_time: lead.next_action_time,
+                      next_action_type: lead.next_action_type,
                       notes: lead.notes,
                       estimated_value: lead.estimated_value,
                     }}

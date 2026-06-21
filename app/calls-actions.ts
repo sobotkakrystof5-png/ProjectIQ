@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import type { ClientLead, LeadStatus } from '@/lib/types'
+import type { ClientLead, LeadStatus, LeadActionType } from '@/lib/types'
 
 async function requireAuth() {
   const session = await getServerSession(authOptions)
@@ -20,6 +20,8 @@ export type LeadPayload = {
   lead_status: LeadStatus
   next_action: string | null
   next_action_date: string | null
+  next_action_time: string | null
+  next_action_type: LeadActionType | null
   notes: string | null
   estimated_value: number | null
 }
@@ -37,7 +39,8 @@ export async function createLead(payload: LeadPayload) {
   await sql`
     INSERT INTO client_leads (
       company_name, contact_name, phone, email,
-      lead_status, next_action, next_action_date, notes, estimated_value
+      lead_status, next_action, next_action_date, next_action_time, next_action_type,
+      notes, estimated_value
     ) VALUES (
       ${payload.company_name},
       ${payload.contact_name},
@@ -46,6 +49,8 @@ export async function createLead(payload: LeadPayload) {
       ${payload.lead_status},
       ${payload.next_action},
       ${payload.next_action_date},
+      ${payload.next_action_time},
+      ${payload.next_action_type},
       ${payload.notes},
       ${payload.estimated_value}
     )
@@ -64,8 +69,12 @@ export async function updateLead(id: string, payload: LeadPayload) {
       lead_status = ${payload.lead_status},
       next_action = ${payload.next_action},
       next_action_date = ${payload.next_action_date},
+      next_action_time = ${payload.next_action_time},
+      next_action_type = ${payload.next_action_type},
       notes = ${payload.notes},
       estimated_value = ${payload.estimated_value},
+      reminder_day_before_sent = false,
+      reminder_2h_before_sent = false,
       updated_at = now()
     WHERE id = ${id}
   `
