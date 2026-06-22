@@ -224,11 +224,11 @@ export default async function HubPage() {
             <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-sm">
               <Dumbbell size={18} strokeWidth={1.5} className="text-white" />
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 uppercase tracking-wide">
-                Brzy
-              </span>
-            </div>
+            <ArrowUpRight
+              size={16}
+              strokeWidth={1.5}
+              className="text-muted-foreground/40 group-hover:text-rose-600 transition-colors mt-0.5"
+            />
           </div>
           <h2 className="font-semibold text-foreground text-[15px] mb-4">Sport & Zdraví</h2>
 

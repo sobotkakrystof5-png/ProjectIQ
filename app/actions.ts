@@ -133,8 +133,9 @@ export async function updateProject(
   await requireAuth()
   const progress = clampProgress(payload.progress)
 
-  const oldRows = await sql`SELECT status FROM projects WHERE id = ${id} LIMIT 1`
-  const oldStatus = (oldRows[0] as { status: string } | undefined)?.status
+  const oldRows = await sql`SELECT status, paid FROM projects WHERE id = ${id} LIMIT 1`
+  const oldStatus = (oldRows[0] as { status: string; paid: boolean } | undefined)?.status
+  const wasPaid = (oldRows[0] as { status: string; paid: boolean } | undefined)?.paid ?? false
 
   const rows = await sql`
     UPDATE projects SET
@@ -179,8 +180,23 @@ export async function updateProject(
     })
   }
 
+  // Přechod na zaplaceno → automaticky zapsat příjem do financí (pokud ještě neexistuje)
+  if (!wasPaid && payload.paid && payload.price && payload.price > 0) {
+    const existing = await sql`
+      SELECT id FROM finance_transactions WHERE source_project_id = ${id} LIMIT 1
+    `
+    if ((existing as unknown[]).length === 0) {
+      const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
+      await sql`
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id)
+        VALUES (${payload.price}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id})
+      `
+    }
+  }
+
   revalidatePath('/dashboard')
   revalidatePath(`/dashboard/${id}`)
+  revalidatePath('/hub/finance')
 }
 
 export async function deleteProject(id: string) {

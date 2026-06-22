@@ -5,6 +5,13 @@ import { createNotification } from '@/lib/notifications'
 
 export const dynamic = 'force-dynamic'
 
+const DEADLINE_TYPE_LABEL: Record<string, string> = {
+  klassenarbeit: 'Klassenarbeit (KA)',
+  homework:      'Domácí úkol',
+  presentation:  'Referát / Prezentace',
+  other:         'Jiné',
+}
+
 const CHANNEL_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
   teams:    'Microsoft Teams',
@@ -33,9 +40,18 @@ function formatPrague(date: Date): string {
 type SlotRow = {
   id: string
   client_email: string | null
+  client_name: string
   scheduled_at: string
   channel: string
   meeting_link: string | null
+}
+
+type DeadlineRow = {
+  id: string
+  title: string
+  subject: string | null
+  type: string
+  due_date: string
 }
 
 type LeadRow = {
@@ -48,34 +64,55 @@ type LeadRow = {
 }
 
 async function sendConsultationReminder(slot: SlotRow, type: 'day_before' | '2h_before') {
-  if (!slot.client_email) return
-
+  const adminEmail = process.env.ADMIN_EMAIL
   const when = new Date(slot.scheduled_at)
   const formattedTime = formatPrague(when)
   const channelName = CHANNEL_LABEL[slot.channel] ?? slot.channel
   const link = slot.meeting_link && slot.meeting_link !== '#' ? slot.meeting_link : null
-
   const isDayBefore = type === 'day_before'
 
-  await sendBrandedEmail({
-    to: slot.client_email,
-    subject: isDayBefore
-      ? `Připomínka zítřejší konzultace – ZakazIQ`
-      : `Konzultace začíná za 2 hodiny – ZakazIQ`,
-    heading: isDayBefore
-      ? 'Zítra máte konzultaci'
-      : 'Za 2 hodiny začínáme',
-    intro: isDayBefore
-      ? 'Jen krátká připomínka — zítra se uvidíme. Níže najdete všechny potřebné informace.'
-      : 'Vaše konzultace začíná za přibližně 2 hodiny. Vše máme připraveno.',
-    fields: [
-      { label: 'Datum a čas', value: formattedTime },
-      { label: 'Způsob spojení', value: channelName },
-    ],
-    ...(link
-      ? { ctas: [{ label: 'Připojit se ke konzultaci', href: link }] }
-      : {}),
-  })
+  const sends: Promise<unknown>[] = []
+
+  // Email klientovi
+  if (slot.client_email) {
+    sends.push(sendBrandedEmail({
+      to: slot.client_email,
+      subject: isDayBefore
+        ? `Připomínka zítřejší konzultace – ZakazIQ`
+        : `Konzultace začíná za 2 hodiny – ZakazIQ`,
+      heading: isDayBefore ? 'Zítra máte konzultaci' : 'Za 2 hodiny začínáme',
+      intro: isDayBefore
+        ? 'Jen krátká připomínka — zítra se uvidíme. Níže najdete všechny potřebné informace.'
+        : 'Vaše konzultace začíná za přibližně 2 hodiny. Vše máme připraveno.',
+      fields: [
+        { label: 'Datum a čas', value: formattedTime },
+        { label: 'Způsob spojení', value: channelName },
+      ],
+      ...(link ? { ctas: [{ label: 'Připojit se ke konzultaci', href: link }] } : {}),
+    }))
+  }
+
+  // Email adminovi
+  if (adminEmail) {
+    sends.push(sendBrandedEmail({
+      to: adminEmail,
+      subject: isDayBefore
+        ? `Zítra máš hovor s ${slot.client_name} – ZakazIQ`
+        : `Za 2 hodiny: hovor s ${slot.client_name} – ZakazIQ`,
+      heading: isDayBefore ? `Zítra máš konzultaci` : `Za 2 hodiny začínáš`,
+      intro: isDayBefore
+        ? `Připomínám ti zítřejší konzultaci s klientem.`
+        : `Za přibližně 2 hodiny začíná konzultace.`,
+      fields: [
+        { label: 'Klient', value: slot.client_name },
+        { label: 'Datum a čas', value: formattedTime },
+        { label: 'Způsob spojení', value: channelName },
+      ],
+      ...(link ? { ctas: [{ label: 'Připojit se', href: link }] } : {}),
+    }))
+  }
+
+  await Promise.all(sends)
 }
 
 async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before') {
@@ -108,6 +145,24 @@ async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before')
   })
 }
 
+async function sendSchoolDeadlineReminder(deadlines: DeadlineRow[]) {
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (!adminEmail || deadlines.length === 0) return
+
+  const fields = deadlines.map(d => ({
+    label: DEADLINE_TYPE_LABEL[d.type] ?? d.type,
+    value: d.title + (d.subject ? ` (${d.subject})` : ''),
+  }))
+
+  await sendBrandedEmail({
+    to: adminEmail,
+    subject: `Zítra máš ${deadlines.length === 1 ? 'školní termín' : `${deadlines.length} školní termíny`} – ZakazIQ`,
+    heading: 'Zítra ve škole',
+    intro: 'Připomínám ti termíny na zítra.',
+    fields,
+  })
+}
+
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (secret) {
@@ -121,22 +176,22 @@ export async function GET(req: NextRequest) {
 
   // Day-before: scheduled 23–25 h from now (target 24h, ±1h for hourly cron).
   const dayBeforeSlots = (await sql`
-    SELECT id, client_email, scheduled_at, channel, meeting_link
-    FROM consultation_slots
-    WHERE reminder_day_before_sent = false
-      AND client_email IS NOT NULL
-      AND scheduled_at BETWEEN now() + interval '23 hours'
-                           AND now() + interval '25 hours'
+    SELECT cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
+    FROM consultation_slots cs
+    JOIN projects p ON cs.project_id = p.id
+    WHERE cs.reminder_day_before_sent = false
+      AND cs.scheduled_at BETWEEN now() + interval '23 hours'
+                               AND now() + interval '25 hours'
   `) as SlotRow[]
 
   // 2h-before: scheduled 1–3 h from now (target 2h, ±1h for hourly cron).
   const twoHourSlots = (await sql`
-    SELECT id, client_email, scheduled_at, channel, meeting_link
-    FROM consultation_slots
-    WHERE reminder_2h_before_sent = false
-      AND client_email IS NOT NULL
-      AND scheduled_at BETWEEN now() + interval '1 hour'
-                           AND now() + interval '3 hours'
+    SELECT cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
+    FROM consultation_slots cs
+    JOIN projects p ON cs.project_id = p.id
+    WHERE cs.reminder_2h_before_sent = false
+      AND cs.scheduled_at BETWEEN now() + interval '1 hour'
+                               AND now() + interval '3 hours'
   `) as SlotRow[]
 
   // ── Lead akce (připomínky pro admina) ────────────────────────────────────
@@ -165,7 +220,16 @@ export async function GET(req: NextRequest) {
           BETWEEN now() + interval '1 hour' AND now() + interval '3 hours'
   `) as LeadRow[]
 
-  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, errors: 0 }
+  // ── Školní termíny (připomínka den před — datum bez času) ─────────────────
+  const schoolDeadlines = (await sql`
+    SELECT id, title, subject, type, due_date::text AS due_date
+    FROM school_deadlines_manual
+    WHERE done = false
+      AND reminder_day_before_sent = false
+      AND due_date = CURRENT_DATE + 1
+  `) as DeadlineRow[]
+
+  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, school_deadlines: 0, errors: 0 }
 
   for (const slot of dayBeforeSlots) {
     try {
@@ -224,6 +288,24 @@ export async function GET(req: NextRequest) {
         link: `/dashboard/calls`,
       })
       results.lead_two_hours++
+    } catch {
+      results.errors++
+    }
+  }
+
+  if (schoolDeadlines.length > 0) {
+    try {
+      await sendSchoolDeadlineReminder(schoolDeadlines)
+      for (const d of schoolDeadlines) {
+        await sql`UPDATE school_deadlines_manual SET reminder_day_before_sent = true WHERE id = ${d.id}`
+      }
+      void createNotification({
+        type: 'reminder_upcoming',
+        title: `Zítra ${schoolDeadlines.length === 1 ? 'školní termín' : `${schoolDeadlines.length} školní termíny`}`,
+        body: schoolDeadlines.map(d => `${DEADLINE_TYPE_LABEL[d.type] ?? d.type}: ${d.title}`).join(' · '),
+        link: '/hub/school',
+      })
+      results.school_deadlines = schoolDeadlines.length
     } catch {
       results.errors++
     }
