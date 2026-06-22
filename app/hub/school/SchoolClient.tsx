@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import {
   GraduationCap, Calendar, BookOpen, BarChart2,
   Plus, Trash2, CheckSquare, Square,
-  AlertCircle, Clock, ChevronDown, ChevronUp, X, Calculator,
+  AlertCircle, Clock, ChevronDown, ChevronUp, X, Calculator, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import {
   SUBJECTS, SubjectStats, DeadlineEntry, GradeEntry, SportCategory,
@@ -198,6 +198,188 @@ function TermínySection({ deadlines, onAdd }: { deadlines: DeadlineEntry[]; onA
           {showDone && (
             <div className="space-y-2">
               {done.map(d => <DeadlineRow key={d.id} deadline={d} />)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Přehledový kalendář */}
+      <div className="pt-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <Calendar size={12} strokeWidth={1.5} />
+          Přehled v kalendáři
+        </p>
+        <DeadlineCalendar deadlines={deadlines} />
+      </div>
+    </div>
+  )
+}
+
+// ── Deadline Calendar ─────────────────────────────────────────────────────────
+
+function DeadlineCalendar({ deadlines }: { deadlines: DeadlineEntry[] }) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const [year, setYear] = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth())
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+
+  const prevMonth = () => {
+    if (month === 0) { setMonth(11); setYear(y => y - 1) }
+    else setMonth(m => m - 1)
+    setSelectedDay(null)
+  }
+  const nextMonth = () => {
+    if (month === 11) { setMonth(0); setYear(y => y + 1) }
+    else setMonth(m => m + 1)
+    setSelectedDay(null)
+  }
+
+  const firstDay = new Date(year, month, 1)
+  // Monday-first: 0=Mon … 6=Sun
+  const startOffset = (firstDay.getDay() + 6) % 7
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  const MONTH_NAMES = [
+    'Leden','Únor','Březen','Duben','Květen','Červen',
+    'Červenec','Srpen','Září','Říjen','Listopad','Prosinec',
+  ]
+  const DAY_NAMES = ['Po','Út','St','Čt','Pá','So','Ne']
+
+  // deadlines grouped by ISO date
+  const byDate: Record<string, DeadlineEntry[]> = {}
+  for (const d of deadlines) {
+    if (!byDate[d.dueDate]) byDate[d.dueDate] = []
+    byDate[d.dueDate].push(d)
+  }
+
+  const TYPE_DOT: Record<string, string> = {
+    klassenarbeit: 'bg-red-500',
+    homework:      'bg-blue-500',
+    presentation:  'bg-violet-500',
+    other:         'bg-slate-400',
+  }
+
+  const selectedItems = selectedDay ? (byDate[selectedDay] ?? []) : []
+
+  // build calendar cells
+  const cells: (number | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+  // pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  return (
+    <div className="bg-white border border-border rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <button onClick={prevMonth} className="p-1 rounded-lg hover:bg-slate-100 text-muted-foreground transition-colors">
+          <ChevronLeft size={16} strokeWidth={1.5} />
+        </button>
+        <p className="text-sm font-semibold text-foreground">
+          {MONTH_NAMES[month]} {year}
+        </p>
+        <button onClick={nextMonth} className="p-1 rounded-lg hover:bg-slate-100 text-muted-foreground transition-colors">
+          <ChevronRight size={16} strokeWidth={1.5} />
+        </button>
+      </div>
+
+      {/* Day names */}
+      <div className="grid grid-cols-7 border-b border-border">
+        {DAY_NAMES.map(d => (
+          <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground py-2">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-7">
+        {cells.map((day, i) => {
+          if (day === null) {
+            return <div key={`e-${i}`} className="h-12 border-b border-r border-border/40 last:border-r-0" />
+          }
+
+          const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const isToday = iso === today.toISOString().slice(0, 10)
+          const isSelected = selectedDay === iso
+          const items = byDate[iso] ?? []
+          const hasOverdue = items.some(d => !d.done)
+          const allDone = items.length > 0 && items.every(d => d.done)
+          const isLast = (i + 1) % 7 === 0
+
+          return (
+            <button
+              key={iso}
+              onClick={() => setSelectedDay(isSelected ? null : iso)}
+              className={`h-12 flex flex-col items-center justify-start pt-1.5 gap-0.5 border-b border-r border-border/40 transition-colors relative
+                ${isLast ? 'border-r-0' : ''}
+                ${isSelected ? 'bg-violet-50' : items.length > 0 ? 'hover:bg-slate-50' : 'hover:bg-slate-50/50'}
+              `}
+            >
+              <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full leading-none
+                ${isToday ? 'bg-violet-600 text-white font-bold' : allDone ? 'text-muted-foreground/50' : 'text-foreground'}
+              `}>
+                {day}
+              </span>
+              {/* dots */}
+              {items.length > 0 && (
+                <div className="flex gap-0.5 flex-wrap justify-center max-w-[28px]">
+                  {items.slice(0, 3).map((it, idx) => (
+                    <span
+                      key={idx}
+                      className={`w-1.5 h-1.5 rounded-full ${it.done ? 'bg-slate-300' : TYPE_DOT[it.type]}`}
+                    />
+                  ))}
+                  {items.length > 3 && (
+                    <span className="text-[9px] text-muted-foreground leading-none">+{items.length - 3}</span>
+                  )}
+                </div>
+              )}
+              {/* urgent glow for today with items */}
+              {isToday && hasOverdue && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-red-500" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 px-4 py-2.5 border-t border-border bg-slate-50">
+        {[
+          { label: 'KA', cls: 'bg-red-500' },
+          { label: 'Úkol', cls: 'bg-blue-500' },
+          { label: 'Referát', cls: 'bg-violet-500' },
+          { label: 'Jiné', cls: 'bg-slate-400' },
+        ].map(({ label, cls }) => (
+          <div key={label} className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${cls}`} />
+            <span className="text-[10px] text-muted-foreground">{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Selected day detail */}
+      {selectedDay && (
+        <div className="border-t border-border px-4 py-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {new Date(selectedDay + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+          {selectedItems.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Nic naplánováno</p>
+          ) : (
+            <div className="space-y-1.5">
+              {selectedItems.map(it => (
+                <div key={it.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 border text-xs ${DEADLINE_COLORS[it.type]} ${it.done ? 'opacity-50' : ''}`}>
+                  <span className="font-semibold">{DEADLINE_LABELS[it.type]}</span>
+                  <span className="font-medium flex-1 truncate">{it.title}</span>
+                  {it.subject && <span className="shrink-0 opacity-70">{it.subject}</span>}
+                  {it.done && <span className="shrink-0 opacity-60">✓</span>}
+                </div>
+              ))}
             </div>
           )}
         </div>
