@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { NutritionSection } from './NutritionSection'
 import { HealthScoreWidget } from './HealthScoreWidget'
 import { WorkoutSection } from './WorkoutSection'
+import { WeightSection } from './WeightSection'
 import { TrainingCalendar } from './TrainingCalendar'
-import type { NutritionLog, WorkoutLog, HealthScore } from './sport-actions'
+import type { NutritionLog, WorkoutLog, HealthScore, WeightLog } from './sport-actions'
 
 interface Props {
   today: string
@@ -14,6 +15,8 @@ interface Props {
   initialWeekScores: HealthScore[]
   initialRecentWorkouts: WorkoutLog[]
   initialMonthWorkouts: WorkoutLog[]
+  initialWeightLogs: WeightLog[]
+  initialLastWeight: WeightLog | null
   year: number
   month: number
 }
@@ -25,10 +28,11 @@ export function SportClient({
   initialWeekScores,
   initialRecentWorkouts,
   initialMonthWorkouts,
+  initialWeightLogs,
+  initialLastWeight,
   year,
   month,
 }: Props) {
-  // Increment to signal sub-components to refresh their data
   const [healthTrigger, setHealthTrigger] = useState(0)
   const [calendarTrigger, setCalendarTrigger] = useState(0)
 
@@ -40,19 +44,25 @@ export function SportClient({
 
   return (
     <div className="space-y-6">
-      {/* Nutriční deník — full width */}
-      <NutritionSection
-        initialDate={today}
-        initialLogs={initialNutrition}
-        onMutated={onNutritionMutated}
-      />
-
-      {/* Health Score + Gym log — 2 columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Řádek 1: Zdravotní skóre + Jídlo — vedle sebe na desktopu */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <HealthScoreWidget
           initialToday={initialTodayScore}
           initialWeek={initialWeekScores}
           trigger={healthTrigger}
+        />
+        <NutritionSection
+          initialDate={today}
+          initialLogs={initialNutrition}
+          onMutated={onNutritionMutated}
+        />
+      </div>
+
+      {/* Řádek 2: Váha + Trénink — vedle sebe */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <WeightSection
+          initialLogs={initialWeightLogs}
+          initialLast={initialLastWeight}
         />
         <WorkoutSection
           initialWorkouts={initialRecentWorkouts}
@@ -60,7 +70,7 @@ export function SportClient({
         />
       </div>
 
-      {/* Training calendar — full width */}
+      {/* Řádek 3: Tréninkový kalendář */}
       <TrainingCalendar
         initialYear={year}
         initialMonth={month}

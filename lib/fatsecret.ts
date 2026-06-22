@@ -26,13 +26,17 @@ async function getAccessToken(): Promise<string> {
     cache: 'no-store',
   })
 
-  if (!res.ok) throw new Error(`FatSecret token error: ${res.status}`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`FatSecret token error ${res.status}: ${body}`)
+  }
 
   const data = await res.json()
-  // Cache for expires_in minus 1 hour to stay safe
+  if (!data.access_token) throw new Error('FatSecret: no access_token in response')
+
   _tokenCache = {
     token: data.access_token,
-    expiresAt: Date.now() + (data.expires_in - 3600) * 1000,
+    expiresAt: Date.now() + ((data.expires_in ?? 86400) - 3600) * 1000,
   }
   return _tokenCache.token
 }
@@ -52,7 +56,6 @@ export function parseFoodDescription(desc: string): {
   protein_g: number
 } {
   // "Per 100g - Calories: 89kcal | Fat: 0.33g | Carbs: 23.43g | Protein: 1.09g"
-  // "Per 1 serving (28g) - Calories: 170kcal | ..."
   const directG = desc.match(/Per (\d+)g -/)
   const servingG = desc.match(/Per .+?\((\d+(?:\.\d+)?)g\)/)
   const per_g = directG ? parseInt(directG[1]) : servingG ? parseFloat(servingG[1]) : 100
@@ -76,17 +79,25 @@ export async function searchFoods(query: string): Promise<FoodSearchResult[]> {
 
   const url =
     `https://platform.fatsecret.com/rest/server.api` +
-    `?method=foods.search&format=json` +
-    `&search_expression=${encodeURIComponent(query)}&max_results=10`
+    `?method=foods.search` +
+    `&format=json` +
+    `&search_expression=${encodeURIComponent(query)}` +
+    `&max_results=10`
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   })
 
-  if (!res.ok) throw new Error(`FatSecret search error: ${res.status}`)
+  if (!res.ok) throw new Error(`FatSecret search HTTP error: ${res.status}`)
 
   const data = await res.json()
+
+  // FatSecret vrací chyby v body s HTTP 200
+  if (data.error) {
+    throw new Error(`FatSecret API error ${data.error.code}: ${data.error.message}`)
+  }
+
   const foods = data.foods?.food
   if (!foods) return []
   return Array.isArray(foods) ? foods : [foods]

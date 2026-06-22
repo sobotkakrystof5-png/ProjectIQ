@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
   try {
     const results = await searchFoods(q)
     return NextResponse.json(results)
-  } catch {
-    return NextResponse.json({ error: 'FatSecret API chyba' }, { status: 500 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[FatSecret] Search error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

@@ -273,6 +273,64 @@ export async function getHealthScoresMonth(): Promise<HealthScore[]> {
   return rows as HealthScore[]
 }
 
+// ─── Weight ───────────────────────────────────────────────────────────────────
+
+export interface WeightLog {
+  id: string
+  logged_date: string
+  weight_kg: number
+  created_at: string
+}
+
+export async function getWeightLogs(days = 30): Promise<WeightLog[]> {
+  await requireAuth()
+  const rows = await sql`
+    SELECT id::text, logged_date::text, weight_kg::float, created_at::text
+    FROM weight_logs
+    WHERE user_id IS NULL AND logged_date >= CURRENT_DATE - (${days} || ' days')::interval
+    ORDER BY logged_date ASC
+  `
+  return rows as WeightLog[]
+}
+
+export async function getLastWeight(): Promise<WeightLog | null> {
+  await requireAuth()
+  const rows = await sql`
+    SELECT id::text, logged_date::text, weight_kg::float, created_at::text
+    FROM weight_logs
+    WHERE user_id IS NULL
+    ORDER BY logged_date DESC
+    LIMIT 1
+  `
+  return ((rows as any[])[0] ?? null) as WeightLog | null
+}
+
+export async function logWeight(data: {
+  logged_date: string
+  weight_kg: number
+}): Promise<{ error?: string }> {
+  try {
+    await requireAuth()
+    if (!data.weight_kg || data.weight_kg <= 0) return { error: 'Neplatná váha' }
+    await sql`
+      INSERT INTO weight_logs (user_id, logged_date, weight_kg)
+      VALUES (NULL, ${data.logged_date}, ${data.weight_kg})
+      ON CONFLICT (logged_date) WHERE user_id IS NULL
+      DO UPDATE SET weight_kg = EXCLUDED.weight_kg
+    `
+    revalidatePath('/hub/sport')
+    return {}
+  } catch {
+    return { error: 'Nepodařilo se uložit váhu' }
+  }
+}
+
+export async function deleteWeight(id: string): Promise<void> {
+  await requireAuth()
+  await sql`DELETE FROM weight_logs WHERE id = ${id} AND user_id IS NULL`
+  revalidatePath('/hub/sport')
+}
+
 export async function getHealthScoresAllTime(): Promise<HealthScore[]> {
   await requireAuth()
   const rows = await sql`

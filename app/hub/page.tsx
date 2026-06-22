@@ -6,6 +6,7 @@ import {
   TrendingUp,
   Dumbbell,
   ArrowUpRight,
+  ChevronRight,
   Clock,
   CreditCard,
   FolderOpen,
@@ -187,10 +188,8 @@ export default async function HubPage() {
             <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-purple-700 rounded-xl flex items-center justify-center shadow-sm">
               <GraduationCap size={18} strokeWidth={1.5} className="text-white" />
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5 uppercase tracking-wide">
-                Brzy
-              </span>
+            <div className="flex items-center mt-0.5">
+              <ChevronRight size={18} strokeWidth={1.5} className="text-muted-foreground group-hover:text-violet-600 transition-colors" />
             </div>
           </div>
           <h2 className="font-semibold text-foreground text-[15px] mb-4">Škola</h2>

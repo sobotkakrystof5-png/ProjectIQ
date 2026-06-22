@@ -6,6 +6,8 @@ import {
   getWorkoutsRecent,
   getHealthScoreToday,
   getHealthScoresWeek,
+  getWeightLogs,
+  getLastWeight,
 } from './sport-actions'
 
 export default async function SportPage() {
@@ -20,12 +22,16 @@ export default async function SportPage() {
     initialWeekScores,
     initialRecentWorkouts,
     initialMonthWorkouts,
+    initialWeightLogs,
+    initialLastWeight,
   ] = await Promise.all([
     getNutritionDay(today),
     getHealthScoreToday(),
     getHealthScoresWeek(),
     getWorkoutsRecent(),
     getWorkoutsMonth(year, month),
+    getWeightLogs(30),
+    getLastWeight(),
   ])
 
   return (
@@ -38,7 +44,7 @@ export default async function SportPage() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground tracking-tight mb-0.5">Sport & Zdraví</h1>
           <p className="text-sm text-muted-foreground">
-            Nutriční deník, Health Score, gym log a tréninkový kalendář
+            Jídlo, váha, trénink a zdravotní skóre — vše na jednom místě
           </p>
         </div>
       </div>
@@ -50,6 +56,8 @@ export default async function SportPage() {
         initialWeekScores={initialWeekScores}
         initialRecentWorkouts={initialRecentWorkouts}
         initialMonthWorkouts={initialMonthWorkouts}
+        initialWeightLogs={initialWeightLogs}
+        initialLastWeight={initialLastWeight}
         year={year}
         month={month}
       />
