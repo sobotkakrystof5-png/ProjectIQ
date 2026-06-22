@@ -97,9 +97,31 @@ export async function createProject(payload: ProjectPayload, completedExtra?: Co
       ${payload.deposit_amount},
       ${payload.deposit_paid}
     )
-    RETURNING public_token
+    RETURNING id, public_token
   `
-  const publicToken = (rows[0] as { public_token: string }).public_token
+  const newProjectId = (rows[0] as { id: string; public_token: string }).id
+  const publicToken = (rows[0] as { id: string; public_token: string }).public_token
+
+  // Záloha zaplacena při vytvoření → okamžitě zapsat do financí
+  if (payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0) {
+    const note = payload.client_name + (payload.description ? ' — ' + payload.description : '') + ' (záloha)'
+    await sql`
+      INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
+      VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, true)
+    `
+  }
+  // Projekt vytvořen rovnou jako zaplacený → zapsat zbývající část
+  if (payload.paid && payload.price && payload.price > 0) {
+    const depositAlreadyPaid = payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0
+    const remaining = depositAlreadyPaid ? payload.price - (payload.deposit_amount ?? 0) : payload.price
+    if (remaining > 0) {
+      const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
+      await sql`
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
+        VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, false)
+      `
+    }
+  }
   await notifyClientOfProjectChange(
     { client_name: payload.client_name, client_email: payload.client_email, status: payload.status, progress, project_url: payload.project_url, public_token: publicToken },
     'created'
@@ -133,9 +155,10 @@ export async function updateProject(
   await requireAuth()
   const progress = clampProgress(payload.progress)
 
-  const oldRows = await sql`SELECT status, paid FROM projects WHERE id = ${id} LIMIT 1`
-  const oldStatus = (oldRows[0] as { status: string; paid: boolean } | undefined)?.status
-  const wasPaid = (oldRows[0] as { status: string; paid: boolean } | undefined)?.paid ?? false
+  const oldRows = await sql`SELECT status, paid, deposit_paid FROM projects WHERE id = ${id} LIMIT 1`
+  const oldStatus = (oldRows[0] as { status: string; paid: boolean; deposit_paid: boolean } | undefined)?.status
+  const wasPaid = (oldRows[0] as { status: string; paid: boolean; deposit_paid: boolean } | undefined)?.paid ?? false
+  const wasDepositPaid = (oldRows[0] as { status: string; paid: boolean; deposit_paid: boolean } | undefined)?.deposit_paid ?? false
 
   const rows = await sql`
     UPDATE projects SET
@@ -180,17 +203,37 @@ export async function updateProject(
     })
   }
 
-  // Přechod na zaplaceno → automaticky zapsat příjem do financí (pokud ještě neexistuje)
-  if (!wasPaid && payload.paid && payload.price && payload.price > 0) {
-    const existing = await sql`
-      SELECT id FROM finance_transactions WHERE source_project_id = ${id} LIMIT 1
+  // Záloha zaplacena → okamžitě zapsat do financí
+  if (!wasDepositPaid && payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0) {
+    const existingDeposit = await sql`
+      SELECT id FROM finance_transactions
+      WHERE source_project_id = ${id} AND deposit_transaction = true LIMIT 1
     `
-    if ((existing as unknown[]).length === 0) {
-      const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
+    if ((existingDeposit as unknown[]).length === 0) {
+      const note = payload.client_name + (payload.description ? ' — ' + payload.description : '') + ' (záloha)'
       await sql`
-        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id)
-        VALUES (${payload.price}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id})
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
+        VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, true)
       `
+    }
+  }
+
+  // Přechod na zaplaceno → zapsat zbývající část (cena − záloha, nebo celá cena pokud záloha nebyla)
+  if (!wasPaid && payload.paid && payload.price && payload.price > 0) {
+    const depositAlreadyPaid = payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0
+    const remaining = depositAlreadyPaid ? payload.price - (payload.deposit_amount ?? 0) : payload.price
+    if (remaining > 0) {
+      const existingFinal = await sql`
+        SELECT id FROM finance_transactions
+        WHERE source_project_id = ${id} AND (deposit_transaction = false OR deposit_transaction IS NULL) LIMIT 1
+      `
+      if ((existingFinal as unknown[]).length === 0) {
+        const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
+        await sql`
+          INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
+          VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, false)
+        `
+      }
     }
   }
 
