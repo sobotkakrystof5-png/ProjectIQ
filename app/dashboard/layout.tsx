@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { CalendarDays, PhoneCall, CheckCircle2, Layers, Receipt, Inbox, Star, Bell } from 'lucide-react'
+import { CalendarDays, PhoneCall, CheckCircle2, Layers, Receipt, Inbox, Star, Bell, LayoutGrid } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { LogoutButton } from './LogoutButton'
@@ -50,6 +50,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <span className="font-semibold text-brand-800 text-[15px] tracking-tight">ZakazIQ</span>
             </Link>
             <nav className="hidden sm:flex items-center gap-0.5">
+              <Link
+                href="/hub"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+                title="Hub — přehled všech modulů"
+              >
+                <LayoutGrid size={14} strokeWidth={1.5} />
+                Hub
+              </Link>
+              <span className="w-px h-4 bg-border mx-1" />
               <Link
                 href="/dashboard"
                 className="text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"

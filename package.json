@@ -16,6 +16,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@sparticuz/chromium": "^149.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.11.0",
     "@types/nodemailer": "^8.0.1",
@@ -30,6 +31,7 @@
     "next-auth": "^4.24.14",
     "nodemailer": "^7.0.13",
     "postcss": "^8.4.49",
+    "puppeteer-core": "^25.1.0",
     "qrcode.react": "^3.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
