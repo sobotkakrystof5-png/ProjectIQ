@@ -1,104 +1,72 @@
-// FatSecret Platform API — OAuth2 Client Credentials flow
-
-interface TokenCache {
-  token: string
-  expiresAt: number
-}
-
-let _tokenCache: TokenCache | null = null
-
-async function getAccessToken(): Promise<string> {
-  if (_tokenCache && Date.now() < _tokenCache.expiresAt) {
-    return _tokenCache.token
-  }
-
-  const clientId = process.env.FATSECRET_CLIENT_ID
-  const clientSecret = process.env.FATSECRET_CLIENT_SECRET
-  if (!clientId || !clientSecret) throw new Error('FatSecret API keys not configured')
-
-  const res = await fetch('https://oauth.fatsecret.com/connect/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-    },
-    body: 'grant_type=client_credentials&scope=basic',
-    cache: 'no-store',
-  })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`FatSecret token error ${res.status}: ${body}`)
-  }
-
-  const data = await res.json()
-  if (!data.access_token) throw new Error('FatSecret: no access_token in response')
-
-  _tokenCache = {
-    token: data.access_token,
-    expiresAt: Date.now() + ((data.expires_in ?? 86400) - 3600) * 1000,
-  }
-  return _tokenCache.token
-}
+// Open Food Facts API — bez autentizace, bez IP omezení
 
 export interface FoodSearchResult {
   food_id: string
   food_name: string
-  food_description: string
-  food_type: string
-}
-
-export function parseFoodDescription(desc: string): {
+  food_description: string  // "na 100g — 89 kcal | B: 1g | S: 23g | T: 0g"
   per_g: number
   calories: number
-  fat_g: number
-  carbs_g: number
   protein_g: number
-} {
-  // "Per 100g - Calories: 89kcal | Fat: 0.33g | Carbs: 23.43g | Protein: 1.09g"
-  const directG = desc.match(/Per (\d+)g -/)
-  const servingG = desc.match(/Per .+?\((\d+(?:\.\d+)?)g\)/)
-  const per_g = directG ? parseInt(directG[1]) : servingG ? parseFloat(servingG[1]) : 100
+  carbs_g: number
+  fat_g: number
+}
 
-  const cal = (desc.match(/Calories:\s*([\d.]+)kcal/i) || [])[1]
-  const fat = (desc.match(/Fat:\s*([\d.]+)g/i) || [])[1]
-  const carbs = (desc.match(/Carbs:\s*([\d.]+)g/i) || [])[1]
-  const protein = (desc.match(/Protein:\s*([\d.]+)g/i) || [])[1]
-
-  return {
-    per_g: per_g || 100,
-    calories: parseFloat(cal ?? '0'),
-    fat_g: parseFloat(fat ?? '0'),
-    carbs_g: parseFloat(carbs ?? '0'),
-    protein_g: parseFloat(protein ?? '0'),
+interface OFFProduct {
+  _id?: string
+  product_name?: string
+  product_name_cs?: string
+  brands?: string
+  nutriments?: {
+    'energy-kcal_100g'?: number
+    proteins_100g?: number
+    carbohydrates_100g?: number
+    fat_100g?: number
   }
 }
 
 export async function searchFoods(query: string): Promise<FoodSearchResult[]> {
-  const token = await getAccessToken()
-
   const url =
-    `https://platform.fatsecret.com/rest/server.api` +
-    `?method=foods.search` +
-    `&format=json` +
-    `&search_expression=${encodeURIComponent(query)}` +
-    `&max_results=10`
+    `https://world.openfoodfacts.org/cgi/search.pl` +
+    `?action=process` +
+    `&search_terms=${encodeURIComponent(query)}` +
+    `&json=1` +
+    `&page_size=20` +
+    `&fields=_id,product_name,product_name_cs,brands,nutriments`
 
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { 'User-Agent': 'ZakazIQ-Sport/1.0' },
     cache: 'no-store',
   })
 
-  if (!res.ok) throw new Error(`FatSecret search HTTP error: ${res.status}`)
+  if (!res.ok) throw new Error(`Open Food Facts error: ${res.status}`)
 
   const data = await res.json()
+  const products: OFFProduct[] = data.products ?? []
 
-  // FatSecret vrací chyby v body s HTTP 200
-  if (data.error) {
-    throw new Error(`FatSecret API error ${data.error.code}: ${data.error.message}`)
-  }
+  return products
+    .filter(p =>
+      p.nutriments?.['energy-kcal_100g'] != null &&
+      (p.product_name || p.product_name_cs)
+    )
+    .slice(0, 12)
+    .map(p => {
+      const n = p.nutriments!
+      const cal = Math.round(n['energy-kcal_100g']!)
+      const prot = Math.round((n.proteins_100g ?? 0) * 10) / 10
+      const carbs = Math.round((n.carbohydrates_100g ?? 0) * 10) / 10
+      const fat = Math.round((n.fat_100g ?? 0) * 10) / 10
+      const name = p.product_name_cs || p.product_name || 'Neznámý produkt'
+      const brand = p.brands ? ` · ${p.brands.split(',')[0].trim()}` : ''
 
-  const foods = data.foods?.food
-  if (!foods) return []
-  return Array.isArray(foods) ? foods : [foods]
+      return {
+        food_id: p._id ?? Math.random().toString(36).slice(2),
+        food_name: name + brand,
+        food_description: `na 100g — ${cal} kcal | B: ${prot}g | S: ${carbs}g | T: ${fat}g`,
+        per_g: 100,
+        calories: cal,
+        protein_g: prot,
+        carbs_g: carbs,
+        fat_g: fat,
+      }
+    })
 }

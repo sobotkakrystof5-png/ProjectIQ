@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import { Search, Plus, Trash2, ChevronLeft, ChevronRight, Loader2, X, UtensilsCrossed } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { parseFoodDescription, type FoodSearchResult } from '@/lib/fatsecret'
+import { type FoodSearchResult } from '@/lib/fatsecret'
 import { getNutritionDay, logFood, deleteFood, type NutritionLog } from './sport-actions'
 import { PROFILE } from './profile'
 
@@ -86,15 +86,11 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
   const [adding, startAdding] = useTransition()
   const [deleting, setDeleting] = useState<string | null>(null)
 
-  // Ověření FatSecret při načtení
+  // Ověření dostupnosti vyhledávání při načtení
   useEffect(() => {
     fetch('/api/fatsecret/search?q=test')
       .then(async r => {
-        if (r.status === 503) {
-          setFsStatus('error')
-          setFsError('FatSecret API není nakonfigurováno')
-          setManualMode(true)
-        } else if (r.status >= 400) {
+        if (r.status >= 400) {
           const body = await r.json().catch(() => ({}))
           setFsStatus('error')
           setFsError(body.error ?? 'Chyba vyhledávání')
@@ -134,17 +130,16 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
   }, [])
 
   const selectFood = (food: FoodSearchResult) => {
-    const macros = parseFoodDescription(food.food_description)
     setSelectedFood({
       food_id: food.food_id,
       food_name: food.food_name,
-      per_g: macros.per_g,
-      calories: macros.calories,
-      protein_g: macros.protein_g,
-      carbs_g: macros.carbs_g,
-      fat_g: macros.fat_g,
+      per_g: food.per_g,
+      calories: food.calories,
+      protein_g: food.protein_g,
+      carbs_g: food.carbs_g,
+      fat_g: food.fat_g,
     })
-    setAmount(macros.per_g)
+    setAmount(food.per_g)
     setQuery('')
     setResults([])
   }

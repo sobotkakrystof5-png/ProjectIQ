@@ -10,16 +10,12 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q')?.trim()
   if (!q || q.length < 2) return NextResponse.json([])
 
-  if (!process.env.FATSECRET_CLIENT_ID) {
-    return NextResponse.json({ error: 'FatSecret API not configured' }, { status: 503 })
-  }
-
   try {
     const results = await searchFoods(q)
     return NextResponse.json(results)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error('[FatSecret] Search error:', msg)
+    console.error('[OpenFoodFacts] Search error:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
