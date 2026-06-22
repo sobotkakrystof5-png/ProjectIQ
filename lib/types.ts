@@ -90,7 +90,7 @@ export interface ConsultationSlot {
   created_at: string | Date
 }
 
-export type LeadStatus = 'cold' | 'warm' | 'hot' | 'converted' | 'lost'
+export type LeadStatus = 'cold' | 'warm' | 'hot' | 'converted' | 'lost' | 'waiting'
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   cold: 'Studený kontakt',
@@ -98,6 +98,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   hot: 'Velký zájem',
   converted: 'Převeden na zakázku',
   lost: 'Ztracen',
+  waiting: 'Čeká na odpověď',
 }
 
 export const LEAD_STATUS_STYLES: Record<LeadStatus, string> = {
@@ -106,6 +107,7 @@ export const LEAD_STATUS_STYLES: Record<LeadStatus, string> = {
   hot: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
   converted: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   lost: 'bg-red-50 text-red-600 ring-1 ring-red-200',
+  waiting: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
 }
 
 export type LeadActionType = 'call' | 'meeting' | 'email' | 'whatsapp' | 'online' | 'other'
@@ -132,6 +134,7 @@ export interface ClientLead {
   next_action_type: LeadActionType | null
   notes: string | null
   estimated_value: number | null
+  call_answered: boolean | null
   reminder_day_before_sent: boolean
   reminder_2h_before_sent: boolean
   created_at: string | Date

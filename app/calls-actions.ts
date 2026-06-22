@@ -24,6 +24,7 @@ export type LeadPayload = {
   next_action_type: LeadActionType | null
   notes: string | null
   estimated_value: number | null
+  call_answered: boolean | null
 }
 
 export async function getLeads() {
@@ -40,7 +41,7 @@ export async function createLead(payload: LeadPayload) {
     INSERT INTO client_leads (
       company_name, contact_name, phone, email,
       lead_status, next_action, next_action_date, next_action_time, next_action_type,
-      notes, estimated_value
+      notes, estimated_value, call_answered
     ) VALUES (
       ${payload.company_name},
       ${payload.contact_name},
@@ -52,7 +53,8 @@ export async function createLead(payload: LeadPayload) {
       ${payload.next_action_time},
       ${payload.next_action_type},
       ${payload.notes},
-      ${payload.estimated_value}
+      ${payload.estimated_value},
+      ${payload.call_answered}
     )
   `
   revalidatePath('/dashboard/calls')
@@ -73,11 +75,30 @@ export async function updateLead(id: string, payload: LeadPayload) {
       next_action_type = ${payload.next_action_type},
       notes = ${payload.notes},
       estimated_value = ${payload.estimated_value},
+      call_answered = ${payload.call_answered},
       reminder_day_before_sent = false,
       reminder_2h_before_sent = false,
       updated_at = now()
     WHERE id = ${id}
   `
+  revalidatePath('/dashboard/calls')
+}
+
+export async function setCallAnswered(id: string, answered: boolean | null) {
+  await requireAuth()
+  await sql`UPDATE client_leads SET call_answered = ${answered}, updated_at = now() WHERE id = ${id}`
+  revalidatePath('/dashboard/calls')
+}
+
+export async function moveLeadToWaiting(id: string) {
+  await requireAuth()
+  await sql`UPDATE client_leads SET lead_status = 'waiting', updated_at = now() WHERE id = ${id}`
+  revalidatePath('/dashboard/calls')
+}
+
+export async function moveLeadFromWaiting(id: string) {
+  await requireAuth()
+  await sql`UPDATE client_leads SET lead_status = 'cold', updated_at = now() WHERE id = ${id}`
   revalidatePath('/dashboard/calls')
 }
 
