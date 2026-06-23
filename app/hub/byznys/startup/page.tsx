@@ -6,6 +6,13 @@ import { StartupProjectCard } from '@/components/StartupProjectCard'
 export default async function StartupPage() {
   const projects = await getStartupProjects()
 
+  const launched = projects.filter(p =>
+    ['launch', 'growth', 'monetization', 'active'].includes(p.phase)
+  ).length
+  const avgProgress = projects.length > 0
+    ? Math.round(projects.reduce((sum, p) => sum + p.progress, 0) / projects.length)
+    : 0
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -28,6 +35,24 @@ export default async function StartupPage() {
           Nový projekt
         </Link>
       </div>
+
+      {/* Dashboard */}
+      {projects.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Celkem projektů</p>
+            <p className="text-2xl font-bold text-foreground tabular-nums">{projects.length}</p>
+          </div>
+          <div className="bg-white border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Spuštěno</p>
+            <p className="text-2xl font-bold text-emerald-600 tabular-nums">{launched}</p>
+          </div>
+          <div className="bg-white border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Průměrný postup</p>
+            <p className="text-2xl font-bold text-brand-600 tabular-nums">{avgProgress} %</p>
+          </div>
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">

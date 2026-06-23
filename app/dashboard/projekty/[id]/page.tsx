@@ -2,22 +2,21 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import {
-  getStartupProject,
-  getStartupImprovements,
-  getStartupChangelog,
-} from '../startup-actions'
-import { StartupProjectEditor } from '@/components/StartupProjectEditor'
-import { AiAssistantsSection } from '@/components/AiAssistantsSection'
+  getPersonalProject,
+  getPersonalProjectImprovements,
+  getPersonalProjectChangelog,
+} from '../projekty-actions'
+import { PersonalProjectEditor } from '@/components/PersonalProjectEditor'
 
 interface Props {
   params: { id: string }
 }
 
-export default async function StartupDetailPage({ params }: Props) {
+export default async function PersonalProjectDetailPage({ params }: Props) {
   const [project, improvements, changelog] = await Promise.all([
-    getStartupProject(params.id),
-    getStartupImprovements(params.id),
-    getStartupChangelog(params.id),
+    getPersonalProject(params.id),
+    getPersonalProjectImprovements(params.id),
+    getPersonalProjectChangelog(params.id),
   ])
 
   if (!project) notFound()
@@ -26,26 +25,20 @@ export default async function StartupDetailPage({ params }: Props) {
     <div className="space-y-6">
       <div>
         <Link
-          href="/hub/byznys/startup"
+          href="/dashboard/projekty"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft size={14} strokeWidth={1.5} />
-          Startup projekty
+          Projekty
         </Link>
         <h1 className="text-2xl font-semibold text-foreground tracking-tight">{project.name}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">{project.segment}</p>
       </div>
 
-      <StartupProjectEditor
+      <PersonalProjectEditor
         project={project}
         improvements={improvements}
         changelog={changelog}
-      />
-
-      <AiAssistantsSection
-        project={project}
-        changelog={changelog}
-        improvements={improvements}
       />
     </div>
   )

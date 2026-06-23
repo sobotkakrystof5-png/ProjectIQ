@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Briefcase, Rocket, ArrowUpRight, ArrowLeft, Plus } from 'lucide-react'
+import { Briefcase, Rocket, ArrowUpRight, ArrowLeft, Layers } from 'lucide-react'
 
 export default function ByznysPage() {
   return (
@@ -16,7 +16,7 @@ export default function ByznysPage() {
         <p className="text-sm text-muted-foreground mt-0.5">Vyber sekci, kterou chceš otevřít</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
         {/* Zakázky */}
         <Link
           href="/dashboard"
@@ -65,6 +65,32 @@ export default function ByznysPage() {
           <div className="mt-5 pt-3 border-t border-border">
             <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
               Otevřít Startup →
+            </span>
+          </div>
+        </Link>
+
+        {/* Projekty */}
+        <Link
+          href="/dashboard/projekty"
+          className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+              <Layers size={22} strokeWidth={1.5} className="text-white" />
+            </div>
+            <ArrowUpRight
+              size={16}
+              strokeWidth={1.5}
+              className="text-muted-foreground/40 group-hover:text-brand-600 transition-colors mt-0.5"
+            />
+          </div>
+          <h2 className="font-semibold text-foreground text-[16px] mb-1.5">Projekty</h2>
+          <p className="text-sm text-muted-foreground flex-1">
+            Osobní projekty ve vývoji — nápady, MVP, prototypy před spuštěním.
+          </p>
+          <div className="mt-5 pt-3 border-t border-border">
+            <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
+              Otevřít Projekty →
             </span>
           </div>
         </Link>

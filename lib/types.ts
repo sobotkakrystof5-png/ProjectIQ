@@ -358,3 +358,45 @@ export const STARTUP_SEGMENTS = [
 ]
 
 export const STARTUP_CURRENCIES = ['CZK', 'EUR', 'USD']
+
+// ─── Personal Projects (sekce Projekty) ───────────────────────────────────────
+
+export interface PersonalProject {
+  id: string
+  name: string
+  segment: string
+  problem: string
+  description: string | null
+  tech_stack: string | null
+  github_url: string | null
+  live_url: string | null
+  monetization: boolean
+  phase: StartupPhase
+  progress: number
+  currency: string
+  planned_investment: number | null
+  notes: string | null
+  archived: boolean
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
+export interface PersonalProjectImprovement {
+  id: string
+  personal_project_id: string
+  content: string
+  status: ImprovementStatus
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
+export interface PersonalProjectChangelogEntry {
+  id: string
+  personal_project_id: string
+  change_date: string
+  change_type: ChangeType
+  description: string
+  progress_from: number | null
+  progress_to: number | null
+  created_at: string | Date
+}
