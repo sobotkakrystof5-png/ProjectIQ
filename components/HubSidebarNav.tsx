@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, GraduationCap, TrendingUp, Dumbbell, Briefcase } from 'lucide-react'
+import { LayoutGrid, GraduationCap, TrendingUp, Dumbbell, Briefcase, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const OVERVIEW = {
@@ -45,6 +45,28 @@ const PILLARS = [
     dot: 'bg-rose-500',
     mobileDot: 'border-b-2 border-rose-500 text-rose-700',
   },
+  {
+    href: '/dashboard/projekty',
+    label: 'Projekty',
+    icon: Layers,
+    activeText: 'text-indigo-700',
+    activeBg: 'bg-indigo-50',
+    hoverBg: 'hover:bg-indigo-50/60',
+    hoverText: 'hover:text-indigo-700',
+    dot: 'bg-indigo-500',
+    mobileDot: 'border-b-2 border-indigo-500 text-indigo-700',
+  },
+  {
+    href: '/hub/byznys',
+    label: 'Byznys',
+    icon: Briefcase,
+    activeText: 'text-brand-800',
+    activeBg: 'bg-brand-50',
+    hoverBg: 'hover:bg-brand-50/60',
+    hoverText: 'hover:text-brand-800',
+    dot: 'bg-brand-600',
+    mobileDot: 'border-b-2 border-brand-600 text-brand-800',
+  },
 ]
 
 interface Props {
@@ -86,13 +108,6 @@ export function HubSidebarNav({ mobile = false }: Props) {
             </Link>
           )
         })}
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
-        >
-          <Briefcase size={13} strokeWidth={1.5} />
-          Zakázky
-        </Link>
       </div>
     )
   }
@@ -139,16 +154,6 @@ export function HubSidebarNav({ mobile = false }: Props) {
         )
       })}
 
-      {/* Business link — external */}
-      <div className="pt-3">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-brand-800 hover:bg-brand-50 transition-colors"
-        >
-          <Briefcase size={15} strokeWidth={1.5} />
-          Zakázky
-        </Link>
-      </div>
     </div>
   )
 }

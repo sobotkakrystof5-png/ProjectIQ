@@ -195,8 +195,14 @@ function ProjectRow({
         <span className="text-sm font-semibold text-emerald-700">
           {Number(project.amount).toLocaleString('cs-CZ')} Kč
         </span>
-        {project.deposit_amount != null && project.deposit_amount > 0 && (
-          <p className="text-xs text-muted-foreground mt-0.5">záloha {Number(project.deposit_amount).toLocaleString('cs-CZ')} Kč</p>
+      </td>
+      <td className="px-3 py-2.5">
+        {project.deposit_amount != null && project.deposit_amount > 0 ? (
+          <span className="text-sm text-amber-700 font-medium">
+            {Number(project.deposit_amount).toLocaleString('cs-CZ')} Kč
+          </span>
+        ) : (
+          <span className="text-muted-foreground/40">—</span>
         )}
       </td>
       <td className="px-3 py-2.5">
@@ -213,15 +219,6 @@ function ProjectRow({
       </td>
       <td className="px-3 py-2.5 max-w-[180px]">
         <span className="text-sm text-muted-foreground truncate block">{project.notes ?? ''}</span>
-      </td>
-      <td className="px-3 py-2.5">
-        {project.deposit_amount != null && project.deposit_amount > 0 ? (
-          <span className="text-sm text-amber-700 font-medium">
-            {Number(project.deposit_amount).toLocaleString('cs-CZ')} Kč
-          </span>
-        ) : (
-          <span className="text-muted-foreground/40">—</span>
-        )}
       </td>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

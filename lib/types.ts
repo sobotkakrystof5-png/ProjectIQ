@@ -227,3 +227,134 @@ export interface CalendarEvent {
   project_id: string | null
   created_at: string | Date
 }
+
+// ─── Startup Projects ─────────────────────────────────────────────────────────
+
+export type StartupPhase =
+  | 'idea'
+  | 'research'
+  | 'mvp'
+  | 'launch'
+  | 'growth'
+  | 'monetization'
+  | 'pivot'
+  | 'active'
+  | 'paused'
+  | 'cancelled'
+
+export const STARTUP_PHASES: {
+  value: StartupPhase
+  label: string
+  emoji: string
+  color: string
+}[] = [
+  { value: 'idea', label: 'Nápad', emoji: '💡', color: 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200' },
+  { value: 'research', label: 'Výzkum / Validace', emoji: '🔬', color: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' },
+  { value: 'mvp', label: 'Vývoj (MVP)', emoji: '🛠️', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' },
+  { value: 'launch', label: 'Spuštění', emoji: '🚀', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+  { value: 'growth', label: 'Růst', emoji: '📈', color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  { value: 'monetization', label: 'Monetizace', emoji: '💰', color: 'bg-green-50 text-green-700 ring-1 ring-green-200' },
+  { value: 'pivot', label: 'Pivotování', emoji: '🔄', color: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200' },
+  { value: 'active', label: 'Aktivní / Stabilní', emoji: '✅', color: 'bg-teal-50 text-teal-700 ring-1 ring-teal-200' },
+  { value: 'paused', label: 'Pozastaveno', emoji: '⏸️', color: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200' },
+  { value: 'cancelled', label: 'Ukončeno', emoji: '❌', color: 'bg-red-50 text-red-600 ring-1 ring-red-200' },
+]
+
+export type ImprovementStatus = 'idea' | 'in_progress' | 'done'
+
+export const IMPROVEMENT_STATUS_LABELS: Record<ImprovementStatus, string> = {
+  idea: 'Nápad',
+  in_progress: 'V řešení',
+  done: 'Hotovo',
+}
+
+export const IMPROVEMENT_STATUS_STYLES: Record<ImprovementStatus, string> = {
+  idea: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  in_progress: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  done: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+}
+
+export type ChangeType = 'development' | 'fix' | 'content' | 'marketing' | 'pricing' | 'strategy' | 'other'
+
+export const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
+  development: 'Vývoj',
+  fix: 'Oprava',
+  content: 'Obsah',
+  marketing: 'Marketing',
+  pricing: 'Cenová změna',
+  strategy: 'Strategie',
+  other: 'Jiné',
+}
+
+export const CHANGE_TYPE_STYLES: Record<ChangeType, string> = {
+  development: 'bg-blue-50 text-blue-700',
+  fix: 'bg-red-50 text-red-700',
+  content: 'bg-slate-50 text-slate-600',
+  marketing: 'bg-pink-50 text-pink-700',
+  pricing: 'bg-green-50 text-green-700',
+  strategy: 'bg-purple-50 text-purple-700',
+  other: 'bg-amber-50 text-amber-700',
+}
+
+export type MonetizationModel = 'saas' | 'onetime'
+
+export interface StartupProject {
+  id: string
+  name: string
+  segment: string
+  problem: string
+  monetization: boolean
+  plan: string | null
+  know_how: string | null
+  notes: string | null
+  live_url: string | null
+  phase: StartupPhase
+  progress: number
+  currency: string
+  planned_investment: number | null
+  total_users: number | null
+  paying_users_pct: number | null
+  monetization_model: MonetizationModel
+  monthly_price: number | null
+  annual_price: number | null
+  annual_discount_pct: number | null
+  onetime_price: number | null
+  archived: boolean
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
+export interface StartupImprovement {
+  id: string
+  startup_project_id: string
+  content: string
+  status: ImprovementStatus
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
+export interface StartupChangelogEntry {
+  id: string
+  startup_project_id: string
+  change_date: string
+  change_type: ChangeType
+  description: string
+  progress_from: number | null
+  progress_to: number | null
+  created_at: string | Date
+}
+
+export const STARTUP_SEGMENTS = [
+  'SaaS',
+  'E-commerce',
+  'B2B',
+  'B2C',
+  'Mobile App',
+  'AI Tool',
+  'Marketplace',
+  'Vlastní nástroj',
+  'Automatizace',
+  'Jiné',
+]
+
+export const STARTUP_CURRENCIES = ['CZK', 'EUR', 'USD']

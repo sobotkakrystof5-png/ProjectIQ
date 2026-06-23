@@ -15,6 +15,7 @@ import {
   Flame,
   BookOpen,
   AlertCircle,
+  Layers,
 } from 'lucide-react'
 
 function formatCZK(amount: number) {
@@ -159,7 +160,7 @@ export default async function HubPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Business */}
         <Link
-          href="/dashboard"
+          href="/hub/byznys"
           className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
         >
           <div className="flex items-start justify-between mb-4">
@@ -370,6 +371,42 @@ export default async function HubPage() {
           <div className="mt-4 pt-3 border-t border-border">
             <span className="text-xs font-semibold text-rose-600 group-hover:text-rose-700 transition-colors">
               Otevřít Sport & Zdraví →
+            </span>
+          </div>
+        </Link>
+
+        {/* Projekty */}
+        <Link
+          href="/dashboard/projekty"
+          className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-indigo-200 transition-all flex flex-col"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-sm">
+              <Layers size={18} strokeWidth={1.5} className="text-white" />
+            </div>
+            <ArrowUpRight
+              size={16}
+              strokeWidth={1.5}
+              className="text-muted-foreground/40 group-hover:text-indigo-600 transition-colors mt-0.5"
+            />
+          </div>
+          <h2 className="font-semibold text-foreground text-[15px] mb-4">Projekty</h2>
+
+          <div className="flex-1 flex flex-col items-center justify-center py-4 gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-2.5 py-0.5">
+                Aplikace
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-2.5 py-0.5">
+                Automatizace
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">Vlastní produkty · Systémy · Nápady</p>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-border">
+            <span className="text-xs font-semibold text-indigo-600 group-hover:text-indigo-700 transition-colors">
+              Otevřít Projekty →
             </span>
           </div>
         </Link>
