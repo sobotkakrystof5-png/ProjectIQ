@@ -79,10 +79,10 @@ async function getSportStats() {
   const today = new Date().toLocaleDateString('sv-SE') // YYYY-MM-DD in local time
   const [scoreRows, calRows, wkRows, weightRows] = await Promise.all([
     sql`
-      SELECT score::float AS score, score_date::text AS score_date
+      SELECT score::float AS score, scored_date::text AS score_date
       FROM health_scores
       WHERE user_id IS NULL
-      ORDER BY score_date DESC
+      ORDER BY scored_date DESC
       LIMIT 1
     `,
     sql`
@@ -100,7 +100,7 @@ async function getSportStats() {
       SELECT weight_kg::float AS weight_kg
       FROM weight_logs
       WHERE user_id IS NULL
-      ORDER BY logged_at DESC
+      ORDER BY created_at DESC
       LIMIT 1
     `,
   ])
