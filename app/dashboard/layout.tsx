@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { CalendarDays, PhoneCall, CheckCircle2, Layers, Receipt, Inbox, Star, Bell, LayoutGrid } from 'lucide-react'
+import { CalendarDays, PhoneCall, CheckCircle2, Receipt, Inbox, Star, Bell, LayoutGrid } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { LogoutButton } from './LogoutButton'
@@ -76,13 +76,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
                     {vizeonCount > 9 ? '9+' : vizeonCount}
                   </span>
                 )}
-              </Link>
-              <Link
-                href="/dashboard/projekty"
-                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
-              >
-                <Layers size={14} strokeWidth={1.5} />
-                Projekty
               </Link>
               <Link
                 href="/dashboard/calendar"
