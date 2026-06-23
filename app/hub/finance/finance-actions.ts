@@ -121,3 +121,45 @@ export async function deleteTransaction(id: string): Promise<void> {
   await sql`DELETE FROM finance_transactions WHERE id = ${id} AND user_id IS NULL`
   revalidatePath('/hub/finance')
 }
+
+// Generates missing recurring cost transactions for the current month/year.
+// Idempotent — safe to call on every page load and from cron.
+// No session auth: called from server components (auth enforced by middleware)
+// and from cron (auth via CRON_SECRET).
+export async function generateRecurringCostTransactions(): Promise<void> {
+  // Fixed monthly → one expense per calendar month (1st of month)
+  await sql`
+    INSERT INTO finance_transactions
+      (amount, type, category, note, date, user_id, source_cost_id, recurring_period)
+    SELECT
+      c.amount::numeric,
+      'expense',
+      'fixní náklady',
+      c.name,
+      DATE_TRUNC('month', CURRENT_DATE)::date,
+      NULL,
+      c.id,
+      TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+    FROM costs c
+    WHERE c.cost_type = 'fixed_monthly'
+    ON CONFLICT (source_cost_id, recurring_period) DO NOTHING
+  `
+
+  // Fixed annual → one expense per calendar year (1st January)
+  await sql`
+    INSERT INTO finance_transactions
+      (amount, type, category, note, date, user_id, source_cost_id, recurring_period)
+    SELECT
+      c.amount::numeric,
+      'expense',
+      'fixní náklady',
+      c.name,
+      DATE_TRUNC('year', CURRENT_DATE)::date,
+      NULL,
+      c.id,
+      TO_CHAR(CURRENT_DATE, 'YYYY')
+    FROM costs c
+    WHERE c.cost_type = 'fixed_annual'
+    ON CONFLICT (source_cost_id, recurring_period) DO NOTHING
+  `
+}

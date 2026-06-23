@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { sendBrandedEmail } from '@/lib/email'
 import { createNotification } from '@/lib/notifications'
+import { generateRecurringCostTransactions } from '@/app/hub/finance/finance-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -145,7 +146,7 @@ async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before')
   })
 }
 
-async function sendSchoolDeadlineReminder(deadlines: DeadlineRow[]) {
+async function sendSchoolDeadlineReminder(deadlines: DeadlineRow[], dayOf = false) {
   const adminEmail = process.env.ADMIN_EMAIL
   if (!adminEmail || deadlines.length === 0) return
 
@@ -154,13 +155,23 @@ async function sendSchoolDeadlineReminder(deadlines: DeadlineRow[]) {
     value: d.title + (d.subject ? ` (${d.subject})` : ''),
   }))
 
-  await sendBrandedEmail({
-    to: adminEmail,
-    subject: `Zítra máš ${deadlines.length === 1 ? 'školní termín' : `${deadlines.length} školní termíny`} – ZakazIQ`,
-    heading: 'Zítra ve škole',
-    intro: 'Připomínám ti termíny na zítra.',
-    fields,
-  })
+  if (dayOf) {
+    await sendBrandedEmail({
+      to: adminEmail,
+      subject: `Dnes ${deadlines.length === 1 ? 'máš školní termín' : `máš ${deadlines.length} školní termíny`} – ZakazIQ`,
+      heading: 'Dnes ve škole',
+      intro: 'Ranní připomínka dnešních školních termínů.',
+      fields,
+    })
+  } else {
+    await sendBrandedEmail({
+      to: adminEmail,
+      subject: `Zítra máš ${deadlines.length === 1 ? 'školní termín' : `${deadlines.length} školní termíny`} – ZakazIQ`,
+      heading: 'Zítra ve škole',
+      intro: 'Připomínám ti termíny na zítra.',
+      fields,
+    })
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -220,7 +231,7 @@ export async function GET(req: NextRequest) {
           BETWEEN now() + interval '1 hour' AND now() + interval '3 hours'
   `) as LeadRow[]
 
-  // ── Školní termíny (připomínka den před — datum bez času) ─────────────────
+  // ── Školní termíny (den před) ──────────────────────────────────────────────
   const schoolDeadlines = (await sql`
     SELECT id, title, subject, type, due_date::text AS due_date
     FROM school_deadlines_manual
@@ -229,7 +240,19 @@ export async function GET(req: NextRequest) {
       AND due_date = CURRENT_DATE + 1
   `) as DeadlineRow[]
 
-  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, school_deadlines: 0, errors: 0 }
+  // ── Školní termíny (ranní připomínka — ve stejný den) ─────────────────────
+  const schoolDeadlinesToday = (await sql`
+    SELECT id, title, subject, type, due_date::text AS due_date
+    FROM school_deadlines_manual
+    WHERE done = false
+      AND reminder_day_of_sent = false
+      AND due_date = CURRENT_DATE
+  `) as DeadlineRow[]
+
+  // Generate recurring cost transactions (monthly/annual) — idempotent
+  await generateRecurringCostTransactions().catch(() => {})
+
+  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, school_deadlines: 0, school_deadlines_today: 0, errors: 0 }
 
   for (const slot of dayBeforeSlots) {
     try {
@@ -306,6 +329,24 @@ export async function GET(req: NextRequest) {
         link: '/hub/school',
       })
       results.school_deadlines = schoolDeadlines.length
+    } catch {
+      results.errors++
+    }
+  }
+
+  if (schoolDeadlinesToday.length > 0) {
+    try {
+      await sendSchoolDeadlineReminder(schoolDeadlinesToday, true)
+      for (const d of schoolDeadlinesToday) {
+        await sql`UPDATE school_deadlines_manual SET reminder_day_of_sent = true WHERE id = ${d.id}`
+      }
+      void createNotification({
+        type: 'reminder_upcoming',
+        title: `Dnes ${schoolDeadlinesToday.length === 1 ? 'školní termín' : `${schoolDeadlinesToday.length} školní termíny`}`,
+        body: schoolDeadlinesToday.map(d => `${DEADLINE_TYPE_LABEL[d.type] ?? d.type}: ${d.title}`).join(' · '),
+        link: '/hub/school',
+      })
+      results.school_deadlines_today = schoolDeadlinesToday.length
     } catch {
       results.errors++
     }

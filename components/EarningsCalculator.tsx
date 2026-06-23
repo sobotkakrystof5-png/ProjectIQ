@@ -51,6 +51,8 @@ export default function EarningsCalculator({
   const clientProjects = projects.filter(p => p.project_type === 'client')
   const clientEarnings = clientProjects.reduce((s, p) => s + Number(p.amount), 0)
   const personalEarnings = projects.filter(p => p.project_type === 'personal').reduce((s, p) => s + Number(p.amount), 0)
+  const totalDeposits = projects.reduce((s, p) => s + (p.deposit_amount != null ? Number(p.deposit_amount) : 0), 0)
+  const clientDeposits = clientProjects.reduce((s, p) => s + (p.deposit_amount != null ? Number(p.deposit_amount) : 0), 0)
   const totalHours = projects.reduce((s, p) => s + (p.time_invested != null ? Number(p.time_invested) : 0), 0)
   const clientHours = clientProjects.reduce((s, p) => s + (p.time_invested != null ? Number(p.time_invested) : 0), 0)
   const personalHours = totalHours - clientHours
@@ -105,7 +107,13 @@ export default function EarningsCalculator({
         <StatCard
           label="Celkové příjmy"
           value={`${fmt(totalEarnings)} Kč`}
-          sub={personalEarnings > 0 ? `${fmt(clientEarnings)} Kč klienti · ${fmt(personalEarnings)} Kč osobní` : undefined}
+          sub={
+            personalEarnings > 0
+              ? `${fmt(clientEarnings)} Kč klienti · ${fmt(personalEarnings)} Kč osobní`
+              : totalDeposits > 0
+                ? `zálohy ${fmt(totalDeposits)} Kč · doplatky ${fmt(totalEarnings - totalDeposits)} Kč`
+                : undefined
+          }
           accent="blue"
         />
         <StatCard
@@ -134,7 +142,7 @@ export default function EarningsCalculator({
       </div>
 
       {clientHours > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${clientDeposits > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={14} className="text-brand-500" strokeWidth={1.5} />
@@ -156,6 +164,32 @@ export default function EarningsCalculator({
             <p className="text-xs text-muted-foreground mt-1">
               {costs.length > 0 ? 'klientský výdělek po nákladech' : 'Přidej náklady v sekci Náklady'}
             </p>
+          </div>
+          {clientDeposits > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <Wallet size={14} className="text-amber-600" strokeWidth={1.5} />
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Zálohy (klienti)</p>
+              </div>
+              <p className="text-2xl font-bold text-amber-700">
+                {fmt(clientDeposits)} Kč
+              </p>
+              <p className="text-xs text-amber-600 mt-1">
+                doplatky {fmt(clientEarnings - clientDeposits)} Kč
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+      {!clientHours && totalDeposits > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet size={14} className="text-amber-600" strokeWidth={1.5} />
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Celkové zálohy</p>
+            </div>
+            <p className="text-2xl font-bold text-amber-700">{fmt(totalDeposits)} Kč</p>
+            <p className="text-xs text-amber-600 mt-1">doplatky {fmt(totalEarnings - totalDeposits)} Kč</p>
           </div>
         </div>
       )}

@@ -33,6 +33,7 @@ const EMPTY_FORM = (type: ProjectType): CompletedProjectPayload => ({
   company: null,
   completed_at: new Date().toISOString().slice(0, 10),
   amount: 0,
+  deposit_amount: null,
   difficulty: 5,
   time_invested: null,
   notes: null,
@@ -97,6 +98,16 @@ function ProjectForm({
           placeholder="Kč"
           value={form.amount || ''}
           onChange={e => setForm(prev => ({ ...prev, amount: Number(e.target.value) || 0 }))}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
+          type="number"
+          min="0"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          placeholder="Záloha Kč"
+          value={form.deposit_amount ?? ''}
+          onChange={e => set('deposit_amount', e.target.value ? Number(e.target.value) : null)}
         />
       </td>
       <td className="px-3 py-2">
@@ -184,6 +195,9 @@ function ProjectRow({
         <span className="text-sm font-semibold text-emerald-700">
           {Number(project.amount).toLocaleString('cs-CZ')} Kč
         </span>
+        {project.deposit_amount != null && project.deposit_amount > 0 && (
+          <p className="text-xs text-muted-foreground mt-0.5">záloha {Number(project.deposit_amount).toLocaleString('cs-CZ')} Kč</p>
+        )}
       </td>
       <td className="px-3 py-2.5">
         <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${difficultyColor(project.difficulty)}`}>
@@ -199,6 +213,15 @@ function ProjectRow({
       </td>
       <td className="px-3 py-2.5 max-w-[180px]">
         <span className="text-sm text-muted-foreground truncate block">{project.notes ?? ''}</span>
+      </td>
+      <td className="px-3 py-2.5">
+        {project.deposit_amount != null && project.deposit_amount > 0 ? (
+          <span className="text-sm text-amber-700 font-medium">
+            {Number(project.deposit_amount).toLocaleString('cs-CZ')} Kč
+          </span>
+        ) : (
+          <span className="text-muted-foreground/40">—</span>
+        )}
       </td>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -323,6 +346,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Datum</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Částka</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Záloha</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Náročnost</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Čas</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Poznámka</th>
@@ -340,7 +364,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
               )}
               {filtered.length === 0 && !addingNew && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     {tab === 'client'
                       ? 'Zatím žádné klientské zakázky. Přidej svoji první dokončenou zakázku.'
                       : 'Zatím žádné osobní projekty. Přidej aplikace, systémy nebo automatizace, které jsi vytvořil.'}
@@ -357,6 +381,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
                       company: project.company,
                       completed_at: new Date(project.completed_at).toISOString().slice(0, 10),
                       amount: Number(project.amount),
+                      deposit_amount: project.deposit_amount != null ? Number(project.deposit_amount) : null,
                       difficulty: project.difficulty,
                       time_invested: project.time_invested != null ? Number(project.time_invested) : null,
                       notes: project.notes,

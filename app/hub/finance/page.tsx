@@ -2,7 +2,7 @@ import { TrendingUp, Calculator, BarChart3, Info } from 'lucide-react'
 import { TradingViewChart } from '@/components/TradingViewChart'
 import { CompoundCalculator } from '@/components/CompoundCalculator'
 import { CashFlowSection } from './CashFlowSection'
-import { getTransactions, getMonthlyAggregates } from './finance-actions'
+import { getTransactions, getMonthlyAggregates, generateRecurringCostTransactions } from './finance-actions'
 
 export default async function FinancePage({
   searchParams,
@@ -10,6 +10,8 @@ export default async function FinancePage({
   searchParams: { month?: string }
 }) {
   const currentMonth = searchParams.month ?? new Date().toISOString().slice(0, 7)
+
+  await generateRecurringCostTransactions()
 
   const [transactions, monthlyAggregates] = await Promise.all([
     getTransactions(currentMonth),

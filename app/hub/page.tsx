@@ -6,11 +6,15 @@ import {
   TrendingUp,
   Dumbbell,
   ArrowUpRight,
-  ChevronRight,
   Clock,
   CreditCard,
   FolderOpen,
   CalendarDays,
+  Activity,
+  Scale,
+  Flame,
+  BookOpen,
+  AlertCircle,
 } from 'lucide-react'
 
 function formatCZK(amount: number) {
@@ -71,8 +75,79 @@ async function getBusinessStats() {
   return { ...stats, nextConsult }
 }
 
+async function getSportStats() {
+  const today = new Date().toLocaleDateString('sv-SE') // YYYY-MM-DD in local time
+  const [scoreRows, calRows, wkRows, weightRows] = await Promise.all([
+    sql`
+      SELECT score::float AS score, score_date::text AS score_date
+      FROM health_scores
+      WHERE user_id IS NULL
+      ORDER BY score_date DESC
+      LIMIT 1
+    `,
+    sql`
+      SELECT COALESCE(SUM(calories), 0)::int AS kcal
+      FROM nutrition_logs
+      WHERE user_id IS NULL AND logged_date = ${today}
+    `,
+    sql`
+      SELECT COUNT(*)::int AS cnt
+      FROM workout_logs
+      WHERE user_id IS NULL
+        AND logged_date >= CURRENT_DATE - INTERVAL '30 days'
+    `,
+    sql`
+      SELECT weight_kg::float AS weight_kg
+      FROM weight_logs
+      WHERE user_id IS NULL
+      ORDER BY logged_at DESC
+      LIMIT 1
+    `,
+  ])
+  return {
+    latestScore: (scoreRows[0] as { score: number; score_date: string } | undefined)?.score ?? null,
+    todayKcal: (calRows[0] as { kcal: number }).kcal,
+    workoutsLast30: (wkRows[0] as { cnt: number }).cnt,
+    latestWeight: (weightRows[0] as { weight_kg: number } | undefined)?.weight_kg ?? null,
+  }
+}
+
+async function getSchoolStats() {
+  const [upcomingRows, nextRows] = await Promise.all([
+    sql`
+      SELECT COUNT(*)::int AS cnt
+      FROM school_deadlines_manual
+      WHERE done = false AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 7
+    `,
+    sql`
+      SELECT title, type, due_date::text AS due_date
+      FROM school_deadlines_manual
+      WHERE done = false AND due_date >= CURRENT_DATE
+      ORDER BY due_date ASC
+      LIMIT 1
+    `,
+  ])
+  const next = nextRows[0] as { title: string; type: string; due_date: string } | undefined
+  return {
+    upcomingCount: (upcomingRows[0] as { cnt: number }).cnt,
+    nextDeadline: next ?? null,
+  }
+}
+
+const DEADLINE_TYPE_LABEL: Record<string, string> = {
+  klassenarbeit: 'KA',
+  homework: 'DÚ',
+  presentation: 'Referát',
+  other: 'Jiné',
+}
+
 export default async function HubPage() {
-  const { active_count, pending_revenue, review_count, nextConsult } = await getBusinessStats()
+  const [business, sport, school] = await Promise.all([
+    getBusinessStats(),
+    getSportStats(),
+    getSchoolStats(),
+  ])
+  const { active_count, pending_revenue, review_count, nextConsult } = business
 
   return (
     <div className="space-y-6">
@@ -188,24 +263,42 @@ export default async function HubPage() {
             <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-purple-700 rounded-xl flex items-center justify-center shadow-sm">
               <GraduationCap size={18} strokeWidth={1.5} className="text-white" />
             </div>
-            <div className="flex items-center mt-0.5">
-              <ChevronRight size={18} strokeWidth={1.5} className="text-muted-foreground group-hover:text-violet-600 transition-colors" />
-            </div>
+            <ArrowUpRight
+              size={16}
+              strokeWidth={1.5}
+              className="text-muted-foreground/40 group-hover:text-violet-600 transition-colors mt-0.5"
+            />
           </div>
           <h2 className="font-semibold text-foreground text-[15px] mb-4">Škola</h2>
 
-          <div className="flex-1 flex flex-col justify-center gap-2">
-            <p className="text-sm text-muted-foreground">Příchozí integrace:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {['LernSax', 'Beste Schule', 'Známky', 'Termíny'].map(tag => (
-                <span
-                  key={tag}
-                  className="text-xs text-muted-foreground/70 bg-muted rounded-full px-2.5 py-0.5"
-                >
-                  {tag}
-                </span>
-              ))}
+          <div className="space-y-2.5 flex-1">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <AlertCircle size={13} strokeWidth={1.5} />
+                Termíny tento týden
+              </span>
+              <span className={`font-semibold tabular-nums ${school.upcomingCount > 0 ? 'text-violet-700' : 'text-foreground'}`}>
+                {school.upcomingCount}
+              </span>
             </div>
+            {school.nextDeadline ? (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <BookOpen size={13} strokeWidth={1.5} />
+                  Příště
+                </span>
+                <span className="font-semibold text-foreground tabular-nums text-right max-w-[140px] truncate" title={school.nextDeadline.title}>
+                  {DEADLINE_TYPE_LABEL[school.nextDeadline.type] ?? school.nextDeadline.type}
+                  {' '}·{' '}
+                  {new Date(school.nextDeadline.due_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center text-sm text-muted-foreground gap-1.5">
+                <BookOpen size={13} strokeWidth={1.5} />
+                Žádné nadcházející termíny
+              </div>
+            )}
           </div>
 
           <div className="mt-4 pt-3 border-t border-border">
@@ -232,18 +325,46 @@ export default async function HubPage() {
           </div>
           <h2 className="font-semibold text-foreground text-[15px] mb-4">Sport & Zdraví</h2>
 
-          <div className="flex-1 flex flex-col justify-center gap-2">
-            <p className="text-sm text-muted-foreground">Příchozí integrace:</p>
-            <div className="flex flex-wrap gap-1.5">
-              {['FatSecret', 'Health Score', 'Gym log', 'Výživa'].map(tag => (
-                <span
-                  key={tag}
-                  className="text-xs text-muted-foreground/70 bg-muted rounded-full px-2.5 py-0.5"
-                >
-                  {tag}
+          <div className="space-y-2.5 flex-1">
+            {sport.latestScore !== null && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Activity size={13} strokeWidth={1.5} />
+                  Health Score
                 </span>
-              ))}
+                <span className={`font-semibold tabular-nums ${sport.latestScore >= 75 ? 'text-emerald-600' : sport.latestScore >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
+                  {sport.latestScore.toFixed(0)} / 100
+                </span>
+              </div>
+            )}
+            {sport.todayKcal > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Flame size={13} strokeWidth={1.5} />
+                  Dnes kcal
+                </span>
+                <span className="font-semibold text-foreground tabular-nums">{sport.todayKcal} kcal</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Dumbbell size={13} strokeWidth={1.5} />
+                Tréninky (30 d.)
+              </span>
+              <span className="font-semibold text-foreground tabular-nums">{sport.workoutsLast30}</span>
             </div>
+            {sport.latestWeight !== null && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Scale size={13} strokeWidth={1.5} />
+                  Váha
+                </span>
+                <span className="font-semibold text-foreground tabular-nums">{sport.latestWeight} kg</span>
+              </div>
+            )}
+            {sport.latestScore === null && sport.todayKcal === 0 && sport.workoutsLast30 === 0 && sport.latestWeight === null && (
+              <p className="text-sm text-muted-foreground">Zatím žádná data — začni logovat!</p>
+            )}
           </div>
 
           <div className="mt-4 pt-3 border-t border-border">

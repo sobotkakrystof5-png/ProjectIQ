@@ -164,6 +164,7 @@ export interface CompletedProject {
   company: string | null
   completed_at: string | Date
   amount: number
+  deposit_amount: number | null
   difficulty: number
   time_invested: number | null
   notes: string | null
