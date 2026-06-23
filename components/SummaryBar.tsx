@@ -2,7 +2,7 @@ import { Briefcase, TrendingUp, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Project } from '@/lib/types'
 
-export type SummaryProject = Pick<Project, 'status' | 'price' | 'paid'>
+export type SummaryProject = Pick<Project, 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid'>
 
 interface SummaryBarProps {
   projects: SummaryProject[]
@@ -11,7 +11,12 @@ interface SummaryBarProps {
 export function SummaryBar({ projects }: SummaryBarProps) {
   const active = projects.filter(p => p.status !== 'paid' && p.status !== 'done').length
   const totalRevenue = projects.reduce((sum, p) => sum + (p.price ?? 0), 0)
-  const unpaid = projects.filter(p => !p.paid && p.price).reduce((sum, p) => sum + (p.price ?? 0), 0)
+  const unpaid = projects
+    .filter(p => !p.paid && p.price)
+    .reduce((sum, p) => {
+      const alreadyPaid = p.deposit_paid && p.deposit_amount ? p.deposit_amount : 0
+      return sum + (p.price ?? 0) - alreadyPaid
+    }, 0)
 
   return (
     <div className="grid grid-cols-3 gap-3">
