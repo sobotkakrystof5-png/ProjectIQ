@@ -3,7 +3,11 @@ import { TradingViewChart } from '@/components/TradingViewChart'
 import { CompoundCalculator } from '@/components/CompoundCalculator'
 import { CashFlowSection } from './CashFlowSection'
 import { FixedCostsSection } from './FixedCostsSection'
-import { getTransactions, getMonthlyAggregates, generateRecurringCostTransactions, getCosts } from './finance-actions'
+import {
+  getTransactions, getMonthlyAggregates,
+  generateRecurringCostTransactions, generateRecurringCashFlowTransactions,
+  getCosts, getRecurringCashFlow,
+} from './finance-actions'
 
 export default async function FinancePage({
   searchParams,
@@ -12,12 +16,16 @@ export default async function FinancePage({
 }) {
   const currentMonth = searchParams.month ?? new Date().toISOString().slice(0, 7)
 
-  await generateRecurringCostTransactions()
+  await Promise.all([
+    generateRecurringCostTransactions(),
+    generateRecurringCashFlowTransactions(),
+  ])
 
-  const [transactions, monthlyAggregates, costs] = await Promise.all([
+  const [transactions, monthlyAggregates, costs, recurringItems] = await Promise.all([
     getTransactions(currentMonth),
     getMonthlyAggregates(),
     getCosts(),
+    getRecurringCashFlow(),
   ])
 
   return (
@@ -76,6 +84,7 @@ export default async function FinancePage({
         transactions={transactions}
         monthlyAggregates={monthlyAggregates}
         currentMonth={currentMonth}
+        recurringItems={recurringItems}
       />
 
       {/* Compound calculator */}
