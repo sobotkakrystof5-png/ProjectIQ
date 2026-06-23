@@ -2,7 +2,8 @@ import { TrendingUp, Calculator, BarChart3, Info } from 'lucide-react'
 import { TradingViewChart } from '@/components/TradingViewChart'
 import { CompoundCalculator } from '@/components/CompoundCalculator'
 import { CashFlowSection } from './CashFlowSection'
-import { getTransactions, getMonthlyAggregates, generateRecurringCostTransactions } from './finance-actions'
+import { FixedCostsSection } from './FixedCostsSection'
+import { getTransactions, getMonthlyAggregates, generateRecurringCostTransactions, getCosts } from './finance-actions'
 
 export default async function FinancePage({
   searchParams,
@@ -13,9 +14,10 @@ export default async function FinancePage({
 
   await generateRecurringCostTransactions()
 
-  const [transactions, monthlyAggregates] = await Promise.all([
+  const [transactions, monthlyAggregates, costs] = await Promise.all([
     getTransactions(currentMonth),
     getMonthlyAggregates(),
+    getCosts(),
   ])
 
   return (
@@ -65,6 +67,9 @@ export default async function FinancePage({
         </div>
         <TradingViewChart symbol="XETR:VWCE" interval="W" height={460} />
       </div>
+
+      {/* Fixní náklady */}
+      <FixedCostsSection costs={costs} />
 
       {/* Cash Flow */}
       <CashFlowSection

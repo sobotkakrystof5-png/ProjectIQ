@@ -6,6 +6,17 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export type TransactionType = 'income' | 'expense'
+export type CostType = 'fixed_monthly' | 'fixed_annual' | 'one_time'
+
+export interface Cost {
+  id: string
+  name: string
+  amount: number
+  cost_type: CostType
+  category: string
+  description: string | null
+  created_at: string
+}
 
 export interface FinanceTransaction {
   id: string
@@ -119,6 +130,61 @@ export async function createTransaction(data: {
 export async function deleteTransaction(id: string): Promise<void> {
   await requireAuth()
   await sql`DELETE FROM finance_transactions WHERE id = ${id} AND user_id IS NULL`
+  revalidatePath('/hub/finance')
+}
+
+export async function getCosts(): Promise<Cost[]> {
+  await requireAuth()
+  const rows = await sql`
+    SELECT
+      id::text,
+      name,
+      amount::float AS amount,
+      cost_type,
+      category,
+      description,
+      created_at::text
+    FROM costs
+    WHERE TRUE
+    ORDER BY cost_type, name
+  `
+  return rows as Cost[]
+}
+
+export async function createCost(data: {
+  name: string
+  amount: number
+  cost_type: CostType
+  category: string
+  description?: string
+}): Promise<{ error?: string }> {
+  try {
+    await requireAuth()
+    if (!data.name?.trim()) return { error: 'Název je povinný' }
+    if (!data.amount || data.amount <= 0) return { error: 'Neplatná částka' }
+    if (!data.cost_type) return { error: 'Typ nákladu je povinný' }
+
+    await sql`
+      INSERT INTO costs (name, amount, cost_type, category, description)
+      VALUES (
+        ${data.name.trim()},
+        ${data.amount},
+        ${data.cost_type},
+        ${data.category},
+        ${data.description?.trim() || null}
+      )
+    `
+
+    revalidatePath('/hub/finance')
+    return {}
+  } catch {
+    return { error: 'Nepodařilo se uložit náklad' }
+  }
+}
+
+export async function deleteCost(id: string): Promise<void> {
+  await requireAuth()
+  await sql`DELETE FROM costs WHERE id = ${id}`
   revalidatePath('/hub/finance')
 }
 
