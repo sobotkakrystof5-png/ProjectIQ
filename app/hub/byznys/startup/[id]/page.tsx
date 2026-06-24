@@ -5,6 +5,7 @@ import {
   getStartupProject,
   getStartupImprovements,
   getStartupChangelog,
+  getWaitlistEntries,
 } from '../startup-actions'
 import { StartupProjectEditor } from '@/components/StartupProjectEditor'
 import { AiAssistantsSection } from '@/components/AiAssistantsSection'
@@ -21,6 +22,10 @@ export default async function StartupDetailPage({ params }: Props) {
   ])
 
   if (!project) notFound()
+
+  const waitlistEntries = project.waitlist_db_url
+    ? await getWaitlistEntries(project.waitlist_db_url)
+    : undefined
 
   return (
     <div className="space-y-6">
@@ -40,6 +45,7 @@ export default async function StartupDetailPage({ params }: Props) {
         project={project}
         improvements={improvements}
         changelog={changelog}
+        waitlistEntries={waitlistEntries}
       />
 
       <AiAssistantsSection

@@ -320,8 +320,18 @@ export interface StartupProject {
   annual_discount_pct: number | null
   onetime_price: number | null
   archived: boolean
+  waitlist_db_url: string | null
   created_at: string | Date
   updated_at: string | Date | null
+}
+
+export interface WaitlistEntry {
+  id: number
+  email: string
+  name: string | null
+  locale: string
+  created_at: string
+  launch_notified: boolean
 }
 
 export interface StartupImprovement {

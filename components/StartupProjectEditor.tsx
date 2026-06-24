@@ -6,12 +6,12 @@ import { toast } from 'sonner'
 import {
   ChevronDown, ChevronUp, Loader2, Archive, Trash2,
   ExternalLink, Save, Info, BookOpen, Calculator,
-  Lightbulb, StickyNote, Link2, Rocket, TrendingUp,
+  Lightbulb, StickyNote, Link2, Rocket, TrendingUp, Users,
 } from 'lucide-react'
 import {
   STARTUP_PHASES, STARTUP_SEGMENTS, STARTUP_CURRENCIES,
   type StartupProject, type StartupImprovement, type StartupChangelogEntry,
-  type StartupPhase, type MonetizationModel,
+  type StartupPhase, type MonetizationModel, type WaitlistEntry,
 } from '@/lib/types'
 import {
   updateStartupProject,
@@ -20,6 +20,7 @@ import {
 } from '@/app/hub/byznys/startup/startup-actions'
 import { StartupImprovements } from '@/components/StartupImprovements'
 import { StartupChangelog } from '@/components/StartupChangelog'
+import { WaitlistSection } from '@/components/WaitlistSection'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,11 +127,12 @@ interface Props {
   project: StartupProject
   improvements: StartupImprovement[]
   changelog: StartupChangelogEntry[]
+  waitlistEntries?: WaitlistEntry[]
 }
 
-type SectionId = 'basic' | 'plan' | 'calc' | 'know_how' | 'notes' | 'url' | 'phase' | 'improvements' | 'changelog'
+type SectionId = 'basic' | 'plan' | 'calc' | 'know_how' | 'notes' | 'url' | 'phase' | 'improvements' | 'changelog' | 'waitlist'
 
-export function StartupProjectEditor({ project, improvements, changelog }: Props) {
+export function StartupProjectEditor({ project, improvements, changelog, waitlistEntries }: Props) {
   const router = useRouter()
 
   // ── Form state ──
@@ -147,6 +149,7 @@ export function StartupProjectEditor({ project, improvements, changelog }: Props
   const [knowHow, setKnowHow] = useState(project.know_how ?? '')
   const [notes, setNotes] = useState(project.notes ?? '')
   const [liveUrl, setLiveUrl] = useState(project.live_url ?? '')
+  const [waitlistDbUrl, setWaitlistDbUrl] = useState(project.waitlist_db_url ?? '')
   const [phase, setPhase] = useState<StartupPhase>(project.phase)
   const [progress, setProgress] = useState(project.progress)
   const [currency, setCurrency] = useState(project.currency)
@@ -227,6 +230,7 @@ export function StartupProjectEditor({ project, improvements, changelog }: Props
       annual_price: numOrNull(annualPrice),
       annual_discount_pct: numOrNull(annualDiscountPct),
       onetime_price: numOrNull(onetimePrice),
+      waitlist_db_url: waitlistDbUrl.trim() || null,
     })
     setSaving(false)
     if (result.error) toast.error(result.error)
@@ -684,6 +688,19 @@ export function StartupProjectEditor({ project, improvements, changelog }: Props
             </a>
           )}
         </div>
+        <div>
+          <label className={labelCls}>Waitlist DB URL</label>
+          <input
+            type="text"
+            value={waitlistDbUrl}
+            onChange={e => setWaitlistDbUrl(e.target.value)}
+            placeholder="postgresql://…@….neon.tech/neondb?sslmode=require"
+            className={inputCls}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Neon DB connection string pro waitlist prelaunch stránky. Po uložení se zobrazí záložka Waitlist.
+          </p>
+        </div>
       </Section>
 
       {/* ── SECTION: Nápady na zlepšení ── */}
@@ -707,6 +724,24 @@ export function StartupProjectEditor({ project, improvements, changelog }: Props
       >
         <StartupChangelog projectId={project.id} initialEntries={changelog} />
       </Section>
+
+      {/* ── SECTION: Waitlist ── */}
+      {waitlistEntries !== undefined && (
+        <Section
+          id="waitlist"
+          title={`Waitlist${waitlistEntries.length > 0 ? ` (${waitlistEntries.length})` : ''}`}
+          icon={<Users size={15} strokeWidth={1.5} />}
+          open={open.has('waitlist')}
+          onToggle={() => toggle('waitlist')}
+        >
+          <WaitlistSection
+            projectId={project.id}
+            entries={waitlistEntries}
+            appUrl={liveUrl || 'https://estatiq.cz'}
+            dbUrl={waitlistDbUrl}
+          />
+        </Section>
+      )}
 
       {/* Bottom save */}
       <div className="flex justify-end pb-4">
