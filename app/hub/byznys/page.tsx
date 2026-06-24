@@ -71,7 +71,7 @@ export default function ByznysPage() {
 
         {/* Projekty */}
         <Link
-          href="/dashboard/projekty"
+          href="/hub/projekty"
           className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
         >
           <div className="flex items-start justify-between mb-4">

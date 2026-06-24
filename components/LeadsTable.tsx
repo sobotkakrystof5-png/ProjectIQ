@@ -227,13 +227,22 @@ function LeadForm({
         </div>
       </td>
       <td className="px-3 py-2">
-        <input
-          type="number"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          placeholder="Kč"
-          value={form.estimated_value ?? ''}
-          onChange={e => set('estimated_value', e.target.value ? Number(e.target.value) : null)}
-        />
+        <div className="flex flex-col gap-1">
+          <input
+            type="number"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="Kč"
+            value={form.estimated_value ?? ''}
+            onChange={e => set('estimated_value', e.target.value ? Number(e.target.value) : null)}
+          />
+          <textarea
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+            placeholder="Poznámka…"
+            value={form.notes ?? ''}
+            rows={2}
+            onChange={e => set('notes', e.target.value)}
+          />
+        </div>
       </td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-1">
@@ -394,14 +403,107 @@ function LeadRow({
   )
 }
 
+function WaitingLeadForm({
+  initial,
+  onSave,
+  onCancel,
+  isPending,
+}: {
+  initial: LeadPayload
+  onSave: (data: LeadPayload) => void
+  onCancel: () => void
+  isPending: boolean
+}) {
+  const [form, setForm] = useState<LeadPayload>(initial)
+  const set = (field: keyof LeadPayload, value: string | number | null) => {
+    setForm(prev => ({ ...prev, [field]: value === '' ? null : value }))
+  }
+
+  return (
+    <tr className="bg-sky-50/40">
+      <td className="px-3 py-2">
+        <input
+          autoFocus
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          placeholder="Název firmy *"
+          value={form.company_name}
+          onChange={e => setForm(prev => ({ ...prev, company_name: e.target.value }))}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          placeholder="Jméno"
+          value={form.contact_name ?? ''}
+          onChange={e => set('contact_name', e.target.value)}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          placeholder="+420…"
+          value={form.phone ?? ''}
+          onChange={e => set('phone', e.target.value)}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
+          type="email"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          placeholder="email@firma.cz"
+          value={form.email ?? ''}
+          onChange={e => set('email', e.target.value)}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <textarea
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+          placeholder="Poznámka…"
+          value={form.notes ?? ''}
+          rows={2}
+          onChange={e => set('notes', e.target.value)}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
+          type="number"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          placeholder="Kč"
+          value={form.estimated_value ?? ''}
+          onChange={e => set('estimated_value', e.target.value ? Number(e.target.value) : null)}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <div className="flex items-center gap-1">
+          <button
+            disabled={!form.company_name.trim() || isPending}
+            onClick={() => form.company_name.trim() && onSave(form)}
+            className="p-1.5 rounded-md bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Check size={14} />
+          </button>
+          <button
+            onClick={onCancel}
+            className="p-1.5 rounded-md text-muted-foreground hover:bg-slate-100 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 function WaitingRow({
   lead,
+  onEdit,
   onConvert,
   onMoveBack,
   onDelete,
   isPending,
 }: {
   lead: ClientLead
+  onEdit: () => void
   onConvert: () => void
   onMoveBack: () => void
   onDelete: () => void
@@ -474,6 +576,13 @@ function WaitingRow({
             <Undo2 size={13} strokeWidth={1.5} />
           </button>
           <button
+            onClick={onEdit}
+            title="Upravit"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-50 transition-colors"
+          >
+            <Pencil size={13} strokeWidth={1.5} />
+          </button>
+          <button
             onClick={onDelete}
             disabled={isPending}
             className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
@@ -490,6 +599,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
   const [leads, setLeads] = useState<ClientLead[]>(initialLeads)
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const activeLeads = leads.filter(l => l.lead_status !== 'waiting')
@@ -525,6 +635,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
         } : l)
       )
       setEditingId(null)
+      setEditingWaitingId(null)
     })
   }
 
@@ -704,16 +815,40 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
                     </td>
                   </tr>
                 )}
-                {waitingLeads.map(lead => (
-                  <WaitingRow
-                    key={lead.id}
-                    lead={lead}
-                    onConvert={() => handleConvert(lead.id)}
-                    onMoveBack={() => handleMoveFromWaiting(lead.id)}
-                    onDelete={() => handleDelete(lead.id)}
-                    isPending={isPending}
-                  />
-                ))}
+                {waitingLeads.map(lead =>
+                  editingWaitingId === lead.id ? (
+                    <WaitingLeadForm
+                      key={lead.id}
+                      initial={{
+                        company_name: lead.company_name,
+                        contact_name: lead.contact_name,
+                        phone: lead.phone,
+                        email: lead.email,
+                        lead_status: lead.lead_status,
+                        next_action: lead.next_action,
+                        next_action_date: lead.next_action_date,
+                        next_action_time: lead.next_action_time,
+                        next_action_type: lead.next_action_type,
+                        notes: lead.notes,
+                        estimated_value: lead.estimated_value,
+                        call_answered: lead.call_answered,
+                      }}
+                      onSave={(data) => handleUpdate(lead.id, data)}
+                      onCancel={() => setEditingWaitingId(null)}
+                      isPending={isPending}
+                    />
+                  ) : (
+                    <WaitingRow
+                      key={lead.id}
+                      lead={lead}
+                      onEdit={() => { setEditingWaitingId(lead.id); setEditingId(null) }}
+                      onConvert={() => handleConvert(lead.id)}
+                      onMoveBack={() => handleMoveFromWaiting(lead.id)}
+                      onDelete={() => handleDelete(lead.id)}
+                      isPending={isPending}
+                    />
+                  )
+                )}
               </tbody>
             </table>
           </div>

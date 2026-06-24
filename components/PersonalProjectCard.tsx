@@ -11,7 +11,7 @@ export function PersonalProjectCard({ project }: Props) {
 
   return (
     <Link
-      href={`/dashboard/projekty/${project.id}`}
+      href={`/hub/projekty/${project.id}`}
       className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
     >
       {/* Header */}

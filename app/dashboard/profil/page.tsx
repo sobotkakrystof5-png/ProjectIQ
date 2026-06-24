@@ -443,7 +443,7 @@ export default async function ProfilPage() {
             { href: '/dashboard/hodnoceni', label: 'Hodnocení', icon: <Star size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/dokoncene', label: 'Dokončené', icon: <CheckCircle2 size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/naklady', label: 'Náklady', icon: <Receipt size={14} strokeWidth={1.5} /> },
-            { href: '/dashboard/projekty', label: 'Projekty', icon: <Briefcase size={14} strokeWidth={1.5} /> },
+            { href: '/hub/projekty', label: 'Projekty', icon: <Briefcase size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/new', label: 'Nová zakázka', icon: <Clock size={14} strokeWidth={1.5} /> },
           ].map(({ href, label, icon }) => (
             <a

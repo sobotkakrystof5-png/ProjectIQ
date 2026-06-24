@@ -30,7 +30,7 @@ import {
   deletePersonalImprovement,
   addPersonalChangelogEntry,
   deletePersonalChangelogEntry,
-} from '@/app/dashboard/projekty/projekty-actions'
+} from '@/app/hub/projekty/projekty-actions'
 
 function numOrNull(v: string): number | null {
   const n = parseFloat(v.replace(',', '.'))

@@ -86,12 +86,24 @@ const labelCls = 'block text-sm font-medium text-foreground mb-1.5'
 
 // ─── CalcCard ─────────────────────────────────────────────────────────────────
 
-function CalcCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function CalcCard({ label, value, sub, highlight }: {
+  label: string; value: string; sub?: string; highlight?: 'positive' | 'negative'
+}) {
   return (
-    <div className="bg-muted/40 rounded-xl p-3.5">
+    <div className={`rounded-xl p-3.5 ${
+      highlight === 'positive' ? 'bg-emerald-50 border border-emerald-200'
+      : highlight === 'negative' ? 'bg-red-50 border border-red-200'
+      : 'bg-muted/40'
+    }`}>
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <p className="text-base font-semibold text-foreground">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+      <p className={`text-base font-semibold ${
+        highlight === 'positive' ? 'text-emerald-700'
+        : highlight === 'negative' ? 'text-red-600'
+        : 'text-foreground'
+      }`}>{value}</p>
+      {sub && <p className={`text-xs mt-0.5 ${
+        highlight === 'negative' ? 'text-red-400' : 'text-muted-foreground'
+      }`}>{sub}</p>}
     </div>
   )
 }
@@ -102,14 +114,14 @@ function MiniBarChart({ data, currency }: { data: number[]; currency: string }) 
   const max = Math.max(...data, 1)
   return (
     <div>
-      <p className="text-xs text-muted-foreground mb-2">Kumulativní příjem (MRR × měsíce)</p>
+      <p className="text-xs text-muted-foreground mb-2">📈 Jak roste příjem v průběhu roku</p>
       <div className="flex items-end gap-1 h-16">
         {data.map((v, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
             <div
               className="w-full brand-gradient rounded-sm transition-all"
               style={{ height: `${(v / max) * 52}px` }}
-              title={formatCurrency(v, currency)}
+              title={`Měsíc ${i + 1}: ${formatCurrency(v, currency)}`}
             />
             {(i === 0 || i === 5 || i === 11) && (
               <span className="text-[9px] text-muted-foreground">{i + 1}</span>
@@ -454,10 +466,14 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         open={open.has('calc')}
         onToggle={() => toggle('calc')}
       >
-        {/* Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <p className="text-xs text-muted-foreground -mt-1">
+          Zadej čísla a kalkulačka sama spočítá, jestli projekt dává smysl.
+        </p>
+
+        {/* ── Vstupní čísla ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className={labelCls}>Plánovaná investice</label>
+            <label className={labelCls}>💸 Kolik investuješ?</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -475,57 +491,74 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 {STARTUP_CURRENCIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">Vývoj, marketing, domény, nástroje…</p>
           </div>
+
           <div>
-            <label className={labelCls}>Celkový počet uživatelů</label>
+            <label className={labelCls}>👥 Celkem uživatelů</label>
             <input
               type="number"
               value={totalUsers}
               onChange={e => setTotalUsers(e.target.value)}
-              placeholder="1000"
+              placeholder="1 000"
               min={0}
               className={inputCls}
             />
+            <p className="text-xs text-muted-foreground mt-1">Kolik lidí bude produkt používat?</p>
           </div>
+
           <div>
-            <label className={labelCls}>% platících uživatelů</label>
-            <input
-              type="number"
-              value={payingUsersPct}
-              onChange={e => setPayingUsersPct(e.target.value)}
-              placeholder="5"
-              min={0}
-              max={100}
-              step="0.1"
-              className={inputCls}
-            />
-            {payingUsers > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">{payingUsers} platících uživatelů</p>
-            )}
+            <label className={labelCls}>💳 Z toho platících</label>
+            <div className="relative">
+              <input
+                type="number"
+                value={payingUsersPct}
+                onChange={e => setPayingUsersPct(e.target.value)}
+                placeholder="5"
+                min={0}
+                max={100}
+                step="0.1"
+                className={`${inputCls} pr-8`}
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+            </div>
+            {payingUsers > 0
+              ? <p className="text-xs text-brand-600 font-medium mt-1">= {payingUsers} platících zákazníků</p>
+              : <p className="text-xs text-muted-foreground mt-1">Typicky 2–10 % uživatelů platí</p>
+            }
           </div>
         </div>
 
-        {/* Model toggle */}
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-xl w-fit">
-          {(['saas', 'onetime'] as const).map(m => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMonetizationModel(m)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                monetizationModel === m
-                  ? 'bg-white text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {m === 'saas' ? 'SaaS / Předplatné' : 'Jednorázový prodej'}
-            </button>
-          ))}
+        {/* ── Jak zákazníci platí? ── */}
+        <div>
+          <p className="text-sm font-medium text-foreground mb-2">Jak zákazníci platí?</p>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { key: 'saas' as const, emoji: '📅', title: 'Opakovaně', sub: 'jako Netflix nebo Spotify' },
+              { key: 'onetime' as const, emoji: '💳', title: 'Jednorázově', sub: 'jako nákup v obchodě' },
+            ] as const).map(m => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setMonetizationModel(m.key)}
+                className={`px-4 py-3.5 rounded-xl border text-left transition-all ${
+                  monetizationModel === m.key
+                    ? 'border-brand-500 bg-brand-50 shadow-sm'
+                    : 'border-border hover:border-brand-200 hover:bg-muted/30'
+                }`}
+              >
+                <p className={`text-sm font-medium ${monetizationModel === m.key ? 'text-brand-700' : 'text-foreground'}`}>
+                  {m.emoji} {m.title}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{m.sub}</p>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Model-specific inputs */}
+        {/* ── Cena ── */}
         {monetizationModel === 'saas' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Měsíční cena ({currency})</label>
               <input
@@ -537,9 +570,13 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 step="0.01"
                 className={inputCls}
               />
+              <p className="text-xs text-muted-foreground mt-1">Zákazník platí každý měsíc</p>
             </div>
             <div>
-              <label className={labelCls}>Roční cena ({currency})</label>
+              <label className={labelCls}>
+                Roční cena ({currency}){' '}
+                <span className="font-normal text-muted-foreground">(nepovinné)</span>
+              </label>
               <input
                 type="number"
                 value={annualPrice}
@@ -549,23 +586,12 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 step="0.01"
                 className={inputCls}
               />
-            </div>
-            <div>
-              <label className={labelCls}>Sleva roční vs. měsíční (%)</label>
-              <input
-                type="number"
-                value={annualDiscountPct}
-                onChange={e => setAnnualDiscountPct(e.target.value)}
-                placeholder="20"
-                min={0}
-                max={100}
-                className={inputCls}
-              />
+              <p className="text-xs text-muted-foreground mt-1">Zvýhodněné předplatné na celý rok</p>
             </div>
           </div>
         ) : (
           <div className="max-w-xs">
-            <label className={labelCls}>Jednorázová cena ({currency})</label>
+            <label className={labelCls}>Cena produktu ({currency})</label>
             <input
               type="number"
               value={onetimePrice}
@@ -575,52 +601,93 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               step="0.01"
               className={inputCls}
             />
+            <p className="text-xs text-muted-foreground mt-1">Zákazník zaplatí jednou a produkt vlastní</p>
           </div>
         )}
 
-        {/* Results */}
-        {calcResults.type === 'saas' && (calcResults.mrr > 0 || calcResults.arr > 0) && (
-          <div className="space-y-3">
+        {/* ── Výsledky: Opakované platby ── */}
+        {calcResults.type === 'saas' && calcResults.mrr > 0 && (
+          <div className="space-y-3 pt-1">
+            <div className="bg-gradient-to-br from-brand-50 to-violet-50 border border-brand-100 rounded-xl p-4">
+              <p className="text-sm text-brand-800 leading-relaxed">
+                💡 S <strong>{payingUsers} platícími zákazníky</strong> budeš vydělávat{' '}
+                <strong>{formatCurrency(calcResults.mrr, currency)} každý měsíc</strong>.
+                {calcResults.breakEven !== null && (
+                  <>
+                    {' '}Investice se ti vrátí za{' '}
+                    <strong>
+                      {calcResults.breakEven}{' '}
+                      {calcResults.breakEven === 1 ? 'měsíc' : calcResults.breakEven <= 4 ? 'měsíce' : 'měsíců'}
+                    </strong>
+                    {' '}a pak je vše čistý zisk.
+                  </>
+                )}
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <CalcCard
-                label="MRR (měsíční výnos)"
+                label="Měsíční příjem"
                 value={formatCurrency(calcResults.mrr, currency)}
+                sub="každý měsíc na účtu"
+                highlight="positive"
               />
               <CalcCard
-                label="ARR (roční výnos)"
-                value={formatCurrency(calcResults.arr, currency)}
-                sub="z ročního předplatného"
+                label="Roční příjem"
+                value={formatCurrency(calcResults.arr > 0 ? calcResults.arr : calcResults.mrr * 12, currency)}
+                sub={calcResults.arr > 0 ? 'z ročního předplatného' : 'odhad za 12 měsíců'}
+                highlight="positive"
               />
               {calcResults.breakEven !== null && (
                 <CalcCard
-                  label="Break-even"
+                  label="Vrátí se za"
                   value={`${calcResults.breakEven} měs.`}
-                  sub="kdy se vrátí investice"
+                  sub="pak je vše čistý zisk"
                 />
               )}
             </div>
+
             <MiniBarChart data={calcResults.monthlyGrowth} currency={currency} />
           </div>
         )}
 
+        {/* ── Výsledky: Jednorázový prodej ── */}
         {calcResults.type === 'onetime' && calcResults.totalRevenue > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <CalcCard
-              label="Celkový výnos"
-              value={formatCurrency(calcResults.totalRevenue, currency)}
-            />
-            <CalcCard
-              label="Čistý zisk"
-              value={formatCurrency(calcResults.netProfit, currency)}
-              sub={calcResults.netProfit >= 0 ? 'po odečtení investice' : 'ztráta'}
-            />
-            {calcResults.roi !== null && (
+          <div className="space-y-3 pt-1">
+            <div className={`border rounded-xl p-4 ${
+              calcResults.netProfit >= 0
+                ? 'bg-gradient-to-br from-brand-50 to-violet-50 border-brand-100'
+                : 'bg-red-50 border-red-100'
+            }`}>
+              <p className={`text-sm leading-relaxed ${calcResults.netProfit >= 0 ? 'text-brand-800' : 'text-red-700'}`}>
+                {calcResults.netProfit >= 0
+                  ? <>💡 Prodáš-li <strong>{payingUsers} zákazníkům</strong>, celkem vyděláš <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>. Po odečtení investice ti zbyde čistý zisk <strong>{formatCurrency(calcResults.netProfit, currency)}</strong>.</>
+                  : <>⚠️ Při <strong>{payingUsers} zákaznících</strong> vydělá projekt <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>, ale investice ještě není pokryta — budeš ve ztrátě <strong>{formatCurrency(Math.abs(calcResults.netProfit), currency)}</strong>. Zkus zvýšit cenu nebo počet zákazníků.</>
+                }
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <CalcCard
-                label="ROI"
-                value={`${calcResults.roi.toFixed(1)} %`}
-                sub="návratnost investice"
+                label="Celkový příjem"
+                value={formatCurrency(calcResults.totalRevenue, currency)}
+                sub="od všech zákazníků"
               />
-            )}
+              <CalcCard
+                label="Čistý zisk"
+                value={formatCurrency(calcResults.netProfit, currency)}
+                sub={calcResults.netProfit >= 0 ? 'po odečtení investice' : 'stále ve ztrátě'}
+                highlight={calcResults.netProfit >= 0 ? 'positive' : 'negative'}
+              />
+              {calcResults.roi !== null && (
+                <CalcCard
+                  label="Výnosnost"
+                  value={`${calcResults.roi.toFixed(0)} %`}
+                  sub={calcResults.roi >= 100 ? 'zdvojnásobení investice' : calcResults.roi >= 0 ? 'kladná návratnost' : 'záporná návratnost'}
+                  highlight={calcResults.roi >= 0 ? 'positive' : 'negative'}
+                />
+              )}
+            </div>
           </div>
         )}
       </Section>

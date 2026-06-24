@@ -46,7 +46,7 @@ const PILLARS = [
     mobileDot: 'border-b-2 border-rose-500 text-rose-700',
   },
   {
-    href: '/dashboard/projekty',
+    href: '/hub/projekty',
     label: 'Projekty',
     icon: Layers,
     activeText: 'text-indigo-700',
