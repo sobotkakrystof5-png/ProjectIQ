@@ -209,7 +209,7 @@ export function WorkoutSection({ initialWorkouts, onMutated }: Props) {
                 onChange={e => setDuration(e.target.value)}
                 placeholder="60"
                 min={1}
-                className="w-full text-sm border border-border rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-rose-200 text-center"
+                className="w-full text-sm border border-border rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-rose-200 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
           </div>

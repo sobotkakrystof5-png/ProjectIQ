@@ -187,7 +187,7 @@ export function WeightSection({ initialLogs, initialLast }: Props) {
                   onChange={e => { setInputVal(e.target.value); setError('') }}
                   onKeyDown={e => e.key === 'Enter' && handleSave()}
                   placeholder={todayLog ? String(todayLog.weight_kg) : (last ? String(last.weight_kg) : '53.5')}
-                  className="w-full text-lg border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200 bg-background tabular-nums"
+                  className="w-full text-lg border border-border rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-rose-200 bg-background tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">kg</span>
               </div>

@@ -454,7 +454,7 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
                         type="number"
                         value={amount}
                         onChange={e => setAmount(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-24 text-base border border-border rounded-lg px-3 py-2 text-center tabular-nums bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-rose-200"
+                        className="w-24 text-base border border-border rounded-lg px-3 py-2 text-center tabular-nums bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         min={1}
                       />
                       <span className="text-sm text-muted-foreground">g</span>
@@ -497,7 +497,7 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
                       onChange={e => setManualCal(e.target.value)}
                       placeholder="350"
                       min={0}
-                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   <div>
@@ -508,7 +508,7 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
                       onChange={e => setManualP(e.target.value)}
                       placeholder="30"
                       min={0}
-                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   <div>
@@ -519,7 +519,7 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
                       onChange={e => setManualC(e.target.value)}
                       placeholder="40"
                       min={0}
-                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   <div>
@@ -530,7 +530,7 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
                       onChange={e => setManualF(e.target.value)}
                       placeholder="12"
                       min={0}
-                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      className="w-full text-sm border border-border rounded-xl px-3 py-2.5 text-center tabular-nums bg-background focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                 </div>
