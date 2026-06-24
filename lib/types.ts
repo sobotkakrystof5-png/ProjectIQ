@@ -298,6 +298,15 @@ export const CHANGE_TYPE_STYLES: Record<ChangeType, string> = {
 
 export type MonetizationModel = 'saas' | 'onetime'
 
+export interface PricingTier {
+  id: string
+  name: string
+  monthlyPrice: number
+  annualPrice: number
+  users: number
+  benefits: string[]
+}
+
 export interface StartupProject {
   id: string
   name: string
@@ -319,6 +328,7 @@ export interface StartupProject {
   annual_price: number | null
   annual_discount_pct: number | null
   onetime_price: number | null
+  pricing_tiers: PricingTier[]
   archived: boolean
   waitlist_db_url: string | null
   created_at: string | Date

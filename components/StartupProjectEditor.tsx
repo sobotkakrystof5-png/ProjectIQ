@@ -7,11 +7,12 @@ import {
   ChevronDown, ChevronUp, Loader2, Archive, Trash2,
   ExternalLink, Save, Info, BookOpen, Calculator,
   Lightbulb, StickyNote, Link2, Rocket, TrendingUp, Users,
+  Plus, X, GripVertical,
 } from 'lucide-react'
 import {
   STARTUP_PHASES, STARTUP_SEGMENTS, STARTUP_CURRENCIES,
   type StartupProject, type StartupImprovement, type StartupChangelogEntry,
-  type StartupPhase, type MonetizationModel, type WaitlistEntry,
+  type StartupPhase, type MonetizationModel, type PricingTier, type WaitlistEntry,
 } from '@/lib/types'
 import {
   updateStartupProject,
@@ -173,8 +174,9 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
   const [monetizationModel, setMonetizationModel] = useState<MonetizationModel>(project.monetization_model)
   const [monthlyPrice, setMonthlyPrice] = useState(project.monthly_price?.toString() ?? '')
   const [annualPrice, setAnnualPrice] = useState(project.annual_price?.toString() ?? '')
-  const [annualDiscountPct, setAnnualDiscountPct] = useState(project.annual_discount_pct?.toString() ?? '0')
+  const [annualDiscountPct] = useState(project.annual_discount_pct?.toString() ?? '0')
   const [onetimePrice, setOnetimePrice] = useState(project.onetime_price?.toString() ?? '')
+  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>(project.pricing_tiers ?? [])
 
   // ── UI state ──
   const [open, setOpen] = useState<Set<SectionId>>(new Set<SectionId>(['basic', 'phase', 'changelog']))
@@ -188,6 +190,44 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
 
   const effectiveSegment = segmentSelect === '__custom__' ? customSegment : segmentSelect
 
+  // ── Pricing tier helpers ──
+  const addTier = () => {
+    const newTier: PricingTier = {
+      id: crypto.randomUUID(),
+      name: '',
+      monthlyPrice: 0,
+      annualPrice: 0,
+      users: 0,
+      benefits: [],
+    }
+    setPricingTiers(prev => [...prev, newTier])
+  }
+
+  const updateTier = (id: string, patch: Partial<PricingTier>) =>
+    setPricingTiers(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t))
+
+  const removeTier = (id: string) =>
+    setPricingTiers(prev => prev.filter(t => t.id !== id))
+
+  const addBenefit = (tierId: string) =>
+    setPricingTiers(prev => prev.map(t =>
+      t.id === tierId ? { ...t, benefits: [...t.benefits, ''] } : t
+    ))
+
+  const updateBenefit = (tierId: string, idx: number, value: string) =>
+    setPricingTiers(prev => prev.map(t =>
+      t.id === tierId
+        ? { ...t, benefits: t.benefits.map((b, i) => i === idx ? value : b) }
+        : t
+    ))
+
+  const removeBenefit = (tierId: string, idx: number) =>
+    setPricingTiers(prev => prev.map(t =>
+      t.id === tierId
+        ? { ...t, benefits: t.benefits.filter((_, i) => i !== idx) }
+        : t
+    ))
+
   // ── Calc results ──
   const payingUsers = useMemo(() => {
     const tu = parseFloat(totalUsers) || 0
@@ -198,14 +238,23 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
   const calcResults = useMemo(() => {
     const inv = parseFloat(plannedInvestment) || 0
     if (monetizationModel === 'saas') {
-      const mp = parseFloat(monthlyPrice) || 0
-      const ap = parseFloat(annualPrice) || 0
-      const adp = parseFloat(annualDiscountPct) || 0
-      const mrr = payingUsers * mp
-      const arr = payingUsers * ap * (1 - adp / 100)
-      const breakEven = mrr > 0 && inv > 0 ? Math.ceil(inv / mrr) : null
-      const monthlyGrowth = Array.from({ length: 12 }, (_, i) => mrr * (i + 1))
-      return { type: 'saas' as const, mrr, arr, breakEven, monthlyGrowth }
+      if (pricingTiers.length > 0) {
+        const mrr = pricingTiers.reduce((sum, t) => sum + t.monthlyPrice * t.users, 0)
+        const arr = pricingTiers.reduce((sum, t) => sum + t.annualPrice * t.users, 0)
+        const totalPayingUsers = pricingTiers.reduce((sum, t) => sum + t.users, 0)
+        const breakEven = mrr > 0 && inv > 0 ? Math.ceil(inv / mrr) : null
+        const monthlyGrowth = Array.from({ length: 12 }, (_, i) => mrr * (i + 1))
+        return { type: 'saas' as const, mrr, arr, breakEven, monthlyGrowth, totalPayingUsers, tiered: true }
+      } else {
+        const mp = parseFloat(monthlyPrice) || 0
+        const ap = parseFloat(annualPrice) || 0
+        const adp = parseFloat(annualDiscountPct) || 0
+        const mrr = payingUsers * mp
+        const arr = payingUsers * ap * (1 - adp / 100)
+        const breakEven = mrr > 0 && inv > 0 ? Math.ceil(inv / mrr) : null
+        const monthlyGrowth = Array.from({ length: 12 }, (_, i) => mrr * (i + 1))
+        return { type: 'saas' as const, mrr, arr, breakEven, monthlyGrowth, totalPayingUsers: payingUsers, tiered: false }
+      }
     } else {
       const op = parseFloat(onetimePrice) || 0
       const totalRevenue = payingUsers * op
@@ -213,7 +262,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
       const roi = inv > 0 ? (netProfit / inv) * 100 : null
       return { type: 'onetime' as const, totalRevenue, netProfit, roi }
     }
-  }, [monetizationModel, payingUsers, monthlyPrice, annualPrice, annualDiscountPct, onetimePrice, plannedInvestment])
+  }, [monetizationModel, pricingTiers, payingUsers, monthlyPrice, annualPrice, annualDiscountPct, onetimePrice, plannedInvestment])
 
   // ── Actions ──
   const handleSave = async () => {
@@ -242,6 +291,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
       annual_price: numOrNull(annualPrice),
       annual_discount_pct: numOrNull(annualDiscountPct),
       onetime_price: numOrNull(onetimePrice),
+      pricing_tiers: pricingTiers,
       waitlist_db_url: waitlistDbUrl.trim() || null,
     })
     setSaving(false)
@@ -558,36 +608,134 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
 
         {/* ── Cena ── */}
         {monetizationModel === 'saas' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Měsíční cena ({currency})</label>
-              <input
-                type="number"
-                value={monthlyPrice}
-                onChange={e => setMonthlyPrice(e.target.value)}
-                placeholder="9.99"
-                min={0}
-                step="0.01"
-                className={inputCls}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Zákazník platí každý měsíc</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">Typy předplatného</p>
+              <button
+                type="button"
+                onClick={addTier}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors"
+              >
+                <Plus size={12} strokeWidth={2} />
+                Přidat plán
+              </button>
             </div>
-            <div>
-              <label className={labelCls}>
-                Roční cena ({currency}){' '}
-                <span className="font-normal text-muted-foreground">(nepovinné)</span>
-              </label>
-              <input
-                type="number"
-                value={annualPrice}
-                onChange={e => setAnnualPrice(e.target.value)}
-                placeholder="99"
-                min={0}
-                step="0.01"
-                className={inputCls}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Zvýhodněné předplatné na celý rok</p>
-            </div>
+
+            {pricingTiers.length === 0 && (
+              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center">
+                <p className="text-sm text-muted-foreground">Zatím žádný plán.</p>
+                <p className="text-xs text-muted-foreground mt-1">Klikni na „Přidat plán" a nastav první typ předplatného (např. Free, Pro, Business).</p>
+              </div>
+            )}
+
+            {pricingTiers.map((tier, tierIdx) => (
+              <div key={tier.id} className="border border-border rounded-xl overflow-hidden">
+                {/* Tier header */}
+                <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b border-border">
+                  <GripVertical size={14} strokeWidth={1.5} className="text-muted-foreground/40 shrink-0" />
+                  <input
+                    type="text"
+                    value={tier.name}
+                    onChange={e => updateTier(tier.id, { name: e.target.value })}
+                    placeholder={`Plán ${tierIdx + 1} (např. Free, Pro, Business)`}
+                    className="flex-1 text-sm font-medium bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeTier(tier.id)}
+                    className="p-1 text-muted-foreground hover:text-red-500 transition-colors rounded"
+                  >
+                    <X size={13} strokeWidth={1.5} />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  {/* Prices + users */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Měsíční cena ({currency})</label>
+                      <input
+                        type="number"
+                        value={tier.monthlyPrice || ''}
+                        onChange={e => updateTier(tier.id, { monthlyPrice: parseFloat(e.target.value) || 0 })}
+                        placeholder="0"
+                        min={0}
+                        step="0.01"
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Roční cena ({currency})</label>
+                      <input
+                        type="number"
+                        value={tier.annualPrice || ''}
+                        onChange={e => updateTier(tier.id, { annualPrice: parseFloat(e.target.value) || 0 })}
+                        placeholder="0"
+                        min={0}
+                        step="0.01"
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Zákazníků</label>
+                      <input
+                        type="number"
+                        value={tier.users || ''}
+                        onChange={e => updateTier(tier.id, { users: parseInt(e.target.value) || 0 })}
+                        placeholder="0"
+                        min={0}
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Benefits */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs text-muted-foreground">Co plán zahrnuje</label>
+                      <button
+                        type="button"
+                        onClick={() => addBenefit(tier.id)}
+                        className="text-xs text-brand-600 hover:text-brand-700 transition-colors"
+                      >
+                        + Přidat výhodu
+                      </button>
+                    </div>
+                    {tier.benefits.length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Žádné výhody — klikni „+ Přidat výhodu"</p>
+                    )}
+                    <div className="space-y-1.5">
+                      {tier.benefits.map((benefit, bIdx) => (
+                        <div key={bIdx} className="flex items-center gap-2">
+                          <span className="text-muted-foreground text-xs shrink-0">✓</span>
+                          <input
+                            type="text"
+                            value={benefit}
+                            onChange={e => updateBenefit(tier.id, bIdx, e.target.value)}
+                            placeholder="Výhoda (např. Neomezené projekty)"
+                            className="flex-1 px-2.5 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeBenefit(tier.id, bIdx)}
+                            className="p-1 text-muted-foreground hover:text-red-500 transition-colors rounded shrink-0"
+                          >
+                            <X size={11} strokeWidth={1.5} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tier MRR preview */}
+                  {tier.monthlyPrice > 0 && tier.users > 0 && (
+                    <p className="text-xs text-brand-600 font-medium">
+                      → {tier.users} zákazníků × {formatCurrency(tier.monthlyPrice, currency)}/měs = <strong>{formatCurrency(tier.monthlyPrice * tier.users, currency)}/měs</strong>
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="max-w-xs">
@@ -610,7 +758,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           <div className="space-y-3 pt-1">
             <div className="bg-gradient-to-br from-brand-50 to-violet-50 border border-brand-100 rounded-xl p-4">
               <p className="text-sm text-brand-800 leading-relaxed">
-                💡 S <strong>{payingUsers} platícími zákazníky</strong> budeš vydělávat{' '}
+                💡 S <strong>{calcResults.totalPayingUsers} platícími zákazníky</strong> budeš vydělávat{' '}
                 <strong>{formatCurrency(calcResults.mrr, currency)} každý měsíc</strong>.
                 {calcResults.breakEven !== null && (
                   <>

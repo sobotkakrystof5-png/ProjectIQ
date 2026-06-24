@@ -13,6 +13,7 @@ import type {
   StartupChangelogEntry,
   StartupPhase,
   MonetizationModel,
+  PricingTier,
   WaitlistEntry,
 } from '@/lib/types'
 
@@ -36,6 +37,7 @@ export async function getStartupProjects(): Promise<StartupProject[]> {
       monetization_model,
       monthly_price::float, annual_price::float,
       annual_discount_pct::float, onetime_price::float,
+      COALESCE(pricing_tiers, '[]'::jsonb) AS pricing_tiers,
       archived, waitlist_db_url, created_at::text, updated_at::text
     FROM startup_projects
     WHERE archived = false
@@ -57,6 +59,7 @@ export async function getStartupProject(id: string): Promise<StartupProject | nu
       monetization_model,
       monthly_price::float, annual_price::float,
       annual_discount_pct::float, onetime_price::float,
+      COALESCE(pricing_tiers, '[]'::jsonb) AS pricing_tiers,
       archived, waitlist_db_url, created_at::text, updated_at::text
     FROM startup_projects
     WHERE id = ${id}
@@ -111,6 +114,7 @@ export async function updateStartupProject(
     annual_price: number | null
     annual_discount_pct: number | null
     onetime_price: number | null
+    pricing_tiers: PricingTier[]
     waitlist_db_url: string | null
   }
 ): Promise<{ error?: string }> {
@@ -141,6 +145,7 @@ export async function updateStartupProject(
         annual_price = ${data.annual_price},
         annual_discount_pct = ${data.annual_discount_pct},
         onetime_price = ${data.onetime_price},
+        pricing_tiers = ${JSON.stringify(data.pricing_tiers)}::jsonb,
         waitlist_db_url = ${data.waitlist_db_url},
         updated_at = now()
       WHERE id = ${id}
