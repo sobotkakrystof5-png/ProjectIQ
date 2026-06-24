@@ -66,7 +66,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
           <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
 
             {/* Brand header */}
-            <div className="brand-gradient px-6 pt-7 pb-6">
+            <div className="brand-gradient px-4 pt-6 pb-5 sm:px-6 sm:pt-7 sm:pb-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-brand-200 uppercase tracking-wider mb-1.5">Projekt pro</p>
@@ -85,7 +85,7 @@ export default async function ClientPortalPage({ params }: PageProps) {
             </div>
 
             {/* Content */}
-            <div className="px-6 py-6 space-y-6">
+            <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
               {/* Progress */}
               <div>
                 <div className="flex items-center justify-between mb-2.5">

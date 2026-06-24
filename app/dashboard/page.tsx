@@ -116,7 +116,7 @@ export default function DashboardPage({ searchParams }: PageProps) {
       </div>
 
       <Suspense fallback={
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[0,1,2].map(i => <div key={i} className="bg-white border border-border rounded-xl p-4 h-24 animate-pulse" />)}
         </div>
       }>

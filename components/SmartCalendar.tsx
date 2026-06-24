@@ -438,7 +438,7 @@ function MonthView({
         {Array.from({ length: totalCells }, (_, i) => {
           const dayNum = i - startOffset + 1
           if (dayNum < 1 || dayNum > daysInMonth) {
-            return <div key={i} className="bg-gray-50/50 min-h-[90px]" />
+            return <div key={i} className="bg-gray-50/50 min-h-[60px] sm:min-h-[90px]" />
           }
 
           const isToday = isSameDay(today, new Date(year, month - 1, dayNum))
@@ -451,7 +451,7 @@ function MonthView({
             <div
               key={i}
               className={cn(
-                'bg-white min-h-[90px] p-1.5 flex flex-col cursor-pointer hover:bg-brand-50/40 transition-colors group',
+                'bg-white min-h-[60px] sm:min-h-[90px] p-1 sm:p-1.5 flex flex-col cursor-pointer hover:bg-brand-50/40 transition-colors group',
                 isWeekend && 'bg-gray-50/30',
               )}
               onClick={() => onSelectDay(year, month, dayNum)}
@@ -531,136 +531,138 @@ function WeekView({
   )
 
   return (
-    <div className="flex flex-col">
-      {/* Day headers */}
-      <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border mb-0">
-        <div />
-        {days.map((d, i) => {
-          const isToday = isSameDay(d, today)
-          return (
-            <div key={i} className={cn(
-              'text-center py-2 border-l border-border',
-              isToday && 'bg-brand-50',
-            )}>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase">
-                {WEEKDAYS_SHORT_CZ[toMondayFirst(d.getDay())]}
-              </p>
-              <p className={cn(
-                'text-sm font-semibold mx-auto mt-0.5 w-7 h-7 flex items-center justify-center rounded-full',
-                isToday ? 'brand-gradient text-white' : 'text-foreground',
-              )}>
-                {d.getDate()}
-              </p>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* All-day row */}
-      {allDayForWeek.length > 0 && (
-        <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border">
-          <div className="text-[9px] text-muted-foreground uppercase font-semibold flex items-center justify-end pr-2 py-1">
-            Celý den
-          </div>
+    <div className="flex flex-col overflow-x-auto">
+      <div className="min-w-[560px]">
+        {/* Day headers */}
+        <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border mb-0">
+          <div />
           {days.map((d, i) => {
-            const dayAllDay = allDayForWeek.filter(ev => isSameDay(ev.startsAt, d))
+            const isToday = isSameDay(d, today)
             return (
-              <div key={i} className="border-l border-border py-1 px-0.5 min-h-[28px]">
-                {dayAllDay.map(ev => {
-                  const style = getEventStyle(ev)
-                  return (
-                    <button
-                      key={ev.id}
-                      type="button"
-                      onClick={() => onSelectEvent(ev)}
-                      className={cn('w-full text-[10px] font-semibold px-1 py-0.5 rounded border truncate block', style.pill)}
-                    >
-                      {ev.label}
-                    </button>
-                  )
-                })}
+              <div key={i} className={cn(
+                'text-center py-2 border-l border-border',
+                isToday && 'bg-brand-50',
+              )}>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">
+                  {WEEKDAYS_SHORT_CZ[toMondayFirst(d.getDay())]}
+                </p>
+                <p className={cn(
+                  'text-sm font-semibold mx-auto mt-0.5 w-7 h-7 flex items-center justify-center rounded-full',
+                  isToday ? 'brand-gradient text-white' : 'text-foreground',
+                )}>
+                  {d.getDate()}
+                </p>
               </div>
             )
           })}
         </div>
-      )}
 
-      {/* Time grid */}
-      <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
-        <div className="grid grid-cols-[48px_repeat(7,1fr)]">
-          {/* Hour labels */}
-          <div>
-            {hours.map(h => (
-              <div key={h} style={{ height: `${HOUR_PX}px` }}
-                className="flex items-start justify-end pr-2 pt-0.5">
-                <span className="text-[10px] text-muted-foreground font-medium">{h}:00</span>
-              </div>
-            ))}
+        {/* All-day row */}
+        {allDayForWeek.length > 0 && (
+          <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border">
+            <div className="text-[9px] text-muted-foreground uppercase font-semibold flex items-center justify-end pr-2 py-1">
+              Celý den
+            </div>
+            {days.map((d, i) => {
+              const dayAllDay = allDayForWeek.filter(ev => isSameDay(ev.startsAt, d))
+              return (
+                <div key={i} className="border-l border-border py-1 px-0.5 min-h-[28px]">
+                  {dayAllDay.map(ev => {
+                    const style = getEventStyle(ev)
+                    return (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        onClick={() => onSelectEvent(ev)}
+                        className={cn('w-full text-[10px] font-semibold px-1 py-0.5 rounded border truncate block', style.pill)}
+                      >
+                        {ev.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
+        )}
 
-          {/* Day columns */}
-          {days.map((d, di) => {
-            const isToday = isSameDay(d, today)
-            const timedEvents = events.filter(ev =>
-              !ev.allDay && isSameDay(ev.startsAt, d) &&
-              ev.startsAt.getHours() >= DAY_START &&
-              ev.startsAt.getHours() <= DAY_END
-            )
-            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        {/* Time grid */}
+        <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+          <div className="grid grid-cols-[48px_repeat(7,1fr)]">
+            {/* Hour labels */}
+            <div>
+              {hours.map(h => (
+                <div key={h} style={{ height: `${HOUR_PX}px` }}
+                  className="flex items-start justify-end pr-2 pt-0.5">
+                  <span className="text-[10px] text-muted-foreground font-medium">{h}:00</span>
+                </div>
+              ))}
+            </div>
 
-            return (
-              <div
-                key={di}
-                className={cn('border-l border-border relative', isToday && 'bg-brand-50/30')}
-                style={{ height: `${HOUR_PX * hours.length}px` }}
-              >
-                {/* Hour grid lines + click zones */}
-                {hours.map((h, hi) => (
-                  <div
-                    key={h}
-                    className="absolute w-full border-t border-gray-100 hover:bg-brand-50/60 cursor-pointer transition-colors"
-                    style={{ top: `${hi * HOUR_PX}px`, height: `${HOUR_PX}px` }}
-                    onClick={() => onClickSlot(dateStr, h)}
-                    title={`Přidat ${h}:00`}
-                  />
-                ))}
+            {/* Day columns */}
+            {days.map((d, di) => {
+              const isToday = isSameDay(d, today)
+              const timedEvents = events.filter(ev =>
+                !ev.allDay && isSameDay(ev.startsAt, d) &&
+                ev.startsAt.getHours() >= DAY_START &&
+                ev.startsAt.getHours() <= DAY_END
+              )
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-                {/* Events */}
-                {timedEvents.map(ev => {
-                  const style = getEventStyle(ev)
-                  const topHour = ev.startsAt.getHours()
-                  const topPx = (topHour - DAY_START) * HOUR_PX
-                  const durationMs = ev.endsAt.getTime() - ev.startsAt.getTime()
-                  const durationHours = Math.max(0.5, durationMs / (1000 * 60 * 60))
-                  const heightPx = durationHours * HOUR_PX - 2
+              return (
+                <div
+                  key={di}
+                  className={cn('border-l border-border relative', isToday && 'bg-brand-50/30')}
+                  style={{ height: `${HOUR_PX * hours.length}px` }}
+                >
+                  {/* Hour grid lines + click zones */}
+                  {hours.map((h, hi) => (
+                    <div
+                      key={h}
+                      className="absolute w-full border-t border-gray-100 hover:bg-brand-50/60 cursor-pointer transition-colors"
+                      style={{ top: `${hi * HOUR_PX}px`, height: `${HOUR_PX}px` }}
+                      onClick={() => onClickSlot(dateStr, h)}
+                      title={`Přidat ${h}:00`}
+                    />
+                  ))}
 
-                  return (
-                    <button
-                      key={ev.id}
-                      type="button"
-                      onClick={e => { e.stopPropagation(); onSelectEvent(ev) }}
-                      className={cn(
-                        'absolute left-0.5 right-0.5 rounded border text-left overflow-hidden z-10',
-                        'hover:brightness-95 transition-all shadow-sm',
-                        style.pill,
-                      )}
-                      style={{ top: `${topPx + 1}px`, height: `${heightPx}px` }}
-                    >
-                      <div className="px-1.5 py-1 flex flex-col h-full">
-                        <span className="text-[10px] font-bold truncate leading-tight">{ev.label}</span>
-                        {heightPx > 30 && (
-                          <span className="text-[9px] opacity-70 truncate">
-                            {formatTime(ev.startsAt)}
-                            {ev.channel && ` · ${CHANNEL_LABELS[ev.channel]}`}
-                          </span>
+                  {/* Events */}
+                  {timedEvents.map(ev => {
+                    const style = getEventStyle(ev)
+                    const topHour = ev.startsAt.getHours()
+                    const topPx = (topHour - DAY_START) * HOUR_PX
+                    const durationMs = ev.endsAt.getTime() - ev.startsAt.getTime()
+                    const durationHours = Math.max(0.5, durationMs / (1000 * 60 * 60))
+                    const heightPx = durationHours * HOUR_PX - 2
+
+                    return (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        onClick={e => { e.stopPropagation(); onSelectEvent(ev) }}
+                        className={cn(
+                          'absolute left-0.5 right-0.5 rounded border text-left overflow-hidden z-10',
+                          'hover:brightness-95 transition-all shadow-sm',
+                          style.pill,
                         )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
+                        style={{ top: `${topPx + 1}px`, height: `${heightPx}px` }}
+                      >
+                        <div className="px-1.5 py-1 flex flex-col h-full">
+                          <span className="text-[10px] font-bold truncate leading-tight">{ev.label}</span>
+                          {heightPx > 30 && (
+                            <span className="text-[9px] opacity-70 truncate">
+                              {formatTime(ev.startsAt)}
+                              {ev.channel && ` · ${CHANNEL_LABELS[ev.channel]}`}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -767,7 +769,7 @@ function DayView({
 
       {/* Day event list sidebar */}
       {timedEvents.length > 0 && (
-        <div className="w-52 shrink-0">
+        <div className="hidden sm:block w-52 shrink-0">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             {timedEvents.length} {timedEvents.length === 1 ? 'událost' : 'události'}
           </p>

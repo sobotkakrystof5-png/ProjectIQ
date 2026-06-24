@@ -456,7 +456,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                         <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
                           Preferovaný komunikační kanál
                         </label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {CHANNELS.map(ch => {
                             const Icon = ch.icon
                             const isActive = selectedChannel === ch.id
