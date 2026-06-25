@@ -1,6 +1,6 @@
 {
   "crons": [
     { "path": "/api/cron/scrape-school", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/send-reminders", "schedule": "0 7 * * *" }
+    { "path": "/api/cron/send-reminders", "schedule": "0 * * * *" }
   ]
 }
