@@ -1,12 +1,13 @@
 import { TrendingUp, Calculator, BarChart3, Info } from 'lucide-react'
 import { TradingViewChart } from '@/components/TradingViewChart'
 import { CompoundCalculator } from '@/components/CompoundCalculator'
-import { CashFlowSection } from './CashFlowSection'
-import { FixedCostsSection } from './FixedCostsSection'
+import { IncomeExpenseSection } from './IncomeExpenseSection'
+import { FinanceHealthSection } from './FinanceHealthSection'
+import { ScenarioSection } from './ScenarioSection'
 import {
-  getTransactions, getMonthlyAggregates,
+  getTransactions,
   generateRecurringCostTransactions, generateRecurringCashFlowTransactions,
-  getCosts, getRecurringCashFlow,
+  getCosts, getRecurringCashFlow, getFinanceHealthOverview, getMonthSummary, getAllTimeSummary,
 } from './finance-actions'
 
 export default async function FinancePage({
@@ -21,11 +22,13 @@ export default async function FinancePage({
     generateRecurringCashFlowTransactions(),
   ])
 
-  const [transactions, monthlyAggregates, costs, recurringItems] = await Promise.all([
+  const [transactions, healthOverview, costs, recurringItems, monthSummary, allTimeSummary] = await Promise.all([
     getTransactions(currentMonth),
-    getMonthlyAggregates(),
+    getFinanceHealthOverview(),
     getCosts(),
     getRecurringCashFlow(),
+    getMonthSummary(currentMonth),
+    getAllTimeSummary(),
   ])
 
   return (
@@ -76,22 +79,26 @@ export default async function FinancePage({
         <TradingViewChart symbol="XETR:VWCE" interval="W" height={460} />
       </div>
 
-      {/* Fixní náklady */}
-      <FixedCostsSection costs={costs} />
+      {/* Jak si stojíš */}
+      <FinanceHealthSection overview={healthOverview} />
 
-      {/* Cash Flow */}
-      <CashFlowSection
+      {/* Příjmy & Výdaje (sjednocené) */}
+      <IncomeExpenseSection
         transactions={transactions}
-        monthlyAggregates={monthlyAggregates}
         currentMonth={currentMonth}
         recurringItems={recurringItems}
+        costs={costs}
+        summary={monthSummary}
       />
 
-      {/* Compound calculator */}
+      {/* Co kdyby analýza */}
+      <ScenarioSection summary={monthSummary} overview={healthOverview} allTime={allTimeSummary} />
+
+      {/* Investice (mimo cash flow) */}
       <div className="space-y-2">
         <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
           <Calculator size={16} strokeWidth={1.5} className="text-emerald-600" />
-          Kalkulačka složeného úroku
+          Investice (mimo cash flow)
         </h2>
         <CompoundCalculator />
       </div>

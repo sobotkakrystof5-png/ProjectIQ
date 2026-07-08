@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import { Briefcase, Rocket, ArrowUpRight, ArrowLeft, Layers } from 'lucide-react'
+import { getBusinessOverview } from './byznys-actions'
+import { BusinessCalculator } from './BusinessCalculator'
 
-export default function ByznysPage() {
+export default async function ByznysPage() {
+  const overview = await getBusinessOverview()
+
   return (
     <div className="space-y-6">
       <div>
@@ -14,6 +18,10 @@ export default function ByznysPage() {
         </Link>
         <h1 className="text-2xl font-semibold text-foreground tracking-tight">Business</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Vyber sekci, kterou chceš otevřít</p>
+      </div>
+
+      <div className="max-w-4xl">
+        <BusinessCalculator overview={overview} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">

@@ -108,6 +108,127 @@ export async function getMonthlyAggregates(): Promise<MonthlyAggregate[]> {
   return months
 }
 
+export interface MonthSummary {
+  month: string
+  prevMonth: string
+  income: number
+  expense: number
+  net: number
+  prevIncome: number
+  prevExpense: number
+  prevNet: number
+}
+
+// Skutečné příjmy/výdaje za daný měsíc a měsíc předchozí (vč. vygenerovaných opakovaných položek), pro porovnání meziměsíční změny.
+export async function getMonthSummary(month: string): Promise<MonthSummary> {
+  await requireAuth()
+
+  const [y, m] = month.split('-').map(Number)
+  const prevDate = new Date(y, m - 2, 1)
+  const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
+
+  const rows = await sql`
+    SELECT
+      to_char(date, 'YYYY-MM') AS month,
+      type,
+      SUM(amount)::float AS total
+    FROM finance_transactions
+    WHERE user_id IS NULL
+      AND to_char(date, 'YYYY-MM') IN (${month}, ${prevMonth})
+    GROUP BY 1, 2
+  `
+
+  let income = 0, expense = 0, prevIncome = 0, prevExpense = 0
+  for (const row of rows as { month: string; type: TransactionType; total: number }[]) {
+    const isCurrent = row.month === month
+    if (row.type === 'income') {
+      if (isCurrent) income = row.total
+      else prevIncome = row.total
+    } else {
+      if (isCurrent) expense = row.total
+      else prevExpense = row.total
+    }
+  }
+
+  return {
+    month,
+    prevMonth,
+    income,
+    expense,
+    net: income - expense,
+    prevIncome,
+    prevExpense,
+    prevNet: prevIncome - prevExpense,
+  }
+}
+
+export interface AllTimeSummary {
+  income: number
+  expense: number
+  net: number
+}
+
+// Skutečné příjmy/výdaje úplně za celou dobu (bez ohledu na měsíc/rok) — pro "Celkově" pohled v Co kdyby analýze.
+export async function getAllTimeSummary(): Promise<AllTimeSummary> {
+  await requireAuth()
+
+  const rows = await sql`
+    SELECT type, SUM(amount)::float AS total
+    FROM finance_transactions
+    WHERE user_id IS NULL
+    GROUP BY type
+  `
+
+  let income = 0, expense = 0
+  for (const row of rows as { type: TransactionType; total: number }[]) {
+    if (row.type === 'income') income = row.total
+    else expense = row.total
+  }
+
+  return { income, expense, net: income - expense }
+}
+
+export type FinanceHealth = 'good' | 'warning' | 'bad'
+
+export interface FinanceHealthOverview {
+  income12m: number
+  expense12m: number
+  savings12m: number
+  savingsRate: number
+  health: FinanceHealth
+  trend: MonthlyAggregate[]
+}
+
+export async function getFinanceHealthOverview(): Promise<FinanceHealthOverview> {
+  await requireAuth()
+
+  const [rows, trend] = await Promise.all([
+    sql`
+      SELECT
+        type,
+        SUM(amount)::float AS total
+      FROM finance_transactions
+      WHERE user_id IS NULL
+        AND date >= CURRENT_DATE - INTERVAL '12 months'
+      GROUP BY type
+    `,
+    getMonthlyAggregates(),
+  ])
+
+  let income12m = 0
+  let expense12m = 0
+  for (const row of rows as { type: TransactionType; total: number }[]) {
+    if (row.type === 'income') income12m = row.total
+    else expense12m = row.total
+  }
+
+  const savings12m = income12m - expense12m
+  const savingsRate = income12m > 0 ? (savings12m / income12m) * 100 : 0
+  const health: FinanceHealth = savingsRate < 0 ? 'bad' : savingsRate >= 20 ? 'good' : 'warning'
+
+  return { income12m, expense12m, savings12m, savingsRate, health, trend }
+}
+
 export async function createTransaction(data: {
   amount: number
   type: TransactionType
@@ -166,8 +287,13 @@ export async function createTransaction(data: {
 
 export async function deleteTransaction(id: string): Promise<void> {
   await requireAuth()
-  // Smazat linked byznys cost
-  await sql`DELETE FROM costs WHERE source_finance_transaction_id = ${id}::uuid`
+  // Smazat provázaný náklad — ať transakce vznikla z nákladu (jednorázový cost → transakce),
+  // nebo z ní náklad vznikl (byznys výdaj → cost). Oba směry musí zmizet spolu, je to jeden celek.
+  await sql`
+    DELETE FROM costs
+    WHERE source_finance_transaction_id = ${id}::uuid
+       OR (cost_type = 'one_time' AND id = (SELECT source_cost_id FROM finance_transactions WHERE id = ${id}::uuid))
+  `
   await sql`DELETE FROM finance_transactions WHERE id = ${id} AND user_id IS NULL`
   revalidatePath('/hub/finance')
   revalidatePath('/dashboard/naklady')
@@ -292,43 +418,6 @@ export async function getCosts(): Promise<Cost[]> {
     ORDER BY cost_type, name
   `
   return rows as Cost[]
-}
-
-export async function createCost(data: {
-  name: string
-  amount: number
-  cost_type: CostType
-  category: string
-  description?: string
-}): Promise<{ error?: string }> {
-  try {
-    await requireAuth()
-    if (!data.name?.trim()) return { error: 'Název je povinný' }
-    if (!data.amount || data.amount <= 0) return { error: 'Neplatná částka' }
-    if (!data.cost_type) return { error: 'Typ nákladu je povinný' }
-
-    await sql`
-      INSERT INTO costs (name, amount, cost_type, category, description)
-      VALUES (
-        ${data.name.trim()},
-        ${data.amount},
-        ${data.cost_type},
-        ${data.category},
-        ${data.description?.trim() || null}
-      )
-    `
-
-    revalidatePath('/hub/finance')
-    return {}
-  } catch {
-    return { error: 'Nepodařilo se uložit náklad' }
-  }
-}
-
-export async function deleteCost(id: string): Promise<void> {
-  await requireAuth()
-  await sql`DELETE FROM costs WHERE id = ${id}`
-  revalidatePath('/hub/finance')
 }
 
 // Generuje chybějící opakované cost transakce pro aktuální měsíc/rok.

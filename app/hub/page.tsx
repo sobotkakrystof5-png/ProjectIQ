@@ -16,6 +16,9 @@ import {
   BookOpen,
   AlertCircle,
   Layers,
+  Target,
+  Gauge,
+  Wallet,
 } from 'lucide-react'
 
 function formatCZK(amount: number) {
@@ -135,6 +138,17 @@ async function getSchoolStats() {
   }
 }
 
+async function getPlanyStats() {
+  const rows = await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE status = 'analyza')::int AS analyza_count,
+      COALESCE(SUM(potential_value) FILTER (WHERE status NOT IN ('rozhodnuto_ne')), 0)::numeric AS total_potential
+    FROM plans
+  `
+  const stats = rows[0] as { analyza_count: number; total_potential: number }
+  return stats
+}
+
 const DEADLINE_TYPE_LABEL: Record<string, string> = {
   klassenarbeit: 'KA',
   homework: 'DÚ',
@@ -143,10 +157,11 @@ const DEADLINE_TYPE_LABEL: Record<string, string> = {
 }
 
 export default async function HubPage() {
-  const [business, sport, school] = await Promise.all([
+  const [business, sport, school, plany] = await Promise.all([
     getBusinessStats(),
     getSportStats(),
     getSchoolStats(),
+    getPlanyStats(),
   ])
   const { active_count, pending_revenue, review_count, nextConsult } = business
 
@@ -407,6 +422,47 @@ export default async function HubPage() {
           <div className="mt-4 pt-3 border-t border-border">
             <span className="text-xs font-semibold text-indigo-600 group-hover:text-indigo-700 transition-colors">
               Otevřít Projekty →
+            </span>
+          </div>
+        </Link>
+
+        {/* Plány */}
+        <Link
+          href="/hub/plany"
+          className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-amber-200 transition-all flex flex-col"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
+              <Target size={18} strokeWidth={1.5} className="text-white" />
+            </div>
+            <ArrowUpRight
+              size={16}
+              strokeWidth={1.5}
+              className="text-muted-foreground/40 group-hover:text-amber-600 transition-colors mt-0.5"
+            />
+          </div>
+          <h2 className="font-semibold text-foreground text-[15px] mb-4">Plány</h2>
+
+          <div className="space-y-2.5 flex-1">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Gauge size={13} strokeWidth={1.5} />
+                V analýze
+              </span>
+              <span className="font-semibold text-foreground tabular-nums">{plany.analyza_count}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Wallet size={13} strokeWidth={1.5} />
+                Potenciál na stole
+              </span>
+              <span className="font-semibold text-foreground tabular-nums">{formatCZK(plany.total_potential)}</span>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-border">
+            <span className="text-xs font-semibold text-amber-600 group-hover:text-amber-700 transition-colors">
+              Otevřít Plány →
             </span>
           </div>
         </Link>

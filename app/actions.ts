@@ -395,17 +395,26 @@ export async function markProjectAsCompleted(
   }
 
   if (extra.include_costs && p.estimated_costs && p.estimated_costs > 0) {
-    await sql`
+    const costName = 'Náklady: ' + (p.description || p.client_name)
+    const costRows = await sql`
       INSERT INTO costs (name, amount, cost_type, category, description)
       VALUES (
-        ${'Náklady: ' + (p.description || p.client_name)},
+        ${costName},
         ${p.estimated_costs},
         ${'one_time'},
         ${'client'},
         ${'Předpokládané náklady ze zakázky ' + p.client_name}
       )
+      RETURNING id
+    `
+    const costId = (costRows[0] as { id: string }).id
+    // Provázat s finance transakcí, ať je náklad vidět i v cash flow (jeden integrovaný systém)
+    await sql`
+      INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_cost_id)
+      VALUES (${p.estimated_costs}, 'expense', 'náklady', ${costName}, ${extra.completed_at}, NULL, ${costId})
     `
     revalidatePath('/dashboard/naklady')
+    revalidatePath('/hub/finance')
   }
 
   revalidatePath('/dashboard/dokoncene')

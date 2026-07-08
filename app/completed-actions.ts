@@ -172,6 +172,8 @@ export async function updateCost(id: string, payload: CostPayload) {
 
 export async function deleteCost(id: string) {
   await requireAuth()
+  // Smazat provázanou finanční transakci — náklad a jeho záznam v cash flow jsou jeden celek
+  await sql`DELETE FROM finance_transactions WHERE source_cost_id = ${id}`
   await sql`DELETE FROM costs WHERE id = ${id}`
   revalidatePath('/dashboard/naklady')
   revalidatePath('/dashboard/dokoncene')
