@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { sql } from '@/lib/db'
+import { formatDate } from '@/lib/utils'
 import {
   Briefcase,
   GraduationCap,
@@ -141,11 +142,20 @@ async function getSchoolStats() {
 async function getPlanyStats() {
   const rows = await sql`
     SELECT
-      COUNT(*) FILTER (WHERE status = 'analyza')::int AS analyza_count,
-      COALESCE(SUM(potential_value) FILTER (WHERE status NOT IN ('rozhodnuto_ne')), 0)::numeric AS total_potential
-    FROM plans
+      (SELECT COUNT(*)::int FROM plan_school_goals WHERE archived = false AND status = 'aktivni') +
+      (SELECT COUNT(*)::int FROM plan_health_goals WHERE archived = false AND status = 'aktivni') +
+      (SELECT COUNT(*)::int FROM plan_projects WHERE archived = false AND status = 'validace') +
+      (SELECT COUNT(*)::int FROM plan_businesses WHERE archived = false AND status IN ('planovani', 'pripraveno_k_exportu'))
+      AS active_count,
+      (SELECT MIN(target_date) FROM (
+        SELECT target_date FROM plan_school_goals WHERE archived = false AND target_date IS NOT NULL AND target_date >= CURRENT_DATE
+        UNION ALL
+        SELECT target_date FROM plan_health_goals WHERE archived = false AND target_date IS NOT NULL AND target_date >= CURRENT_DATE
+        UNION ALL
+        SELECT target_date FROM plan_finance_goals WHERE archived = false AND target_date IS NOT NULL AND target_date >= CURRENT_DATE
+      ) t)::text AS nearest_date
   `
-  const stats = rows[0] as { analyza_count: number; total_potential: number }
+  const stats = rows[0] as { active_count: number; nearest_date: string | null }
   return stats
 }
 
@@ -447,16 +457,18 @@ export default async function HubPage() {
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground flex items-center gap-1.5">
                 <Gauge size={13} strokeWidth={1.5} />
-                V analýze
+                Aktivních cílů
               </span>
-              <span className="font-semibold text-foreground tabular-nums">{plany.analyza_count}</span>
+              <span className="font-semibold text-foreground tabular-nums">{plany.active_count}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground flex items-center gap-1.5">
                 <Wallet size={13} strokeWidth={1.5} />
-                Potenciál na stole
+                Nejbližší termín
               </span>
-              <span className="font-semibold text-foreground tabular-nums">{formatCZK(plany.total_potential)}</span>
+              <span className="font-semibold text-foreground tabular-nums">
+                {plany.nearest_date ? formatDate(plany.nearest_date) : '—'}
+              </span>
             </div>
           </div>
 
