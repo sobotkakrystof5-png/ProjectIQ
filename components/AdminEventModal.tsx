@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, CalendarPlus, Lock } from 'lucide-react'
 import { createCalendarEvent } from '@/app/calendar-actions'
 import { cn } from '@/lib/utils'
+import { getPragueTodayISO, parsePragueDatetimeLocalToISO } from '@/lib/prague-time'
 import type { CalendarEventType } from '@/lib/types'
 
 interface AdminEventModalProps {
@@ -20,13 +21,10 @@ function toLocalDatetimeValue(date: string, hour: number): string {
 }
 
 function localDatetimeToISO(localDt: string): string {
-  // The datetime-local input gives us local time — we treat it as Prague time.
-  // For simplicity, we parse it as a local timestamp and send it as-is;
-  // the DB stores it as timestamptz (UTC). The server will receive the ISO string.
-  // Since Next.js server actions run on the server (UTC), we must send Prague local ISO.
-  // We approximate: assume the browser is in CET/CEST (Prague). For a single-admin
-  // app this is acceptable; for global use, pragueSlotToISO would be used instead.
-  return new Date(localDt).toISOString()
+  // The datetime-local input has no timezone info — we treat it as Prague
+  // wall-clock time regardless of the browser's own timezone, and convert
+  // it to a UTC ISO string correctly across CET/CEST transitions.
+  return parsePragueDatetimeLocalToISO(localDt)
 }
 
 const EVENT_TYPES: { id: CalendarEventType; label: string; description: string; icon: typeof Lock }[] = [
@@ -45,7 +43,7 @@ const EVENT_TYPES: { id: CalendarEventType; label: string; description: string; 
 ]
 
 export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: AdminEventModalProps) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getPragueTodayISO()
   const initDate = defaultDate ?? today
   const initHour = defaultHour ?? 10
 
@@ -62,7 +60,7 @@ export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: A
     setDescription('')
     setEventType('manual')
     setError(null)
-    const d = new Date().toISOString().split('T')[0]
+    const d = getPragueTodayISO()
     setStartsAt(toLocalDatetimeValue(d, 10))
     setEndsAt(toLocalDatetimeValue(d, 11))
     onClose()

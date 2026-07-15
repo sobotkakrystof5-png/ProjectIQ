@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getWorkoutsMonth, type WorkoutLog } from './sport-actions'
 import { MUSCLE_COLORS } from './WorkoutSection'
+import { getPragueTodayISO } from '@/lib/prague-time'
 
 const WEEKDAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 
@@ -82,7 +83,7 @@ export function TrainingCalendar({ initialYear, initialMonth, initialWorkouts, t
     byDate[w.logged_date] = [...(byDate[w.logged_date] ?? []), w]
   }
 
-  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayIso = getPragueTodayISO()
   const todayWeekStart = getWeekStart(todayIso)
 
   // Stats

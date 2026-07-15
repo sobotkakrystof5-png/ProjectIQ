@@ -41,7 +41,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       }}
       className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-100 px-2.5 py-1.5 rounded-lg hover:bg-brand-100 transition-colors"
     >
-      {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.5} />}
+      {copied ? <Check size={13} strokeWidth={1.5} /> : <Copy size={13} strokeWidth={1.5} />}
       {copied ? 'Zkopírováno' : label}
     </button>
   )

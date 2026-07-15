@@ -2,8 +2,12 @@
 
 import { sql } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
+import type { CostCategory } from '@/lib/types'
+import {
+  generateRecurringCashFlowTransactionsInternal,
+  generateRecurringCostTransactionsInternal,
+} from '@/lib/recurring-transactions'
 
 export type TransactionType = 'income' | 'expense'
 export type CostType = 'fixed_monthly' | 'fixed_annual' | 'one_time'
@@ -14,7 +18,7 @@ export interface Cost {
   name: string
   amount: number
   cost_type: CostType
-  category: string
+  category: CostCategory
   description: string | null
   source_finance_transaction_id: string | null
   created_at: string
@@ -46,11 +50,6 @@ export interface MonthlyAggregate {
   month: string // 'yyyy-MM'
   income: number
   expense: number
-}
-
-async function requireAuth() {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Unauthorized')
 }
 
 export async function getTransactions(month: string): Promise<FinanceTransaction[]> {
@@ -362,43 +361,8 @@ export async function deleteRecurringCashFlow(id: string): Promise<void> {
 // Generuje chybějící opakované cash-flow transakce pro aktuální měsíc/rok.
 // Idempotentní — bezpečné volat při každém načtení stránky.
 export async function generateRecurringCashFlowTransactions(): Promise<void> {
-  // Měsíční → jedna transakce na kalendářní měsíc (1. v měsíci)
-  await sql`
-    INSERT INTO finance_transactions
-      (amount, type, category, note, area, date, user_id, source_recurring_cash_flow_id, recurring_period)
-    SELECT
-      r.amount::numeric,
-      r.type,
-      r.category,
-      r.description,
-      r.area,
-      DATE_TRUNC('month', CURRENT_DATE)::date,
-      NULL,
-      r.id,
-      TO_CHAR(CURRENT_DATE, 'YYYY-MM')
-    FROM recurring_cash_flow r
-    WHERE r.frequency = 'monthly'
-    ON CONFLICT (source_recurring_cash_flow_id, recurring_period) DO NOTHING
-  `
-
-  // Roční → jedna transakce na kalendářní rok (1. ledna)
-  await sql`
-    INSERT INTO finance_transactions
-      (amount, type, category, note, area, date, user_id, source_recurring_cash_flow_id, recurring_period)
-    SELECT
-      r.amount::numeric,
-      r.type,
-      r.category,
-      r.description,
-      r.area,
-      DATE_TRUNC('year', CURRENT_DATE)::date,
-      NULL,
-      r.id,
-      TO_CHAR(CURRENT_DATE, 'YYYY')
-    FROM recurring_cash_flow r
-    WHERE r.frequency = 'annual'
-    ON CONFLICT (source_recurring_cash_flow_id, recurring_period) DO NOTHING
-  `
+  await requireAuth()
+  await generateRecurringCashFlowTransactionsInternal()
 }
 
 export async function getCosts(): Promise<Cost[]> {
@@ -423,37 +387,6 @@ export async function getCosts(): Promise<Cost[]> {
 // Generuje chybějící opakované cost transakce pro aktuální měsíc/rok.
 // Idempotentní — bezpečné volat při každém načtení stránky.
 export async function generateRecurringCostTransactions(): Promise<void> {
-  await sql`
-    INSERT INTO finance_transactions
-      (amount, type, category, note, date, user_id, source_cost_id, recurring_period)
-    SELECT
-      c.amount::numeric,
-      'expense',
-      'fixní náklady',
-      c.name,
-      DATE_TRUNC('month', CURRENT_DATE)::date,
-      NULL,
-      c.id,
-      TO_CHAR(CURRENT_DATE, 'YYYY-MM')
-    FROM costs c
-    WHERE c.cost_type = 'fixed_monthly'
-    ON CONFLICT (source_cost_id, recurring_period) DO NOTHING
-  `
-
-  await sql`
-    INSERT INTO finance_transactions
-      (amount, type, category, note, date, user_id, source_cost_id, recurring_period)
-    SELECT
-      c.amount::numeric,
-      'expense',
-      'fixní náklady',
-      c.name,
-      DATE_TRUNC('year', CURRENT_DATE)::date,
-      NULL,
-      c.id,
-      TO_CHAR(CURRENT_DATE, 'YYYY')
-    FROM costs c
-    WHERE c.cost_type = 'fixed_annual'
-    ON CONFLICT (source_cost_id, recurring_period) DO NOTHING
-  `
+  await requireAuth()
+  await generateRecurringCostTransactionsInternal()
 }

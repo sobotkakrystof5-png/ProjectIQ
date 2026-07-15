@@ -15,16 +15,29 @@ async function getProjectIdByToken(token: string): Promise<string | null> {
 }
 
 // Throttle abuse of public, unauthenticated endpoints (token-only protection).
+// One query per table, kept as tagged templates (never raw/interpolated SQL) —
+// add a line here for any new public-action table instead of hardcoding a
+// two-way ternary.
+const RATE_LIMIT_QUERIES: Record<
+  'client_feedback' | 'consultation_slots' | 'project_surveys',
+  (id: string, windowMinutes: number) => Promise<{ count: string }[]>
+> = {
+  client_feedback: (id, windowMinutes) =>
+    sql`SELECT count(*) FROM client_feedback WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
+  consultation_slots: (id, windowMinutes) =>
+    sql`SELECT count(*) FROM consultation_slots WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
+  project_surveys: (id, windowMinutes) =>
+    sql`SELECT count(*) FROM project_surveys WHERE completed_project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
+}
+
 async function isRateLimited(
-  table: 'client_feedback' | 'consultation_slots',
-  projectId: string,
+  table: keyof typeof RATE_LIMIT_QUERIES,
+  id: string,
   windowMinutes: number,
   maxCount: number,
 ): Promise<boolean> {
-  const rows = table === 'client_feedback'
-    ? await sql`SELECT count(*) FROM client_feedback WHERE project_id = ${projectId} AND created_at > now() - interval '1 minute' * ${windowMinutes}`
-    : await sql`SELECT count(*) FROM consultation_slots WHERE project_id = ${projectId} AND created_at > now() - interval '1 minute' * ${windowMinutes}`
-  return parseInt((rows[0] as { count: string }).count, 10) >= maxCount
+  const rows = await RATE_LIMIT_QUERIES[table](id, windowMinutes)
+  return parseInt(rows[0].count, 10) >= maxCount
 }
 
 // ─── Feedback ─────────────────────────────────────────────────────────────────
@@ -127,26 +140,14 @@ export async function submitConsultation(
 
   const meetingLink = generateMeetingLink(parsed.data.channel, scheduledDate)
 
-  // consultation_slots and calendar_events (admin blocks, vizeon.cz bookings) live in
-  // separate tables, so a single DB constraint can't span both — check here too.
-  const overlapping = await sql`
-    SELECT 1 FROM calendar_events
-    WHERE starts_at <= ${scheduledDate.toISOString()}
-      AND ends_at > ${scheduledDate.toISOString()}
-    LIMIT 1
-  `
-  if (overlapping.length) {
-    return { success: false, error: 'Tento termín je již obsazen. Vyberte prosím jiný.' }
-  }
-
   try {
     await sql`
-      INSERT INTO consultation_slots (project_id, scheduled_at, channel, client_wish, meeting_link, client_email)
-      VALUES (${projectId}, ${scheduledDate.toISOString()}, ${effectiveChannel}, ${parsed.data.clientWish}, ${meetingLink}, ${parsed.data.clientEmail})
+      INSERT INTO consultation_slots (project_id, scheduled_at, channel, channel_other_text, client_wish, meeting_link, client_email)
+      VALUES (${projectId}, ${scheduledDate.toISOString()}, ${effectiveChannel}, ${parsed.data.channelOtherText ?? null}, ${parsed.data.clientWish}, ${meetingLink}, ${parsed.data.clientEmail})
     `
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.includes('unique') || (err as { code?: string })?.code === '23505') {
+    const code = (err as { code?: string })?.code
+    if (code === '23505' || code === '23P01') {
       return { success: false, error: 'Tento termín je již obsazen. Vyberte prosím jiný.' }
     }
     console.error('[Booking] DB chyba při INSERT:', err)
@@ -214,22 +215,30 @@ export async function submitSurvey(
   const cp = projectRows[0] as { id: string; title: string; client_name: string | null } | undefined
   if (!cp) return { success: false, error: 'Dotazník nenalezen.' }
 
-  // Jeden dotazník na zakázku — existence zároveň slouží jako rate limit
-  const existing = await sql`SELECT 1 FROM project_surveys WHERE completed_project_id = ${cp.id} LIMIT 1`
-  if (existing.length) return { success: false, error: 'Tento dotazník již byl vyplněn. Děkujeme!' }
+  if (await isRateLimited('project_surveys', cp.id, 10, 3)) {
+    return { success: false, error: 'Příliš mnoho pokusů v krátkém čase. Zkuste to prosím později.' }
+  }
 
   const d = parsed.data
-  await sql`
-    INSERT INTO project_surveys (
-      completed_project_id, rating_cooperation, rating_speed, rating_design,
-      rating_functionality, rating_reliability, rating_flexibility, reference_text, consent
-    )
-    VALUES (
-      ${cp.id}, ${d.rating_cooperation}, ${d.rating_speed}, ${d.rating_design},
-      ${d.rating_functionality}, ${d.rating_reliability}, ${d.rating_flexibility},
-      ${d.reference_text?.trim() || null}, ${d.consent}
-    )
-  `
+  try {
+    await sql`
+      INSERT INTO project_surveys (
+        completed_project_id, rating_cooperation, rating_speed, rating_design,
+        rating_functionality, rating_reliability, rating_flexibility, reference_text, consent
+      )
+      VALUES (
+        ${cp.id}, ${d.rating_cooperation}, ${d.rating_speed}, ${d.rating_design},
+        ${d.rating_functionality}, ${d.rating_reliability}, ${d.rating_flexibility},
+        ${d.reference_text?.trim() || null}, ${d.consent}
+      )
+    `
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === '23505') {
+      return { success: false, error: 'Tento dotazník již byl vyplněn. Děkujeme!' }
+    }
+    console.error('[Survey] DB chyba při INSERT:', err)
+    return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
+  }
 
   revalidatePath('/dashboard/hodnoceni')
 

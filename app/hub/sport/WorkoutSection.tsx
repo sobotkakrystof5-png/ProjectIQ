@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Dumbbell, Plus, Trash2, Loader2, Clock, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logWorkout, deleteWorkout, getWorkoutsRecent, type WorkoutLog } from './sport-actions'
+import { getPragueTodayISO, addIsoDays } from '@/lib/prague-time'
 
 export const MUSCLE_GROUPS = [
   'Prsa', 'Záda', 'Ramena', 'Bicepsy', 'Tricepsy', 'Nohy', 'Břicho', 'Kardio',
@@ -32,16 +33,14 @@ const MUSCLE_BADGE: Record<string, string> = {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return getPragueTodayISO()
 }
 
 function formatRelDate(iso: string) {
   const today = todayIso()
   const d = new Date(iso + 'T00:00:00')
   if (iso === today) return 'Dnes'
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (iso === yesterday.toISOString().slice(0, 10)) return 'Včera'
+  if (iso === addIsoDays(today, -1)) return 'Včera'
   return d.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
@@ -121,7 +120,7 @@ export function WorkoutSection({ initialWorkouts, onMutated }: Props) {
             onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 text-sm text-rose-600 hover:text-rose-700 font-medium"
           >
-            <Plus size={15} strokeWidth={2} />
+            <Plus size={15} strokeWidth={1.5} />
             Přidat trénink
           </button>
         )}
@@ -233,7 +232,7 @@ export function WorkoutSection({ initialWorkouts, onMutated }: Props) {
             disabled={adding || !title.trim()}
             className="w-full flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
           >
-            {adding ? <Loader2 size={16} strokeWidth={1.5} className="animate-spin" /> : <Plus size={16} strokeWidth={2} />}
+            {adding ? <Loader2 size={16} strokeWidth={1.5} className="animate-spin" /> : <Plus size={16} strokeWidth={1.5} />}
             Uložit trénink
           </button>
         </div>

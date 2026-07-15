@@ -1,14 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
-
-async function requireAuth() {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Neautorizovaný přístup')
-}
 
 export async function markNotificationRead(id: string) {
   await requireAuth()

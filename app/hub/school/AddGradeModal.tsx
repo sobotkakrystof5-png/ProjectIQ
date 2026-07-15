@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { X } from 'lucide-react'
 import { SUBJECTS } from './subjects'
 import { addGrade } from './actions'
+import { getPragueTodayISO } from '@/lib/prague-time'
 
 const GRADE_LABELS: Record<number, string> = {
   1: 'Sehr gut', 2: 'Gut', 3: 'Befriedigend',
@@ -34,7 +35,7 @@ export function AddGradeModal({
   const [grade, setGrade] = useState<number | null>(null)
   const [note, setNote] = useState('')
   const [sportCategory, setSportCategory] = useState('')
-  const [gradedAt, setGradedAt] = useState(() => new Date().toISOString().slice(0, 10))
+  const [gradedAt, setGradedAt] = useState(() => getPragueTodayISO())
   const [pending, startTransition] = useTransition()
 
   function handleSubmit() {

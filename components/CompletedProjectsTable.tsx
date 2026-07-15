@@ -8,6 +8,7 @@ import {
   deleteCompletedProject,
   type CompletedProjectPayload,
 } from '@/app/completed-actions'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import type { CompletedProject, ProjectType } from '@/lib/types'
 
 const DIFFICULTY_COLORS: Record<number, string> = {
@@ -31,7 +32,7 @@ const EMPTY_FORM = (type: ProjectType): CompletedProjectPayload => ({
   title: '',
   client_name: null,
   company: null,
-  completed_at: new Date().toISOString().slice(0, 10),
+  completed_at: getPragueTodayISO(),
   amount: 0,
   deposit_amount: null,
   difficulty: 5,

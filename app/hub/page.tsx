@@ -21,6 +21,7 @@ import {
   Gauge,
   Wallet,
 } from 'lucide-react'
+import { DEADLINE_TYPE_LABEL, type DeadlineType } from '@/lib/types'
 
 function formatCZK(amount: number) {
   return new Intl.NumberFormat('cs-CZ', {
@@ -51,11 +52,11 @@ async function getBusinessStats() {
       SELECT
         COUNT(*) FILTER (
           WHERE status NOT IN ('done', 'paid')
-          AND NOT (source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL))
+          AND NOT is_vizeon_pending(source, vizeon_confirmed)
         )::int AS active_count,
         COALESCE(SUM(price) FILTER (
           WHERE paid = false AND price IS NOT NULL
-          AND NOT (source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL))
+          AND NOT is_vizeon_pending(source, vizeon_confirmed)
         ), 0)::numeric AS pending_revenue,
         COUNT(*) FILTER (WHERE status = 'review')::int AS review_count
       FROM projects
@@ -132,7 +133,7 @@ async function getSchoolStats() {
       LIMIT 1
     `,
   ])
-  const next = nextRows[0] as { title: string; type: string; due_date: string } | undefined
+  const next = nextRows[0] as { title: string; type: DeadlineType; due_date: string } | undefined
   return {
     upcomingCount: (upcomingRows[0] as { cnt: number }).cnt,
     nextDeadline: next ?? null,
@@ -157,13 +158,6 @@ async function getPlanyStats() {
   `
   const stats = rows[0] as { active_count: number; nearest_date: string | null }
   return stats
-}
-
-const DEADLINE_TYPE_LABEL: Record<string, string> = {
-  klassenarbeit: 'KA',
-  homework: 'DÚ',
-  presentation: 'Referát',
-  other: 'Jiné',
 }
 
 export default async function HubPage() {

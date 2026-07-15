@@ -3,14 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import type { ClientLead, LeadStatus, LeadActionType } from '@/lib/types'
-
-async function requireAuth() {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Neautorizovaný přístup')
-}
 
 export type LeadPayload = {
   company_name: string
@@ -62,7 +57,7 @@ export async function createLead(payload: LeadPayload) {
 
 export async function updateLead(id: string, payload: LeadPayload) {
   await requireAuth()
-  await sql`
+  const rows = await sql`
     UPDATE client_leads SET
       company_name = ${payload.company_name},
       contact_name = ${payload.contact_name},
@@ -80,8 +75,10 @@ export async function updateLead(id: string, payload: LeadPayload) {
       reminder_2h_before_sent = false,
       updated_at = now()
     WHERE id = ${id}
+    RETURNING reminder_day_before_sent, reminder_2h_before_sent, updated_at
   `
   revalidatePath('/dashboard/calls')
+  return rows[0] as Pick<ClientLead, 'reminder_day_before_sent' | 'reminder_2h_before_sent' | 'updated_at'>
 }
 
 export async function setCallAnswered(id: string, answered: boolean | null) {

@@ -2,18 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
-
-async function requireAuth() {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Neautorizovaný přístup')
-}
 
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
@@ -128,7 +122,7 @@ export async function createProject(payload: ProjectPayload, completedExtra?: Co
   )
   if (completedExtra) {
     await sql`
-      INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type)
+      INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type, source_project_id)
       VALUES (
         ${payload.description || payload.client_name},
         ${payload.client_name},
@@ -138,7 +132,8 @@ export async function createProject(payload: ProjectPayload, completedExtra?: Co
         ${completedExtra.difficulty},
         ${completedExtra.time_invested},
         ${payload.notes},
-        ${completedExtra.project_type}
+        ${completedExtra.project_type},
+        ${newProjectId}
       )
     `
     revalidatePath('/dashboard/dokoncene')
@@ -268,7 +263,7 @@ export async function confirmVizeonBooking(projectId: string) {
   await requireAuth()
   const rows = await sql`
     SELECT client_name, client_email, service_type, description, public_token, project_url
-    FROM projects WHERE id = ${projectId} AND source = 'vizeon_web' AND vizeon_confirmed = false
+    FROM projects WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)
     LIMIT 1
   `
   if (!rows.length) throw new Error('Rezervace nenalezena nebo již potvrzena')
@@ -327,7 +322,7 @@ export async function confirmVizeonBooking(projectId: string) {
 
 export async function deleteVizeonBooking(projectId: string) {
   await requireAuth()
-  await sql`DELETE FROM projects WHERE id = ${projectId} AND source = 'vizeon_web' AND vizeon_confirmed = false`
+  await sql`DELETE FROM projects WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)`
   revalidatePath('/dashboard/vizeon')
 }
 
@@ -357,13 +352,16 @@ export async function markProjectAsCompleted(
   }
 
   const title = p.description || p.client_name
+  // Scoped na source_project_id, ne na title/client_name — jinak dva různé
+  // projekty od stejného klienta s prázdným popisem (title spadne na
+  // client_name) vypadají jako "duplicitní", i když jde o odlišné zakázky.
   const existing = await sql`
-    SELECT id FROM completed_projects WHERE title = ${title} AND client_name = ${p.client_name} LIMIT 1
+    SELECT id FROM completed_projects WHERE source_project_id = ${projectId} LIMIT 1
   `
   if (existing.length) throw new Error('Tato zakázka již byla přidána do dokončených.')
 
   const inserted = await sql`
-    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type, client_email)
+    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type, client_email, source_project_id)
     VALUES (
       ${p.description || p.client_name},
       ${p.client_name},
@@ -374,7 +372,8 @@ export async function markProjectAsCompleted(
       ${extra.time_invested},
       ${p.notes},
       ${extra.project_type},
-      ${p.client_email}
+      ${p.client_email},
+      ${projectId}
     )
     RETURNING survey_token
   `

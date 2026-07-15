@@ -2,14 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import type { ProjectType, CostType, CostCategory } from '@/lib/types'
-
-async function requireAuth() {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Neautorizovaný přístup')
-}
 
 export type CompletedProjectPayload = {
   title: string
@@ -102,14 +97,23 @@ export async function updateCompletedProject(id: string, payload: CompletedProje
       project_type = ${payload.project_type}
     WHERE id = ${id}
   `
-  // Sync linked finance transaction
+  // Sync linked finance transaction — upsert, protože založení s amount = 0
+  // (kdy se transakce nevytvářela) a následná editace na kladnou částku by
+  // jinak UPDATE nic netrefil a transakce by nikdy nevznikla.
   if (payload.amount > 0) {
     const note = payload.title + (payload.client_name ? ' — ' + payload.client_name : '')
-    await sql`
+    const updated = await sql`
       UPDATE finance_transactions
       SET amount = ${payload.amount}, note = ${note}, date = ${payload.completed_at}
       WHERE source_completed_project_id = ${id}
+      RETURNING id
     `
+    if (updated.length === 0) {
+      await sql`
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_completed_project_id)
+        VALUES (${payload.amount}, 'income', 'dokončený projekt', ${note}, ${payload.completed_at}, NULL, ${id})
+      `
+    }
   } else {
     await sql`DELETE FROM finance_transactions WHERE source_completed_project_id = ${id}`
   }
@@ -119,6 +123,10 @@ export async function updateCompletedProject(id: string, payload: CompletedProje
 
 export async function deleteCompletedProject(id: string) {
   await requireAuth()
+  // finance_transactions.source_completed_project_id je ON DELETE SET NULL,
+  // takže bez explicitního úklidu by transakce přežila jako "osiřelá" —
+  // nenavázaná na nic, ale dál započítaná do příjmů.
+  await sql`DELETE FROM finance_transactions WHERE source_completed_project_id = ${id}`
   await sql`DELETE FROM completed_projects WHERE id = ${id}`
   revalidatePath('/dashboard/dokoncene')
   revalidatePath('/hub/finance')
@@ -155,13 +163,21 @@ export async function updateCost(id: string, payload: CostPayload) {
       description = ${payload.description}
     WHERE id = ${id}
   `
-  // Sync linked finance transaction (platí jen pro one_time)
+  // Sync linked finance transaction (platí jen pro one_time) — upsert ze
+  // stejného důvodu jako u completed_projects výše.
   if (payload.cost_type === 'one_time' && payload.amount > 0) {
-    await sql`
+    const updated = await sql`
       UPDATE finance_transactions
       SET amount = ${payload.amount}, note = ${payload.name}
       WHERE source_cost_id = ${id}
+      RETURNING id
     `
+    if (updated.length === 0) {
+      await sql`
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_cost_id)
+        VALUES (${payload.amount}, 'expense', 'náklady', ${payload.name}, now()::date, NULL, ${id})
+      `
+    }
   } else {
     await sql`DELETE FROM finance_transactions WHERE source_cost_id = ${id}`
   }

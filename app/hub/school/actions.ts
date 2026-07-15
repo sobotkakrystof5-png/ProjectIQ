@@ -1,14 +1,8 @@
 'use server'
 
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-
-async function requireAuth() {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Unauthorized')
-}
 
 // ── Termíny ──────────────────────────────────────────────────────────────────
 

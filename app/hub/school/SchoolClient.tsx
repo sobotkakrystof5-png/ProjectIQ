@@ -13,16 +13,14 @@ import {
 import { toggleDeadline, deleteDeadline, deleteGrade } from './actions'
 import { AddGradeModal } from './AddGradeModal'
 import { AddDeadlineModal } from './AddDeadlineModal'
+import { getPragueTodayISO } from '@/lib/prague-time'
+import { DEADLINE_TYPE_LABEL } from '@/lib/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const GRADE_LABELS: Record<number, string> = {
   1: 'Sehr gut', 2: 'Gut', 3: 'Befriedigend',
   4: 'Ausreichend', 5: 'Mangelhaft', 6: 'Ungenügend',
-}
-
-const DEADLINE_LABELS = {
-  klassenarbeit: 'KA', homework: 'Úkol', presentation: 'Referát', other: 'Jiné',
 }
 
 const DEADLINE_COLORS = {
@@ -303,7 +301,7 @@ function DeadlineCalendar({ deadlines }: { deadlines: DeadlineEntry[] }) {
           }
 
           const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-          const isToday = iso === today.toISOString().slice(0, 10)
+          const isToday = iso === getPragueTodayISO()
           const isSelected = selectedDay === iso
           const items = byDate[iso] ?? []
           const hasOverdue = items.some(d => !d.done)
@@ -374,7 +372,7 @@ function DeadlineCalendar({ deadlines }: { deadlines: DeadlineEntry[] }) {
             <div className="space-y-1.5">
               {selectedItems.map(it => (
                 <div key={it.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 border text-xs ${DEADLINE_COLORS[it.type]} ${it.done ? 'opacity-50' : ''}`}>
-                  <span className="font-semibold">{DEADLINE_LABELS[it.type]}</span>
+                  <span className="font-semibold">{DEADLINE_TYPE_LABEL[it.type]}</span>
                   <span className="font-medium flex-1 truncate">{it.title}</span>
                   {it.subject && <span className="shrink-0 opacity-70">{it.subject}</span>}
                   {it.done && <span className="shrink-0 opacity-60">✓</span>}
@@ -429,7 +427,7 @@ function DeadlineRow({ deadline, isOverdue = false }: { deadline: DeadlineEntry;
 
       <div className="flex items-center gap-2 shrink-0">
         <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${DEADLINE_COLORS[deadline.type]}`}>
-          {DEADLINE_LABELS[deadline.type]}
+          {DEADLINE_TYPE_LABEL[deadline.type]}
         </span>
         <span className={`text-xs ${diffCls}`}>{diffLabel}</span>
         <span className="text-xs text-muted-foreground hidden sm:inline">{formatDate(deadline.dueDate)}</span>

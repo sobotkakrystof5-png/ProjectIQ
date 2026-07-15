@@ -18,7 +18,7 @@ interface PageProps {
 const loadAllProjects = cache(async () => {
   const rows = await sql`
     SELECT * FROM projects
-    WHERE NOT (source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL))
+    WHERE NOT is_vizeon_pending(source, vizeon_confirmed)
     ORDER BY created_at DESC
   `
   return rows as Project[]
@@ -50,7 +50,7 @@ async function ProjectGrid({ statusFilter }: { statusFilter?: string }) {
             href="/dashboard/new"
             className="mt-5 inline-flex items-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
           >
-            <Plus size={15} strokeWidth={2} />
+            <Plus size={15} strokeWidth={1.5} />
             Přidat první zakázku
           </Link>
         )}
@@ -110,7 +110,7 @@ export default function DashboardPage({ searchParams }: PageProps) {
           href="/dashboard/new"
           className="flex items-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
         >
-          <Plus size={15} strokeWidth={2} />
+          <Plus size={15} strokeWidth={1.5} />
           Nová zakázka
         </Link>
       </div>

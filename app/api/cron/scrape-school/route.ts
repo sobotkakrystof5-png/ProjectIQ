@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { scrapeLernSax } from '@/lib/lernsax'
 import { scrapeBesteSchule } from '@/lib/besteschule'
+import { verifyCronSecret } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -67,12 +68,8 @@ async function upsertBesteSchuleData(data: Awaited<ReturnType<typeof scrapeBeste
 }
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET
-  if (secret) {
-    const auth = req.headers.get('authorization')
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!verifyCronSecret(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const results = { lernsax: 'skipped', besteschule: 'skipped' }

@@ -78,16 +78,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const scheduledAtISO = pragueWallClockToISO(year, month, day, hour, minute)
   const endsAtISO = new Date(new Date(scheduledAtISO).getTime() + 60 * 60 * 1000).toISOString()
 
-  // consultation_slots and calendar_events live in separate tables, so the DB
-  // exclusion constraint on calendar_events alone can't catch a clash with an
-  // existing client-portal consultation — check that here too.
-  const conflictingConsultation = await sql`
-    SELECT 1 FROM consultation_slots WHERE scheduled_at = ${scheduledAtISO} LIMIT 1
-  `
-  if (conflictingConsultation.length) {
-    return errorResponse(origin, 409, 'Tento termín je již obsazen. Zvolte prosím jiný.', 'SLOT_TAKEN')
-  }
-
   try {
     const projectRows = await sql`
       INSERT INTO projects (client_name, client_email, client_phone, service_type, description, status, source)

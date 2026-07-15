@@ -2,13 +2,7 @@
 
 import { sql } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-
-async function requireAuth() {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Unauthorized')
-}
+import { requireAuth } from '@/lib/auth'
 
 // ─── Nutrition ────────────────────────────────────────────────────────────────
 
@@ -201,19 +195,23 @@ function calculateHealthScore(
 
 export async function recalcHealthScore(date: string): Promise<void> {
   try {
-    const nutRows = await sql`
-      SELECT
-        COALESCE(SUM(protein_g), 0)::float AS total_protein,
-        COALESCE(SUM(carbs_g), 0)::float AS total_carbs,
-        COALESCE(SUM(fat_g), 0)::float AS total_fat
-      FROM nutrition_logs
-      WHERE user_id IS NULL AND logged_date = ${date}
-    `
-    const nut = (nutRows as any[])[0] ?? { total_protein: 0, total_carbs: 0, total_fat: 0 }
+    await requireAuth()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return
 
-    const wkRows = await sql`
-      SELECT COUNT(*)::int AS cnt FROM workout_logs WHERE user_id IS NULL AND logged_date = ${date}
-    `
+    const [nutRows, wkRows] = await Promise.all([
+      sql`
+        SELECT
+          COALESCE(SUM(protein_g), 0)::float AS total_protein,
+          COALESCE(SUM(carbs_g), 0)::float AS total_carbs,
+          COALESCE(SUM(fat_g), 0)::float AS total_fat
+        FROM nutrition_logs
+        WHERE user_id IS NULL AND logged_date = ${date}
+      `,
+      sql`
+        SELECT COUNT(*)::int AS cnt FROM workout_logs WHERE user_id IS NULL AND logged_date = ${date}
+      `,
+    ])
+    const nut = (nutRows as any[])[0] ?? { total_protein: 0, total_carbs: 0, total_fat: 0 }
     const workoutDone = ((wkRows as any[])[0]?.cnt ?? 0) > 0
 
     const { score, proteinScore, carbsScore, fatScore, activityScore } = calculateHealthScore(

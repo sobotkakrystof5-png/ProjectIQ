@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { type FoodSearchResult } from '@/lib/fatsecret'
 import { getNutritionDay, logFood, deleteFood, type NutritionLog } from './sport-actions'
 import { PROFILE } from './profile'
+import { getPragueTodayISO } from '@/lib/prague-time'
 
 const MEAL_LABELS: Record<string, string> = {
   breakfast: 'Snídaně',
@@ -40,7 +41,7 @@ function addDays(iso: string, n: number) {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return getPragueTodayISO()
 }
 
 interface Props {
@@ -332,7 +333,7 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
             onClick={() => setShowAddForm(true)}
             className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-rose-200 rounded-xl text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition-colors font-medium text-sm"
           >
-            <Plus size={16} strokeWidth={2} />
+            <Plus size={16} strokeWidth={1.5} />
             Přidat jídlo
           </button>
         ) : (
@@ -544,7 +545,7 @@ export function NutritionSection({ initialDate, initialLogs, onMutated }: Props)
                 disabled={adding}
                 className="w-full flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
               >
-                {adding ? <Loader2 size={16} strokeWidth={1.5} className="animate-spin" /> : <Plus size={16} strokeWidth={2} />}
+                {adding ? <Loader2 size={16} strokeWidth={1.5} className="animate-spin" /> : <Plus size={16} strokeWidth={1.5} />}
                 Přidat do {MEAL_LABELS[mealType].toLowerCase()}
               </button>
             )}

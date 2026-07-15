@@ -59,7 +59,10 @@ function SlotDetailModal({ slot, clientName, onClose }: { slot: ConsultationSlot
             </div>
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Kanál</p>
-              <p className="text-sm text-foreground">{CHANNEL_LABELS[slot.channel as ConsultationChannel] ?? slot.channel}</p>
+              <p className="text-sm text-foreground">
+                {CHANNEL_LABELS[slot.channel as ConsultationChannel] ?? slot.channel}
+                {slot.channel === 'other' && slot.channel_other_text ? ` — ${slot.channel_other_text}` : ''}
+              </p>
             </div>
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Přání klienta</p>

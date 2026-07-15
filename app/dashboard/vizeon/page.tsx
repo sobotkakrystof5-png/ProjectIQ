@@ -27,7 +27,7 @@ async function loadBookings(): Promise<VizeonBooking[]> {
       ce.starts_at AS consultation_at
     FROM projects p
     LEFT JOIN calendar_events ce ON ce.project_id = p.id
-    WHERE p.source = 'vizeon_web' AND (p.vizeon_confirmed = false OR p.vizeon_confirmed IS NULL)
+    WHERE is_vizeon_pending(p.source, p.vizeon_confirmed)
     ORDER BY p.created_at DESC
   `
   return rows as VizeonBooking[]

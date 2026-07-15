@@ -13,6 +13,7 @@ import {
   type StartupChangelogEntry,
   type ChangeType,
 } from '@/lib/types'
+import { getPragueTodayISO } from '@/lib/prague-time'
 
 const CHANGE_TYPES = Object.entries(CHANGE_TYPE_LABELS) as [ChangeType, string][]
 
@@ -24,7 +25,7 @@ interface Props {
 export function StartupChangelog({ projectId, initialEntries }: Props) {
   const [entries, setEntries] = useState(initialEntries)
   const [showForm, setShowForm] = useState(false)
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(getPragueTodayISO())
   const [type, setType] = useState<ChangeType>('development')
   const [description, setDescription] = useState('')
   const [progressFrom, setProgressFrom] = useState('')

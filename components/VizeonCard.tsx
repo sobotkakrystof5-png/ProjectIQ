@@ -132,9 +132,9 @@ export function VizeonCard({ booking }: Props) {
           className="flex items-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-60"
         >
           {confirming ? (
-            <Loader2 size={15} strokeWidth={2} className="animate-spin" />
+            <Loader2 size={15} strokeWidth={1.5} className="animate-spin" />
           ) : (
-            <CheckCircle size={15} strokeWidth={2} />
+            <CheckCircle size={15} strokeWidth={1.5} />
           )}
           {confirming ? 'Potvrzuji…' : 'Potvrdit jako zakázku'}
         </button>

@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const [countRows, notifRows] = await Promise.all([
     sql`
       SELECT count(*)::int AS count FROM projects
-      WHERE source = 'vizeon_web' AND (vizeon_confirmed = false OR vizeon_confirmed IS NULL)
+      WHERE is_vizeon_pending(source, vizeon_confirmed)
     `,
     sql`SELECT count(*)::int AS count FROM notifications WHERE read = false`,
   ])

@@ -5,9 +5,10 @@ import { Scale, TrendingUp, TrendingDown, Minus, Loader2, Check } from 'lucide-r
 import { cn } from '@/lib/utils'
 import { logWeight, getWeightLogs, getLastWeight, type WeightLog } from './sport-actions'
 import { calcBMI, bmiCategory, PROFILE } from './profile'
+import { getPragueTodayISO } from '@/lib/prague-time'
 
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  return getPragueTodayISO()
 }
 
 function formatDate(iso: string) {
@@ -204,7 +205,7 @@ export function WeightSection({ initialLogs, initialLast }: Props) {
               )}
             >
               {saving ? <Loader2 size={16} strokeWidth={1.5} className="animate-spin" /> :
-               saved ? <Check size={16} strokeWidth={2} /> : null}
+               saved ? <Check size={16} strokeWidth={1.5} /> : null}
               {saved ? 'Uloženo!' : 'Uložit'}
             </button>
           </div>

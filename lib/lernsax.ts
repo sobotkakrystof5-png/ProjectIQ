@@ -10,6 +10,8 @@
  * - Navigation: must click links IN main_frame iframe (JS intercepts location.href changes)
  */
 
+import { pragueWallClockToISO } from '@/lib/prague-time'
+
 export type LernSaxMessage = {
   sender: string
   subject: string
@@ -71,13 +73,14 @@ function guessDeadlineType(title: string): 'test' | 'homework' | 'presentation' 
   return 'homework'
 }
 
-/** Parsuje německý datum formát "DD.MM.YYYY HH:MM" → Date */
+/** Parsuje německý datum formát "DD.MM.YYYY HH:MM" → Date (interpretován jako Europe/Berlin wall-clock) */
 function parseGermanDate(str: string): Date | null {
   if (!str) return null
   const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/)
   if (!m) return null
   const [, d, mo, y, h = '0', min = '0'] = m
-  const date = new Date(+y, +mo - 1, +d, +h, +min)
+  const iso = pragueWallClockToISO(+y, +mo, +d, +h, +min)
+  const date = new Date(iso)
   return isNaN(date.getTime()) ? null : date
 }
 

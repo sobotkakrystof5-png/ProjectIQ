@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, PhoneOff, PhoneMissed } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2 } from 'lucide-react'
 import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import {
@@ -85,7 +85,7 @@ function CallAnsweredToggle({
         title="Zvedl — klikni pro změnu"
         className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-40"
       >
-        <Check size={11} strokeWidth={2.5} />
+        <Check size={11} strokeWidth={1.5} />
         Zvedl
       </button>
     )
@@ -99,7 +99,7 @@ function CallAnsweredToggle({
         title="Nezvedl — klikni pro změnu"
         className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100 transition-colors disabled:opacity-40"
       >
-        <X size={11} strokeWidth={2.5} />
+        <X size={11} strokeWidth={1.5} />
         Nezvedl
       </button>
     )
@@ -265,6 +265,70 @@ function LeadForm({
   )
 }
 
+function CompanyCell({ lead }: { lead: ClientLead }) {
+  return (
+    <td className="px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <Building2 size={13} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
+        <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
+      </div>
+    </td>
+  )
+}
+
+function ContactCell({ lead }: { lead: ClientLead }) {
+  return (
+    <td className="px-3 py-2.5">
+      {lead.contact_name && (
+        <div className="flex items-center gap-1.5">
+          <User size={12} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
+          <span className="text-sm text-foreground">{lead.contact_name}</span>
+        </div>
+      )}
+    </td>
+  )
+}
+
+function PhoneCell({ lead }: { lead: ClientLead }) {
+  return (
+    <td className="px-3 py-2.5">
+      {lead.phone && (
+        <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline">
+          <Phone size={12} strokeWidth={1.5} />
+          {lead.phone}
+        </a>
+      )}
+    </td>
+  )
+}
+
+function EmailCell({ lead }: { lead: ClientLead }) {
+  return (
+    <td className="px-3 py-2.5">
+      {lead.email && (
+        <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline truncate max-w-[160px]">
+          <Mail size={12} strokeWidth={1.5} />
+          {lead.email}
+        </a>
+      )}
+    </td>
+  )
+}
+
+function ValueCell({ lead }: { lead: ClientLead }) {
+  return (
+    <td className="px-3 py-2.5">
+      {lead.estimated_value != null ? (
+        <span className="text-sm font-medium text-foreground">
+          {Number(lead.estimated_value).toLocaleString('cs-CZ')} Kč
+        </span>
+      ) : (
+        <span className="text-muted-foreground/50">—</span>
+      )}
+    </td>
+  )
+}
+
 function LeadRow({
   lead,
   onEdit,
@@ -296,28 +360,9 @@ function LeadRow({
 
   return (
     <tr className="border-t border-border hover:bg-slate-50/60 transition-colors group">
-      <td className="px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <Building2 size={13} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
-          <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
-        </div>
-      </td>
-      <td className="px-3 py-2.5">
-        {lead.contact_name && (
-          <div className="flex items-center gap-1.5">
-            <User size={12} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
-            <span className="text-sm text-foreground">{lead.contact_name}</span>
-          </div>
-        )}
-      </td>
-      <td className="px-3 py-2.5">
-        {lead.phone && (
-          <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline">
-            <Phone size={12} strokeWidth={1.5} />
-            {lead.phone}
-          </a>
-        )}
-      </td>
+      <CompanyCell lead={lead} />
+      <ContactCell lead={lead} />
+      <PhoneCell lead={lead} />
       <td className="px-3 py-2.5">
         <CallAnsweredToggle
           answered={lead.call_answered}
@@ -325,14 +370,7 @@ function LeadRow({
           isPending={isPending}
         />
       </td>
-      <td className="px-3 py-2.5">
-        {lead.email && (
-          <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline truncate max-w-[160px]">
-            <Mail size={12} strokeWidth={1.5} />
-            {lead.email}
-          </a>
-        )}
-      </td>
+      <EmailCell lead={lead} />
       <td className="px-3 py-2.5">
         <StatusBadge status={lead.lead_status} />
       </td>
@@ -357,15 +395,7 @@ function LeadRow({
           <span className="text-muted-foreground/50">—</span>
         )}
       </td>
-      <td className="px-3 py-2.5">
-        {lead.estimated_value != null ? (
-          <span className="text-sm font-medium text-foreground">
-            {Number(lead.estimated_value).toLocaleString('cs-CZ')} Kč
-          </span>
-        ) : (
-          <span className="text-muted-foreground/50">—</span>
-        )}
-      </td>
+      <ValueCell lead={lead} />
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
@@ -511,36 +541,10 @@ function WaitingRow({
 }) {
   return (
     <tr className="border-t border-border hover:bg-slate-50/60 transition-colors group">
-      <td className="px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <Building2 size={13} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
-          <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
-        </div>
-      </td>
-      <td className="px-3 py-2.5">
-        {lead.contact_name && (
-          <div className="flex items-center gap-1.5">
-            <User size={12} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
-            <span className="text-sm text-foreground">{lead.contact_name}</span>
-          </div>
-        )}
-      </td>
-      <td className="px-3 py-2.5">
-        {lead.phone && (
-          <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline">
-            <Phone size={12} strokeWidth={1.5} />
-            {lead.phone}
-          </a>
-        )}
-      </td>
-      <td className="px-3 py-2.5">
-        {lead.email && (
-          <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline truncate max-w-[160px]">
-            <Mail size={12} strokeWidth={1.5} />
-            {lead.email}
-          </a>
-        )}
-      </td>
+      <CompanyCell lead={lead} />
+      <ContactCell lead={lead} />
+      <PhoneCell lead={lead} />
+      <EmailCell lead={lead} />
       <td className="px-3 py-2.5">
         {lead.notes ? (
           <span className="text-sm text-muted-foreground truncate max-w-[200px] block">{lead.notes}</span>
@@ -548,15 +552,7 @@ function WaitingRow({
           <span className="text-muted-foreground/40">—</span>
         )}
       </td>
-      <td className="px-3 py-2.5">
-        {lead.estimated_value != null ? (
-          <span className="text-sm font-medium text-foreground">
-            {Number(lead.estimated_value).toLocaleString('cs-CZ')} Kč
-          </span>
-        ) : (
-          <span className="text-muted-foreground/50">—</span>
-        )}
-      </td>
+      <ValueCell lead={lead} />
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
@@ -625,14 +621,9 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
 
   const handleUpdate = (id: string, data: LeadPayload) => {
     startTransition(async () => {
-      await updateLead(id, data)
+      const result = await updateLead(id, data)
       setLeads(prev =>
-        prev.map(l => l.id === id ? {
-          ...l, ...data,
-          reminder_day_before_sent: false,
-          reminder_2h_before_sent: false,
-          updated_at: new Date(),
-        } : l)
+        prev.map(l => l.id === id ? { ...l, ...data, ...result } : l)
       )
       setEditingId(null)
       setEditingWaitingId(null)

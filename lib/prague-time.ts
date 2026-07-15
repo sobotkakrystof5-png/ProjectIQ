@@ -106,6 +106,33 @@ export function expandRangeToHourlySlots(startIso: string, endIso: string): stri
   return slots
 }
 
+// Today's date in Europe/Prague, as 'YYYY-MM-DD'. Use this instead of
+// `new Date().toISOString().slice(0, 10)`, which reads the UTC calendar date
+// and is off by one around midnight Prague time (23:00–01:00 UTC).
+export function getPragueTodayISO(): string {
+  const { year, month, day } = getPragueNow()
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+// Add (or subtract) whole days from a 'YYYY-MM-DD' date string, staying in
+// pure calendar arithmetic (no timezone involved on either side).
+export function addIsoDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d + days))
+  return dt.toISOString().slice(0, 10)
+}
+
+// Parse a <input type="datetime-local"> value ('YYYY-MM-DDTHH:MM'), treating
+// it as Prague wall-clock time, and return the equivalent UTC ISO string.
+// Correct across CET/CEST transitions (unlike `new Date(localDt).toISOString()`,
+// which assumes the browser's local timezone is Prague).
+export function parsePragueDatetimeLocalToISO(localDt: string): string {
+  const [datePart, timePart] = localDt.split('T')
+  const [year, month, day] = datePart.split('-').map(Number)
+  const [hour, minute] = (timePart ?? '00:00').split(':').map(Number)
+  return pragueWallClockToISO(year, month, day, hour, minute)
+}
+
 export function formatPragueDateTime(utcIso: string): string {
   return new Intl.DateTimeFormat('cs-CZ', {
     timeZone: TZ,

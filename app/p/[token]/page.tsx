@@ -15,23 +15,28 @@ interface PageProps {
 }
 
 export default async function ClientPortalPage({ params }: PageProps) {
-  const [projectRows, msgRows, progressRows, bookedRows, eventRows] = await Promise.all([
-    sql`
-      SELECT id, client_name, description, focus, status, progress, deadline, updated_at, project_url
-      FROM projects
-      WHERE public_token = ${params.token}
-      LIMIT 1
-    `,
+  const projectRows = await sql`
+    SELECT id, client_name, description, focus, status, progress, deadline, updated_at, project_url
+    FROM projects
+    WHERE public_token = ${params.token}
+    LIMIT 1
+  `
+
+  if (!projectRows.length) notFound()
+
+  const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at' | 'project_url'>
+
+  const [msgRows, progressRows, bookedRows, eventRows] = await Promise.all([
     sql`
       SELECT id, content, created_at
       FROM client_messages
-      WHERE project_id = (SELECT id FROM projects WHERE public_token = ${params.token})
+      WHERE project_id = ${project.id}
       ORDER BY created_at DESC
     `,
     sql`
       SELECT id, progress_from, progress_to, description, created_at
       FROM progress_updates
-      WHERE project_id = (SELECT id FROM projects WHERE public_token = ${params.token})
+      WHERE project_id = ${project.id}
       ORDER BY created_at DESC
     `,
     sql`
@@ -48,9 +53,6 @@ export default async function ClientPortalPage({ params }: PageProps) {
     `,
   ])
 
-  if (!projectRows.length) notFound()
-
-  const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at' | 'project_url'>
   const messages = msgRows as Pick<ClientMessage, 'id' | 'content' | 'created_at'>[]
   const progressUpdates = progressRows as Pick<ProgressUpdate, 'id' | 'progress_from' | 'progress_to' | 'description' | 'created_at'>[]
   const consultationSlots = (bookedRows as { scheduled_at: Date | string }[]).map(r => new Date(r.scheduled_at).toISOString())

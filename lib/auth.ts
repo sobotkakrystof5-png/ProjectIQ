@@ -1,5 +1,6 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { getServerSession } from 'next-auth'
 import bcrypt from 'bcryptjs'
 import { sql } from './db'
 
@@ -59,4 +60,9 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
   },
+}
+
+export async function requireAuth(): Promise<void> {
+  const session = await getServerSession(authOptions)
+  if (!session) throw new Error('Neautorizovaný přístup')
 }

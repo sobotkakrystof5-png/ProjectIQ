@@ -79,11 +79,21 @@ export const CHANNEL_LABELS: Record<ConsultationChannel, string> = {
   other: 'Jiné',
 }
 
+export type DeadlineType = 'klassenarbeit' | 'homework' | 'presentation' | 'other'
+
+export const DEADLINE_TYPE_LABEL: Record<DeadlineType, string> = {
+  klassenarbeit: 'KA',
+  homework: 'Úkol',
+  presentation: 'Referát',
+  other: 'Jiné',
+}
+
 export interface ConsultationSlot {
   id: string
   project_id: string
   scheduled_at: string | Date
   channel: ConsultationChannel
+  channel_other_text: string | null
   client_wish: string
   meeting_link: string | null
   client_email: string | null
@@ -143,7 +153,13 @@ export interface ClientLead {
 
 export type ProjectType = 'client' | 'personal'
 export type CostType = 'fixed_monthly' | 'fixed_annual' | 'one_time'
-export type CostCategory = 'client' | 'personal' | 'all'
+
+// 'client' | 'personal' | 'all' come from the business-costs UI (CostsManager,
+// /dashboard/naklady); the rest come from the personal-finance UI
+// (FixedCostsSection, /hub/finance) — both write into the same `costs` table
+// (migrations/012_costs_category.sql), so this union has to cover every value
+// either UI can store or category badges looking up a narrower type render undefined.
+export type CostCategory = 'client' | 'personal' | 'all' | 'domény' | 'hosting' | 'software' | 'nástroje' | 'ostatní'
 
 export const COST_TYPE_LABELS: Record<CostType, string> = {
   fixed_monthly: 'Fixní měsíční',
@@ -155,6 +171,11 @@ export const COST_CATEGORY_LABELS: Record<CostCategory, string> = {
   client: 'Zakázky pro klienty',
   personal: 'Osobní projekty',
   all: 'Obecné',
+  domény: 'Domény',
+  hosting: 'Hosting',
+  software: 'Software',
+  nástroje: 'Nástroje',
+  ostatní: 'Ostatní',
 }
 
 export interface CompletedProject {
@@ -171,6 +192,7 @@ export interface CompletedProject {
   project_type: ProjectType
   survey_token: string
   client_email: string | null
+  source_project_id: string | null
   created_at: string | Date
 }
 

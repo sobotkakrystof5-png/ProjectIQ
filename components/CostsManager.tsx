@@ -24,12 +24,22 @@ const CATEGORY_STYLES: Record<CostCategory, string> = {
   client: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
   personal: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
   all: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  domény: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  hosting: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  software: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  nástroje: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
+  ostatní: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
 }
 
 const CATEGORY_SHORT: Record<CostCategory, string> = {
   client: 'Zakázky',
   personal: 'Osobní',
   all: 'Obecné',
+  domény: 'Doména',
+  hosting: 'Hosting',
+  software: 'Software',
+  nástroje: 'Nástroj',
+  ostatní: 'Ostatní',
 }
 
 function CostForm({
@@ -298,7 +308,8 @@ function CostSection({
 export default function CostsManager({ initialCosts }: { initialCosts: Cost[] }) {
   const [costs, setCosts] = useState<Cost[]>(initialCosts)
   const [addingType, setAddingType] = useState<CostType | null>(null)
-  const [addingSection, setAddingSection] = useState<'fixed' | 'onetime' | null>(null)
+  const addingSection: 'fixed' | 'onetime' | null =
+    addingType === null ? null : addingType === 'one_time' ? 'onetime' : 'fixed'
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -322,7 +333,6 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
         created_at: new Date(),
       } as Cost, ...prev])
       setAddingType(null)
-      setAddingSection(null)
     })
   }
 
@@ -377,10 +387,10 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
         }
         costs={fixedCosts}
         addingType={addingSection === 'fixed' ? addingType : null}
-        onAddNew={(type) => { setAddingType(type); setAddingSection('fixed'); setEditingId(null) }}
-        onCancelAdd={() => { setAddingType(null); setAddingSection(null) }}
+        onAddNew={(type) => { setAddingType(type); setEditingId(null) }}
+        onCancelAdd={() => setAddingType(null)}
         editingId={editingId}
-        onEdit={(id) => { setEditingId(id); setAddingType(null); setAddingSection(null) }}
+        onEdit={(id) => { setEditingId(id); setAddingType(null) }}
         onCancelEdit={() => setEditingId(null)}
         onSave={handleUpdate}
         onCreate={handleCreate}
@@ -399,10 +409,10 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
         }
         costs={oneTimeCosts}
         addingType={addingSection === 'onetime' ? addingType : null}
-        onAddNew={(type) => { setAddingType(type); setAddingSection('onetime'); setEditingId(null) }}
-        onCancelAdd={() => { setAddingType(null); setAddingSection(null) }}
+        onAddNew={(type) => { setAddingType(type); setEditingId(null) }}
+        onCancelAdd={() => setAddingType(null)}
         editingId={editingId}
-        onEdit={(id) => { setEditingId(id); setAddingType(null); setAddingSection(null) }}
+        onEdit={(id) => { setEditingId(id); setAddingType(null) }}
         onCancelEdit={() => setEditingId(null)}
         onSave={handleUpdate}
         onCreate={handleCreate}

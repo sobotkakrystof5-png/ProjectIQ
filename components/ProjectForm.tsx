@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProject, updateProject } from '@/app/actions'
 import { STATUS_LABELS, STATUS_ORDER, type Project, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { ChevronDown, Loader2 } from 'lucide-react'
 
 type FormData = {
@@ -56,7 +57,7 @@ const defaultData: FormData = {
   progressNote: '',
   addToCompleted: false,
   completedType: 'client',
-  completedAt: new Date().toISOString().slice(0, 10),
+  completedAt: getPragueTodayISO(),
   completedDifficulty: 5,
   completedTimeInvested: '',
 }
@@ -82,7 +83,7 @@ function projectToForm(p: Project): FormData {
     progressNote: '',
     addToCompleted: false,
     completedType: 'client',
-    completedAt: new Date().toISOString().slice(0, 10),
+    completedAt: getPragueTodayISO(),
     completedDifficulty: 5,
     completedTimeInvested: '',
   }
@@ -95,19 +96,20 @@ export function ProjectForm({ project }: ProjectFormProps) {
   )
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  // isPending only reflects the transition's synchronous portion for async
+  // callbacks in React 18 — it can flip back to false before the server
+  // action resolves, so a fast double-click could still slip through and
+  // create two projects. This ref guards the async work itself.
+  const isSubmittingRef = useRef(false)
   const router = useRouter()
   const originalProgress = project?.progress ?? 0
   const progressChanged = project != null && form.progress !== originalProgress
 
-  useEffect(() => {
-    if (depositManuallySet) return
+  const depositAmount = useMemo(() => {
+    if (depositManuallySet) return form.deposit_amount
     const price = Number(form.price)
-    if (form.price !== '' && price > 0) {
-      setForm(prev => ({ ...prev, deposit_amount: String(Math.round(price * 0.3)) }))
-    } else {
-      setForm(prev => ({ ...prev, deposit_amount: '' }))
-    }
-  }, [form.price, depositManuallySet])
+    return form.price !== '' && price > 0 ? String(Math.round(price * 0.3)) : ''
+  }, [depositManuallySet, form.deposit_amount, form.price])
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -120,6 +122,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (isSubmittingRef.current) return
     setError(null)
 
     if (!form.client_name.trim()) {
@@ -145,7 +148,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
       price: form.price !== '' ? Number(form.price) : null,
       paid: form.paid,
       estimated_costs: form.estimated_costs !== '' ? Number(form.estimated_costs) : null,
-      deposit_amount: form.deposit_amount !== '' ? Number(form.deposit_amount) : null,
+      deposit_amount: depositAmount !== '' ? Number(depositAmount) : null,
       deposit_paid: form.deposit_paid,
       deadline: form.deadline || null,
       notes: form.notes.trim() || null,
@@ -158,6 +161,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
       time_invested: form.completedTimeInvested ? Number(form.completedTimeInvested) : null,
     } : undefined
 
+    isSubmittingRef.current = true
     startTransition(async () => {
       try {
         if (project) {
@@ -174,6 +178,8 @@ export function ProjectForm({ project }: ProjectFormProps) {
         }
       } catch {
         setError('Chyba při ukládání zakázky')
+      } finally {
+        isSubmittingRef.current = false
       }
     })
   }
@@ -361,8 +367,8 @@ export function ProjectForm({ project }: ProjectFormProps) {
             <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
               Záloha{(() => {
                 const price = Number(form.price)
-                const deposit = Number(form.deposit_amount)
-                if (form.price && price > 0 && form.deposit_amount && deposit > 0) {
+                const deposit = Number(depositAmount)
+                if (form.price && price > 0 && depositAmount && deposit > 0) {
                   const pct = Math.round((deposit / price) * 100)
                   return ` — ${pct} % z ceny`
                 }
@@ -372,7 +378,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                value={form.deposit_amount}
+                value={depositAmount}
                 onChange={e => handleDepositChange(e.target.value)}
                 placeholder={
                   form.price !== '' && Number(form.price) > 0

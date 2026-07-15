@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { CheckCircle, ChevronDown, Loader2 } from 'lucide-react'
 import { markProjectAsCompleted } from '@/app/actions'
 import { cn } from '@/lib/utils'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import type { ProjectType } from '@/lib/types'
 
 interface Props {
@@ -18,7 +19,7 @@ const inputCls =
 export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts }: Props) {
   const [open, setOpen] = useState(false)
   const [type, setType] = useState<ProjectType>('client')
-  const [completedAt, setCompletedAt] = useState(new Date().toISOString().slice(0, 10))
+  const [completedAt, setCompletedAt] = useState(getPragueTodayISO())
   const [difficulty, setDifficulty] = useState(5)
   const [timeInvested, setTimeInvested] = useState('')
   const [includeCosts, setIncludeCosts] = useState(hasEstimatedCosts)

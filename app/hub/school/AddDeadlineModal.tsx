@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { X } from 'lucide-react'
 import { SUBJECTS } from './subjects'
 import { addDeadline } from './actions'
+import { getPragueTodayISO } from '@/lib/prague-time'
 
 const TYPES = [
   { id: 'klassenarbeit' as const, label: 'Klassenarbeit', short: 'KA' },
@@ -16,7 +17,7 @@ export function AddDeadlineModal({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('')
   const [subject, setSubject] = useState('')
   const [type, setType] = useState<'klassenarbeit' | 'homework' | 'presentation' | 'other'>('homework')
-  const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [dueDate, setDueDate] = useState(() => getPragueTodayISO())
   const [pending, startTransition] = useTransition()
 
   function handleSubmit() {

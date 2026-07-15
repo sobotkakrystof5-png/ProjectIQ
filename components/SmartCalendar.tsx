@@ -275,14 +275,7 @@ function EventDetailModal({
           onClick={e => e.stopPropagation()}
         >
           {/* Coloured header strip */}
-          <div className={cn(
-            'h-1.5',
-            event.kind === 'consultation' && event.channel
-              ? { whatsapp: 'bg-green-500', teams: 'bg-blue-600', meet: 'bg-red-500', phone: 'bg-slate-400', other: 'bg-gray-400' }[event.channel]
-              : event.kind === 'deadline' ? 'bg-purple-500'
-              : event.kind === 'block'    ? 'bg-slate-400'
-              : 'bg-amber-500'
-          )} />
+          <div className={cn('h-1.5', style.dot)} />
 
           <div className="p-5">
             {/* Header row */}
@@ -292,8 +285,8 @@ function EventDetailModal({
                   {event.kind === 'consultation' && event.channel && (
                     <ChannelIcon channel={event.channel} />
                   )}
-                  {event.kind === 'deadline' && <Flag size={10} strokeWidth={2} />}
-                  {event.kind === 'block' && <Lock size={10} strokeWidth={2} />}
+                  {event.kind === 'deadline' && <Flag size={10} strokeWidth={1.5} />}
+                  {event.kind === 'block' && <Lock size={10} strokeWidth={1.5} />}
                   <span>{event.sublabel}</span>
                 </div>
                 <h3 className="font-semibold text-foreground text-base leading-tight">{event.label}</h3>
@@ -706,7 +699,7 @@ function DayView({
                   className={cn('w-full text-left text-xs font-semibold px-3 py-2 rounded-lg border', style.pill)}
                 >
                   <span className="flex items-center gap-1.5">
-                    <Flag size={10} strokeWidth={2} />
+                    <Flag size={10} strokeWidth={1.5} />
                     {ev.label} — {ev.sublabel}
                   </span>
                 </button>
@@ -974,7 +967,7 @@ export function SmartCalendar({
             onClick={() => setCreateModal({ open: true })}
             className="flex items-center gap-1.5 brand-gradient text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
           >
-            <Plus size={13} strokeWidth={2} />
+            <Plus size={13} strokeWidth={1.5} />
             Přidat
           </button>
         </div>
