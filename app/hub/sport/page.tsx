@@ -1,6 +1,6 @@
 import { Dumbbell } from 'lucide-react'
 import { SportClient } from './SportClient'
-import { getPragueNow } from '@/lib/prague-time'
+import { getPragueNow, getPragueTodayISO } from '@/lib/prague-time'
 import {
   getNutritionDay,
   getWorkoutsMonth,
@@ -13,7 +13,7 @@ import {
 
 export default async function SportPage() {
   const now = getPragueNow()
-  const today = `${now.year}-${String(now.month).padStart(2, '0')}-${String(now.day).padStart(2, '0')}`
+  const today = getPragueTodayISO()
   const year = now.year
   const month = now.month
 
