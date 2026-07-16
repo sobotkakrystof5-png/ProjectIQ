@@ -71,8 +71,14 @@ export async function updateLead(id: string, payload: LeadPayload) {
       notes = ${payload.notes},
       estimated_value = ${payload.estimated_value},
       call_answered = ${payload.call_answered},
-      reminder_day_before_sent = false,
-      reminder_2h_before_sent = false,
+      reminder_day_before_sent = CASE
+        WHEN next_action_date IS DISTINCT FROM ${payload.next_action_date}
+          OR next_action_time IS DISTINCT FROM ${payload.next_action_time}
+        THEN false ELSE reminder_day_before_sent END,
+      reminder_2h_before_sent = CASE
+        WHEN next_action_date IS DISTINCT FROM ${payload.next_action_date}
+          OR next_action_time IS DISTINCT FROM ${payload.next_action_time}
+        THEN false ELSE reminder_2h_before_sent END,
       updated_at = now()
     WHERE id = ${id}
     RETURNING reminder_day_before_sent, reminder_2h_before_sent, updated_at

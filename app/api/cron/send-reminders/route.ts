@@ -174,65 +174,76 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Konzultační sloty (pro klienty) + lead akce + školní termíny ─────────
-  // 6 nezávislých SELECTů — spouštíme paralelně, ne sekvenčně.
+  // 6 nezávislých atomických UPDATE...RETURNING — spouštíme paralelně, ne sekvenčně.
+  // Řádek se "claimne" (sent = true) ve stejném dotazu, který ho vybere, takže
+  // souběžná/duplicitní volání cronu (externí cron-job.org) nemůžou stejný
+  // řádek vyzvednout dvakrát — stejný princip jako UNIQUE constraint u rezervací.
   const [dayBeforeSlots, twoHourSlots, leadDayBefore, leadTwoHour, schoolDeadlines, schoolDeadlinesToday] = await Promise.all([
     // Day-before: scheduled 23–25 h from now (target 24h, ±1h for hourly cron).
     sql`
-      SELECT cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
-      FROM consultation_slots cs
-      JOIN projects p ON cs.project_id = p.id
-      WHERE cs.reminder_day_before_sent = false
+      UPDATE consultation_slots cs
+      SET reminder_day_before_sent = true
+      FROM projects p
+      WHERE cs.project_id = p.id
+        AND cs.reminder_day_before_sent = false
         AND cs.scheduled_at BETWEEN now() + interval '23 hours'
                                  AND now() + interval '25 hours'
+      RETURNING cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
     `,
     // 2h-before: scheduled 1–3 h from now (target 2h, ±1h for hourly cron).
     sql`
-      SELECT cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
-      FROM consultation_slots cs
-      JOIN projects p ON cs.project_id = p.id
-      WHERE cs.reminder_2h_before_sent = false
+      UPDATE consultation_slots cs
+      SET reminder_2h_before_sent = true
+      FROM projects p
+      WHERE cs.project_id = p.id
+        AND cs.reminder_2h_before_sent = false
         AND cs.scheduled_at BETWEEN now() + interval '1 hour'
                                  AND now() + interval '3 hours'
+      RETURNING cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
     `,
     // Lead akce (připomínky pro admina) — kombinujeme date + time do timestamptz
     // přes Prague timezone. Okno ±1h kolem 24h / 2h, shodné s konzultacemi.
     sql`
-      SELECT id, company_name, contact_name, next_action, next_action_type,
-             (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague' AS action_at
-      FROM client_leads
+      UPDATE client_leads
+      SET reminder_day_before_sent = true
       WHERE reminder_day_before_sent = false
         AND next_action_date IS NOT NULL
         AND next_action_time IS NOT NULL
         AND (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague'
             BETWEEN now() + interval '23 hours' AND now() + interval '25 hours'
+      RETURNING id, company_name, contact_name, next_action, next_action_type,
+                (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague' AS action_at
     `,
     sql`
-      SELECT id, company_name, contact_name, next_action, next_action_type,
-             (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague' AS action_at
-      FROM client_leads
+      UPDATE client_leads
+      SET reminder_2h_before_sent = true
       WHERE reminder_2h_before_sent = false
         AND next_action_date IS NOT NULL
         AND next_action_time IS NOT NULL
         AND (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague'
             BETWEEN now() + interval '1 hour' AND now() + interval '3 hours'
+      RETURNING id, company_name, contact_name, next_action, next_action_type,
+                (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague' AS action_at
     `,
     // Školní termíny (den před). CURRENT_DATE je na Neon spojení bez SET timezone
     // vždy UTC — porovnáváme proto proti "dnešku" spočítanému v Europe/Prague,
     // stejně jako u leadů výše.
     sql`
-      SELECT id, title, subject, type, due_date::text AS due_date
-      FROM school_deadlines_manual
+      UPDATE school_deadlines_manual
+      SET reminder_day_before_sent = true
       WHERE done = false
         AND reminder_day_before_sent = false
         AND due_date = (now() AT TIME ZONE 'Europe/Prague')::date + 1
+      RETURNING id, title, subject, type, due_date::text AS due_date
     `,
     // Školní termíny (ranní připomínka — ve stejný den)
     sql`
-      SELECT id, title, subject, type, due_date::text AS due_date
-      FROM school_deadlines_manual
+      UPDATE school_deadlines_manual
+      SET reminder_day_of_sent = true
       WHERE done = false
         AND reminder_day_of_sent = false
         AND due_date = (now() AT TIME ZONE 'Europe/Prague')::date
+      RETURNING id, title, subject, type, due_date::text AS due_date
     `,
   ]) as [SlotRow[], SlotRow[], LeadRow[], LeadRow[], DeadlineRow[], DeadlineRow[]]
 
@@ -243,7 +254,6 @@ export async function GET(req: NextRequest) {
 
   const dayBeforeResults = await Promise.allSettled(dayBeforeSlots.map(async (slot) => {
     await sendConsultationReminder(slot, 'day_before')
-    await sql`UPDATE consultation_slots SET reminder_day_before_sent = true WHERE id = ${slot.id}`
     void createNotification({
       type: 'reminder_upcoming',
       title: `Připomínka: zítřejší konzultace`,
@@ -255,7 +265,6 @@ export async function GET(req: NextRequest) {
 
   const twoHourResults = await Promise.allSettled(twoHourSlots.map(async (slot) => {
     await sendConsultationReminder(slot, '2h_before')
-    await sql`UPDATE consultation_slots SET reminder_2h_before_sent = true WHERE id = ${slot.id}`
     void createNotification({
       type: 'reminder_upcoming',
       title: `Za 2 hodiny začíná konzultace`,
@@ -267,7 +276,6 @@ export async function GET(req: NextRequest) {
 
   const leadDayBeforeResults = await Promise.allSettled(leadDayBefore.map(async (lead) => {
     await sendLeadReminder(lead, 'day_before')
-    await sql`UPDATE client_leads SET reminder_day_before_sent = true WHERE id = ${lead.id}`
     void createNotification({
       type: 'reminder_upcoming',
       title: `Připomínka: zítřejší akce s klientem`,
@@ -280,7 +288,6 @@ export async function GET(req: NextRequest) {
 
   const leadTwoHourResults = await Promise.allSettled(leadTwoHour.map(async (lead) => {
     await sendLeadReminder(lead, '2h_before')
-    await sql`UPDATE client_leads SET reminder_2h_before_sent = true WHERE id = ${lead.id}`
     void createNotification({
       type: 'reminder_upcoming',
       title: `Za 2 hodiny: akce s klientem`,
@@ -294,9 +301,6 @@ export async function GET(req: NextRequest) {
   if (schoolDeadlines.length > 0) {
     try {
       await sendSchoolDeadlineReminder(schoolDeadlines)
-      for (const d of schoolDeadlines) {
-        await sql`UPDATE school_deadlines_manual SET reminder_day_before_sent = true WHERE id = ${d.id}`
-      }
       void createNotification({
         type: 'reminder_upcoming',
         title: `Zítra ${schoolDeadlines.length === 1 ? 'školní termín' : `${schoolDeadlines.length} školní termíny`}`,
@@ -312,9 +316,6 @@ export async function GET(req: NextRequest) {
   if (schoolDeadlinesToday.length > 0) {
     try {
       await sendSchoolDeadlineReminder(schoolDeadlinesToday, true)
-      for (const d of schoolDeadlinesToday) {
-        await sql`UPDATE school_deadlines_manual SET reminder_day_of_sent = true WHERE id = ${d.id}`
-      }
       void createNotification({
         type: 'reminder_upcoming',
         title: `Dnes ${schoolDeadlinesToday.length === 1 ? 'školní termín' : `${schoolDeadlinesToday.length} školní termíny`}`,
