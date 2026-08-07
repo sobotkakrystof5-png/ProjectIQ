@@ -154,8 +154,13 @@ const DAY_PREPOSITION_PHRASE: Record<string, string> = {
 }
 
 // 'YYYY-MM-DD' -> "ve čtvrtek 13. srpna" (Europe/Prague, grammatically correct preposition).
-export function formatPragueDayDatePhrase(isoDate: string): string {
-  const [y, m, d] = isoDate.split('-').map(Number)
+// Accepts a Date too — some drivers hand back Postgres `date` columns as JS
+// Date objects instead of the 'YYYY-MM-DD' string the column logically is.
+export function formatPragueDayDatePhrase(isoDate: string | Date): string {
+  const iso = isoDate instanceof Date
+    ? `${isoDate.getFullYear()}-${String(isoDate.getMonth() + 1).padStart(2, '0')}-${String(isoDate.getDate()).padStart(2, '0')}`
+    : isoDate
+  const [y, m, d] = iso.split('-').map(Number)
   const date = new Date(Date.UTC(y, m - 1, d, 12))
   const weekday = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, weekday: 'long' }).format(date)
   const dayMonth = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, day: 'numeric', month: 'long' }).format(date)

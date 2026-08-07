@@ -6,7 +6,7 @@ const SIGNATURE = 'S přáním pěkného dne\nKryštof Sobotka\nTel. +420 604 83
 
 export function buildPortfolioEmailBody(params: {
   todayISO: string
-  nextCallDateISO: string | null
+  nextCallDateISO: string | Date | null
 }): string {
   const todayPhrase = formatPragueDayDatePhrase(params.todayISO)
   const todayCapitalized = todayPhrase.charAt(0).toUpperCase() + todayPhrase.slice(1)

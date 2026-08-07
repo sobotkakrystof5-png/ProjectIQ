@@ -29,7 +29,7 @@ export async function getLeads() {
   const session = await getServerSession(authOptions)
   if (!session) return []
   return await sql`
-    SELECT * FROM client_leads ORDER BY created_at DESC
+    SELECT *, next_action_date::text AS next_action_date FROM client_leads ORDER BY created_at DESC
   `
 }
 
@@ -150,7 +150,7 @@ async function markPortfolioSent(leadId: string) {
 
 export async function sendPortfolioEmail(leadId: string): Promise<{ success: true } | { error: string }> {
   await requireAuth()
-  const rows = await sql`SELECT * FROM client_leads WHERE id = ${leadId}`
+  const rows = await sql`SELECT *, next_action_date::text AS next_action_date FROM client_leads WHERE id = ${leadId}`
   const lead = rows[0] as unknown as ClientLead
   if (!lead) return { error: 'Kontakt nenalezen.' }
   if (!lead.email) return { error: 'Kontakt nemá vyplněný email.' }
