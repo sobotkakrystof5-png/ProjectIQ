@@ -640,16 +640,15 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
 
   const handleCreate = (data: LeadPayload) => {
     startTransition(async () => {
-      await createLead(data)
-      const tempId = crypto.randomUUID()
+      const created = await createLead(data)
       const newLead: ClientLead = {
         ...data,
-        id: tempId,
+        id: created.id,
         call_answered: null,
         reminder_day_before_sent: false,
         reminder_2h_before_sent: false,
         portfolio_sent_at: null,
-        created_at: new Date(),
+        created_at: created.created_at,
         updated_at: null,
       }
       setLeads(prev => [newLead, ...prev])

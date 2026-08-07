@@ -35,7 +35,7 @@ export async function getLeads() {
 
 export async function createLead(payload: LeadPayload) {
   await requireAuth()
-  await sql`
+  const rows = await sql`
     INSERT INTO client_leads (
       company_name, contact_name, phone, email,
       lead_status, next_action, next_action_date, next_action_time, next_action_type,
@@ -54,8 +54,10 @@ export async function createLead(payload: LeadPayload) {
       ${payload.estimated_value},
       ${payload.call_answered}
     )
+    RETURNING id, created_at
   `
   revalidatePath('/dashboard/calls')
+  return rows[0] as { id: string; created_at: string }
 }
 
 export async function updateLead(id: string, payload: LeadPayload) {
