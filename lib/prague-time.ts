@@ -141,3 +141,24 @@ export function formatPragueDateTime(utcIso: string): string {
     hour: '2-digit', minute: '2-digit',
   }).format(new Date(utcIso))
 }
+
+// Czech "v/ve + day" preposition — "ve" before consonant-cluster days (středa, čtvrtek).
+const DAY_PREPOSITION_PHRASE: Record<string, string> = {
+  'pondělí': 'v pondělí',
+  'úterý': 'v úterý',
+  'středa': 've středu',
+  'čtvrtek': 've čtvrtek',
+  'pátek': 'v pátek',
+  'sobota': 'v sobotu',
+  'neděle': 'v neděli',
+}
+
+// 'YYYY-MM-DD' -> "ve čtvrtek 13. srpna" (Europe/Prague, grammatically correct preposition).
+export function formatPragueDayDatePhrase(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d, 12))
+  const weekday = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, weekday: 'long' }).format(date)
+  const dayMonth = new Intl.DateTimeFormat('cs-CZ', { timeZone: TZ, day: 'numeric', month: 'long' }).format(date)
+  const phrase = DAY_PREPOSITION_PHRASE[weekday] ?? `v ${weekday}`
+  return `${phrase} ${dayMonth}`
+}

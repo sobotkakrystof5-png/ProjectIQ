@@ -147,6 +147,7 @@ export interface ClientLead {
   call_answered: boolean | null
   reminder_day_before_sent: boolean
   reminder_2h_before_sent: boolean
+  portfolio_sent_at: string | Date | null
   created_at: string | Date
   updated_at: string | Date | null
 }

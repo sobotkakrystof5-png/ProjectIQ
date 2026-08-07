@@ -98,3 +98,48 @@ export async function sendBrandedEmail(opts: {
     return false
   }
 }
+
+function linkify(escaped: string): string {
+  return escaped.replace(/https?:\/\/[^\s]+/g, (url) => `<a href="${url}" style="color:#1b3868;">${url}</a>`)
+}
+
+function buildPlainLayout(text: string): string {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map(
+      (block) =>
+        `<p style="margin:0 0 18px;color:#1f2937;font-size:15px;line-height:1.7;white-space:pre-line;">${linkify(escapeHtml(block))}</p>`
+    )
+    .join('')
+
+  return `<!DOCTYPE html><html lang="cs" style="color-scheme:light only;"><head><meta charset="UTF-8"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color-scheme:light only;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+<tr><td>${paragraphs}</td></tr>
+</table>
+</td></tr></table>
+</body></html>`
+}
+
+// Sends a plain, personal-letter-style email (no ZakazIQ branded header/CTA
+// card) — used when the message should read as coming directly from the
+// admin rather than as an automated notification.
+export async function sendPlainEmail(opts: { to: string; subject: string; text: string }): Promise<boolean> {
+  const mailer = await getTransporter()
+  if (!mailer) return false
+  try {
+    await mailer.transporter.sendMail({
+      from: mailer.from,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      html: buildPlainLayout(opts.text),
+    })
+    return true
+  } catch (err) {
+    console.error('[Email] Selhání odesílání:', err)
+    return false
+  }
+}

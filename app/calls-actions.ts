@@ -5,6 +5,9 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
+import { sendPlainEmail } from '@/lib/email'
+import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import type { ClientLead, LeadStatus, LeadActionType } from '@/lib/types'
 
 export type LeadPayload = {
@@ -138,4 +141,46 @@ export async function convertLeadToProject(leadId: string) {
   revalidatePath('/dashboard/calls')
   revalidatePath('/dashboard')
   redirect('/dashboard')
+}
+
+async function markPortfolioSent(leadId: string) {
+  await sql`UPDATE client_leads SET portfolio_sent_at = now() WHERE id = ${leadId}`
+  revalidatePath('/dashboard/calls')
+}
+
+export async function sendPortfolioEmail(leadId: string): Promise<{ success: true } | { error: string }> {
+  await requireAuth()
+  const rows = await sql`SELECT * FROM client_leads WHERE id = ${leadId}`
+  const lead = rows[0] as unknown as ClientLead
+  if (!lead) return { error: 'Kontakt nenalezen.' }
+  if (!lead.email) return { error: 'Kontakt nemá vyplněný email.' }
+  if (!lead.next_action_date) return { error: 'Kontakt nemá vyplněné datum příštího hovoru.' }
+
+  const body = buildPortfolioEmailBody({
+    todayISO: getPragueTodayISO(),
+    nextCallDateISO: lead.next_action_date,
+  })
+  const ok = await sendPlainEmail({ to: lead.email, subject: PORTFOLIO_EMAIL_SUBJECT, text: body })
+  if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
+
+  await markPortfolioSent(leadId)
+  return { success: true }
+}
+
+export async function sendCustomLeadEmail(
+  leadId: string,
+  opts: { subject: string; body: string }
+): Promise<{ success: true } | { error: string }> {
+  await requireAuth()
+  const rows = await sql`SELECT email FROM client_leads WHERE id = ${leadId}`
+  const lead = rows[0] as { email: string | null } | undefined
+  if (!lead) return { error: 'Kontakt nenalezen.' }
+  if (!lead.email) return { error: 'Kontakt nemá vyplněný email.' }
+  if (!opts.subject.trim() || !opts.body.trim()) return { error: 'Předmět i text zprávy musí být vyplněné.' }
+
+  const ok = await sendPlainEmail({ to: lead.email, subject: opts.subject, text: opts.body })
+  if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
+
+  await markPortfolioSent(leadId)
+  return { success: true }
 }

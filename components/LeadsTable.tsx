@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2 } from 'lucide-react'
-import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting } from '@/app/calls-actions'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
+import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
 import {
   LEAD_STATUS_LABELS,
   LEAD_STATUS_STYLES,
@@ -306,10 +308,18 @@ function EmailCell({ lead }: { lead: ClientLead }) {
   return (
     <td className="px-3 py-2.5">
       {lead.email && (
-        <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline truncate max-w-[160px]">
-          <Mail size={12} strokeWidth={1.5} />
-          {lead.email}
-        </a>
+        <div className="flex flex-col gap-0.5">
+          <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline truncate max-w-[160px]">
+            <Mail size={12} strokeWidth={1.5} />
+            {lead.email}
+          </a>
+          {lead.portfolio_sent_at && (
+            <span className="flex items-center gap-1 text-[11px] text-emerald-600" title="Portfolio bylo odesláno">
+              <CheckCircle2 size={11} strokeWidth={1.5} />
+              Odesláno {new Date(lead.portfolio_sent_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+            </span>
+          )}
+        </div>
       )}
     </td>
   )
@@ -336,6 +346,8 @@ function LeadRow({
   onConvert,
   onMoveToWaiting,
   onToggleAnswered,
+  onSendPortfolio,
+  onOpenCustomMessage,
   isPending,
 }: {
   lead: ClientLead
@@ -344,6 +356,8 @@ function LeadRow({
   onConvert: () => void
   onMoveToWaiting: () => void
   onToggleAnswered: (val: boolean | null) => void
+  onSendPortfolio: () => void
+  onOpenCustomMessage: () => void
   isPending: boolean
 }) {
   const isOverdue = lead.next_action_date
@@ -397,36 +411,58 @@ function LeadRow({
       </td>
       <ValueCell lead={lead} />
       <td className="px-3 py-2.5">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={onConvert}
-            disabled={isPending || lead.lead_status === 'converted'}
-            title="Převést na zakázku"
-            className="p-1.5 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <FolderPlus size={13} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={onMoveToWaiting}
-            disabled={isPending}
-            title="Přesunout do Čekání"
-            className="p-1.5 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-50 transition-colors disabled:opacity-40"
-          >
-            <Clock size={13} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={onEdit}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors"
-          >
-            <Pencil size={13} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={onDelete}
-            disabled={isPending}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
-          >
-            <Trash2 size={13} strokeWidth={1.5} />
-          </button>
+        <div className="flex items-center gap-1">
+          {lead.email && lead.next_action_date && (
+            <button
+              onClick={onSendPortfolio}
+              disabled={isPending}
+              title="Poslat portfolio (odešle ihned)"
+              className="p-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-40"
+            >
+              <Send size={13} strokeWidth={1.5} />
+            </button>
+          )}
+          {lead.email && (
+            <button
+              onClick={onOpenCustomMessage}
+              disabled={isPending}
+              title="Napsat jinou zprávu"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors disabled:opacity-40"
+            >
+              <MessageSquareText size={13} strokeWidth={1.5} />
+            </button>
+          )}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={onConvert}
+              disabled={isPending || lead.lead_status === 'converted'}
+              title="Převést na zakázku"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <FolderPlus size={13} strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={onMoveToWaiting}
+              disabled={isPending}
+              title="Přesunout do Čekání"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-50 transition-colors disabled:opacity-40"
+            >
+              <Clock size={13} strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={onEdit}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors"
+            >
+              <Pencil size={13} strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={onDelete}
+              disabled={isPending}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+            >
+              <Trash2 size={13} strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
       </td>
     </tr>
@@ -596,6 +632,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
+  const [portfolioModalLead, setPortfolioModalLead] = useState<ClientLead | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const activeLeads = leads.filter(l => l.lead_status !== 'waiting')
@@ -611,6 +648,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
         call_answered: null,
         reminder_day_before_sent: false,
         reminder_2h_before_sent: false,
+        portfolio_sent_at: null,
         created_at: new Date(),
         updated_at: null,
       }
@@ -663,6 +701,22 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
     startTransition(async () => {
       await setCallAnswered(id, val)
       setLeads(prev => prev.map(l => l.id === id ? { ...l, call_answered: val, updated_at: new Date() } : l))
+    })
+  }
+
+  const handlePortfolioSent = (id: string) => {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, portfolio_sent_at: new Date() } : l))
+  }
+
+  const handleSendPortfolio = (id: string) => {
+    startTransition(async () => {
+      const result = await sendPortfolioEmail(id)
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Portfolio odesláno')
+      handlePortfolioSent(id)
     })
   }
 
@@ -757,6 +811,8 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
                       onConvert={() => handleConvert(lead.id)}
                       onMoveToWaiting={() => handleMoveToWaiting(lead.id)}
                       onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
+                      onSendPortfolio={() => handleSendPortfolio(lead.id)}
+                      onOpenCustomMessage={() => setPortfolioModalLead(lead)}
                       isPending={isPending}
                     />
                   )
@@ -845,6 +901,13 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
           </div>
         </div>
       </div>
+
+      <PortfolioEmailModal
+        isOpen={!!portfolioModalLead}
+        lead={portfolioModalLead}
+        onClose={() => setPortfolioModalLead(null)}
+        onSent={() => portfolioModalLead && handlePortfolioSent(portfolioModalLead.id)}
+      />
     </div>
   )
 }
