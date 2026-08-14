@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Briefcase, Rocket, ArrowUpRight, ArrowLeft, Layers } from 'lucide-react'
+import { Briefcase, Rocket, ArrowUpRight, ArrowLeft, Layers, Bot } from 'lucide-react'
 import { getBusinessOverview } from './byznys-actions'
 import { BusinessCalculator } from './BusinessCalculator'
 
@@ -25,7 +25,7 @@ export default async function ByznysPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">
-        {/* Zakázky */}
+        {/* VIZEON */}
         <Link
           href="/dashboard"
           className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
@@ -40,13 +40,41 @@ export default async function ByznysPage() {
               className="text-muted-foreground/40 group-hover:text-brand-600 transition-colors mt-0.5"
             />
           </div>
-          <h2 className="font-semibold text-foreground text-[16px] mb-1.5">Zakázky</h2>
+          <h2 className="font-semibold text-foreground text-[16px] mb-1.5">
+            VIZEON — tvorba webových stránek, design
+          </h2>
           <p className="text-sm text-muted-foreground flex-1">
             Správa klientských zakázek, fakturace, kalendář konzultací a hodnocení.
           </p>
           <div className="mt-5 pt-3 border-t border-border">
             <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
-              Otevřít Zakázky →
+              Otevřít VIZEON →
+            </span>
+          </div>
+        </Link>
+
+        {/* ALTENO */}
+        <Link
+          href="/hub/byznys/alteno"
+          className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
+              <Bot size={22} strokeWidth={1.5} className="text-white" />
+            </div>
+            <ArrowUpRight
+              size={16}
+              strokeWidth={1.5}
+              className="text-muted-foreground/40 group-hover:text-brand-600 transition-colors mt-0.5"
+            />
+          </div>
+          <h2 className="font-semibold text-foreground text-[16px] mb-1.5">ALTENO — AI automatizace</h2>
+          <p className="text-sm text-muted-foreground flex-1">
+            Automatizace procesů, AI agenti a integrace na míru.
+          </p>
+          <div className="mt-5 pt-3 border-t border-border">
+            <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
+              Otevřít ALTENO →
             </span>
           </div>
         </Link>
