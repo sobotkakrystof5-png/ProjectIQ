@@ -5,6 +5,7 @@ export type NotificationType =
   | 'feedback_submitted'
   | 'survey_submitted'
   | 'vizeon_booking'
+  | 'alteno_booking'
   | 'project_status_changed'
   | 'reminder_upcoming'
 

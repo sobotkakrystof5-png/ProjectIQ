@@ -18,8 +18,8 @@ interface PageProps {
 const loadAllProjects = cache(async () => {
   const rows = await sql`
     SELECT * FROM projects
-    WHERE business = 'vizeon'
-      AND NOT is_vizeon_pending(source, vizeon_confirmed)
+    WHERE business = 'alteno'
+      AND NOT is_alteno_pending(source, alteno_confirmed)
     ORDER BY created_at DESC
   `
   return rows as Project[]
@@ -35,8 +35,8 @@ async function ProjectGrid({ statusFilter }: { statusFilter?: string }) {
   if (projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-14 h-14 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
-          <FolderOpen size={24} strokeWidth={1.5} className="text-brand-400" />
+        <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-4">
+          <FolderOpen size={24} strokeWidth={1.5} className="text-amber-400" />
         </div>
         <p className="font-medium text-foreground mb-1">
           {statusFilter && statusFilter !== 'all' ? 'Žádné zakázky s tímto stavem' : 'Zatím žádné zakázky'}
@@ -44,12 +44,12 @@ async function ProjectGrid({ statusFilter }: { statusFilter?: string }) {
         <p className="text-sm text-muted-foreground max-w-xs">
           {statusFilter && statusFilter !== 'all'
             ? 'Zkus jiný filtr nebo přidej novou zakázku'
-            : 'Přidej svoji první zakázku a začni sledovat projekty'}
+            : 'Přidej svoji první ALTENO zakázku a začni sledovat projekty'}
         </p>
         {(!statusFilter || statusFilter === 'all') && (
           <Link
-            href="/dashboard/new"
-            className="mt-5 inline-flex items-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+            href="/alteno/new"
+            className="mt-5 inline-flex items-center gap-2 bg-gradient-to-br from-amber-500 to-orange-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
           >
             <Plus size={15} strokeWidth={1.5} />
             Přidat první zakázku
@@ -61,7 +61,7 @@ async function ProjectGrid({ statusFilter }: { statusFilter?: string }) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {projects.map(p => <ProjectCard key={p.id} project={p} />)}
+      {projects.map(p => <ProjectCard key={p.id} project={p} business="alteno" />)}
     </div>
   )
 }
@@ -79,7 +79,7 @@ async function ConsultationsSection() {
     FROM consultation_slots cs
     JOIN projects p ON cs.project_id = p.id
     WHERE cs.scheduled_at > now()
-      AND p.business = 'vizeon'
+      AND p.business = 'alteno'
 
     UNION ALL
 
@@ -91,15 +91,15 @@ async function ConsultationsSection() {
     JOIN projects p ON ce.project_id = p.id
     WHERE ce.starts_at > now()
       AND ce.project_id IS NOT NULL
-      AND p.business = 'vizeon'
+      AND p.business = 'alteno'
 
     ORDER BY scheduled_at
     LIMIT 20
   `
-  return <UpcomingConsultations consultations={rows as UpcomingConsultation[]} />
+  return <UpcomingConsultations consultations={rows as UpcomingConsultation[]} business="alteno" />
 }
 
-export default function DashboardPage({ searchParams }: PageProps) {
+export default function AltenoPage({ searchParams }: PageProps) {
   const statusFilter = searchParams.status
 
   return (
@@ -107,11 +107,11 @@ export default function DashboardPage({ searchParams }: PageProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">Zakázky</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Přehled tvých projektů</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Přehled ALTENO projektů — AI automatizace</p>
         </div>
         <Link
-          href="/dashboard/new"
-          className="flex items-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+          href="/alteno/new"
+          className="flex items-center gap-2 bg-gradient-to-br from-amber-500 to-orange-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
         >
           <Plus size={15} strokeWidth={1.5} />
           Nová zakázka

@@ -10,7 +10,6 @@ import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
 import { DeleteButton } from './DeleteButton'
-import { MarkCompletedButton } from '@/components/MarkCompletedButton'
 import { getPublicUrl, formatDate } from '@/lib/utils'
 import { toBusiness } from '@/lib/business'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot } from '@/lib/types'
@@ -19,7 +18,7 @@ interface PageProps {
   params: { id: string }
 }
 
-export default async function ProjectDetailPage({ params }: PageProps) {
+export default async function AltenoProjectDetailPage({ params }: PageProps) {
   const [rows, msgRows, progressRows, feedbackRows, slotRows] = await Promise.all([
     sql`SELECT * FROM projects WHERE id = ${params.id} LIMIT 1`,
     sql`SELECT * FROM client_messages WHERE project_id = ${params.id} ORDER BY created_at DESC`,
@@ -30,9 +29,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
 
   if (!rows.length) notFound()
   const project = rows[0] as Project & { business?: string }
-  // ALTENO zakázka se edituje ve své sekci — jinak by se ukládala s VIZEON
-  // revalidací a nabízela "Přidat do dokončených", což ALTENO nemá.
-  if (toBusiness(project.business) !== 'vizeon') redirect(`/alteno/${params.id}`)
+  // Starší odkazy (notifikace, emaily) mířily na /dashboard — a naopak. Místo
+  // 404 pošli uživatele do sekce, kam zakázka doopravdy patří.
+  if (toBusiness(project.business) !== 'alteno') redirect(`/dashboard/${params.id}`)
 
   const messages = msgRows as ClientMessage[]
   const progressUpdates = progressRows as ProgressUpdate[]
@@ -45,8 +44,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       <div className="flex items-start justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <Link
-            href="/dashboard"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-brand-800 hover:bg-brand-50 transition-colors"
+            href="/alteno"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-800 hover:bg-amber-50 transition-colors"
           >
             <ArrowLeft size={18} strokeWidth={1.5} />
           </Link>
@@ -65,7 +64,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             href={project.project_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-sm text-amber-700 hover:text-amber-800 px-3 py-1.5 rounded-lg hover:bg-amber-50 transition-colors shrink-0"
           >
             <ExternalLink size={14} strokeWidth={1.5} />
             Živá verze
@@ -76,7 +75,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       <div className="space-y-4">
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">Editace zakázky</h2>
-          <ProjectForm project={project} />
+          <ProjectForm project={project} business="alteno" />
         </div>
 
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
@@ -87,8 +86,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               <p className="text-sm text-muted-foreground mb-3">
                 Pošli klientovi odkaz — bez registrace uvidí aktuální stav zakázky.
               </p>
-              <div className="flex items-center gap-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2 mb-3">
-                <span className="text-xs text-brand-600 flex-1 truncate font-mono">{publicUrl}</span>
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-3">
+                <span className="text-xs text-amber-700 flex-1 truncate font-mono">{publicUrl}</span>
               </div>
               <ShareButton token={project.public_token} />
             </div>
@@ -113,14 +112,14 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               {progressUpdates.map((u, i) => (
                 <li key={u.id} className="relative flex gap-3">
                   <div className="flex flex-col items-center">
-                    <div className="w-2 h-2 rounded-full bg-brand-600 mt-1.5 shrink-0" />
+                    <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
                     {i < progressUpdates.length - 1 && (
-                      <div className="w-px flex-1 bg-brand-100 mt-1" />
+                      <div className="w-px flex-1 bg-amber-100 mt-1" />
                     )}
                   </div>
                   <div className="pb-3 flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
+                      <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
                         {u.progress_from}% → {u.progress_to}%
                       </span>
                       <span className="text-xs text-muted-foreground">{formatDate(u.created_at)}</span>
@@ -153,18 +152,6 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             Termíny rezervované klientem. Kliknutím zobrazíš detail a odkaz na hovor.
           </p>
           <ConsultationCalendar slots={slots} clientName={project.client_name} />
-        </div>
-
-        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Přidat do dokončených</h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            Přidá záznam do sekce Dokončené zakázky a zahrne ji do kalkulačky výdělků. Zakázka zůstane i v aktivním přehledu.
-          </p>
-          <MarkCompletedButton
-            projectId={project.id}
-            projectName={project.client_name}
-            hasEstimatedCosts={project.estimated_costs != null && Number(project.estimated_costs) > 0}
-          />
         </div>
 
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">

@@ -16,6 +16,7 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   feedback_submitted:    { icon: Star,              color: 'text-amber-600 bg-amber-50',  label: 'Hodnocení NPS' },
   survey_submitted:      { icon: ClipboardList,     color: 'text-purple-600 bg-purple-50', label: 'Dotazník' },
   vizeon_booking:        { icon: Inbox,             color: 'text-green-600 bg-green-50',  label: 'Vizeon poptávka' },
+  alteno_booking:        { icon: Inbox,             color: 'text-amber-600 bg-amber-50',  label: 'Alteno poptávka' },
   project_status_changed:{ icon: ArrowRightLeft,    color: 'text-indigo-600 bg-indigo-50', label: 'Stav zakázky' },
   reminder_upcoming:     { icon: Bell,              color: 'text-orange-600 bg-orange-50', label: 'Připomínka' },
 }

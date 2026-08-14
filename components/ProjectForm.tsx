@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProject, updateProject } from '@/app/actions'
+import type { Business } from '@/lib/business'
 import { STATUS_LABELS, STATUS_ORDER, type Project, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { getPragueTodayISO } from '@/lib/prague-time'
@@ -35,6 +36,8 @@ type FormData = {
 
 interface ProjectFormProps {
   project?: Project
+  /** Do které sekce zakázka patří — řídí redirect i revalidaci po uložení */
+  business?: Business
 }
 
 const defaultData: FormData = {
@@ -89,7 +92,7 @@ function projectToForm(p: Project): FormData {
   }
 }
 
-export function ProjectForm({ project }: ProjectFormProps) {
+export function ProjectForm({ project, business = 'vizeon' }: ProjectFormProps) {
   const [form, setForm] = useState<FormData>(project ? projectToForm(project) : defaultData)
   const [depositManuallySet, setDepositManuallySet] = useState(
     project ? project.deposit_amount !== null : false
@@ -170,11 +173,12 @@ export function ProjectForm({ project }: ProjectFormProps) {
             payload,
             progressChanged
               ? { from: originalProgress, description: form.progressNote.trim() }
-              : undefined
+              : undefined,
+            business
           )
           router.refresh()
         } else {
-          await createProject(payload, completedExtra)
+          await createProject(payload, completedExtra, business)
         }
       } catch {
         setError('Chyba při ukládání zakázky')
@@ -408,7 +412,9 @@ export function ProjectForm({ project }: ProjectFormProps) {
           </div>
         </div>
 
-        {!project && (
+        {/* Dokončené projekty jsou sekce jen ve VIZEONu — v ALTENU by zakázka
+            skončila v přehledu, který tam neexistuje. */}
+        {!project && business === 'vizeon' && (
           <div className="sm:col-span-2">
             <div className="flex items-center gap-3">
               <input
@@ -487,7 +493,10 @@ export function ProjectForm({ project }: ProjectFormProps) {
         <button
           type="submit"
           disabled={isPending}
-          className="flex items-center gap-2 brand-gradient text-white text-sm font-medium px-5 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+          className={cn(
+            'flex items-center gap-2 text-white text-sm font-medium px-5 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50',
+            business === 'alteno' ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'brand-gradient',
+          )}
         >
           {isPending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
           {project ? 'Uložit změny' : 'Přidat zakázku'}

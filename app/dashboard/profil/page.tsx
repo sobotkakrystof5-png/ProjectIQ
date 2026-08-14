@@ -36,6 +36,7 @@ async function loadStats() {
         COALESCE(SUM(price) FILTER (WHERE status = 'done' AND paid = false), 0)::numeric AS unpaid_price
       FROM projects
       WHERE NOT is_vizeon_pending(source, vizeon_confirmed)
+        AND NOT is_alteno_pending(source, alteno_confirmed)
     `,
     sql`
       SELECT
@@ -75,6 +76,7 @@ async function loadStats() {
       SELECT COUNT(DISTINCT client_name)::int AS total
       FROM projects
       WHERE NOT is_vizeon_pending(source, vizeon_confirmed)
+        AND NOT is_alteno_pending(source, alteno_confirmed)
         AND client_name IS NOT NULL
     `,
     sql`

@@ -43,6 +43,9 @@ GMAIL_APP_PASSWORD=       # App password (Google Account → Security → App pa
 ADMIN_PHONE=               # Telefon pro WhatsApp/hovor, bez mezery a bez + (např. 420601234567)
 GOOGLE_MEET_LINK=          # Permanentní Google Meet link
 TEAMS_MEETING_LINK=        # Teams meeting link
+
+VIZEON_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/booking (vizeon.cz)
+ALTENO_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/booking/alteno (alteno.cz)
 ```
 
 Vzor je v `.env.example` — udržuj ho v sync s realitou, pokud přidáváš novou env proměnnou.
@@ -92,6 +95,8 @@ CREATE TABLE projects (
 | project_url | text | — | Link na živou verzi projektu (např. Vercel deploy) — zobrazí se klientovi i v emailu |
 | created_at | timestamptz | now() | Datum vytvoření |
 | updated_at | timestamptz | — | Datum poslední úpravy (nastavuje server action) |
+| business | text | `'vizeon'` | Do které sekce zakázka patří — `vizeon` / `alteno` (migrace 050) |
+| alteno_confirmed | boolean | false | Potvrzená poptávka z alteno.cz — obdoba `vizeon_confirmed` (migrace 050) |
 
 ### `client_messages`
 
@@ -153,6 +158,7 @@ Ruční admin události/blokace v globálním kalendáři (`/dashboard/calendar`
 | ends_at | timestamptz | Konec |
 | event_type | text | `manual` / `block` |
 | created_at | timestamptz | Datum vytvoření |
+| business | text | `vizeon` / `alteno`, default `'vizeon'` (migrace 050) — VIZEON kalendář zobrazuje jen své události |
 
 ---
 
@@ -174,6 +180,12 @@ app/
 │   ├── new/page.tsx             ← Nová zakázka
 │   ├── calendar/page.tsx        ← Globální kalendář (všechny projekty)
 │   └── [id]/page.tsx           ← Detail + editace zakázky + FeedbackFeed + ConsultationCalendar
+├── alteno/                      ← Sekce ALTENO (AI automatizace) — jádro stejné jako VIZEON
+│   ├── layout.tsx               ← Auth + ALTENO nav (Zakázky | Rezervace), amber branding
+│   ├── page.tsx                 ← Přehled ALTENO zakázek
+│   ├── new/page.tsx             ← Nová ALTENO zakázka
+│   ├── rezervace/page.tsx       ← Inbox nepotvrzených poptávek z alteno.cz
+│   └── [id]/page.tsx           ← Detail + editace ALTENO zakázky
 ├── p/
 │   └── [token]/page.tsx        ← Klientský portál (public, bez auth) — FeedbackBlock + BookingCTA
 ├── layout.tsx
@@ -181,8 +193,9 @@ app/
 
 components/
 ├── ui/                          ← shadcn/ui komponenty
-├── ProjectCard.tsx              ← Karta zakázky v dashboardu
-├── ProjectForm.tsx              ← Formulář (volá server actions)
+├── ProjectCard.tsx              ← Karta zakázky v dashboardu (prop `business` řídí cestu i barvy)
+├── ProjectForm.tsx              ← Formulář (volá server actions, prop `business`)
+├── BookingCard.tsx              ← Admin: karta poptávky z webu + potvrzení/smazání (VIZEON i ALTENO)
 ├── StatusBadge.tsx              ← Barevný badge stavu
 ├── ProgressBar.tsx              ← Vizuální progress bar
 ├── ShareButton.tsx              ← Kopírování klientského linku
@@ -198,6 +211,8 @@ components/
 
 lib/
 ├── db.ts                        ← Neon klient: sql tagged template
+├── business.ts                  ← VIZEON/ALTENO konfigurace: cesty, domény, source, branding
+├── web-booking.ts               ← Sdílená implementace veřejného booking endpointu (obě domény)
 ├── auth.ts                      ← NextAuth authOptions
 ├── email.ts                     ← Sdílený nodemailer transporter + branded HTML layout (sendBrandedEmail)
 ├── feedback-schema.ts           ← Zod schémata: feedbackSchema, bookingSchema
@@ -205,7 +220,7 @@ lib/
 ├── utils.ts
 └── types.ts
 
-middleware.ts                    ← next-auth middleware, chrání /dashboard/:path*
+middleware.ts                    ← next-auth middleware, chrání /dashboard/:path*, /alteno/:path*, /hub/:path*
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 ```
 
@@ -238,8 +253,26 @@ migrations/                      ← Inkrementální SQL migrace nad základním
 - Tlačítko smazat zakázku
 
 ### `/dashboard/calendar`
-- Globální kalendář (Month/Week/Day) napříč všemi projekty — konzultace + manuální události/blokace
+- Globální kalendář (Month/Week/Day) napříč VIZEON projekty — konzultace + manuální události/blokace
 - Admin může vytvořit ruční událost nebo blokaci přes `AdminEventModal`
+
+### `/alteno` — sekce ALTENO (AI automatizace)
+Druhý byznys vedle VIZEONu. **Stejný software jako jádro VIZEON dashboardu**, jen nad daty s `business = 'alteno'` a s vlastním brandingem (amber/orange místo brand-*). Rozsah je záměrně jen jádro:
+
+| Stránka | Co dělá |
+|---------|---------|
+| `/alteno` | Přehled ALTENO zakázek — SummaryBar, nadcházející konzultace, filtry, karty |
+| `/alteno/new` | Nová ALTENO zakázka |
+| `/alteno/[id]` | Detail + editace, sdílení klientského linku, vzkazy, historie postupu, feedback, konzultace, smazání |
+| `/alteno/rezervace` | Inbox nepotvrzených poptávek z alteno.cz — potvrdit jako zakázku / smazat |
+
+Co ALTENO **nemá** (zůstává jen ve VIZEONu): Kalendář, Hovory, Dokončené, Hodnocení, Náklady. Proto detail ALTENO zakázky nenabízí „Přidat do dokončených" a `ProjectForm` tam skrývá checkbox „Ihned přidat do dokončených".
+
+**Oddělení dat:** `projects.business` a `calendar_events.business` (`'vizeon' | 'alteno'`, default `'vizeon'`). VIZEON stránky filtrují `business = 'vizeon'`, ALTENO `= 'alteno'`. `consultation_slots` vlastní sloupec nemá — business se dohledá joinem přes `projects`.
+
+**Sdílené napříč oběma:** klientský portál `/p/[token]`, notifikace (`/dashboard/notifications`), profil (`/dashboard/profil` — statistiky napříč byznysy), Hub finance a DB overlap guard na termínech (jeden člověk = jeden diář, dvě konzultace ve stejný čas nelze rezervovat ani napříč byznysy).
+
+`/dashboard/[id]` a `/alteno/[id]` se navzájem přesměrovávají podle `business` — starší odkazy z notifikací a emailů tak nikdy nekončí na 404.
 
 ### `/p/[token]` — Klientský portál (PUBLIC)
 - **Bez přihlášení, bez registrace**
@@ -315,3 +348,7 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`) 
 - Výchozí chování na portálu: cena je **skrytá** (volitelné zapnutí)
 - Nová DB změna → nová idempotentní migrace v `migrations/`, ne přímá úprava základního schématu výše
 - Časové sloty/kalendářní logika → vždy přes `lib/prague-time.ts`, nepřepočítávej timezony znovu v komponentě
+- **Dva byznysy:** cesty, domény, `source` a názvy ber vždy z `BUSINESSES` v `lib/business.ts` — nikdy nehardcoduj `/dashboard`, `/alteno` ani `'vizeon_web'` v nové logice
+- Nový dotaz nad `projects` nebo `calendar_events` → rozmysli, jestli patří jen jednomu byznysu, a filtruj `business`. Bez filtru se ALTENO data objeví ve VIZEONu
+- Nová sdílená komponenta pro obě sekce → prop `business?: Business` s defaultem `'vizeon'`, ne duplikát souboru
+- Podmínka „nepotvrzená poptávka z webu" žije v DB jako `is_vizeon_pending()` / `is_alteno_pending()` — neon `sql` tag neumí skládat fragmenty, takže ji nelze sdílet jako JS konstantu

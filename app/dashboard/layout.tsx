@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const [countRows, notifRows] = await Promise.all([
     sql`
       SELECT count(*)::int AS count FROM projects
-      WHERE is_vizeon_pending(source, vizeon_confirmed)
+      WHERE business = 'vizeon' AND is_vizeon_pending(source, vizeon_confirmed)
     `,
     sql`SELECT count(*)::int AS count FROM notifications WHERE read = false`,
   ])
@@ -39,7 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <header className="bg-white border-b border-border sticky top-0 z-10 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ height: '60px' }}>
           <div className="flex items-center gap-3">
-            <MobileNav vizeonCount={vizeonCount} />
+            <MobileNav section="dashboard" pendingCount={vizeonCount} />
             <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0">
               <div className="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center shadow-sm">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

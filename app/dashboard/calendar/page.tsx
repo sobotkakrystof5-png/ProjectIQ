@@ -18,17 +18,20 @@ export default async function CalendarPage() {
         p.id AS project_id
       FROM consultation_slots cs
       JOIN projects p ON cs.project_id = p.id
+      WHERE p.business = 'vizeon'
       ORDER BY cs.scheduled_at
     `,
     sql`
       SELECT id, client_name, deadline
       FROM projects
       WHERE deadline IS NOT NULL
+        AND business = 'vizeon'
       ORDER BY deadline
     `,
     sql`
       SELECT id, title, description, starts_at, ends_at, event_type
       FROM calendar_events
+      WHERE business = 'vizeon'
       ORDER BY starts_at
     `,
     sql`

@@ -53,10 +53,12 @@ async function getBusinessStats() {
         COUNT(*) FILTER (
           WHERE status NOT IN ('done', 'paid')
           AND NOT is_vizeon_pending(source, vizeon_confirmed)
+          AND NOT is_alteno_pending(source, alteno_confirmed)
         )::int AS active_count,
         COALESCE(SUM(price) FILTER (
           WHERE paid = false AND price IS NOT NULL
           AND NOT is_vizeon_pending(source, vizeon_confirmed)
+          AND NOT is_alteno_pending(source, alteno_confirmed)
         ), 0)::numeric AS pending_revenue,
         COUNT(*) FILTER (WHERE status = 'review')::int AS review_count
       FROM projects

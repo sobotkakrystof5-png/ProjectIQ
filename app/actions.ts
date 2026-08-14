@@ -8,6 +8,7 @@ import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
+import { BUSINESSES, projectPath, type Business } from '@/lib/business'
 
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
@@ -68,11 +69,16 @@ type CompletedExtra = {
   time_invested: number | null
 }
 
-export async function createProject(payload: ProjectPayload, completedExtra?: CompletedExtra) {
+export async function createProject(
+  payload: ProjectPayload,
+  completedExtra?: CompletedExtra,
+  business: Business = 'vizeon'
+) {
   await requireAuth()
+  const basePath = BUSINESSES[business].basePath
   const progress = clampProgress(payload.progress)
   const rows = await sql`
-    INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes, estimated_costs, deposit_amount, deposit_paid)
+    INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes, estimated_costs, deposit_amount, deposit_paid, business)
     VALUES (
       ${payload.client_name},
       ${payload.client_email},
@@ -89,7 +95,8 @@ export async function createProject(payload: ProjectPayload, completedExtra?: Co
       ${payload.notes},
       ${payload.estimated_costs},
       ${payload.deposit_amount},
-      ${payload.deposit_paid}
+      ${payload.deposit_paid},
+      ${business}
     )
     RETURNING id, public_token
   `
@@ -138,16 +145,18 @@ export async function createProject(payload: ProjectPayload, completedExtra?: Co
     `
     revalidatePath('/dashboard/dokoncene')
   }
-  revalidatePath('/dashboard')
-  redirect('/dashboard')
+  revalidatePath(basePath)
+  redirect(basePath)
 }
 
 export async function updateProject(
   id: string,
   payload: ProjectPayload,
-  progressUpdate?: { from: number; description: string }
+  progressUpdate?: { from: number; description: string },
+  business: Business = 'vizeon'
 ) {
   await requireAuth()
+  const basePath = BUSINESSES[business].basePath
   const progress = clampProgress(payload.progress)
 
   const oldRows = await sql`SELECT status, paid, deposit_paid FROM projects WHERE id = ${id} LIMIT 1`
@@ -194,7 +203,7 @@ export async function updateProject(
       type: 'project_status_changed',
       title: `Stav zakázky změněn — ${payload.client_name}`,
       body: `${STATUS_LABELS[oldStatus as ProjectStatus] ?? oldStatus} → ${STATUS_LABELS[payload.status]}`,
-      link: `/dashboard/${id}`,
+      link: projectPath(business, id),
     })
   }
 
@@ -232,16 +241,17 @@ export async function updateProject(
     }
   }
 
-  revalidatePath('/dashboard')
-  revalidatePath(`/dashboard/${id}`)
+  revalidatePath(basePath)
+  revalidatePath(projectPath(business, id))
   revalidatePath('/hub/finance')
 }
 
-export async function deleteProject(id: string) {
+export async function deleteProject(id: string, business: Business = 'vizeon') {
   await requireAuth()
+  const basePath = BUSINESSES[business].basePath
   await sql`DELETE FROM projects WHERE id = ${id}`
-  revalidatePath('/dashboard')
-  redirect('/dashboard')
+  revalidatePath(basePath)
+  redirect(basePath)
 }
 
 export async function addClientMessage(projectId: string, publicToken: string, content: string) {
@@ -259,13 +269,47 @@ export async function deleteClientMessage(messageId: string, projectId: string, 
   revalidatePath(`/p/${publicToken}`)
 }
 
-export async function confirmVizeonBooking(projectId: string) {
+// VIZEON i ALTENO mají vlastní `source` a vlastní potvrzovací flag, takže
+// dotaz nejde napsat jedním sql`` (neon tagged template neumí fragmenty).
+// Rozvětvené jsou proto jen samotné dotazy — logika potvrzení je společná.
+function selectPendingBooking(projectId: string, business: Business) {
+  return business === 'alteno'
+    ? sql`
+        SELECT client_name, client_email, service_type, description, public_token, project_url
+        FROM projects WHERE id = ${projectId} AND is_alteno_pending(source, alteno_confirmed)
+        LIMIT 1
+      `
+    : sql`
+        SELECT client_name, client_email, service_type, description, public_token, project_url
+        FROM projects WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)
+        LIMIT 1
+      `
+}
+
+function markBookingConfirmed(projectId: string, business: Business) {
+  return business === 'alteno'
+    ? sql`
+        UPDATE projects
+        SET alteno_confirmed = true, status = 'in_progress', updated_at = now()
+        WHERE id = ${projectId}
+      `
+    : sql`
+        UPDATE projects
+        SET vizeon_confirmed = true, status = 'in_progress', updated_at = now()
+        WHERE id = ${projectId}
+      `
+}
+
+function deletePendingBooking(projectId: string, business: Business) {
+  return business === 'alteno'
+    ? sql`DELETE FROM projects WHERE id = ${projectId} AND is_alteno_pending(source, alteno_confirmed)`
+    : sql`DELETE FROM projects WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)`
+}
+
+async function confirmWebBooking(projectId: string, business: Business) {
   await requireAuth()
-  const rows = await sql`
-    SELECT client_name, client_email, service_type, description, public_token, project_url
-    FROM projects WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)
-    LIMIT 1
-  `
+  const cfg = BUSINESSES[business]
+  const rows = await selectPendingBooking(projectId, business)
   if (!rows.length) throw new Error('Rezervace nenalezena nebo již potvrzena')
   const p = rows[0] as {
     client_name: string
@@ -276,11 +320,7 @@ export async function confirmVizeonBooking(projectId: string) {
     project_url: string | null
   }
 
-  await sql`
-    UPDATE projects
-    SET vizeon_confirmed = true, status = 'in_progress', updated_at = now()
-    WHERE id = ${projectId}
-  `
+  await markBookingConfirmed(projectId, business)
 
   const adminEmail = process.env.ADMIN_EMAIL
   const portalUrl = getPublicUrl(p.public_token)
@@ -292,7 +332,7 @@ export async function confirmVizeonBooking(projectId: string) {
       heading: 'Váš projekt je oficálně zahájen',
       intro: `Dobrý den, ${p.client_name}! S radostí vám oznamuji, že váš projekt byl oficálně potvrzen a podle vašeho zadání nyní začínám pracovat. Jakmile bude první ukázka hotová, pošlu vám odkaz, kde uvidíte aktuální stav projektu — budete ho moci ohodnotit, napsat zpětnou vazbu, nebo si se mnou rovnou rezervovat konzultaci a vše osobně probrat.`,
       fields: [
-        { label: 'Typ projektu', value: p.service_type ?? 'Webový projekt' },
+        { label: 'Typ projektu', value: p.service_type ?? cfg.defaultServiceType },
         { label: 'Stav', value: 'V řešení' },
       ],
       ctas: [
@@ -304,7 +344,7 @@ export async function confirmVizeonBooking(projectId: string) {
   if (adminEmail) {
     await sendBrandedEmail({
       to: adminEmail,
-      subject: `Vizeon rezervace potvrzena – ${p.client_name}`,
+      subject: `${cfg.name} rezervace potvrzena – ${p.client_name}`,
       heading: 'Rezervace přesunuta do zakázek',
       intro: `Zakázka od klienta ${p.client_name} byla úspěšně potvrzena a přesunuta do aktivních zakázek.`,
       fields: [
@@ -312,18 +352,34 @@ export async function confirmVizeonBooking(projectId: string) {
         ...(p.service_type ? [{ label: 'Typ projektu', value: p.service_type }] : []),
         ...(p.description ? [{ label: 'Popis', value: p.description }] : []),
       ],
-      ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}/dashboard/${projectId}` }],
+      ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}${projectPath(business, projectId)}` }],
     })
   }
 
-  revalidatePath('/dashboard/vizeon')
-  revalidatePath('/dashboard')
+  revalidatePath(cfg.inboxPath)
+  revalidatePath(cfg.basePath)
+}
+
+export async function confirmVizeonBooking(projectId: string) {
+  await confirmWebBooking(projectId, 'vizeon')
+}
+
+export async function confirmAltenoBooking(projectId: string) {
+  await confirmWebBooking(projectId, 'alteno')
+}
+
+async function deleteWebBooking(projectId: string, business: Business) {
+  await requireAuth()
+  await deletePendingBooking(projectId, business)
+  revalidatePath(BUSINESSES[business].inboxPath)
 }
 
 export async function deleteVizeonBooking(projectId: string) {
-  await requireAuth()
-  await sql`DELETE FROM projects WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)`
-  revalidatePath('/dashboard/vizeon')
+  await deleteWebBooking(projectId, 'vizeon')
+}
+
+export async function deleteAltenoBooking(projectId: string) {
+  await deleteWebBooking(projectId, 'alteno')
 }
 
 export async function markProjectAsCompleted(

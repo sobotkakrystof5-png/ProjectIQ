@@ -55,8 +55,8 @@ export default async function ByznysPage() {
 
         {/* ALTENO */}
         <Link
-          href="/hub/byznys/alteno"
-          className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
+          href="/alteno"
+          className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-amber-200 transition-all flex flex-col"
         >
           <div className="flex items-start justify-between mb-4">
             <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
@@ -65,15 +65,15 @@ export default async function ByznysPage() {
             <ArrowUpRight
               size={16}
               strokeWidth={1.5}
-              className="text-muted-foreground/40 group-hover:text-brand-600 transition-colors mt-0.5"
+              className="text-muted-foreground/40 group-hover:text-amber-600 transition-colors mt-0.5"
             />
           </div>
           <h2 className="font-semibold text-foreground text-[16px] mb-1.5">ALTENO — AI automatizace</h2>
           <p className="text-sm text-muted-foreground flex-1">
-            Automatizace procesů, AI agenti a integrace na míru.
+            Správa zakázek na automatizace a AI agenty, poptávky z alteno.cz a konzultace.
           </p>
           <div className="mt-5 pt-3 border-t border-border">
-            <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
+            <span className="text-xs font-semibold text-amber-600 group-hover:text-amber-700 transition-colors">
               Otevřít ALTENO →
             </span>
           </div>

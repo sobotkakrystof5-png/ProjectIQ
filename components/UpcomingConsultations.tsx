@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays } from 'lucide-react'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
+import { BUSINESSES, projectPath, type Business } from '@/lib/business'
+import { cn } from '@/lib/utils'
 
 export interface UpcomingConsultation {
   id: string
@@ -26,8 +28,16 @@ const CHANNEL_BADGE: Record<ConsultationChannel, string> = {
 
 const VISIBLE_COUNT = 5
 
-export function UpcomingConsultations({ consultations }: { consultations: UpcomingConsultation[] }) {
+export function UpcomingConsultations({
+  consultations,
+  business = 'vizeon',
+}: {
+  consultations: UpcomingConsultation[]
+  business?: Business
+}) {
   const [showAll, setShowAll] = useState(false)
+  const cfg = BUSINESSES[business]
+  const isAlteno = business === 'alteno'
 
   if (consultations.length === 0) return null
 
@@ -56,20 +66,31 @@ export function UpcomingConsultations({ consultations }: { consultations: Upcomi
           return (
             <Link
               key={c.id}
-              href={`/dashboard/${c.project_id}`}
-              className="flex items-center gap-3 bg-white border border-border rounded-xl px-4 py-3 hover:border-brand-200 hover:bg-brand-50 transition-colors group"
+              href={projectPath(business, c.project_id)}
+              className={cn(
+                'flex items-center gap-3 bg-white border border-border rounded-xl px-4 py-3 transition-colors group',
+                isAlteno
+                  ? 'hover:border-amber-200 hover:bg-amber-50'
+                  : 'hover:border-brand-200 hover:bg-brand-50',
+              )}
             >
-              <div className="brand-gradient w-12 h-12 rounded-lg flex flex-col items-center justify-center shrink-0 text-white">
+              <div className={cn(
+                'w-12 h-12 rounded-lg flex flex-col items-center justify-center shrink-0 text-white',
+                isAlteno ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'brand-gradient',
+              )}>
                 <span className="text-xs font-bold leading-tight">{formattedHour}</span>
                 <span className="text-[10px] opacity-80 leading-tight">{formattedDate}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate group-hover:text-brand-800">
+                <p className={cn(
+                  'text-sm font-medium text-foreground truncate',
+                  isAlteno ? 'group-hover:text-amber-800' : 'group-hover:text-brand-800',
+                )}>
                   {c.client_name}
                 </p>
-                {c.source === 'vizeon' ? (
+                {c.source === 'web' ? (
                   <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 ring-1 ring-violet-200 mt-0.5">
-                    vizeon.cz
+                    {cfg.domain}
                   </span>
                 ) : (
                   <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-0.5 ${CHANNEL_BADGE[c.channel]}`}>

@@ -6,12 +6,16 @@ import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@
 import { sendBrandedEmail } from '@/lib/email'
 import { SURVEY_CATEGORIES } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
+import { projectPath, toBusiness, type Business } from '@/lib/business'
 
 type ActionResult = { success: boolean; error?: string }
 
-async function getProjectIdByToken(token: string): Promise<string | null> {
-  const rows = await sql`SELECT id FROM projects WHERE public_token = ${token} LIMIT 1`
-  return (rows[0] as { id: string } | undefined)?.id ?? null
+// Klientský portál je společný pro VIZEON i ALTENO, ale odkaz v notifikaci
+// i revalidace musí mířit do sekce, kam zakázka patří.
+async function getProjectByToken(token: string): Promise<{ id: string; business: Business } | null> {
+  const rows = await sql`SELECT id, business FROM projects WHERE public_token = ${token} LIMIT 1`
+  const row = rows[0] as { id: string; business: string | null } | undefined
+  return row ? { id: row.id, business: toBusiness(row.business) } : null
 }
 
 // Throttle abuse of public, unauthenticated endpoints (token-only protection).
@@ -49,8 +53,9 @@ export async function submitFeedback(
   const parsed = feedbackSchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: 'Neplatná data hodnocení.' }
 
-  const projectId = await getProjectIdByToken(token)
-  if (!projectId) return { success: false, error: 'Projekt nenalezen.' }
+  const project = await getProjectByToken(token)
+  if (!project) return { success: false, error: 'Projekt nenalezen.' }
+  const { id: projectId, business } = project
 
   if (await isRateLimited('client_feedback', projectId, 10, 3)) {
     return { success: false, error: 'Příliš mnoho hodnocení v krátkém čase. Zkuste to prosím později.' }
@@ -64,13 +69,13 @@ export async function submitFeedback(
     VALUES (${projectId}, ${parsed.data.nps}, ${parsed.data.content ?? null})
   `
 
-  revalidatePath(`/dashboard/${projectId}`)
+  revalidatePath(projectPath(business, projectId))
 
   void createNotification({
     type: 'feedback_submitted',
     title: `Nové hodnocení od klienta — ${clientName}`,
     body: `NPS: ${parsed.data.nps}/10${parsed.data.content ? ' · ' + parsed.data.content : ''}`,
-    link: `/dashboard/${projectId}`,
+    link: projectPath(business, projectId),
   })
 
   const adminEmail = process.env.ADMIN_EMAIL
@@ -129,8 +134,9 @@ export async function submitConsultation(
   const scheduledDate = new Date(parsed.data.scheduledAt)
   if (scheduledDate <= new Date()) return { success: false, error: 'Nelze rezervovat termín v minulosti.' }
 
-  const projectId = await getProjectIdByToken(token)
-  if (!projectId) return { success: false, error: 'Projekt nenalezen.' }
+  const project = await getProjectByToken(token)
+  if (!project) return { success: false, error: 'Projekt nenalezen.' }
+  const { id: projectId, business } = project
 
   if (await isRateLimited('consultation_slots', projectId, 30, 3)) {
     return { success: false, error: 'Příliš mnoho rezervací v krátkém čase. Zkuste to prosím později.' }
@@ -194,7 +200,7 @@ export async function submitConsultation(
     type: 'consultation_booked',
     title: 'Nová rezervace konzultace',
     body: `${formattedTime} · ${channelName} — ${parsed.data.clientWish}`,
-    link: `/dashboard/${projectId}`,
+    link: projectPath(business, projectId),
   })
 
   return { success: true }
