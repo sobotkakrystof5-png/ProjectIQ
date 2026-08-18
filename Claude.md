@@ -25,7 +25,7 @@
 | Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
 | Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session, chráněno i přes `middleware.ts` |
-| Email | Nodemailer + Gmail SMTP | `lib/email.ts` — sdílený mailer + branded HTML layout |
+| Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
 | Deployment | Vercel | Zero-ops, napojení na GitHub |
 
 ### Env proměnné
@@ -37,8 +37,12 @@ NEXTAUTH_URL=             # http://localhost:3000 (dev) / https://... (prod)
 ADMIN_EMAIL=              # e-mail pro přihlášení i pro notifikace o nových rezervacích
 ADMIN_PASSWORD_HASH=      # bcrypt hash hesla (generuj: node -e "require('bcryptjs').hash('heslo',12).then(console.log)")
 
-GMAIL_USER=               # Gmail adresa, ze které se odesílají emaily
+GMAIL_USER=               # Výchozí odesílací účet — přihlášení, ALTENO, Hub (vše, co není VIZEON)
 GMAIL_APP_PASSWORD=       # App password (Google Account → Security → App passwords)
+
+VIZEON_GMAIL_USER=        # info@vizeon.cz — vlastní odesílací schránka VIZEONu (klientské i admin emaily)
+VIZEON_GMAIL_APP_PASSWORD= # App password pro VIZEON_GMAIL_USER. Chybí-li, VIZEON emaily spadnou zpět na GMAIL_USER
+VIZEON_ADMIN_EMAIL=       # info@vizeon.cz — cíl admin notifikací pro VIZEON (nezávislé na přihlašovacím ADMIN_EMAIL)
 
 ADMIN_PHONE=               # Telefon pro WhatsApp/hovor, bez mezery a bez + (např. 420601234567)
 GOOGLE_MEET_LINK=          # Permanentní Google Meet link
@@ -304,10 +308,14 @@ Zdroj pravdy je `lib/types.ts` — obsahuje `Project`, `ClientMessage`, `Progres
 
 ## Emaily
 
-Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`) — jeden nodemailer transporter (Gmail SMTP), jeden branded HTML layout (gradient header, card, CTA tlačítka). Nikdy nepiš novou HTML šablonu inline v server action — rozšiř `sendBrandedEmail`/`buildLayout`, pokud potřebuješ nový vizuální prvek.
+Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`sendPlainEmail`) — branded HTML layout (gradient header, card, CTA tlačítka). Nikdy nepiš novou HTML šablonu inline v server action — rozšiř `sendBrandedEmail`/`buildLayout`, pokud potřebuješ nový vizuální prvek.
 
-- Selhání odeslání emailu **nikdy** nesmí shodit DB mutaci — `sendBrandedEmail` interně chytá chyby a vrací `false`, voláno bez `await` na výsledek pokud na něm nic nezávisí.
-- Emaily se neodešlou, pokud chybí `GMAIL_USER`/`GMAIL_APP_PASSWORD` — v dev prostředí bez těchto proměnných appka funguje, jen nechodí maily.
+**Dva odesílací účty:** VIZEON má vlastní Gmail schránku (`VIZEON_GMAIL_USER`/`VIZEON_GMAIL_APP_PASSWORD` = info@vizeon.cz), oddělenou od výchozího `GMAIL_USER` (přihlášení + ALTENO + Hub). `lib/email.ts` drží samostatný nodemailer transporter per účet a vybírá ho podle volitelného `business` parametru v `sendBrandedEmail`/`sendPlainEmail` — chybí-li VIZEON dvojice env proměnných kompletní, spadne zpět na výchozí účet (nikdy nezkouší auth s nesedícím heslem).
+
+- **Nová volaná funkce, kde jde jasně určit byznys projektu/leadu → vždy pošli `business`.** Cíl admin notifikace se stejně tak odvozuje přes `adminEmailFor(business)` z `lib/business.ts` (VIZEON → `VIZEON_ADMIN_EMAIL`, jinak `ADMIN_EMAIL`) — nikdy nečti `process.env.ADMIN_EMAIL` přímo, pokud je byznys známý.
+- Funkce, které existují jen ve VIZEON sekci (Hovory/`client_leads`, Dokončené/`completed_projects`, dotazník spokojenosti) → volej s natvrdo `business: 'vizeon'`, protože v DB nemají sloupec `business` k odvození.
+- Selhání odeslání emailu **nikdy** nesmí shodit DB mutaci — `sendBrandedEmail`/`sendPlainEmail` interně chytají chyby a vrací `false`, voláno bez `await` na výsledek pokud na něm nic nezávisí.
+- Emaily se neodešlou, pokud chybí odpovídající dvojice `*_USER`/`*_APP_PASSWORD` — v dev prostředí appka funguje i bez nich, jen nechodí maily.
 - Trigger body: `notifyClientOfProjectChange` v `app/actions.ts` (vytvoření/update projektu → klient), `submitConsultation` v `app/portal-actions.ts` (rezervace → admin i klient).
 
 ---

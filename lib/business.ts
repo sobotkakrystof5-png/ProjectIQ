@@ -55,3 +55,13 @@ export function projectPath(business: Business, projectId: string): string {
 export function toBusiness(value: string | null | undefined): Business {
   return value === 'alteno' ? 'alteno' : 'vizeon'
 }
+
+/**
+ * Cílová adresa pro admin notifikace daného byznysu. VIZEON má vlastní
+ * schránku (VIZEON_ADMIN_EMAIL, info@vizeon.cz) — ALTENO i zbytek appky dál
+ * míří na sdílený ADMIN_EMAIL.
+ */
+export function adminEmailFor(business: Business): string | undefined {
+  if (business === 'vizeon') return process.env.VIZEON_ADMIN_EMAIL || process.env.ADMIN_EMAIL
+  return process.env.ADMIN_EMAIL
+}

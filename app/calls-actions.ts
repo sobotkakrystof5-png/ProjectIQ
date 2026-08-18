@@ -162,7 +162,7 @@ export async function sendPortfolioEmail(leadId: string): Promise<{ success: tru
     todayISO: getPragueTodayISO(),
     nextCallDateISO: lead.next_action_date,
   })
-  const ok = await sendPlainEmail({ to: lead.email, subject: PORTFOLIO_EMAIL_SUBJECT, text: body })
+  const ok = await sendPlainEmail({ to: lead.email, subject: PORTFOLIO_EMAIL_SUBJECT, text: body, business: 'vizeon' })
   if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
 
   await markPortfolioSent(leadId)
@@ -180,7 +180,7 @@ export async function sendCustomLeadEmail(
   if (!lead.email) return { error: 'Kontakt nemá vyplněný email.' }
   if (!opts.subject.trim() || !opts.body.trim()) return { error: 'Předmět i text zprávy musí být vyplněné.' }
 
-  const ok = await sendPlainEmail({ to: lead.email, subject: opts.subject, text: opts.body })
+  const ok = await sendPlainEmail({ to: lead.email, subject: opts.subject, text: opts.body, business: 'vizeon' })
   if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
 
   await markPortfolioSent(leadId)

@@ -6,7 +6,7 @@ import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@
 import { sendBrandedEmail } from '@/lib/email'
 import { SURVEY_CATEGORIES } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
-import { projectPath, toBusiness, type Business } from '@/lib/business'
+import { projectPath, toBusiness, adminEmailFor, type Business } from '@/lib/business'
 
 type ActionResult = { success: boolean; error?: string }
 
@@ -78,7 +78,7 @@ export async function submitFeedback(
     link: projectPath(business, projectId),
   })
 
-  const adminEmail = process.env.ADMIN_EMAIL
+  const adminEmail = adminEmailFor(business)
   if (adminEmail) {
     await sendBrandedEmail({
       to: adminEmail,
@@ -90,6 +90,7 @@ export async function submitFeedback(
         { label: 'NPS hodnocení', value: `${parsed.data.nps} / 10` },
         ...(parsed.data.content ? [{ label: 'Komentář', value: parsed.data.content }] : []),
       ],
+      business,
     })
   }
 
@@ -160,7 +161,7 @@ export async function submitConsultation(
     return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL
+  const adminEmail = adminEmailFor(business)
   const formattedTime = new Intl.DateTimeFormat('cs-CZ', {
     timeZone: 'Europe/Prague',
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -182,6 +183,7 @@ export async function submitConsultation(
       intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji. Níže najdete vše potřebné.',
       fields: [...fields, { label: 'Přání klienta', value: parsed.data.clientWish }],
       ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
+      business,
     })
   }
 
@@ -193,6 +195,7 @@ export async function submitConsultation(
       intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji.',
       fields: [...fields, { label: 'Vaše přání', value: parsed.data.clientWish }],
       ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
+      business,
     })
   }
 
@@ -255,7 +258,9 @@ export async function submitSurvey(
     link: `/dashboard/hodnoceni`,
   })
 
-  const adminEmail = process.env.ADMIN_EMAIL
+  // Dotazník spokojenosti existuje jen u "Dokončené" — funkce dostupná
+  // výhradně ve VIZEON sekci (viz CLAUDE.md), completed_projects nemá sloupec business.
+  const adminEmail = adminEmailFor('vizeon')
   if (adminEmail) {
     await sendBrandedEmail({
       to: adminEmail,
@@ -266,6 +271,7 @@ export async function submitSurvey(
         ...SURVEY_CATEGORIES.map(c => ({ label: c.label, value: `${d[c.key]} / 5` })),
         ...(d.reference_text?.trim() ? [{ label: 'Reference', value: d.reference_text.trim() }] : []),
       ],
+      business: 'vizeon',
     })
   }
 

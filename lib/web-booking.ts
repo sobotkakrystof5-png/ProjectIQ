@@ -5,7 +5,7 @@ import { vizeonBookingSchema, altenoBookingSchema } from '@/types/booking'
 import { pragueWallClockToISO, formatPragueDateTime } from '@/lib/prague-time'
 import { sendBrandedEmail } from '@/lib/email'
 import { createNotification, type NotificationType } from '@/lib/notifications'
-import { BUSINESSES, type Business } from '@/lib/business'
+import { BUSINESSES, adminEmailFor, type Business } from '@/lib/business'
 
 // Veřejný booking endpoint je pro VIZEON i ALTENO identický — liší se jen
 // doménou, API klíčem a byznysem, do kterého poptávka spadne. Sdílená
@@ -132,7 +132,7 @@ export function bookingPostHandler(business: Business) {
       `
       const eventId = (eventRows[0] as { id: string }).id
 
-      const adminEmail = process.env.ADMIN_EMAIL
+      const adminEmail = adminEmailFor(business)
       if (adminEmail) {
         await sendBrandedEmail({
           to: adminEmail,
@@ -147,6 +147,7 @@ export function bookingPostHandler(business: Business) {
             { label: 'Navržený termín', value: formatPragueDateTime(scheduledAtISO) },
             ...(data.message ? [{ label: 'Zpráva', value: data.message }] : []),
           ],
+          business,
         })
       }
 

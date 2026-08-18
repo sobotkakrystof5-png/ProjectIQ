@@ -8,7 +8,7 @@ import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
-import { BUSINESSES, projectPath, type Business } from '@/lib/business'
+import { BUSINESSES, adminEmailFor, projectPath, type Business } from '@/lib/business'
 
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
@@ -42,7 +42,8 @@ async function notifyClientOfProjectChange(
     project_url: string | null
     public_token: string
   },
-  changeType: 'created' | 'updated'
+  changeType: 'created' | 'updated',
+  business: Business
 ) {
   if (!project.client_email) return
   const ctas: EmailCta[] = []
@@ -59,6 +60,7 @@ async function notifyClientOfProjectChange(
       { label: 'Postup', value: `${project.progress}%` },
     ],
     ctas,
+    business,
   })
 }
 
@@ -125,7 +127,8 @@ export async function createProject(
   }
   await notifyClientOfProjectChange(
     { client_name: payload.client_name, client_email: payload.client_email, status: payload.status, progress, project_url: payload.project_url, public_token: publicToken },
-    'created'
+    'created',
+    business
   )
   if (completedExtra) {
     await sql`
@@ -195,7 +198,8 @@ export async function updateProject(
   const publicToken = (rows[0] as { public_token: string }).public_token
   await notifyClientOfProjectChange(
     { client_name: payload.client_name, client_email: payload.client_email, status: payload.status, progress, project_url: payload.project_url, public_token: publicToken },
-    'updated'
+    'updated',
+    business
   )
 
   if (oldStatus && oldStatus !== payload.status) {
@@ -322,7 +326,7 @@ async function confirmWebBooking(projectId: string, business: Business) {
 
   await markBookingConfirmed(projectId, business)
 
-  const adminEmail = process.env.ADMIN_EMAIL
+  const adminEmail = adminEmailFor(business)
   const portalUrl = getPublicUrl(p.public_token)
 
   if (p.client_email) {
@@ -338,6 +342,7 @@ async function confirmWebBooking(projectId: string, business: Business) {
       ctas: [
         { label: 'Sledovat stav projektu', href: portalUrl },
       ],
+      business,
     })
   }
 
@@ -353,6 +358,7 @@ async function confirmWebBooking(projectId: string, business: Business) {
         ...(p.description ? [{ label: 'Popis', value: p.description }] : []),
       ],
       ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}${projectPath(business, projectId)}` }],
+      business,
     })
   }
 
@@ -446,6 +452,7 @@ export async function markProjectAsCompleted(
         { label: 'Projekt', value: title },
       ],
       ctas: [{ label: 'Vyplnit dotazník spokojenosti', href: getSurveyUrl(surveyToken) }],
+      business: 'vizeon',
     })
   }
 

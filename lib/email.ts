@@ -1,20 +1,39 @@
 import type { Transporter } from 'nodemailer'
+import type { Business } from './business'
 
-let _transporter: Transporter | null = null
+// VIZEON má vlastní odesílací schránku (info@vizeon.cz), ALTENO a zbytek appky
+// (přihlášení, Hub) dál jedou přes sdílený GMAIL_USER. Držíme samostatný
+// transporter per účet, aby se nemíchala přihlašovací data mezi schránkami.
+type EmailAccount = 'vizeon' | 'default'
 
-async function getTransporter(): Promise<{ transporter: Transporter; from: string } | null> {
+const transporters: Partial<Record<EmailAccount, Transporter>> = {}
+
+function credentialsFor(account: EmailAccount): { user: string; pass: string } | null {
+  // VIZEON přepíná účet jen když je nastavená CELÁ dvojice user+pass — dokud
+  // chybí VIZEON_GMAIL_APP_PASSWORD, radši spadneme zpět na výchozí funkční
+  // účet než zkoušet auth s nesedícím heslem (jistý fail u Gmailu).
+  if (account === 'vizeon' && process.env.VIZEON_GMAIL_USER && process.env.VIZEON_GMAIL_APP_PASSWORD) {
+    return { user: process.env.VIZEON_GMAIL_USER, pass: process.env.VIZEON_GMAIL_APP_PASSWORD }
+  }
   const user = process.env.GMAIL_USER
   const pass = process.env.GMAIL_APP_PASSWORD
   if (!user || !pass) return null
+  return { user, pass }
+}
 
-  if (!_transporter) {
+async function getTransporter(business?: Business): Promise<{ transporter: Transporter; from: string } | null> {
+  const account: EmailAccount = business === 'vizeon' ? 'vizeon' : 'default'
+  const creds = credentialsFor(account)
+  if (!creds) return null
+
+  if (!transporters[account]) {
     const nodemailer = await import('nodemailer')
-    _transporter = nodemailer.createTransport({
+    transporters[account] = nodemailer.createTransport({
       service: 'gmail',
-      auth: { user, pass: pass.replace(/\s/g, '') },
+      auth: { user: creds.user, pass: creds.pass.replace(/\s/g, '') },
     })
   }
-  return { transporter: _transporter, from: `ZakazIQ <${user}>` }
+  return { transporter: transporters[account]!, from: `ZakazIQ <${creds.user}>` }
 }
 
 function escapeHtml(value: string): string {
@@ -82,8 +101,9 @@ export async function sendBrandedEmail(opts: {
   intro: string
   fields: EmailField[]
   ctas?: EmailCta[]
+  business?: Business
 }): Promise<boolean> {
-  const mailer = await getTransporter()
+  const mailer = await getTransporter(opts.business)
   if (!mailer) return false
   try {
     await mailer.transporter.sendMail({
@@ -126,8 +146,8 @@ function buildPlainLayout(text: string): string {
 // Sends a plain, personal-letter-style email (no ZakazIQ branded header/CTA
 // card) — used when the message should read as coming directly from the
 // admin rather than as an automated notification.
-export async function sendPlainEmail(opts: { to: string; subject: string; text: string }): Promise<boolean> {
-  const mailer = await getTransporter()
+export async function sendPlainEmail(opts: { to: string; subject: string; text: string; business?: Business }): Promise<boolean> {
+  const mailer = await getTransporter(opts.business)
   if (!mailer) return false
   try {
     await mailer.transporter.sendMail({
