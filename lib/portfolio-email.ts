@@ -2,7 +2,7 @@ import { formatPragueDayDatePhrase } from './prague-time'
 
 export const PORTFOLIO_EMAIL_SUBJECT = 'Tvorba webových stránek - Kryštof Sobotka'
 
-const SIGNATURE = 'S přáním pěkného dne\nKryštof Sobotka\nTel. +420 604 837 333\nsobotkakrystof5@gmail.com'
+const SIGNATURE = 'S přáním pěkného dne\nKryštof Sobotka\nTel. +420 604 837 333\ninfo@vizeon.cz'
 
 export function buildPortfolioEmailBody(params: {
   todayISO: string
