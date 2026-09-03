@@ -42,6 +42,7 @@ export default async function CalendarPage() {
       WHERE next_action_date IS NOT NULL
         AND next_action_time IS NOT NULL
         AND lead_status NOT IN ('converted', 'lost')
+        AND calendar_event_id IS NULL
       ORDER BY next_action_date, next_action_time
     `,
   ])

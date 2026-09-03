@@ -24,7 +24,13 @@ function credentialsFor(account: EmailAccount): { user: string; pass: string } |
 async function getTransporter(business?: Business): Promise<{ transporter: Transporter; from: string } | null> {
   const account: EmailAccount = business === 'vizeon' ? 'vizeon' : 'default'
   const creds = credentialsFor(account)
-  if (!creds) return null
+  if (!creds) {
+    // Bez tohohle logu je "chybí GMAIL_USER/GMAIL_APP_PASSWORD" k nerozeznání
+    // od "Google odmítl přihlášení" (ten padá až v catch bloku níž) — obojí
+    // se navenek projeví stejně, jako že email prostě nikdy nedorazil.
+    console.error(`[Email] Chybí přihlašovací údaje pro účet "${account}" — email se neodeslal.`)
+    return null
+  }
 
   if (!transporters[account]) {
     const nodemailer = await import('nodemailer')

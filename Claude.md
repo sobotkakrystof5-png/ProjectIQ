@@ -163,6 +163,9 @@ Ruční admin události/blokace v globálním kalendáři (`/dashboard/calendar`
 | event_type | text | `manual` / `block` |
 | created_at | timestamptz | Datum vytvoření |
 | business | text | `vizeon` / `alteno`, default `'vizeon'` (migrace 050) — VIZEON kalendář zobrazuje jen své události |
+| lead_id | uuid | FK → client_leads.id, ON DELETE SET NULL (migrace 051) — párový kontakt v Hovorech, viz níže |
+
+**Propojení s Hovory (migrace 051):** vytvoření kalendářní události automaticky založí odpovídající řádek v `client_leads` (company_name = název události, next_action = popis, next_action_date/time odvozeno z `starts_at` v Europe/Prague) a propojí obě strany přes `calendar_events.lead_id` / `client_leads.calendar_event_id`. Smazání jedné strany smaže i druhou (`deleteCalendarEvent` / `deleteLead` v `app/calendar-actions.ts` a `app/calls-actions.ts`). Kalendářová stránka proto z `client_leads` do zobrazení bere jen řádky s `calendar_event_id IS NULL` — jinak by se termín zdvojil (jednou jako reálná `calendar_events` událost, podruhé jako virtuální položka z `next_action`).
 
 ---
 

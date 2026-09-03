@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { sendPlainEmail } from '@/lib/email'
+import { notifyClientOfProjectChange } from '@/app/actions'
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import type { ClientLead, LeadStatus, LeadActionType } from '@/lib/types'
@@ -112,7 +113,13 @@ export async function moveLeadFromWaiting(id: string) {
 
 export async function deleteLead(id: string) {
   await requireAuth()
+  const rows = await sql`SELECT calendar_event_id FROM client_leads WHERE id = ${id}`
+  const calendarEventId = (rows[0] as { calendar_event_id: string | null } | undefined)?.calendar_event_id
   await sql`DELETE FROM client_leads WHERE id = ${id}`
+  if (calendarEventId) {
+    await sql`DELETE FROM calendar_events WHERE id = ${calendarEventId}`
+    revalidatePath('/dashboard/calendar')
+  }
   revalidatePath('/dashboard/calls')
 }
 
@@ -122,10 +129,11 @@ export async function convertLeadToProject(leadId: string) {
   const lead = rows[0] as unknown as ClientLead
   if (!lead) throw new Error('Kontakt nenalezen')
 
-  await sql`
+  const clientName = lead.contact_name || lead.company_name
+  const projectRows = await sql`
     INSERT INTO projects (client_name, client_email, client_phone, description, status, progress, price, paid)
     VALUES (
-      ${lead.contact_name || lead.company_name},
+      ${clientName},
       ${lead.email},
       ${lead.phone},
       ${lead.notes},
@@ -134,11 +142,21 @@ export async function convertLeadToProject(leadId: string) {
       ${lead.estimated_value},
       false
     )
+    RETURNING public_token
   `
+  const publicToken = (projectRows[0] as { public_token: string }).public_token
 
   await sql`
     UPDATE client_leads SET lead_status = 'converted', updated_at = now() WHERE id = ${leadId}
   `
+
+  // Stejné uvítací upozornění jako u založení zakázky přes /dashboard/new —
+  // klient by o novém projektu založeném přes Hovory jinak nikdy nezjistil.
+  await notifyClientOfProjectChange(
+    { client_name: clientName, client_email: lead.email, status: 'new', progress: 0, project_url: null, public_token: publicToken },
+    'created',
+    'vizeon'
+  )
 
   revalidatePath('/dashboard/calls')
   revalidatePath('/dashboard')

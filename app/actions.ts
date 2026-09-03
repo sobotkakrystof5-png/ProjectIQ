@@ -33,7 +33,7 @@ type ProjectPayload = {
   deposit_paid: boolean
 }
 
-async function notifyClientOfProjectChange(
+export async function notifyClientOfProjectChange(
   project: {
     client_name: string
     client_email: string | null

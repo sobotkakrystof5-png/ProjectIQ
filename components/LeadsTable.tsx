@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
@@ -273,6 +273,11 @@ function CompanyCell({ lead }: { lead: ClientLead }) {
       <div className="flex items-center gap-2">
         <Building2 size={13} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
         <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
+        {lead.calendar_event_id && (
+          <span title="Založeno z kalendáře" className="shrink-0 text-brand-500">
+            <CalendarDays size={12} strokeWidth={1.5} />
+          </span>
+        )}
       </div>
     </td>
   )
@@ -648,6 +653,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
         reminder_day_before_sent: false,
         reminder_2h_before_sent: false,
         portfolio_sent_at: null,
+        calendar_event_id: null,
         created_at: created.created_at,
         updated_at: null,
       }

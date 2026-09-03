@@ -148,6 +148,7 @@ export interface ClientLead {
   reminder_day_before_sent: boolean
   reminder_2h_before_sent: boolean
   portfolio_sent_at: string | Date | null
+  calendar_event_id: string | null
   created_at: string | Date
   updated_at: string | Date | null
 }
@@ -248,6 +249,7 @@ export interface CalendarEvent {
   ends_at: string | Date
   event_type: CalendarEventType
   project_id: string | null
+  lead_id: string | null
   created_at: string | Date
 }
 
