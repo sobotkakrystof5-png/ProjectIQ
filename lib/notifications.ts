@@ -8,6 +8,7 @@ export type NotificationType =
   | 'alteno_booking'
   | 'project_status_changed'
   | 'reminder_upcoming'
+  | 'agent_lead_received'
 
 export async function createNotification(params: {
   type: NotificationType
