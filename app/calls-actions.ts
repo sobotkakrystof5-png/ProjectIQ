@@ -130,25 +130,27 @@ export async function convertLeadToProject(leadId: string) {
   if (!lead) throw new Error('Kontakt nenalezen')
 
   const clientName = lead.contact_name || lead.company_name
-  const projectRows = await sql`
-    INSERT INTO projects (client_name, client_email, client_phone, description, status, progress, price, paid)
-    VALUES (
-      ${clientName},
-      ${lead.email},
-      ${lead.phone},
-      ${lead.notes},
-      'new',
-      0,
-      ${lead.estimated_value},
-      false
-    )
-    RETURNING public_token
-  `
-  const publicToken = (projectRows[0] as { public_token: string }).public_token
 
-  await sql`
-    UPDATE client_leads SET lead_status = 'converted', updated_at = now() WHERE id = ${leadId}
+  // Jeden atomický příkaz: založení projektu (new_project) čte data jen z
+  // updated_lead, takže k INSERTu dojde pouze tehdy, když UPDATE skutečně
+  // zasáhl řádek (lead existuje a ještě není 'converted'). Zdvojený klik
+  // nebo retry po chybě tak nikdy nezaloží duplicitní projekt.
+  const projectRows = await sql`
+    WITH updated_lead AS (
+      UPDATE client_leads SET lead_status = 'converted', updated_at = now()
+      WHERE id = ${leadId} AND lead_status <> 'converted'
+      RETURNING company_name, contact_name, email, phone, notes, estimated_value
+    ),
+    new_project AS (
+      INSERT INTO projects (client_name, client_email, client_phone, description, status, progress, price, paid)
+      SELECT COALESCE(contact_name, company_name), email, phone, notes, 'new', 0, estimated_value, false
+      FROM updated_lead
+      RETURNING public_token
+    )
+    SELECT public_token FROM new_project
   `
+  if (!projectRows.length) throw new Error('Kontakt je již převeden na zakázku.')
+  const publicToken = (projectRows[0] as { public_token: string }).public_token
 
   // Stejné uvítací upozornění jako u založení zakázky přes /dashboard/new —
   // klient by o novém projektu založeném přes Hovory jinak nikdy nezjistil.

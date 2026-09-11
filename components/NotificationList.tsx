@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Calendar, Star, ClipboardList, Inbox, ArrowRightLeft, Bell,
-  CheckCheck, ExternalLink, Sparkles,
+  CheckCheck, ExternalLink, Sparkles, FileText,
 } from 'lucide-react'
 import { markNotificationRead, markAllNotificationsRead } from '@/app/notification-actions'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   project_status_changed:{ icon: ArrowRightLeft,    color: 'text-indigo-600 bg-indigo-50', label: 'Stav zakázky' },
   reminder_upcoming:     { icon: Bell,              color: 'text-orange-600 bg-orange-50', label: 'Připomínka' },
   agent_lead_received:   { icon: Sparkles,          color: 'text-teal-600 bg-teal-50',    label: 'AI lead' },
+  invoice_received:      { icon: FileText,          color: 'text-emerald-600 bg-emerald-50', label: 'Nová faktura' },
 }
 
 function timeAgo(iso: string): string {

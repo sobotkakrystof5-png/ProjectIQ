@@ -5,15 +5,17 @@ import { addClientMessage, deleteClientMessage } from '@/app/actions'
 import { formatDate } from '@/lib/utils'
 import { Trash2, Send, Loader2, MessageSquarePlus } from 'lucide-react'
 import type { ClientMessage } from '@/lib/types'
+import type { Business } from '@/lib/business'
 import { cn } from '@/lib/utils'
 
 interface Props {
   projectId: string
   publicToken: string
   messages: ClientMessage[]
+  business?: Business
 }
 
-export function ClientMessagesEditor({ projectId, publicToken, messages }: Props) {
+export function ClientMessagesEditor({ projectId, publicToken, messages, business = 'vizeon' }: Props) {
   const [content, setContent] = useState('')
   const [isPending, startTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -23,7 +25,7 @@ export function ClientMessagesEditor({ projectId, publicToken, messages }: Props
     e.preventDefault()
     if (!content.trim()) return
     startTransition(async () => {
-      await addClientMessage(projectId, publicToken, content)
+      await addClientMessage(projectId, publicToken, content, business)
       setContent('')
       textareaRef.current?.focus()
     })
@@ -32,7 +34,7 @@ export function ClientMessagesEditor({ projectId, publicToken, messages }: Props
   function handleDelete(messageId: string) {
     setDeletingId(messageId)
     startTransition(async () => {
-      await deleteClientMessage(messageId, projectId, publicToken)
+      await deleteClientMessage(messageId, projectId, publicToken, business)
       setDeletingId(null)
     })
   }

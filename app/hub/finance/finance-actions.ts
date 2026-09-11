@@ -32,6 +32,8 @@ export interface FinanceTransaction {
   note: string | null
   area: string | null
   date: string
+  /** Příjem fakturovaný na IČO — vstupuje do daňového základu (migrace 054) */
+  declared: boolean
   created_at: string
 }
 
@@ -63,6 +65,7 @@ export async function getTransactions(month: string): Promise<FinanceTransaction
       note,
       area,
       date::text,
+      declared,
       created_at::text
     FROM finance_transactions
     WHERE user_id IS NULL
@@ -235,6 +238,8 @@ export async function createTransaction(data: {
   note?: string
   area?: string | null
   date: string
+  /** Přiznaný příjem (fakturováno na IČO). U výdajů nedává smysl a ukládá se jako false. */
+  declared?: boolean
 }): Promise<{ error?: string }> {
   try {
     await requireAuth()
@@ -244,8 +249,10 @@ export async function createTransaction(data: {
     if (!data.category?.trim()) return { error: 'Kategorie je povinná' }
     if (!data.date) return { error: 'Datum je povinné' }
 
+    const declared = data.type === 'income' && data.declared === true
+
     const rows = await sql`
-      INSERT INTO finance_transactions (amount, type, category, note, area, date, user_id)
+      INSERT INTO finance_transactions (amount, type, category, note, area, date, user_id, declared)
       VALUES (
         ${data.amount},
         ${data.type},
@@ -253,7 +260,8 @@ export async function createTransaction(data: {
         ${data.note?.trim() || null},
         ${data.area || null},
         ${data.date},
-        NULL
+        NULL,
+        ${declared}
       )
       RETURNING id::text AS id
     `
@@ -282,6 +290,23 @@ export async function createTransaction(data: {
   } catch {
     return { error: 'Nepodařilo se uložit transakci' }
   }
+}
+
+/**
+ * Přeřadí existující příjem mezi liniemi. Bez tohohle by se historická data
+ * (která migrace 054 schválně nechala jako nepřiznaná) nedala označit vůbec.
+ *
+ * U příjmu ze zakázky je zdrojem pravdy checkbox „fakturováno na IČO" —
+ * ruční přeřazení tady přežije jen do nejbližší úpravy té zakázky.
+ */
+export async function setTransactionDeclared(id: string, declared: boolean): Promise<void> {
+  await requireAuth()
+  await sql`
+    UPDATE finance_transactions
+    SET declared = ${declared}
+    WHERE id = ${id} AND user_id IS NULL AND type = 'income'
+  `
+  revalidatePath('/hub/finance')
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -389,4 +414,103 @@ export async function getCosts(): Promise<Cost[]> {
 export async function generateRecurringCostTransactions(): Promise<void> {
   await requireAuth()
   await generateRecurringCostTransactionsInternal()
+}
+
+// --- Podnikání: dvě linie příjmů (přiznané / nepřiznané) ---
+//
+// „Přiznané" = fakturováno na IČO, jde do daňového přiznání. Nemá to nic
+// společného s DPH (neplátce). Linie visí na `finance_transactions.declared`,
+// ne na existenci faktury — jinak by se nepřiznaný příjem nedal evidovat
+// vůbec (viz migrace 054).
+//
+// Rok se bere podle `date`, tedy podle dne, kdy peníze dorazily. Daňová
+// evidence jede na hotovostním principu, vystavení faktury tu nehraje roli.
+
+export interface IncomeLine {
+  income: number
+  transactionCount: number
+  /** Kolik různých zakázek se na příjmu podílelo (transakce bez zakázky se nepočítají) */
+  projectCount: number
+  /**
+   * Nezaplacené zakázky téhle linie — očekávaný, ale zatím nedoručený příjem.
+   * Napříč roky, ne za vybraný rok: dokud peníze nedorazí, nepatří žádnému.
+   */
+  outstanding: number
+}
+
+export interface BusinessIncomeSummary {
+  year: number
+  /** Roky, ve kterých nějaký příjem existuje (vždy včetně letošního) */
+  availableYears: number[]
+  declared: IncomeLine
+  undeclared: IncomeLine
+  /** Součet obou linií — musí sedět na celkový příjem za rok */
+  total: number
+}
+
+const EMPTY_LINE: IncomeLine = { income: 0, transactionCount: 0, projectCount: 0, outstanding: 0 }
+
+export async function getBusinessIncome(year: number): Promise<BusinessIncomeSummary> {
+  await requireAuth()
+
+  const [incomeRows, outstandingRows, yearRows] = await Promise.all([
+    sql`
+      SELECT
+        declared,
+        SUM(amount)::float AS income,
+        COUNT(*)::int AS transaction_count,
+        COUNT(DISTINCT COALESCE(source_project_id::text, source_completed_project_id::text))::int AS project_count
+      FROM finance_transactions
+      WHERE user_id IS NULL
+        AND type = 'income'
+        AND EXTRACT(YEAR FROM date) = ${year}
+      GROUP BY declared
+    `,
+    // Zbývá doplatit = cena − už zaplacená záloha. Zakázky obou byznysů
+    // dohromady: je to jedno IČO a jedno daňové přiznání.
+    sql`
+      SELECT
+        invoiced_on_ico AS declared,
+        SUM(GREATEST(price - CASE WHEN deposit_paid THEN COALESCE(deposit_amount, 0) ELSE 0 END, 0))::float AS outstanding
+      FROM projects
+      WHERE paid = false
+        AND price IS NOT NULL
+        AND price > 0
+      GROUP BY invoiced_on_ico
+    `,
+    sql`
+      SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS year
+      FROM finance_transactions
+      WHERE user_id IS NULL AND type = 'income'
+      ORDER BY year DESC
+    `,
+  ])
+
+  const lines: Record<'true' | 'false', IncomeLine> = {
+    true: { ...EMPTY_LINE },
+    false: { ...EMPTY_LINE },
+  }
+
+  for (const row of incomeRows as { declared: boolean; income: number; transaction_count: number; project_count: number }[]) {
+    const key = row.declared ? 'true' : 'false'
+    lines[key].income = row.income
+    lines[key].transactionCount = row.transaction_count
+    lines[key].projectCount = row.project_count
+  }
+
+  for (const row of outstandingRows as { declared: boolean; outstanding: number }[]) {
+    lines[row.declared ? 'true' : 'false'].outstanding = row.outstanding
+  }
+
+  const currentYear = new Date().getFullYear()
+  const years = (yearRows as { year: number }[]).map(r => r.year)
+  const availableYears = Array.from(new Set([currentYear, year, ...years])).sort((a, b) => b - a)
+
+  return {
+    year,
+    availableYears,
+    declared: lines.true,
+    undeclared: lines.false,
+    total: lines.true.income + lines.false.income,
+  }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { sql } from '@/lib/db'
 import { verifyApiKey, getClientIp } from '@/lib/api-auth'
+import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { n8nLeadSchema } from '@/types/leads'
 
 const ENDPOINT = 'n8n_lead'
@@ -12,27 +13,13 @@ function errorResponse(status: number, error: string, code: string): NextRespons
   return NextResponse.json({ success: false, error, code }, { status })
 }
 
-async function isRateLimited(ip: string): Promise<boolean> {
-  const rows = await sql`
-    SELECT count(*)::int AS count FROM api_requests
-    WHERE endpoint = ${ENDPOINT} AND ip = ${ip}
-      AND created_at > now() - interval '1 minute' * ${RATE_LIMIT_WINDOW_MINUTES}
-  `
-  return (rows[0] as { count: number }).count >= RATE_LIMIT_MAX_REQUESTS
-}
-
-async function recordRequest(ip: string): Promise<void> {
-  await sql`INSERT INTO api_requests (endpoint, ip) VALUES (${ENDPOINT}, ${ip})`
-  await sql`DELETE FROM api_requests WHERE created_at < now() - interval '1 day'`
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const ip = getClientIp(req)
 
-  if (await isRateLimited(ip)) {
+  if (await isApiRateLimited(ENDPOINT, ip, RATE_LIMIT_WINDOW_MINUTES, RATE_LIMIT_MAX_REQUESTS)) {
     return errorResponse(429, 'Příliš mnoho požadavků. Zkuste to prosím později.', 'RATE_LIMITED')
   }
-  await recordRequest(ip)
+  await recordApiRequest(ENDPOINT, ip)
 
   if (!verifyApiKey(req, 'N8N_API_KEY')) {
     return errorResponse(401, 'Neplatný API klíč', 'UNAUTHORIZED')

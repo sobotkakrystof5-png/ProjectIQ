@@ -9,6 +9,7 @@ import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
 import { BUSINESSES, adminEmailFor, projectPath, type Business } from '@/lib/business'
+import { parseInvoiceForm, insertInvoice, type InvoiceInput, type InvoicePdf } from '@/lib/invoices'
 
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
@@ -31,6 +32,8 @@ type ProjectPayload = {
   estimated_costs: number | null
   deposit_amount: number | null
   deposit_paid: boolean
+  /** Fakturováno na IČO — příjmy z této zakázky patří do přiznané linie */
+  invoiced_on_ico: boolean
 }
 
 export async function notifyClientOfProjectChange(
@@ -45,6 +48,11 @@ export async function notifyClientOfProjectChange(
   changeType: 'created' | 'updated',
   business: Business
 ) {
+  // Exportovaná 'use server' funkce je vždy volatelná napřímo (server action
+  // endpoint), bez ohledu na to, že interní volající (createProject apod.)
+  // už requireAuth() zavolali — bez vlastní kontroly by šlo tuto funkci
+  // zneužít jako neautentizovaný email-relay.
+  await requireAuth()
   if (!project.client_email) return
   const ctas: EmailCta[] = []
   if (project.project_url) ctas.push({ label: 'Zobrazit živou verzi', href: project.project_url })
@@ -74,13 +82,30 @@ type CompletedExtra = {
 export async function createProject(
   payload: ProjectPayload,
   completedExtra?: CompletedExtra,
-  business: Business = 'vizeon'
-) {
+  business: Business = 'vizeon',
+  /** Volitelná faktura přiložená rovnou při zakládání zakázky (pole z `InvoiceFields`) */
+  invoiceForm?: FormData
+): Promise<{ error?: string } | void> {
   await requireAuth()
   const basePath = BUSINESSES[business].basePath
+
+  // Fakturu ověřit dřív, než vznikne zakázka. Kdyby se validovala až po
+  // vložení, zůstala by po chybě viset zakázka bez faktury a uživatel by
+  // dostal jen hlášku, že se nic neuložilo — což by nebyla pravda.
+  let invoice: { data: InvoiceInput; pdf: InvoicePdf | null } | null = null
+  if (invoiceForm) {
+    const parsed = await parseInvoiceForm(invoiceForm)
+    if ('error' in parsed) return { error: parsed.error }
+    const clash = await sql`
+      SELECT 1 FROM invoices WHERE invoice_number = ${parsed.data.invoice_number} LIMIT 1
+    `
+    if ((clash as unknown[]).length > 0) return { error: 'Faktura s tímhle číslem už v archivu je' }
+    invoice = { data: parsed.data, pdf: parsed.pdf }
+  }
+
   const progress = clampProgress(payload.progress)
   const rows = await sql`
-    INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes, estimated_costs, deposit_amount, deposit_paid, business)
+    INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes, estimated_costs, deposit_amount, deposit_paid, business, invoiced_on_ico)
     VALUES (
       ${payload.client_name},
       ${payload.client_email},
@@ -98,7 +123,8 @@ export async function createProject(
       ${payload.estimated_costs},
       ${payload.deposit_amount},
       ${payload.deposit_paid},
-      ${business}
+      ${business},
+      ${payload.invoiced_on_ico}
     )
     RETURNING id, public_token
   `
@@ -109,8 +135,8 @@ export async function createProject(
   if (payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0) {
     const note = payload.client_name + (payload.description ? ' — ' + payload.description : '') + ' (záloha)'
     await sql`
-      INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
-      VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, true)
+      INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
+      VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, true, ${payload.invoiced_on_ico})
     `
   }
   // Projekt vytvořen rovnou jako zaplacený → zapsat zbývající část
@@ -120,8 +146,8 @@ export async function createProject(
     if (remaining > 0) {
       const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
       await sql`
-        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
-        VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, false)
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
+        VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, false, ${payload.invoiced_on_ico})
       `
     }
   }
@@ -148,6 +174,14 @@ export async function createProject(
     `
     revalidatePath('/dashboard/dokoncene')
   }
+
+  // Až za příjmovými transakcemi ze zakázky — `syncInvoiceTransaction` pak
+  // může existující příjem převzít místo toho, aby založil druhý.
+  if (invoice) {
+    await insertInvoice({ ...invoice.data, project_id: newProjectId }, invoice.pdf)
+    revalidatePath('/hub/finance')
+  }
+
   revalidatePath(basePath)
   redirect(basePath)
 }
@@ -162,10 +196,13 @@ export async function updateProject(
   const basePath = BUSINESSES[business].basePath
   const progress = clampProgress(payload.progress)
 
-  const oldRows = await sql`SELECT status, paid, deposit_paid FROM projects WHERE id = ${id} LIMIT 1`
-  const oldStatus = (oldRows[0] as { status: string; paid: boolean; deposit_paid: boolean } | undefined)?.status
-  const wasPaid = (oldRows[0] as { status: string; paid: boolean; deposit_paid: boolean } | undefined)?.paid ?? false
-  const wasDepositPaid = (oldRows[0] as { status: string; paid: boolean; deposit_paid: boolean } | undefined)?.deposit_paid ?? false
+  const oldRows = await sql`SELECT status, paid, deposit_paid, invoiced_on_ico FROM projects WHERE id = ${id} LIMIT 1`
+  type OldProject = { status: string; paid: boolean; deposit_paid: boolean; invoiced_on_ico: boolean }
+  const old = oldRows[0] as OldProject | undefined
+  const oldStatus = old?.status
+  const wasPaid = old?.paid ?? false
+  const wasDepositPaid = old?.deposit_paid ?? false
+  const wasInvoicedOnIco = old?.invoiced_on_ico ?? false
 
   const rows = await sql`
     UPDATE projects SET
@@ -185,6 +222,7 @@ export async function updateProject(
       estimated_costs = ${payload.estimated_costs},
       deposit_amount = ${payload.deposit_amount},
       deposit_paid = ${payload.deposit_paid},
+      invoiced_on_ico = ${payload.invoiced_on_ico},
       updated_at = now()
     WHERE id = ${id}
     RETURNING public_token
@@ -201,6 +239,20 @@ export async function updateProject(
     'updated',
     business
   )
+
+  // Přepnutí „fakturováno na IČO" musí přerovnat i příjmy, které ze zakázky
+  // už vznikly — jinak by zakázka byla v jedné linii a její peníze v druhé
+  // a součet obou linií by přestal sedět na celkový příjem.
+  // Zakázka je pro své transakce zdroj pravdy: ruční přeřazení jednotlivé
+  // transakce tenhle přepis přebije.
+  if (wasInvoicedOnIco !== payload.invoiced_on_ico) {
+    await sql`
+      UPDATE finance_transactions
+      SET declared = ${payload.invoiced_on_ico}
+      WHERE source_project_id = ${id} AND type = 'income'
+    `
+    revalidatePath('/hub/finance')
+  }
 
   if (oldStatus && oldStatus !== payload.status) {
     void createNotification({
@@ -220,8 +272,8 @@ export async function updateProject(
     if ((existingDeposit as unknown[]).length === 0) {
       const note = payload.client_name + (payload.description ? ' — ' + payload.description : '') + ' (záloha)'
       await sql`
-        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
-        VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, true)
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
+        VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, true, ${payload.invoiced_on_ico})
       `
     }
   }
@@ -238,8 +290,8 @@ export async function updateProject(
       if ((existingFinal as unknown[]).length === 0) {
         const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
         await sql`
-          INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction)
-          VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, false)
+          INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
+          VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, false, ${payload.invoiced_on_ico})
         `
       }
     }
@@ -258,49 +310,53 @@ export async function deleteProject(id: string, business: Business = 'vizeon') {
   redirect(basePath)
 }
 
-export async function addClientMessage(projectId: string, publicToken: string, content: string) {
+export async function addClientMessage(
+  projectId: string,
+  publicToken: string,
+  content: string,
+  business: Business = 'vizeon'
+) {
   await requireAuth()
   if (!content.trim()) return
   await sql`INSERT INTO client_messages (project_id, content) VALUES (${projectId}, ${content.trim()})`
-  revalidatePath(`/dashboard/${projectId}`)
+  revalidatePath(projectPath(business, projectId))
   revalidatePath(`/p/${publicToken}`)
 }
 
-export async function deleteClientMessage(messageId: string, projectId: string, publicToken: string) {
+export async function deleteClientMessage(
+  messageId: string,
+  projectId: string,
+  publicToken: string,
+  business: Business = 'vizeon'
+) {
   await requireAuth()
   await sql`DELETE FROM client_messages WHERE id = ${messageId} AND project_id = ${projectId}`
-  revalidatePath(`/dashboard/${projectId}`)
+  revalidatePath(projectPath(business, projectId))
   revalidatePath(`/p/${publicToken}`)
 }
 
 // VIZEON i ALTENO mají vlastní `source` a vlastní potvrzovací flag, takže
 // dotaz nejde napsat jedním sql`` (neon tagged template neumí fragmenty).
 // Rozvětvené jsou proto jen samotné dotazy — logika potvrzení je společná.
-function selectPendingBooking(projectId: string, business: Business) {
-  return business === 'alteno'
-    ? sql`
-        SELECT client_name, client_email, service_type, description, public_token, project_url
-        FROM projects WHERE id = ${projectId} AND is_alteno_pending(source, alteno_confirmed)
-        LIMIT 1
-      `
-    : sql`
-        SELECT client_name, client_email, service_type, description, public_token, project_url
-        FROM projects WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)
-        LIMIT 1
-      `
-}
-
-function markBookingConfirmed(projectId: string, business: Business) {
+//
+// Potvrzení a pending-gate jsou schválně v jednom atomickém UPDATE (místo
+// dřívějšího SELECT + samostatný UPDATE bez gate) — dva souběžné pokusy o
+// potvrzení stejné rezervace by jinak oba prošly select kontrolou a poslaly
+// duplicitní potvrzovací email. Takhle vyhraje jen ten UPDATE, jehož WHERE
+// ještě sedí; druhý vrátí 0 řádků.
+function confirmPendingBooking(projectId: string, business: Business) {
   return business === 'alteno'
     ? sql`
         UPDATE projects
         SET alteno_confirmed = true, status = 'in_progress', updated_at = now()
-        WHERE id = ${projectId}
+        WHERE id = ${projectId} AND is_alteno_pending(source, alteno_confirmed)
+        RETURNING client_name, client_email, service_type, description, public_token, project_url
       `
     : sql`
         UPDATE projects
         SET vizeon_confirmed = true, status = 'in_progress', updated_at = now()
-        WHERE id = ${projectId}
+        WHERE id = ${projectId} AND is_vizeon_pending(source, vizeon_confirmed)
+        RETURNING client_name, client_email, service_type, description, public_token, project_url
       `
 }
 
@@ -313,7 +369,7 @@ function deletePendingBooking(projectId: string, business: Business) {
 async function confirmWebBooking(projectId: string, business: Business) {
   await requireAuth()
   const cfg = BUSINESSES[business]
-  const rows = await selectPendingBooking(projectId, business)
+  const rows = await confirmPendingBooking(projectId, business)
   if (!rows.length) throw new Error('Rezervace nenalezena nebo již potvrzena')
   const p = rows[0] as {
     client_name: string
@@ -323,8 +379,6 @@ async function confirmWebBooking(projectId: string, business: Business) {
     public_token: string
     project_url: string | null
   }
-
-  await markBookingConfirmed(projectId, business)
 
   const adminEmail = adminEmailFor(business)
   const portalUrl = getPublicUrl(p.public_token)
@@ -395,6 +449,7 @@ export async function markProjectAsCompleted(
     completed_at: string
     difficulty: number
     time_invested: number | null
+    estimated_hours: number | null
     include_costs: boolean
   }
 ) {
@@ -423,7 +478,7 @@ export async function markProjectAsCompleted(
   if (existing.length) throw new Error('Tato zakázka již byla přidána do dokončených.')
 
   const inserted = await sql`
-    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type, client_email, source_project_id)
+    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, estimated_hours, notes, project_type, client_email, source_project_id)
     VALUES (
       ${p.description || p.client_name},
       ${p.client_name},
@@ -432,6 +487,7 @@ export async function markProjectAsCompleted(
       ${p.price ?? 0},
       ${extra.difficulty},
       ${extra.time_invested},
+      ${extra.estimated_hours},
       ${p.notes},
       ${extra.project_type},
       ${p.client_email},

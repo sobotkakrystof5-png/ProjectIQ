@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays } from 'lucide-react'
+import { Fragment, useEffect, useState, useTransition } from 'react'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote } from 'lucide-react'
 import { toast } from 'sonner'
 import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
+import { whatsappHref } from '@/lib/utils'
 import {
   LEAD_STATUS_LABELS,
   LEAD_STATUS_STYLES,
@@ -267,11 +268,33 @@ function LeadForm({
   )
 }
 
-function CompanyCell({ lead }: { lead: ClientLead }) {
+function CompanyCell({
+  lead,
+  expanded,
+  onToggleExpand,
+}: {
+  lead: ClientLead
+  expanded?: boolean
+  onToggleExpand?: () => void
+}) {
   return (
     <td className="px-3 py-2.5">
       <div className="flex items-center gap-2">
-        <Building2 size={13} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
+        {onToggleExpand ? (
+          <button
+            onClick={onToggleExpand}
+            title={expanded ? 'Sbalit detail' : 'Rozbalit detail'}
+            aria-expanded={expanded}
+            className="p-0.5 -ml-1 rounded text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors shrink-0"
+          >
+            {expanded
+              ? <ChevronDown size={13} strokeWidth={1.5} />
+              : <ChevronRight size={13} strokeWidth={1.5} />
+            }
+          </button>
+        ) : (
+          <Building2 size={13} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
+        )}
         <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
         {lead.calendar_event_id && (
           <span title="Založeno z kalendáře" className="shrink-0 text-brand-500">
@@ -354,6 +377,9 @@ function LeadRow({
   onSendPortfolio,
   onOpenCustomMessage,
   isPending,
+  expanded,
+  onToggleExpand,
+  highlighted,
 }: {
   lead: ClientLead
   onEdit: () => void
@@ -364,6 +390,9 @@ function LeadRow({
   onSendPortfolio: () => void
   onOpenCustomMessage: () => void
   isPending: boolean
+  expanded: boolean
+  onToggleExpand: () => void
+  highlighted: boolean
 }) {
   const isOverdue = lead.next_action_date
     ? new Date(lead.next_action_date) < new Date(new Date().toDateString())
@@ -378,8 +407,14 @@ function LeadRow({
   })()
 
   return (
-    <tr className="border-t border-border hover:bg-slate-50/60 transition-colors group">
-      <CompanyCell lead={lead} />
+    <Fragment>
+    <tr
+      id={`lead-${lead.id}`}
+      className={`border-t border-border transition-colors group ${
+        highlighted ? 'bg-brand-50 ring-2 ring-inset ring-brand-300' : 'hover:bg-slate-50/60'
+      }`}
+    >
+      <CompanyCell lead={lead} expanded={expanded} onToggleExpand={onToggleExpand} />
       <ContactCell lead={lead} />
       <PhoneCell lead={lead} />
       <td className="px-3 py-2.5">
@@ -467,6 +502,72 @@ function LeadRow({
             >
               <Trash2 size={13} strokeWidth={1.5} />
             </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+    {expanded && <LeadDetailRow lead={lead} />}
+    </Fragment>
+  )
+}
+
+// Poznámky a kontaktní akce se do tabulky nevejdou — žijí v rozbaleném řádku.
+function LeadDetailRow({ lead }: { lead: ClientLead }) {
+  const waHref = lead.phone ? whatsappHref(lead.phone) : null
+
+  return (
+    <tr className="bg-slate-50/80 border-t border-border">
+      <td colSpan={11} className="px-6 py-4">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+          <div className="space-y-2 min-w-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <StickyNote size={12} strokeWidth={1.5} />
+              Poznámky
+            </p>
+            {lead.notes ? (
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{lead.notes}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground/70">Žádné poznámky.</p>
+            )}
+            <p className="text-xs text-muted-foreground pt-1">
+              Přidáno {new Date(lead.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {lead.calendar_event_id && ' · založeno z kalendáře'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            {lead.phone && (
+              <a
+                href={`tel:${lead.phone}`}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border px-3 py-2 rounded-lg hover:bg-muted transition-colors"
+              >
+                <Phone size={12} strokeWidth={1.5} />
+                Volat
+              </a>
+            )}
+            {lead.email && (
+              <a
+                href={`mailto:${lead.email}`}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border px-3 py-2 rounded-lg hover:bg-muted transition-colors"
+              >
+                <Mail size={12} strokeWidth={1.5} />
+                Napsat
+              </a>
+            )}
+            {waHref && (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-white border border-green-200 px-3 py-2 rounded-lg hover:bg-green-50 transition-colors"
+              >
+                <MessageCircle size={12} strokeWidth={1.5} />
+                WhatsApp
+              </a>
+            )}
+            {!lead.phone && !lead.email && (
+              <span className="text-xs text-muted-foreground/70">Kontakt nemá telefon ani e-mail.</span>
+            )}
           </div>
         </div>
       </td>
@@ -572,6 +673,7 @@ function WaitingRow({
   onMoveBack,
   onDelete,
   isPending,
+  highlighted,
 }: {
   lead: ClientLead
   onEdit: () => void
@@ -579,9 +681,15 @@ function WaitingRow({
   onMoveBack: () => void
   onDelete: () => void
   isPending: boolean
+  highlighted: boolean
 }) {
   return (
-    <tr className="border-t border-border hover:bg-slate-50/60 transition-colors group">
+    <tr
+      id={`lead-${lead.id}`}
+      className={`border-t border-border transition-colors group ${
+        highlighted ? 'bg-sky-50 ring-2 ring-inset ring-sky-300' : 'hover:bg-slate-50/60'
+      }`}
+    >
       <CompanyCell lead={lead} />
       <ContactCell lead={lead} />
       <PhoneCell lead={lead} />
@@ -632,13 +740,42 @@ function WaitingRow({
   )
 }
 
-export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[] }) {
+export default function LeadsTable({
+  initialLeads,
+  focusLeadId,
+}: {
+  initialLeads: ClientLead[]
+  focusLeadId?: string
+}) {
   const [leads, setLeads] = useState<ClientLead[]>(initialLeads)
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
   const [portfolioModalLead, setPortfolioModalLead] = useState<ClientLead | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Příchod z kalendáře (`?lead=ID`): kontakt rozbalit, odscrollovat na něj
+  // a na chvíli zvýraznit, ať je v široké tabulce vidět, o který řádek jde.
+  useEffect(() => {
+    if (!focusLeadId) return
+    if (!initialLeads.some(l => l.id === focusLeadId)) return
+
+    setExpandedId(focusLeadId)
+    setHighlightedId(focusLeadId)
+
+    const scroll = requestAnimationFrame(() => {
+      document.getElementById(`lead-${focusLeadId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    const fade = setTimeout(() => setHighlightedId(null), 4000)
+
+    return () => {
+      cancelAnimationFrame(scroll)
+      clearTimeout(fade)
+    }
+  }, [focusLeadId, initialLeads])
 
   const activeLeads = leads.filter(l => l.lead_status !== 'waiting')
   const waitingLeads = leads.filter(l => l.lead_status === 'waiting')
@@ -819,6 +956,9 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
                       onSendPortfolio={() => handleSendPortfolio(lead.id)}
                       onOpenCustomMessage={() => setPortfolioModalLead(lead)}
                       isPending={isPending}
+                      expanded={expandedId === lead.id}
+                      onToggleExpand={() => setExpandedId(prev => prev === lead.id ? null : lead.id)}
+                      highlighted={highlightedId === lead.id}
                     />
                   )
                 )}
@@ -898,6 +1038,7 @@ export default function LeadsTable({ initialLeads }: { initialLeads: ClientLead[
                       onMoveBack={() => handleMoveFromWaiting(lead.id)}
                       onDelete={() => handleDelete(lead.id)}
                       isPending={isPending}
+                      highlighted={highlightedId === lead.id}
                     />
                   )
                 )}

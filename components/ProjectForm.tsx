@@ -4,10 +4,14 @@ import { useState, useTransition, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProject, updateProject } from '@/app/actions'
 import type { Business } from '@/lib/business'
-import { STATUS_LABELS, STATUS_ORDER, type Project, type ProjectStatus, type ProjectType } from '@/lib/types'
+import { STATUS_LABELS, STATUS_ORDER, type InvoiceAiExtract, type Project, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { ChevronDown, Loader2 } from 'lucide-react'
+import {
+  InvoiceFields, emptyInvoiceForm, validateInvoiceForm, invoiceFormToFormData,
+  type InvoiceFormState,
+} from '@/components/InvoiceFields'
 
 type FormData = {
   client_name: string
@@ -24,6 +28,7 @@ type FormData = {
   estimated_costs: string
   deposit_amount: string
   deposit_paid: boolean
+  invoiced_on_ico: boolean
   deadline: string
   notes: string
   progressNote: string
@@ -55,6 +60,7 @@ const defaultData: FormData = {
   estimated_costs: '',
   deposit_amount: '',
   deposit_paid: false,
+  invoiced_on_ico: false,
   deadline: '',
   notes: '',
   progressNote: '',
@@ -81,6 +87,7 @@ function projectToForm(p: Project): FormData {
     estimated_costs: p.estimated_costs !== null ? String(p.estimated_costs) : '',
     deposit_amount: p.deposit_amount !== null ? String(p.deposit_amount) : '',
     deposit_paid: p.deposit_paid,
+    invoiced_on_ico: p.invoiced_on_ico ?? false,
     deadline: p.deadline ?? '',
     notes: p.notes ?? '',
     progressNote: '',
@@ -98,6 +105,12 @@ export function ProjectForm({ project, business = 'vizeon' }: ProjectFormProps) 
     project ? project.deposit_amount !== null : false
   )
   const [error, setError] = useState<string | null>(null)
+  // Faktura přiložená rovnou k nové zakázce. Vlastní state, ne součást
+  // `FormData` — jde do jiné tabulky a odesílá se jako FormData kvůli PDF.
+  const [attachInvoice, setAttachInvoice] = useState(false)
+  const [invoiceForm, setInvoiceForm] = useState<InvoiceFormState>(() => emptyInvoiceForm())
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null)
+  const [invoiceAi, setInvoiceAi] = useState<InvoiceAiExtract | null>(null)
   const [isPending, startTransition] = useTransition()
   // isPending only reflects the transition's synchronous portion for async
   // callbacks in React 18 — it can flip back to false before the server
@@ -153,8 +166,18 @@ export function ProjectForm({ project, business = 'vizeon' }: ProjectFormProps) 
       estimated_costs: form.estimated_costs !== '' ? Number(form.estimated_costs) : null,
       deposit_amount: depositAmount !== '' ? Number(depositAmount) : null,
       deposit_paid: form.deposit_paid,
+      invoiced_on_ico: form.invoiced_on_ico,
       deadline: form.deadline || null,
       notes: form.notes.trim() || null,
+    }
+
+    const wantsInvoice = !project && business === 'vizeon' && attachInvoice
+    if (wantsInvoice) {
+      const invoiceError = validateInvoiceForm(invoiceForm, invoiceFile)
+      if (invoiceError) {
+        setError(invoiceError)
+        return
+      }
     }
 
     const completedExtra = !project && form.addToCompleted ? {
@@ -178,7 +201,24 @@ export function ProjectForm({ project, business = 'vizeon' }: ProjectFormProps) 
           )
           router.refresh()
         } else {
-          await createProject(payload, completedExtra, business)
+          const result = await createProject(
+            payload,
+            completedExtra,
+            business,
+            wantsInvoice
+              ? invoiceFormToFormData(
+                  // Odběratel se bere z klienta zakázky, když ho uživatel nepřepsal.
+                  { ...invoiceForm, client_name: invoiceForm.client_name || payload.client_name },
+                  invoiceFile,
+                  false,
+                  invoiceAi
+                )
+              : undefined
+          )
+          if (result?.error) {
+            setError(result.error)
+            return
+          }
         }
       } catch {
         setError('Chyba při ukládání zakázky')
@@ -366,6 +406,27 @@ export function ProjectForm({ project, business = 'vizeon' }: ProjectFormProps) 
             </label>
           </div>
 
+          {/* Řídí, do které linie příjmů zakázka spadne — přiznané jdou do
+              daňového přiznání a do daňové kalkulačky ve Financích. */}
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="invoiced_on_ico"
+              checked={form.invoiced_on_ico}
+              onChange={e => set('invoiced_on_ico', e.target.checked)}
+              className="w-4 h-4 accent-emerald-600 mt-0.5"
+            />
+            <div>
+              <label htmlFor="invoiced_on_ico" className="text-sm text-foreground cursor-pointer">
+                Fakturováno na IČO
+              </label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Příjmy z této zakázky spadnou do přiznané linie a do daňové kalkulačky.
+                {project && ' Změna přerovná i příjmy, které už ze zakázky vznikly.'}
+              </p>
+            </div>
+          </div>
+
           {/* Záloha */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
             <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
@@ -483,6 +544,43 @@ export function ProjectForm({ project, business = 'vizeon' }: ProjectFormProps) 
                     />
                   </Field>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Faktura k nové zakázce. Fakturace je zatím jen VIZEON — v ALTENU
+            archiv faktur neexistuje, takže by blok vedl do prázdna. */}
+        {!project && business === 'vizeon' && (
+          <div className="sm:col-span-2">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="attachInvoice"
+                checked={attachInvoice}
+                onChange={e => setAttachInvoice(e.target.checked)}
+                className="w-4 h-4 accent-emerald-600"
+              />
+              <label htmlFor="attachInvoice" className="text-sm text-foreground cursor-pointer">
+                Přiložit fakturu
+              </label>
+            </div>
+
+            {attachInvoice && (
+              <div className="mt-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-3">
+                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Faktura k zakázce</p>
+                <InvoiceFields
+                  value={invoiceForm}
+                  onChange={setInvoiceForm}
+                  file={invoiceFile}
+                  onFileChange={f => {
+                    setInvoiceFile(f)
+                    // Přepis patří ke konkrétnímu PDF — po výměně souboru zahodit.
+                    setInvoiceAi(null)
+                  }}
+                  onAiExtracted={setInvoiceAi}
+                  disabled={isPending}
+                />
               </div>
             )}
           </div>

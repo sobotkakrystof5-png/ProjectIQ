@@ -9,9 +9,9 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
-import { DeleteButton } from './DeleteButton'
+import { DeleteButton } from '@/components/DeleteButton'
 import { getPublicUrl, formatDate } from '@/lib/utils'
-import { toBusiness } from '@/lib/business'
+import { toBusiness, projectPath } from '@/lib/business'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot } from '@/lib/types'
 
 interface PageProps {
@@ -31,7 +31,7 @@ export default async function AltenoProjectDetailPage({ params }: PageProps) {
   const project = rows[0] as Project & { business?: string }
   // Starší odkazy (notifikace, emaily) mířily na /dashboard — a naopak. Místo
   // 404 pošli uživatele do sekce, kam zakázka doopravdy patří.
-  if (toBusiness(project.business) !== 'alteno') redirect(`/dashboard/${params.id}`)
+  if (toBusiness(project.business) !== 'alteno') redirect(projectPath(toBusiness(project.business), params.id))
 
   const messages = msgRows as ClientMessage[]
   const progressUpdates = progressRows as ProgressUpdate[]
@@ -101,6 +101,7 @@ export default async function AltenoProjectDetailPage({ params }: PageProps) {
             projectId={project.id}
             publicToken={project.public_token}
             messages={messages}
+            business="alteno"
           />
         </div>
 
@@ -157,7 +158,7 @@ export default async function AltenoProjectDetailPage({ params }: PageProps) {
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">Nebezpečná zóna</h2>
           <p className="text-xs text-muted-foreground mb-4">Smazání zakázky je nevratné.</p>
-          <DeleteButton projectId={project.id} />
+          <DeleteButton projectId={project.id} business="alteno" />
         </div>
       </div>
     </div>

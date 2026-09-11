@@ -106,6 +106,24 @@ export function expandRangeToHourlySlots(startIso: string, endIso: string): stri
   return slots
 }
 
+// Convert a UTC ISO instant to its Europe/Prague wall-clock date and time,
+// as separate 'YYYY-MM-DD' / 'HH:MM:00' strings ready for `date`/`time`
+// columns. Use this instead of `AT TIME ZONE 'Europe/Prague'` in raw SQL —
+// keeps all timezone math in one place.
+export function isoToPragueDateAndTime(utcIso: string): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ,
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', hour12: false,
+  }).formatToParts(new Date(utcIso))
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0')
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    date: `${get('year')}-${pad(get('month'))}-${pad(get('day'))}`,
+    time: `${pad(get('hour') % 24)}:${pad(get('minute'))}:00`,
+  }
+}
+
 // Today's date in Europe/Prague, as 'YYYY-MM-DD'. Use this instead of
 // `new Date().toISOString().slice(0, 10)`, which reads the UTC calendar date
 // and is off by one around midnight Prague time (23:00–01:00 UTC).

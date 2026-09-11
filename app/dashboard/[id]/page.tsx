@@ -9,10 +9,12 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
-import { DeleteButton } from './DeleteButton'
+import { DeleteButton } from '@/components/DeleteButton'
 import { MarkCompletedButton } from '@/components/MarkCompletedButton'
+import { InvoiceArchive } from '@/components/InvoiceArchive'
+import { getProjectInvoices } from '@/app/hub/finance/invoice-actions'
 import { getPublicUrl, formatDate } from '@/lib/utils'
-import { toBusiness } from '@/lib/business'
+import { toBusiness, projectPath } from '@/lib/business'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot } from '@/lib/types'
 
 interface PageProps {
@@ -32,13 +34,14 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const project = rows[0] as Project & { business?: string }
   // ALTENO zakázka se edituje ve své sekci — jinak by se ukládala s VIZEON
   // revalidací a nabízela "Přidat do dokončených", což ALTENO nemá.
-  if (toBusiness(project.business) !== 'vizeon') redirect(`/alteno/${params.id}`)
+  if (toBusiness(project.business) !== 'vizeon') redirect(projectPath(toBusiness(project.business), params.id))
 
   const messages = msgRows as ClientMessage[]
   const progressUpdates = progressRows as ProgressUpdate[]
   const feedbacks = feedbackRows as ClientFeedback[]
   const slots = slotRows as ConsultationSlot[]
   const publicUrl = getPublicUrl(project.public_token)
+  const invoices = await getProjectInvoices(project.id)
 
   return (
     <div className="max-w-2xl">
@@ -153,6 +156,21 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             Termíny rezervované klientem. Kliknutím zobrazíš detail a odkaz na hovor.
           </p>
           <ConsultationCalendar slots={slots} clientName={project.client_name} />
+        </div>
+
+        {/* ── Faktury ── */}
+        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
+          <InvoiceArchive
+            data={invoices}
+            defaults={{
+              project_id: project.id,
+              client_name: project.client_name,
+              amount: project.price !== null ? String(project.price) : '',
+            }}
+            title="Faktury zakázky"
+            description="Doklady k téhle zakázce. Zaplacená faktura založí příjem v přiznané linii."
+            paidLabel="Zaplacené"
+          />
         </div>
 
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">

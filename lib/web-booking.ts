@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { verifyApiKey, getClientIp } from '@/lib/api-auth'
+import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { vizeonBookingSchema, altenoBookingSchema } from '@/types/booking'
 import { pragueWallClockToISO, formatPragueDateTime } from '@/lib/prague-time'
 import { sendBrandedEmail } from '@/lib/email'
 import { createNotification, type NotificationType } from '@/lib/notifications'
 import { BUSINESSES, adminEmailFor, type Business } from '@/lib/business'
+import type { WebBooking } from '@/components/BookingCard'
 
 // Veřejný booking endpoint je pro VIZEON i ALTENO identický — liší se jen
 // doménou, API klíčem a byznysem, do kterého poptávka spadne. Sdílená
@@ -16,7 +18,6 @@ const RATE_LIMIT_WINDOW_MINUTES = 1
 const RATE_LIMIT_MAX_REQUESTS = 10
 
 interface BookingEndpointConfig {
-  business: Business
   /** Název endpointu v tabulce api_requests (rate limit je per byznys) */
   endpoint: string
   allowedOrigins: string[]
@@ -24,18 +25,18 @@ interface BookingEndpointConfig {
   notificationType: NotificationType
 }
 
+// Domény se berou z BUSINESSES (lib/business.ts) — nikdy nedávej doménu jen
+// sem, jinak se VIZEON/ALTENO můžou v konfiguraci rozejít.
 const ENDPOINTS: Record<Business, BookingEndpointConfig> = {
   vizeon: {
-    business: 'vizeon',
     endpoint: 'vizeon_booking',
-    allowedOrigins: ['https://vizeon.cz', 'http://localhost:3000'],
+    allowedOrigins: [`https://${BUSINESSES.vizeon.domain}`, 'http://localhost:3000'],
     apiKeyEnvVar: 'VIZEON_API_KEY',
     notificationType: 'vizeon_booking',
   },
   alteno: {
-    business: 'alteno',
     endpoint: 'alteno_booking',
-    allowedOrigins: ['https://alteno.cz', 'http://localhost:3000'],
+    allowedOrigins: [`https://${BUSINESSES.alteno.domain}`, 'http://localhost:3000'],
     apiKeyEnvVar: 'ALTENO_API_KEY',
     notificationType: 'alteno_booking',
   },
@@ -60,20 +61,6 @@ function errorResponse(
   return NextResponse.json({ success: false, error, code }, { status, headers: corsHeaders(cfg, origin) })
 }
 
-async function isRateLimited(endpoint: string, ip: string): Promise<boolean> {
-  const rows = await sql`
-    SELECT count(*)::int AS count FROM api_requests
-    WHERE endpoint = ${endpoint} AND ip = ${ip}
-      AND created_at > now() - interval '1 minute' * ${RATE_LIMIT_WINDOW_MINUTES}
-  `
-  return (rows[0] as { count: number }).count >= RATE_LIMIT_MAX_REQUESTS
-}
-
-async function recordRequest(endpoint: string, ip: string): Promise<void> {
-  await sql`INSERT INTO api_requests (endpoint, ip) VALUES (${endpoint}, ${ip})`
-  await sql`DELETE FROM api_requests WHERE created_at < now() - interval '1 day'`
-}
-
 export function bookingOptionsHandler(business: Business) {
   const cfg = ENDPOINTS[business]
   return async function OPTIONS(req: NextRequest): Promise<NextResponse> {
@@ -90,10 +77,10 @@ export function bookingPostHandler(business: Business) {
     const origin = req.headers.get('origin')
     const ip = getClientIp(req)
 
-    if (await isRateLimited(cfg.endpoint, ip)) {
+    if (await isApiRateLimited(cfg.endpoint, ip, RATE_LIMIT_WINDOW_MINUTES, RATE_LIMIT_MAX_REQUESTS)) {
       return errorResponse(cfg, origin, 429, 'Příliš mnoho požadavků. Zkuste to prosím později.', 'RATE_LIMITED')
     }
-    await recordRequest(cfg.endpoint, ip)
+    await recordApiRequest(cfg.endpoint, ip)
 
     if (!verifyApiKey(req, cfg.apiKeyEnvVar)) {
       return errorResponse(cfg, origin, 401, 'Neplatný API klíč', 'UNAUTHORIZED')
@@ -170,4 +157,29 @@ export function bookingPostHandler(business: Business) {
       return errorResponse(cfg, origin, 500, 'Chyba serveru. Zkuste to prosím znovu.', 'SERVER_ERROR')
     }
   }
+}
+
+// Admin inbox nepotvrzených poptávek (/dashboard/vizeon, /alteno/rezervace) —
+// dřív identicky duplikováno v obou route page.tsx souborech.
+export async function loadPendingBookings(business: Business): Promise<WebBooking[]> {
+  const rows = business === 'alteno'
+    ? await sql`
+        SELECT
+          p.id, p.client_name, p.client_email, p.client_phone, p.service_type, p.description, p.created_at,
+          ce.starts_at AS consultation_at
+        FROM projects p
+        LEFT JOIN calendar_events ce ON ce.project_id = p.id
+        WHERE p.business = 'alteno' AND is_alteno_pending(p.source, p.alteno_confirmed)
+        ORDER BY p.created_at DESC
+      `
+    : await sql`
+        SELECT
+          p.id, p.client_name, p.client_email, p.client_phone, p.service_type, p.description, p.created_at,
+          ce.starts_at AS consultation_at
+        FROM projects p
+        LEFT JOIN calendar_events ce ON ce.project_id = p.id
+        WHERE p.business = 'vizeon' AND is_vizeon_pending(p.source, p.vizeon_confirmed)
+        ORDER BY p.created_at DESC
+      `
+  return rows as WebBooking[]
 }

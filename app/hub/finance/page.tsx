@@ -1,35 +1,64 @@
-import { TrendingUp, Calculator, BarChart3, Info } from 'lucide-react'
+import Link from 'next/link'
+import { TrendingUp, Calculator, BarChart3, Info, User, Briefcase } from 'lucide-react'
 import { TradingViewChart } from '@/components/TradingViewChart'
 import { CompoundCalculator } from '@/components/CompoundCalculator'
 import { IncomeExpenseSection } from './IncomeExpenseSection'
 import { FinanceHealthSection } from './FinanceHealthSection'
 import { ScenarioSection } from './ScenarioSection'
+import { BusinessSection } from './BusinessSection'
 import {
   getTransactions,
   generateRecurringCostTransactions, generateRecurringCashFlowTransactions,
   getCosts, getRecurringCashFlow, getFinanceHealthOverview, getMonthSummary, getAllTimeSummary,
+  getBusinessIncome,
 } from './finance-actions'
+import { getInvoices, getInvoiceProjectOptions } from './invoice-actions'
+import { getTaxNews } from './tax-news-actions'
+import { getPragueTodayISO } from '@/lib/prague-time'
+
+type Tab = 'osobni' | 'podnikani'
+
+const TABS: { key: Tab; label: string; icon: typeof User }[] = [
+  { key: 'osobni', label: 'Osobní', icon: User },
+  { key: 'podnikani', label: 'Podnikání', icon: Briefcase },
+]
 
 export default async function FinancePage({
   searchParams,
 }: {
-  searchParams: { month?: string }
+  searchParams: { month?: string; tab?: string; year?: string }
 }) {
+  // Záložka žije v URL, ne ve state — odkaz na Podnikání se dá poslat
+  // i uložit a přežije reload.
+  const tab: Tab = searchParams.tab === 'podnikani' ? 'podnikani' : 'osobni'
   const currentMonth = searchParams.month ?? new Date().toISOString().slice(0, 7)
+  const year = Number(searchParams.year) || new Date().getFullYear()
 
   await Promise.all([
     generateRecurringCostTransactions(),
     generateRecurringCashFlowTransactions(),
   ])
 
-  const [transactions, healthOverview, costs, recurringItems, monthSummary, allTimeSummary] = await Promise.all([
-    getTransactions(currentMonth),
-    getFinanceHealthOverview(),
-    getCosts(),
-    getRecurringCashFlow(),
-    getMonthSummary(currentMonth),
-    getAllTimeSummary(),
-  ])
+  // Data se tahají jen pro zobrazenou záložku — ta druhá by jinak platila
+  // za dotazy, které nikdo neuvidí.
+  const [transactions, healthOverview, costs, recurringItems, monthSummary, allTimeSummary] =
+    tab === 'osobni'
+      ? await Promise.all([
+          getTransactions(currentMonth),
+          getFinanceHealthOverview(),
+          getCosts(),
+          getRecurringCashFlow(),
+          getMonthSummary(currentMonth),
+          getAllTimeSummary(),
+        ])
+      : [null, null, null, null, null, null]
+
+  const [businessIncome, invoices, projectOptions, taxNews] =
+    tab === 'podnikani'
+      ? await Promise.all([
+          getBusinessIncome(year), getInvoices(year), getInvoiceProjectOptions(), getTaxNews(),
+        ])
+      : [null, null, null, null]
 
   return (
     <div className="space-y-8">
@@ -42,10 +71,44 @@ export default async function FinancePage({
             </div>
             <h1 className="text-2xl font-semibold text-foreground tracking-tight">Finance</h1>
           </div>
-          <p className="text-sm text-muted-foreground">ETF tracker, cash flow a investiční kalkulačky</p>
+          <p className="text-sm text-muted-foreground">
+            {tab === 'osobni'
+              ? 'ETF tracker, cash flow a investiční kalkulačky'
+              : 'Přiznané a nepřiznané příjmy, daně a odvody'}
+          </p>
         </div>
       </div>
 
+      {/* Záložky */}
+      <div className="flex gap-1 border-b border-border">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <Link
+            key={key}
+            href={key === 'osobni' ? `/hub/finance?month=${currentMonth}` : `/hub/finance?tab=podnikani&year=${year}`}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors border-b-2 -mb-px ${
+              tab === key
+                ? 'border-emerald-600 text-foreground font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Icon size={14} strokeWidth={1.5} />
+            {label}
+          </Link>
+        ))}
+      </div>
+
+      {businessIncome && (
+        <BusinessSection
+          summary={businessIncome}
+          invoices={invoices!}
+          projectOptions={projectOptions!}
+          taxNews={taxNews!}
+          todayIso={getPragueTodayISO()}
+        />
+      )}
+
+      {tab === 'osobni' && (
+        <>
       {/* ETF Watchlist chips */}
       <div className="flex flex-wrap gap-2">
         {[
@@ -80,19 +143,19 @@ export default async function FinancePage({
       </div>
 
       {/* Jak si stojíš */}
-      <FinanceHealthSection overview={healthOverview} />
+      <FinanceHealthSection overview={healthOverview!} />
 
       {/* Příjmy & Výdaje (sjednocené) */}
       <IncomeExpenseSection
-        transactions={transactions}
+        transactions={transactions!}
         currentMonth={currentMonth}
-        recurringItems={recurringItems}
-        costs={costs}
-        summary={monthSummary}
+        recurringItems={recurringItems!}
+        costs={costs!}
+        summary={monthSummary!}
       />
 
       {/* Co kdyby analýza */}
-      <ScenarioSection summary={monthSummary} overview={healthOverview} allTime={allTimeSummary} />
+      <ScenarioSection summary={monthSummary!} overview={healthOverview!} allTime={allTimeSummary!} />
 
       {/* Investice (mimo cash flow) */}
       <div className="space-y-2">
@@ -102,6 +165,8 @@ export default async function FinancePage({
         </h2>
         <CompoundCalculator />
       </div>
+        </>
+      )}
     </div>
   )
 }

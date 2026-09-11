@@ -22,6 +22,7 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
   const [completedAt, setCompletedAt] = useState(getPragueTodayISO())
   const [difficulty, setDifficulty] = useState(5)
   const [timeInvested, setTimeInvested] = useState('')
+  const [estimatedHours, setEstimatedHours] = useState('')
   const [includeCosts, setIncludeCosts] = useState(hasEstimatedCosts)
   const [done, setDone] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +38,7 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
           completed_at: completedAt,
           difficulty,
           time_invested: timeInvested ? Number(timeInvested) : null,
+          estimated_hours: estimatedHours ? Number(estimatedHours) : null,
           include_costs: includeCosts,
         })
         setDone(true)
@@ -130,6 +132,19 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
                 value={timeInvested}
                 onChange={e => setTimeInvested(e.target.value)}
                 placeholder="např. 12"
+                className={inputCls}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Odhad při zadání (hod., volitelné)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={estimatedHours}
+                onChange={e => setEstimatedHours(e.target.value)}
+                placeholder="např. 8"
                 className={inputCls}
               />
             </div>

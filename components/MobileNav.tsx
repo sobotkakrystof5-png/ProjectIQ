@@ -8,18 +8,20 @@ import {
   CheckCircle2, Star, Receipt,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { BUSINESSES, type Business } from '@/lib/business'
 
 interface MobileNavProps {
   /** Která sekce se právě prochází — VIZEON dashboard, nebo ALTENO */
-  section: 'dashboard' | 'alteno'
+  business: Business
   /** Počet nepotvrzených poptávek z webu dané sekce */
   pendingCount: number
 }
 
-export function MobileNav({ section, pendingCount }: MobileNavProps) {
+export function MobileNav({ business, pendingCount }: MobileNavProps) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
-  const isAlteno = section === 'alteno'
+  const isAlteno = business === 'alteno'
+  const cfg = BUSINESSES[business]
 
   // Close on route change
   useEffect(() => { setOpen(false) }, [pathname])
@@ -34,13 +36,13 @@ export function MobileNav({ section, pendingCount }: MobileNavProps) {
   const links = isAlteno
     ? [
         { href: '/hub', label: 'Hub', icon: LayoutGrid },
-        { href: '/alteno', label: 'Zakázky', icon: null },
-        { href: '/alteno/rezervace', label: 'Rezervace', icon: Inbox, badge: pendingCount },
+        { href: cfg.basePath, label: 'Zakázky', icon: null },
+        { href: cfg.inboxPath, label: 'Rezervace', icon: Inbox, badge: pendingCount },
       ]
     : [
         { href: '/hub', label: 'Hub', icon: LayoutGrid },
-        { href: '/dashboard', label: 'Zakázky', icon: null },
-        { href: '/dashboard/vizeon', label: 'Vizeon', icon: Inbox, badge: pendingCount },
+        { href: cfg.basePath, label: 'Zakázky', icon: null },
+        { href: cfg.inboxPath, label: 'Vizeon', icon: Inbox, badge: pendingCount },
         { href: '/dashboard/calendar', label: 'Kalendář', icon: CalendarDays },
         { href: '/dashboard/calls', label: 'Hovory', icon: PhoneCall },
         { href: '/dashboard/dokoncene', label: 'Dokončené', icon: CheckCircle2 },
@@ -48,7 +50,7 @@ export function MobileNav({ section, pendingCount }: MobileNavProps) {
         { href: '/dashboard/naklady', label: 'Náklady', icon: Receipt },
       ]
 
-  const rootHrefs = ['/hub', '/dashboard', '/alteno']
+  const rootHrefs = ['/hub', BUSINESSES.vizeon.basePath, BUSINESSES.alteno.basePath]
 
   return (
     <>

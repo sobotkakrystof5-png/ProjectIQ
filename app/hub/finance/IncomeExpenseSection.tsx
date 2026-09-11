@@ -10,7 +10,7 @@ import {
   TrendingUp, TrendingDown, Scale, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react'
 import {
-  createTransaction, deleteTransaction,
+  createTransaction, deleteTransaction, setTransactionDeclared,
   createRecurringCashFlow, deleteRecurringCashFlow,
   type FinanceTransaction, type TransactionType,
   type RecurringCashFlow, type RecurringFrequency, type Cost, type MonthSummary,
@@ -108,13 +108,14 @@ function RecurringRowItem({
 }
 
 function ColumnSection({
-  oneTimeItems, monthlyItems, annualItems, onDeleteTransaction, onDeleteRecurring, isPending, currentMonth,
+  oneTimeItems, monthlyItems, annualItems, onDeleteTransaction, onDeleteRecurring, onToggleDeclared, isPending, currentMonth,
 }: {
   oneTimeItems: FinanceTransaction[]
   monthlyItems: RecurringRow[]
   annualItems: RecurringRow[]
   onDeleteTransaction: (id: string) => void
   onDeleteRecurring: (id: string) => void
+  onToggleDeclared: (id: string, declared: boolean) => void
   isPending: boolean
   currentMonth: string
 }) {
@@ -138,6 +139,25 @@ function ColumnSection({
                   <span className="text-sm font-medium text-foreground">{t.category}</span>
                   {t.note && <span className="text-xs text-muted-foreground ml-2 truncate">{t.note}</span>}
                 </div>
+                {t.type === 'income' && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleDeclared(t.id, !t.declared)}
+                    disabled={isPending}
+                    title={
+                      t.declared
+                        ? 'Přiznaný příjem — klikni pro přeřazení do nepřiznané linie'
+                        : 'Nepřiznaný příjem — klikni pro označení jako fakturováno na IČO'
+                    }
+                    className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 transition-colors disabled:opacity-40 ${
+                      t.declared
+                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
+                        : 'bg-slate-50 text-slate-400 ring-1 ring-slate-200 hover:text-slate-600 opacity-0 group-hover:opacity-100'
+                    }`}
+                  >
+                    IČO
+                  </button>
+                )}
                 {t.area && <AreaBadge area={t.area} />}
                 <span className="text-xs text-muted-foreground shrink-0">{formatDate(t.date)}</span>
                 <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">{formatAmount(t.amount)}</span>
@@ -272,6 +292,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [description, setDescription] = useState('')
+  const [declared, setDeclared] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -334,6 +355,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
         })
       : await createTransaction({
           amount: amountNum, type, category, note: description || undefined, area: area || null, date,
+          declared,
         })
 
     setIsSubmitting(false)
@@ -347,8 +369,16 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
     setDescription('')
     setDate(new Date().toISOString().slice(0, 10))
     setArea('')
+    setDeclared(false)
     setShowForm(false)
     startTransition(() => { router.refresh() })
+  }
+
+  function handleToggleDeclared(id: string, declared: boolean) {
+    startTransition(async () => {
+      await setTransactionDeclared(id, declared)
+      router.refresh()
+    })
   }
 
   function handleDeleteTransaction(id: string) {
@@ -524,6 +554,40 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
             </div>
           )}
 
+          {type === 'income' && !isPassive && (
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="grid grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setDeclared(false)}
+                  className={`py-2 text-sm transition-colors ${
+                    !declared
+                      ? 'bg-slate-100 text-foreground font-medium'
+                      : 'bg-white text-muted-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  Nepřiznaný
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeclared(true)}
+                  className={`py-2 text-sm transition-colors ${
+                    declared
+                      ? 'bg-emerald-50 text-emerald-700 font-medium'
+                      : 'bg-white text-muted-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  Přiznaný (na IČO)
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground px-3 py-2 border-t border-border bg-muted/20 leading-snug">
+                {declared
+                  ? 'Půjde do daňového přiznání a započítá se do daňové kalkulačky.'
+                  : 'Zůstane mimo daňový základ — v přehledu Podnikání ho najdeš v nepřiznané linii.'}
+              </p>
+            </div>
+          )}
+
           {type === 'expense' && area === 'byznys' && (
             <div className="flex items-start gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
               <AlertCircle size={13} className="shrink-0 mt-0.5" strokeWidth={1.5} />
@@ -576,6 +640,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
             annualItems={incomeAnnual}
             onDeleteTransaction={handleDeleteTransaction}
             onDeleteRecurring={handleDeleteRecurring}
+            onToggleDeclared={handleToggleDeclared}
             isPending={isPending}
             currentMonth={currentMonth}
           />
@@ -597,6 +662,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
             annualItems={expenseAnnual}
             onDeleteTransaction={handleDeleteTransaction}
             onDeleteRecurring={handleDeleteRecurring}
+            onToggleDeclared={handleToggleDeclared}
             isPending={isPending}
             currentMonth={currentMonth}
           />

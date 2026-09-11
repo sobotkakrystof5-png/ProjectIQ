@@ -37,6 +37,7 @@ const EMPTY_FORM = (type: ProjectType): CompletedProjectPayload => ({
   deposit_amount: null,
   difficulty: 5,
   time_invested: null,
+  estimated_hours: null,
   notes: null,
   project_type: type,
 })
@@ -138,6 +139,17 @@ function ProjectForm({
       </td>
       <td className="px-3 py-2">
         <input
+          type="number"
+          min="0"
+          step="0.5"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          placeholder="odhad hod."
+          value={form.estimated_hours ?? ''}
+          onChange={e => set('estimated_hours', e.target.value ? Number(e.target.value) : null)}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
           className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
           placeholder="Poznámka"
           value={form.notes ?? ''}
@@ -214,6 +226,13 @@ function ProjectRow({
       <td className="px-3 py-2.5">
         {project.time_invested != null ? (
           <span className="text-sm text-foreground">{Number(project.time_invested).toLocaleString('cs-CZ')} h</span>
+        ) : (
+          <span className="text-muted-foreground/40">—</span>
+        )}
+      </td>
+      <td className="px-3 py-2.5">
+        {project.estimated_hours != null ? (
+          <span className="text-sm text-muted-foreground">{Number(project.estimated_hours).toLocaleString('cs-CZ')} h</span>
         ) : (
           <span className="text-muted-foreground/40">—</span>
         )}
@@ -336,7 +355,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
 
       <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
+          <table className="w-full text-left min-w-[980px]">
             <thead>
               <tr className="bg-slate-50 border-b border-border">
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Název</th>
@@ -347,6 +366,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Záloha</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Náročnost</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Čas</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Odhad</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Poznámka</th>
                 <th className="px-3 py-2.5 w-20" />
               </tr>
@@ -362,7 +382,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
               )}
               {filtered.length === 0 && !addingNew && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     {tab === 'client'
                       ? 'Zatím žádné klientské zakázky. Přidej svoji první dokončenou zakázku.'
                       : 'Zatím žádné osobní projekty. Přidej aplikace, systémy nebo automatizace, které jsi vytvořil.'}
@@ -382,6 +402,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
                       deposit_amount: project.deposit_amount != null ? Number(project.deposit_amount) : null,
                       difficulty: project.difficulty,
                       time_invested: project.time_invested != null ? Number(project.time_invested) : null,
+                      estimated_hours: project.estimated_hours != null ? Number(project.estimated_hours) : null,
                       notes: project.notes,
                       project_type: project.project_type,
                     }}

@@ -38,3 +38,14 @@ export function getPublicUrl(token: string): string {
 export function getSurveyUrl(token: string): string {
   return `${appBaseUrl()}/h/${token}`
 }
+
+// wa.me chce mezinárodní tvar bez '+' a bez mezer. České devítimístné číslo
+// doplníme o předvolbu 420; z čehokoli kratšího se WhatsApp odkaz udělat nedá.
+export function whatsappHref(phone: string): string | null {
+  let digits = phone.trim()
+  if (digits.startsWith('+')) digits = digits.slice(1)
+  else if (digits.startsWith('00')) digits = digits.slice(2)
+  digits = digits.replace(/\D/g, '')
+  if (digits.length === 9) digits = `420${digits}`
+  return digits.length >= 9 ? `https://wa.me/${digits}` : null
+}

@@ -39,7 +39,7 @@ export default async function AltenoLayout({ children }: { children: React.React
       <header className="bg-white border-b border-border sticky top-0 z-10 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ height: '60px' }}>
           <div className="flex items-center gap-3">
-            <MobileNav section="alteno" pendingCount={altenoCount} />
+            <MobileNav business="alteno" pendingCount={altenoCount} />
             <Link href="/alteno" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0">
               <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-sm">
                 <Bot size={17} strokeWidth={1.5} className="text-white" />

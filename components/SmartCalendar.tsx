@@ -7,11 +7,15 @@ import {
   ChevronLeft, ChevronRight, Plus, X, ExternalLink,
   CalendarDays, Phone, Monitor, Video, MessageSquare,
   CalendarPlus, Lock, Trash2, Clock, Flag,
+  Building2, User, Mail, MessageCircle, Coins,
 } from 'lucide-react'
 import { AdminEventModal } from './AdminEventModal'
 import { deleteCalendarEvent } from '@/app/calendar-actions'
-import { CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, type ConsultationChannel, type CalendarEventType, type LeadActionType } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import {
+  CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS, LEAD_STATUS_STYLES,
+  type ConsultationChannel, type CalendarEventType, type LeadActionType, type LeadStatus,
+} from '@/lib/types'
+import { cn, whatsappHref } from '@/lib/utils'
 import { toMondayFirst, getDaysInMonth, getMonthStartOffset } from '@/lib/prague-time'
 
 // ─── Raw data shapes (serialised from server) ────────────────────────────────
@@ -48,6 +52,11 @@ export interface RawLead {
   contact_name: string | null
   next_action: string | null
   next_action_type: string | null
+  phone: string | null
+  email: string | null
+  lead_status: LeadStatus
+  estimated_value: number | null
+  notes: string | null
   action_at: string // ISO datetime (date + time combined in Prague TZ)
 }
 
@@ -71,6 +80,17 @@ interface UnifiedEvent {
     clientEmail?: string | null
     description?: string | null
     clientName?: string
+    // kontakt z Hovorů — jen u kind === 'call'
+    lead?: {
+      id: string
+      companyName: string
+      contactName: string | null
+      phone: string | null
+      email: string | null
+      status: LeadStatus
+      estimatedValue: number | null
+      notes: string | null
+    }
   }
 }
 
@@ -177,7 +197,19 @@ function buildUnified(
       allDay: false,
       label: lead.contact_name || lead.company_name,
       sublabel: LEAD_ACTION_TYPE_LABELS[lead.next_action_type as LeadActionType] ?? lead.next_action_type ?? 'Akce',
-      meta: { description: lead.next_action },
+      meta: {
+        description: lead.next_action,
+        lead: {
+          id: lead.id,
+          companyName: lead.company_name,
+          contactName: lead.contact_name,
+          phone: lead.phone,
+          email: lead.email,
+          status: lead.lead_status,
+          estimatedValue: lead.estimated_value,
+          notes: lead.notes,
+        },
+      },
     })
   }
 
@@ -242,6 +274,8 @@ function EventDetailModal({
   const [deleting, setDeleting] = useState(false)
   const style = getEventStyle(event)
   const isManualEvent = event.kind === 'manual' || event.kind === 'block'
+  const lead = event.kind === 'call' ? event.meta.lead : undefined
+  const waHref = lead?.phone ? whatsappHref(lead.phone) : null
 
   async function handleDelete() {
     if (!confirm('Smazat tuto událost?')) return
@@ -314,6 +348,94 @@ function EventDetailModal({
                 </div>
               </div>
 
+              {/* Kontakt z Hovorů */}
+              {lead && (
+                <div className="space-y-2.5 rounded-xl bg-slate-50 border border-border p-3">
+                  {lead.contactName && (
+                    <div className="flex items-center gap-2.5">
+                      <Building2 size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
+                      <span className="text-foreground">{lead.companyName}</span>
+                    </div>
+                  )}
+                  {!lead.contactName && lead.companyName && (
+                    <div className="flex items-center gap-2.5">
+                      <User size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">Kontaktní osoba není vyplněná</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', LEAD_STATUS_STYLES[lead.status])}>
+                      {LEAD_STATUS_LABELS[lead.status]}
+                    </span>
+                    {lead.estimatedValue != null && (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Coins size={12} strokeWidth={1.5} />
+                        {lead.estimatedValue.toLocaleString('cs-CZ')} Kč
+                      </span>
+                    )}
+                  </div>
+
+                  {lead.phone && (
+                    <a href={`tel:${lead.phone}`} className="flex items-center gap-2.5 text-brand-700 hover:underline">
+                      <Phone size={14} strokeWidth={1.5} className="shrink-0" />
+                      {lead.phone}
+                    </a>
+                  )}
+                  {lead.email && (
+                    <a href={`mailto:${lead.email}`} className="flex items-center gap-2.5 text-brand-700 hover:underline break-all">
+                      <Mail size={14} strokeWidth={1.5} className="shrink-0" />
+                      {lead.email}
+                    </a>
+                  )}
+                  {!lead.phone && !lead.email && (
+                    <p className="text-xs text-muted-foreground">Kontakt nemá vyplněný telefon ani e-mail.</p>
+                  )}
+
+                  {lead.notes && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Poznámky ke kontaktu</p>
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{lead.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Rychlé akce */}
+                  {(lead.phone || lead.email) && (
+                    <div className="flex gap-1.5 pt-0.5">
+                      {lead.phone && (
+                        <a
+                          href={`tel:${lead.phone}`}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border py-2 rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <Phone size={12} strokeWidth={1.5} />
+                          Volat
+                        </a>
+                      )}
+                      {lead.email && (
+                        <a
+                          href={`mailto:${lead.email}`}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border py-2 rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <Mail size={12} strokeWidth={1.5} />
+                          Napsat
+                        </a>
+                      )}
+                      {waHref && (
+                        <a
+                          href={waHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700 bg-white border border-green-200 py-2 rounded-lg hover:bg-green-50 transition-colors"
+                        >
+                          <MessageCircle size={12} strokeWidth={1.5} />
+                          WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Client wish */}
               {event.meta.clientWish && (
                 <div>
@@ -335,7 +457,9 @@ function EventDetailModal({
               {/* Description */}
               {event.meta.description && (
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Poznámka</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                    {lead ? 'Co je v plánu' : 'Poznámka'}
+                  </p>
                   <p className="text-foreground leading-relaxed whitespace-pre-wrap">{event.meta.description}</p>
                 </div>
               )}
@@ -366,9 +490,10 @@ function EventDetailModal({
 
               {event.kind === 'call' && (
                 <a
-                  href="/dashboard/calls"
-                  className="flex-1 flex items-center justify-center text-sm font-semibold text-brand-800 border border-brand-200 py-2.5 rounded-xl hover:bg-brand-50 transition-colors"
+                  href={lead ? `/dashboard/calls?lead=${lead.id}` : '/dashboard/calls'}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-800 border border-brand-200 py-2.5 rounded-xl hover:bg-brand-50 transition-colors"
                 >
+                  <ExternalLink size={13} strokeWidth={1.5} />
                   Otevřít hovory
                 </a>
               )}

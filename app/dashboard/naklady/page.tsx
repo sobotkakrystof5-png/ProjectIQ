@@ -11,7 +11,7 @@ export default async function NakladyPage() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground tracking-tight">Náklady</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Eviduj fixní a jednorázové výdaje — výsledky se promítají do kalkulačky v sekci Dokončené zakázky.
+          Eviduj fixní a jednorázové výdaje — promítají se do cash flow ve Financích.
         </p>
       </div>
       <CostsManager initialCosts={costs} />

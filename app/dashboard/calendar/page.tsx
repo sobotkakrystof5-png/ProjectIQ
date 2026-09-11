@@ -1,6 +1,7 @@
 import { sql } from '@/lib/db'
 import { SmartCalendar } from '@/components/SmartCalendar'
 import type { RawConsultation, RawDeadline, RawCalendarEvent, RawLead } from '@/components/SmartCalendar'
+import type { LeadStatus } from '@/lib/types'
 
 export const revalidate = 0
 
@@ -37,6 +38,7 @@ export default async function CalendarPage() {
     sql`
       SELECT
         id, company_name, contact_name, next_action, next_action_type,
+        phone, email, lead_status, estimated_value, notes,
         (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague' AS action_at
       FROM client_leads
       WHERE next_action_date IS NOT NULL
@@ -66,12 +68,32 @@ export default async function CalendarPage() {
     ends_at: new Date(r.ends_at).toISOString(),
   }))
 
-  const leads = (leadRows as { id: string; company_name: string; contact_name: string | null; next_action: string | null; next_action_type: string | null; action_at: Date | string }[]).map(r => ({
+  type LeadRowShape = {
+    id: string
+    company_name: string
+    contact_name: string | null
+    next_action: string | null
+    next_action_type: string | null
+    phone: string | null
+    email: string | null
+    lead_status: string
+    // numeric přijde z neonu jako string — do klienta posíláme číslo
+    estimated_value: string | number | null
+    notes: string | null
+    action_at: Date | string
+  }
+
+  const leads = (leadRows as LeadRowShape[]).map(r => ({
     id: r.id,
     company_name: r.company_name,
     contact_name: r.contact_name,
     next_action: r.next_action,
     next_action_type: r.next_action_type,
+    phone: r.phone,
+    email: r.email,
+    lead_status: r.lead_status as LeadStatus,
+    estimated_value: r.estimated_value == null ? null : Number(r.estimated_value),
+    notes: r.notes,
     action_at: new Date(r.action_at).toISOString(),
   })) satisfies RawLead[]
 

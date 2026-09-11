@@ -20,6 +20,8 @@ export interface Project {
   estimated_costs: number | null
   deposit_amount: number | null
   deposit_paid: boolean
+  /** Fakturováno na IČO — příjem ze zakázky patří do přiznané linie (migrace 054) */
+  invoiced_on_ico: boolean
   created_at: string | Date | null
   updated_at: string | Date | null
 }
@@ -190,6 +192,9 @@ export interface CompletedProject {
   deposit_amount: number | null
   difficulty: number
   time_invested: number | null
+  // Odhad v hodinách, jak se čekalo při zadání zakázky — volitelný, historická
+  // data ho nemají (migrace 057). Slouží jen k metrice „odhad vs. realita".
+  estimated_hours: number | null
   notes: string | null
   project_type: ProjectType
   survey_token: string
@@ -443,5 +448,77 @@ export interface PersonalProjectChangelogEntry {
   description: string
   progress_from: number | null
   progress_to: number | null
+  created_at: string | Date
+}
+
+// ─── Fakturace a daně (migrace 053–055) ───────────────────────────────────────
+
+/**
+ * Faktura z archivu. `pdf_data` (bytea) tu schválně není — binárka se
+ * nikdy netahá do seznamu ani na klienta, servíruje ji chráněná routa
+ * /api/invoices/[id]/pdf. Přítomnost PDF poznáš z `pdf_filename`.
+ *
+ * `paid_on` rozhoduje o daních: NULL = pohledávka mimo daňový základ,
+ * vyplněné datum = zdanitelný příjem toho dne (hotovostní princip).
+ */
+export interface Invoice {
+  id: string
+  invoice_number: string
+  project_id: string | null
+  client_name: string | null
+  client_ico: string | null
+  client_dic: string | null
+  issued_on: string
+  due_on: string | null
+  paid_on: string | null
+  amount: number
+  currency: string
+  note: string | null
+  pdf_filename: string | null
+  pdf_size: number | null
+  /** Surový výstup AI přepisu PDF — pro dohledatelnost, ne pro výpočty */
+  ai_extracted: InvoiceAiExtract | null
+  /** Transakce, kterou faktura založila v ledgeru. Pojistka proti dvojímu započtení příjmu. */
+  finance_transaction_id: string | null
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
+/** Co z PDF vytáhla AI. Všechno volitelné — model se může splést nebo pole nenajít. */
+export interface InvoiceAiExtract {
+  invoice_number?: string | null
+  issued_on?: string | null
+  due_on?: string | null
+  amount?: number | null
+  currency?: string | null
+  client_name?: string | null
+  client_ico?: string | null
+  client_dic?: string | null
+}
+
+export type InvoiceInsert = Omit<
+  Invoice,
+  'id' | 'created_at' | 'updated_at' | 'finance_transaction_id'
+>
+export type InvoiceUpdate = Partial<InvoiceInsert>
+
+export type TaxNewsSource = 'financni_sprava' | 'cssz'
+
+export const TAX_NEWS_SOURCE_LABELS: Record<TaxNewsSource, string> = {
+  financni_sprava: 'Finanční správa',
+  cssz: 'ČSSZ',
+}
+
+/** Novinka z oficiálního RSS. Zdroj a datum se v UI zobrazují vždy — je to informace, ne daňové poradenství. */
+export interface TaxNews {
+  id: string
+  source: TaxNewsSource
+  /** Identifikátor položky z RSS — nese idempotenci opakovaného běhu cronu */
+  guid: string
+  title: string
+  link: string
+  published_at: string | Date | null
+  summary: string | null
+  read: boolean
   created_at: string | Date
 }

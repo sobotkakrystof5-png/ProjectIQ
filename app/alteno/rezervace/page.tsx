@@ -1,29 +1,9 @@
-import { sql } from '@/lib/db'
 import { Inbox } from 'lucide-react'
-import { BookingCard, type WebBooking } from '@/components/BookingCard'
-
-async function loadBookings(): Promise<WebBooking[]> {
-  const rows = await sql`
-    SELECT
-      p.id,
-      p.client_name,
-      p.client_email,
-      p.client_phone,
-      p.service_type,
-      p.description,
-      p.created_at,
-      ce.starts_at AS consultation_at
-    FROM projects p
-    LEFT JOIN calendar_events ce ON ce.project_id = p.id
-    WHERE p.business = 'alteno'
-      AND is_alteno_pending(p.source, p.alteno_confirmed)
-    ORDER BY p.created_at DESC
-  `
-  return rows as WebBooking[]
-}
+import { BookingCard } from '@/components/BookingCard'
+import { loadPendingBookings } from '@/lib/web-booking'
 
 export default async function AltenoRezervacePage() {
-  const bookings = await loadBookings()
+  const bookings = await loadPendingBookings('alteno')
 
   return (
     <div className="space-y-6">

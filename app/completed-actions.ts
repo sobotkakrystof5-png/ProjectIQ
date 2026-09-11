@@ -15,6 +15,9 @@ export type CompletedProjectPayload = {
   deposit_amount: number | null
   difficulty: number
   time_invested: number | null
+  // Odhad v hodinách z doby, kdy se zakázka brala — volitelný, jen pro
+  // metriku „odhad vs. realita" v Dokončených. Nesouvisí s financemi.
+  estimated_hours: number | null
   notes: string | null
   project_type: ProjectType
 }
@@ -54,7 +57,7 @@ export async function deleteProjectSurvey(id: string) {
 export async function createCompletedProject(payload: CompletedProjectPayload) {
   await requireAuth()
   const rows = await sql`
-    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, deposit_amount, difficulty, time_invested, notes, project_type)
+    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, deposit_amount, difficulty, time_invested, estimated_hours, notes, project_type)
     VALUES (
       ${payload.title},
       ${payload.client_name},
@@ -64,6 +67,7 @@ export async function createCompletedProject(payload: CompletedProjectPayload) {
       ${payload.deposit_amount},
       ${payload.difficulty},
       ${payload.time_invested},
+      ${payload.estimated_hours},
       ${payload.notes},
       ${payload.project_type}
     )
@@ -93,6 +97,7 @@ export async function updateCompletedProject(id: string, payload: CompletedProje
       deposit_amount = ${payload.deposit_amount},
       difficulty = ${payload.difficulty},
       time_invested = ${payload.time_invested},
+      estimated_hours = ${payload.estimated_hours},
       notes = ${payload.notes},
       project_type = ${payload.project_type}
     WHERE id = ${id}
