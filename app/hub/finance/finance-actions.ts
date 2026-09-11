@@ -3,26 +3,13 @@
 import { sql } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
-import type { CostCategory } from '@/lib/types'
 import {
   generateRecurringCashFlowTransactionsInternal,
   generateRecurringCostTransactionsInternal,
 } from '@/lib/recurring-transactions'
 
 export type TransactionType = 'income' | 'expense'
-export type CostType = 'fixed_monthly' | 'fixed_annual' | 'one_time'
 export type RecurringFrequency = 'monthly' | 'annual'
-
-export interface Cost {
-  id: string
-  name: string
-  amount: number
-  cost_type: CostType
-  category: CostCategory
-  description: string | null
-  source_finance_transaction_id: string | null
-  created_at: string
-}
 
 export interface FinanceTransaction {
   id: string
@@ -388,25 +375,6 @@ export async function deleteRecurringCashFlow(id: string): Promise<void> {
 export async function generateRecurringCashFlowTransactions(): Promise<void> {
   await requireAuth()
   await generateRecurringCashFlowTransactionsInternal()
-}
-
-export async function getCosts(): Promise<Cost[]> {
-  await requireAuth()
-  const rows = await sql`
-    SELECT
-      id::text,
-      name,
-      amount::float AS amount,
-      cost_type,
-      category,
-      description,
-      source_finance_transaction_id::text,
-      created_at::text
-    FROM costs
-    WHERE TRUE
-    ORDER BY cost_type, name
-  `
-  return rows as Cost[]
 }
 
 // Generuje chybějící opakované cost transakce pro aktuální měsíc/rok.

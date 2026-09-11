@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ExternalLink, Layers } from 'lucide-react'
 import { sql } from '@/lib/db'
 import { ProjectForm } from '@/components/ProjectForm'
 import { ShareButton } from '@/components/ShareButton'
@@ -9,25 +9,30 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
+import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 import { DeleteButton } from '@/components/DeleteButton'
 import { MarkCompletedButton } from '@/components/MarkCompletedButton'
 import { InvoiceArchive } from '@/components/InvoiceArchive'
+import CostsManager from '@/components/CostsManager'
 import { getProjectInvoices } from '@/app/hub/finance/invoice-actions'
+import { getProjectCosts } from '@/app/costs-actions'
 import { getPublicUrl, formatDate } from '@/lib/utils'
 import { toBusiness, projectPath } from '@/lib/business'
-import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot } from '@/lib/types'
+import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot, ProjectNote } from '@/lib/types'
 
 interface PageProps {
   params: { id: string }
 }
 
 export default async function ProjectDetailPage({ params }: PageProps) {
-  const [rows, msgRows, progressRows, feedbackRows, slotRows] = await Promise.all([
+  const [rows, msgRows, progressRows, feedbackRows, slotRows, noteRows, blockCountRows] = await Promise.all([
     sql`SELECT * FROM projects WHERE id = ${params.id} LIMIT 1`,
     sql`SELECT * FROM client_messages WHERE project_id = ${params.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM progress_updates WHERE project_id = ${params.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM client_feedback WHERE project_id = ${params.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM consultation_slots WHERE project_id = ${params.id} ORDER BY scheduled_at DESC`,
+    sql`SELECT * FROM project_notes WHERE project_id = ${params.id} ORDER BY created_at DESC`,
+    sql`SELECT count(*)::int AS count FROM project_blocks WHERE project_id = ${params.id}`,
   ])
 
   if (!rows.length) notFound()
@@ -40,8 +45,13 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const progressUpdates = progressRows as ProgressUpdate[]
   const feedbacks = feedbackRows as ClientFeedback[]
   const slots = slotRows as ConsultationSlot[]
+  const projectNotes = noteRows as ProjectNote[]
+  const blockCount = (blockCountRows[0] as { count: number }).count
   const publicUrl = getPublicUrl(project.public_token)
-  const invoices = await getProjectInvoices(project.id)
+  const [invoices, projectCosts] = await Promise.all([
+    getProjectInvoices(project.id),
+    getProjectCosts(project.id),
+  ])
 
   return (
     <div className="max-w-2xl">
@@ -78,6 +88,12 @@ export default async function ProjectDetailPage({ params }: PageProps) {
 
       <div className="space-y-4">
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Poznámky k zakázce</h2>
+          <p className="text-xs text-muted-foreground mb-5">Jen pro tebe — klient je nikdy neuvidí.</p>
+          <ProjectNotesPanel projectId={project.id} initialNotes={projectNotes} />
+        </div>
+
+        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">Editace zakázky</h2>
           <ProjectForm project={project} />
         </div>
@@ -107,6 +123,27 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             messages={messages}
           />
         </div>
+
+        <Link
+          href={`/dashboard/${project.id}/sablona`}
+          className="flex items-center justify-between gap-3 bg-white border border-border rounded-2xl p-6 shadow-sm hover:border-brand-300 hover:bg-brand-50/40 transition-colors group"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+              <Layers size={16} strokeWidth={1.5} className="text-brand-700" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-foreground">Šablona webu</h2>
+              <p className="text-xs text-muted-foreground">
+                {blockCount > 0 ? `${blockCount} ${blockCount === 1 ? 'blok' : blockCount < 5 ? 'bloky' : 'bloků'}` : 'Zatím žádné bloky'}
+              </p>
+            </div>
+          </div>
+          <span className="flex items-center gap-1 text-sm font-medium text-brand-700 group-hover:text-brand-800 shrink-0">
+            Otevřít
+            <ArrowRight size={14} strokeWidth={1.5} />
+          </span>
+        </Link>
 
         {progressUpdates.length > 0 && (
           <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
@@ -171,6 +208,15 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             description="Doklady k téhle zakázce. Zaplacená faktura založí příjem v přiznané linii."
             paidLabel="Zaplacené"
           />
+        </div>
+
+        {/* ── Náklady zakázky ── */}
+        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Náklady zakázky</h2>
+          <p className="text-xs text-muted-foreground mb-5">
+            Skutečné náklady — promítají se do cash flow ve Financích. Odhad v editaci zakázky je jen orientační.
+          </p>
+          <CostsManager initialCosts={projectCosts} projectId={project.id} />
         </div>
 
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">

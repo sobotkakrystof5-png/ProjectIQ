@@ -1,12 +1,12 @@
 'use client'
 
-import { Fragment, useEffect, useState, useTransition } from 'react'
+import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
 import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote } from 'lucide-react'
 import { toast } from 'sonner'
-import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail } from '@/app/calls-actions'
+import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
-import { whatsappHref } from '@/lib/utils'
+import { whatsappHref, formatDate } from '@/lib/utils'
 import {
   LEAD_STATUS_LABELS,
   LEAD_STATUS_STYLES,
@@ -14,6 +14,7 @@ import {
   type ClientLead,
   type LeadStatus,
   type LeadActionType,
+  type LeadNote,
 } from '@/lib/types'
 
 const LEAD_STATUSES: LeadStatus[] = ['cold', 'warm', 'hot', 'converted', 'lost']
@@ -240,7 +241,7 @@ function LeadForm({
           />
           <textarea
             className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
-            placeholder="Poznámka…"
+            placeholder="Shrnutí (kontext leadu)…"
             value={form.notes ?? ''}
             rows={2}
             onChange={e => set('notes', e.target.value)}
@@ -272,11 +273,16 @@ function CompanyCell({
   lead,
   expanded,
   onToggleExpand,
+  notes,
 }: {
   lead: ClientLead
   expanded?: boolean
   onToggleExpand?: () => void
+  notes?: LeadNote[]
 }) {
+  const noteCount = notes?.length ?? 0
+  const lastNote = notes?.[0]
+
   return (
     <td className="px-3 py-2.5">
       <div className="flex items-center gap-2">
@@ -299,6 +305,15 @@ function CompanyCell({
         {lead.calendar_event_id && (
           <span title="Založeno z kalendáře" className="shrink-0 text-brand-500">
             <CalendarDays size={12} strokeWidth={1.5} />
+          </span>
+        )}
+        {noteCount > 0 && (
+          <span
+            title={lastNote ? `${noteCount}× poznámka — naposledy: ${lastNote.content}` : `${noteCount}× poznámka`}
+            className="flex items-center gap-0.5 shrink-0 text-muted-foreground/70"
+          >
+            <StickyNote size={11} strokeWidth={1.5} />
+            <span className="text-[11px]">{noteCount}</span>
           </span>
         )}
       </div>
@@ -369,6 +384,7 @@ function ValueCell({ lead }: { lead: ClientLead }) {
 
 function LeadRow({
   lead,
+  notes,
   onEdit,
   onDelete,
   onConvert,
@@ -376,12 +392,15 @@ function LeadRow({
   onToggleAnswered,
   onSendPortfolio,
   onOpenCustomMessage,
+  onAddNote,
+  onDeleteNote,
   isPending,
   expanded,
   onToggleExpand,
   highlighted,
 }: {
   lead: ClientLead
+  notes: LeadNote[]
   onEdit: () => void
   onDelete: () => void
   onConvert: () => void
@@ -389,6 +408,8 @@ function LeadRow({
   onToggleAnswered: (val: boolean | null) => void
   onSendPortfolio: () => void
   onOpenCustomMessage: () => void
+  onAddNote: (content: string) => void
+  onDeleteNote: (id: string) => void
   isPending: boolean
   expanded: boolean
   onToggleExpand: () => void
@@ -414,7 +435,7 @@ function LeadRow({
         highlighted ? 'bg-brand-50 ring-2 ring-inset ring-brand-300' : 'hover:bg-slate-50/60'
       }`}
     >
-      <CompanyCell lead={lead} expanded={expanded} onToggleExpand={onToggleExpand} />
+      <CompanyCell lead={lead} expanded={expanded} onToggleExpand={onToggleExpand} notes={notes} />
       <ContactCell lead={lead} />
       <PhoneCell lead={lead} />
       <td className="px-3 py-2.5">
@@ -506,31 +527,96 @@ function LeadRow({
         </div>
       </td>
     </tr>
-    {expanded && <LeadDetailRow lead={lead} />}
+    {expanded && (
+      <LeadDetailRow lead={lead} notes={notes} onAddNote={onAddNote} onDeleteNote={onDeleteNote} isPending={isPending} />
+    )}
     </Fragment>
   )
 }
 
 // Poznámky a kontaktní akce se do tabulky nevejdou — žijí v rozbaleném řádku.
-function LeadDetailRow({ lead }: { lead: ClientLead }) {
+function LeadDetailRow({
+  lead,
+  notes,
+  onAddNote,
+  onDeleteNote,
+  isPending,
+}: {
+  lead: ClientLead
+  notes: LeadNote[]
+  onAddNote: (content: string) => void
+  onDeleteNote: (id: string) => void
+  isPending: boolean
+}) {
   const waHref = lead.phone ? whatsappHref(lead.phone) : null
+  const [draft, setDraft] = useState('')
+
+  const submit = () => {
+    const content = draft.trim()
+    if (!content) return
+    onAddNote(content)
+    setDraft('')
+  }
 
   return (
     <tr className="bg-slate-50/80 border-t border-border">
       <td colSpan={11} className="px-6 py-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-          <div className="space-y-2 min-w-0">
+          <div className="space-y-3 min-w-0">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
               <StickyNote size={12} strokeWidth={1.5} />
               Poznámky
             </p>
-            {lead.notes ? (
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{lead.notes}</p>
+
+            <div className="flex flex-col gap-1.5">
+              <textarea
+                className="w-full text-sm border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none bg-white"
+                placeholder="Nový zápisek z hovoru…"
+                rows={2}
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+              />
+              <button
+                onClick={submit}
+                disabled={!draft.trim() || isPending}
+                className="self-start flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus size={12} strokeWidth={1.5} />
+                Přidat poznámku
+              </button>
+            </div>
+
+            {notes.length > 0 ? (
+              <ul className="space-y-2.5 pt-1">
+                {notes.map((note, i) => (
+                  <li key={note.id} className="relative flex gap-2.5 group/note">
+                    <div className="flex flex-col items-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-600 mt-1.5 shrink-0" />
+                      {i < notes.length - 1 && <div className="w-px flex-1 bg-brand-100 mt-1" />}
+                    </div>
+                    <div className="pb-2.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{formatDate(note.created_at)}</span>
+                        <button
+                          onClick={() => onDeleteNote(note.id)}
+                          disabled={isPending}
+                          className="opacity-0 group-hover/note:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity disabled:opacity-40"
+                          title="Smazat poznámku"
+                        >
+                          <Trash2 size={11} strokeWidth={1.5} />
+                        </button>
+                      </div>
+                      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             ) : (
               <p className="text-sm text-muted-foreground/70">Žádné poznámky.</p>
             )}
+
             <p className="text-xs text-muted-foreground pt-1">
-              Přidáno {new Date(lead.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+              Kontakt přidán {new Date(lead.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
               {lead.calendar_event_id && ' · založeno z kalendáře'}
             </p>
           </div>
@@ -630,7 +716,7 @@ function WaitingLeadForm({
       <td className="px-3 py-2">
         <textarea
           className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
-          placeholder="Poznámka…"
+          placeholder="Shrnutí (kontext leadu)…"
           value={form.notes ?? ''}
           rows={2}
           onChange={e => set('notes', e.target.value)}
@@ -668,6 +754,7 @@ function WaitingLeadForm({
 
 function WaitingRow({
   lead,
+  notes,
   onEdit,
   onConvert,
   onMoveBack,
@@ -676,6 +763,7 @@ function WaitingRow({
   highlighted,
 }: {
   lead: ClientLead
+  notes: LeadNote[]
   onEdit: () => void
   onConvert: () => void
   onMoveBack: () => void
@@ -683,6 +771,8 @@ function WaitingRow({
   isPending: boolean
   highlighted: boolean
 }) {
+  const lastNote = notes[0]
+
   return (
     <tr
       id={`lead-${lead.id}`}
@@ -690,13 +780,13 @@ function WaitingRow({
         highlighted ? 'bg-sky-50 ring-2 ring-inset ring-sky-300' : 'hover:bg-slate-50/60'
       }`}
     >
-      <CompanyCell lead={lead} />
+      <CompanyCell lead={lead} notes={notes} />
       <ContactCell lead={lead} />
       <PhoneCell lead={lead} />
       <EmailCell lead={lead} />
       <td className="px-3 py-2.5">
-        {lead.notes ? (
-          <span className="text-sm text-muted-foreground truncate max-w-[200px] block">{lead.notes}</span>
+        {lastNote ? (
+          <span className="text-sm text-muted-foreground truncate max-w-[200px] block">{lastNote.content}</span>
         ) : (
           <span className="text-muted-foreground/40">—</span>
         )}
@@ -742,12 +832,15 @@ function WaitingRow({
 
 export default function LeadsTable({
   initialLeads,
+  initialNotes,
   focusLeadId,
 }: {
   initialLeads: ClientLead[]
+  initialNotes: LeadNote[]
   focusLeadId?: string
 }) {
   const [leads, setLeads] = useState<ClientLead[]>(initialLeads)
+  const [notes, setNotes] = useState<LeadNote[]>(initialNotes)
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
@@ -755,6 +848,16 @@ export default function LeadsTable({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const notesByLead = useMemo(() => {
+    const map = new Map<string, LeadNote[]>()
+    for (const note of notes) {
+      const list = map.get(note.lead_id)
+      if (list) list.push(note)
+      else map.set(note.lead_id, [note])
+    }
+    return map
+  }, [notes])
 
   // Příchod z kalendáře (`?lead=ID`): kontakt rozbalit, odscrollovat na něj
   // a na chvíli zvýraznit, ať je v široké tabulce vidět, o který řádek jde.
@@ -862,6 +965,21 @@ export default function LeadsTable({
     })
   }
 
+  const handleAddNote = (leadId: string, content: string) => {
+    startTransition(async () => {
+      const created = await addLeadNote(leadId, content)
+      const newNote: LeadNote = { id: created.id, lead_id: leadId, content, created_at: created.created_at }
+      setNotes(prev => [newNote, ...prev])
+    })
+  }
+
+  const handleDeleteNote = (id: string) => {
+    startTransition(async () => {
+      await deleteLeadNote(id)
+      setNotes(prev => prev.filter(n => n.id !== id))
+    })
+  }
+
   return (
     <div className="space-y-8">
       {/* Hovory */}
@@ -948,6 +1066,7 @@ export default function LeadsTable({
                     <LeadRow
                       key={lead.id}
                       lead={lead}
+                      notes={notesByLead.get(lead.id) ?? []}
                       onEdit={() => { setEditingId(lead.id); setAddingNew(false) }}
                       onDelete={() => handleDelete(lead.id)}
                       onConvert={() => handleConvert(lead.id)}
@@ -955,6 +1074,8 @@ export default function LeadsTable({
                       onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
                       onSendPortfolio={() => handleSendPortfolio(lead.id)}
                       onOpenCustomMessage={() => setPortfolioModalLead(lead)}
+                      onAddNote={(content) => handleAddNote(lead.id, content)}
+                      onDeleteNote={handleDeleteNote}
                       isPending={isPending}
                       expanded={expandedId === lead.id}
                       onToggleExpand={() => setExpandedId(prev => prev === lead.id ? null : lead.id)}
@@ -1033,6 +1154,7 @@ export default function LeadsTable({
                     <WaitingRow
                       key={lead.id}
                       lead={lead}
+                      notes={notesByLead.get(lead.id) ?? []}
                       onEdit={() => { setEditingWaitingId(lead.id); setEditingId(null) }}
                       onConvert={() => handleConvert(lead.id)}
                       onMoveBack={() => handleMoveFromWaiting(lead.id)}

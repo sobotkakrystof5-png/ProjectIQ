@@ -1,10 +1,8 @@
-import { getCosts } from '@/app/completed-actions'
+import { getCosts } from '@/app/costs-actions'
 import CostsManager from '@/components/CostsManager'
-import type { Cost } from '@/lib/types'
 
 export default async function NakladyPage() {
-  const rows = await getCosts()
-  const costs = rows as unknown as Cost[]
+  const costs = await getCosts()
 
   return (
     <div className="space-y-6">

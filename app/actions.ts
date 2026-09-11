@@ -512,30 +512,45 @@ export async function markProjectAsCompleted(
     })
   }
 
+  let skippedCostsDueToExisting = false
+
   if (extra.include_costs && p.estimated_costs && p.estimated_costs > 0) {
-    const costName = 'Náklady: ' + (p.description || p.client_name)
-    const costRows = await sql`
-      INSERT INTO costs (name, amount, cost_type, category, description)
-      VALUES (
-        ${costName},
-        ${p.estimated_costs},
-        ${'one_time'},
-        ${'client'},
-        ${'Předpokládané náklady ze zakázky ' + p.client_name}
-      )
-      RETURNING id
-    `
-    const costId = (costRows[0] as { id: string }).id
-    // Provázat s finance transakcí, ať je náklad vidět i v cash flow (jeden integrovaný systém)
-    await sql`
-      INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_cost_id)
-      VALUES (${p.estimated_costs}, 'expense', 'náklady', ${costName}, ${extra.completed_at}, NULL, ${costId})
-    `
-    revalidatePath('/dashboard/naklady')
-    revalidatePath('/hub/finance')
+    // Zakázka může už mít ručně evidované skutečné náklady (panel na detailu
+    // zakázky, Fáze 2) — v tom případě je odhad `estimated_costs` zastaralý
+    // a přičítat ho navrch by vytvořilo duplicitní součet.
+    const existingCosts = await sql`SELECT COUNT(*)::int AS count FROM costs WHERE project_id = ${projectId}`
+    const hasExistingCosts = (existingCosts[0] as { count: number }).count > 0
+
+    if (hasExistingCosts) {
+      skippedCostsDueToExisting = true
+    } else {
+      const costName = 'Náklady: ' + (p.description || p.client_name)
+      const costRows = await sql`
+        INSERT INTO costs (name, amount, cost_type, category, description, project_id)
+        VALUES (
+          ${costName},
+          ${p.estimated_costs},
+          ${'one_time'},
+          ${'client'},
+          ${'Předpokládané náklady ze zakázky ' + p.client_name},
+          ${projectId}
+        )
+        RETURNING id
+      `
+      const costId = (costRows[0] as { id: string }).id
+      // Provázat s finance transakcí, ať je náklad vidět i v cash flow (jeden integrovaný systém)
+      await sql`
+        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_cost_id)
+        VALUES (${p.estimated_costs}, 'expense', 'náklady', ${costName}, ${extra.completed_at}, NULL, ${costId})
+      `
+      revalidatePath('/dashboard/naklady')
+      revalidatePath('/hub/finance')
+    }
   }
 
   revalidatePath('/dashboard/dokoncene')
   revalidatePath('/dashboard/hodnoceni')
   revalidatePath(`/dashboard/${projectId}`)
+
+  return { skippedCostsDueToExisting }
 }

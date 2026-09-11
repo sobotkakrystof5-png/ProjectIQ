@@ -54,6 +54,14 @@ export interface ClientMessage {
   created_at: string | Date
 }
 
+export interface ProjectNote {
+  id: string
+  project_id: string
+  section: string
+  content: string
+  created_at: string | Date
+}
+
 export interface ProgressUpdate {
   id: string
   project_id: string
@@ -131,6 +139,13 @@ export const LEAD_ACTION_TYPE_LABELS: Record<LeadActionType, string> = {
   whatsapp: 'WhatsApp',
   online: 'Online schůzka',
   other: 'Jiné',
+}
+
+export interface LeadNote {
+  id: string
+  lead_id: string
+  content: string
+  created_at: string | Date
 }
 
 export interface ClientLead {
@@ -241,6 +256,13 @@ export interface Cost {
   cost_type: CostType
   category: CostCategory
   description: string | null
+  // Vazba na zakázku (migrace 060) — null pro obecné/osobní náklady mimo
+  // konkrétní zakázku. `ON DELETE SET NULL`, aby smazání zakázky nesmazalo
+  // historii nákladů.
+  project_id: string | null
+  // Zpětný odkaz na finance_transactions, když náklad vznikl automaticky
+  // z byznys výdaje (viz app/hub/finance/finance-actions.ts createTransaction).
+  source_finance_transaction_id: string | null
   created_at: string | Date
 }
 
@@ -501,6 +523,47 @@ export type InvoiceInsert = Omit<
   'id' | 'created_at' | 'updated_at' | 'finance_transaction_id'
 >
 export type InvoiceUpdate = Partial<InvoiceInsert>
+
+// ─── Šablony webu (migrace 061–062) ───────────────────────────────────────────
+
+/** Uživatelova osobní knihovna typů bloků webu. Spravuje se přes /dashboard/sablony. */
+export interface BlockTemplate {
+  id: string
+  name: string
+  description: string | null
+  color: string | null
+  position: number
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
+/**
+ * Konkrétní blok použitý u konkrétní zakázky. `name`/`color` se při přidání
+ * ze šablony zkopírují (denormalizace) — pozdější úprava šablony nebo bloku
+ * na jedné zakázce neovlivní knihovnu ani jiné zakázky.
+ */
+export interface ProjectBlock {
+  id: string
+  project_id: string
+  source_template_id: string | null
+  title: string
+  color: string | null
+  content: string | null
+  position: number
+  created_at: string | Date
+  updated_at: string | Date | null
+}
+
+export const BLOCK_COLOR_PALETTE = [
+  '#3b82f6', // blue
+  '#f59e0b', // amber
+  '#a855f7', // purple
+  '#10b981', // emerald
+  '#ef4444', // red
+  '#64748b', // slate
+  '#ec4899', // pink
+  '#f97316', // orange
+]
 
 export type TaxNewsSource = 'financni_sprava' | 'cssz'
 

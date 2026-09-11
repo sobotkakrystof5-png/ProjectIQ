@@ -2,18 +2,21 @@
 
 import { useState, useTransition } from 'react'
 import { Plus, Trash2, Pencil, Check, X, ChevronDown, RefreshCw, Zap } from 'lucide-react'
-import { createCost, updateCost, deleteCost, type CostPayload } from '@/app/completed-actions'
+import { createCost, updateCost, deleteCost, type CostPayload } from '@/app/costs-actions'
 import { COST_TYPE_LABELS, COST_CATEGORY_LABELS, type Cost, type CostType, type CostCategory } from '@/lib/types'
 
 const COST_TYPES: CostType[] = ['fixed_monthly', 'fixed_annual', 'one_time']
 const COST_CATEGORIES: CostCategory[] = ['client', 'personal', 'all']
 
-const EMPTY_FORM = (type: CostType): CostPayload => ({
+const EMPTY_FORM = (type: CostType, projectId: string | null): CostPayload => ({
   name: '',
   amount: 0,
   cost_type: type,
-  category: 'all',
+  // Náklad založený rovnou u zakázky je vždy klientský — nemá smysl ho
+  // nechávat "obecný" a nutit uživatele kategorii dohledávat.
+  category: projectId ? 'client' : 'all',
   description: null,
+  project_id: projectId,
 })
 
 function fmt(n: number) {
@@ -207,6 +210,7 @@ function CostSection({
   isPending,
   summary,
   defaultType,
+  projectId,
 }: {
   title: string
   icon: React.ReactNode
@@ -223,6 +227,7 @@ function CostSection({
   isPending: boolean
   summary: string
   defaultType: CostType
+  projectId: string | null
 }) {
   return (
     <div>
@@ -259,7 +264,7 @@ function CostSection({
             <tbody>
               {addingType !== null && (
                 <CostForm
-                  initial={EMPTY_FORM(addingType)}
+                  initial={EMPTY_FORM(addingType, projectId)}
                   onSave={onCreate}
                   onCancel={onCancelAdd}
                   isPending={isPending}
@@ -282,6 +287,7 @@ function CostSection({
                       cost_type: cost.cost_type,
                       category: cost.category ?? 'all',
                       description: cost.description,
+                      project_id: cost.project_id,
                     }}
                     onSave={(data) => onSave(cost.id, data)}
                     onCancel={onCancelEdit}
@@ -305,7 +311,7 @@ function CostSection({
   )
 }
 
-export default function CostsManager({ initialCosts }: { initialCosts: Cost[] }) {
+export default function CostsManager({ initialCosts, projectId = null }: { initialCosts: Cost[]; projectId?: string | null }) {
   const [costs, setCosts] = useState<Cost[]>(initialCosts)
   const [addingType, setAddingType] = useState<CostType | null>(null)
   const addingSection: 'fixed' | 'onetime' | null =
@@ -347,7 +353,7 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
   const handleDelete = (id: string) => {
     if (!confirm('Opravdu smazat tento náklad?')) return
     startTransition(async () => {
-      await deleteCost(id)
+      await deleteCost(id, projectId)
       setCosts(prev => prev.filter(c => c.id !== id))
     })
   }
@@ -398,6 +404,7 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
         isPending={isPending}
         summary={`${fmt(monthlySum)} Kč/měs · ${fmt(annualTotal)} Kč/rok`}
         defaultType="fixed_monthly"
+        projectId={projectId}
       />
 
       <CostSection
@@ -420,6 +427,7 @@ export default function CostsManager({ initialCosts }: { initialCosts: Cost[] })
         isPending={isPending}
         summary={`${fmt(oneTimeSum)} Kč celkem`}
         defaultType="one_time"
+        projectId={projectId}
       />
     </div>
   )

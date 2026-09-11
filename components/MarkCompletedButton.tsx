@@ -25,6 +25,7 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
   const [estimatedHours, setEstimatedHours] = useState('')
   const [includeCosts, setIncludeCosts] = useState(hasEstimatedCosts)
   const [done, setDone] = useState(false)
+  const [skippedCosts, setSkippedCosts] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -33,7 +34,7 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
     setError(null)
     startTransition(async () => {
       try {
-        await markProjectAsCompleted(projectId, {
+        const result = await markProjectAsCompleted(projectId, {
           project_type: type,
           completed_at: completedAt,
           difficulty,
@@ -41,6 +42,7 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
           estimated_hours: estimatedHours ? Number(estimatedHours) : null,
           include_costs: includeCosts,
         })
+        setSkippedCosts(result.skippedCostsDueToExisting)
         setDone(true)
         setOpen(false)
       } catch (err) {
@@ -51,9 +53,16 @@ export function MarkCompletedButton({ projectId, projectName, hasEstimatedCosts 
 
   if (done) {
     return (
-      <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5">
-        <CheckCircle size={15} strokeWidth={1.5} />
-        Přidáno do dokončených zakázek
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5">
+          <CheckCircle size={15} strokeWidth={1.5} />
+          Přidáno do dokončených zakázek
+        </div>
+        {skippedCosts && (
+          <p className="text-xs text-muted-foreground px-1">
+            Zakázka už má evidované náklady, přeskakuji odhad.
+          </p>
+        )}
       </div>
     )
   }

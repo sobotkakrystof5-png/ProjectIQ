@@ -9,9 +9,10 @@ import { BusinessSection } from './BusinessSection'
 import {
   getTransactions,
   generateRecurringCostTransactions, generateRecurringCashFlowTransactions,
-  getCosts, getRecurringCashFlow, getFinanceHealthOverview, getMonthSummary, getAllTimeSummary,
+  getRecurringCashFlow, getFinanceHealthOverview, getMonthSummary, getAllTimeSummary,
   getBusinessIncome,
 } from './finance-actions'
+import { getCosts } from '@/app/costs-actions'
 import { getInvoices, getInvoiceProjectOptions } from './invoice-actions'
 import { getTaxNews } from './tax-news-actions'
 import { getPragueTodayISO } from '@/lib/prague-time'

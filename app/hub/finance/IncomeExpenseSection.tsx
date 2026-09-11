@@ -13,8 +13,9 @@ import {
   createTransaction, deleteTransaction, setTransactionDeclared,
   createRecurringCashFlow, deleteRecurringCashFlow,
   type FinanceTransaction, type TransactionType,
-  type RecurringCashFlow, type RecurringFrequency, type Cost, type MonthSummary,
+  type RecurringCashFlow, type RecurringFrequency, type MonthSummary,
 } from './finance-actions'
+import type { Cost } from '@/lib/types'
 import {
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
   LIFE_AREAS, AREA_LABELS, AREA_STYLES, type LifeArea,

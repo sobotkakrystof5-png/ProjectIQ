@@ -9,7 +9,7 @@ import { sendPlainEmail } from '@/lib/email'
 import { notifyClientOfProjectChange } from '@/app/actions'
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
 import { getPragueTodayISO } from '@/lib/prague-time'
-import type { ClientLead, LeadStatus, LeadActionType } from '@/lib/types'
+import type { ClientLead, LeadNote, LeadStatus, LeadActionType } from '@/lib/types'
 
 export type LeadPayload = {
   company_name: string
@@ -32,6 +32,30 @@ export async function getLeads() {
   return await sql`
     SELECT *, next_action_date::text AS next_action_date FROM client_leads ORDER BY created_at DESC
   `
+}
+
+export async function getAllLeadNotes(): Promise<LeadNote[]> {
+  const session = await getServerSession(authOptions)
+  if (!session) return []
+  return (await sql`SELECT * FROM lead_notes ORDER BY created_at DESC`) as unknown as LeadNote[]
+}
+
+export async function addLeadNote(leadId: string, content: string) {
+  await requireAuth()
+  if (!content.trim()) throw new Error('Poznámka nemůže být prázdná.')
+  const rows = await sql`
+    INSERT INTO lead_notes (lead_id, content)
+    VALUES (${leadId}, ${content.trim()})
+    RETURNING id, created_at
+  `
+  revalidatePath('/dashboard/calls')
+  return rows[0] as { id: string; created_at: string }
+}
+
+export async function deleteLeadNote(id: string) {
+  await requireAuth()
+  await sql`DELETE FROM lead_notes WHERE id = ${id}`
+  revalidatePath('/dashboard/calls')
 }
 
 export async function createLead(payload: LeadPayload) {

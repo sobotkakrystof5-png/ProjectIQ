@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import type { ProjectType, CostType, CostCategory } from '@/lib/types'
+import type { ProjectType } from '@/lib/types'
 
 export type CompletedProjectPayload = {
   title: string
@@ -22,24 +22,10 @@ export type CompletedProjectPayload = {
   project_type: ProjectType
 }
 
-export type CostPayload = {
-  name: string
-  amount: number
-  cost_type: CostType
-  category: CostCategory
-  description: string | null
-}
-
 export async function getCompletedProjects() {
   const session = await getServerSession(authOptions)
   if (!session) return []
   return await sql`SELECT * FROM completed_projects ORDER BY completed_at DESC`
-}
-
-export async function getCosts() {
-  const session = await getServerSession(authOptions)
-  if (!session) return []
-  return await sql`SELECT * FROM costs ORDER BY cost_type, created_at DESC`
 }
 
 export async function getProjectSurveys() {
@@ -133,70 +119,6 @@ export async function deleteCompletedProject(id: string) {
   // nenavázaná na nic, ale dál započítaná do příjmů.
   await sql`DELETE FROM finance_transactions WHERE source_completed_project_id = ${id}`
   await sql`DELETE FROM completed_projects WHERE id = ${id}`
-  revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/hub/finance')
-}
-
-export async function createCost(payload: CostPayload) {
-  await requireAuth()
-  const rows = await sql`
-    INSERT INTO costs (name, amount, cost_type, category, description)
-    VALUES (${payload.name}, ${payload.amount}, ${payload.cost_type}, ${payload.category}, ${payload.description})
-    RETURNING id
-  `
-  // Jednorázové náklady → okamžitě do financí
-  if (payload.cost_type === 'one_time' && payload.amount > 0) {
-    const newId = (rows[0] as { id: string }).id
-    await sql`
-      INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_cost_id)
-      VALUES (${payload.amount}, 'expense', 'náklady', ${payload.name}, now()::date, NULL, ${newId})
-    `
-  }
-  revalidatePath('/dashboard/naklady')
-  revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/hub/finance')
-}
-
-export async function updateCost(id: string, payload: CostPayload) {
-  await requireAuth()
-  await sql`
-    UPDATE costs SET
-      name = ${payload.name},
-      amount = ${payload.amount},
-      cost_type = ${payload.cost_type},
-      category = ${payload.category},
-      description = ${payload.description}
-    WHERE id = ${id}
-  `
-  // Sync linked finance transaction (platí jen pro one_time) — upsert ze
-  // stejného důvodu jako u completed_projects výše.
-  if (payload.cost_type === 'one_time' && payload.amount > 0) {
-    const updated = await sql`
-      UPDATE finance_transactions
-      SET amount = ${payload.amount}, note = ${payload.name}
-      WHERE source_cost_id = ${id}
-      RETURNING id
-    `
-    if (updated.length === 0) {
-      await sql`
-        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_cost_id)
-        VALUES (${payload.amount}, 'expense', 'náklady', ${payload.name}, now()::date, NULL, ${id})
-      `
-    }
-  } else {
-    await sql`DELETE FROM finance_transactions WHERE source_cost_id = ${id}`
-  }
-  revalidatePath('/dashboard/naklady')
-  revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/hub/finance')
-}
-
-export async function deleteCost(id: string) {
-  await requireAuth()
-  // Smazat provázanou finanční transakci — náklad a jeho záznam v cash flow jsou jeden celek
-  await sql`DELETE FROM finance_transactions WHERE source_cost_id = ${id}`
-  await sql`DELETE FROM costs WHERE id = ${id}`
-  revalidatePath('/dashboard/naklady')
   revalidatePath('/dashboard/dokoncene')
   revalidatePath('/hub/finance')
 }
