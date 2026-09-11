@@ -12,20 +12,21 @@ export async function getProjectNotes(projectId: string): Promise<ProjectNote[]>
   `) as unknown as ProjectNote[]
 }
 
-export async function addProjectNote(projectId: string, section: string, content: string) {
+export async function addProjectNote(projectId: string, author: string, content: string) {
   await requireAuth()
-  const trimmedSection = section.trim()
+  const trimmedAuthor = author.trim()
   const trimmedContent = content.trim()
-  if (!trimmedSection) throw new Error('Název sekce nemůže být prázdný.')
+  if (!trimmedAuthor) throw new Error('Jméno autora nemůže být prázdné.')
   if (!trimmedContent) throw new Error('Poznámka nemůže být prázdná.')
 
   const rows = await sql`
-    INSERT INTO project_notes (project_id, section, content)
-    VALUES (${projectId}, ${trimmedSection}, ${trimmedContent})
-    RETURNING id, created_at
+    INSERT INTO project_notes (project_id, author, content, progress_snapshot)
+    SELECT ${projectId}, ${trimmedAuthor}, ${trimmedContent}, progress FROM projects WHERE id = ${projectId}
+    RETURNING id, created_at, progress_snapshot
   `
+  if (!rows.length) throw new Error('Zakázka nebyla nalezena.')
   revalidatePath(`/dashboard/${projectId}`)
-  return rows[0] as { id: string; created_at: string }
+  return rows[0] as { id: string; created_at: string; progress_snapshot: number | null }
 }
 
 export async function deleteProjectNote(id: string, projectId: string) {

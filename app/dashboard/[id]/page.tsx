@@ -54,8 +54,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   ])
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-start justify-between gap-4 mb-8">
+    <div>
+      <div className="max-w-2xl flex items-start justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard"
@@ -86,13 +86,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      <div className="space-y-4">
-        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Poznámky k zakázce</h2>
-          <p className="text-xs text-muted-foreground mb-5">Jen pro tebe — klient je nikdy neuvidí.</p>
-          <ProjectNotesPanel projectId={project.id} initialNotes={projectNotes} />
-        </div>
-
+      <div className="max-w-2xl space-y-4">
         <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">Editace zakázky</h2>
           <ProjectForm project={project} />
@@ -230,12 +224,19 @@ export default async function ProjectDetailPage({ params }: PageProps) {
             hasEstimatedCosts={project.estimated_costs != null && Number(project.estimated_costs) > 0}
           />
         </div>
+      </div>
 
-        <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">Nebezpečná zóna</h2>
-          <p className="text-xs text-muted-foreground mb-4">Smazání zakázky je nevratné.</p>
-          <DeleteButton projectId={project.id} />
-        </div>
+      {/* ── Poznámky ze schůzek a hovorů — vlastní široký panel ── */}
+      <div className="mt-4 bg-white border border-border rounded-2xl p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Poznámky ze schůzek a hovorů</h2>
+        <p className="text-xs text-muted-foreground mb-5">Jen pro tebe — klient je nikdy neuvidí. Stav zakázky se sem jen zrcadlí, měníš ho v Editaci zakázky výše.</p>
+        <ProjectNotesPanel projectId={project.id} initialNotes={projectNotes} currentProgress={project.progress} />
+      </div>
+
+      <div className="max-w-2xl mt-4 bg-white border border-border rounded-2xl p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">Nebezpečná zóna</h2>
+        <p className="text-xs text-muted-foreground mb-4">Smazání zakázky je nevratné.</p>
+        <DeleteButton projectId={project.id} />
       </div>
     </div>
   )

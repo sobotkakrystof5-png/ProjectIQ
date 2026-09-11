@@ -57,8 +57,9 @@ export interface ClientMessage {
 export interface ProjectNote {
   id: string
   project_id: string
-  section: string
+  author: string
   content: string
+  progress_snapshot: number | null
   created_at: string | Date
 }
 

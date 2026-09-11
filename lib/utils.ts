@@ -23,6 +23,17 @@ export function formatDate(date: string | Date | null): string {
   }).format(date instanceof Date ? date : new Date(date))
 }
 
+export function formatDateTime(date: string | Date | null): string {
+  if (!date) return '—'
+  return new Intl.DateTimeFormat('cs-CZ', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date instanceof Date ? date : new Date(date))
+}
+
 function appBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL ||
