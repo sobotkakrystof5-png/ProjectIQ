@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { AlertCircle, FileText, Loader2, Paperclip, Sparkles, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertCircle, FileText, Loader2, Paperclip, Sparkles, UploadCloud, X } from 'lucide-react'
 import { MAX_PDF_BYTES, MAX_PDF_LABEL, INVOICE_CURRENCIES } from '@/lib/invoice-constants'
+import { usePdfDrop } from '@/lib/use-pdf-drop'
 import type { InvoiceAiExtract } from '@/lib/types'
 import type { InvoiceProjectOption } from '@/app/hub/finance/invoice-actions'
 
@@ -121,6 +122,7 @@ export function InvoiceFields({
   projects,
   disabled,
   onAiExtracted,
+  autoParse,
 }: {
   value: InvoiceFormState
   onChange: (next: InvoiceFormState) => void
@@ -134,6 +136,8 @@ export function InvoiceFields({
   disabled?: boolean
   /** Dostane surový výstup AI přepisu, aby se dal uložit k faktuře */
   onAiExtracted?: (extract: InvoiceAiExtract) => void
+  /** Nově přiložené PDF přečte AI samo, bez klikání na „Načíst z PDF" */
+  autoParse?: boolean
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isParsing, setIsParsing] = useState(false)
@@ -141,17 +145,22 @@ export function InvoiceFields({
   const set = <K extends keyof InvoiceFormState>(key: K, v: InvoiceFormState[K]) =>
     onChange({ ...value, [key]: v })
 
+  // Přepis běží na pozadí a uživatel může mezitím psát — kdyby se výsledek
+  // skládal na `value` z doby spuštění, jeho úpravy by zmizely.
+  const valueRef = useRef(value)
+  valueRef.current = value
+
   /**
    * Nechá AI přečíst vybrané PDF a předvyplnit pole. Selhání jen zobrazí
    * hlášku — formulář zůstane vyplnitelný ručně, na tom přepis nic nemění.
    */
-  async function runAiParse() {
-    if (!file || isParsing) return
+  async function runAiParse(target: File | null = file) {
+    if (!target || isParsing) return
     setIsParsing(true)
     setParseError(null)
     try {
       const fd = new FormData()
-      fd.set('pdf', file)
+      fd.set('pdf', target)
       const res = await fetch('/api/invoices/parse', { method: 'POST', body: fd })
       const json = (await res.json()) as {
         success: boolean
@@ -162,7 +171,7 @@ export function InvoiceFields({
         setParseError(json.error ?? 'Přepis se nepodařil — vyplň fakturu ručně')
         return
       }
-      onChange(applyInvoiceExtract(value, json.data))
+      onChange(applyInvoiceExtract(valueRef.current, json.data))
       onAiExtracted?.(json.data)
     } catch {
       setParseError('Přepis se nepodařil — vyplň fakturu ručně')
@@ -171,8 +180,38 @@ export function InvoiceFields({
     }
   }
 
+  /**
+   * Nově přiložené PDF pošleme rovnou AI — ať přišlo přetažením, výběrem,
+   * nebo s ním modal rovnou otevřel. V editaci faktury se `autoParse`
+   * nezapíná: tam by přepis přebil ručně opravená pole.
+   */
+  const autoParsedRef = useRef<File | null>(null)
+  useEffect(() => {
+    if (!autoParse || disabled || !file || autoParsedRef.current === file) return
+    autoParsedRef.current = file
+    void runAiParse(file)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, autoParse, disabled])
+
+  const { isOver, dropProps } = usePdfDrop({
+    onFile: f => {
+      onFileChange(f)
+      setParseError(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    },
+    onReject: setParseError,
+    disabled,
+  })
+
   return (
-    <div className="space-y-3">
+    <div className="relative space-y-3" {...dropProps}>
+      {isOver && (
+        <div className="absolute -inset-2 z-10 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/95 text-sm font-medium text-emerald-700 pointer-events-none">
+          <UploadCloud size={16} strokeWidth={1.5} />
+          Pusť PDF — vyplní se samo
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={labelClass}>Číslo faktury *</label>
@@ -380,7 +419,7 @@ export function InvoiceFields({
             className="w-full flex items-center justify-center gap-2 border border-dashed border-border rounded-lg px-3 py-3 text-sm text-muted-foreground hover:border-emerald-400 hover:text-emerald-700 transition-colors"
           >
             <Paperclip size={14} strokeWidth={1.5} />
-            Vybrat PDF (max {MAX_PDF_LABEL})
+            Přetáhni sem PDF nebo vyber ze souborů (max {MAX_PDF_LABEL})
           </button>
         )}
 
@@ -388,7 +427,7 @@ export function InvoiceFields({
         {file && (
           <button
             type="button"
-            onClick={runAiParse}
+            onClick={() => runAiParse()}
             disabled={disabled || isParsing}
             className="w-full flex items-center justify-center gap-2 mt-2 px-3 py-2 text-sm font-medium text-emerald-700 border border-emerald-200 bg-emerald-50/60 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50"
           >

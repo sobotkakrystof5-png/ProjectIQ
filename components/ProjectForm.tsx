@@ -580,6 +580,7 @@ export function ProjectForm({ project, business = 'vizeon' }: ProjectFormProps) 
                   }}
                   onAiExtracted={setInvoiceAi}
                   disabled={isPending}
+                  autoParse
                 />
               </div>
             )}

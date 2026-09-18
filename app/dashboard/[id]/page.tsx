@@ -199,7 +199,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
               amount: project.price !== null ? String(project.price) : '',
             }}
             title="Faktury zakázky"
-            description="Doklady k téhle zakázce. Zaplacená faktura založí příjem v přiznané linii."
+            description="Doklady k téhle zakázce — PDF stačí přetáhnout kamkoliv na tuhle kartu, AI z něj vyplní pole. Zaplacená faktura založí příjem v přiznané linii."
             paidLabel="Zaplacené"
           />
         </div>

@@ -38,6 +38,7 @@ export function InvoiceUploadModal({
   invoice,
   projects,
   defaults,
+  initialFile,
 }: {
   onClose: () => void
   /** Když je vyplněná, modal edituje místo zakládání */
@@ -45,12 +46,14 @@ export function InvoiceUploadModal({
   /** Když chybí, výběr zakázky se nezobrazí — faktura patří k zakázce z `defaults` */
   projects?: InvoiceProjectOption[]
   defaults?: Partial<InvoiceFormState>
+  /** PDF přetažené na archiv — modal se s ním otevře a rovnou ho nechá přečíst */
+  initialFile?: File | null
 }) {
   const router = useRouter()
   const [form, setForm] = useState<InvoiceFormState>(
     invoice ? invoiceToForm(invoice) : emptyInvoiceForm(defaults)
   )
-  const [file, setFile] = useState<File | null>(null)
+  const [file, setFile] = useState<File | null>(initialFile ?? null)
   const [removePdf, setRemovePdf] = useState(false)
   /** Co z PDF vyčetla AI — ukládá se k faktuře kvůli dohledatelnosti */
   const [aiExtracted, setAiExtracted] = useState<InvoiceAiExtract | null>(null)
@@ -124,6 +127,7 @@ export function InvoiceUploadModal({
             onRemoveExistingPdf={() => setRemovePdf(true)}
             projects={projects}
             disabled={isSaving}
+            autoParse={!invoice}
           />
 
           {error && (

@@ -3,10 +3,12 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import {
-  FileText, Plus, Trash2, Pencil, ExternalLink, AlertTriangle, Clock, Loader2,
+  FileText, Plus, Trash2, Pencil, ExternalLink, AlertTriangle, Clock, Loader2, UploadCloud,
 } from 'lucide-react'
 import { InvoiceUploadModal } from '@/components/InvoiceUploadModal'
+import { usePdfDrop } from '@/lib/use-pdf-drop'
 import { deleteInvoice } from '@/app/hub/finance/invoice-actions'
 import type { InvoiceArchiveData, InvoiceListItem, InvoiceProjectOption } from '@/app/hub/finance/invoice-actions'
 import type { InvoiceFormState } from '@/components/InvoiceFields'
@@ -147,7 +149,7 @@ export function InvoiceArchive({
   paidLabel?: string
 }) {
   const router = useRouter()
-  const [modal, setModal] = useState<{ invoice?: InvoiceListItem } | null>(null)
+  const [modal, setModal] = useState<{ invoice?: InvoiceListItem; file?: File } | null>(null)
   const [isPending, startTransition] = useTransition()
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -163,8 +165,23 @@ export function InvoiceArchive({
 
   const empty = data.paid.length === 0 && data.outstanding.length === 0
 
+  // Fakturu jde hodit rovnou na archiv — odkudkoliv (Finder, příloha mailu).
+  // Modal se otevře s PDF už přiloženým a AI ho rovnou přečte.
+  const { isOver, dropProps } = usePdfDrop({
+    onFile: file => setModal({ file }),
+    onReject: message => toast.error(message),
+  })
+
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4" {...dropProps}>
+      {isOver && (
+        <div className="absolute -inset-3 z-20 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/95 pointer-events-none">
+          <UploadCloud size={20} strokeWidth={1.5} className="text-emerald-600" />
+          <span className="text-sm font-medium text-emerald-700">Pusť fakturu sem</span>
+          <span className="text-xs text-emerald-600">PDF přečte AI a předvyplní pole</span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -184,7 +201,7 @@ export function InvoiceArchive({
 
       {empty ? (
         <p className="text-xs text-muted-foreground py-3">
-          Zatím žádné faktury. Nahraj hotové PDF, nebo fakturu zadej ručně.
+          Zatím žádné faktury. Přetáhni sem PDF odkudkoliv — přečte ho AI — nebo fakturu zadej ručně.
         </p>
       ) : (
         <div className="space-y-4">
@@ -262,6 +279,7 @@ export function InvoiceArchive({
           invoice={modal.invoice}
           projects={projects}
           defaults={defaults}
+          initialFile={modal.file}
         />
       )}
     </div>
