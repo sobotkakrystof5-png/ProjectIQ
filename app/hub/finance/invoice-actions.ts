@@ -7,6 +7,7 @@ import {
   parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow,
 } from '@/lib/invoices'
 import { projectPath, toBusiness } from '@/lib/business'
+import type { InvoiceAiExtract } from '@/lib/types'
 
 /**
  * Archiv faktur. Faktura je doklad, ne příjem — do ledgeru vstupuje až
@@ -203,6 +204,7 @@ export async function getInvoiceProjectOptions(): Promise<InvoiceProjectOption[]
 
 function revalidateInvoicePaths(projectId: string | null) {
   revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/faktury')
   if (projectId) {
     revalidatePath(`/dashboard/${projectId}`)
     revalidatePath(`/alteno/${projectId}`)
@@ -256,4 +258,131 @@ function invoiceErrorMessage(err: unknown): string {
   const code = (err as { code?: string })?.code
   if (code === '23505') return 'Faktura s tímhle číslem už v archivu je'
   return 'Nepodařilo se uložit fakturu'
+}
+
+// ─── Evidence faktur (/dashboard/faktury) ────────────────────────────────────
+
+/**
+ * Faktura v evidenci. Proti `InvoiceListItem` navíc nese popis zakázky —
+ * v evidenci je „jméno zakázky" hlavní orientační bod, samotné jméno klienta
+ * u opakovaných zakázek nestačí.
+ */
+export interface InvoiceRegistryItem extends InvoiceListItem {
+  project_description: string | null
+}
+
+type RegistryRow = Row & { project_description: string | null }
+
+function toRegistryItem(row: RegistryRow): InvoiceRegistryItem {
+  const { project_description, ...base } = row
+  return { ...toItem(base), project_description }
+}
+
+/**
+ * Všechny faktury, co kdy vznikly — bez filtru roku a bez dělení na
+ * zaplacené/pohledávky. Evidence je archiv dokladů: filtrování si řídí
+ * uživatel v UI, server vrací kompletní pravdu.
+ *
+ * Řadí se podle data vystavení (ne zaplacení) — v archivu hledáš doklad
+ * podle toho, kdy vznikl.
+ */
+export async function getAllInvoices(): Promise<InvoiceRegistryItem[]> {
+  await requireAuth()
+
+  const rows = await sql`
+    SELECT
+      i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
+      i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
+      i.currency, i.note, i.pdf_filename, i.pdf_size,
+      (i.pdf_data IS NOT NULL) AS has_pdf,
+      p.business AS project_business,
+      p.client_name AS project_client_name,
+      p.description AS project_description,
+      COALESCE((
+        SELECT COUNT(*) FROM finance_transactions t
+        WHERE t.source_project_id = i.project_id
+          AND t.type = 'income'
+          AND t.user_id IS NULL
+          AND (i.finance_transaction_id IS NULL OR t.id <> i.finance_transaction_id)
+      ), 0)::int AS other_income_count
+    FROM invoices i
+    LEFT JOIN projects p ON p.id = i.project_id
+    ORDER BY i.issued_on DESC, i.created_at DESC
+  `
+
+  return (rows as RegistryRow[]).map(toRegistryItem)
+}
+
+/** Příjem v ledgeru, který fakturu zastupuje — na detailu ať je vidět, co doklad udělal s daněmi. */
+export interface InvoiceLedgerEntry {
+  id: string
+  amount: number
+  date: string
+  category: string
+  note: string | null
+  /** true = transakci založila tahle faktura; false = převzala ji po zakázce */
+  owned_by_invoice: boolean
+}
+
+/** Faktura se vším, co je o ní uloženo — včetně surového AI přepisu a vazby na ledger. */
+export interface InvoiceDetail extends InvoiceRegistryItem {
+  ai_extracted: InvoiceAiExtract | null
+  created_at: string
+  updated_at: string | null
+  ledger: InvoiceLedgerEntry | null
+}
+
+export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null> {
+  await requireAuth()
+
+  const rows = await sql`
+    SELECT
+      i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
+      i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
+      i.currency, i.note, i.pdf_filename, i.pdf_size,
+      (i.pdf_data IS NOT NULL) AS has_pdf,
+      i.ai_extracted,
+      i.created_at::text, i.updated_at::text,
+      i.finance_transaction_id::text,
+      p.business AS project_business,
+      p.client_name AS project_client_name,
+      p.description AS project_description,
+      COALESCE((
+        SELECT COUNT(*) FROM finance_transactions t
+        WHERE t.source_project_id = i.project_id
+          AND t.type = 'income'
+          AND t.user_id IS NULL
+          AND (i.finance_transaction_id IS NULL OR t.id <> i.finance_transaction_id)
+      ), 0)::int AS other_income_count
+    FROM invoices i
+    LEFT JOIN projects p ON p.id = i.project_id
+    WHERE i.id = ${id}
+    LIMIT 1
+  `
+
+  const row = rows[0] as
+    | (RegistryRow & {
+        ai_extracted: InvoiceAiExtract | null
+        created_at: string
+        updated_at: string | null
+        finance_transaction_id: string | null
+      })
+    | undefined
+  if (!row) return null
+
+  const { ai_extracted, created_at, updated_at, finance_transaction_id, ...registryRow } = row
+
+  let ledger: InvoiceLedgerEntry | null = null
+  if (finance_transaction_id) {
+    const txRows = await sql`
+      SELECT id::text, amount::float AS amount, date::text, category, note,
+             (source_invoice_id IS NOT NULL AND source_invoice_id::text = ${id}) AS owned_by_invoice
+      FROM finance_transactions
+      WHERE id = ${finance_transaction_id}
+      LIMIT 1
+    `
+    ledger = ((txRows[0] as InvoiceLedgerEntry | undefined) ?? null)
+  }
+
+  return { ...toRegistryItem(registryRow), ai_extracted, created_at, updated_at, ledger }
 }

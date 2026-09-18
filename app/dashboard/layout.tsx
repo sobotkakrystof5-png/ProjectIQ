@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { CalendarDays, PhoneCall, CheckCircle2, Receipt, Inbox, Star, Bell, LayoutGrid, Layers } from 'lucide-react'
+import { CalendarDays, PhoneCall, CheckCircle2, Receipt, Inbox, Star, Bell, LayoutGrid, Layers, FileText } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { LogoutButton } from './LogoutButton'
@@ -38,7 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="min-h-screen bg-background">
       <header className="bg-white border-b border-border sticky top-0 z-10 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ height: '60px' }}>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <MobileNav business="vizeon" pendingCount={vizeonCount} />
             <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0">
               <div className="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center shadow-sm">
@@ -51,7 +51,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </div>
               <span className="font-semibold text-brand-800 text-[15px] tracking-tight">ZakazIQ</span>
             </Link>
-            <nav className="hidden sm:flex items-center gap-0.5">
+            <nav className="hidden sm:flex items-center gap-0.5 overflow-x-auto no-scrollbar">
               <Link
                 href="/hub"
                 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
@@ -113,6 +113,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
               >
                 <Receipt size={14} strokeWidth={1.5} />
                 Náklady
+              </Link>
+              <Link
+                href="/dashboard/faktury"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+              >
+                <FileText size={14} strokeWidth={1.5} />
+                Faktury
               </Link>
               <Link
                 href="/dashboard/sablony"

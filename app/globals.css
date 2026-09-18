@@ -47,4 +47,12 @@
   .card-hover {
     @apply transition-all duration-200 hover:shadow-md hover:border-brand-200;
   }
+  /* Vodorovně posuvná navigace bez pruhu scrollbaru pod položkami */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

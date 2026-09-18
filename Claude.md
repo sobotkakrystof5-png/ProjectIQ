@@ -186,6 +186,8 @@ app/
 │   ├── page.tsx                 ← Přehled zakázek
 │   ├── new/page.tsx             ← Nová zakázka
 │   ├── calendar/page.tsx        ← Globální kalendář (všechny projekty)
+│   ├── faktury/page.tsx         ← Evidence všech vystavených faktur (napříč byznysy)
+│   ├── faktury/[id]/page.tsx    ← Detail faktury — kompletní přepsané údaje + PDF + vazba na ledger
 │   └── [id]/page.tsx           ← Detail + editace zakázky + FeedbackFeed + ConsultationCalendar
 ├── alteno/                      ← Sekce ALTENO (AI automatizace) — jádro stejné jako VIZEON
 │   ├── layout.tsx               ← Auth + ALTENO nav (Zakázky | Rezervace), amber branding
@@ -214,6 +216,8 @@ components/
 ├── BookingModal.tsx             ← Klientská rezervace: kalendář + sloty + kanál + email
 ├── ConsultationCalendar.tsx     ← Admin: kalendář konzultací per projekt
 ├── SmartCalendar.tsx            ← Admin: globální kalendář (Month/Week/Day)
+├── InvoiceRegistry.tsx          ← Admin: evidence faktur (filtry, souhrny po měnách, drag-and-drop PDF)
+├── InvoiceDetailActions.tsx     ← Admin: úprava a smazání faktury z jejího detailu
 └── AdminEventModal.tsx          ← Admin: vytvoření manuální události/blokace
 
 lib/
@@ -263,6 +267,21 @@ migrations/                      ← Inkrementální SQL migrace nad základním
 - Globální kalendář (Month/Week/Day) napříč VIZEON projekty — konzultace + manuální události/blokace
 - Admin může vytvořit ruční událost nebo blokaci přes `AdminEventModal`
 
+### `/dashboard/faktury`
+- **Evidence všech vystavených faktur** — archiv dokladů, řazený podle data vystavení a seskupený po rocích
+- Filtry: hledání (číslo / klient / zakázka / IČO / poznámka), rok, stav (Všechny | Zaplacené | Nezaplacené | Po splatnosti)
+- Souhrn nad filtrovaným výběrem: počet, vyfakturováno, zaplaceno, nezaplaceno — **sčítá se po měnách**, CZK a EUR se nikdy neslučují do jednoho čísla
+- Nová faktura přes tlačítko nebo přetažením PDF na stránku (AI přepis přes `InvoiceUploadModal`)
+- **Záměrně napříč byznysy** — VIZEON i ALTENO fakturuje jedno IČO pod jedním přiznáním, rozdělený archiv by znamenal hledat doklad na špatném místě
+- Komponenta `InvoiceRegistry.tsx`; data z `getAllInvoices()` v `app/hub/finance/invoice-actions.ts` (veškerá logika faktur žije tam, tahle sekce je jen další pohled)
+
+### `/dashboard/faktury/[id]`
+- Kompletní přepis jedné faktury: číslo, částka/měna, vystaveno/splatnost/zaplaceno, odběratel + IČO + DIČ, poznámka
+- Náhled přiloženého PDF (`<object>` + odkaz na `/api/invoices/[id]/pdf`), vazba na zakázku, úprava a smazání
+- **Přiznaná linie** — jestli faktura v ledgeru příjem založila, nebo jen převzala ten od zakázky (`owned_by_invoice`); bez `paid_on` žádný nemá
+- **Co z PDF přečetla AI** — surový `ai_extracted` pro dohledatelnost; pole, kde se uložená hodnota od přepisu liší, jsou označená jako ručně upravená. Platí vždy uložené údaje, ne přepis
+- Data z `getInvoiceDetail()`; akce v `InvoiceDetailActions.tsx`
+
 ### `/alteno` — sekce ALTENO (AI automatizace)
 Druhý byznys vedle VIZEONu. **Stejný software jako jádro VIZEON dashboardu**, jen nad daty s `business = 'alteno'` a s vlastním brandingem (amber/orange místo brand-*). Rozsah je záměrně jen jádro:
 
@@ -273,11 +292,11 @@ Druhý byznys vedle VIZEONu. **Stejný software jako jádro VIZEON dashboardu**,
 | `/alteno/[id]` | Detail + editace, sdílení klientského linku, vzkazy, historie postupu, feedback, konzultace, smazání |
 | `/alteno/rezervace` | Inbox nepotvrzených poptávek z alteno.cz — potvrdit jako zakázku / smazat |
 
-Co ALTENO **nemá** (zůstává jen ve VIZEONu): Kalendář, Hovory, Dokončené, Hodnocení, Náklady. Proto detail ALTENO zakázky nenabízí „Přidat do dokončených" a `ProjectForm` tam skrývá checkbox „Ihned přidat do dokončených".
+Co ALTENO **nemá** (zůstává jen ve VIZEONu): Kalendář, Hovory, Dokončené, Hodnocení, Náklady, Faktury. Proto detail ALTENO zakázky nenabízí „Přidat do dokončených" a `ProjectForm` tam skrývá checkbox „Ihned přidat do dokončených".
 
 **Oddělení dat:** `projects.business` a `calendar_events.business` (`'vizeon' | 'alteno'`, default `'vizeon'`). VIZEON stránky filtrují `business = 'vizeon'`, ALTENO `= 'alteno'`. `consultation_slots` vlastní sloupec nemá — business se dohledá joinem přes `projects`.
 
-**Sdílené napříč oběma:** klientský portál `/p/[token]`, notifikace (`/dashboard/notifications`), profil (`/dashboard/profil` — statistiky napříč byznysy), Hub finance a DB overlap guard na termínech (jeden člověk = jeden diář, dvě konzultace ve stejný čas nelze rezervovat ani napříč byznysy).
+**Sdílené napříč oběma:** klientský portál `/p/[token]`, notifikace (`/dashboard/notifications`), profil (`/dashboard/profil` — statistiky napříč byznysy), evidence faktur (`/dashboard/faktury` — jedno IČO, jedno přiznání), Hub finance a DB overlap guard na termínech (jeden člověk = jeden diář, dvě konzultace ve stejný čas nelze rezervovat ani napříč byznysy).
 
 `/dashboard/[id]` a `/alteno/[id]` se navzájem přesměrovávají podle `business` — starší odkazy z notifikací a emailů tak nikdy nekončí na 404.
 
