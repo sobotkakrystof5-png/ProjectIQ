@@ -10,11 +10,11 @@ function constantTimeMatch(provided: string, expected: string): boolean {
   return timingSafeEqual(a, b)
 }
 
-export function verifyApiKey(req: NextRequest, envVarName: string): boolean {
+export function verifyApiKey(req: NextRequest, envVarName: string, headerName = 'x-api-key'): boolean {
   const expected = process.env[envVarName]
   if (!expected) return false
 
-  const provided = req.headers.get('x-api-key')
+  const provided = req.headers.get(headerName)
   if (!provided) return false
 
   return constantTimeMatch(provided, expected)
