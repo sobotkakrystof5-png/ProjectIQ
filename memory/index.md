@@ -19,6 +19,7 @@
 | [`../docs/workspace/PLAN.md`](../docs/workspace/PLAN.md) | Produktový a designový plán Workspace — zdroj pravdy pro rozsah (export z Claude Docs; při rozporu platí Rozhodnutí v memory.md) | Při každém sezení Workspace | Novým exportem, když se změní plán |
 | `../.claude/skills/zakaziq-*` | Projektové skilly: `design-dilky` (UI), `workspace-backend` (DB/API/Clerk/Stripe), `ux-texty-cs` (texty), `memory` (rituál sezení nad `memory/`) | Claude Code (podle úlohy) | Když se mění pravidla oblasti |
 | [`../new - area of zakaziq/prompty/00-README.md`](<../new - area of zakaziq/prompty/00-README.md>) | Prompty sezení S00–S19 pro výstavbu Workspace + landing page (jedno sezení = jedna konverzace) | Na začátku každého sezení Workspace | Když se mění plán sezení |
+| [`../docs/landing/PROJECT-BRIEF.md`](../docs/landing/PROJECT-BRIEF.md) | Brief landing page (S03): anti-šablona, sekce s texty, kontakt, CSP, SEO zadání pro S05 | S04, S05 a každá změna landing page | Když se mění struktura nebo texty landing page |
 | [`../docs/CLAUDE_BOOKING_PROMPT.md`](../docs/CLAUDE_BOOKING_PROMPT.md) | Historický prompt pro booking a komunikaci s klienty (z doby ProjectIQ) | Jen pro kontext historie | Ne |
 | `../graphify-out/` | Znalostní graf kódu (gitignored, lokální) — `/graphify` | Při orientaci v architektuře | Přegenerováním |
 
@@ -43,6 +44,7 @@
 | Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `middleware.ts`, `lib/security/`, `.claude/security/` |
 | Crony | `vercel.json`, `app/api/cron/**` |
 | Hub (osobní moduly) | `app/hub/**`, `components/HubSidebarNav.tsx` |
+| Landing page | `../docs/landing/PROJECT-BRIEF.md`, `app/(marketing)/` |
 | Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `AGENTS.md` → Část B |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | `AGENTS.md` → Databázový model + Katalog tabulek; detail v `migrations/` |

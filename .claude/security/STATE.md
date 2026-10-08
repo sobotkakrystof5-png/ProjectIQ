@@ -94,7 +94,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
 | Admin CSP → vynucená | Report-Only nic nechrání. Potřeba dynamický `/login` (souhlas se zásahem do adminu) a 404 | Kryštof + Claude | do S19 |
-| Landing (`app/(marketing)`) do vynucené CSP | stránky vznikají v S04; layout musí být dynamický (nonce) a cesty přidat do `ENFORCED_PREFIXES` | S04 | S04 |
+| Landing (`app/(marketing)`) do vynucené CSP | rozhodnuto (DECISIONS #007, R-033): layout `force-dynamic`, `/` a právní stránky jako přesné cesty, ne prefix `/` | S04 | S04 |
 | Clerk domény do CSP | S07 — `script-src` (strict-dynamic stačí), `connect-src`, `frame-src`, `img-src` podle instance; popup OAuth vs COOP | S07 | S07 |
 | `frame-ancestors` a CORS z `web_integrations.allowed_origins` | `/r/*` teď jen `'self'`, CORS helper bez dat | S11 | S11 |
 | Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; ve Workspace nastavit `z.config({ jitless: true })` | S06/S07 | S07 |

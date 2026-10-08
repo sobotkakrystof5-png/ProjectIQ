@@ -64,3 +64,11 @@ Důvod: `npm audit --omit=dev --audit-level=high` dnes padá na `next` 14 (criti
 Zvažované alternativy: `--audit-level=critical` (stejně padá na `next`); vypnout job (ztratíme přehled).
 Přijaté riziko: nová high/critical zranitelnost neshodí build, jen se objeví v logu jobu.
 Revize: S19 — po upgradu Next 15 a nodemailer 10 vrátit `continue-on-error: false`.
+
+## 007 — Landing page dynamická s vynucenou CSP
+Datum: 2026-10-08
+Rozhodnutí: `app/(marketing)/layout.tsx` bude `force-dynamic` a `/`, `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` dostanou vynucenou CSP (profil `workspace`). V `lib/security/csp.ts` jako přesné cesty, ne prefix `/` (ten by chytil celý web včetně adminu). Rozhodl Kryštof v S03 (R-033), provede S04. Uzavírá revizi „S04“ u #003.
+Důvod: nonce dostanou jen dynamické stránky; Report-Only nic nechrání a landing je veřejná vstupní stránka produktu.
+Zvažované alternativy: statické generování + Report-Only (rychlejší z CDN, ale bez ochrany); hashe místo nonce (Next 14 je pro App Router neumí).
+Přijaté riziko: o něco horší TTFB, HTML se necachuje na CDN. Landing nemá veřejný vstup (R-032), takže útočná plocha je malá.
+Revize: S05 (změřit LCP/TTFB na produkčním buildu); při upgradu na Next 15 (podpora statické stránky s CSP).

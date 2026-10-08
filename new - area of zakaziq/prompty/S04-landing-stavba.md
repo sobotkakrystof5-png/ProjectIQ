@@ -13,9 +13,11 @@ Rituál začátku. Načti `zakaziq-design-dilky` (+ references), `frontend-desig
    jako landing page. Stávající `app/page.tsx` (přesměrování na `/hub`/`/login`) **smaž** — je to
    jediná povolená změna mimo nové složky, dvě stránky pro `/` by kolidovaly. Přihlášený admin
    na `/` uvidí v hlavičce odkaz „Do administrace" místo automatického přesměrování; zjistí to
-   malá klientská komponenta (`/api/auth/session`), aby stránka zůstala statická. Rozhodnutí zapiš do `memory/memory.md` → Rozhodnutí.
+   malá klientská komponenta (`/api/auth/session`), aby landing neimportoval NextAuth na serveru. Rozhodnutí zapiš do `memory/memory.md` → Rozhodnutí.
+   Layout je `force-dynamic` a `/` + právní stránky jdou do vynucené CSP jako přesné cesty (R-033, brief § 3).
 2. Sekce jako samostatné komponenty v `components/marketing/`: `Header`, `Hero`, `LiveDemo`,
-   `OborMarquee`, `Features`, `HowItWorks`, `Modules`, `Connect`, `Pricing`, `Faq`, `Footer`.
+   `OborMarquee`, `WhyBother` (Proč to řešit, R-031), `Features`, `HowItWorks`, `Modules`, `Connect`,
+   `Pricing`, `Faq`, `Footer`.
 3. **Hero:** `TileField` v pozadí, jedno jemné radiální světlo, `LiveDot` „Právě dorazila
    poptávka: …", nadpis s `AccentHeading`, CTA.
 4. **LiveDemo** (klientská komponenta): 6 ukázkových poptávek v cyklu 2,8 s, vjezd nové
@@ -24,9 +26,8 @@ Rituál začátku. Načti `zakaziq-design-dilky` (+ references), `frontend-desig
    Data jsou zjevně ukázková (fiktivní jména), bez tvrzení o skutečných klientech.
 5. **HowItWorks:** 4 kroky s ukazatelem postupu, auto-postup + kliknutí na krok.
 6. **Faq:** přístupný akordeon (`<details>` nebo Radix), otázky a odpovědi z briefu.
-7. **Kontakt „Domluvit hovor"**: dialog s krátkým formulářem → server action → existující
-   `/api/public/leads` (bez úpravy toho endpointu) nebo přímý insert stejnou cestou jako
-   endpoint. Rate limit, Zod, děkovná zpráva.
+7. **Kontakt:** žádný formulář (R-032). Odkaz „Napište nám“ (`mailto:` na e-mail podpory, zatím
+   `[DOPLNIT]`, konstanta na jednom místě) v hero, dotazech a footeru. Brief § 5.
 8. **Footer:** odkaz **Admin** na `/login` (nenápadný), právní stránky (zatím `[DOPLNIT]`).
 9. Nájezdy sekcí `animate-zq-rise` jednou při scrollu. Lighthouse: Performance ≥ 90,
    Accessibility ≥ 95 na mobilu; LCP prvek hero nadpis, ne animace.
