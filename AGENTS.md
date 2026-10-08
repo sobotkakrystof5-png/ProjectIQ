@@ -586,7 +586,7 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 
 - Jeden produkt, jedna měsíční cena `STRIPE_PRICE_MONTHLY`: **249 Kč konečná cena** (provozovatel je neplátce DPH, R-018).
 - Zkušební doba **14 dní bez platební karty**; po ní výzva k platbě, bez předplatného jen čtení (R-019).
-- V ceně **1 byznys na účet a neomezeně pracovníků**; další byznys = další účet/předplatné (R-020).
+- V ceně **1 byznys a neomezeně pracovníků**. Datový model a URL počítají s více byznysy na účet (`business_id`, `/w/[byznys]`), přidání dalšího byznysu je v UI zatím vypnuté (R-026).
 - Checkout se zakládá na serveru, `account_id` v metadatech. Customer Portal pro změny a zrušení.
 - Webhook ověřuje podpis, každou událost uloží do `ws.stripe_events` a zpracuje jen jednou.
 - Přístup řídí `hasActiveSubscription(accountId)`. Po neúspěšné platbě 7 dní lhůta, pak jen čtení. Data se nikdy nemažou, poptávky z webu se ukládají dál.

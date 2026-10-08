@@ -1,4 +1,4 @@
-> Export plánu z dokumentu „ZakazIQ Workspace — produktový a designový plán“ (8. 10. 2026). Zdroj pravdy pro rozsah. Při změně plánu exportovat znovu.
+> Export plánu z dokumentu „ZakazIQ Workspace — produktový a designový plán“ (8. 10. 2026, revize 44, po rozhodnutích R-016–R-025 v S00). Zdroj pravdy pro rozsah. Při změně plánu exportovat znovu.
 
 # ZakazIQ Workspace — produktový a designový plán
 
@@ -94,7 +94,7 @@ Závazným vzhledem celého projektu je návrh **LP-D · Podle loga ZakazIQ** na
 
 ## Struktura aplikace a obrazovky
 
-Workspace má dvě úrovně: **účet** (firma, jedno IČO, předplatné, tým) a v něm libovolný počet **byznysů** (např. Kadeřnictví a Kosmetika, nebo Zámečnictví a Likvidace azbestu). Byznys má vlastní moduly, služby, kolonky, stavy, věrnostní program a napojený web. Postranní panel ukazuje jen zapnuté moduly, přepínač v hlavičce mění byznys a Peníze mají navíc pohled „Vše · jedno IČO“.
+Workspace má dvě úrovně: **účet** (firma, jedno IČO, předplatné, tým) a v něm libovolný počet **byznysů** (např. Kadeřnictví a Kosmetika, nebo Zámečnictví a Likvidace azbestu). Byznys má vlastní moduly, služby, kolonky, stavy, věrnostní program a napojený web. Postranní panel ukazuje jen zapnuté moduly, přepínač v hlavičce mění byznys a Peníze mají navíc pohled „Vše · jedno IČO“. V ceně 249 Kč je zatím jeden byznys: struktura pro víc byznysů zůstává, přidání dalšího je vypnuté, dokud nebude rozhodnutá jeho cena.
 
 | Obrazovka | Cesta | Co ukazuje | Mockup |
 | --- | --- | --- | --- |
@@ -189,9 +189,8 @@ Landing page běží na `/` ve stejné aplikaci a nahrazuje dnešní přesměrov
 | 07 | Peníze a daně | ukázka obrazovky Peníze, jasné „odhad, ne daňové poradenství“ |
 | 08 | Napojení na váš web | widget, e-shop, „web vám postavím a napojím“, odkaz na reference |
 | 09 | Ceník | jedna cena 249 Kč měsíčně, všechny moduly v ceně, zrušení kdykoli; tlačítko rovnou na registraci |
-| 10 | Kdo za tím stojí | Kryštof, VIZEON a ALTENO, fotka, krátký příběh |
-| 11 | Časté dotazy | data a GDPR, export, zrušení, kolik to stojí, jak dlouho trvá napojení |
-| 12 | Kontakt | formulář, který založí poptávku v admin konzoli (stávající vzor `/api/public/leads`) |
+| 10 | Časté dotazy | data a GDPR, export, zrušení, kolik to stojí, jak dlouho trvá napojení |
+| 11 | Kontakt | formulář, který založí poptávku v admin konzoli (stávající vzor `/api/public/leads`) |
 | — | Footer | navigace, právní stránky (podmínky, GDPR, zpracovatelská smlouva), IČO, odkaz Admin |
 
 **Registrace přímo z landing page, bez složitostí:**
@@ -199,7 +198,7 @@ Landing page běží na `/` ve stejné aplikaci a nahrazuje dnešní přesměrov
 1. Tlačítko „Začít za 249 Kč měsíčně“ (v hero, v ceníku a ve footeru).
 2. Registrace přes Clerk: e-mail s jednorázovým kódem nebo „Pokračovat přes Google“. Žádné heslo, žádné potvrzování e-mailu odkazem.
 3. Dvě otázky: název byznysu a obor (dlaždice). Vše ostatní doplní šablona.
-4. Stripe Checkout na 249 Kč měsíčně.
+4. 14 dní zdarma, bez platební karty. Stripe Checkout na 249 Kč měsíčně přijde na řadu až na konci zkušební doby.
 5. Obrazovka Dnes s jediným úkolem: „Zkopírujte odkaz na objednání“ nebo „Vložte kód na web“.
 
 Cíl: od kliknutí na landing page po první možnou poptávku do 3 minut. Landing page se generuje staticky a pro SEO dostane metadata, Open Graph obrázek a strukturovaná data.
@@ -296,7 +295,9 @@ Navržený stack sedí na to, co repo už používá. Přibývají jen Clerk, St
 
 **Stripe:**
 
-- **Jeden tarif: 249 Kč měsíčně**, všechny moduly v ceně. Žádné porovnávání balíčků, jedno tlačítko. Ve Stripe jeden produkt a jedna měsíční cena (`STRIPE_PRICE_MONTHLY`).
+- **Jeden tarif: 249 Kč měsíčně**, všechny moduly v ceně. Žádné porovnávání balíčků, jedno tlačítko. Je to konečná cena: provozovatel je neplátce DPH, takže se nic nepřipočítává. Ve Stripe jeden produkt a jedna měsíční cena (`STRIPE_PRICE_MONTHLY`).
+- **Zkušební doba 14 dní bez karty.** Počítá se v databázi Workspace, ne jako Stripe trial. `hasActiveSubscription` bere v úvahu i běžící zkušební dobu. Po jejím konci přijde výzva k platbě a do zaplacení platí režim jen pro čtení.
+- **V ceně 1 byznys a neomezeně pracovníků.** Struktura účtu s více byznysy zůstává připravená, přidání dalšího byznysu je zatím vypnuté.
 - Platba kartou, Apple Pay a Google Pay přes Stripe Checkout; kartu, fakturaci a zrušení si klient řeší sám ve Stripe Customer Portal.
 - Checkout se zakládá na serveru s ID účtu v metadatech. Webhook zpracuje dokončení platby, změny a zrušení předplatného a zaplacené i nezaplacené faktury; každá událost se ukládá a zpracuje jen jednou.
 - Jedna funkce `hasActiveSubscription(účet)` rozhoduje o přístupu. Po neúspěšné platbě 7 dní lhůta s upozorněním, pak režim jen pro čtení; data se nikdy nemažou a poptávky z webu se dál ukládají.
@@ -340,9 +341,11 @@ Všechny tabulky Workspace jsou ve schématu `ws` a nesou `account_id`. Tabulky 
 
 ## Plán pro Claude Code
 
+**Aktualizace 8. 10.:** fáze níže jsou rozpracované do 20 sezení S00–S19 v sadě pro Claude Code (`prompts/`, `CLAUDE.md`, `AGENTS.md`, skilly `zakaziq-*`, paměť `memory/`). Pro pořadí a obsah platí sada. Cesty veřejných částí: aplikace `/w`, objednávací stránka `/r/[slug]`, widget `/embed/[slug].js`, klientský portál `/z/[token]` (admin portál `/p/[token]` zůstává).
+
 Stavíme v tomto repu na samostatné větvi `workspace`, po fázích a každou fázi v nové konverzaci s Claude Code. Každá fáze končí kontrolou, že admin konzole funguje beze změny.
 
-1. **Příprava.** Větev, nová sekce „Workspace“ v `Claude.md`, závislosti (Clerk, Stripe, shadcn/ui), design systém Dílky (tokeny, písma, animace) pro Workspace, klientský portál a landing page, složený `middleware.ts`, doplněný `.env.example`. *Hotovo, když:* `/login`, `/dashboard`, `/alteno`, `/hub` a `/p/[token]` vypadají a fungují jako předtím a `npm run build` a `npm test` procházejí.
+1. **Příprava.** Větev, nová sekce „Workspace“ v `CLAUDE.md`, závislosti (Clerk, Stripe, shadcn/ui), design systém Dílky (tokeny, písma, animace) pro Workspace, klientský portál a landing page, složený `middleware.ts`, doplněný `.env.example`. *Hotovo, když:* `/login`, `/dashboard`, `/alteno`, `/hub` a `/p/[token]` vypadají a fungují jako předtím a `npm run build` a `npm test` procházejí.
 2. **Landing page.** `/` podle sekce Landing page, footer s odkazem Admin, responzivní, metadata. *Hotovo, když:* stránka je statická, funguje na telefonu a kontaktní formulář založí poptávku v adminu.
 3. **Základ více klientů.** Schéma `ws` (migrace od 064), DB role, Row Level Security, webhook Clerk, `requireWorkspace()`, průvodce Nový byznys se šablonami oborů (C5). *Hotovo, když:* dva testovací účty navzájem nevidí data, ověřené testem.
 4. **Jádro.** Rozložení aplikace (postranní panel, přepínač byznysů, ⌘K), obrazovky Dnes, Poptávky, Kalendář, Zákazníci, veřejné API (schema + requests), tlačítko „Zkopírovat prompt pro Claude Code“, skill zakaziq-napojeni, stránka pro objednání a záložní widget. *Hotovo, když:* poptávka z testovací stránky se do 15 s objeví v kalendáři jako čárkovaný blok a jde potvrdit jedním klikem.
@@ -353,7 +356,7 @@ Stavíme v tomto repu na samostatné větvi `workspace`, po fázích a každou f
 9. **Admin doplněk.** `/dashboard/klienti` (přehled účtů, založení klienta, klíče k webu). *Hotovo, když:* klienta založím a napojím na jeho web bez SQL.
 10. **Doladit a spustit.** Mobilní verze (D), tmavý režim, export a smazání dat, právní stránky, bezpečnostní hlavičky, první pilotní klient.
 
-**Pravidla pro Claude Code** (vložit do `Claude.md`):
+**Pravidla pro Claude Code** (vložit do `AGENTS.md`):
 
 - Neměnit soubory admin konzole (`app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/*-actions.ts`, `lib/business.ts`, stávající komponenty). Co se přebírá, se kopíruje do `lib/ws/` a `components/ws/`.
 - Nový kód: `app/(marketing)/` pro landing page, `app/w/` pro Workspace, `app/api/ws/` a `app/api/public/v1/` pro API.
@@ -363,17 +366,18 @@ Stavíme v tomto repu na samostatné větvi `workspace`, po fázích a každou f
 - Časy přes helpery Europe/Prague, kolize termínů řeší DB omezení, ne kontrola před vložením.
 - Každá fáze: testy (Vitest), `npm run build`, kontrola admin stránek, commit s popisem.
 
-**První prompt pro Claude Code:** „Přečti `Claude.md` a dokument ZakazIQ Workspace. Proveď fázi 1 (Příprava) na větvi `workspace`. Neměň žádný soubor admin konzole. Na konci ověř, že `/login`, `/dashboard`, `/hub` a `/p/[token]` fungují jako předtím, a vypiš změněné soubory.“
+**První prompt pro Claude Code:** „Přečti `CLAUDE.md` a dokument ZakazIQ Workspace. Proveď fázi 1 (Příprava) na větvi `workspace`. Neměň žádný soubor admin konzole. Na konci ověř, že `/login`, `/dashboard`, `/hub` a `/p/[token]` fungují jako předtím, a vypiš změněné soubory.“
 
 ## Otevřené otázky
 
 Tyto body je potřeba rozhodnout před fází, kterou ovlivňují.
 
-- [ ] Cena 249 Kč měsíčně je rozhodnutá. Zbývá: je v ní DPH, chceme zkušební dobu zdarma (a jak dlouhou) a kolik byznysů a pracovníků je v ceně?
-- [ ] Doména Workspace: běží landing page i aplikace na jedné doméně (např. zakaziq.cz + `/w`), nebo aplikace na subdoméně? Ovlivňuje Clerk, Stripe a widget (fáze 1).
+- [x] Cena 249 Kč měsíčně je rozhodnutá. Rozhodnuto 8. 10. 2026: konečná cena bez DPH (neplátce), 14 dní zdarma bez karty, v ceně 1 byznys a neomezeně pracovníků.
+- [x] Doména Workspace: běží landing page i aplikace na jedné doméně (např. zakaziq.cz + `/w`), nebo aplikace na subdoméně? Rozhodnuto 8. 10. 2026: jedna doména, aplikace na /w.
 - [ ] Admin přihlášení: nechat NextAuth natrvalo, nebo později převést admina na Clerk s rolí admin a mít jeden způsob přihlášení?
 - [ ] SMS: který poskytovatel pro připomínky a „Komu napsat“, a platí SMS klient zvlášť?
 - [ ] Zálohy online: chceme ve fázi 1 přijímat platby od zákazníků firem (Stripe Connect), nebo až později?
-- [ ] Právní stránka: obchodní podmínky, zpracovatelská smlouva a zásady ochrany údajů; kdo je připraví.
+- [ ] Právní stránka: obchodní podmínky, zpracovatelská smlouva a zásady ochrany údajů; kdo je připraví. Do spuštění jsou na landing page zástupně \[DOPLNIT\].
 - [ ] Daňové údaje: aktuální limit pro registraci k DPH a sazby pro odhad je nutné ověřit před spuštěním modulu Daně.
 - [ ] Obory: které šablony chceme mít hotové při spuštění a který klient bude první pilotní (např. kadeřnictví).
+- [ ] Další byznys na účtu: kolik bude stát a kdy ho zapnout?

@@ -28,7 +28,7 @@
 |---|---|---|
 | S00 | Příprava repa, paměti, skillů | hotovo (2026-10-08) |
 | S01 | Design systém Dílky v kódu | čeká |
-| S02 | Bezpečnostní základ | čeká (chybí skill `web-security-memory`) |
+| S02 | Bezpečnostní základ | čeká |
 | S03 | Brief landing page | čeká |
 | S04 | Landing page — stavba a animace | čeká |
 | S05 | Landing page — SEO a texty | čeká |
@@ -45,7 +45,7 @@
 | S16 | Klientský portál | čeká |
 | S17 | Admin: klienti a novinky | čeká |
 | S18 | Mobil, tmavý režim, GDPR | čeká |
-| S19 | Bezpečnostní audit a spuštění | čeká (chybí skilly `web-security-audit`, `-review`) |
+| S19 | Bezpečnostní audit a spuštění | čeká |
 
 **Další krok:** S01 (`new - area of zakaziq/prompty/S01-design-system-dilky.md`). Souběžně jde S06 (DB) — nezávisí na landing page.
 
@@ -142,6 +142,12 @@
 **Rozhodnutí:** jeden účet = jedno předplatné = jeden byznys; pracovníků neomezeně.
 **Proč:** jednoduché vysvětlit, drží „jeden tarif".
 **Důsledek:** datový model si `business_id` nechává (plán), ale UI nenabízí založení druhého byznysu; S08/S13. `AGENTS.md` → B5.
+**Nahrazeno:** R-026 (2026-10-08) — „další byznys = další účet" nebylo rozhodnuto.
+
+### R-026 · Další byznys na účtu zatím vypnutý (2026-10-08)
+**Rozhodnutí:** v ceně 249 Kč je 1 byznys a neomezeně pracovníků. Struktura účtu s více byznysy z plánu zůstává (`business_id`, `/w/[byznys]`, přepínač), jen přidání dalšího byznysu je v UI vypnuté.
+**Proč:** upřesnění R-020 podle plánu (účet = firma s libovolným počtem byznysů); cena za další byznys není rozhodnutá.
+**Důsledek:** S07/S13 stavějí datový model a URL pro víc byznysů, průvodce „Nový byznys" jen pro první. `AGENTS.md` → B5.
 
 ### R-021 · Design systém Dílky je závazný (2026-10-08)
 **Rozhodnutí:** Workspace, klientský portál, objednávací stránka, e-maily a landing page vypadají podle mockupu LP-D (barvy a dílky z loga, Instrument Sans/Serif, JetBrains Mono). Starší mockupy (A–D, C2–C5, LP-A–A3) platí jen pro rozložení a funkce. Admin si nechává svůj vzhled.
@@ -178,9 +184,8 @@
 - [ ] **Workspace — zálohy online přes Stripe Connect** teď, nebo až po spuštění? Neblokuje · od 2026-10-08
 - [ ] **Workspace — admin přihlášení:** nechat NextAuth natrvalo, nebo později převést na Clerk? Neblokuje · od 2026-10-08
 - [ ] **Workspace — limit pro DPH a sazby pro odhad daní** ověřit před S14 · od 2026-10-08
-- [ ] **Workspace — chybí uživatelské skilly** `web-security-memory` (blokuje S02), `web-security-audit` a `web-security-review` (blokují S19). Je jen `web-security-setup`, který na ně odkazuje · od 2026-10-08
-- [ ] **Workspace — plán v Claude Docs neodpovídá rozhodnutím** R-019 (trial bez karty) a R-023 (bez „Kdo za tím stojí"). Upravit dokument a znovu exportovat `docs/workspace/PLAN.md` · od 2026-10-08
-- [ ] **Zranitelné závislosti:** `npm audit --omit=dev` hlásí 16 zranitelností (2 critical: `next` 14, `next-auth`; high: `nodemailer`, `postcss`, `braces`, `nanoid` …). Upgrade Next je mimo výstavbu (AGENTS B2) — posoudit v S02/S19 · od 2026-10-08
+- [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
+- [ ] **Zranitelné závislosti:** po `npm audit fix` zbývá 11 (1 critical `next` 14 — opravy až v 15.5.24+; high: `nodemailer` 7 → oprava v 10, `next-auth` přes `next`, `postcss` přibalený v `next`, řetězec `tailwindcss` 3 → 4). Obě critical RCE (Image Optimizer s AVIF, Windows hosting) se aplikace netýkají — nepoužívá `next/image` a běží na Vercelu. Zbytek jsou hlavně DoS/SSRF v Server Actions a rewrites. Řešení = upgrade Next 15 + nodemailer 10 jako samostatný krok (AGENTS B2 ho dává až po spuštění) — rozhodnout nejpozději v S19, ideálně před spuštěním · od 2026-10-08
 - [ ] **`N8N_API_KEY`** není v lokálním `.env.local` — lokálně `/api/public/leads` vše odmítne (fail-closed). Na produkci ověřit ve Vercelu · od 2026-10-08
 
 ---
@@ -190,6 +195,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-08
+- **chore** Dotažení S00. (1) Skilly `web-security-memory`, `web-security-audit`, `web-security-review` nainstalovány globálně do `~/.claude/skills/` z `~/Documents/claude skills/SAFETY /claude-web-security/` (mimo repo). (2) `npm audit fix` bez `--force`: `next-auth` 4.24.14 → 4.24.15 a tranzitivní závislosti (jen `package-lock.json`), zranitelnosti v produkci 16 → 11; build OK, testy 100/100, produkční server: `/login` 200, `/dashboard`, `/alteno`, `/hub` přesměrují na přihlášení, `/p/[neplatný]` 404. (3) Plán v Claude Docs upraven podle R-016–R-026 (bez sekce „Kdo za tím stojí", 14 dní bez karty, konečná cena bez DPH, 1 byznys v ceně, odškrtnuté otázky DPH/doména, odkazy `memory/`, `CLAUDE.md`/`AGENTS.md`) a znovu exportován do `docs/workspace/PLAN.md`. (4) Smazán prázdný `new - area of zakaziq/docs/workspace/PLAN.md`. R-020 nahrazeno R-026.
 - **chore** S00 — příprava repa pro Workspace (bez produktového kódu, admin konzole beze změny). Větev `workspace` z `main`. Ze sady `~/Documents/zakaziq-claude-kit/` převzaty `docs/workspace/PLAN.md` a skilly `.claude/skills/zakaziq-{design-dilky,workspace-backend,ux-texty-cs,memory}`; `zakaziq-memory` přepsán na `memory/` podle `pravidla.md` (stará `.claude/memory/` se nezavádí). Prázdné složky s README: `app/(marketing)/`, `app/w/`, `components/ws/`, `components/ui/`, `lib/ws/`. `.env.example`: blok `# --- ZakazIQ Workspace ---` (`DATABASE_URL_WS`, Clerk ×3, Stripe ×4, `WS_KEY_PEPPER`; `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, `CRON_SECRET` už existovaly — neduplikováno). Rozhodnutí R-016–R-025 (cesty, doména, DPH, trial, limity, Dílky, SEO skilly, landing bez „Kdo za tím stojí", napojení webů, segmenty) → `AGENTS.md` Hranice, B2, B4, B5; prompty S03, S05 a `00-README.md` upraveny.
 - **chore** S00 výchozí stav: `npm ci` OK (235 balíčků, 1 deprecated varování `uuid@8`, audit 18 zranitelností / `--omit=dev` 16, z toho 2 critical). `npm run build` OK bez varování. `npm test` OK — 10 souborů, 100 testů. Uživatelské skilly: chybí `web-security-memory`, `web-security-audit`, `web-security-review`.
 - **docs** Nová složka `new - area of zakaziq/prompty/` — prompty sezení S00–S19 + `00-README.md` převzaté z `~/Documents/zakaziq-claude-kit/prompts/`. Odkazy na paměť sady (`.claude/memory/` STATE/SESSION-LOG/DECISIONS/OPEN-QUESTIONS) přepsány na `memory/memory.md` (R-014), `projectiq` → `ZakazIQ`, S00 upraven na současný stav repa (Claude.md už je AGENTS.md), S02 míří na `AGENTS.md` → B13, S17 na `AGENTS.md` → Část A. Otevřené otázky sady přeneseny do Otevřených problémů.

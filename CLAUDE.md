@@ -74,7 +74,7 @@ Projektové skilly (`.claude/skills/`):
 | `zakaziq-ux-texty-cs` | každý text, který uvidí uživatel nebo zákazník |
 | `zakaziq-memory` | začátek a konec sezení, zápis rozhodnutí — zapisuje do `memory/` podle `memory/pravidla.md` |
 
-Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-security-memory`, `web-security-audit`, `web-security-review`), `web-project-brief`, `humanize-text-cs`, `frontend-design`, `seo` + `seo-quality-principles` (R-022). Chybí zatím `web-security-memory`, `web-security-audit`, `web-security-review` (viz Otevřené problémy).
+Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-security-memory`, `web-security-audit`, `web-security-review`), `web-project-brief`, `humanize-text-cs`, `frontend-design`, `seo` + `seo-quality-principles` (R-022).
 
 ## Kde co najdeš
 
