@@ -23,35 +23,35 @@ const PIECES: Piece[] = [
     icon: MessageSquare,
     from: 'SMS',
     text: 'Dobrý den, máte v pátek volno?',
-    scatter: 'md:left-[2%] md:top-[4%] md:-rotate-[4deg]',
+    scatter: 'self-start -rotate-2 md:left-0 md:top-0 md:-rotate-[4deg]',
     tidy: { label: 'Poptávka · SMS', title: 'pá 9:00 čeká na potvrzení', state: 'new' },
   },
   {
     icon: Instagram,
     from: 'Instagram',
     text: 'Kolik stojí melír?',
-    scatter: 'md:left-[46%] md:top-[0%] md:rotate-[5deg]',
+    scatter: 'self-end rotate-2 md:left-[54%] md:top-[19%] md:rotate-[5deg]',
     tidy: { label: 'Poptávka · Instagram', title: 'Melír, dotaz na cenu', state: 'new' },
   },
   {
     icon: Mail,
     from: 'E-mail',
     text: 'Poptávka: výměna zámku',
-    scatter: 'md:left-[8%] md:top-[36%] md:rotate-[2deg]',
+    scatter: 'ml-4 self-start rotate-1 md:left-[3%] md:top-[38%] md:ml-0 md:rotate-[2deg]',
     tidy: { label: 'Termín', title: 'st 9:00 výměna zámku', state: 'confirmed' },
   },
   {
     icon: BookOpen,
     from: 'Diář',
     text: '~~čt 14:00~~ Novák, přesunout',
-    scatter: 'md:left-[50%] md:top-[40%] md:-rotate-[6deg]',
+    scatter: 'self-end -rotate-2 md:left-[50%] md:top-[60%] md:-rotate-[6deg]',
     tidy: { label: 'Kalendář', title: 'Novák přesunut na čt 16:00', state: 'confirmed' },
   },
   {
     icon: Table2,
     from: 'Tabulka',
     text: 'faktura 03: zaplaceno?',
-    scatter: 'md:left-[22%] md:top-[70%] md:rotate-[3deg]',
+    scatter: 'ml-8 self-start rotate-2 md:left-[12%] md:top-[80%] md:ml-0 md:rotate-[3deg]',
     tidy: { label: 'Faktura 03', title: 'zaplaceno', state: 'plain' },
   },
 ]
@@ -93,12 +93,12 @@ export function WhyBother() {
         {/* Dnes */}
         <div>
           <p className="font-num text-xs uppercase tracking-[0.12em] text-quiet">Dnes</p>
-          <ul className="mt-4 flex flex-col gap-3 md:relative md:h-[360px]">
+          <ul className="mt-4 flex flex-col gap-3 md:relative md:h-[400px]">
             {PIECES.map(({ icon: Icon, from, text, scatter }) => (
               <li
                 key={from}
                 className={cn(
-                  'flex max-w-[280px] items-start gap-3 rounded-chip border border-navy-100 bg-surface px-3.5 py-3 text-[15px] text-quiet shadow-sm shadow-navy-950/5 md:absolute',
+                  'flex w-max max-w-[280px] items-start gap-3 rounded-chip border border-navy-100 bg-surface px-3.5 py-3 text-[15px] text-quiet shadow-sm shadow-navy-950/5 md:absolute',
                   scatter,
                 )}
               >

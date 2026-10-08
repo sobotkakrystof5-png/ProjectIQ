@@ -33,8 +33,10 @@ export function Pricing() {
               Jedna cena.
             </AccentHeading>
             <p className="flex items-baseline gap-3">
-              <span className="font-num text-[64px] font-medium leading-none tracking-[-0.04em] sm:text-[88px]">249 Kč</span>
-              <span className="text-lg text-navy-200">/ měsíc</span>
+              <span className="font-num text-[72px] font-medium leading-none tracking-[-0.05em] sm:text-[96px]">249</span>
+              <span className="text-xl text-navy-200 sm:text-2xl">
+                <span className="font-num text-white">Kč</span> / měsíc
+              </span>
             </p>
             <p className="max-w-[420px] font-num text-xs leading-relaxed text-navy-300">
               konečná cena, nic se nepřipočítává · 14 dní zdarma bez karty · zrušíte kdykoli · karta, Apple Pay, Google Pay

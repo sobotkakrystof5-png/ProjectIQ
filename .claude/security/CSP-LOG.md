@@ -49,7 +49,7 @@ Ověřeno (produkční build lokálně, headless Chrome 2026-10-08, přihlášen
 - Safari zatím neověřeno (není tu) — udělat při přepnutí adminu na vynucenou.
 
 ## v2 — 2026-10-08
-Landing page do vynucené CSP (DECISIONS #007, R-033): `/`, `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` jako přesné cesty v `ENFORCED_PATHS` (`lib/security/csp.ts`, test). Profil `workspace`, žádný nový zdroj. Layout `app/(marketing)` je `force-dynamic`. Očekávané hlášení: zablokovaný adminův `@import` Inter z `globals.css` (jako na `/w`). Konzole v prohlížeči zatím neověřena.
+Landing page do vynucené CSP (DECISIONS #007, R-033): `/`, `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` jako přesné cesty v `ENFORCED_PATHS` (`lib/security/csp.ts`, test). Profil `workspace`, žádný nový zdroj. Layout `app/(marketing)` je `force-dynamic`. Ověřeno 2026-10-08 v headless Chromu (produkční build, 390–1440 px, `/`, `/podminky`, `/w/registrace`): stránky i hydratace fungují, jediné hlášení je zablokovaný adminův `@import` Inter z `globals.css` (jako na `/w`, otevřený problém v `memory/memory.md`). Safari neověřeno.
 
 ## Čeká (zapsat jako vN při přidání)
 - S07 Clerk: domény instance (dev `*.clerk.accounts.dev` → konkrétní host, produkce `clerk.zakaziq.cz`), `img-src img.clerk.com`, případně Turnstile (`challenges.cloudflare.com`) — jen to, co ukáže konzole.

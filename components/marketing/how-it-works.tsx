@@ -13,12 +13,12 @@ const STEP_MS = 2800
 /** Čtyři velké dílky v rohu panelu — zvětšené logo. */
 function CornerTiles() {
   return (
-    <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 grid grid-cols-2 gap-3 opacity-60 md:-right-6 md:-top-6">
+    <div aria-hidden className="pointer-events-none absolute -bottom-14 -right-14 hidden grid-cols-2 gap-3 opacity-60 md:grid">
       {[0, 1, 2, 3].map((i) => (
         <span
           key={i}
           className={cn(
-            'block h-20 w-20 rounded-[22px] md:h-28 md:w-28 md:rounded-[30px]',
+            'block h-24 w-24 rounded-[26px]',
             i === 1 || i === 2 ? 'bg-navy-800' : 'border border-navy-200/10',
           )}
         />

@@ -148,9 +148,9 @@ export function Features() {
           title="Poptávka rovnou v kalendáři"
           text="Z webu, e-shopu i telefonu. Potvrdíte ji v aplikaci nebo přímo z e-mailu."
           className="lg:col-span-2 lg:row-span-2"
-          illustrationClassName="flex-1 sm:p-10 lg:px-16 lg:py-14"
+          illustrationClassName="flex flex-1 flex-col justify-center sm:p-10 lg:px-16 lg:py-14"
         >
-          <div className="mx-auto max-w-[420px]">
+          <div className="mx-auto w-full max-w-[420px]">
             <RequestsIllustration />
           </div>
         </FeatureCard>

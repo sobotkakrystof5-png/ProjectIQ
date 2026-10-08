@@ -165,7 +165,7 @@ export function LiveDemo() {
           </div>
         </div>
 
-        <span className="absolute left-5 top-5 z-10 hidden rounded-full bg-navy-950/80 px-2.5 py-1 font-num text-[10px] uppercase tracking-[0.12em] text-navy-200 md:inline-block">
+        <span className="absolute -top-3 left-6 z-10 rounded-full border border-navy-200/20 bg-navy-900 px-2.5 py-1 font-num text-[10px] uppercase tracking-[0.12em] text-navy-200">
           ukázka
         </span>
 
