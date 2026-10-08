@@ -1,0 +1,90 @@
+/* Design systém Dílky — tokeny (zdroj: skill zakaziq-design-dilky → references/tokens.css).
+   Importuje se jen v layoutech Workspace a landing page. Platí jen uvnitř [data-app="ws"],
+   aby se nedotkly admin konzole, která má vlastní :root v app/globals.css (R-027).
+   Barvy jsou RGB trojice kvůli Tailwind <alpha-value> (lib/ws/tailwind-dilky.ts). */
+
+[data-app="ws"] {
+  --navy-950: 12 26 54;     /* #0c1a36 */
+  --navy-900: 19 40 80;     /* #132850 */
+  --navy-800: 27 56 104;    /* #1b3868 */
+  --navy-700: 35 71 139;    /* #23478b  hlavní akce */
+  --navy-600: 43 87 168;    /* #2b57a8 */
+  --navy-500: 58 110 196;   /* #3a6ec4  akcent na světlém (4.6:1) */
+  --navy-400: 92 141 211;   /* #5c8dd3 */
+  --navy-300: 138 174 227;  /* #8aaee3  kurzíva na tmavém */
+  --navy-200: 184 206 239;  /* #b8ceef  text na tmavém */
+  --navy-100: 220 231 247;  /* #dce7f7  okraje */
+  --navy-50: 238 242 251;   /* #eef2fb */
+
+  --ground: 244 246 251;    /* #f4f6fb */
+  --surface: 255 255 255;
+  --ink: 12 26 54;          /* = navy-950 */
+  --quiet: 74 88 120;       /* #4a5878  6.6:1 na ground */
+
+  --signal: 255 181 71;     /* #ffb547 */
+  --signal-bg: 255 247 232; /* #fff7e8 */
+  --signal-line: 225 154 44;/* #e19a2c */
+  --signal-ink: 107 67 0;   /* #6b4300 */
+  --reward: 255 210 138;    /* #ffd28a  „Odměna připravena" na tmavém */
+  --danger: 179 38 30;      /* #b3261e */
+
+  /* shadcn/ui čte hsl(var(--x)) — uvnitř Workspace jim dáme HSL hodnoty Dílků */
+  --background: 223 47% 97%;
+  --foreground: 220 64% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 64% 13%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 64% 13%;
+  --primary: 219 60% 34%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 62% 96%;
+  --secondary-foreground: 220 64% 13%;
+  --muted: 222 62% 96%;
+  --muted-foreground: 222 24% 38%;
+  --accent: 216 63% 92%;
+  --accent-foreground: 220 64% 13%;
+  --destructive: 3 71% 41%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 216 63% 92%;
+  --input: 216 63% 92%;
+  --ring: 217 54% 50%;
+  --radius: 12px;
+
+  color-scheme: light;
+  font-family: var(--font-instrument-sans), system-ui, sans-serif;
+  /* body v app/globals.css zapíná znakové varianty Interu — na Instrument Sans nepatří */
+  font-feature-settings: normal;
+  background: rgb(var(--ground));
+  color: rgb(var(--ink));
+}
+
+[data-app="ws"][data-theme="dark"] {
+  --ground: 12 26 54;
+  --surface: 19 40 80;
+  --ink: 238 242 251;
+  --quiet: 184 206 239;
+  --background: 220 64% 13%;
+  --foreground: 222 62% 96%;
+  --card: 219 62% 19%;
+  --card-foreground: 222 62% 96%;
+  --popover: 219 62% 19%;
+  --popover-foreground: 222 62% 96%;
+  --secondary: 217 59% 26%;
+  --secondary-foreground: 222 62% 96%;
+  --muted: 217 59% 26%;
+  --muted-foreground: 216 63% 83%;
+  --accent: 217 59% 26%;
+  --accent-foreground: 222 62% 96%;
+  --border: 217 59% 26%;
+  --input: 217 59% 26%;
+  --ring: 216 56% 60%;
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app="ws"] *, [data-app="ws"] *::before, [data-app="ws"] *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}

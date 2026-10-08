@@ -1,7 +1,9 @@
 import type { Config } from 'tailwindcss'
+import { dilkyExtend } from './lib/ws/tailwind-dilky'
 
 const config: Config = {
-  darkMode: ['class'],
+  // `.dark` pro admin (beze změny) + `data-theme="dark"` pro Workspace (R-027)
+  darkMode: ['variant', ['&:is(.dark *)', '&:is([data-theme="dark"] *)']],
   content: [
     './pages/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
@@ -11,6 +13,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        ...dilkyExtend.fontFamily,
       },
       colors: {
         border: 'hsl(var(--border))',
@@ -42,6 +45,10 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
         brand: {
           50:  '#eef2fb',
           100: '#dce7f7',
@@ -55,12 +62,17 @@ const config: Config = {
           900: '#132850',
           950: '#0c1a36',
         },
+        ...dilkyExtend.colors,
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        ...dilkyExtend.borderRadius,
       },
+      transitionTimingFunction: dilkyExtend.transitionTimingFunction,
+      keyframes: dilkyExtend.keyframes,
+      animation: dilkyExtend.animation,
     },
   },
   plugins: [],

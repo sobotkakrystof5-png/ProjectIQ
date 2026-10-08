@@ -20,14 +20,14 @@
 
 **Poslední práce (2026-09-19):** veřejný endpoint `/api/public/alteno-leads` pro kontaktní formulář alteno.cz.
 
-**Rozpracováno:** ZakazIQ Workspace (SaaS) + landing page na větvi `workspace` (R-015). Repo je připravené (S00): plán `docs/workspace/PLAN.md`, skilly `.claude/skills/zakaziq-*`, prázdné složky `app/(marketing)/`, `app/w/`, `components/ws/`, `components/ui/`, `lib/ws/` (jen README), env blok v `.env.example`. Produktový kód zatím neexistuje. Prompty sezení: `new - area of zakaziq/prompty/` (rozcestník `00-README.md`).
+**Rozpracováno:** ZakazIQ Workspace (SaaS) + landing page na větvi `workspace` (R-015). S00: plán `docs/workspace/PLAN.md`, skilly `.claude/skills/zakaziq-*`, env blok v `.env.example`. S01: design systém Dílky v kódu — tokeny `app/ws-tokens.css`, Tailwind `lib/ws/tailwind-dilky.ts`, písma `lib/ws/fonts.ts`, kořen `components/ws/ws-root.tsx`, UI kit `components/ui/`, komponenty `components/ws/brand/`, přehled `/w/_design` (jen dev). Layouty `app/w/layout.tsx` a `app/(marketing)/layout.tsx` existují, stránky zatím ne (kromě `/w/_design`). Prompty sezení: `new - area of zakaziq/prompty/` (rozcestník `00-README.md`).
 
 **Sezení Workspace:**
 
 | # | Sezení | Stav |
 |---|---|---|
 | S00 | Příprava repa, paměti, skillů | hotovo (2026-10-08) |
-| S01 | Design systém Dílky v kódu | čeká |
+| S01 | Design systém Dílky v kódu | hotovo (2026-10-08) |
 | S02 | Bezpečnostní základ | čeká |
 | S03 | Brief landing page | čeká |
 | S04 | Landing page — stavba a animace | čeká |
@@ -47,7 +47,7 @@
 | S18 | Mobil, tmavý režim, GDPR | čeká |
 | S19 | Bezpečnostní audit a spuštění | čeká |
 
-**Další krok:** S01 (`new - area of zakaziq/prompty/S01-design-system-dilky.md`). Souběžně jde S06 (DB) — nezávisí na landing page.
+**Další krok:** S02 (`new - area of zakaziq/prompty/S02-bezpecnost-zaklad.md`). Souběžně jde S06 (DB) — nezávisí na landing page.
 
 ---
 
@@ -170,6 +170,15 @@
 **Rozhodnutí:** segmenty Noví, Stálí, Jednorázoví, Spící, Ukončení; hranice podle oboru, nastavitelné.
 **Proč:** převzato ze sady (rozhodl Kryštof). Detail v `docs/workspace/PLAN.md`.
 
+### R-027 · Oddělení Dílků od admin konzole (2026-10-08)
+**Rozhodnutí:** tokeny Dílků platí jen uvnitř `[data-app="ws"]` (`app/ws-tokens.css`, importované jen v layoutech `app/w` a `app/(marketing)`); písma přes `next/font` jen tam; Tailwind dostal jen nové klíče (`navy`, `ground`, `surface`…, adminové `brand`/`card`/`muted`/rádiusy/`font-sans` beze změny). Kořen `WsRoot` je i kontejner pro Radix portály, aby dialogy a menu nebyly v `<body>` bez tokenů. Tmavý režim = `data-theme="dark"`, `darkMode` v Tailwindu rozšířen o tenhle selektor (`.dark` zůstal). Toasty Workspace jdou přes adminův `<Toaster>` v `app/layout.tsx` (sonner 1.x neumí víc toasterů) jako `toast.custom` s vlastním `data-app="ws"`. Bez pluginu `tailwindcss-animate`.
+**Proč:** admin se nesmí změnit ani o pixel; plugin `tailwindcss-animate` přidával `animation-duration` do existujících tříd `duration-*`/`ease-*` (ověřeno porovnáním zkompilovaného CSS). Kořenový `app/layout.tsx` se neměnil.
+**Důsledek:** `AGENTS.md` → B8 (tabulka „Jak je systém v kódu"). Ověřeno: všech 1011 existujících CSS selektorů beze změny, screenshoty `/login`, `/dashboard`, `/hub`, `/alteno` (1280 i 390 px) bajtově shodné.
+
+### R-028 · Závislosti UI kitu (2026-10-08)
+**Rozhodnutí:** `@radix-ui/react-{slot,label,select,checkbox,switch,dialog,popover,dropdown-menu,tabs,tooltip,separator}`, `class-variance-authority`, `cmdk` (⌘K), `react-day-picker` 10 (kalendář, česká lokalizace z balíčku). shadcn komponenty psané ručně (bez `shadcn` CLI, které by přepsalo `tailwind.config.ts` a `globals.css`).
+**Proč:** standardní základ shadcn/ui, přístupnost (klávesnice, ARIA) zadarmo; Radix je jen v kódu Workspace, admin ho nenačítá.
+
 ---
 
 ## 3. Otevřené problémy
@@ -186,6 +195,9 @@
 - [ ] **Workspace — limit pro DPH a sazby pro odhad daní** ověřit před S14 · od 2026-10-08
 - [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
 - [ ] **Zranitelné závislosti:** po `npm audit fix` zbývá 11 (1 critical `next` 14 — opravy až v 15.5.24+; high: `nodemailer` 7 → oprava v 10, `next-auth` přes `next`, `postcss` přibalený v `next`, řetězec `tailwindcss` 3 → 4). Obě critical RCE (Image Optimizer s AVIF, Windows hosting) se aplikace netýkají — nepoužívá `next/image` a běží na Vercelu. Zbytek jsou hlavně DoS/SSRF v Server Actions a rewrites. Řešení = upgrade Next 15 + nodemailer 10 jako samostatný krok (AGENTS B2 ho dává až po spuštění) — rozhodnout nejpozději v S19, ideálně před spuštěním · od 2026-10-08
+- [ ] **Workspace — toasty přes adminův `<Toaster>`** (R-027): pozice a délka jsou společné s adminem (vpravo nahoře). Až bude potřeba vlastní toaster (např. spodní lišta na mobilu v S09/S18), řešit upgradem sonneru na 2.x (víc toasterů) nebo úpravou `app/layout.tsx` — obojí sahá na admin, chce souhlas · od 2026-10-08
+- [ ] **Workspace — Inter se stahuje i na stránkách Dílků:** `@import` Google Fonts v `app/globals.css` (admin) se načte všude; Instrument Sans ho přebije, jen zbytečný request CSS. Řešit, až se bude sahat na admin · od 2026-10-08
+- [ ] **Landing na `/`:** kořenová `app/page.tsx` (admin) přesměrovává na `/hub` nebo `/login` — landing page v `app/(marketing)/page.tsx` s ní bude kolidovat. Rozhodnout v S04 (přesunout přesměrování) · od 2026-10-08
 - [ ] **`N8N_API_KEY`** není v lokálním `.env.local` — lokálně `/api/public/leads` vše odmítne (fail-closed). Na produkci ověřit ve Vercelu · od 2026-10-08
 
 ---
@@ -195,6 +207,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-08
+- **feat** S01 — design systém Dílky v kódu. Tokeny `app/ws-tokens.css` (+ tmavý režim, doplněné `--secondary`/`--accent`/`--ring` pro tmavý), Tailwind rozšíření `lib/ws/tailwind-dilky.ts` → `tailwind.config.ts` (+ `popover` barva, `darkMode` i pro `[data-theme="dark"]`, vlastní keyframes překryvů `zq-fade|pop|slide-*`), písma `lib/ws/fonts.ts`, `WsRoot` (`components/ws/ws-root.tsx`), layouty `app/w/layout.tsx` a `app/(marketing)/layout.tsx`. UI kit `components/ui/` (18 komponent + `portal.tsx`, toasty s „Zpět"), komponenty `components/ws/brand/` (12), `lib/ws/{motion,money,time,utils}.ts`, stránka `/w/_design` (v produkci 404). Testy `lib/ws/__tests__/dilky-format.test.ts` (částky, pražský čas, pole dílků). Nové závislosti R-028, oddělení od adminu R-027. `npm run build` OK, `npm test` 108/108, admin pixelově beze změny (porovnání screenshotů a zkompilovaného CSS), `/p/[neplatný]` 404, `npm audit --omit=dev` beze změny (11).
 - **chore** Dotažení S00. (1) Skilly `web-security-memory`, `web-security-audit`, `web-security-review` nainstalovány globálně do `~/.claude/skills/` z `~/Documents/claude skills/SAFETY /claude-web-security/` (mimo repo). (2) `npm audit fix` bez `--force`: `next-auth` 4.24.14 → 4.24.15 a tranzitivní závislosti (jen `package-lock.json`), zranitelnosti v produkci 16 → 11; build OK, testy 100/100, produkční server: `/login` 200, `/dashboard`, `/alteno`, `/hub` přesměrují na přihlášení, `/p/[neplatný]` 404. (3) Plán v Claude Docs upraven podle R-016–R-026 (bez sekce „Kdo za tím stojí", 14 dní bez karty, konečná cena bez DPH, 1 byznys v ceně, odškrtnuté otázky DPH/doména, odkazy `memory/`, `CLAUDE.md`/`AGENTS.md`) a znovu exportován do `docs/workspace/PLAN.md`. (4) Smazán prázdný `new - area of zakaziq/docs/workspace/PLAN.md`. R-020 nahrazeno R-026.
 - **chore** S00 — příprava repa pro Workspace (bez produktového kódu, admin konzole beze změny). Větev `workspace` z `main`. Ze sady `~/Documents/zakaziq-claude-kit/` převzaty `docs/workspace/PLAN.md` a skilly `.claude/skills/zakaziq-{design-dilky,workspace-backend,ux-texty-cs,memory}`; `zakaziq-memory` přepsán na `memory/` podle `pravidla.md` (stará `.claude/memory/` se nezavádí). Prázdné složky s README: `app/(marketing)/`, `app/w/`, `components/ws/`, `components/ui/`, `lib/ws/`. `.env.example`: blok `# --- ZakazIQ Workspace ---` (`DATABASE_URL_WS`, Clerk ×3, Stripe ×4, `WS_KEY_PEPPER`; `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, `CRON_SECRET` už existovaly — neduplikováno). Rozhodnutí R-016–R-025 (cesty, doména, DPH, trial, limity, Dílky, SEO skilly, landing bez „Kdo za tím stojí", napojení webů, segmenty) → `AGENTS.md` Hranice, B2, B4, B5; prompty S03, S05 a `00-README.md` upraveny.
 - **chore** S00 výchozí stav: `npm ci` OK (235 balíčků, 1 deprecated varování `uuid@8`, audit 18 zranitelností / `--omit=dev` 16, z toho 2 critical). `npm run build` OK bez varování. `npm test` OK — 10 souborů, 100 testů. Uživatelské skilly: chybí `web-security-memory`, `web-security-audit`, `web-security-review`.

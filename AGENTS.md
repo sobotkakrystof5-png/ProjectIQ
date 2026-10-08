@@ -558,6 +558,7 @@ ZakazIQ Workspace je SaaS pro malé firmy, které dostávají poptávky (kadeřn
 Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Neon Postgres (`@neondatabase/serverless`) · Clerk (klienti) · NextAuth (jen admin) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
 
 - Nové závislosti jen s důvodem zapsaným do `memory/memory.md` → Rozhodnutí.
+- UI kit stojí na Radix UI (`@radix-ui/react-*`), `class-variance-authority`, `cmdk` (⌘K) a `react-day-picker` (kalendář) — R-028.
 - E-maily Workspace jdou přes Resend (B7). Admin zůstává na Gmail SMTP (R-004) — `lib/email.ts` Workspace nepoužívá.
 - Upgrade Next.js na 15 není součást výstavby, je to samostatný krok po spuštění.
 - Env proměnné Workspace jsou předem (prázdné) v `.env.example` v bloku `# --- ZakazIQ Workspace ---` (S00). Do tabulky env v části A se zapisují až s kódem, který je čte; další nové proměnné do obou míst zároveň.
@@ -605,6 +606,25 @@ Resend z domény ZakazIQ, jako odesílatel jméno byznysu, Reply-To e-mail klien
 ## B8. Design
 
 Jediný platný vzhled je design systém **Dílky** (podle loga, mockup LP-D). Pravidla, tokeny a pohyb jsou ve skillu `zakaziq-design-dilky`. Žádné barvy natvrdo, žádné výchozí shadcn šedé motivy, žádné gradientové pozadí navíc, žádné emoji v UI.
+
+Jak je systém v kódu (S01, R-027):
+
+| Co | Kde |
+|---|---|
+| Tokeny (CSS proměnné, světlý + tmavý) | `app/ws-tokens.css` — platí jen uvnitř `[data-app="ws"]`, importuje se jen v `app/w/layout.tsx` a `app/(marketing)/layout.tsx` |
+| Tailwind (`navy-*`, `ground`, `surface`, `ink`, `quiet`, `signal*`, `reward`, `danger`, `font-accent`, `font-num`, `rounded-tiny…hero`, `ease-zq`, `animate-zq-*`) | `lib/ws/tailwind-dilky.ts`, sloučeno do `tailwind.config.ts` (adminové klíče beze změny) |
+| Písma Instrument Sans/Serif, JetBrains Mono (`next/font`) | `lib/ws/fonts.ts` → `wsFontVariables` |
+| Kořen každé stránky Dílků | `components/ws/ws-root.tsx` (`WsRoot`): `data-app="ws"`, `data-theme`, písma, kontejner pro portály, `MotionConfig reducedMotion="user"`; téma přes `useWsTheme()` |
+| UI kit (shadcn/ui upravený na Dílky) | `components/ui/` — button, input, label, select, checkbox, switch, dialog, sheet, popover, dropdown-menu, tabs, tooltip, toast, command (⌘K), calendar, badge, separator, skeleton |
+| Komponenty Dílků | `components/ws/brand/` — Logo, TileField, TileGlyph, SectionLabel, AccentHeading, Money, TimeRange, NewRequestBlock, ConfirmedBlock, LoyaltyCard, EmptyState, LiveDot |
+| Pohyb (Framer Motion presety) | `lib/ws/motion.ts` (`zqIn`, `zqStamp`, `zqSwap`) |
+| Formát částek a času | `lib/ws/money.ts` (`formatMoney`), `lib/ws/time.ts` (`formatClock`, `formatTimeRange`, Europe/Prague) |
+| Přehled celého systému | `/w/_design` (složka `app/w/%5Fdesign`), jen ve vývoji — v produkci 404 |
+
+- Tmavý režim: `data-theme="dark"` na kořeni, Tailwind `dark:` funguje i pro něj (`darkMode` = `.dark` **nebo** `[data-theme="dark"]`).
+- Portály (dialog, panel, menu, select, tooltip) se vykreslují do `WsRoot` přes `usePortalContainer()` z `components/ui/portal.tsx` — nový překryv v `components/ui/` musí předat `container`, jinak skončí v `<body>` bez tokenů.
+- Toasty: `toast` z `components/ui/toast.tsx` (ne přímo `sonner`). Jdou přes jediný `<Toaster>` v `app/layout.tsx` a nesou si vlastní `data-app="ws"`. Místo potvrzovacích dialogů `toast.success('…', { undo })`.
+- Plugin `tailwindcss-animate` se nepoužívá (mění `duration-*`/`ease-*` i v adminu). Animace překryvů jsou `animate-zq-fade|pop|slide-*`.
 
 ## B9. Jednoduchost (tvrdé pravidlo)
 
