@@ -22,19 +22,25 @@ type Directives = Record<string, string[]>
 /** Cesty Workspace, kde CSP platí naostro (DECISIONS.md #003). */
 const ENFORCED_PREFIXES = ['/w', '/r', '/z'] as const
 
+/**
+ * Landing page a její právní stránky — naostro jako přesné cesty (DECISIONS.md #007).
+ * Nikdy prefix `/`: ten by chytil celý web včetně adminu.
+ */
+const ENFORCED_PATHS = ['/', '/podminky', '/ochrana-udaju', '/zpracovatelska-smlouva'] as const
+
 /** Prefix bez „vedlejších" shod: `/w` sedí na `/w` a `/w/…`, ne na `/wiki`. */
 export function hasPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`)
 }
 
 /**
- * Které CSP pro danou cestu. Všechno mimo Workspace dostává admin profil
- * v Report-Only — admin běží v produkci, `/login` a 404 jsou statické (bez
- * nonce) a landing page zatím nemá stránky. Landing se přepne na `workspace`
- * v S04, až bude její layout dynamický (viz `.claude/security/STATE.md`).
+ * Které CSP pro danou cestu. Workspace a landing page (layout `app/(marketing)` je
+ * dynamický) naostro, všechno ostatní admin profil v Report-Only — admin běží
+ * v produkci a `/login` a 404 jsou statické (bez nonce).
  */
 export function cspProfileFor(pathname: string): { profile: CspProfile; mode: CspMode } {
-  if (ENFORCED_PREFIXES.some((p) => hasPrefix(pathname, p))) {
+  const path = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  if (ENFORCED_PREFIXES.some((p) => hasPrefix(path, p)) || (ENFORCED_PATHS as readonly string[]).includes(path)) {
     return { profile: 'workspace', mode: 'enforce' }
   }
   return { profile: 'admin', mode: 'report-only' }

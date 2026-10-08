@@ -5,14 +5,23 @@ const directive = (csp: string, name: string) =>
   csp.split('; ').find((d) => d === name || d.startsWith(`${name} `))
 
 describe('cspProfileFor', () => {
-  it('Workspace naostro, všechno ostatní Report-Only', () => {
+  it('Workspace naostro, admin Report-Only', () => {
     expect(cspProfileFor('/w')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/w/dnes')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/r/kadernictvi')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/z/abc')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/dashboard')).toEqual({ profile: 'admin', mode: 'report-only' })
     expect(cspProfileFor('/p/abc')).toEqual({ profile: 'admin', mode: 'report-only' })
-    expect(cspProfileFor('/')).toEqual({ profile: 'admin', mode: 'report-only' })
+  })
+
+  it('landing page naostro jen na přesných cestách, ne jako prefix /', () => {
+    for (const path of ['/', '/podminky', '/ochrana-udaju', '/zpracovatelska-smlouva', '/podminky/']) {
+      expect(cspProfileFor(path)).toEqual({ profile: 'workspace', mode: 'enforce' })
+    }
+    expect(cspProfileFor('/login')).toEqual({ profile: 'admin', mode: 'report-only' })
+    expect(cspProfileFor('/hub/finance')).toEqual({ profile: 'admin', mode: 'report-only' })
+    expect(cspProfileFor('/podminky-stare')).toEqual({ profile: 'admin', mode: 'report-only' })
+    expect(cspProfileFor('/h/abc')).toEqual({ profile: 'admin', mode: 'report-only' })
   })
 
   it('prefix nechytá podobné cesty', () => {

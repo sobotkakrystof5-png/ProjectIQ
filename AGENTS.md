@@ -17,7 +17,7 @@ Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin),
 | Oblast | Složky | Pravidlo |
 |---|---|---|
 | Admin konzole | `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/api/*` mimo `public/v1`, `ws`, `stripe`, `clerk`, `app/*-actions.ts`, `components/*.tsx` (kořen), `lib/*.ts` (kořen) | **neměnit**. Výjimky jen s výslovným souhlasem v zadání sezení (např. nová stránka `/dashboard/klienti`). |
-| Landing page | `app/(marketing)/` | nová |
+| Landing page | `app/(marketing)/`, `components/marketing/` | nová (`app/page.tsx` smazán, R-034) |
 | Workspace | `app/w/`, `components/ws/`, `lib/ws/` | nová |
 | Veřejné části Workspace | `app/r/` (objednávací stránka `/r/[slug]`), `app/embed/` (widget `/embed/[slug].js`), `app/z/` (klientský portál `/z/[token]`) | nové (R-016) |
 | API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/`, `app/api/clerk/` | nové |

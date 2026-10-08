@@ -30,7 +30,7 @@
 | S01 | Design systém Dílky v kódu | hotovo (2026-10-08) |
 | S02 | Bezpečnostní základ | hotovo (2026-10-08) |
 | S03 | Brief landing page | hotovo (2026-10-08) |
-| S04 | Landing page — stavba a animace | čeká |
+| S04 | Landing page — stavba a animace | rozpracováno (2026-10-08) |
 | S05 | Landing page — SEO a texty | čeká |
 | S06 | Databáze a oddělení účtů | čeká |
 | S07 | Clerk, registrace, nový byznys | čeká |
@@ -49,7 +49,7 @@
 
 **Landing page (S03):** zadání je `docs/landing/PROJECT-BRIEF.md`. Jedna stránka s kotvami v `app/(marketing)/page.tsx`, sekce LP-D + Proč to řešit (R-031), bez formuláře, kontakt e-mailem podpory (R-032), dynamická s vynucenou CSP (R-033), právní stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` zástupně. Úmyslně zatím chybí: e-mail podpory, IČO, právní texty, sociální důkaz (nemáme reference), odkaz Novinky.
 
-**Další krok:** S04 (`new - area of zakaziq/prompty/S04-landing-stavba.md`, sladěný s R-031–R-033) podle briefu. Souběžně jde S06 (DB), nezávisí na landing page. S07 doplní Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
+**Další krok:** dokončit S04: vizuální kontrola `/` v prohlížeči (390/768/1280/1440 px, konzole CSP, prefers-reduced-motion), porovnání s LP-D a checklistem Dílků, Lighthouse, kontrola admin stránek (B12). Kód stojí v `components/marketing/`, build a testy prochází. Souběžně jde S06 (DB), nezávisí na landing page. S07 doplní Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
 
 ---
 
@@ -190,6 +190,10 @@
 **Rozhodnutí:** Workspace i landing poběží na `zakaziq.cz` (rozhodl Kryštof). Kontakt pro hlášení zranitelností v `security.txt` je `info@vizeon.cz`.
 **Důsledek:** `public/.well-known/security.txt` (Canonical na `zakaziq.cz`, `Expires` 2027-10-01); DNS doporučení pro `zakaziq.cz` v `.claude/security/STATE.md`.
 
+### R-034 · `/` je landing page, admin přes /login (2026-10-08)
+**Rozhodnutí:** `app/page.tsx` (přesměrování na `/hub`/`/login`) smazán (povoleno promptem S04). Přihlášený admin vidí v hlavičce landing „Do administrace“ místo „Přihlásit“ (`useSession` z kořenového SessionProvideru). Komponenty landing page v `components/marketing/`.
+**Proč:** dvě stránky pro `/` nejdou; landing nemá importovat NextAuth na serveru.
+
 ### R-031 · Sekce landing page: LP-D + Proč to řešit (2026-10-08)
 **Rozhodnutí:** landing má pořadí z mockupu LP-D a navíc sekci „Proč to řešit“ (srovnání dnes / se ZakazIQ) hned za pásem oborů: hero · pás oborů · 01 Proč to řešit · 02 Co to umí · 03 Jak to funguje · 04 Funkce · 05 Napojení · 06 Ceník · 07 Dotazy · footer. Ostatní sekce z `docs/workspace/PLAN.md` (Pro koho, Zákazníci se vracejí, Peníze a daně, Kontakt) se nedělají samostatně, pokryje je pás oborů a karty v Co to umí.
 **Proč:** rozhodl Kryštof v S03. LP-D je kratší a soustředěnější, srovnání „před a po“ v něm chybělo.
@@ -224,7 +228,6 @@
 - [ ] **Workspace — toasty přes adminův `<Toaster>`** (R-027): pozice a délka jsou společné s adminem (vpravo nahoře). Až bude potřeba vlastní toaster (např. spodní lišta na mobilu v S09/S18), řešit upgradem sonneru na 2.x (víc toasterů) nebo úpravou `app/layout.tsx` — obojí sahá na admin, chce souhlas · od 2026-10-08
 - [ ] **Workspace — Inter se stahuje i na stránkách Dílků:** `@import` Google Fonts v `app/globals.css` (admin) se načte všude; Instrument Sans ho přebije, jen zbytečný request CSS. Od S02 ho na `/w` blokuje CSP (chyba v konzoli, žádný request) — na landing page dál. Řešit, až se bude sahat na admin · od 2026-10-08
 - [ ] **Bezpečnost — otevřené položky** (vynucení admin CSP, Clerk do CSP, DNS `zakaziq.cz`, živý audit, `Expires` v security.txt): vedené v `.claude/security/STATE.md` → Otevřené položky · od 2026-10-08
-- [ ] **Landing na `/`:** kořenová `app/page.tsx` (admin) přesměrovává na `/hub` nebo `/login` — landing page v `app/(marketing)/page.tsx` s ní bude kolidovat (build spadne). Prompt S04 smazání `app/page.tsx` povoluje (admin přes `/login`, přihlášený admin odkaz „Do administrace“), provede S04 · od 2026-10-08
 - [ ] **Landing — e-mail podpory:** firemní adresa pro „Napište nám“ (R-032) chybí, na landing `[DOPLNIT]`. Blokuje spuštění (S19) · od 2026-10-08
 - [ ] **Landing — kde jsou data uložená:** odpověď v Dotazech má `[DOPLNIT]` (region Neonu, ověřit) · od 2026-10-08
 - [ ] **Landing — cesty Clerku:** „Přihlásit“ → `/w/prihlaseni` a „Začít“ → `/w/registrace` jsou v briefu předpoklad, potvrdí S07 · od 2026-10-08
@@ -237,6 +240,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-08
+- **feat** S04 (rozpracováno) — landing page: `app/(marketing)/page.tsx` + `layout.tsx` (`force-dynamic`, `landing.css`), sekce v `components/marketing/` (hero s živou ukázkou, pás oborů, Proč to řešit, Co to umí, Jak to funguje, Funkce, Napojení, Ceník, Dotazy, footer), právní stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` (`[DOPLNIT]`), zástupné `/w/registrace` a `/w/prihlaseni` (`components/ws/coming-soon.tsx`). Smazán `app/page.tsx` (R-034). CSP: landing cesty vynucené jako přesné cesty (`lib/security/csp.ts` + test, CSP-LOG v2). `AccentHeading` dostal prop `id`. `npm run build` OK bez varování, `npm test` 126/126, `/` vrací 200 s vynucenou CSP. **Neověřeno:** vzhled v prohlížeči, konzole, mobil, Lighthouse, admin stránky.
 - **docs** S03 — brief landing page `docs/landing/PROJECT-BRIEF.md` (skill `web-project-brief`, texty podle `zakaziq-ux-texty-cs` a `humanize-text-cs`). Sekce 0 konkrétně (dílky 2×2 z loga jako skládání byznysu, pole dílků, živá ukázka, věrnostní karta, rozházené kousky → mřížka v Proč to řešit), sekce po sekcích s texty, odchylky od LP-D (widget `/embed/` místo `/w/lenka.js`, „Funkce“ místo „Moduly“, konečná cena místo `[DPH: DOPLNIT]`, bez Novinek), zadání SEO pro S05. Šablona `CLAUDE.md` ze skillu se nevytvářela, stav je tady. Prompt `S04-landing-stavba.md` sladěn (bez formuláře, `WhyBother`, dynamický layout). Ověřen tvar `/api/public/leads` (tajný `N8N_API_KEY`, natvrdo „z chatbota“). Rozhodnutí R-031–R-033, bezpečnost `.claude/security/DECISIONS.md` #007 + `STATE.md`. Žádný kód.
 - **feat** S02 — bezpečnostní základ podle `web-security-setup`. `middleware.ts` přepsán: NextAuth pro `/dashboard`, `/alteno`, `/hub` beze změny chování (bez session 307 na přihlášení, se session 200), CSP s nonce per request pro všechny stránky, místo pro Clerk (S07). Nové `lib/security/csp.ts` (profily admin/workspace, Report-Only vs vynucená), `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse` pro S11) + testy. `next.config.mjs`: plná sada hlaviček, `poweredByHeader: false`, výjimky z X-Frame-Options/CORP pro `/r`, `/embed`, `/api/public/v1`, `SAMEORIGIN` pro PDF faktury (náhled v `<object>` s DENY v Chromu nejspíš nefungoval). `app/w/layout.tsx` `force-dynamic` (nonce). `.gitignore` na všechny `.env*` kromě vzorů, `public/.well-known/security.txt`, `.github/workflows/security.yml` (audit — dočasně jen upozornění, gitleaks, hlavičky), `.claude/security/` (STATE, DECISIONS, CSP-LOG, AUDIT-LOG, `security-check.sh`). `AGENTS.md` → B13 plná pravidla, `CLAUDE.md` → Bezpečnost. R-029, R-030. Ověřeno: `npm run build` OK, `npm test` 125/125, průchod 30 admin stránek v headless Chromu na produkčním buildu (CSP hlášení jen statický `/login` a sonda Zodu na portálu, TradingView i PDF faktury fungují), `/w/_design` pod vynucenou CSP včetně hydratace, gitleaks přes historii čistý. Safari a živý web neověřeny.
 - **feat** S01 — design systém Dílky v kódu. Tokeny `app/ws-tokens.css` (+ tmavý režim, doplněné `--secondary`/`--accent`/`--ring` pro tmavý), Tailwind rozšíření `lib/ws/tailwind-dilky.ts` → `tailwind.config.ts` (+ `popover` barva, `darkMode` i pro `[data-theme="dark"]`, vlastní keyframes překryvů `zq-fade|pop|slide-*`), písma `lib/ws/fonts.ts`, `WsRoot` (`components/ws/ws-root.tsx`), layouty `app/w/layout.tsx` a `app/(marketing)/layout.tsx`. UI kit `components/ui/` (18 komponent + `portal.tsx`, toasty s „Zpět"), komponenty `components/ws/brand/` (12), `lib/ws/{motion,money,time,utils}.ts`, stránka `/w/_design` (v produkci 404). Testy `lib/ws/__tests__/dilky-format.test.ts` (částky, pražský čas, pole dílků). Nové závislosti R-028, oddělení od adminu R-027. `npm run build` OK, `npm test` 108/108, admin pixelově beze změny (porovnání screenshotů a zkompilovaného CSS), `/p/[neplatný]` 404, `npm audit --omit=dev` beze změny (11).

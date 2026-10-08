@@ -17,6 +17,7 @@ const sizes = {
  */
 export function AccentHeading({
   as: Tag = 'h1',
+  id,
   size = 'page',
   accent,
   onDark = false,
@@ -24,6 +25,8 @@ export function AccentHeading({
   children,
 }: {
   as?: 'h1' | 'h2' | 'h3'
+  /** Pro `aria-labelledby` sekce. */
+  id?: string
   size?: keyof typeof sizes
   accent?: React.ReactNode
   onDark?: boolean
@@ -31,7 +34,7 @@ export function AccentHeading({
   children: React.ReactNode
 }) {
   return (
-    <Tag className={cn('font-semibold', sizes[size], onDark ? 'text-white' : 'text-ink', className)}>
+    <Tag id={id} className={cn('font-semibold', sizes[size], onDark ? 'text-white' : 'text-ink', className)}>
       {children}
       {accent && (
         <>

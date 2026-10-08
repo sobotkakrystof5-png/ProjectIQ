@@ -1,0 +1,15 @@
+/* Landing page: plynulý posun ke kotvám a odsazení pod přichycenou hlavičku.
+   Načítá se jen v layoutu app/(marketing) — admin se nemění. */
+html:has([data-page="landing"]) {
+  scroll-behavior: smooth;
+}
+
+[data-page="landing"] [id] {
+  scroll-margin-top: 88px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has([data-page="landing"]) {
+    scroll-behavior: auto;
+  }
+}
