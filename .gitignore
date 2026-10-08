@@ -16,6 +16,8 @@
 # misc
 .DS_Store
 *.pem
+*.key
+*.p12
 
 # debug
 npm-debug.log*
@@ -23,11 +25,11 @@ yarn-debug.log*
 yarn-error.log*
 .debug-*/
 
-# local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# local env files — všechny kromě vzoru .env.example
+.env
+.env.*
+!.env.example
+!.env.local.example
 
 # vercel
 .vercel

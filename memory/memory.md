@@ -20,7 +20,7 @@
 
 **Poslední práce (2026-09-19):** veřejný endpoint `/api/public/alteno-leads` pro kontaktní formulář alteno.cz.
 
-**Rozpracováno:** ZakazIQ Workspace (SaaS) + landing page na větvi `workspace` (R-015). S00: plán `docs/workspace/PLAN.md`, skilly `.claude/skills/zakaziq-*`, env blok v `.env.example`. S01: design systém Dílky v kódu — tokeny `app/ws-tokens.css`, Tailwind `lib/ws/tailwind-dilky.ts`, písma `lib/ws/fonts.ts`, kořen `components/ws/ws-root.tsx`, UI kit `components/ui/`, komponenty `components/ws/brand/`, přehled `/w/_design` (jen dev). Layouty `app/w/layout.tsx` a `app/(marketing)/layout.tsx` existují, stránky zatím ne (kromě `/w/_design`). Prompty sezení: `new - area of zakaziq/prompty/` (rozcestník `00-README.md`).
+**Rozpracováno:** ZakazIQ Workspace (SaaS) + landing page na větvi `workspace` (R-015). S00: plán `docs/workspace/PLAN.md`, skilly `.claude/skills/zakaziq-*`, env blok v `.env.example`. S01: design systém Dílky v kódu — tokeny `app/ws-tokens.css`, Tailwind `lib/ws/tailwind-dilky.ts`, písma `lib/ws/fonts.ts`, kořen `components/ws/ws-root.tsx`, UI kit `components/ui/`, komponenty `components/ws/brand/`, přehled `/w/_design` (jen dev). S02: bezpečnostní základ — hlavičky v `next.config.mjs`, CSP s nonce v `middleware.ts` + `lib/security/` (admin Report-Only, `/w` `/r` `/z` vynucená), `security.txt`, CI `.github/workflows/security.yml`, stav v `.claude/security/STATE.md`. Layouty `app/w/layout.tsx` a `app/(marketing)/layout.tsx` existují, stránky zatím ne (kromě `/w/_design`). Prompty sezení: `new - area of zakaziq/prompty/` (rozcestník `00-README.md`).
 
 **Sezení Workspace:**
 
@@ -28,7 +28,7 @@
 |---|---|---|
 | S00 | Příprava repa, paměti, skillů | hotovo (2026-10-08) |
 | S01 | Design systém Dílky v kódu | hotovo (2026-10-08) |
-| S02 | Bezpečnostní základ | čeká |
+| S02 | Bezpečnostní základ | hotovo (2026-10-08) |
 | S03 | Brief landing page | čeká |
 | S04 | Landing page — stavba a animace | čeká |
 | S05 | Landing page — SEO a texty | čeká |
@@ -47,7 +47,7 @@
 | S18 | Mobil, tmavý režim, GDPR | čeká |
 | S19 | Bezpečnostní audit a spuštění | čeká |
 
-**Další krok:** S02 (`new - area of zakaziq/prompty/S02-bezpecnost-zaklad.md`). Souběžně jde S06 (DB) — nezávisí na landing page.
+**Další krok:** S03 (`new - area of zakaziq/prompty/S03-landing-brief.md`). Souběžně jde S06 (DB) — nezávisí na landing page. S04 musí rozhodnout CSP landing page a S07 doplnit Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
 
 ---
 
@@ -179,6 +179,15 @@
 **Rozhodnutí:** `@radix-ui/react-{slot,label,select,checkbox,switch,dialog,popover,dropdown-menu,tabs,tooltip,separator}`, `class-variance-authority`, `cmdk` (⌘K), `react-day-picker` 10 (kalendář, česká lokalizace z balíčku). shadcn komponenty psané ručně (bez `shadcn` CLI, které by přepsalo `tailwind.config.ts` a `globals.css`).
 **Proč:** standardní základ shadcn/ui, přístupnost (klávesnice, ARIA) zadarmo; Radix je jen v kódu Workspace, admin ho nenačítá.
 
+### R-029 · Bezpečnostní základ celého repa (2026-10-08)
+**Rozhodnutí:** jeden `middleware.ts` (admin NextAuth → místo pro Clerk → CSP s nonce a `strict-dynamic`), statické hlavičky v `next.config.mjs`, logika v `lib/security/`. CSP pro admin a vše mimo Workspace jen Report-Only, pro `/w`, `/r`, `/z` vynucená (layout `/w` je proto dynamický). Bezpečnostní stav a kompromisy se vedou v `.claude/security/` (STATE, DECISIONS, CSP-LOG, AUDIT-LOG), do `memory/` jen odkaz.
+**Proč:** admin běží v produkci a `/login` je statický (bez nonce) — vynucení by rozbilo přihlášení; nová část se staví rovnou do politiky. Podrobně `.claude/security/DECISIONS.md` #001–#006.
+**Důsledek:** `AGENTS.md` → Hranice (řádek Bezpečnost) a B13 (plná pravidla); `CLAUDE.md` → Bezpečnost.
+
+### R-030 · Doména zakaziq.cz a bezpečnostní kontakt (2026-10-08)
+**Rozhodnutí:** Workspace i landing poběží na `zakaziq.cz` (rozhodl Kryštof). Kontakt pro hlášení zranitelností v `security.txt` je `info@vizeon.cz`.
+**Důsledek:** `public/.well-known/security.txt` (Canonical na `zakaziq.cz`, `Expires` 2027-10-01); DNS doporučení pro `zakaziq.cz` v `.claude/security/STATE.md`.
+
 ---
 
 ## 3. Otevřené problémy
@@ -196,7 +205,8 @@
 - [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
 - [ ] **Zranitelné závislosti:** po `npm audit fix` zbývá 11 (1 critical `next` 14 — opravy až v 15.5.24+; high: `nodemailer` 7 → oprava v 10, `next-auth` přes `next`, `postcss` přibalený v `next`, řetězec `tailwindcss` 3 → 4). Obě critical RCE (Image Optimizer s AVIF, Windows hosting) se aplikace netýkají — nepoužívá `next/image` a běží na Vercelu. Zbytek jsou hlavně DoS/SSRF v Server Actions a rewrites. Řešení = upgrade Next 15 + nodemailer 10 jako samostatný krok (AGENTS B2 ho dává až po spuštění) — rozhodnout nejpozději v S19, ideálně před spuštěním · od 2026-10-08
 - [ ] **Workspace — toasty přes adminův `<Toaster>`** (R-027): pozice a délka jsou společné s adminem (vpravo nahoře). Až bude potřeba vlastní toaster (např. spodní lišta na mobilu v S09/S18), řešit upgradem sonneru na 2.x (víc toasterů) nebo úpravou `app/layout.tsx` — obojí sahá na admin, chce souhlas · od 2026-10-08
-- [ ] **Workspace — Inter se stahuje i na stránkách Dílků:** `@import` Google Fonts v `app/globals.css` (admin) se načte všude; Instrument Sans ho přebije, jen zbytečný request CSS. Řešit, až se bude sahat na admin · od 2026-10-08
+- [ ] **Workspace — Inter se stahuje i na stránkách Dílků:** `@import` Google Fonts v `app/globals.css` (admin) se načte všude; Instrument Sans ho přebije, jen zbytečný request CSS. Od S02 ho na `/w` blokuje CSP (chyba v konzoli, žádný request) — na landing page dál. Řešit, až se bude sahat na admin · od 2026-10-08
+- [ ] **Bezpečnost — otevřené položky** (vynucení admin CSP, Clerk do CSP, DNS `zakaziq.cz`, živý audit, `Expires` v security.txt): vedené v `.claude/security/STATE.md` → Otevřené položky · od 2026-10-08
 - [ ] **Landing na `/`:** kořenová `app/page.tsx` (admin) přesměrovává na `/hub` nebo `/login` — landing page v `app/(marketing)/page.tsx` s ní bude kolidovat. Rozhodnout v S04 (přesunout přesměrování) · od 2026-10-08
 - [ ] **`N8N_API_KEY`** není v lokálním `.env.local` — lokálně `/api/public/leads` vše odmítne (fail-closed). Na produkci ověřit ve Vercelu · od 2026-10-08
 
@@ -207,6 +217,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-08
+- **feat** S02 — bezpečnostní základ podle `web-security-setup`. `middleware.ts` přepsán: NextAuth pro `/dashboard`, `/alteno`, `/hub` beze změny chování (bez session 307 na přihlášení, se session 200), CSP s nonce per request pro všechny stránky, místo pro Clerk (S07). Nové `lib/security/csp.ts` (profily admin/workspace, Report-Only vs vynucená), `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse` pro S11) + testy. `next.config.mjs`: plná sada hlaviček, `poweredByHeader: false`, výjimky z X-Frame-Options/CORP pro `/r`, `/embed`, `/api/public/v1`, `SAMEORIGIN` pro PDF faktury (náhled v `<object>` s DENY v Chromu nejspíš nefungoval). `app/w/layout.tsx` `force-dynamic` (nonce). `.gitignore` na všechny `.env*` kromě vzorů, `public/.well-known/security.txt`, `.github/workflows/security.yml` (audit — dočasně jen upozornění, gitleaks, hlavičky), `.claude/security/` (STATE, DECISIONS, CSP-LOG, AUDIT-LOG, `security-check.sh`). `AGENTS.md` → B13 plná pravidla, `CLAUDE.md` → Bezpečnost. R-029, R-030. Ověřeno: `npm run build` OK, `npm test` 125/125, průchod 30 admin stránek v headless Chromu na produkčním buildu (CSP hlášení jen statický `/login` a sonda Zodu na portálu, TradingView i PDF faktury fungují), `/w/_design` pod vynucenou CSP včetně hydratace, gitleaks přes historii čistý. Safari a živý web neověřeny.
 - **feat** S01 — design systém Dílky v kódu. Tokeny `app/ws-tokens.css` (+ tmavý režim, doplněné `--secondary`/`--accent`/`--ring` pro tmavý), Tailwind rozšíření `lib/ws/tailwind-dilky.ts` → `tailwind.config.ts` (+ `popover` barva, `darkMode` i pro `[data-theme="dark"]`, vlastní keyframes překryvů `zq-fade|pop|slide-*`), písma `lib/ws/fonts.ts`, `WsRoot` (`components/ws/ws-root.tsx`), layouty `app/w/layout.tsx` a `app/(marketing)/layout.tsx`. UI kit `components/ui/` (18 komponent + `portal.tsx`, toasty s „Zpět"), komponenty `components/ws/brand/` (12), `lib/ws/{motion,money,time,utils}.ts`, stránka `/w/_design` (v produkci 404). Testy `lib/ws/__tests__/dilky-format.test.ts` (částky, pražský čas, pole dílků). Nové závislosti R-028, oddělení od adminu R-027. `npm run build` OK, `npm test` 108/108, admin pixelově beze změny (porovnání screenshotů a zkompilovaného CSS), `/p/[neplatný]` 404, `npm audit --omit=dev` beze změny (11).
 - **chore** Dotažení S00. (1) Skilly `web-security-memory`, `web-security-audit`, `web-security-review` nainstalovány globálně do `~/.claude/skills/` z `~/Documents/claude skills/SAFETY /claude-web-security/` (mimo repo). (2) `npm audit fix` bez `--force`: `next-auth` 4.24.14 → 4.24.15 a tranzitivní závislosti (jen `package-lock.json`), zranitelnosti v produkci 16 → 11; build OK, testy 100/100, produkční server: `/login` 200, `/dashboard`, `/alteno`, `/hub` přesměrují na přihlášení, `/p/[neplatný]` 404. (3) Plán v Claude Docs upraven podle R-016–R-026 (bez sekce „Kdo za tím stojí", 14 dní bez karty, konečná cena bez DPH, 1 byznys v ceně, odškrtnuté otázky DPH/doména, odkazy `memory/`, `CLAUDE.md`/`AGENTS.md`) a znovu exportován do `docs/workspace/PLAN.md`. (4) Smazán prázdný `new - area of zakaziq/docs/workspace/PLAN.md`. R-020 nahrazeno R-026.
 - **chore** S00 — příprava repa pro Workspace (bez produktového kódu, admin konzole beze změny). Větev `workspace` z `main`. Ze sady `~/Documents/zakaziq-claude-kit/` převzaty `docs/workspace/PLAN.md` a skilly `.claude/skills/zakaziq-{design-dilky,workspace-backend,ux-texty-cs,memory}`; `zakaziq-memory` přepsán na `memory/` podle `pravidla.md` (stará `.claude/memory/` se nezavádí). Prázdné složky s README: `app/(marketing)/`, `app/w/`, `components/ws/`, `components/ui/`, `lib/ws/`. `.env.example`: blok `# --- ZakazIQ Workspace ---` (`DATABASE_URL_WS`, Clerk ×3, Stripe ×4, `WS_KEY_PEPPER`; `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, `CRON_SECRET` už existovaly — neduplikováno). Rozhodnutí R-016–R-025 (cesty, doména, DPH, trial, limity, Dílky, SEO skilly, landing bez „Kdo za tím stojí", napojení webů, segmenty) → `AGENTS.md` Hranice, B2, B4, B5; prompty S03, S05 a `00-README.md` upraveny.

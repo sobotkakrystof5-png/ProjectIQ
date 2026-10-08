@@ -81,7 +81,7 @@ Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-se
 - `AGENTS.md` — pravidla a technická fakta pro všechny agenty; část A = admin konzole (popis kódu), část B = Workspace (pravidla pro nový kód). Při rozporu s CLAUDE.md platí AGENTS.md
 - `memory/` — stav, rozhodnutí, otevřené problémy, changelog (mapa v `memory/index.md`)
 - `docs/workspace/PLAN.md` — produktový plán Workspace (zdroj pravdy pro rozsah; export z Claude Docs — při rozporu s Rozhodnutími v `memory/memory.md` platí Rozhodnutí)
-- `.claude/security/` — bezpečnostní stav (vytvoří skill `web-security-setup`)
+- `.claude/security/` — bezpečnostní stav: `STATE.md`, `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (S02)
 - `new - area of zakaziq/prompty/` — připravené prompty pro jednotlivá sezení S00–S19 (rozcestník `new - area of zakaziq/prompty/00-README.md`)
 
 ## Git
@@ -92,3 +92,19 @@ Pravidla (větve, kdy commitovat, formát zpráv) jsou v `AGENTS.md` → Společ
 - Push na `main` = produkční deploy → před pushem se zeptej. `.env.local` nikdy necommituj ani nevypisuj.
 
 <!-- Sem se v sezení S02 doplní bezpečnostní blok ze skillu web-security-setup. -->
+
+## Bezpečnost — povinné
+
+Plná pravidla jsou v **`AGENTS.md` → B13** (platí pro celé repo). Stav zabezpečení je v **`.claude/security/`**:
+
+- `STATE.md` — co teď platí, otevřené položky, co neměnit bez zeptání. **Čti na začátku sezení**, které sahá na hlavičky, CSP, middleware, API nebo vstupy.
+- `DECISIONS.md` — proč jsou výjimky, s datem revize. `CSP-LOG.md` — každá změna CSP a proč. `AUDIT-LOG.md` — audity a incidenty.
+
+Bezpečnostní změna = zápis do odpovídajícího souboru ve stejném commitu.
+
+Tři nejdůležitější:
+1. **CSP neoslabuj, aby něco fungovalo** — žádné `unsafe-inline`/`unsafe-eval` ve `script-src`, žádný wildcard, žádné mazání direktivy. Nepasuje-li funkce do politiky, řekni to.
+2. **Žádný secret tam, kam dosáhne prohlížeč**, ani přes `NEXT_PUBLIC_`. Commitnutý secret se rotuje, ne jen maže.
+3. **Každý vstup validovat na serveru** a nedůvěryhodný vstup nikdy nevykreslovat jako HTML.
+
+Skilly: `web-security-review` před commitem a deployem, `web-security-audit` po deployi, `web-security-memory` při zápisu změny.

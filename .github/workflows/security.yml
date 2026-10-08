@@ -1,0 +1,48 @@
+# Bezpečnostní kontrola: audit závislostí, hledání secrets v historii,
+# hlavičky živého webu. Stav a výjimky: .claude/security/STATE.md.
+
+name: security
+
+on:
+  push:
+    branches: [main, workspace]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1' # pondělí ráno — nově zveřejněné CVE
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    # Dočasně jen upozornění: next 14 má známé zranitelnosti, oprava je upgrade
+    # na Next 15 (rozhodnout nejpozději v S19). .claude/security/DECISIONS.md #006.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Dev závislosti se k uživatelům nedostanou.
+      - run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # celá historie — smazaný klíč v historii pořád uniká
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  headers:
+    # Má smysl až s živou adresou — proměnná repa SITE_URL (Settings → Variables).
+    if: vars.SITE_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .claude/security/security-check.sh "${{ vars.SITE_URL }}"

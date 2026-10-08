@@ -1,5 +1,32 @@
+/**
+ * Statické bezpečnostní hlavičky pro všechny odpovědi (stránky, API, soubory).
+ * CSP se skládá per request v `middleware.ts` (nonce), tady není.
+ * Stav a důvody každé výjimky: `.claude/security/STATE.md` a `DECISIONS.md`.
+ */
+const securityHeaders = [
+  // `preload` zděděný z dřívější konfigurace — DECISIONS.md #005.
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Permissions-Policy',
+    value:
+      'accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), xr-spatial-tracking=()',
+  },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  { key: 'X-XSS-Protection', value: '0' },
+  { key: 'X-DNS-Prefetch-Control', value: 'off' },
+]
+
+// Co se vkládá na weby klientů: objednávací stránka /r/[slug] (iframe, rámování
+// řídí frame-ancestors z middleware) a widget /embed/[slug].js + veřejné API
+// /api/public/v1 (načítají se z cizí domény). DECISIONS.md #004.
+const notEmbeddable = '/((?!r/|r$|embed/|api/public/v1/).*)'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  poweredByHeader: false,
+  productionBrowserSourceMaps: false,
   experimental: {
     serverActions: {
       // PDF faktury chodí server actionou jako FormData. Výchozí 1 MB by
@@ -9,16 +36,28 @@ const nextConfig = {
     },
   },
   async headers() {
+    // Při shodě více pravidel vyhrává pozdější hodnota stejné hlavičky.
     return [
+      { source: '/:path*', headers: securityHeaders },
       {
-        source: '/:path*',
+        source: notEmbeddable,
         headers: [
           { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
         ],
+      },
+      {
+        source: '/embed/:path*',
+        headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }],
+      },
+      {
+        source: '/api/public/v1/:path*',
+        headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }],
+      },
+      {
+        // Náhled PDF faktury v <object> na /dashboard/faktury/[id] — stejný origin.
+        source: '/api/invoices/:id/pdf',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
     ]
   },

@@ -23,6 +23,7 @@ Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin),
 | API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/`, `app/api/clerk/` | nové |
 | UI kit | `components/ui/` (shadcn/ui, tokeny Dílky) | nový, admin ho nepoužívá |
 | DB | `migrations/064_*.sql` a dál | jen nové migrace, staré se nemění |
+| Bezpečnost (celé repo) | `middleware.ts`, `next.config.mjs` (hlavičky), `lib/security/`, `public/.well-known/`, `.github/workflows/security.yml`, `.claude/security/` | mění se jen spolu se zápisem do `.claude/security/` (B13) |
 
 Co se z adminu přebírá (příjem poptávek, časové helpery, faktury, daně, e-maily, portál), se **zkopíruje** do `lib/ws/` a tam zobecní. Původní soubor zůstává netknutý.
 
@@ -316,7 +317,7 @@ lib/
 ├── utils.ts
 └── types.ts
 
-middleware.ts                    ← next-auth middleware, chrání /dashboard/:path*, /alteno/:path*, /hub/:path*
+middleware.ts                    ← jediný middleware: NextAuth pro /dashboard, /alteno, /hub (vč. podcest) + CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -500,7 +501,7 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 ## Bezpečnost
 
 - **NextAuth JWT session** — admin chráněn `middleware.ts` (matcher `/dashboard`, `/alteno`, `/hub` vč. podcest) + `getServerSession` v layoutu. `/api/*` middleware **nehlídá** — každá neveřejná API routa si session kontroluje sama
-- **Security hlavičky** v `next.config.mjs` (X-Frame-Options DENY, HSTS, …); server actions body limit 5 MB kvůli PDF faktur
+- **Security hlavičky** v `next.config.mjs`, CSP s nonce v `middleware.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
 - **Heslo uloženo jako bcrypt hash** v env proměnné `ADMIN_PASSWORD_HASH`
@@ -657,11 +658,94 @@ Jak je systém v kódu (S01, R-027):
 
 ## B13. Bezpečnost
 
-<!-- Tuto sekci v sezení S02 nahradí plná pravidla ze skillu web-security-setup
-     (templates/AGENTS.md). Do té doby platí minimum níže. -->
-- Žádné secrets v kódu ani v klientském bundlu, `.env*` v `.gitignore`.
-- Každý vstup zvenku validovat Zodem, každé veřejné API mít rate limit.
-- CSP bez `unsafe-inline`/`unsafe-eval` ve `script-src`.
+> Platí pro **celé repo** (admin, Workspace, landing page), nejen pro Workspace. Zavedeno v S02 podle skillu `web-security-setup`.
+
+### Bezpečnostní paměť — čti první
+
+Stav zabezpečení je v `.claude/security/`:
+
+| Soubor | Obsah | Kdy číst |
+|---|---|---|
+| `STATE.md` | současný stav, threat model, otevřené položky, „neměnit bez zeptání" | na začátku každého sezení, které sahá na hlavičky, CSP, middleware, API nebo vstupy |
+| `DECISIONS.md` | přijaté kompromisy a proč, s datem revize | před změnou čehokoli bezpečnostního |
+| `CSP-LOG.md` | každá změna CSP a funkce, která ji vyžádala | před sáhnutím na politiku |
+| `AUDIT-LOG.md` | audity, review, incidenty, rotace klíčů | při vyšetřování nebo hlášení |
+
+**Bezpečnostní změna = zápis do odpovídajícího souboru ve stejném commitu.** Do `memory/memory.md` jen odkaz.
+
+| Změna | Zapsat do |
+|---|---|
+| hlavička přidaná/odebraná/změněná | `STATE.md` |
+| direktiva CSP | `CSP-LOG.md` + řádek CSP ve `STATE.md` |
+| přijatý kompromis | `DECISIONS.md` s datem revize |
+| audit nebo code review | `AUDIT-LOG.md` |
+| incident, uniklý klíč, rotace | `AUDIT-LOG.md` |
+
+### Kde je konfigurace
+
+| Co | Kde |
+|---|---|
+| Statické hlavičky (HSTS, nosniff, X-Frame-Options, CORP, COOP, Permissions-Policy…) pro všechny odpovědi | `next.config.mjs` |
+| CSP s nonce per request (`strict-dynamic`), výběr profilu podle cesty | `middleware.ts` + `lib/security/csp.ts` |
+| Admin přihlášení (NextAuth), místo pro Clerk (S07) | `middleware.ts` — pořadí: admin auth → Clerk → CSP |
+| `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`) |
+| Hlášení zranitelností | `public/.well-known/security.txt` (`Expires` obnovit) |
+| CI: audit závislostí, gitleaks, kontrola hlaviček živého webu | `.github/workflows/security.yml`, skript `.claude/security/security-check.sh` |
+
+- CSP: admin a vše mimo Workspace **Report-Only**, `/w`, `/r`, `/z` **vynucená**. Stránka s vynucenou CSP musí být dynamicky renderovaná (nonce dostanou jen dynamické stránky) — `app/w/layout.tsx` má `dynamic = 'force-dynamic'`. Nová veřejná část → přidat do `ENFORCED_PREFIXES` v `lib/security/csp.ts` a ověřit konzoli.
+- Nonce v komponentě (vlastní `<Script>`): `headers().get('x-nonce')`. Skripty Nextu ho dostanou samy.
+
+### Nepřekročitelná pravidla
+
+Nejsou to stylové preference — porušení = skutečná zranitelnost v aplikaci, na které závisí cizí firmy.
+
+**Nikdy neoslabuj CSP, aby něco fungovalo.** Žádné `unsafe-inline` ani `unsafe-eval` do `script-src` (mimo dev větev v `csp.ts`), žádný wildcard, žádné mazání direktivy kvůli chybě v konzoli. Když funkce do politiky nepasuje: vyměnit funkci, načíst skript přes nonce, nebo se zeptat. Nový zdroj = konkrétní host v `lib/security/csp.ts` + řádek v `CSP-LOG.md`.
+
+**Nikdy secret v kódu, kam dosáhne prohlížeč.** Nic citlivého za `NEXT_PUBLIC_`, žádný Stripe secret, Clerk secret, `DATABASE_URL*`, Resend/Anthropic klíč ani SMTP heslo mimo serverový kód. Publikovatelné klíče (Clerk publishable, Stripe publishable, veřejný klíč widgetu) jsou v pořádku. Commitnutý secret se musí **rotovat**, ne jen smazat — a zapsat do `AUDIT-LOG.md`.
+
+**Nikdy vstup bez validace na serveru.** Každá server action, route handler a veřejné API validuje Zodem a omezuje délku každého pole. Klientská validace je jen UX.
+
+**Nikdy nevykresluj nedůvěryhodný vstup jako HTML.** Žádné `innerHTML` ani `dangerouslySetInnerHTML` na čemkoli od uživatele, z URL nebo z API (poptávky, poznámky, jména zákazníků, vlastní kolonky). Když HTML být musí, nejdřív DOMPurify.
+
+**Nikdy nečti ani nezapisuj data jiného účtu.** Každý dotaz do `ws` přes `requireWorkspace()` a `account_id = ctx.accountId` (B3); `account_id` nikdy z formuláře ani URL. RLS je druhá pojistka, nikdy se nevypíná a nikdy `USING (true)`.
+
+**Nikdy nepřidávej skript třetí strany bez zeptání.** Běží s plnými právy na stránce a vidí formulář, do kterého zákazník píše. Když zůstane, potřebuje záznam v `CSP-LOG.md` (a SRI hash, pokud se načítá staticky).
+
+**Nikdy veřejný vstup bez ochrany.** Veřejné API a formuláře: rate limit, validace, honeypot nebo captcha, odeslání jen ze serveru. Webhooky (Stripe, Clerk) vždy s ověřeným podpisem a idempotentní.
+
+**CORS a rámování jen pro přesné domény.** CORS jen na `/api/public/v1/*` přes `corsHeaders()` — přesný origin, nikdy `*`, nikdy `Allow-Credentials`. Rámování jen `/r/*` přes `frameAncestorsFor()`. Neplatný origin se přeskočí, nikdy nerozšíří povolení.
+
+### Pracovní výchozí stav
+
+- `target="_blank"` vždy s `rel="noopener noreferrer"`.
+- Žádný inline `<script>` ani `onclick=` atribut — CSP je zakazuje.
+- Cookies: `Secure; HttpOnly; SameSite=Lax`, pokud není zapsaný důvod jinak.
+- Chyby pro návštěvníky obecné a česky (B6), detaily do logu — se `account_id`, bez osobních údajů.
+- Zdrojové mapy a `console.log` interních dat nepatří do produkce (`productionBrowserSourceMaps: false`).
+- OAuth (Clerk) přesměrováním, ne popupem — `Cross-Origin-Opener-Policy: same-origin` popup rozbije.
+- Lockfile v repu; `npm audit --omit=dev --audit-level=high` čistý před spuštěním (dnes výjimka, `DECISIONS.md` #006).
+
+### Skilly
+
+| Situace | Skill |
+|---|---|
+| nový projekt nebo chybí hlavičky | `web-security-setup` |
+| psaní/změna formulářů, API rout, DB dotazů, uploadů, env; před commitem a deployem | `web-security-review` |
+| po deployi a pravidelná kontrola živého webu | `web-security-audit` |
+| začátek sezení, zápis bezpečnostní změny | `web-security-memory` |
+
+### Checklist před produkčním deployem
+
+- [ ] `npm audit --omit=dev --audit-level=high` čistý (nebo výjimka v `DECISIONS.md`)
+- [ ] v diffu žádný nový secret (`git diff` + gitleaks v CI)
+- [ ] nové vstupy validované na serveru, nové dotazy do `ws` filtrují `account_id`
+- [ ] CSP pokrývá všechno nové — konzole čistá na dotčených stránkách
+- [ ] `.claude/security/` aktualizované pro všechno bezpečnostní v téhle změně
+- [ ] po deployi: `bash .claude/security/security-check.sh <adresa>` a výsledek do `AUDIT-LOG.md`
+
+### Když si nejsi jistý
+
+Zeptej se. Zbytečná otázka stojí minutu; potichu oslabená politika nebo uniklý klíč stojí důvěru firem, které Workspace používají — a objeví je někdo jiný.
 
 ---
 
