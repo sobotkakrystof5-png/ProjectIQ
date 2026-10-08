@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Technická fakta: [`../AGENTS.md`](../AGENTS.md).
 >
-> **Poslední aktualizace:** 2026-10-08 (S03)
+> **Poslední aktualizace:** 2026-10-08 (S06)
 
 ---
 
@@ -32,7 +32,7 @@
 | S03 | Brief landing page | hotovo (2026-10-08) |
 | S04 | Landing page — stavba a animace | hotovo (2026-10-08) |
 | S05 | Landing page — SEO a texty | čeká |
-| S06 | Databáze a oddělení účtů | čeká |
+| S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace na Neon čekají |
 | S07 | Clerk, registrace, nový byznys | čeká |
 | S08 | Stripe předplatné 249 Kč | čeká |
 | S09 | Kostra aplikace a obrazovka Dnes | čeká |
@@ -49,7 +49,9 @@
 
 **Landing page (S03):** zadání je `docs/landing/PROJECT-BRIEF.md`. Jedna stránka s kotvami v `app/(marketing)/page.tsx`, sekce LP-D + Proč to řešit (R-031), bez formuláře, kontakt e-mailem podpory (R-032), dynamická s vynucenou CSP (R-033), právní stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` zástupně. Úmyslně zatím chybí: e-mail podpory, IČO, právní texty, sociální důkaz (nemáme reference), odkaz Novinky.
 
-**Další krok:** S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Souběžně jde S06 (DB), nezávisí na landing page. S07 doplní Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
+**Databáze Workspace (S06):** schéma `ws` (migrace 064–075, 33 tabulek, R-035), role `ws_app` (`scripts/ws-create-role.js`), `lib/ws/{db,context,result}.ts`, šablony 8 oborů `lib/ws/templates/`, testy oddělení účtů v PGlite (R-036). Postup: `docs/workspace/SETUP.md`. **Na produkčním Neonu zatím neaplikováno** — migrace a role pouští Kryštof (Otevřené problémy). `requireWorkspace()` čeká na Clerk (S07, `setWsAuthProvider`).
+
+**Další krok:** S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Souběžně může jít S07 (Clerk) — předtím aplikovat migrace 064–075 a roli `ws_app` na Neon (`docs/workspace/SETUP.md`). S07 doplní Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
 
 ---
 
@@ -209,6 +211,16 @@
 **Proč:** rozhodl Kryštof v S03. Nonce dostanou jen dynamické stránky, Report-Only nic nechrání. Cena je o něco horší TTFB a HTML bez cache na CDN.
 **Důsledek:** provede S04. `.claude/security/DECISIONS.md` #007, brief § 3.
 
+### R-035 · Schéma ws a oddělení účtů (2026-10-08)
+**Rozhodnutí:** 33 tabulek ve schématu `ws` (migrace 064–075). Každá tabulka s daty účtu má `account_id` a RLS politiku `account_id = ws.current_account()` (`set_config('app.account_id')` v transakci). Vazby jsou složené cizí klíče `(account_id, x_id)`. Zákazník patří účtu, skupina (segment) se počítá pro zákazník × byznys (`customer_segments`). Blokace a dovolené jsou termíny `kind = 'block'`, takže je hlídá stejné `EXCLUDE` jako návštěvy. Před známým účtem jen úzké `SECURITY DEFINER` funkce (`ws.account_by_clerk_org`, další přidají S11/S16). Systémové tabulky bez RLS a bez osobních údajů: `stripe_events`, `webhook_events`, `rate_limits`. Aplikace se připojuje rolí `ws_app` založenou **přes SQL** skriptem, nikdy v Neon konzoli. `lib/ws/db.ts` má vlastní tag `q` a ovladač nad Neon HTTP transakcí (neinteraktivní, interaktivní přes Pool přidá S10, pokud bude potřeba).
+**Proč:** odsouhlaseno v S06. Kontrola cizího klíče RLS obchází (bez `account_id` v klíči by šlo připojit cizí řádek přes UUID). Role z Neon konzole dostávají `neon_superuser` s BYPASSRLS (ověřeno na `neondb_owner`). Po transakci vrací `current_setting` prázdný řetězec, proto `NULLIF` ve funkci. Hranice skupin má každý byznys vlastní. Jedno `EXCLUDE` je jednodušší než trigger přes dvě tabulky (R-005).
+**Důsledek:** `AGENTS.md` → B3 „Jak je to v kódu“, `docs/workspace/SETUP.md`, `.claude/security/DECISIONS.md` #008. Nová tabulka = řádek v `seedAccount()` v testovém helperu.
+
+### R-036 · Testy DB proti PGlite (2026-10-08)
+**Rozhodnutí:** vývojová závislost `@electric-sql/pglite` (Postgres 18 ve WASM). Testy Workspace pouští migrace 064+ do čisté DB dvakrát po sobě a ověřují pravidla jako `ws_app`.
+**Proč:** Docker neběží, lokální Postgres není a Neon branch by potřebovala přihlašovací údaje a síť. PGlite umí role, RLS, `set_config` i `btree_gist`. Neon běží na PG 18.6, rozdíl verzí je zanedbatelný. Testy jsou součástí běžného `npm test` (asi 2 s).
+**Důsledek:** `lib/ws/__tests__/helpers/ws-pglite.ts`, `docs/workspace/SETUP.md` → Testy. Do produkčního bundlu se nedostane.
+
 ---
 
 ## 3. Otevřené problémy
@@ -216,6 +228,7 @@
 - [ ] **Legacy routy:** `app/dashboard/projekty/**` zůstalo po přesunu Projektů do Hubu (R-007); `projekty-actions.ts` se liší od verze v `app/hub/projekty/`. Rozhodnout: smazat, nebo přesměrovat na `/hub/projekty` · od 2026-06-23
 - [ ] **Mrtvé env:** `FATSECRET_CLIENT_ID/SECRET` jsou v `.env.example`, ale kód je nepoužívá (vyhledávání jídla jede přes Open Food Facts, `lib/fatsecret.ts` a `/api/fatsecret/search` mají historický název) · od 2026-06-22
 - [ ] **Připomínky 2 h před konzultací:** po R-006 není jasné, jestli běží externí hodinový cron (commit 2026-06-20 zmiňuje „externí hodinový cron"). Ověřit u uživatele · od 2026-06-25
+- [ ] **Workspace — migrace 064–075 a role `ws_app` na produkčním Neonu:** neaplikováno. Postup `docs/workspace/SETUP.md` (migrace → `node scripts/ws-create-role.js` → `DATABASE_URL_WS` do Vercelu). Blokuje S07 · od 2026-10-08
 - [ ] **Evidence migrací:** neexistuje tabulka, která by evidovala, které migrace jsou aplikované na produkční DB — stav se drží jen v changelogu (pravidlo: u každé migrace zapsat „aplikována: ano/ne") · od 2026-10-08
 - [ ] **Resend jen kvůli waitlistu:** závislost `resend` slouží jedné funkci (`sendLaunchEmailBlast`). Zvážit převod na `lib/email.ts` (R-004) · od 2026-10-08
 - [ ] **Workspace — IČO a právní texty** (podmínky, ochrana údajů, zpracovatelská smlouva). V S04 zástupně `[DOPLNIT]` (R-023), skutečné texty blokují S19 · od 2026-10-08
@@ -240,6 +253,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-08
+- **db** S06 — schéma `ws` a oddělení účtů. Migrace 064–075 (aplikována: ne): účty, členové, byznysy, funkce, služby, pracovníci, otevírací doba, kolonky, stavy, zákazníci, poptávky, zakázky, termíny (`EXCLUDE` per pracovník), věrnost (1 návštěva = 1 razítko), skupiny, faktury, příjmy, daně, napojení webu, předplatné, Stripe/Clerk události, e-maily, upozornění, audit, idempotence, rate limit. Role `ws_app`: `scripts/ws-create-role.js` (heslo rovnou do `.env.local`, kontrola bez BYPASSRLS a bez přístupu k `public`) + `scripts/ws-grants.sql`. `lib/ws/db.ts` (`wsDb`, `wsSystem`, `q`), `lib/ws/context.ts` (`requireWorkspace`, `requireBusiness`, `requireRole`, Clerk za rozhraním), `lib/ws/result.ts`, šablony 8 oborů `lib/ws/templates/` (ceny `null`, věrnost vypnutá). Testy `lib/ws/__tests__/ws-{schema,db-context,templates}.test.ts` v PGlite: idempotence (otisk schématu po 2. průchodu stejný, i po jednom příkazu přes splitter `apply-migration.js`), účet A nevidí, nezmění ani nesmaže nic z B ve všech 30 tabulkách, složené FK, překryv, razítka, duplicitní události, mutační kontrola (oslabená politika test shodí). `docs/workspace/SETUP.md`, `AGENTS.md` B3 + env + příkazy, `.env.example`, R-035, R-036, bezpečnost `DECISIONS.md` #008 + `STATE.md`. Ověřeno: `npm test` 182/182, `npm run build` OK, admin `/login` 200, `/dashboard` `/alteno` `/hub` 307 na přihlášení, `/p/[neplatný]` 404. Migrace < 064 beze změny.
 - **fix** S04 dokončeno — kontrola v headless Chromu (produkční build i dev, 390/768/1280/1440 px): nic nepřetéká, jeden H1, nájezdy, menu, klávesnice (neviditelná přichycená hlavička mimo tabulátor), akordeon, prefers-reduced-motion; jediné porušení CSP = adminův `@import` Inter (známé), 404 jen `favicon.ico` (S05). Opraveno po screenshotech: štítek „ukázka“ přes nadpis v hero, překrývající se kousky v Proč to řešit (+ natočení i na mobilu), dílky přes nadpis v Jak to funguje (dole vpravo, na mobilu skryté), cena 249 + menší „Kč / měsíc“, ilustrace karty Poptávky na střed. Admin: `/login` 200, `/dashboard` `/alteno` `/hub` → přihlášení, `/p` a `/h` s neplatným tokenem 404. Lighthouse neměřen (→ S05). Pozn.: souběžné `next dev` sdílí `.next` s produkčním buildem — kontrolovat přes dev server.
 - **feat** S04 (rozpracováno) — landing page: `app/(marketing)/page.tsx` + `layout.tsx` (`force-dynamic`, `landing.css`), sekce v `components/marketing/` (hero s živou ukázkou, pás oborů, Proč to řešit, Co to umí, Jak to funguje, Funkce, Napojení, Ceník, Dotazy, footer), právní stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` (`[DOPLNIT]`), zástupné `/w/registrace` a `/w/prihlaseni` (`components/ws/coming-soon.tsx`). Smazán `app/page.tsx` (R-034). CSP: landing cesty vynucené jako přesné cesty (`lib/security/csp.ts` + test, CSP-LOG v2). `AccentHeading` dostal prop `id`. `npm run build` OK bez varování, `npm test` 126/126, `/` vrací 200 s vynucenou CSP. **Neověřeno:** vzhled v prohlížeči, konzole, mobil, Lighthouse, admin stránky.
 - **docs** S03 — brief landing page `docs/landing/PROJECT-BRIEF.md` (skill `web-project-brief`, texty podle `zakaziq-ux-texty-cs` a `humanize-text-cs`). Sekce 0 konkrétně (dílky 2×2 z loga jako skládání byznysu, pole dílků, živá ukázka, věrnostní karta, rozházené kousky → mřížka v Proč to řešit), sekce po sekcích s texty, odchylky od LP-D (widget `/embed/` místo `/w/lenka.js`, „Funkce“ místo „Moduly“, konečná cena místo `[DPH: DOPLNIT]`, bez Novinek), zadání SEO pro S05. Šablona `CLAUDE.md` ze skillu se nevytvářela, stav je tady. Prompt `S04-landing-stavba.md` sladěn (bez formuláře, `WhyBother`, dynamický layout). Ověřen tvar `/api/public/leads` (tajný `N8N_API_KEY`, natvrdo „z chatbota“). Rozhodnutí R-031–R-033, bezpečnost `.claude/security/DECISIONS.md` #007 + `STATE.md`. Žádný kód.

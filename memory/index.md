@@ -17,6 +17,7 @@
 | [`../docs/FINANCE_SYSTEM_PLAN.md`](../docs/FINANCE_SYSTEM_PLAN.md) | Plán finance/faktury/daně — **hotový** (fáze 0–8), zafixovaná rozhodnutí a daňové parametry 2026 | Při práci na Financích/fakturách/daních | Jen když se mění daňová pravidla |
 | [`../docs/POZNAMKY_NAKLADY_SABLONY_PLAN.md`](../docs/POZNAMKY_NAKLADY_SABLONY_PLAN.md) | Plán poznámek, sjednocení nákladů, šablon webu a drag-and-drop — implementováno | Při práci na Hovorech/poznámkách/nákladech/šablonách | — |
 | [`../docs/workspace/PLAN.md`](../docs/workspace/PLAN.md) | Produktový a designový plán Workspace — zdroj pravdy pro rozsah (export z Claude Docs; při rozporu platí Rozhodnutí v memory.md) | Při každém sezení Workspace | Novým exportem, když se změní plán |
+| [`../docs/workspace/SETUP.md`](../docs/workspace/SETUP.md) | Databáze Workspace: pořadí migrací 064+, založení role `ws_app`, výměna hesla, jak běží testy oddělení účtů v PGlite | Při práci na DB Workspace a nasazení | Když se mění postup nebo testy |
 | `../.claude/skills/zakaziq-*` | Projektové skilly: `design-dilky` (UI), `workspace-backend` (DB/API/Clerk/Stripe), `ux-texty-cs` (texty), `memory` (rituál sezení nad `memory/`) | Claude Code (podle úlohy) | Když se mění pravidla oblasti |
 | [`../new - area of zakaziq/prompty/00-README.md`](<../new - area of zakaziq/prompty/00-README.md>) | Prompty sezení S00–S19 pro výstavbu Workspace + landing page (jedno sezení = jedna konverzace) | Na začátku každého sezení Workspace | Když se mění plán sezení |
 | [`../docs/landing/PROJECT-BRIEF.md`](../docs/landing/PROJECT-BRIEF.md) | Brief landing page (S03): anti-šablona, sekce s texty, kontakt, CSP, SEO zadání pro S05 | S04, S05 a každá změna landing page | Když se mění struktura nebo texty landing page |
@@ -46,6 +47,7 @@
 | Hub (osobní moduly) | `app/hub/**`, `components/HubSidebarNav.tsx` |
 | Landing page | `../docs/landing/PROJECT-BRIEF.md`, `app/(marketing)/` |
 | Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `AGENTS.md` → Část B |
+| Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `AGENTS.md` → B3 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | `AGENTS.md` → Databázový model + Katalog tabulek; detail v `migrations/` |
 | Testy | `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |

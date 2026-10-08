@@ -3,7 +3,7 @@
 > Současný stav. Přepisuje se — historie je v ostatních souborech.
 > Čti na začátku každého sezení, které sahá na hlavičky, CSP, middleware, API nebo vstupy.
 
-**Poslední aktualizace:** 2026-10-08, sezení S02 (bezpečnostní základ)
+**Poslední aktualizace:** 2026-10-08, sezení S06 (databáze a oddělení účtů)
 
 ## Projekt
 
@@ -82,7 +82,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 ## Aplikace
 
 - Validace na serveru: Zod ve veřejných admin API a portálových akcích ✅; Workspace povinně (AGENTS.md B11, B13)
-- Izolace účtů: `requireWorkspace()` + `account_id` — vzniká v S06/S07, test povinný
+- Izolace účtů: `requireWorkspace()` + `account_id` v každém dotazu (`lib/ws/context.ts`, `lib/ws/db.ts`) + RLS na všech 30 tabulkách `ws` s daty účtu, role `ws_app` bez BYPASSRLS, složené cizí klíče (S06, DECISIONS #008). Testy `lib/ws/__tests__/ws-schema.test.ts` ✅. Clerk do `requireWorkspace` napojí S07
 - Rate limit: admin API a portál DB-backed (`lib/api-rate-limit.ts`, `isRateLimited`) ✅; Workspace API v S11
 - Captcha: žádná. Zvážit Turnstile pro `/r/[slug]` a widget v S11
 - Secrets: jen env Vercelu, `.env*` v `.gitignore` (kromě vzorů), gitleaks v CI. Historie gitu 2026-10-08 čistá (90 commitů)
@@ -93,6 +93,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
+| Migrace `ws` + role `ws_app` na produkčním Neonu | dokud neběží, Workspace nemá DB; roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli (BYPASSRLS) | Kryštof | před S07 |
 | Admin CSP → vynucená | Report-Only nic nechrání. Potřeba dynamický `/login` (souhlas se zásahem do adminu) a 404 | Kryštof + Claude | do S19 |
 | Clerk domény do CSP | S07 — `script-src` (strict-dynamic stačí), `connect-src`, `frame-src`, `img-src` podle instance; popup OAuth vs COOP | S07 | S07 |
 | `frame-ancestors` a CORS z `web_integrations.allowed_origins` | `/r/*` teď jen `'self'`, CORS helper bez dat | S11 | S11 |
@@ -111,3 +112,4 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 - Výjimky `/r/*`, `/embed/*`, `/api/public/v1/*` z `X-Frame-Options`/CORP — jinak nepůjde vložit objednávka ani widget na weby klientů.
 - `object-src`/`frame-src 'self'` jen na `/dashboard/faktury/*` — nerozšiřovat na celý admin.
 - Pořadí v `middleware.ts`: admin auth → (Clerk) → CSP. Admin přihlášení se nesmí změnit.
+- Workspace nikdy přes `DATABASE_URL` (admin role obchází RLS) — jen `DATABASE_URL_WS` / `lib/ws/db.ts`. RLS na `ws` se nevypíná a politika nikdy `USING (true)`.

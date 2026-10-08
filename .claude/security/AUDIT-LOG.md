@@ -16,6 +16,17 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-08 — review (S06, databáze a oddělení účtů)
+Spouštěč: nové schéma `ws`, DB role, přístupová vrstva.
+Rozsah: migrace 064–075, `scripts/ws-grants.sql`, `scripts/ws-create-role.js`, `lib/ws/{db,context}.ts`, testy v PGlite.
+Výsledek: oddělení účtů ověřené automaticky na všech 30 tabulkách s daty účtu (čtení, změna, mazání, zápis s cizím `account_id`, cizí UUID přes cizí klíč); mutační kontrola — politika `USING (true)` test shodí.
+Nálezy:
+- Role z Neon konzole mají `neon_superuser` → `BYPASSRLS` (ověřeno na `neondb_owner`). Řešeno: role jen přes SQL skript, který na konci ověří, že RLS platí.
+- `current_setting('app.account_id', true)` vrací po transakci `''` → `''::uuid` by shodil dotazy. Řešeno `NULLIF` v `ws.current_account()`.
+- Kontrola cizích klíčů obchází RLS. Řešeno složenými klíči `(account_id, x_id)`.
+Opraveno: vše výše před commitem „ws/db: schéma a oddělení účtů“.
+Zůstává: migrace a role ještě nejsou na produkčním Neonu (STATE → Otevřené položky); přijatá rizika v DECISIONS #008.
+
 ## 2026-10-08 — audit (lokální, zavedení základu S02)
 Spouštěč: zavedení bezpečnostního základu.
 Rozsah: hlavičky přes `curl` na produkčním buildu (`next start`) pro `/login`, `/dashboard`, `/w/_design`, `/r/*`, `/p/[token]`, `/api/invoices/[id]/pdf`, `/embed/*`, `/api/public/v1/*`, `/.well-known/security.txt`; průchod 30 admin stránek v headless Chromu s CSP hlášeními; `gitleaks git` přes celou historii; kontrola trackovaných `.env*` souborů a `NEXT_PUBLIC_` proměnných; `npm audit --omit=dev`.

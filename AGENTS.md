@@ -69,6 +69,7 @@ npm run build    # produkční build — musí projít před commitem větší z
 npm test         # vitest run
 npm run lint     # next lint
 node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace migrace na DATABASE_URL z .env.local
+node scripts/ws-create-role.js   # Workspace: role ws_app + práva + DATABASE_URL_WS do .env.local (docs/workspace/SETUP.md)
 ```
 
 ### Env proměnné
@@ -78,6 +79,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | Skupina | Proměnné |
 |---------|----------|
 | DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
+| Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
 | Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
 | Veřejná API | `VIZEON_API_KEY`, `ALTENO_API_KEY`, `ALTENO_LEAD_WEBHOOK_SECRET`, `N8N_API_KEY`, `VIZEON_AGENT_API_KEY`, `INVOICES_API_KEY` |
@@ -575,6 +577,42 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 - Čas vždy přes `lib/ws/time.ts` (zkopírováno z `lib/prague-time.ts`), Europe/Prague.
 - Peníze v haléřích (`integer`) nebo `numeric(12,2)`, měny se nikdy nesčítají dohromady.
 - Migrace jsou idempotentní (`IF NOT EXISTS`, `DO $$ … $$` guardy), číslované sekvenčně od 064.
+
+### Jak je to v kódu (S06, R-035)
+
+| Co | Kde |
+|---|---|
+| Schéma `ws` — 33 tabulek | migrace `064_ws_zaklad` … `075_ws_audit_limity` (přehled níže) |
+| Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
+| Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505) |
+| Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení za `setWsAuthProvider` — Clerk napojí S07 |
+| Výsledek akcí | `lib/ws/result.ts` (`ok`, `fail`, `Result<T>`) |
+| Šablony oborů | `lib/ws/templates/` — 8 oborů, `templateSeedQueries()` naplní nový byznys (funkce, služby bez cen, kolonky, stavy, hranice skupin, vypnutá věrnost) |
+| Testy | `lib/ws/__tests__/ws-*.test.ts` proti PGlite (R-036) |
+
+Pravidla schématu:
+- RLS politika `account_isolation` (`account_id = ws.current_account()`) na každé tabulce s daty účtu, přes `ws.enable_account_rls()`. `ws.current_account()` má `NULLIF` — po transakci je nastavení `''`, ne NULL.
+- Vazby jsou **složené cizí klíče** `(account_id, x_id) → x(account_id, id)` (kontrola cizího klíče RLS obchází). Nová tabulka s vazbou na jinou to dodržuje, cílová tabulka má `UNIQUE (account_id, id)`.
+- Systémové tabulky bez RLS a bez osobních údajů: `stripe_events`, `webhook_events`, `rate_limits`. Nic dalšího bez důvodu.
+- Kolize termínů: `appointments_no_overlap` (`EXCLUDE USING gist` per `staff_id`, mimo `cancelled`). Blokace/dovolená = `appointments.kind = 'block'`.
+- `updated_at` hlídá trigger `touch_updated_at` (`ws.add_touch_trigger()`), není potřeba ho nastavovat v akci.
+- `ws_app` nemá `UPDATE`/`DELETE` na `audit_log`.
+- Nová tabulka = řádek v `seedAccount()` v `lib/ws/__tests__/helpers/ws-pglite.ts`, jinak spadne test oddělení účtů.
+
+| Migrace | Tabulky |
+|---|---|
+| 064 | `accounts` (Clerk org, IČO, `trial_ends_at` +14 dní), `members`, `businesses` (slug unikátní globálně), `business_modules` |
+| 065 | `services`, `staff`, `service_staff`, `opening_hours` |
+| 066 | `field_definitions`, `stages` |
+| 067 | `customers` (účet, ne byznys; telefon E.164 a e-mail malými unikátní v účtu) |
+| 068 | `requests` (`field_values`, `contact`, `source`, `external_id`), `jobs` (`public_token` pro `/z`), `appointments` |
+| 069 | `loyalty_programs`, `loyalty_cards`, `loyalty_events` (1 návštěva = max. 1 razítko) |
+| 070 | `segment_rules`, `customer_segments` (zákazník × byznys), `segment_history` |
+| 071 | `invoices` (číslo unikátní v účtu), `transactions`, `tax_settings` |
+| 072 | `web_integrations` (`public_key`, `secret_prefix` + `secret_hash`, `allowed_origins`) |
+| 073 | `subscriptions`, `stripe_events`, `webhook_events` |
+| 074 | `message_settings`, `outbound_messages` (fronta), `notifications` |
+| 075 | `audit_log`, `idempotency_keys`, `rate_limits` |
 
 ## B4. Přihlášení a role
 
