@@ -1,8 +1,36 @@
-#ZakazIQ — CLAUDE.md
+# ZakazIQ — AGENTS.md
 
-> Kontext pro Claude Code. Zahrnuje přehled zakázek, klientský portál, klientský feedback (NPS), rezervace konzultací a globální kalendář.
+> **Pravidla a technická fakta pro všechny agenty v repu** — Claude Code, Cursor, Codex, Copilot i lidi. Co projekt je, z čeho se skládá a jaká pravidla platí.
+>
+> **Než začneš pracovat:** přečti [`memory/index.md`](memory/index.md) → [`memory/memory.md`](memory/memory.md) (aktuální stav, rozhodnutí, otevřené problémy) a dodržuj [`memory/pravidla.md`](memory/pravidla.md) — včetně povinnosti zapsat každou dokončenou změnu do changelogu v `memory/memory.md`.
+>
+> Chování a proces specifické pro Claude Code jsou v [`CLAUDE.md`](CLAUDE.md) — krátký rozcestník sem. **Když se pravidla v těchto dvou souborech rozcházejí, platí `AGENTS.md` a rozpor oprav.** Stav práce a historie sem nepatří.
+
+Soubor má dvě části: **[A — Admin konzole](#část-a--admin-konzole)** (běžící osobní systém, popis kódu) a **[B — ZakazIQ Workspace](#část-b--zakaziq-workspace)** (SaaS ve výstavbě, pravidla pro nový kód). Společné jsou hranice v repu níže a sekce na konci (git, paměť, nikdy).
 
 ---
+
+## Hranice v repu
+
+Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin), **ZakazIQ Workspace** (Clerk, firmy) a **landing page** (veřejná).
+
+| Oblast | Složky | Pravidlo |
+|---|---|---|
+| Admin konzole | `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/api/*` mimo `public/v1`, `ws`, `stripe`, `clerk`, `app/*-actions.ts`, `components/*.tsx` (kořen), `lib/*.ts` (kořen) | **neměnit**. Výjimky jen s výslovným souhlasem v zadání sezení (např. nová stránka `/dashboard/klienti`). |
+| Landing page | `app/(marketing)/` | nová |
+| Workspace | `app/w/`, `components/ws/`, `lib/ws/` | nová |
+| Veřejné části Workspace | `app/r/` (objednávací stránka `/r/[slug]`), `app/embed/` (widget `/embed/[slug].js`), `app/z/` (klientský portál `/z/[token]`) | nové (R-016) |
+| API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/`, `app/api/clerk/` | nové |
+| UI kit | `components/ui/` (shadcn/ui, tokeny Dílky) | nový, admin ho nepoužívá |
+| DB | `migrations/064_*.sql` a dál | jen nové migrace, staré se nemění |
+
+Co se z adminu přebírá (příjem poptávek, časové helpery, faktury, daně, e-maily, portál), se **zkopíruje** do `lib/ws/` a tam zobecní. Původní soubor zůstává netknutý.
+
+---
+
+# Část A — Admin konzole
+
+> Kryštofův osobní produkční systém (VIZEON, ALTENO, Hub, klientský portál). Popis níže je popis **existujícího kódu** — platí pro údržbu adminu, ne jako vzor pro Workspace.
 
 ## Vize a cíl
 
@@ -19,16 +47,43 @@
 | Vrstva | Technologie | Poznámka |
 |--------|-------------|----------|
 | Frontend | Next.js 14 (App Router) + TypeScript | SSR, App Router — nikdy Pages Router |
-| Styling | Tailwind CSS + shadcn/ui | Rychlé, profesionální komponenty, brand-* barvy |
+| Styling | Tailwind CSS (+ `clsx`, `tailwind-merge`) | Vlastní komponenty, brand-* barvy — shadcn/ui admin nepoužívá |
 | Animace | Framer Motion | Booking modal, success states |
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
 | Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
 | Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session, chráněno i přes `middleware.ts` |
 | Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
-| Deployment | Vercel | Zero-ops, napojení na GitHub |
+| Deployment | Vercel | Zero-ops, napojení na GitHub, Hobby plán (crony max 1× denně) |
+| AI | `@anthropic-ai/sdk` | AI asistenti (Startup) + AI přepis PDF faktur (`lib/invoice-ai.ts`) |
+| Drag-and-drop | `@dnd-kit/*` | Řazení bloků šablony webu (`ProjectBlockList`) |
+| Scraping | `puppeteer-core` + `@sparticuz/chromium` | Hub › Škola (LernSax, Beste Schule) |
+| Testy | Vitest | `npm test` — testy v `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |
+
+### Příkazy
+
+```bash
+npm run dev      # lokální vývoj (http://localhost:3000)
+npm run build    # produkční build — musí projít před commitem větší změny
+npm test         # vitest run
+npm run lint     # next lint
+node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace migrace na DATABASE_URL z .env.local
+```
 
 ### Env proměnné
+
+Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy, udržuj ho v sync. Přehled:
+
+| Skupina | Proměnné |
+|---------|----------|
+| DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
+| Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
+| Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
+| Veřejná API | `VIZEON_API_KEY`, `ALTENO_API_KEY`, `ALTENO_LEAD_WEBHOOK_SECRET`, `N8N_API_KEY`, `VIZEON_AGENT_API_KEY`, `INVOICES_API_KEY` |
+| Crony | `CRON_SECRET` |
+| Hub | `LERNSAX_USER`, `LERNSAX_PASS`, `BESTESCHULE_USER`, `BESTESCHULE_PASS`, `BESTESCHULE_URL`, `CHROME_PATH` (dev), `ANTHROPIC_API_KEY` |
+
+Nejdůležitější s popisem:
 
 ```env
 DATABASE_URL=             # Neon connection string (pooled)
@@ -52,7 +107,7 @@ VIZEON_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/b
 ALTENO_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/booking/alteno (alteno.cz)
 ```
 
-Vzor je v `.env.example` — udržuj ho v sync s realitou, pokud přidáváš novou env proměnnou.
+Přidáváš novou env proměnnou → zapiš ji do `.env.example` **i** do tabulky výše a připomeň uživateli, že ji musí nastavit ve Vercelu.
 
 ---
 
@@ -167,6 +222,37 @@ Ruční admin události/blokace v globálním kalendáři (`/dashboard/calendar`
 
 **Propojení s Hovory (migrace 051):** vytvoření kalendářní události automaticky založí odpovídající řádek v `client_leads` (company_name = název události, next_action = popis, next_action_date/time odvozeno z `starts_at` v Europe/Prague) a propojí obě strany přes `calendar_events.lead_id` / `client_leads.calendar_event_id`. Smazání jedné strany smaže i druhou (`deleteCalendarEvent` / `deleteLead` v `app/calendar-actions.ts` a `app/calls-actions.ts`). Kalendářová stránka proto z `client_leads` do zobrazení bere jen řádky s `calendar_event_id IS NULL` — jinak by se termín zdvojil (jednou jako reálná `calendar_events` událost, podruhé jako virtuální položka z `next_action`).
 
+### Katalog ostatních tabulek
+
+Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je jen mapa, co kde žije.
+
+| Tabulka | Migrace | K čemu |
+|---------|---------|--------|
+| `login_attempts` | 006 | Brute-force lockout přihlášení |
+| `api_requests` | 007 | Rate limit veřejných API (`lib/api-rate-limit.ts`) |
+| `client_leads` | 010, 017, 024, 049, 051 | **Hovory** — kontakty/leady, další akce, telefonát zvednut, portfolio odesláno, vazba na kalendář |
+| `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
+| `agent_leads` | 052 | AI-scorované leady z externího `vizeon-lead-agent` |
+| `completed_projects` | 011, 029, 047, 057 | **Dokončené** zakázky (záloha, vazba na zdrojový projekt, odhad) |
+| `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/hub/finance`), volitelná vazba na projekt |
+| `project_surveys` | 016, 046 | Dotazník spokojenosti (`/h/[token]`, `completed_projects.survey_token`) — max 1 na zakázku |
+| `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
+| `invoices` | 053, 056 | Archiv faktur (PDF, AI přepis, vazba na transakci) |
+| `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
+| `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
+| `block_templates` | 061 | Globální knihovna bloků šablon webu |
+| `project_blocks` | 062 | Bloky šablony per zakázka (řazení drag-and-drop) |
+| `finance_transactions` | 019, 026, 027, 054 | Hub › Finance — transakce; `declared` = přiznaná linie (fakturováno na IČO) |
+| `finance_goals`, `recurring_cash_flow` | 019, 031 | Finanční cíle, opakované cash-flow položky |
+| `school_*` | 019, 020, 022, 025 | Hub › Škola — známky, termíny, zprávy, rozvrh, ruční záznamy, sync log |
+| `nutrition_logs`, `workout_logs`, `health_scores`, `weight_logs` | 019, 021, 023 | Hub › Sport |
+| `startup_projects` (+ `_improvements`, `_changelog`) | 032, 034, 035 | Hub › Byznys › Startup (waitlist DB URL, cenové tiery) |
+| `personal_projects` (+ `_improvements`, `_changelog`) | 033 | Hub › Projekty |
+| `plan_*` | 036–041 | Hub › Plány (škola, projekty, byznys, sport, finance) |
+| `plans_legacy_archived` | 042 | Stará plochá tabulka plánů — jen archiv, nepoužívat |
+
+**DB funkce/triggery:** `check_calendar_overlap`, `check_consultation_overlap` (overlap guard napříč tabulkami, migrace 008/043/044), `is_vizeon_pending()`, `is_alteno_pending()` (migrace 048/050).
+
 ---
 
 ## Struktura aplikace
@@ -201,7 +287,6 @@ app/
 └── globals.css
 
 components/
-├── ui/                          ← shadcn/ui komponenty
 ├── ProjectCard.tsx              ← Karta zakázky v dashboardu (prop `business` řídí cestu i barvy)
 ├── ProjectForm.tsx              ← Formulář (volá server actions, prop `business`)
 ├── BookingCard.tsx              ← Admin: karta poptávky z webu + potvrzení/smazání (VIZEON i ALTENO)
@@ -233,7 +318,77 @@ lib/
 
 middleware.ts                    ← next-auth middleware, chrání /dashboard/:path*, /alteno/:path*, /hub/:path*
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
+scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
+docs/                            ← Implementační plány velkých celků (viz memory/index.md)
+memory/                          ← Paměť projektu: index, pravidla, živý stav + changelog
 ```
+
+Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a API je níže.
+
+### Server actions (soubory)
+
+| Soubor | Oblast |
+|--------|--------|
+| `app/actions.ts` | Zakázky: CRUD, vzkazy, potvrzení/smazání poptávek z webu (VIZEON/ALTENO), `markProjectAsCompleted`, `notifyClientOfProjectChange` |
+| `app/portal-actions.ts` | Veřejné (token): `submitFeedback`, `submitConsultation`, `submitSurvey` |
+| `app/calendar-actions.ts` | Kalendářní události (+ párový lead v Hovorech) |
+| `app/calls-actions.ts` | Hovory: leady, poznámky, waiting stav, převod na zakázku, portfolio email, vlastní email |
+| `app/completed-actions.ts` | Dokončené zakázky + dotazníky |
+| `app/costs-actions.ts` | Náklady — jediný zdroj pravdy pro firemní i osobní náklady |
+| `app/notification-actions.ts` | Notifikace (přečteno) |
+| `app/project-notes-actions.ts` | Log schůzek u zakázky |
+| `app/block-templates-actions.ts`, `app/project-blocks-actions.ts` | Šablony webu — knihovna bloků / bloky zakázky |
+| `app/hub/finance/finance-actions.ts` | Transakce, měsíční agregace, opakované cash-flow, příjmy z byznysu |
+| `app/hub/finance/invoice-actions.ts` | **Veškerá logika faktur** (sdílené jádro v `lib/invoices.ts`) |
+| `app/hub/finance/tax-news-actions.ts` | Novinky z legislativy |
+| `app/hub/byznys/…` | Přehled byznysu, Startup projekty (+ waitlist, launch email přes Resend) |
+| `app/hub/projekty/projekty-actions.ts` | Osobní projekty |
+| `app/hub/plany/**/…-actions.ts` | Plány po kategoriích |
+| `app/hub/school/actions.ts`, `app/hub/sport/sport-actions.ts` | Škola, Sport |
+
+### Mapa rout (admin)
+
+| Sekce | Routy |
+|-------|-------|
+| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/[id]/sablona` (šablona webu zakázky), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/sablony` (knihovna bloků), `/notifications`, `/profil` |
+| ALTENO (`/alteno`) | `/alteno`, `/new`, `/[id]`, `/rezervace` |
+| Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/plany` (+ `/skola`, `/projekty`, `/byznys`, `/byznys/[id]`, `/sport`, `/finance`), `/projekty` (+ `/new`, `/[id]`), `/school`, `/sport` |
+| Legacy | `/dashboard/projekty/**` — z navigace odstraněno (přesunuto do Hubu), soubory zůstaly, viz `memory/memory.md` |
+
+### Veřejné stránky
+
+| Routa | Co |
+|-------|----|
+| `/p/[token]` | Klientský portál zakázky (`projects.public_token`) |
+| `/h/[token]` | Dotazník spokojenosti po dokončení (`completed_projects.survey_token`) |
+| `/login` | Přihlášení |
+
+### API routy
+
+| Endpoint | Auth | Účel |
+|----------|------|------|
+| `POST /api/public/booking` | `x-api-key` = `VIZEON_API_KEY` | Rezervace z vizeon.cz (`lib/web-booking.ts`) |
+| `POST /api/public/booking/alteno` | `x-api-key` = `ALTENO_API_KEY` | Rezervace z alteno.cz |
+| `POST /api/public/alteno-leads` | `x-alteno-lead-signature` = `ALTENO_LEAD_WEBHOOK_SECRET` | Kontaktní formulář alteno.cz → nepotvrzená poptávka |
+| `POST /api/public/leads` | `N8N_API_KEY` | Leady z n8n chatbota → Hovory |
+| `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
+| `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
+| `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
+| `GET /api/invoices/[id]/pdf` | session (kontrola v route — middleware `/api` nehlídá) | PDF faktury |
+| `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
+| `GET /api/fatsecret/search` | — | Vyhledávání jídla (dnes Open Food Facts, název je historický) |
+| `POST /api/school/sync` | session | Ruční spuštění školního scraperu (proxy na cron) |
+| `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
+
+Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-closed) + `lib/api-rate-limit.ts` + Zod validace. Klíč se nikdy neloguje.
+
+### Crony (`vercel.json`, Vercel Hobby = max 1× denně per job)
+
+| Endpoint | Kdy (UTC) | Co |
+|----------|-----------|----|
+| `/api/cron/scrape-school` | denně 6:00 | LernSax + Beste Schule scraping |
+| `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací, lead akcí, školních termínů (idempotentní příznaky proti duplicitám) |
+| `/api/cron/tax-news` | pondělí 5:00 | Stažení legislativních novinek (`ON CONFLICT DO NOTHING`) |
 
 ---
 
@@ -324,7 +479,7 @@ Co ALTENO **nemá** (zůstává jen ve VIZEONu): Kalendář, Hovory, Dokončené
 
 ## TypeScript typy
 
-Zdroj pravdy je `lib/types.ts` — obsahuje `Project`, `ClientMessage`, `ProgressUpdate`, `ClientFeedback`, `ConsultationSlot`, `ConsultationChannel`, `CalendarEvent` a odpovídající `STATUS_LABELS` / `STATUS_STYLES` / `CHANNEL_LABELS` konstanty. Necituj typy zde do CLAUDE.md — drift mezi dokumentací a kódem je horší než žádná dokumentace; při změně typu se dívej přímo do souboru.
+Zdroj pravdy je `lib/types.ts` — obsahuje `Project`, `ClientMessage`, `ProgressUpdate`, `ClientFeedback`, `ConsultationSlot`, `ConsultationChannel`, `CalendarEvent` a odpovídající `STATUS_LABELS` / `STATUS_STYLES` / `CHANNEL_LABELS` konstanty. Necituj typy do dokumentace (AGENTS.md, memory/) — drift mezi dokumentací a kódem je horší než žádná dokumentace; při změně typu se dívej přímo do souboru.
 
 ---
 
@@ -344,7 +499,8 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 ## Bezpečnost
 
-- **NextAuth JWT session** — dashboard chráněn `middleware.ts` (matcher `/dashboard/:path*`) + `getServerSession` v layoutu
+- **NextAuth JWT session** — admin chráněn `middleware.ts` (matcher `/dashboard`, `/alteno`, `/hub` vč. podcest) + `getServerSession` v layoutu. `/api/*` middleware **nehlídá** — každá neveřejná API routa si session kontroluje sama
+- **Security hlavičky** v `next.config.mjs` (X-Frame-Options DENY, HSTS, …); server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
 - **Heslo uloženo jako bcrypt hash** v env proměnné `ADMIN_PASSWORD_HASH`
@@ -382,3 +538,140 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - Nový dotaz nad `projects` nebo `calendar_events` → rozmysli, jestli patří jen jednomu byznysu, a filtruj `business`. Bez filtru se ALTENO data objeví ve VIZEONu
 - Nová sdílená komponenta pro obě sekce → prop `business?: Business` s defaultem `'vizeon'`, ne duplikát souboru
 - Podmínka „nepotvrzená poptávka z webu" žije v DB jako `is_vizeon_pending()` / `is_alteno_pending()` — neon `sql` tag neumí skládat fragmenty, takže ji nelze sdílet jako JS konstantu
+- Neon vrací `date`/`timestamptz` jako **`Date` objekt, ne string** — nikdy na tom nevolej `.split()` apod. (opakovaný zdroj pádů v historii)
+- Daně a odvody počítej **jen** přes `lib/tax.ts` + `lib/tax-constants.ts`; daňové termíny jsou pevný kalendář v `lib/tax-deadlines.ts`
+- AI přepis faktury **nikdy neblokuje** ruční uložení — bez `ANTHROPIC_API_KEY` musí appka fungovat dál
+- Částky v různých měnách (CZK/EUR) se **nikdy** nesčítají do jednoho čísla
+
+---
+
+# Část B — ZakazIQ Workspace
+
+> SaaS ve výstavbě (R-014). Sekce níže jsou **pravidla pro nový kód**, ne popis existujícího — až kód vznikne, doplň sem konkrétní tabulky, routy a env stejně jako v části A. Zdroj pravdy pro rozsah: `docs/workspace/PLAN.md` (export z Claude Docs; při rozporu platí Rozhodnutí v `memory/memory.md`).
+
+## B1. Produkt v jednom odstavci
+
+ZakazIQ Workspace je SaaS pro malé firmy, které dostávají poptávky (kadeřnictví, kosmetika, zámečnictví, studnařství, likvidace azbestu, autoservis, úklid, stavba). Poptávka z webu klienta se sama objeví v kalendáři, potvrdí se jedním klikem, zákazník dostane e-mail, po návštěvě razítko na věrnostní kartu. K tomu zákazníci a segmenty, zakázky s vlastními stavy a kolonkami, faktury, příjmy, odhad daní a měsíční přehled. Jeden tarif 249 Kč měsíčně. Kryštof klientům staví weby (v Claude Code) a napojuje je na Workspace.
+
+## B2. Tech stack
+
+Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Neon Postgres (`@neondatabase/serverless`) · Clerk (klienti) · NextAuth (jen admin) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
+
+- Nové závislosti jen s důvodem zapsaným do `memory/memory.md` → Rozhodnutí.
+- E-maily Workspace jdou přes Resend (B7). Admin zůstává na Gmail SMTP (R-004) — `lib/email.ts` Workspace nepoužívá.
+- Upgrade Next.js na 15 není součást výstavby, je to samostatný krok po spuštění.
+- Env proměnné Workspace jsou předem (prázdné) v `.env.example` v bloku `# --- ZakazIQ Workspace ---` (S00). Do tabulky env v části A se zapisují až s kódem, který je čte; další nové proměnné do obou míst zároveň.
+
+## B3. Data a oddělení klientů
+
+- Všechny tabulky Workspace jsou ve schématu `ws`, každá má `account_id`, tabulky byznysu i `business_id`. Admin tabulky ve `public` se nemění.
+- Workspace kód se připojuje přes `DATABASE_URL_WS` (role bez přístupu k `public`). Admin stránka `/dashboard/klienti` čte `ws` jen pro čtení.
+- **Každá** server action, route handler a server komponenta Workspace začíná `const ctx = await requireWorkspace()` a každý dotaz filtruje `account_id = ctx.accountId`. `account_id` se nikdy nečte z formuláře ani z URL; `business_id` z URL se vždy ověří proti `ctx.accountId`.
+- Row Level Security v Postgresu je druhá pojistka, ne náhrada aplikační kontroly.
+- Hodnoty vlastních kolonek jsou v `jsonb` a validují se Zodem sestaveným z `field_definitions`.
+- Kolize termínů řeší DB (`EXCLUDE USING gist` na `tstzrange` per pracovník), nikdy „zkontroluj a vlož" (stejný princip jako R-005). Chybu `23P01`/`23505` převeď na srozumitelnou hlášku.
+- Čas vždy přes `lib/ws/time.ts` (zkopírováno z `lib/prague-time.ts`), Europe/Prague.
+- Peníze v haléřích (`integer`) nebo `numeric(12,2)`, měny se nikdy nesčítají dohromady.
+- Migrace jsou idempotentní (`IF NOT EXISTS`, `DO $$ … $$` guardy), číslované sekvenčně od 064.
+
+## B4. Přihlášení a role
+
+- Clerk: Organization = účet (firma, jedno IČO, předplatné). Role `owner`, `staff`.
+- Přihlášení bez hesla: e-mailový kód nebo Google.
+- Jedna doména: landing na `/`, aplikace na `/w/*`, jedna Clerk instance (R-017). Cesty veřejných částí viz Hranice v repu (R-016).
+- Jeden `middleware.ts`: veřejné cesty; Workspace přes Clerk; admin cesty přes NextAuth token jako dnes. Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
+- Webhook Clerk (`/api/clerk/webhook`, ověření podpisu) synchronizuje účty a členy do `ws`.
+
+## B5. Platby
+
+- Jeden produkt, jedna měsíční cena `STRIPE_PRICE_MONTHLY`: **249 Kč konečná cena** (provozovatel je neplátce DPH, R-018).
+- Zkušební doba **14 dní bez platební karty**; po ní výzva k platbě, bez předplatného jen čtení (R-019).
+- V ceně **1 byznys na účet a neomezeně pracovníků**; další byznys = další účet/předplatné (R-020).
+- Checkout se zakládá na serveru, `account_id` v metadatech. Customer Portal pro změny a zrušení.
+- Webhook ověřuje podpis, každou událost uloží do `ws.stripe_events` a zpracuje jen jednou.
+- Přístup řídí `hasActiveSubscription(accountId)`. Po neúspěšné platbě 7 dní lhůta, pak jen čtení. Data se nikdy nemažou, poptávky z webu se ukládají dál.
+
+## B6. Příjem poptávek z webů
+
+- `GET /api/public/v1/schema` a `POST /api/public/v1/requests`.
+- Dva druhy klíčů na byznys: veřejný (widget, kontrola domény přes CORS) a tajný (server-server, posílá se v `Authorization: Bearer`). Tajný klíč se ukládá jen jako hash.
+- Validace podle kolonek byznysu, rate limit, přiřazení zákazníka podle telefonu/e-mailu, notifikace, e-mail. Uložení poptávky nesmí nikdy shodit selhání e-mailu ani notifikace.
+- Chyby vrací `{ success: false, code, error }`, `error` česky a srozumitelně.
+
+## B7. E-maily
+
+Resend z domény ZakazIQ, jako odesílatel jméno byznysu, Reply-To e-mail klienta. Šablony v React Email ve stylu Dílky v `lib/ws/email/`. Fronta `ws.outbound_messages` s opakováním. Každý typ e-mailu jde zapnout/vypnout a upravit v nastavení. Odhlašovací odkaz u všeho, co není transakční.
+
+## B8. Design
+
+Jediný platný vzhled je design systém **Dílky** (podle loga, mockup LP-D). Pravidla, tokeny a pohyb jsou ve skillu `zakaziq-design-dilky`. Žádné barvy natvrdo, žádné výchozí shadcn šedé motivy, žádné gradientové pozadí navíc, žádné emoji v UI.
+
+## B9. Jednoduchost (tvrdé pravidlo)
+
+- Začátek do 3 minut: registrace, obor, název a aplikace je použitelná díky šabloně oboru.
+- Jedna hlavní akce na obrazovce. Detail se otevírá v pravém panelu, ne na nové stránce.
+- Žádná akce dál než dva kliky od obrazovky Dnes. ⌘K umí najít cokoli.
+- Místo potvrzovacích dialogů tlačítko „Zpět" na pár sekund.
+- Prázdný stav vždy říká, co udělat dál.
+- Ovladatelné na telefonu jednou rukou, klikací plochy min. 44 px.
+
+## B10. Texty
+
+Česky, obyčejnými slovy, oslovení „vy". Žádná technická slova v UI („Potvrdit termín", ne „Změnit stav na confirmed"). Texty podle skillu `zakaziq-ux-texty-cs`; marketingové texty a e-maily projdou skillem `humanize-text-cs`. Nikdy si nevymýšlej čísla, reference ani citace; chybějící údaj = zástupný text `[DOPLNIT]`.
+
+## B11. Konvence kódu
+
+- App Router, server components jako výchozí, `'use client'` jen kde je stav nebo interakce.
+- Mutace jako Server Actions v `app/w/**/actions.ts`, vstup vždy přes Zod.
+- Výsledek akce `{ ok: true, data } | { ok: false, error }`, žádné throw do UI.
+- Komponenty Workspace v `components/ws/`, sdílené UI v `components/ui/`.
+- Pojmenování: soubory kebab-case, komponenty PascalCase, DB snake_case.
+- Žádné `any`, žádné tiché `catch {}`; chyby logovat se `account_id` a bez osobních údajů.
+
+## B12. Testy a kontrola před commitem
+
+1. `npm run build` a `npm test` prochází.
+2. Nové pravidlo (oddělení účtů, razítka, segmenty, webhooky) má test ve Vitestu.
+3. Admin stránky `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]` fungují jako předtím.
+4. UI změna: porovnat s mockupem a s pravidly Dílky, zkontrolovat šířku telefonu.
+
+## B13. Bezpečnost
+
+<!-- Tuto sekci v sezení S02 nahradí plná pravidla ze skillu web-security-setup
+     (templates/AGENTS.md). Do té doby platí minimum níže. -->
+- Žádné secrets v kódu ani v klientském bundlu, `.env*` v `.gitignore`.
+- Každý vstup zvenku validovat Zodem, každé veřejné API mít rate limit.
+- CSP bez `unsafe-inline`/`unsafe-eval` ve `script-src`.
+
+---
+
+# Společné
+
+## Git
+
+| Oblast | Větev | Commit | Formát zprávy |
+|---|---|---|---|
+| Workspace + landing page | `workspace` | po každém uceleném kroku | `oblast: co se změnilo`, např. `ws/poptavky: potvrzení jedním klikem` |
+| Admin konzole | `main` | jen na požádání | `feat: …`, `fix: …`, `refactor: …`, `chore: …`, `docs: …` |
+
+Zprávy česky, *co a proč*. Nic nepushovat na `main` bez souhlasu (push = produkční deploy). Secrets nikdy do repa, `.env.local` nikdy necommitovat ani nevypisovat.
+
+## Nikdy
+
+- Neměnit admin konzoli bez výslovného zadání.
+- Nečíst ani nezapisovat data jiného účtu.
+- Nemazat data klientů (kromě GDPR výmazu na žádost).
+- Nevymýšlet obsah, čísla, recenze ani reference.
+- Nepoužít `force`/`--no-verify`, nepřepisovat historii gitu.
+
+## Paměť projektu (pro všechny AI nástroje)
+
+Kontinuita mezi sezeními žije ve složce `memory/` (R-013) — sdílená paměť mezi sezeními a agenty. **Rozhodnutí, které není zapsané v `memory/memory.md` → Rozhodnutí, neexistuje.**
+
+| Soubor | Co v něm je |
+|--------|-------------|
+| [`memory/index.md`](memory/index.md) | Mapa — kde co najít (dokumenty i kód podle úlohy) |
+| [`memory/pravidla.md`](memory/pravidla.md) | Pravidla paměti — co se kam zapisuje, kdy a v jakém formátu |
+| [`memory/memory.md`](memory/memory.md) | Živý stav: aktuální stav, rozhodnutí s důvody, otevřené problémy, changelog |
+
+**Povinné:** po každé dokončené změně zapiš záznam do changelogu v `memory/memory.md` podle `memory/pravidla.md`. Změníš-li technický fakt popsaný v tomto souboru (tabulka, routa, env, pravidlo), oprav ho tady ve stejném commitu.

@@ -115,7 +115,7 @@ async function sendConsultationReminder(slot: SlotRow, type: 'day_before' | '2h_
   await Promise.all(sends)
 }
 
-// client_leads ("Hovory") je funkce jen ve VIZEON sekci — viz CLAUDE.md.
+// client_leads ("Hovory") je funkce jen ve VIZEON sekci — viz AGENTS.md.
 async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before') {
   const adminEmail = adminEmailFor('vizeon')
   if (!adminEmail) return

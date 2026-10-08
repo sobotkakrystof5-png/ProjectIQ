@@ -259,7 +259,7 @@ export async function submitSurvey(
   })
 
   // Dotazník spokojenosti existuje jen u "Dokončené" — funkce dostupná
-  // výhradně ve VIZEON sekci (viz CLAUDE.md), completed_projects nemá sloupec business.
+  // výhradně ve VIZEON sekci (viz AGENTS.md), completed_projects nemá sloupec business.
   const adminEmail = adminEmailFor('vizeon')
   if (adminEmail) {
     await sendBrandedEmail({
