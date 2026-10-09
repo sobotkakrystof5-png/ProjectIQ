@@ -18,7 +18,7 @@ function PriceTiles() {
   )
 }
 
-/** 06 Ceník — jedna cena, žádné balíčky (R-018, R-019, R-026). */
+/** 06 Ceník — jedna cena, žádné balíčky (R-018, R-026, R-038). */
 export function Pricing() {
   return (
     <section id="cenik" aria-labelledby="cenik-title" className="mx-auto max-w-[1200px] px-3 pt-[72px] sm:px-7 md:pt-[120px]">
@@ -39,7 +39,7 @@ export function Pricing() {
               </span>
             </p>
             <p className="max-w-[420px] font-num text-xs leading-relaxed text-navy-300">
-              konečná cena, nic se nepřipočítává · 14 dní zdarma bez karty · zrušíte kdykoli · karta, Apple Pay, Google Pay
+              konečná cena, nic se nepřipočítává · prvních 14 dní zdarma · zrušíte kdykoli · karta, Apple Pay, Google Pay
             </p>
           </div>
         </div>

@@ -14,7 +14,7 @@ import { WhyBother } from '@/components/marketing/why-bother'
 export const metadata: Metadata = {
   title: 'ZakazIQ · poptávky, kalendář a zákazníci na jednom místě',
   description:
-    'Poptávka z vašeho webu se sama zařadí do kalendáře a potvrdíte ji jedním klikem. Pro kadeřnictví, řemeslníky a malé firmy. 249 Kč měsíčně, 14 dní zdarma bez karty.',
+    'Poptávka z vašeho webu se sama zařadí do kalendáře a potvrdíte ji jedním klikem. Pro kadeřnictví, řemeslníky a malé firmy. 249 Kč měsíčně, prvních 14 dní zdarma.',
 }
 
 // Landing page ZakazIQ podle docs/landing/PROJECT-BRIEF.md (pořadí sekcí R-031).

@@ -1,6 +1,6 @@
 // Obsah landing page na jednom místě (docs/landing/PROJECT-BRIEF.md § 4).
 // Údaje označené [DOPLNIT] chybí záměrně — nevymýšlet (AGENTS.md → B10). Fakta o ceně
-// a zkušební době: R-018, R-019, R-026.
+// a zkušební době: R-018, R-026, R-038.
 
 /** E-mail podpory pro „Napište nám" (R-032). Firemní adresa se teprve řeší. */
 export const SUPPORT_EMAIL = '[DOPLNIT]'
@@ -131,7 +131,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
   {
     q: 'Co se stane po 14 dnech?',
-    a: 'Napíšeme vám, že zkušební doba končí. Když budete chtít pokračovat, zaplatíte kartou 249 Kč měsíčně. Když ne, nic se neplatí a k datům se dostanete dál, jen je nepůjde měnit.',
+    a: 'Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho zrušíte, nic nezaplatíte a k datům se dostanete dál, jen je nepůjde měnit.',
   },
   {
     q: 'Můžu předplatné kdykoli zrušit?',

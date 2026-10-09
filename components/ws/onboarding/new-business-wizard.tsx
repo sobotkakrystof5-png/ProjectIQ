@@ -2,15 +2,16 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { SignOutButton, useOrganizationList } from '@clerk/nextjs'
+import { useOrganizationList } from '@clerk/nextjs'
 import { Biohazard, Car, Check, Droplets, HardHat, KeyRound, Scissors, Shapes, Sparkles, type LucideIcon } from 'lucide-react'
-import { AccentHeading, Logo, SectionLabel } from '@/components/ws/brand'
+import { AccentHeading, SectionLabel } from '@/components/ws/brand'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createBusiness } from '@/app/w/novy/actions'
 import type { FieldType, IndustryKey, StageType } from '@/lib/ws/templates/types'
 import { cn } from '@/lib/ws/utils'
+import { WizardHeader } from './wizard-header'
 
 /** Co šablona oboru předvyplní — jen data pro náhled, sestavuje server (app/w/novy/page.tsx). */
 export type IndustrySummary = {
@@ -46,15 +47,10 @@ const FIELD_TYPES: Record<FieldType, string> = {
   file: 'Soubor',
 }
 
-const STEPS = [
-  { n: '01', label: 'Název a obor' },
-  { n: '02', label: 'Předplatné' },
-]
-
 /**
  * Průvodce Nový byznys, krok 1 ze 2 (rozložení podle mockupu C5, vzhled Dílky).
  * Vlevo název a obor, vpravo živý náhled toho, co šablona oboru připraví.
- * Krok 2 (platba) přidá S08 — do té doby „Pokračovat“ vede rovnou do aplikace.
+ * Po založení účtu vede „Pokračovat“ na krok 2 (předplatné, components/ws/onboarding/subscribe-step.tsx).
  */
 export function NewBusinessWizard({ industries }: { industries: IndustrySummary[] }) {
   const router = useRouter()
@@ -82,7 +78,7 @@ export function NewBusinessWizard({ industries }: { industries: IndustrySummary[
       }
       try {
         await setActive?.({ organization: result.data.orgId })
-        router.replace('/w')
+        router.replace('/w/novy')
         router.refresh()
       } catch {
         setError('Byznys je založený, jen se nepodařilo otevřít. Načtěte prosím stránku znovu.')
@@ -92,37 +88,7 @@ export function NewBusinessWizard({ industries }: { industries: IndustrySummary[
 
   return (
     <div className="min-h-screen bg-ground text-ink">
-      <header className="bg-navy-950 text-white">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
-          <div className="flex items-center gap-3">
-            <Logo size={32} onDark />
-            <span className="text-[15px] font-semibold">Nový byznys</span>
-          </div>
-          <ol className="order-3 flex w-full flex-wrap gap-1.5 sm:order-none sm:w-auto" aria-label="Kroky">
-            {STEPS.map((s, i) => (
-              <li
-                key={s.n}
-                aria-current={i === 0 ? 'step' : undefined}
-                className={cn(
-                  'inline-flex min-h-[34px] items-center gap-1.5 rounded-full px-3 text-[13px]',
-                  i === 0 ? 'bg-white font-semibold text-navy-950' : 'border border-navy-800 text-navy-300',
-                )}
-              >
-                <span className="font-num text-[11px]">{s.n}</span>
-                {s.label}
-              </li>
-            ))}
-          </ol>
-          <SignOutButton redirectUrl="/">
-            <button
-              type="button"
-              className="min-h-[44px] rounded-full px-3 text-[13px] text-navy-300 transition-colors duration-200 ease-zq hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-300"
-            >
-              Odhlásit se
-            </button>
-          </SignOutButton>
-        </div>
-      </header>
+      <WizardHeader step={1} />
 
       <form
         onSubmit={submit}
@@ -221,7 +187,7 @@ export function NewBusinessWizard({ industries }: { industries: IndustrySummary[
             <Button type="submit" size="lg" disabled={pending} className="w-full">
               {pending ? 'Zakládám…' : 'Pokračovat'}
             </Button>
-            <p className="text-center text-xs text-quiet">14 dní zdarma, bez platební karty.</p>
+            <p className="text-center text-xs text-quiet">Prvních 14 dní zdarma, potom 249 Kč měsíčně.</p>
           </div>
         </aside>
       </form>

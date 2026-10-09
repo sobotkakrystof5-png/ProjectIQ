@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Technická fakta: [`../AGENTS.md`](../AGENTS.md).
 >
-> **Poslední aktualizace:** 2026-10-09 (S07)
+> **Poslední aktualizace:** 2026-10-09 (S08)
 
 ---
 
@@ -34,7 +34,7 @@
 | S05 | Landing page — SEO a texty | čeká |
 | S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace a role `ws_app` na Neonu (2026-10-09) |
 | S07 | Clerk, registrace, nový byznys | hotovo (2026-10-09) |
-| S08 | Stripe předplatné 249 Kč | čeká |
+| S08 | Stripe předplatné 249 Kč | kód hotový (2026-10-09), čeká sandbox Stripe a ruční test |
 | S09 | Kostra aplikace a obrazovka Dnes | čeká |
 | S10 | Poptávky a kalendář | čeká |
 | S11 | Veřejné API, objednávací stránka, widget | čeká |
@@ -53,7 +53,9 @@
 
 **Přihlášení Workspace (S07):** Clerk 6.39.7 jen pod `/w` (R-037), přihlášení `/w/prihlaseni`, registrace `/w/registrace`, průvodce `/w/novy` (název + obor → účet, byznys a šablona oboru), `/w` s hlavičkou a prázdným stavem, webhook `/api/clerk/webhook`. Dev instance Clerku (aplikace ZakazIQ, `app_3KSvZAk4iFgvwVicglMwWtga6Gd`) propojená `clerk link`, klíče v `.env.local`. Registrace → průvodce → `/w` ověřená naostro 2026-10-09 (Kryštof, e-mailem): v produkční DB 1 účet, 1 člen, 1 byznys se šablonou oboru. Neověřeno: přihlášení přes Google, Turnstile, Safari. Webhook nemá endpoint ani `CLERK_WEBHOOK_SECRET`.
 
-**Další krok:** S08 (Stripe, krok 2 průvodce) nebo S05 (SEO landing). S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Před nasazením `/w` na Vercel: `DATABASE_URL_WS` a klíče Clerku do Vercelu.
+**Předplatné (S08):** 14 dní zdarma s kartou přes Stripe Checkout (R-038), `stripe` 22.6.2 (R-039). Průvodce `/w/novy` má krok 2 (předplatné), návrat z Checkoutu `/w/predplatne`, `/w/ucet` (stav, Customer Portal, doklady), pruh `components/ws/billing/billing-banner.tsx`, webhook `/api/stripe/webhook`, logika `lib/ws/billing.ts`. Testy proti podstrčenému Stripe prochází. **Chybí:** sandbox ZakazIQ ve Stripe a klíče v `.env.local`, takže Checkout ani ruční test (`docs/workspace/SETUP.md` → Stripe § 6) zatím neproběhly a vzhled kroku 2 a `/w/ucet` není vyfocený. Zapojení stavu předplatného do kostry `/w/[business]` (přesměrování při `none`, pruh, odkaz Účet, `?vitejte=1`) dělá S09 (souběžné sezení). Kryštofův účet v produkční DB předplatné nemá, po přihlášení ho průvodce pošle do kroku 2.
+
+**Další krok:** dokončit S08: Kryštof založí ve Stripe sandbox ZakazIQ a přihlásí do něj CLI (`stripe login`), pak produkt, cena, omezený klíč, `stripe listen` a ruční test podle `docs/workspace/SETUP.md` → Stripe. Potom S05 (SEO landing). S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Před nasazením `/w` na Vercel: `DATABASE_URL_WS` a klíče Clerku do Vercelu.
 
 ---
 
@@ -143,6 +145,7 @@
 **Rozhodnutí:** po registraci 14 dní zdarma bez zadání karty, pak výzva k platbě přes Stripe Checkout; bez předplatného režim jen pro čtení (data se nemažou, poptávky se ukládají dál).
 **Proč:** nejnižší bariéra pro malé firmy.
 **Důsledek:** trial se počítá v `ws` (ne Stripe trial s kartou); `hasActiveSubscription` musí znát i běžící zkušební dobu. `AGENTS.md` → B5.
+**Nahrazeno:** R-038 (2026-10-09) — 14 dní zdarma s kartou.
 
 ### R-020 · V ceně 1 byznys a neomezeně pracovníků (2026-10-08)
 **Rozhodnutí:** jeden účet = jedno předplatné = jeden byznys; pracovníků neomezeně.
@@ -228,6 +231,16 @@
 **Proč:** odsouhlaseno v S07. Admin se nesmí změnit; účet bez byznysu nedává smysl; jedno místo založení = jedna transakce bez závodu s webhookem. R-026 (jeden byznys v ceně).
 **Důsledek:** `AGENTS.md` → B4 „Jak je to v kódu“, `.claude/security/DECISIONS.md` #009, CSP v3. Krok 2 průvodce (platba) přidá S08 do `app/w/novy`.
 
+### R-038 · 14 dní zdarma s kartou, zkušební doba ve Stripe (2026-10-09)
+**Rozhodnutí:** registrace končí krokem 2 průvodce, kde se ve Stripe Checkoutu zadá karta. Prvních 14 dní je zdarma (`trial_period_days` ve Stripe), první platba 249 Kč proběhne po zkušební době. Zkušební doba jen jednou na účet. Účet, který Checkout nedokončil, nemá přístup do aplikace (průvodce ho vrátí na krok 2). Po zrušení nebo nezaplacení jen čtení, data se nemažou. Při nezaplacené platbě (`past_due`) se nový Checkout nezakládá, jen výměna karty v Portalu.
+**Proč:** rozhodl Kryštof 2026-10-09 („14 dní zdarma s kartou“). Zkušební doba s kartou plynule přejde v placené předplatné bez další výzvy. Nový Checkout při `past_due` by vedle nezaplaceného předplatného založil druhé a hrozila by dvojí platba.
+**Důsledek:** `ws.accounts.trial_ends_at` se nepoužívá. Landing („bez karty“ pryč, nová odpověď v Dotazech s připomínkou 7 dní předem, kterou musí zapnout nastavení Stripe), brief, průvodce. `AGENTS.md` → B5. Odchylka od `docs/workspace/PLAN.md` (export, řádky o zkušební době bez karty), platí tohle rozhodnutí.
+
+### R-039 · Stripe SDK a vývojové prostředí (2026-10-09)
+**Rozhodnutí:** závislost `stripe` 22.6.2 (API `2026-08-26.dahlia`, verze se mění jen s upgradem balíčku). Vývoj v samostatném sandboxu „ZakazIQ“, ne ve sdíleném test módu ani v sandboxu jiného projektu. Tajný klíč jako omezený klíč `rk_…` s minimálními právy. Bez `payment_method_types` (metody z dashboardu) a bez Stripe Tax (neplátce, R-018). Předplatné se při každé události znovu načítá ze Stripe, ne z payloadu.
+**Proč:** oficiální SDK s typy pro aktuální API, doporučení Stripe pro nové integrace. Načítání ze Stripe odstraní problém s pořadím událostí.
+**Důsledek:** `docs/workspace/SETUP.md` → Stripe, `AGENTS.md` → B5 „Jak je to v kódu“, `.claude/security/STATE.md`.
+
 ---
 
 ## 3. Otevřené problémy
@@ -235,12 +248,15 @@
 - [ ] **Legacy routy:** `app/dashboard/projekty/**` zůstalo po přesunu Projektů do Hubu (R-007); `projekty-actions.ts` se liší od verze v `app/hub/projekty/`. Rozhodnout: smazat, nebo přesměrovat na `/hub/projekty` · od 2026-06-23
 - [ ] **Mrtvé env:** `FATSECRET_CLIENT_ID/SECRET` jsou v `.env.example`, ale kód je nepoužívá (vyhledávání jídla jede přes Open Food Facts, `lib/fatsecret.ts` a `/api/fatsecret/search` mají historický název) · od 2026-06-22
 - [ ] **Připomínky 2 h před konzultací:** po R-006 není jasné, jestli běží externí hodinový cron (commit 2026-06-20 zmiňuje „externí hodinový cron"). Ověřit u uživatele · od 2026-06-25
-- [ ] **Workspace — env ve Vercelu:** `DATABASE_URL_WS` (z `.env.local`, `docs/workspace/SETUP.md` krok 3), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` (Production i Preview). Lokálně všechno je. Blokuje nasazení `/w` · od 2026-10-08
+- [ ] **Workspace — env ve Vercelu:** `DATABASE_URL_WS` (z `.env.local`, `docs/workspace/SETUP.md` krok 3), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `NEXT_PUBLIC_APP_URL` (Production i Preview). Lokálně všechno je. Blokuje nasazení `/w` · od 2026-10-08
 - [ ] **Clerk — webhook:** v Clerk dashboardu založit endpoint `https://<doména>/api/clerk/webhook` (události `organization.updated`, `organizationMembership.*`) a jeho podpisový klíč dát do `CLERK_WEBHOOK_SECRET` (`.env.local` i Vercel). Do té doby route vrací 503 a členové se nesynchronizují (vlastníka zapíše průvodce) · od 2026-10-09
 - [ ] **Clerk — produkční instance** (`clerk deploy`, doména `clerk.zakaziq.cz`, vlastní Google OAuth údaje, produkční klíče). Dev instance nesmí do produkce · před S19 · od 2026-10-09
 - [ ] **Clerk — limit 5 členů na organizaci** (výchozí v Clerku). R-020 slibuje neomezeně pracovníků — pracovníci ve `ws.staff` se přihlašovat nemusí, ale přihlašovací účty pro tým (S13?) limit narazí. Ověřit, jestli jde zvednout na našem plánu Clerku · od 2026-10-09
 - [ ] **Clerk — e-maily s kódem** chodí z Clerku (šablona a jazyk podle nastavení instance). Ověřit při první registraci, že jsou česky a jménem ZakazIQ; jinak nastavit v dashboardu Clerku (Customization → Emails) · od 2026-10-09
 - [ ] **Clerk — `user.updated`** (změna jména/e-mailu) se do `ws.members` nepropisuje — webhook ho nezpracovává, payload nemá organizace. Řešit, až se jména členů budou někde zobrazovat (S13) · od 2026-10-09
+- [ ] **Stripe — sandbox ZakazIQ chybí:** CLI je přihlášené do sandboxů jiných projektů. Kryštof založí sandbox ZakazIQ a `stripe login`, pak produkt, cena, omezený klíč a nastavení dashboardu podle `docs/workspace/SETUP.md` → Stripe (hlavně připomínka 7 dní před koncem zkušební doby, kterou slibuje landing). Blokuje ruční test S08 · od 2026-10-09
+- [ ] **Stripe — live mód** (produkt, cena, Portal, e-maily, šablona faktury s IČO a „Nejsem plátce DPH“, webhook endpoint, live klíče jen do Vercelu Production) · před S19 · od 2026-10-09
+- [ ] **`ws.accounts.trial_ends_at`** se po R-038 nepoužívá. Nechat, nebo odstranit migrací (data se tím nemažou)? Neblokuje · od 2026-10-09
 - [ ] **Evidence migrací:** neexistuje tabulka, která by evidovala, které migrace jsou aplikované na produkční DB — stav se drží jen v changelogu (pravidlo: u každé migrace zapsat „aplikována: ano/ne") · od 2026-10-08
 - [ ] **Resend jen kvůli waitlistu:** závislost `resend` slouží jedné funkci (`sendLaunchEmailBlast`). Zvážit převod na `lib/email.ts` (R-004) · od 2026-10-08
 - [ ] **Workspace — IČO a právní texty** (podmínky, ochrana údajů, zpracovatelská smlouva). V S04 zástupně `[DOPLNIT]` (R-023), skutečné texty blokují S19 · od 2026-10-08
@@ -264,6 +280,8 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-09
+- **feat** S08 — Stripe předplatné 249 Kč (R-038, R-039). `stripe` 22.6.2. `lib/ws/stripe.ts` (klient, `server-only`), `lib/ws/billing.ts` (stav přístupu `none|trialing|active|grace|read_only`, `hasActiveSubscription`, `assertWritable`, Checkout se 14 dny zdarma jen poprvé, Portal, doklady, `syncSubscription` ze Stripe, `syncCheckoutSession`), `lib/ws/stripe-webhook.ts` + `app/api/stripe/webhook/route.ts` (podpis, idempotence `ws.stripe_events`). Průvodce: krok 2 `components/ws/onboarding/subscribe-step.tsx`, sdílená hlavička `wizard-header.tsx`, `app/w/novy/page.tsx` (účet bez předplatného → krok 2). `/w/predplatne` (návrat z Checkoutu), `/w/ucet` + `actions.ts`, `components/ws/billing/` (pruh, tlačítko, datum). Landing a brief: „bez karty“ pryč, nová odpověď „Co se stane po 14 dnech?“. `docs/workspace/SETUP.md` → Stripe, `.env.example`, `AGENTS.md` B5 + env, bezpečnost STATE + AUDIT-LOG. Review našlo a opravilo dvojí předplatné při `past_due`. Testy `lib/ws/__tests__/ws-billing.test.ts` (20). Ověřeno: `npm test` 247/247, `tsc` OK, `next build` OK (v kopii repa, protože běží `next dev`), Stripe není v klientském bundlu, `npm audit --omit=dev` beze změny (11). **Neověřeno:** skutečný Checkout, Portal, webhook a vzhled kroku 2 a `/w/ucet` (chybí sandbox a klíče Stripe), admin stránky v prohlížeči (admin kód se neměnil).
+- **decision** R-038: 14 dní zdarma s kartou, nahrazuje R-019 (rozhodl Kryštof).
 - **chore** S07 ověřeno naostro: Kryštof prošel registraci, průvodce a `/w`; v produkční DB vznikl 1 účet, 1 člen (vlastník), 1 byznys (kadeřnictví a kosmetika) se 4 službami a 5 stavy ze šablony.
 - **feat** S07 — Clerk, registrace a nový byznys. `@clerk/nextjs` 6.39.7 + `@clerk/localizations` (R-037). `middleware.ts`: Clerk jen pro `/w` a `/api/ws`, ochrana `/w` kromě přihlášení/registrace, CSP s nonce zachovaná. `app/w/layout.tsx`: `ClerkProvider` (česky, nonce, bez telemetrie, `noindex`). Stránky `/w/prihlaseni`, `/w/registrace` (catch-all, vzhled Dílků `components/ws/auth/`), průvodce `/w/novy` (rozložení C5: název, obor z 8 šablon, živý náhled stavů/kolonek/služeb; `app/w/novy/actions.ts`, `components/ws/onboarding/`), `/w` (hlavička s přepínačem byznysů bez „+ Přidat byznys“ podle R-026, odhlášení, prázdný stav). `lib/ws/onboarding.ts` (účet + vlastník + byznys + šablona v jedné transakci pod RLS, slug s koncovkou při kolizi), `lib/ws/clerk-orgs.ts`, `lib/ws/clerk-webhook.ts` + `app/api/clerk/webhook/route.ts` (Svix, idempotence), `lib/ws/paths.ts`, `requireWorkspace()` na Clerk `auth()`. Smazán `components/ws/coming-soon.tsx`. CSP v3 (Clerk host z publishable key, `img.clerk.com`, Turnstile) + test. Instance Clerku přes CLI: `clerk link`, `clerk env pull` (klíče do `.env.local`, ostatní řádky beze změny), přihlášení jen e-mailový kód + Google (heslo, telefon, uživatelské jméno vypnuté), organizace zapnuté, aplikace přejmenovaná na ZakazIQ. Testy `lib/ws/__tests__/ws-onboarding.test.ts` (13): dva nové účty se nevidí ani bez aplikačního filtru, opakované založení nic nezdvojí, webhook (členové, idempotence, organizace bez účtu, mazání organizace nic nemaže), podpis route (bez klíče 503, podvržený/cizí/starý 400). Bezpečnost: CSP-LOG v3, STATE, DECISIONS #009, AUDIT-LOG review. Ověřeno: `npm test` 198/198, `npm run build` OK bez varování, admin `/login` 200, `/dashboard` `/alteno` `/hub` 307 na přihlášení NextAuth, `/p` a `/h` s neplatným tokenem 404, admin chunky bez Clerku; `/w/prihlaseni` a `/w/registrace` v Chromu a headless (390 i 1280 px) bez přetékání a bez hlášení CSP od Clerku; průvodce vyfocen přes dočasnou stránku (smazána) včetně chybové hlášky a klávesnice. `npm audit --omit=dev` beze změny (11). **Neověřeno:** skutečná registrace a průchod průvodcem do `/w`, Google přihlášení, Turnstile, Safari.
 - **db** Role `ws_app` založená na produkčním Neonu přes `node scripts/ws-create-role.js` (spustil Kryštof), `DATABASE_URL_WS` zapsaná do `.env.local`. Ověřeno: bez BYPASSRLS a superuser, bez členství v jiné roli, k žádné tabulce v `public` nemá přístup. Ve Vercelu zatím není.

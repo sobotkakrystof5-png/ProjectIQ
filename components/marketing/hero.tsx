@@ -54,7 +54,7 @@ export function Hero() {
               </a>
             </div>
             <p className="font-num text-xs text-navy-300 animate-zq-rise [animation-delay:300ms]">
-              14 dní zdarma bez karty · vše v ceně · zrušíte kdykoli · přihlášení bez hesla
+              14 dní zdarma · vše v ceně · zrušíte kdykoli · přihlášení bez hesla
             </p>
           </div>
 

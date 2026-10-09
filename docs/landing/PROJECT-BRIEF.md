@@ -50,7 +50,7 @@ Tohle je nejdůležitější část zadání a platí pro každé rozhodnutí n�
 
 **Co produkt umí** (zdroj: `docs/workspace/PLAN.md`, nic navíc): poptávka z webu se sama objeví v kalendáři jako čárkovaný blok a potvrdí se jedním klikem. Zákazník dostane e-mail a po návštěvě razítko na věrnostní kartu. Dál zákazníci se skupinami (Noví, Stálí, Jednorázoví, Spící, Ukončení) a panelem „Komu napsat“, zakázky s vlastními stavy a kolonkami, faktury, příjmy a výdaje, odhad daní a měsíční přehled e-mailem. Šablony podle oboru. Napojení webu třemi cestami.
 
-**Cena:** 249 Kč měsíčně, konečná cena bez DPH navíc (R-018). 14 dní zdarma bez platební karty (R-019). V ceně 1 byznys a neomezeně pracovníků, všechny funkce (R-026).
+**Cena:** 249 Kč měsíčně, konečná cena bez DPH navíc (R-018). Prvních 14 dní zdarma, karta se zadává při registraci (R-038, nahradilo R-019). V ceně 1 byznys a neomezeně pracovníků, všechny funkce (R-026).
 
 **Obory** (pás oborů, šablony): Kadeřnictví, Kosmetika, Zámečnictví, Studnařství, Likvidace azbestu, Autoservis, Úklid, Stavba a řemesla.
 
@@ -155,7 +155,7 @@ Texty níže jsou návrh (prošly `zakaziq-ux-texty-cs` a `humanize-text-cs`). S
 - **Perex:** „Poptávka z vašeho webu se sama zařadí do kalendáře. Potvrdíte ji jedním klikem a o e-mail, připomínku i razítko na věrnostní kartu se postará ZakazIQ.“
 - **Hlavní tlačítko:** „Začít za 249 Kč měsíčně“ → `/w/registrace` (bílá pilulka).
 - **Vedlejší odkaz:** „Napište nám“ → `mailto:[DOPLNIT e-mail podpory]` (textový odkaz `navy-200` s podtržením při hoveru, žádné druhé tlačítko).
-- **Drobný řádek** (mono, `navy-300`): „14 dní zdarma bez karty · vše v ceně · zrušíte kdykoli · přihlášení bez hesla“
+- **Drobný řádek** (mono, `navy-300`): „14 dní zdarma · vše v ceně · zrušíte kdykoli · přihlášení bez hesla“
 
 **Živá ukázka** (`aria-label="Ukázka aplikace"`, malý štítek „ukázka“ v rohu, aby nikdo nečetl jména jako skutečné zákazníky):
 
@@ -274,7 +274,7 @@ zakaziq.cz/r/kadernictvi-lenka
 - Štítek: `06 — CENÍK`
 - **H2:** „Jedna cena. *Žádné balíčky.*“
 - Cena: **249 Kč** (mono, velké) + „/ měsíc“
-- Pod cenou (mono, drobné): „konečná cena, nic se nepřipočítává · 14 dní zdarma bez karty · zrušíte kdykoli · karta, Apple Pay, Google Pay“ (nahrazuje `[DPH: DOPLNIT]` z mockupu, R-018, R-019)
+- Pod cenou (mono, drobné): „konečná cena, nic se nepřipočítává · prvních 14 dní zdarma · zrušíte kdykoli · karta, Apple Pay, Google Pay“ (nahrazuje `[DPH: DOPLNIT]` z mockupu, R-018, R-038)
 - **V ceně** (odrážky s Lucide `Check`, ne s „✓“ znakem):
   - Neomezené poptávky a zákazníci
   - Kalendář a rezervace
@@ -301,12 +301,12 @@ Nikde „+ DPH“, žádná srovnávací tabulka balíčků, žádné přeškrtn
 | Jak napojím svůj web? | Třemi způsoby. Pošlete zákazníkům odkaz na objednání, vložíte na web jeden řádek kódu, nebo vám web postavím a napojím sám. Napojení si pak ověříte jedním klikem. |
 | Co když nemám web? | Nevadí. Dostanete vlastní stránku pro objednání a QR kód. Odkaz dáte na Instagram, do Google profilu nebo na pult. |
 | Kde jsou moje data a kdo je vidí? | Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. `[DOPLNIT: kde jsou data uložená]` Podrobnosti najdete v Ochraně údajů. |
-| Co se stane po 14 dnech? | Napíšeme vám, že zkušební doba končí. Když budete chtít pokračovat, zaplatíte kartou 249 Kč měsíčně. Když ne, nic se neplatí a k datům se dostanete dál, jen je nepůjde měnit. |
+| Co se stane po 14 dnech? | Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho zrušíte, nic nezaplatíte a k datům se dostanete dál, jen je nepůjde měnit. |
 | Můžu předplatné kdykoli zrušit? | Ano, sami v nastavení účtu. Data se nemažou, zůstanou vám k nahlédnutí. |
 | Funguje to na telefonu? | Ano. Aplikace je dělaná tak, aby šla ovládat jednou rukou mezi dvěma zákazníky. |
 | Kde najdu pomoc, když se něco nedaří? | Napište mi na `[DOPLNIT e-mail podpory]`. |
 
-Odpovědi o zkušební době a zrušení stojí na R-019 a `AGENTS.md` → B5 (bez předplatného jen čtení, data se nemažou). Před spuštěním (S19) je ověřit proti skutečnému chování aplikace.
+Odpovědi o zkušební době a zrušení stojí na R-038 a `AGENTS.md` → B5 (bez předplatného jen čtení, data se nemažou). Před spuštěním (S19) je ověřit proti skutečnému chování aplikace.
 
 ### 4.10 Footer
 
@@ -326,7 +326,7 @@ Odpovědi o zkušební době a zrušení stojí na R-019 a `AGENTS.md` → B5 (b
 | bez sekce Proč to řešit | nová sekce 01, ostatní čísla posunutá | R-031 |
 | „Domluvit hovor“ (tlačítko) | „Napište nám“ (textový odkaz na e-mail podpory) | R-032 |
 | `[DOMÉNA]/w/lenka.js` | `zakaziq.cz/embed/kadernictvi-lenka.js` | R-016, R-030 |
-| `[DPH: DOPLNIT]` | „konečná cena, nic se nepřipočítává · 14 dní zdarma bez karty“ | R-018, R-019 |
+| `[DPH: DOPLNIT]` | „konečná cena, nic se nepřipočítává · prvních 14 dní zdarma“ | R-018, R-038 |
 | „MODULY“ | „FUNKCE“ | slovník `zakaziq-ux-texty-cs` |
 | „segmenty“ | „skupiny“ | slovník |
 | znak „✓“ | Lucide `Check` | B8, ikony jen Lucide |

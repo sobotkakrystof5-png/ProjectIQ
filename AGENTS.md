@@ -81,6 +81,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
 | Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
+| Workspace platby | `STRIPE_SECRET_KEY` (omezený `rk_…`, jen server), `STRIPE_WEBHOOK_SECRET` (`/api/stripe/webhook`, bez něj 503), `STRIPE_PRICE_MONTHLY` (cena 249 Kč), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (zatím nepoužitý). Postup `docs/workspace/SETUP.md` → Stripe |
 | Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
 | Veřejná API | `VIZEON_API_KEY`, `ALTENO_API_KEY`, `ALTENO_LEAD_WEBHOOK_SECRET`, `N8N_API_KEY`, `VIZEON_AGENT_API_KEY`, `INVOICES_API_KEY` |
@@ -604,7 +605,7 @@ Pravidla schématu:
 
 | Migrace | Tabulky |
 |---|---|
-| 064 | `accounts` (Clerk org, IČO, `trial_ends_at` +14 dní), `members`, `businesses` (slug unikátní globálně), `business_modules` |
+| 064 | `accounts` (Clerk org, IČO, `stripe_customer_id`, `trial_ends_at` — nepoužívá se, R-038), `members`, `businesses` (slug unikátní globálně), `business_modules` |
 | 065 | `services`, `staff`, `service_staff`, `opening_hours` |
 | 066 | `field_definitions`, `stages` |
 | 067 | `customers` (účet, ne byznys; telefon E.164 a e-mail malými unikátní v účtu) |
@@ -645,11 +646,28 @@ Pravidla schématu:
 ## B5. Platby
 
 - Jeden produkt, jedna měsíční cena `STRIPE_PRICE_MONTHLY`: **249 Kč konečná cena** (provozovatel je neplátce DPH, R-018).
-- Zkušební doba **14 dní bez platební karty**; po ní výzva k platbě, bez předplatného jen čtení (R-019).
+- Zkušební doba **14 dní zdarma s kartou**: karta se zadává hned v průvodci (Stripe Checkout, trial ve Stripe), první platba po 14 dnech. Zkušební doba jen jednou na účet. Bez předplatného jen čtení (R-038, nahrazuje R-019).
 - V ceně **1 byznys a neomezeně pracovníků**. Datový model a URL počítají s více byznysy na účet (`business_id`, `/w/[byznys]`), přidání dalšího byznysu je v UI zatím vypnuté (R-026).
 - Checkout se zakládá na serveru, `account_id` v metadatech. Customer Portal pro změny a zrušení.
 - Webhook ověřuje podpis, každou událost uloží do `ws.stripe_events` a zpracuje jen jednou.
 - Přístup řídí `hasActiveSubscription(accountId)`. Po neúspěšné platbě 7 dní lhůta, pak jen čtení. Data se nikdy nemažou, poptávky z webu se ukládají dál.
+
+### Jak je to v kódu (S08, R-038, R-039)
+
+| Co | Kde |
+|---|---|
+| SDK | `stripe` **22.6.2**, API `2026-08-26.dahlia` (verze SDK, nemění se samostatně). Klient `getStripe()` v `lib/ws/stripe.ts` (`server-only`), omezený klíč `rk_…` |
+| Stav přístupu | `lib/ws/billing.ts`: `getBillingState(accountId)` → `access`: `none` (Checkout nikdy nedokončen → průvodce krok 2), `trialing`, `active`, `grace` (`past_due` do 7 dní od `past_due_since`), `read_only` (zrušeno, nezaplaceno, po lhůtě). `hasActiveSubscription()`, `canWrite()`, čistá `billingStateFrom()` |
+| Jen čtení | Mutační server action začíná `const blocked = await assertWritable(ctx); if (blocked) return blocked`. Příjem poptávek z webu (S11) to **nevolá** |
+| Checkout | `createCheckoutSession(ctx, { cancelPath })`: zákazník Stripe jednou na účet (`ws.accounts.stripe_customer_id`, idempotentní klíč), `trial_period_days: 14` jen bez předchozího předplatného, `payment_method_collection: 'always'`, `locale: 'cs'`, bez `payment_method_types` (metody řídí dashboard) a bez `automatic_tax` (neplátce). Při `past_due` nový Checkout nezakládá (dvojí platba), pošle do Portalu |
+| Portal, doklady | `createPortalSession(ctx)` (návrat `/w/ucet`), `listInvoices(ctx)` (12 posledních dokladů ze Stripe) |
+| Synchronizace | `syncSubscription(id)` vždy znovu načte předplatné ze Stripe a upsertne `ws.subscriptions` (konec období z položky předplatného, `past_due_since` drží první selhání). Účet z `metadata.account_id` předplatného, jinak zákazníka |
+| Webhook | `app/api/stripe/webhook/route.ts` (syrové tělo, `constructEvent`, limit 512 kB, bez klíče 503) → `lib/ws/stripe-webhook.ts` (`HANDLED_EVENTS`, idempotence `ws.stripe_events`) |
+| Stránky | `/w/novy` krok 2 (`components/ws/onboarding/subscribe-step.tsx`), `/w/predplatne?session_id=…` (návrat z Checkoutu: ověří, že relace patří účtu, synchronizuje, pak `/w?vitejte=1`), `/w/ucet` (jen vlastník: stav, Portal, doklady). Akce `app/w/ucet/actions.ts` (`startCheckout`, `openBillingPortal`), tlačítko `components/ws/billing/billing-action-button.tsx`, pruh `components/ws/billing/billing-banner.tsx` (`grace`, `read_only`) |
+| Nastavení Stripe | `docs/workspace/SETUP.md` → Stripe (sandbox ZakazIQ, cena, práva klíče, Portal, e-maily, webhook, ruční test) |
+| Testy | `lib/ws/__tests__/ws-billing.test.ts` (stavy, přechody, idempotence, účty se nepřepíšou, Checkout, podpis route) |
+
+- `ws.accounts.trial_ends_at` (migrace 064) se po R-038 nepoužívá — zkušební doba je ve Stripe.
 
 ## B6. Příjem poptávek z webů
 

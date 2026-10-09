@@ -16,6 +16,19 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-09 — review (S08, Stripe předplatné)
+Spouštěč: skill `web-security-review` před commitem S08.
+Rozsah: `lib/ws/{stripe,billing,stripe-webhook}.ts`, `app/api/stripe/webhook/route.ts`, `app/w/ucet/{actions,page}.tsx`, `app/w/predplatne/page.tsx`, `app/w/novy/page.tsx`, `components/ws/billing/*`. gitleaks nad soubory commitu, grep na klíče, kontrola klientského bundlu (`api.stripe.com` v `.next/static`: 0 výskytů).
+Výsledek:
+- Secrets: tajný klíč jen v `lib/ws/stripe.ts` (`server-only`), nic za `NEXT_PUBLIC_` kromě publikovatelného klíče. Doporučený omezený klíč `rk_…` s právy Customers/Checkout/Portal write, Subscriptions/Invoices read.
+- Webhook: podpis ze syrového těla, cizí klíč, staré razítko, změněné tělo i chybějící hlavička → 400 (testy), bez klíče 503, idempotence, do logu jen typ a id události. Zpracování si předplatné vždy znovu načte ze Stripe, podvržený obsah události by se nepropsal.
+- Server actions: jen vlastník, vstup jen `'novy' | 'ucet'` přes Zod, `account_id` z `requireWorkspace()`. `/w/predplatne` ověří tvar `session_id` a že relace patří přihlášenému účtu (test s cizí relací). Přesměrování jen na adresy, které vrátí Stripe.
+- Účty: zápis pod RLS s účtem z metadat, předplatné jednoho účtu nejde metadaty převést na jiný (test).
+- `npm audit --omit=dev`: 11, beze změny (`stripe` 22.6.2 bez nálezu).
+Nálezy: 1 opraveno před commitem. Při stavu `past_due` šlo otevřít nový Checkout, takže by vzniklo druhé předplatné vedle nezaplaceného, které Stripe dál zkouší strhnout, a hrozila dvojí platba. Teď vede jen na výměnu karty v Customer Portalu (test).
+Opraveno: v commitu S08.
+Zůstává: sandbox a klíče Stripe, live mód (STATE → Otevřené položky).
+
 ## 2026-10-09 — review (S07, Clerk, registrace, nový byznys)
 Spouštěč: skill `web-security-review` před commitem S07.
 Rozsah: `middleware.ts` (Clerk jen `/w` a `/api/ws`, admin větev beze změny), `lib/security/csp.ts` (v3), `app/w/novy/actions.ts` (server action), `app/api/clerk/webhook/route.ts` + `lib/ws/clerk-webhook.ts`, `lib/ws/onboarding.ts`, `lib/ws/clerk-orgs.ts`, komponenty `/w`. gitleaks nad soubory commitu, grep na `innerHTML`/`dangerouslySetInnerHTML` a klíče v kódu, `npm audit --omit=dev`.
