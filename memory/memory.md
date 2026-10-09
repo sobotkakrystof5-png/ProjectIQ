@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Technická fakta: [`../AGENTS.md`](../AGENTS.md).
 >
-> **Poslední aktualizace:** 2026-10-08 (S06)
+> **Poslední aktualizace:** 2026-10-09 (migrace 064–075 na Neonu)
 
 ---
 
@@ -32,7 +32,7 @@
 | S03 | Brief landing page | hotovo (2026-10-08) |
 | S04 | Landing page — stavba a animace | hotovo (2026-10-08) |
 | S05 | Landing page — SEO a texty | čeká |
-| S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace na Neon čekají |
+| S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace na Neonu (2026-10-09), role `ws_app` čeká |
 | S07 | Clerk, registrace, nový byznys | čeká |
 | S08 | Stripe předplatné 249 Kč | čeká |
 | S09 | Kostra aplikace a obrazovka Dnes | čeká |
@@ -49,9 +49,9 @@
 
 **Landing page (S03):** zadání je `docs/landing/PROJECT-BRIEF.md`. Jedna stránka s kotvami v `app/(marketing)/page.tsx`, sekce LP-D + Proč to řešit (R-031), bez formuláře, kontakt e-mailem podpory (R-032), dynamická s vynucenou CSP (R-033), právní stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` zástupně. Úmyslně zatím chybí: e-mail podpory, IČO, právní texty, sociální důkaz (nemáme reference), odkaz Novinky.
 
-**Databáze Workspace (S06):** schéma `ws` (migrace 064–075, 33 tabulek, R-035), role `ws_app` (`scripts/ws-create-role.js`), `lib/ws/{db,context,result}.ts`, šablony 8 oborů `lib/ws/templates/`, testy oddělení účtů v PGlite (R-036). Postup: `docs/workspace/SETUP.md`. **Na produkčním Neonu zatím neaplikováno** — migrace a role pouští Kryštof (Otevřené problémy). `requireWorkspace()` čeká na Clerk (S07, `setWsAuthProvider`).
+**Databáze Workspace (S06):** schéma `ws` (migrace 064–075, 33 tabulek, R-035), role `ws_app` (`scripts/ws-create-role.js`), `lib/ws/{db,context,result}.ts`, šablony 8 oborů `lib/ws/templates/`, testy oddělení účtů v PGlite (R-036). Postup: `docs/workspace/SETUP.md`. Migrace 064–075 jsou na produkčním Neonu (ověřeno 2026-10-09: 33 tabulek, RLS na všech kromě `stripe_events`, `webhook_events`, `rate_limits`). **Role `ws_app` zatím neexistuje** a `DATABASE_URL_WS` chybí v `.env.local` i Vercelu (Otevřené problémy). `requireWorkspace()` čeká na Clerk (S07, `setWsAuthProvider`).
 
-**Další krok:** S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Souběžně může jít S07 (Clerk) — předtím aplikovat migrace 064–075 a roli `ws_app` na Neon (`docs/workspace/SETUP.md`). S07 doplní Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
+**Další krok:** S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Souběžně může jít S07 (Clerk) — předtím založit roli `ws_app` (`node scripts/ws-create-role.js`, `docs/workspace/SETUP.md` krok 2–3) a mít klíče Clerku v `.env.local` (dnes chybí všechny tři). S07 doplní Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
 
 ---
 
@@ -228,7 +228,7 @@
 - [ ] **Legacy routy:** `app/dashboard/projekty/**` zůstalo po přesunu Projektů do Hubu (R-007); `projekty-actions.ts` se liší od verze v `app/hub/projekty/`. Rozhodnout: smazat, nebo přesměrovat na `/hub/projekty` · od 2026-06-23
 - [ ] **Mrtvé env:** `FATSECRET_CLIENT_ID/SECRET` jsou v `.env.example`, ale kód je nepoužívá (vyhledávání jídla jede přes Open Food Facts, `lib/fatsecret.ts` a `/api/fatsecret/search` mají historický název) · od 2026-06-22
 - [ ] **Připomínky 2 h před konzultací:** po R-006 není jasné, jestli běží externí hodinový cron (commit 2026-06-20 zmiňuje „externí hodinový cron"). Ověřit u uživatele · od 2026-06-25
-- [ ] **Workspace — migrace 064–075 a role `ws_app` na produkčním Neonu:** neaplikováno. Postup `docs/workspace/SETUP.md` (migrace → `node scripts/ws-create-role.js` → `DATABASE_URL_WS` do Vercelu). Blokuje S07 · od 2026-10-08
+- [ ] **Workspace — role `ws_app` na produkčním Neonu:** migrace 064–075 aplikované (2026-10-09), role ne. Zbývá `node scripts/ws-create-role.js` → `DATABASE_URL_WS` do Vercelu (`docs/workspace/SETUP.md` krok 2–3). Blokuje S07 spolu s klíči Clerku (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`) · od 2026-10-08
 - [ ] **Evidence migrací:** neexistuje tabulka, která by evidovala, které migrace jsou aplikované na produkční DB — stav se drží jen v changelogu (pravidlo: u každé migrace zapsat „aplikována: ano/ne") · od 2026-10-08
 - [ ] **Resend jen kvůli waitlistu:** závislost `resend` slouží jedné funkci (`sendLaunchEmailBlast`). Zvážit převod na `lib/email.ts` (R-004) · od 2026-10-08
 - [ ] **Workspace — IČO a právní texty** (podmínky, ochrana údajů, zpracovatelská smlouva). V S04 zástupně `[DOPLNIT]` (R-023), skutečné texty blokují S19 · od 2026-10-08
@@ -251,6 +251,9 @@
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-10-09
+- **db** Migrace 064–075 (schéma `ws`) aplikované na produkčním Neonu (aplikována: ano). Ověřeno dotazem: 33 tabulek ve `ws`, RLS zapnutá na všech kromě systémových `stripe_events`, `webhook_events`, `rate_limits`. Role `ws_app` v DB zatím není a `DATABASE_URL_WS` chybí v `.env.local`, takže krok 2 ze `docs/workspace/SETUP.md` zůstává otevřený.
 
 ### 2026-10-08
 - **db** S06 — schéma `ws` a oddělení účtů. Migrace 064–075 (aplikována: ne): účty, členové, byznysy, funkce, služby, pracovníci, otevírací doba, kolonky, stavy, zákazníci, poptávky, zakázky, termíny (`EXCLUDE` per pracovník), věrnost (1 návštěva = 1 razítko), skupiny, faktury, příjmy, daně, napojení webu, předplatné, Stripe/Clerk události, e-maily, upozornění, audit, idempotence, rate limit. Role `ws_app`: `scripts/ws-create-role.js` (heslo rovnou do `.env.local`, kontrola bez BYPASSRLS a bez přístupu k `public`) + `scripts/ws-grants.sql`. `lib/ws/db.ts` (`wsDb`, `wsSystem`, `q`), `lib/ws/context.ts` (`requireWorkspace`, `requireBusiness`, `requireRole`, Clerk za rozhraním), `lib/ws/result.ts`, šablony 8 oborů `lib/ws/templates/` (ceny `null`, věrnost vypnutá). Testy `lib/ws/__tests__/ws-{schema,db-context,templates}.test.ts` v PGlite: idempotence (otisk schématu po 2. průchodu stejný, i po jednom příkazu přes splitter `apply-migration.js`), účet A nevidí, nezmění ani nesmaže nic z B ve všech 30 tabulkách, složené FK, překryv, razítka, duplicitní události, mutační kontrola (oslabená politika test shodí). `docs/workspace/SETUP.md`, `AGENTS.md` B3 + env + příkazy, `.env.example`, R-035, R-036, bezpečnost `DECISIONS.md` #008 + `STATE.md`. Ověřeno: `npm test` 182/182, `npm run build` OK, admin `/login` 200, `/dashboard` `/alteno` `/hub` 307 na přihlášení, `/p/[neplatný]` 404. Migrace < 064 beze změny.
