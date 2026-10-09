@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from 'crypto'
 import { isUniqueViolation, pgConstraint, q, wsDb, wsSystem } from './db'
+import { RESERVED_BUSINESS_SLUGS } from './paths'
 import { getIndustryTemplate, templateSeedQueries, type IndustryKey } from './templates'
 
 // Založení účtu s prvním byznysem (průvodce /w/novy, S07). Clerk organizaci
@@ -33,7 +34,8 @@ export function slugify(name: string): string {
 }
 
 function slugCandidate(base: string, attempt: number): string {
-  if (attempt === 0) return base
+  // Rezervovaný slug („novy“, „ucet“…) by zakryla pevná cesta pod /w — rovnou s koncovkou.
+  if (attempt === 0 && !RESERVED_BUSINESS_SLUGS.has(base)) return base
   const alphabet = 'abcdefghijkmnpqrstuvwxyz23456789'
   let suffix = ''
   for (let i = 0; i < SUFFIX_LENGTH; i++) suffix += alphabet[randomInt(alphabet.length)]

@@ -43,6 +43,18 @@ describe('slugify', () => {
 })
 
 describe('createAccountWithBusiness', () => {
+  it('rezervovaný slug (pevná cesta pod /w) dostane koncovku', async () => {
+    const { accountId } = await createAccountWithBusiness({
+      orgId: 'org_rezervovany',
+      name: 'Nový',
+      industry: 'uklid',
+      owner: owner('user_rez'),
+    })
+    const [biz] = await wsDb({ accountId })`SELECT slug FROM ws.businesses WHERE account_id = ${accountId}`
+    expect(biz.slug).toMatch(/^novy-[a-z2-9]{4}$/)
+  })
+
+
   it('založí účet, vlastníka, byznys a šablonu oboru v jedné transakci', async () => {
     const { accountId, created } = await createAccountWithBusiness({
       orgId: 'org_novy_1',

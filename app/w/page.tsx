@@ -1,36 +1,22 @@
-import type { Metadata } from 'next'
-import { AppHeader, type HeaderBusiness } from '@/components/ws/app-header'
-import { AccentHeading, EmptyState, SectionLabel } from '@/components/ws/brand'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { getBillingState } from '@/lib/ws/billing'
 import { requireWorkspace } from '@/lib/ws/context'
-import { wsDb } from '@/lib/ws/db'
+import { LAST_BUSINESS_COOKIE, WS_ONBOARDING_PATH } from '@/lib/ws/paths'
+import { getBusinesses } from '@/lib/ws/today'
 
-export const metadata: Metadata = { title: 'Dnes' }
+type SearchParams = Record<string, string | string[] | undefined>
 
-// Úvod aplikace. Zatím jen hlavička s přepínačem byznysů a prázdný stav —
-// obrazovku Dnes a kostru aplikace (postranní panel, /w/[byznys]) postaví S09.
-export default async function WorkspaceHome() {
+// /w jen přesměruje na naposledy otevřený byznys (cookie z kostry aplikace),
+// jinak na první. `?vitejte=1` (návrat z předplatného, S08) jde s sebou,
+// obrazovka Dnes podle něj přivítá.
+export default async function WorkspaceHome({ searchParams }: { searchParams: SearchParams }) {
   const ctx = await requireWorkspace()
-  const businesses = await wsDb(ctx)<HeaderBusiness>`
-    SELECT name, slug FROM ws.businesses
-    WHERE account_id = ${ctx.accountId} AND archived_at IS NULL
-    ORDER BY created_at
-  `
-  const current = businesses[0] ?? null
+  const [billing, businesses] = await Promise.all([getBillingState(ctx.accountId), getBusinesses(ctx)])
+  if (billing.access === 'none' || businesses.length === 0) redirect(WS_ONBOARDING_PATH)
 
-  return (
-    <>
-      <AppHeader businesses={businesses} activeSlug={current?.slug ?? null} />
-      <main className="mx-auto flex max-w-[1240px] flex-col gap-8 px-4 py-8 sm:px-8 lg:py-10">
-        <div className="flex flex-col gap-2">
-          {current && <SectionLabel>{current.name}</SectionLabel>}
-          <AccentHeading accent="je připravený.">Váš byznys</AccentHeading>
-        </div>
-        <EmptyState
-          size="large"
-          title="Přehled dne se ještě staví"
-          description="Brzy tu na jeden pohled uvidíte nové poptávky, dnešní termíny a zákazníky."
-        />
-      </main>
-    </>
-  )
+  const remembered = cookies().get(LAST_BUSINESS_COOKIE)?.value
+  const target = businesses.find((b) => b.slug === remembered) ?? businesses[0]
+  const welcome = searchParams.vitejte === '1' ? '?vitejte=1' : ''
+  redirect(`/w/${target.slug}${welcome}`)
 }

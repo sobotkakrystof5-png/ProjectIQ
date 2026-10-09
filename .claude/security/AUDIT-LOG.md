@@ -16,6 +16,20 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-09 — review (S09, kostra aplikace a Dnes)
+Spouštěč: skill `web-security-review` před commitem S09.
+Rozsah: `app/w/page.tsx`, `app/w/[business]/{layout,page,loading,actions}.tsx|ts`, `app/w/[business]/[section]/page.tsx`, `components/ws/app/**`, `lib/ws/{today,search,detail-param,command-parser,nav,app-origin,demo-seed}.ts`, `lib/ws/context.ts` (`React.cache`), `scripts/ws-seed.mjs`. Grep na `innerHTML`/`dangerouslySetInnerHTML` (0), klíče v kódu (0).
+Výsledek:
+- Vstupy: `searchAction` (Zod, dotaz max. 160 znaků, oříznutí na 80, ILIKE s escapováním `%`, `_`, `\`, byznys z URL přes `requireBusiness`), `rememberBusinessAction` (slug regexem a proti účtu). URL parametry: `?detail=` jen známé tvary s UUID, `?zakaznik=` UUID, `?tyden=` platné datum, `kdo`/`sluzba` zkrácené a vykreslené jako text.
+- Data: každý dotaz `account_id = ctx.accountId` + `business_id` ověřeného byznysu, pod RLS. Testy: účet B nevidí kartu zákazníka, poptávku, Dnes ani výsledky hledání účtu A ani s byznysem A v ruce; poptávka A přes jiný byznys taky ne.
+- Cookie `ws_byznys`: HttpOnly, SameSite=Lax, Secure v produkci, path `/w`, nese jen slug, při čtení se znovu ověří proti účtu.
+- Odkazy z upozornění (`ws.notifications.link`) se vykreslí jako odkaz jen, když začínají `/w/` (žádné `javascript:` ani cizí doména).
+- Odkaz na objednání: z `NEXT_PUBLIC_APP_URL`, bez ní z hlavičky Host (jen lokálně; vidí ho jen přihlášený uživatel sám).
+- Seed skript: bez `--ano` nic nezapíše, maže jen označená data, zápis jako `ws_app` pod RLS.
+- CSP beze změny: nové stránky pod vynucenou politikou `/w`, v konzoli jen známé blokované Inter z adminu.
+Nálezy: 0.
+Zůstává: —
+
 ## 2026-10-09 — review (S08, Stripe předplatné)
 Spouštěč: skill `web-security-review` před commitem S08.
 Rozsah: `lib/ws/{stripe,billing,stripe-webhook}.ts`, `app/api/stripe/webhook/route.ts`, `app/w/ucet/{actions,page}.tsx`, `app/w/predplatne/page.tsx`, `app/w/novy/page.tsx`, `components/ws/billing/*`. gitleaks nad soubory commitu, grep na klíče, kontrola klientského bundlu (`api.stripe.com` v `.next/static`: 0 výskytů).

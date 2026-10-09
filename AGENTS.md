@@ -70,6 +70,7 @@ npm test         # vitest run
 npm run lint     # next lint
 node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace migrace na DATABASE_URL z .env.local
 node scripts/ws-create-role.js   # Workspace: role ws_app + práva + DATABASE_URL_WS do .env.local (docs/workspace/SETUP.md)
+node scripts/ws-seed.mjs <slug> --ano   # Workspace: ukázková data pro obrazovku Dnes (--smazat --ano je smaže)
 ```
 
 ### Env proměnné
@@ -634,7 +635,7 @@ Pravidla schématu:
 | Middleware | `middleware.ts`: `clerkMiddleware` jen pro `/w` a `/api/ws`; bez přihlášení `auth.protect()` → `/w/prihlaseni` (veřejné jen přihlášení, registrace a `/w/_design`). Admin a landing Clerk vůbec nespouští. CSP s nonce zůstává (`withCsp` uvnitř Clerku) |
 | Provider | `app/w/layout.tsx`: `ClerkProvider dynamic` (nonce z `x-nonce`), česky, `telemetry={false}`, po přihlášení `/w`, po registraci `/w/novy`. Kořenový `app/layout.tsx` beze změny |
 | Vzhled | `components/ws/auth/clerk-appearance.ts` (třídy Tailwindu s tokeny Dílků, `!`), rozložení `components/ws/auth/auth-shell.tsx` |
-| Stránky | `/w/prihlaseni/[[...prihlaseni]]`, `/w/registrace/[[...registrace]]` (catch-all kvůli krokům Clerku), `/w/novy` (průvodce), `/w` (hlavička s přepínačem byznysů, zatím prázdný stav) |
+| Stránky | `/w/prihlaseni/[[...prihlaseni]]`, `/w/registrace/[[...registrace]]` (catch-all kvůli krokům Clerku), `/w/novy` (průvodce), `/w` (přesměruje na `/w/[byznys]`, kostra a Dnes viz B9 „Jak je to v kódu (S09)“) |
 | Průvodce Nový byznys | `app/w/novy/actions.ts` (`createBusiness`: Zod, `auth()`, organizace přes `lib/ws/clerk-orgs.ts`, pak `createAccountWithBusiness`), UI `components/ws/onboarding/` (rozložení C5, náhled šablony z `industry-summaries.ts`). Krok 2 = platba (S08) |
 | Organizace | `lib/ws/clerk-orgs.ts` (`server-only`): má-li uživatel organizaci s účtem, nový účet se nezakládá (R-026) a průvodce ji jen aktivuje (`ActivateAccount`, Clerk po přihlášení organizaci sám nevybere); organizace bez účtu (spadlé založení) se použije znovu |
 | Webhook | `app/api/clerk/webhook/route.ts` (`verifyWebhook` = Svix podpis + čerstvost, limit 256 kB) → `lib/ws/clerk-webhook.ts`: `organization.updated` (název účtu), `organizationMembership.created/updated/deleted` (`ws.members`, `org:admin` → `owner`). Účet nezakládá — to dělá jen průvodce. `organization.deleted` data nemaže. Idempotence `ws.webhook_events` (`processed_at`) |
@@ -711,6 +712,26 @@ Jak je systém v kódu (S01, R-027):
 - Místo potvrzovacích dialogů tlačítko „Zpět" na pár sekund.
 - Prázdný stav vždy říká, co udělat dál.
 - Ovladatelné na telefonu jednou rukou, klikací plochy min. 44 px.
+
+### Jak je to v kódu (S09, R-040)
+
+| Co | Kde |
+|---|---|
+| `/w` | `app/w/page.tsx` — jen přesměruje na naposledy otevřený byznys (cookie `ws_byznys`, slug, HttpOnly, path `/w`), jinak první; `?vitejte=1` jde s sebou. Bez předplatného (`access: 'none'`) → `/w/novy` |
+| Kostra `/w/[byznys]` | `app/w/[business]/layout.tsx` (byznys přes `requireBusiness`, stav předplatného + `BillingBanner`, funkce, upozornění) → `components/ws/app/app-frame.tsx`: postranní panel `navy-950` jen se zapnutými funkcemi, hlavička (přepínač byznysů, hledání, zvonek, „+ Nová“), na telefonu spodní lišta (Dnes, Kalendář, +, Zákazníci, Peníze) a menu v panelu |
+| Navigace | `lib/ws/nav.ts` (`navItems`, `bottomBarSlots`, `navHref`) podle `ws.business_modules`; Poptávky, Zákazníci a Nastavení vždy |
+| Dnes | `app/w/[business]/page.tsx` + `components/ws/app/today/` (Příchozí, týdenní kalendář, agenda pro telefon, uvítání); data `lib/ws/today.ts` (`getTodayData`, `getCustomerCard`, `getRequestDetail`, `getNotifications`) v jedné transakci na volání; rozložení kalendáře `lib/ws/calendar-layout.ts` (čistá funkce, bez JS v prohlížeči); skeleton `loading.tsx` |
+| Stav v URL | `?detail=zakaznik:<id>` / `poptavka:<id>` / `nova-rezervace` / `nova-faktura` = pravý panel (`lib/ws/detail-param.ts`, `components/ws/app/detail-slot.tsx` na serveru, `detail-sheet.tsx` v prohlížeči; zavření odebere parametr). `?zakaznik=` karta vpravo na Dnes, `?tyden=` týden (pondělí) |
+| ⌘K | `components/ws/app/command-palette.tsx`: hledání `searchAction` → `lib/ws/search.ts` (zákazníci v účtu, poptávky a faktury v byznysu, ILIKE s escapováním), akce, přechod na obrazovky; příkaz „rezervace Tereza pátek 9:00“ rozpozná `lib/ws/command-parser.ts` (pravidla, ne AI) a otevře panel Nová rezervace s předvyplněním |
+| Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost |
+| Rezervované slugy | `RESERVED_BUSINESS_SLUGS` v `lib/ws/paths.ts` — pevné cesty pod `/w` (`novy`, `ucet`…). Nová pevná cesta pod `/w` = přidat sem, jinak by zakryla byznys se stejným slugem |
+| Čas | `lib/ws/time.ts`: `pragueToday`, `pragueParts`, `pragueToUtc` (přes letní/zimní čas), `weekStartOf`, `formatDayShort` („pá 9. 10.“), `formatRelativeDay` |
+| Ukázková data | `node scripts/ws-seed.mjs <slug> --ano` (smazání `--smazat --ano`), data v `lib/ws/demo-seed.ts` (bez runtime importů, Node 24 ho spustí bez překladu). Označená, jiných dat se nedotkne. Pozor: `.env.local` míří na produkční Neon |
+| Testy | `lib/ws/__tests__/ws-app-shell.test.ts` (čas, parser, kalendář, navigace, `?detail=`), `ws-today.test.ts` (Dnes nad ukázkovými daty v PGlite, oddělení účtů, hledání, smazání ukázky) |
+
+- `requireWorkspace` a `requireBusiness` jsou obalené `React.cache` — layout a stránka téhož požadavku se ptají jen jednou.
+- Detail se otevírá v pravém panelu přes `?detail=`, ne na nové stránce. Nový druh detailu = `DetailRef` v `detail-param.ts` + větev v `detail-slot.tsx`.
+- Formuláře „Nová rezervace“ a „Nová faktura“ jsou zatím jen náhled údajů (uložení S10, S14).
 
 ## B10. Texty
 

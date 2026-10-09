@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { wsDb, wsSystem } from './db'
 import { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH } from './paths'
@@ -31,7 +32,14 @@ export function setWsAuthProvider(provider: WsAuthProvider | null): void {
 
 export { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH }
 
-export async function requireWorkspace(): Promise<WsContext> {
+// cache(): layout i stránka téhož požadavku se ptají jen jednou. React.cache
+// je jen v Reactu, který přibaluje Next (server components); mimo render
+// (server action) nic neukládá a ve Vitestu (obyčejný React 18) chybí úplně —
+// tam se funkce volá pokaždé.
+type Cache = <F extends (...args: never[]) => unknown>(fn: F) => F
+const cache: Cache = (React as unknown as { cache?: Cache }).cache ?? ((fn) => fn)
+
+export const requireWorkspace = cache(async function requireWorkspace(): Promise<WsContext> {
   const identity = await authProvider()
   if (!identity) redirect(WS_SIGN_IN_PATH)
   if (!identity.orgId) redirect(WS_ONBOARDING_PATH)
@@ -45,7 +53,7 @@ export async function requireWorkspace(): Promise<WsContext> {
     accountId: row.id,
     role: identity.orgRole === 'org:admin' ? 'owner' : 'staff',
   }
-}
+})
 
 export type WsBusiness = {
   id: string
@@ -63,7 +71,7 @@ export type WsBusiness = {
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 /** Byznys z URL ověřený proti účtu. Cizí nebo neexistující slug = 404, nikdy 403. */
-export async function requireBusiness(ctx: WsContext, slug: string): Promise<WsBusiness> {
+export const requireBusiness = cache(async function requireBusiness(ctx: WsContext, slug: string): Promise<WsBusiness> {
   if (!SLUG_RE.test(slug) || slug.length > 60) notFound()
   const db = wsDb(ctx)
   const [business] = await db<WsBusiness>`
@@ -73,7 +81,7 @@ export async function requireBusiness(ctx: WsContext, slug: string): Promise<WsB
   `
   if (!business) notFound()
   return business
-}
+})
 
 export const hasRole = (ctx: WsContext, role: WsRole): boolean => role === 'staff' || ctx.role === 'owner'
 

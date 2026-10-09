@@ -25,12 +25,15 @@ function CommandDialog({
   onOpenChange,
   title = 'Hledat',
   description = 'Najděte zákazníka, termín nebo obrazovku.',
+  shouldFilter,
   children,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   title?: string
   description?: string
+  /** false = výsledky filtruje volající (např. hledání v DB), cmdk je nechá být. */
+  shouldFilter?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -38,7 +41,7 @@ function CommandDialog({
       <DialogContent className="bottom-auto top-[12vh] my-0 max-w-xl gap-0 overflow-hidden p-0 [&>button:last-child]:hidden">
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">{description}</DialogDescription>
-        <Command>{children}</Command>
+        <Command shouldFilter={shouldFilter}>{children}</Command>
       </DialogContent>
     </Dialog>
   )
