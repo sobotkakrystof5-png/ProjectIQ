@@ -93,7 +93,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
-| Migrace `ws` + role `ws_app` na produkčním Neonu | dokud neběží, Workspace nemá DB; roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli (BYPASSRLS) | Kryštof | před S07 |
+| `DATABASE_URL_WS` do Vercelu (Production + Preview) | migrace `ws` i role `ws_app` jsou na Neonu od 2026-10-09 (ověřeno: bez BYPASSRLS, do `public` nevidí); bez proměnné ve Vercelu Workspace v produkci nemá DB. Roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli | Kryštof | před S07 |
 | Admin CSP → vynucená | Report-Only nic nechrání. Potřeba dynamický `/login` (souhlas se zásahem do adminu) a 404 | Kryštof + Claude | do S19 |
 | Clerk domény do CSP | S07 — `script-src` (strict-dynamic stačí), `connect-src`, `frame-src`, `img-src` podle instance; popup OAuth vs COOP | S07 | S07 |
 | `frame-ancestors` a CORS z `web_integrations.allowed_origins` | `/r/*` teď jen `'self'`, CORS helper bez dat | S11 | S11 |
