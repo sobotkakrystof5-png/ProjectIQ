@@ -5,7 +5,7 @@ V admin konzoli přibudou **dvě nové stránky**, nic stávajícího se nezměn
 `/dashboard/klienti` (přehled účtů Workspace) a `/dashboard/novinky` (psaní novinek).
 
 ## Než začneš
-Rituál začátku. Načti `zakaziq-workspace-backend`. Přečti `AGENTS.md` → Část A a
+Rituál začátku. Načti `zakaziq-workspace-backend`. Přečti `docs/admin/AGENTS-ADMIN.md` (dřív `AGENTS.md` → Část A) a
 `app/dashboard/layout.tsx`. Toto je jediné sezení, kde smíš do `app/dashboard/` **přidat**
 soubory; existující neměň kromě jednoho řádku navigace (nové položky).
 

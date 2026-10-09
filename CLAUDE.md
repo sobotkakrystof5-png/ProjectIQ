@@ -17,7 +17,7 @@ Jedna Next.js aplikace se třemi částmi:
 
 | Část | Cesty | Přihlášení | Stav |
 |---|---|---|---|
-| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/alteno/*`, `/hub/*`, `/login`, `/p/[token]`, `/h/[token]` | NextAuth (jeden admin) | **beze změny**, dokumentace v `AGENTS.md` |
+| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/alteno/*`, `/hub/*`, `/login`, `/p/[token]`, `/h/[token]` | NextAuth (jeden admin) | **beze změny**, dokumentace v `docs/admin/AGENTS-ADMIN.md` |
 | **ZakazIQ Workspace** (SaaS pro firmy) | `/w/*`, `/api/ws/*`, `/api/public/v1/*` | Clerk | ve výstavbě |
 | **Landing page** | `/` a marketingové stránky v `app/(marketing)/` | žádné | ve výstavbě |
 
@@ -78,7 +78,7 @@ Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-se
 
 ## Kde co najdeš
 
-- `AGENTS.md` — pravidla a technická fakta pro všechny agenty; část A = admin konzole (popis kódu), část B = Workspace (pravidla pro nový kód). Při rozporu s CLAUDE.md platí AGENTS.md
+- `AGENTS.md` — pravidla a technická fakta pro všechny agenty; část A = příkazy a env (popis kódu adminu je v `docs/admin/AGENTS-ADMIN.md`), část B = Workspace (pravidla pro nový kód). Při rozporu s CLAUDE.md platí AGENTS.md
 - `memory/` — stav, rozhodnutí, otevřené problémy, changelog (mapa v `memory/index.md`)
 - `docs/workspace/PLAN.md` — produktový plán Workspace (zdroj pravdy pro rozsah; export z Claude Docs — při rozporu s Rozhodnutími v `memory/memory.md` platí Rozhodnutí)
 - `.claude/security/` — bezpečnostní stav: `STATE.md`, `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (S02)

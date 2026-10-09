@@ -24,7 +24,7 @@ Duplicitu nahraď odkazem. Narazíš-li na rozpor mezi soubory, **pravdu má kó
 | Událost | Co udělat |
 |---------|-----------|
 | Hotová feature / fix / refactor | Changelog + případně Aktuální stav |
-| Nová migrace | Changelog (číslo migrace + zda je aplikovaná na produkci) + katalog tabulek v AGENTS.md |
+| Nová migrace | Changelog (číslo migrace + zda je aplikovaná na produkci) + katalog tabulek (admin `docs/admin/AGENTS-ADMIN.md`, Workspace `AGENTS.md` → B3) |
 | Nová routa / API / cron / env | AGENTS.md + changelog; env i do `.env.example` |
 | Uživatel rozhodl „takhle a ne jinak" | Rozhodnutí (nový `R-xxx`) |
 | Objevený bug, který se teď neopravuje | Otevřené problémy |
@@ -62,7 +62,7 @@ Zrušené rozhodnutí se nemaže — dopiš `**Nahrazeno:** R-0xx (datum)`.
 ## 4. Údržba velikosti
 
 - `memory.md` se načítá do každého sezení — drž ho **pod ~400 řádky**.
-- Když changelog přeroste, přesuň celé starší měsíce do `memory/archiv/YYYY-MM.md` (nový soubor, stejný formát) a v memory.md nech odkaz. Rozhodnutí a otevřené problémy se nearchivují.
+- Changelog v memory.md drží jen poslední den práce. Starší dny a měsíce přesuň do `memory/archiv/` (`YYYY-MM.md`, stejný formát) a v memory.md nech odkaz v sekci „Starší“ (R-042). Rozhodnutí a otevřené problémy se nearchivují.
 - Aktuální stav přepisuj (je to snímek), changelog jen doplňuj (je to historie).
 
 ## 5. Bezpečnost

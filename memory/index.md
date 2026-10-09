@@ -7,11 +7,12 @@
 | Soubor | Role | Kdo ho čte | Mění se |
 |--------|------|-----------|---------|
 | [`../CLAUDE.md`](../CLAUDE.md) | Chování a proces Claude Code (komunikace, protokol sezení, git) | Claude Code (auto) | Zřídka — když uživatel změní, jak chce pracovat |
-| [`../AGENTS.md`](../AGENTS.md) | Pravidla a technická fakta pro všechny agenty: hranice v repu, A — admin konzole (stack, DB, routy, API, crony, emaily, bezpečnost, UX), B — Workspace (pravidla pro nový kód), git, „nikdy". Při rozporu s CLAUDE.md platí AGENTS.md | Každý AI nástroj | Při změně kódu, který popisuje, nebo pravidel Workspace |
+| [`../AGENTS.md`](../AGENTS.md) | Pravidla a technická fakta pro všechny agenty: hranice v repu, A — příkazy a env (popis adminu viz `docs/admin/AGENTS-ADMIN.md`), B — Workspace (pravidla pro nový kód), git, „nikdy". Při rozporu s CLAUDE.md platí AGENTS.md | Každý AI nástroj | Při změně kódu, který popisuje, nebo pravidel Workspace |
+| [`../docs/admin/AGENTS-ADMIN.md`](../docs/admin/AGENTS-ADMIN.md) | Popis kódu admin konzole: stack, DB model a katalog tabulek, struktura, server actions, routy, API, crony, stránky, e-maily, bezpečnost, UX, poznámky pro AI (R-042) | Sezení, které mění admin konzoli | Při změně admin kódu |
 | [`index.md`](index.md) | Tahle mapa | Každý AI nástroj | Nový dokument / nová oblast |
 | [`pravidla.md`](pravidla.md) | Meta-pravidla paměti — co kam, kdy, formát | Každý AI nástroj | Zřídka |
 | [`memory.md`](memory.md) | Živý stav, rozhodnutí s důvody, otevřené problémy, changelog | Každý AI nástroj | **Po každé dokončené změně** |
-| `archiv/` | Starší části changelogu (vzniká až při archivaci, viz pravidla) | Při pátrání v historii | Při archivaci |
+| `archiv/` | Starší části changelogu: `2026-10.md`, `2026-06-az-09.md` (viz pravidla §4) | Při pátrání v historii | Při archivaci |
 | [`../.env.example`](../.env.example) | Zdroj pravdy pro env proměnné | — | Nová env proměnná |
 | [`../.claude/security/STATE.md`](../.claude/security/STATE.md) | Bezpečnostní stav: hlavičky, CSP, threat model, DNS, otevřené položky; vedle `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (R-029) | Sezení, které sahá na hlavičky, CSP, middleware, API, vstupy | Se každou bezpečnostní změnou |
 | [`../docs/FINANCE_SYSTEM_PLAN.md`](../docs/FINANCE_SYSTEM_PLAN.md) | Plán finance/faktury/daně — **hotový** (fáze 0–8), zafixovaná rozhodnutí a daňové parametry 2026 | Při práci na Financích/fakturách/daních | Jen když se mění daňová pravidla |
@@ -51,7 +52,7 @@
 | Workspace — kostra aplikace, Dnes, ⌘K, pravý panel | `AGENTS.md` → B9 „Jak je to v kódu (S09)“, `app/w/[business]/`, `components/ws/app/`, `lib/ws/{today,nav,detail-param,command-parser,calendar-layout,search}.ts`, ukázková data `scripts/ws-seed.mjs`, R-040 |
 | Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `AGENTS.md` → B3 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
-| DB schéma | `AGENTS.md` → Databázový model + Katalog tabulek; detail v `migrations/` |
+| DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `AGENTS.md` → B3; detail v `migrations/` |
 | Testy | `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |
 
 ## Mimo tento repozitář
