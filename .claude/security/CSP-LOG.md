@@ -51,8 +51,13 @@ Ověřeno (produkční build lokálně, headless Chrome 2026-10-08, přihlášen
 ## v2 — 2026-10-08
 Landing page do vynucené CSP (DECISIONS #007, R-033): `/`, `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` jako přesné cesty v `ENFORCED_PATHS` (`lib/security/csp.ts`, test). Profil `workspace`, žádný nový zdroj. Layout `app/(marketing)` je `force-dynamic`. Ověřeno 2026-10-08 v headless Chromu (produkční build, 390–1440 px, `/`, `/podminky`, `/w/registrace`): stránky i hydratace fungují, jediné hlášení je zablokovaný adminův `@import` Inter z `globals.css` (jako na `/w`, otevřený problém v `memory/memory.md`). Safari neověřeno.
 
+## v3 — 2026-10-09
+Změna: jen na `/w/*` (profil `workspace`): `connect-src https://<Frontend API Clerku>`, `img-src https://img.clerk.com`, `frame-src https://challenges.cloudflare.com`. `script-src` beze změny.
+Kvůli: přihlášení a registrace přes Clerk (S07). Host Frontend API se bere z `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`clerkFrontendApiHost()`, base64 `<host>$`, kontrola tvaru hostu, neplatný klíč = nic) — dev `ultimate-chimp-4657.clerk.accounts.dev`, produkce bude `clerk.zakaziq.cz`. Skript clerk-js jde z toho hostu s naším nonce (`ClerkProvider dynamic` čte `x-nonce`), Turnstile a chunky clerk-js pouští `strict-dynamic`. Turnstile (bot ochrana registrace) běží v rámečku z `challenges.cloudflare.com`. Telemetrie Clerku vypnutá (`telemetry={false}`), `clerk-telemetry.com` proto v politice není. Landing, `/r`, `/z` a admin Clerk nedostávají (test v `lib/security/__tests__/csp.test.ts`).
+Ověřeno: produkční build lokálně, headless Chrome i Chrome 2026-10-09, `/w/prihlaseni` a `/w/registrace` na 390 a 1280 px — formuláře Clerku se vykreslí a hydratují, žádné hlášení CSP od Clerku. Jediné porušení zůstává adminův `@import` Inter (známé). Turnstile se v dev instanci nezobrazil (neověřeno v rámečku), přihlášení přes Google a ověření kódem neprošly ručně (zakládání účtu dělá Kryštof). Safari neověřeno.
+
 ## Čeká (zapsat jako vN při přidání)
-- S07 Clerk: domény instance (dev `*.clerk.accounts.dev` → konkrétní host, produkce `clerk.zakaziq.cz`), `img-src img.clerk.com`, případně Turnstile (`challenges.cloudflare.com`) — jen to, co ukáže konzole.
+- Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.
 
 ## Odebrané

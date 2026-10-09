@@ -47,6 +47,7 @@
 | Hub (osobní moduly) | `app/hub/**`, `components/HubSidebarNav.tsx` |
 | Landing page | `../docs/landing/PROJECT-BRIEF.md`, `app/(marketing)/` |
 | Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `AGENTS.md` → Část B |
+| Workspace — přihlášení, registrace, nový byznys (Clerk) | `AGENTS.md` → B4 „Jak je to v kódu“, `middleware.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |
 | Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `AGENTS.md` → B3 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | `AGENTS.md` → Databázový model + Katalog tabulek; detail v `migrations/` |

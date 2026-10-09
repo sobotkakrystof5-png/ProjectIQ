@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Technická fakta: [`../AGENTS.md`](../AGENTS.md).
 >
-> **Poslední aktualizace:** 2026-10-09 (migrace 064–075 a role `ws_app` na Neonu)
+> **Poslední aktualizace:** 2026-10-09 (S07)
 
 ---
 
@@ -33,7 +33,7 @@
 | S04 | Landing page — stavba a animace | hotovo (2026-10-08) |
 | S05 | Landing page — SEO a texty | čeká |
 | S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace a role `ws_app` na Neonu (2026-10-09) |
-| S07 | Clerk, registrace, nový byznys | čeká |
+| S07 | Clerk, registrace, nový byznys | hotovo (2026-10-09), registraci ručně neprošel nikdo |
 | S08 | Stripe předplatné 249 Kč | čeká |
 | S09 | Kostra aplikace a obrazovka Dnes | čeká |
 | S10 | Poptávky a kalendář | čeká |
@@ -49,9 +49,11 @@
 
 **Landing page (S03):** zadání je `docs/landing/PROJECT-BRIEF.md`. Jedna stránka s kotvami v `app/(marketing)/page.tsx`, sekce LP-D + Proč to řešit (R-031), bez formuláře, kontakt e-mailem podpory (R-032), dynamická s vynucenou CSP (R-033), právní stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` zástupně. Úmyslně zatím chybí: e-mail podpory, IČO, právní texty, sociální důkaz (nemáme reference), odkaz Novinky.
 
-**Databáze Workspace (S06):** schéma `ws` (migrace 064–075, 33 tabulek, R-035), role `ws_app` (`scripts/ws-create-role.js`), `lib/ws/{db,context,result}.ts`, šablony 8 oborů `lib/ws/templates/`, testy oddělení účtů v PGlite (R-036). Postup: `docs/workspace/SETUP.md`. Migrace 064–075 jsou na produkčním Neonu (ověřeno 2026-10-09: 33 tabulek, RLS na všech kromě `stripe_events`, `webhook_events`, `rate_limits`). Role `ws_app` založená skriptem, `DATABASE_URL_WS` je v `.env.local`; **ve Vercelu zatím chybí** (Otevřené problémy). `requireWorkspace()` čeká na Clerk (S07, `setWsAuthProvider`).
+**Databáze Workspace (S06):** schéma `ws` (migrace 064–075, 33 tabulek, R-035), role `ws_app` (`scripts/ws-create-role.js`), `lib/ws/{db,context,result}.ts`, šablony 8 oborů `lib/ws/templates/`, testy oddělení účtů v PGlite (R-036). Postup: `docs/workspace/SETUP.md`. Migrace 064–075 jsou na produkčním Neonu (ověřeno 2026-10-09: 33 tabulek, RLS na všech kromě `stripe_events`, `webhook_events`, `rate_limits`). Role `ws_app` založená skriptem, `DATABASE_URL_WS` je v `.env.local`; **ve Vercelu zatím chybí** (Otevřené problémy).
 
-**Další krok:** S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Souběžně může jít S07 (Clerk) — předtím `DATABASE_URL_WS` do Vercelu (`docs/workspace/SETUP.md` krok 3) a klíče Clerku do `.env.local` (dnes chybí všechny tři). S07 doplní Clerk do CSP (`.claude/security/STATE.md` → Otevřené položky).
+**Přihlášení Workspace (S07):** Clerk 6.39.7 jen pod `/w` (R-037), přihlášení `/w/prihlaseni`, registrace `/w/registrace`, průvodce `/w/novy` (název + obor → účet, byznys a šablona oboru), `/w` s hlavičkou a prázdným stavem, webhook `/api/clerk/webhook`. Dev instance Clerku (aplikace ZakazIQ, `app_3KSvZAk4iFgvwVicglMwWtga6Gd`) propojená `clerk link`, klíče v `.env.local`. **Neověřeno ručně:** skutečná registrace (kód z e-mailu, Google) a průchod průvodcem až do `/w` — dělá Kryštof (zakládání účtů ve službě Clerk nedělá Claude). Webhook nemá endpoint ani `CLERK_WEBHOOK_SECRET`.
+
+**Další krok:** Kryštof projde registraci → průvodce → `/w` (`npm run dev`, `http://localhost:3000/w/registrace`). Pak S08 (Stripe, krok 2 průvodce) nebo S05 (SEO landing). S05 (`new - area of zakaziq/prompty/S05-landing-seo-texty.md`): SEO, metadata, OG obrázek, favicon (dnes 404), strukturovaná data a změření Lighthouse/LCP podle briefu § 11 — v S04 se Lighthouse neměřil. Landing je v `components/marketing/`. Před nasazením `/w` na Vercel: `DATABASE_URL_WS` a klíče Clerku do Vercelu.
 
 ---
 
@@ -221,6 +223,11 @@
 **Proč:** Docker neběží, lokální Postgres není a Neon branch by potřebovala přihlašovací údaje a síť. PGlite umí role, RLS, `set_config` i `btree_gist`. Neon běží na PG 18.6, rozdíl verzí je zanedbatelný. Testy jsou součástí běžného `npm test` (asi 2 s).
 **Důsledek:** `lib/ws/__tests__/helpers/ws-pglite.ts`, `docs/workspace/SETUP.md` → Testy. Do produkčního bundlu se nedostane.
 
+### R-037 · Clerk jen pod /w, účet zakládá průvodce (2026-10-09)
+**Rozhodnutí:** `@clerk/nextjs` 6.39.7 (verze 7 vyžaduje Next 15) + `@clerk/localizations`. Clerk běží jen pro `/w` a `/api/ws` (middleware i `ClerkProvider` v `app/w/layout.tsx`), admin a landing ho nespouští. `clerk init` se nepoužil — přepsal by kořenový layout adminu a `middleware.ts`. Účet (`ws.accounts`) zakládá jen průvodce `/w/novy` spolu s byznysem a šablonou oboru; webhook účty nezakládá, jen drží název a členy. Má-li uživatel organizaci s účtem, nový se nezakládá a průvodce ji jen aktivuje (Clerk po přihlášení aktivní organizaci nevybere). Odhlášení vlastním tlačítkem, ne `UserButton` (správa účtu se vykresluje mimo tokeny Dílků). Nastavení instance Clerku jde přes CLI (`clerk config patch`), ne ručně.
+**Proč:** odsouhlaseno v S07. Admin se nesmí změnit; účet bez byznysu nedává smysl; jedno místo založení = jedna transakce bez závodu s webhookem. R-026 (jeden byznys v ceně).
+**Důsledek:** `AGENTS.md` → B4 „Jak je to v kódu“, `.claude/security/DECISIONS.md` #009, CSP v3. Krok 2 průvodce (platba) přidá S08 do `app/w/novy`.
+
 ---
 
 ## 3. Otevřené problémy
@@ -228,7 +235,12 @@
 - [ ] **Legacy routy:** `app/dashboard/projekty/**` zůstalo po přesunu Projektů do Hubu (R-007); `projekty-actions.ts` se liší od verze v `app/hub/projekty/`. Rozhodnout: smazat, nebo přesměrovat na `/hub/projekty` · od 2026-06-23
 - [ ] **Mrtvé env:** `FATSECRET_CLIENT_ID/SECRET` jsou v `.env.example`, ale kód je nepoužívá (vyhledávání jídla jede přes Open Food Facts, `lib/fatsecret.ts` a `/api/fatsecret/search` mají historický název) · od 2026-06-22
 - [ ] **Připomínky 2 h před konzultací:** po R-006 není jasné, jestli běží externí hodinový cron (commit 2026-06-20 zmiňuje „externí hodinový cron"). Ověřit u uživatele · od 2026-06-25
-- [ ] **Workspace — `DATABASE_URL_WS` ve Vercelu a klíče Clerku:** migrace 064–075 i role `ws_app` jsou na Neonu (2026-10-09). Zbývá zkopírovat `DATABASE_URL_WS` z `.env.local` do Vercelu, Production i Preview (`docs/workspace/SETUP.md` krok 3). Blokuje S07 spolu s klíči Clerku (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`) · od 2026-10-08
+- [ ] **Workspace — env ve Vercelu:** `DATABASE_URL_WS` (z `.env.local`, `docs/workspace/SETUP.md` krok 3), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` (Production i Preview). Lokálně všechno je. Blokuje nasazení `/w` · od 2026-10-08
+- [ ] **Clerk — webhook:** v Clerk dashboardu založit endpoint `https://<doména>/api/clerk/webhook` (události `organization.updated`, `organizationMembership.*`) a jeho podpisový klíč dát do `CLERK_WEBHOOK_SECRET` (`.env.local` i Vercel). Do té doby route vrací 503 a členové se nesynchronizují (vlastníka zapíše průvodce) · od 2026-10-09
+- [ ] **Clerk — produkční instance** (`clerk deploy`, doména `clerk.zakaziq.cz`, vlastní Google OAuth údaje, produkční klíče). Dev instance nesmí do produkce · před S19 · od 2026-10-09
+- [ ] **Clerk — limit 5 členů na organizaci** (výchozí v Clerku). R-020 slibuje neomezeně pracovníků — pracovníci ve `ws.staff` se přihlašovat nemusí, ale přihlašovací účty pro tým (S13?) limit narazí. Ověřit, jestli jde zvednout na našem plánu Clerku · od 2026-10-09
+- [ ] **Clerk — e-maily s kódem** chodí z Clerku (šablona a jazyk podle nastavení instance). Ověřit při první registraci, že jsou česky a jménem ZakazIQ; jinak nastavit v dashboardu Clerku (Customization → Emails) · od 2026-10-09
+- [ ] **Clerk — `user.updated`** (změna jména/e-mailu) se do `ws.members` nepropisuje — webhook ho nezpracovává, payload nemá organizace. Řešit, až se jména členů budou někde zobrazovat (S13) · od 2026-10-09
 - [ ] **Evidence migrací:** neexistuje tabulka, která by evidovala, které migrace jsou aplikované na produkční DB — stav se drží jen v changelogu (pravidlo: u každé migrace zapsat „aplikována: ano/ne") · od 2026-10-08
 - [ ] **Resend jen kvůli waitlistu:** závislost `resend` slouží jedné funkci (`sendLaunchEmailBlast`). Zvážit převod na `lib/email.ts` (R-004) · od 2026-10-08
 - [ ] **Workspace — IČO a právní texty** (podmínky, ochrana údajů, zpracovatelská smlouva). V S04 zástupně `[DOPLNIT]` (R-023), skutečné texty blokují S19 · od 2026-10-08
@@ -243,7 +255,6 @@
 - [ ] **Bezpečnost — otevřené položky** (vynucení admin CSP, Clerk do CSP, DNS `zakaziq.cz`, živý audit, `Expires` v security.txt): vedené v `.claude/security/STATE.md` → Otevřené položky · od 2026-10-08
 - [ ] **Landing — e-mail podpory:** firemní adresa pro „Napište nám“ (R-032) chybí, na landing `[DOPLNIT]`. Blokuje spuštění (S19) · od 2026-10-08
 - [ ] **Landing — kde jsou data uložená:** odpověď v Dotazech má `[DOPLNIT]` (region Neonu, ověřit) · od 2026-10-08
-- [ ] **Landing — cesty Clerku:** „Přihlásit“ → `/w/prihlaseni` a „Začít“ → `/w/registrace` jsou v briefu předpoklad, potvrdí S07 · od 2026-10-08
 - [ ] **`N8N_API_KEY`** není v lokálním `.env.local` — lokálně `/api/public/leads` vše odmítne (fail-closed). Na produkci ověřit ve Vercelu · od 2026-10-08
 
 ---
@@ -253,6 +264,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-09
+- **feat** S07 — Clerk, registrace a nový byznys. `@clerk/nextjs` 6.39.7 + `@clerk/localizations` (R-037). `middleware.ts`: Clerk jen pro `/w` a `/api/ws`, ochrana `/w` kromě přihlášení/registrace, CSP s nonce zachovaná. `app/w/layout.tsx`: `ClerkProvider` (česky, nonce, bez telemetrie, `noindex`). Stránky `/w/prihlaseni`, `/w/registrace` (catch-all, vzhled Dílků `components/ws/auth/`), průvodce `/w/novy` (rozložení C5: název, obor z 8 šablon, živý náhled stavů/kolonek/služeb; `app/w/novy/actions.ts`, `components/ws/onboarding/`), `/w` (hlavička s přepínačem byznysů bez „+ Přidat byznys“ podle R-026, odhlášení, prázdný stav). `lib/ws/onboarding.ts` (účet + vlastník + byznys + šablona v jedné transakci pod RLS, slug s koncovkou při kolizi), `lib/ws/clerk-orgs.ts`, `lib/ws/clerk-webhook.ts` + `app/api/clerk/webhook/route.ts` (Svix, idempotence), `lib/ws/paths.ts`, `requireWorkspace()` na Clerk `auth()`. Smazán `components/ws/coming-soon.tsx`. CSP v3 (Clerk host z publishable key, `img.clerk.com`, Turnstile) + test. Instance Clerku přes CLI: `clerk link`, `clerk env pull` (klíče do `.env.local`, ostatní řádky beze změny), přihlášení jen e-mailový kód + Google (heslo, telefon, uživatelské jméno vypnuté), organizace zapnuté, aplikace přejmenovaná na ZakazIQ. Testy `lib/ws/__tests__/ws-onboarding.test.ts` (13): dva nové účty se nevidí ani bez aplikačního filtru, opakované založení nic nezdvojí, webhook (členové, idempotence, organizace bez účtu, mazání organizace nic nemaže), podpis route (bez klíče 503, podvržený/cizí/starý 400). Bezpečnost: CSP-LOG v3, STATE, DECISIONS #009, AUDIT-LOG review. Ověřeno: `npm test` 198/198, `npm run build` OK bez varování, admin `/login` 200, `/dashboard` `/alteno` `/hub` 307 na přihlášení NextAuth, `/p` a `/h` s neplatným tokenem 404, admin chunky bez Clerku; `/w/prihlaseni` a `/w/registrace` v Chromu a headless (390 i 1280 px) bez přetékání a bez hlášení CSP od Clerku; průvodce vyfocen přes dočasnou stránku (smazána) včetně chybové hlášky a klávesnice. `npm audit --omit=dev` beze změny (11). **Neověřeno:** skutečná registrace a průchod průvodcem do `/w`, Google přihlášení, Turnstile, Safari.
 - **db** Role `ws_app` založená na produkčním Neonu přes `node scripts/ws-create-role.js` (spustil Kryštof), `DATABASE_URL_WS` zapsaná do `.env.local`. Ověřeno: bez BYPASSRLS a superuser, bez členství v jiné roli, k žádné tabulce v `public` nemá přístup. Ve Vercelu zatím není.
 - **db** Migrace 064–075 (schéma `ws`) aplikované na produkčním Neonu (aplikována: ano). Ověřeno dotazem: 33 tabulek ve `ws`, RLS zapnutá na všech kromě systémových `stripe_events`, `webhook_events`, `rate_limits`. Role `ws_app` v DB zatím není a `DATABASE_URL_WS` chybí v `.env.local`, takže krok 2 ze `docs/workspace/SETUP.md` zůstává otevřený.
 

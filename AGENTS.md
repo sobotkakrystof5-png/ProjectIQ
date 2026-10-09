@@ -80,6 +80,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 |---------|----------|
 | DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
+| Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
 | Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
 | Veřejná API | `VIZEON_API_KEY`, `ALTENO_API_KEY`, `ALTENO_LEAD_WEBHOOK_SECRET`, `N8N_API_KEY`, `VIZEON_AGENT_API_KEY`, `INVOICES_API_KEY` |
@@ -319,7 +320,7 @@ lib/
 ├── utils.ts
 └── types.ts
 
-middleware.ts                    ← jediný middleware: NextAuth pro /dashboard, /alteno, /hub (vč. podcest) + CSP s nonce (B13)
+middleware.ts                    ← jediný middleware: NextAuth pro /dashboard, /alteno, /hub (vč. podcest), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -585,7 +586,9 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 | Schéma `ws` — 33 tabulek | migrace `064_ws_zaklad` … `075_ws_audit_limity` (přehled níže) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505) |
-| Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení za `setWsAuthProvider` — Clerk napojí S07 |
+| Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
+| Cesty | `lib/ws/paths.ts` — `/w`, `/w/prihlaseni`, `/w/registrace`, `/w/novy` (bez závislostí, importuje i middleware) |
+| Založení účtu | `lib/ws/onboarding.ts`: `createAccountWithBusiness()` — účet, vlastník, byznys a šablona oboru v jedné transakci pod RLS s nově vygenerovaným `account_id`; obsazený slug zkusí s koncovkou, existující organizace vrátí její účet; `accountIdForOrg()`, `slugify()` |
 | Výsledek akcí | `lib/ws/result.ts` (`ok`, `fail`, `Result<T>`) |
 | Šablony oborů | `lib/ws/templates/` — 8 oborů, `templateSeedQueries()` naplní nový byznys (funkce, služby bez cen, kolonky, stavy, hranice skupin, vypnutá věrnost) |
 | Testy | `lib/ws/__tests__/ws-*.test.ts` proti PGlite (R-036) |
@@ -621,6 +624,23 @@ Pravidla schématu:
 - Jedna doména: landing na `/`, aplikace na `/w/*`, jedna Clerk instance (R-017). Cesty veřejných částí viz Hranice v repu (R-016).
 - Jeden `middleware.ts`: veřejné cesty; Workspace přes Clerk; admin cesty přes NextAuth token jako dnes. Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
 - Webhook Clerk (`/api/clerk/webhook`, ověření podpisu) synchronizuje účty a členy do `ws`.
+
+### Jak je to v kódu (S07, R-037)
+
+| Co | Kde |
+|---|---|
+| SDK | `@clerk/nextjs` **6.39.7** (poslední s podporou Next 14; v7 chce Next 15) + `@clerk/localizations` (`csCZ`) |
+| Middleware | `middleware.ts`: `clerkMiddleware` jen pro `/w` a `/api/ws`; bez přihlášení `auth.protect()` → `/w/prihlaseni` (veřejné jen přihlášení, registrace a `/w/_design`). Admin a landing Clerk vůbec nespouští. CSP s nonce zůstává (`withCsp` uvnitř Clerku) |
+| Provider | `app/w/layout.tsx`: `ClerkProvider dynamic` (nonce z `x-nonce`), česky, `telemetry={false}`, po přihlášení `/w`, po registraci `/w/novy`. Kořenový `app/layout.tsx` beze změny |
+| Vzhled | `components/ws/auth/clerk-appearance.ts` (třídy Tailwindu s tokeny Dílků, `!`), rozložení `components/ws/auth/auth-shell.tsx` |
+| Stránky | `/w/prihlaseni/[[...prihlaseni]]`, `/w/registrace/[[...registrace]]` (catch-all kvůli krokům Clerku), `/w/novy` (průvodce), `/w` (hlavička s přepínačem byznysů, zatím prázdný stav) |
+| Průvodce Nový byznys | `app/w/novy/actions.ts` (`createBusiness`: Zod, `auth()`, organizace přes `lib/ws/clerk-orgs.ts`, pak `createAccountWithBusiness`), UI `components/ws/onboarding/` (rozložení C5, náhled šablony z `industry-summaries.ts`). Krok 2 = platba (S08) |
+| Organizace | `lib/ws/clerk-orgs.ts` (`server-only`): má-li uživatel organizaci s účtem, nový účet se nezakládá (R-026) a průvodce ji jen aktivuje (`ActivateAccount`, Clerk po přihlášení organizaci sám nevybere); organizace bez účtu (spadlé založení) se použije znovu |
+| Webhook | `app/api/clerk/webhook/route.ts` (`verifyWebhook` = Svix podpis + čerstvost, limit 256 kB) → `lib/ws/clerk-webhook.ts`: `organization.updated` (název účtu), `organizationMembership.created/updated/deleted` (`ws.members`, `org:admin` → `owner`). Účet nezakládá — to dělá jen průvodce. `organization.deleted` data nemaže. Idempotence `ws.webhook_events` (`processed_at`) |
+| Testy | `lib/ws/__tests__/ws-onboarding.test.ts` (založení, dva účty se nevidí, opakování, webhook, podpis route) |
+
+- Instance Clerku (dev): přihlášení jen e-mailový kód a Google, bez hesla, telefonu a uživatelského jména; organizace zapnuté, max. 5 členů na organizaci (limit Clerku). Nastavení přes `clerk config pull/patch`, ne ručně v dashboardu.
+- Odhlášení vlastním tlačítkem (`SignOutButton`), ne `UserButton` — jeho okno správy účtu se vykresluje mimo `[data-app="ws"]` bez tokenů.
 
 ## B5. Platby
 
@@ -725,7 +745,7 @@ Stav zabezpečení je v `.claude/security/`:
 |---|---|
 | Statické hlavičky (HSTS, nosniff, X-Frame-Options, CORP, COOP, Permissions-Policy…) pro všechny odpovědi | `next.config.mjs` |
 | CSP s nonce per request (`strict-dynamic`), výběr profilu podle cesty | `middleware.ts` + `lib/security/csp.ts` |
-| Admin přihlášení (NextAuth), místo pro Clerk (S07) | `middleware.ts` — pořadí: admin auth → Clerk → CSP |
+| Admin přihlášení (NextAuth), Workspace (Clerk jen `/w`, `/api/ws`) | `middleware.ts` — Clerk větev (`/w`, `/api/ws`) → admin NextAuth → CSP |
 | `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`) |
 | Hlášení zranitelností | `public/.well-known/security.txt` (`Expires` obnovit) |
 | CI: audit závislostí, gitleaks, kontrola hlaviček živého webu | `.github/workflows/security.yml`, skript `.claude/security/security-check.sh` |

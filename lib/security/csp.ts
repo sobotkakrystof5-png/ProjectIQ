@@ -68,8 +68,41 @@ function base(nonce: string, isDev: boolean): Directives {
   }
 }
 
+/**
+ * Host Frontend API Clerku z publishable key (`pk_test_…`/`pk_live_…` = base64
+ * z `<host>$`). Dev instance je `*.clerk.accounts.dev`, produkce `clerk.<doména>`.
+ * Neplatný klíč = `null`, CSP pak Clerk nepustí (selže zavřeně).
+ */
+export function clerkFrontendApiHost(publishableKey: string | undefined): string | null {
+  const match = /^pk_(test|live)_([A-Za-z0-9+/=]+)$/.exec(publishableKey ?? '')
+  if (!match) return null
+  let decoded: string
+  try {
+    decoded = atob(match[2])
+  } catch {
+    return null
+  }
+  const host = decoded.endsWith('$') ? decoded.slice(0, -1) : ''
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(host) ? host.toLowerCase() : null
+}
+
+/**
+ * Clerk (S07) jen pod /w — přihlášení, registrace, aplikace. Landing page Clerk
+ * nenačítá. Skript clerk-js jde z Frontend API s naším nonce (ClerkProvider
+ * `dynamic`), Turnstile ho načte sám (strict-dynamic). Telemetrie je vypnutá
+ * v `app/w/layout.tsx`, host clerk-telemetry.com proto není potřeba.
+ */
+function clerkSources(host: string): Directives {
+  return {
+    'connect-src': [`https://${host}`],
+    'img-src': ['https://img.clerk.com'],
+    // Bot ochrana při registraci (Cloudflare Turnstile v rámečku)
+    'frame-src': ['https://challenges.cloudflare.com'],
+  }
+}
+
 /** Zdroje navíc podle profilu. Jen konkrétní hosty, každý zapsaný v CSP-LOG.md. */
-function extras(profile: CspProfile, pathname: string): Directives {
+function extras(profile: CspProfile, pathname: string, clerkHost: string | null): Directives {
   if (profile === 'admin') {
     return {
       // Inter přes @import v app/globals.css
@@ -85,7 +118,7 @@ function extras(profile: CspProfile, pathname: string): Directives {
         : {}),
     }
   }
-  // S07: Clerk (skripty, frame a API domény instance) — doplnit sem + CSP-LOG.md.
+  if (clerkHost && hasPrefix(pathname, '/w')) return clerkSources(clerkHost)
   // S08: Stripe Checkout je přesměrování; pokud bude potřeba, `form-action https://checkout.stripe.com`.
   return {}
 }
@@ -107,10 +140,20 @@ export interface BuildCspOptions {
   isDev?: boolean
   /** Hodnota `frame-ancestors` pro stránky vkládané na cizí weby (`/r/[slug]`). */
   frameAncestors?: string[]
+  /** Host Frontend API Clerku (`clerkFrontendApiHost`), pouští Clerk na /w. */
+  clerkHost?: string | null
 }
 
-export function buildCsp({ nonce, pathname, profile, mode, isDev = false, frameAncestors }: BuildCspOptions): string {
-  let directives = merge(base(nonce, isDev), extras(profile, pathname))
+export function buildCsp({
+  nonce,
+  pathname,
+  profile,
+  mode,
+  isDev = false,
+  frameAncestors,
+  clerkHost = null,
+}: BuildCspOptions): string {
+  let directives = merge(base(nonce, isDev), extras(profile, pathname, clerkHost))
   if (frameAncestors) directives = { ...directives, 'frame-ancestors': frameAncestors }
 
   const parts = Object.entries(directives).map(([key, values]) => `${key} ${values.join(' ')}`)

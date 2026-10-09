@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCsp, createNonce, cspProfileFor, hasPrefix } from '@/lib/security/csp'
+import { buildCsp, clerkFrontendApiHost, createNonce, cspProfileFor, hasPrefix } from '@/lib/security/csp'
 
 const directive = (csp: string, name: string) =>
   csp.split('; ').find((d) => d === name || d.startsWith(`${name} `))
@@ -93,6 +93,40 @@ describe('buildCsp', () => {
       frameAncestors: ["'self'", 'https://kadernictvi.cz'],
     })
     expect(directive(csp, 'frame-ancestors')).toBe("frame-ancestors 'self' https://kadernictvi.cz")
+  })
+})
+
+describe('Clerk', () => {
+  const nonce = 'dGVzdG5vbmNl'
+  // pk_test_ + base64("demo-app-12.clerk.accounts.dev$")
+  const key = `pk_test_${btoa('demo-app-12.clerk.accounts.dev$')}`
+  const host = 'demo-app-12.clerk.accounts.dev'
+
+  it('host Frontend API z publishable key', () => {
+    expect(clerkFrontendApiHost(key)).toBe(host)
+    expect(clerkFrontendApiHost(`pk_live_${btoa('clerk.zakaziq.cz$')}`)).toBe('clerk.zakaziq.cz')
+  })
+
+  it('neplatný klíč nepustí nic', () => {
+    expect(clerkFrontendApiHost(undefined)).toBeNull()
+    expect(clerkFrontendApiHost('sk_test_abc')).toBeNull()
+    expect(clerkFrontendApiHost(`pk_test_${btoa('*.evil.com$')}`)).toBeNull()
+    expect(clerkFrontendApiHost(`pk_test_${btoa('a.b.cz https://x.cz$')}`)).toBeNull()
+    expect(clerkFrontendApiHost(`pk_test_${btoa('bez-dolaru.cz')}`)).toBeNull()
+  })
+
+  it('jen na /w, konkrétní hosty, script-src beze změny', () => {
+    const w = buildCsp({ nonce, pathname: '/w/prihlaseni', profile: 'workspace', mode: 'enforce', clerkHost: host })
+    expect(directive(w, 'connect-src')).toBe(`connect-src 'self' https://${host}`)
+    expect(directive(w, 'img-src')).toContain('https://img.clerk.com')
+    expect(directive(w, 'frame-src')).toBe('frame-src https://challenges.cloudflare.com')
+    expect(directive(w, 'script-src')).not.toContain(host)
+    expect(w).not.toContain('*')
+
+    const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce', clerkHost: host })
+    const admin = buildCsp({ nonce, pathname: '/hub', profile: 'admin', mode: 'report-only', clerkHost: host })
+    const portal = buildCsp({ nonce, pathname: '/z/abc', profile: 'workspace', mode: 'enforce', clerkHost: host })
+    for (const csp of [landing, admin, portal]) expect(csp).not.toContain('clerk')
   })
 })
 

@@ -16,6 +16,19 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-09 — review (S07, Clerk, registrace, nový byznys)
+Spouštěč: skill `web-security-review` před commitem S07.
+Rozsah: `middleware.ts` (Clerk jen `/w` a `/api/ws`, admin větev beze změny), `lib/security/csp.ts` (v3), `app/w/novy/actions.ts` (server action), `app/api/clerk/webhook/route.ts` + `lib/ws/clerk-webhook.ts`, `lib/ws/onboarding.ts`, `lib/ws/clerk-orgs.ts`, komponenty `/w`. gitleaks nad soubory commitu, grep na `innerHTML`/`dangerouslySetInnerHTML` a klíče v kódu, `npm audit --omit=dev`.
+Výsledek:
+- Vstupy: průvodce validuje Zodem na serveru (název 2–80 znaků, obor z výčtu), `account_id` generuje server, `userId` jen z `auth()`. Webhook: Svix podpis přes `verifyWebhook` (HMAC + časové razítko, test na podvržený podpis, cizí klíč, staré razítko), bez klíče 503, limit těla 256 kB, idempotence přes `ws.webhook_events`, do logu jen typ a id události.
+- Dotazy jen parametrizované (`q`/`wsDb`), zápisy pod RLS se správným `app.account_id`; test „druhý účet nevidí nic z prvního“ i bez aplikačního filtru.
+- Secrets: jen `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` do prohlížeče (publikovatelný); `CLERK_SECRET_KEY` čte jen serverový kód Clerku, `lib/ws/clerk-orgs.ts` má `server-only`. gitleaks bez nálezu. Klíče stažené `clerk env pull` do `.env.local` (gitignored), hodnoty se nikde nevypsaly.
+- Admin: `/dashboard`, `/alteno`, `/hub` dál 307 na přihlášení NextAuth, `/login` 200 s Report-Only CSP, admin chunky bez Clerku.
+- `npm audit --omit=dev`: 11, beze změny.
+Nálezy: žádný k opravě. Přijato: `__session` bez HttpOnly (DECISIONS #009). Poznámka: limit těla webhooku kontroluje jen `Content-Length` (chunked tělo omezí až Vercel, 4,5 MB) — u podepsaného endpointu přijatelné.
+Opraveno: —
+Zůstává: produkční instance Clerku, endpoint webhooku a `CLERK_WEBHOOK_SECRET` (STATE → Otevřené položky).
+
 ## 2026-10-08 — review (S06, databáze a oddělení účtů)
 Spouštěč: nové schéma `ws`, DB role, přístupová vrstva.
 Rozsah: migrace 064–075, `scripts/ws-grants.sql`, `scripts/ws-create-role.js`, `lib/ws/{db,context}.ts`, testy v PGlite.

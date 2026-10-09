@@ -1,12 +1,13 @@
 import { notFound, redirect } from 'next/navigation'
 import { wsDb, wsSystem } from './db'
+import { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH } from './paths'
 
 // Kontext každé server action, route handleru a server komponenty Workspace
 // (AGENTS.md B3): `const ctx = await requireWorkspace()` je první řádek.
 //
-// Přihlášení je za rozhraním WsAuthProvider. Clerk ho napojí v S07
-// (auth() z @clerk/nextjs/server → userId, orgId, orgRole). Do té doby je
-// výchozí poskytovatel „nikdo není přihlášený“ a vše přesměruje na přihlášení.
+// Přihlášení je za rozhraním WsAuthProvider. Výchozí je Clerk (auth() z
+// @clerk/nextjs/server → userId, aktivní organizace, role). Testy si přes
+// setWsAuthProvider podstrčí vlastní identitu a Clerk se v nich nenačte.
 
 export type WsRole = 'owner' | 'staff'
 export type WsContext = { userId: string; accountId: string; role: WsRole }
@@ -14,15 +15,21 @@ export type WsContext = { userId: string; accountId: string; role: WsRole }
 export type WsIdentity = { userId: string; orgId: string | null; orgRole: string | null }
 export type WsAuthProvider = () => Promise<WsIdentity | null>
 
-let authProvider: WsAuthProvider = async () => null
-
-/** S07 sem předá Clerk, testy vlastní identitu. */
-export function setWsAuthProvider(provider: WsAuthProvider): void {
-  authProvider = provider
+const clerkAuthProvider: WsAuthProvider = async () => {
+  const { auth } = await import('@clerk/nextjs/server')
+  const { userId, orgId, orgRole } = await auth()
+  if (!userId) return null
+  return { userId, orgId: orgId ?? null, orgRole: orgRole ?? null }
 }
 
-export const WS_SIGN_IN_PATH = '/w/prihlaseni'
-export const WS_ONBOARDING_PATH = '/w/novy'
+let authProvider: WsAuthProvider = clerkAuthProvider
+
+/** Jen pro testy: vlastní identita. `null` vrátí Clerk. */
+export function setWsAuthProvider(provider: WsAuthProvider | null): void {
+  authProvider = provider ?? clerkAuthProvider
+}
+
+export { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH }
 
 export async function requireWorkspace(): Promise<WsContext> {
   const identity = await authProvider()

@@ -91,6 +91,12 @@ export function pgErrorCode(e: unknown): string | undefined {
   return undefined
 }
 
+/** Název porušeného omezení (např. `businesses_slug_key`), pokud ho chyba nese. */
+export function pgConstraint(e: unknown): string | undefined {
+  if (typeof e === 'object' && e !== null && 'constraint' in e && typeof e.constraint === 'string') return e.constraint
+  return undefined
+}
+
 /** Překryv termínů (EXCLUDE na ws.appointments). */
 export const isOverlapError = (e: unknown): boolean => pgErrorCode(e) === '23P01'
 

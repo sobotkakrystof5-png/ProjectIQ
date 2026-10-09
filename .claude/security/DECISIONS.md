@@ -80,3 +80,11 @@ Důvod: aplikační filtr `account_id` je první pojistka, RLS druhá — jedna 
 Zvažované alternativy: role z Neon konzole (BYPASSRLS); `FORCE ROW LEVEL SECURITY` i pro vlastníka (admin by potřeboval vlastní roli a migrace by se komplikovaly); zvláštní role `ws_system` s BYPASSRLS pro webhooky a crony (další secret v env, širší než pár úzkých funkcí); jednoduché cizí klíče (cizí řádek připojitelný přes UUID).
 Přijaté riziko: `ws_app` si `app.account_id` nastavuje sama — při SQL injection v kódu Workspace by RLS útočníka nezastavila (proto jen parametrizované dotazy přes `q`/`wsDb`, nikdy skládaný SQL). `wsSystem` jde zneužít k dotazu bez účtu, na tabulky s RLS ale nevidí nic. Heslo role jde při založení do DB jako SQL literál (Neon ho neloguje ve výchozím nastavení). `ws_app` vidí v katalogu názvy tabulek `public` (jen metadata, žádná data). Unikátní slug byznysu prozradí, že slug existuje (slugy jsou veřejné v `/r/`).
 Revize: S11 a S16 (každá nová `SECURITY DEFINER` funkce sem dopsat) · S19 (audit před spuštěním).
+
+## 009 — Clerk jen pod /w, session cookie čitelná z JavaScriptu
+Datum: 2026-10-09
+Rozhodnutí: přihlášení Workspace přes Clerk (`@clerk/nextjs` 6.39.7). `clerkMiddleware` běží jen pro `/w` a `/api/ws`, `ClerkProvider` jen v `app/w/layout.tsx`. Session Clerku je krátký JWT v cookie `__session` (platnost ~60 s, obnovuje ji clerk-js), která podle návrhu Clerku **není HttpOnly** — clerk-js ji čte a obnovuje. Dlouhodobá cookie `__client` je na doméně Frontend API Clerku a HttpOnly je.
+Důvod: Clerk je dané rozhodnutí (R-014, AGENTS.md B4). HttpOnly na `__session` Clerk nepodporuje. Krátká platnost omezuje, co s ukradeným tokenem jde udělat.
+Zvažované alternativy: vlastní přihlášení (hesla, ověřování e-mailů a Google OAuth bychom psali sami — větší riziko než tahle výjimka); Clerk i pro admin (mimo rozsah, otevřená otázka v `memory/memory.md`).
+Přijaté riziko: XSS na `/w` by mohla číst session token a jednat jménem uživatele, dokud token platí. Hlavní obrana zůstává vynucená CSP s nonce na `/w` a zákaz vykreslování nedůvěryhodného HTML (B13).
+Revize: S19 (audit před spuštěním) · při upgradu Clerku na verzi s jinou správou session.

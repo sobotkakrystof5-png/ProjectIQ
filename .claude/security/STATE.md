@@ -49,7 +49,7 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 
 ## CSP
 
-Verze: **v2** (CSP-LOG.md)
+Verze: **v3** (CSP-LOG.md)
 Režim: admin + zbytek **Report-Only**, Workspace (`/w`, `/r`, `/z`) a landing page (přesné cesty `/`, `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`, DECISIONS #007) **vynucená**
 Výběr profilu: `cspProfileFor()` v `lib/security/csp.ts`
 
@@ -57,7 +57,7 @@ Společný základ: `default-src 'self'; base-uri 'self'; object-src 'none'; fra
 
 Třetí strany:
 - admin: Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`), TradingView (`frame-src www.tradingview-widget.com`), na `/dashboard/faktury/*` `object-src 'self'` + `frame-src 'self'` (náhled PDF)
-- Workspace: zatím žádné. S07 přidá Clerk, S08 případně Stripe (`form-action`)
+- Workspace `/w/*`: Clerk — `connect-src` Frontend API (host z publishable key), `img-src img.clerk.com`, `frame-src challenges.cloudflare.com` (Turnstile). Skript clerk-js s nonce. S08 případně Stripe (`form-action`)
 - `/r/*`: `frame-ancestors 'self'` + povolené domény klienta (zatím prázdné)
 
 Známé výjimky: `style-src 'unsafe-inline'` (DECISIONS #002).
@@ -82,22 +82,24 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 ## Aplikace
 
 - Validace na serveru: Zod ve veřejných admin API a portálových akcích ✅; Workspace povinně (AGENTS.md B11, B13)
-- Izolace účtů: `requireWorkspace()` + `account_id` v každém dotazu (`lib/ws/context.ts`, `lib/ws/db.ts`) + RLS na všech 30 tabulkách `ws` s daty účtu, role `ws_app` bez BYPASSRLS, složené cizí klíče (S06, DECISIONS #008). Testy `lib/ws/__tests__/ws-schema.test.ts` ✅. Clerk do `requireWorkspace` napojí S07
+- Izolace účtů: `requireWorkspace()` + `account_id` v každém dotazu (`lib/ws/context.ts`, `lib/ws/db.ts`) + RLS na všech 30 tabulkách `ws` s daty účtu, role `ws_app` bez BYPASSRLS, složené cizí klíče (S06, DECISIONS #008). Testy `lib/ws/__tests__/ws-schema.test.ts` ✅. Clerk napojený do `requireWorkspace` (S07); účet zakládá jen průvodce `/w/novy` (server action, `account_id` generuje server), webhook `/api/clerk/webhook` se Svix podpisem a idempotencí (`ws.webhook_events`), bez `CLERK_WEBHOOK_SECRET` vrací 503
 - Rate limit: admin API a portál DB-backed (`lib/api-rate-limit.ts`, `isRateLimited`) ✅; Workspace API v S11
 - Captcha: žádná. Zvážit Turnstile pro `/r/[slug]` a widget v S11
 - Secrets: jen env Vercelu, `.env*` v `.gitignore` (kromě vzorů), gitleaks v CI. Historie gitu 2026-10-08 čistá (90 commitů)
-- Session: NextAuth JWT (admin), Clerk (Workspace)
+- Session: NextAuth JWT (admin), Clerk (Workspace, jen pod `/w` a `/api/ws` — middleware Clerk jinde nespouští). Cookie `__session` Clerku není HttpOnly (DECISIONS #009)
 - Zálohy: Neon point-in-time restore (podle plánu Neonu) — test obnovy nikdy neproběhl
 
 ## Otevřené položky
 
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
-| `DATABASE_URL_WS` do Vercelu (Production + Preview) | migrace `ws` i role `ws_app` jsou na Neonu od 2026-10-09 (ověřeno: bez BYPASSRLS, do `public` nevidí); bez proměnné ve Vercelu Workspace v produkci nemá DB. Roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli | Kryštof | před S07 |
+| `DATABASE_URL_WS` do Vercelu (Production + Preview) | migrace `ws` i role `ws_app` jsou na Neonu od 2026-10-09 (ověřeno: bez BYPASSRLS, do `public` nevidí); bez proměnné ve Vercelu Workspace v produkci nemá DB. Roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli | Kryštof | před nasazením `/w` |
 | Admin CSP → vynucená | Report-Only nic nechrání. Potřeba dynamický `/login` (souhlas se zásahem do adminu) a 404 | Kryštof + Claude | do S19 |
-| Clerk domény do CSP | S07 — `script-src` (strict-dynamic stačí), `connect-src`, `frame-src`, `img-src` podle instance; popup OAuth vs COOP | S07 | S07 |
+| Clerk produkční instance (`clerk deploy`, `clerk.zakaziq.cz`, produkční klíče, Google OAuth s vlastními údaji) | dev klíče mají limity a dev banner, dev instance nesmí do produkce | Kryštof + Claude | před spuštěním (S19) |
+| Webhook Clerku: endpoint v Clerk dashboardu + `CLERK_WEBHOOK_SECRET` (lokálně i Vercel) | bez něj se nesynchronizují členové a název účtu (route vrací 503) | Kryštof | po prvním nasazení `/w` |
+| Google OAuth přes přesměrování, ne popup | COOP `same-origin` by popup rozbil; Clerk SignIn ve výchozím stavu přesměrovává — ověřit ručně | Kryštof | při prvním přihlášení Googlem |
 | `frame-ancestors` a CORS z `web_integrations.allowed_origins` | `/r/*` teď jen `'self'`, CORS helper bez dat | S11 | S11 |
-| Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; ve Workspace nastavit `z.config({ jitless: true })` | S06/S07 | S07 |
+| Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; Workspace zatím Zod jen na serveru (S07) — `z.config({ jitless: true })` až s prvním formulářem validovaným v prohlížeči | — | S10+ |
 | `npm audit` — 11 zranitelností (1 critical `next` 14) | CI job audit je dočasně jen upozornění (DECISIONS #006) | Kryštof | S19 |
 | `security.txt` — `Expires: 2027-10-01` | prošlý security.txt je horší než žádný | Kryštof | připomínka 2027-09 |
 | DNS `zakaziq.cz` (DNSSEC, CAA, SPF, DKIM, DMARC) | bez nich lze posílat poštu jménem domény | Kryštof | před prvním e-mailem z Resendu (S15) |
