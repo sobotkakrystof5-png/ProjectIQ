@@ -40,6 +40,7 @@ Admin v kostce: Next.js 14 App Router, Neon přes `sql` tag z `lib/db.ts` (bez O
 ```bash
 npm run dev      # lokální vývoj (http://localhost:3000)
 npm run build    # produkční build — musí projít před commitem větší změny
+npm run build:check   # totéž v dočasné kopii repa — když běží `next dev` (sdílí .next, build by ho rozbil)
 npm test         # vitest run
 npm run lint     # next lint
 node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace migrace na DATABASE_URL z .env.local
@@ -265,7 +266,8 @@ Jak je systém v kódu (S01, R-027):
 | Navigace | `lib/ws/nav.ts` (`navItems`, `bottomBarSlots`, `navHref`) podle `ws.business_modules`; Poptávky, Zákazníci a Nastavení vždy |
 | Dnes | `app/w/[business]/page.tsx` + `components/ws/app/today/` (Příchozí, týdenní kalendář, agenda pro telefon, uvítání); data `lib/ws/today.ts` (`getTodayData`, `getCustomerCard`, `getRequestDetail`, `getNotifications`) v jedné transakci na volání; rozložení kalendáře `lib/ws/calendar-layout.ts` (čistá funkce, bez JS v prohlížeči); skeleton `loading.tsx` |
 | Stav v URL | `?detail=zakaznik:<id>` / `poptavka:<id>` / `nova-rezervace` / `nova-faktura` = pravý panel (`lib/ws/detail-param.ts`, `components/ws/app/detail-slot.tsx` na serveru, `detail-sheet.tsx` v prohlížeči; zavření odebere parametr). `?zakaznik=` karta vpravo na Dnes, `?tyden=` týden (pondělí) |
-| ⌘K | `components/ws/app/command-palette.tsx`: hledání `searchAction` → `lib/ws/search.ts` (zákazníci v účtu, poptávky a faktury v byznysu, ILIKE s escapováním), akce, přechod na obrazovky; příkaz „rezervace Tereza pátek 9:00“ rozpozná `lib/ws/command-parser.ts` (pravidla, ne AI) a otevře panel Nová rezervace s předvyplněním |
+| ⌘K | `components/ws/app/command-palette.tsx`: hledání `searchAction` → `lib/ws/search.ts` (zákazníci v účtu, poptávky a faktury v byznysu, ILIKE s escapováním), akce, přechod na obrazovky; příkaz „rezervace Tereza pátek 9:00“ rozpozná `lib/ws/command-parser.ts` (pravidla, ne AI) a otevře panel Nová rezervace s předvyplněním (jen se zapnutou akcí, viz níže) |
+| Nehotové akce | `lib/ws/features.ts` (`WS_FEATURES`, `newActions`, R-043): odkaz na objednání (zapne S11), Nová rezervace (S10), Nová faktura (S14). Vypnutá akce není v „+ Nová“, ⌘K, uvítání ani v panelu (ani ze sdíleného odkazu). Bez hotové akce chybí „+ Nová“ i „+“ ve spodní liště |
 | Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost |
 | Rezervované slugy | `RESERVED_BUSINESS_SLUGS` v `lib/ws/paths.ts` — pevné cesty pod `/w` (`novy`, `ucet`…). Nová pevná cesta pod `/w` = přidat sem, jinak by zakryla byznys se stejným slugem |
 | Čas | `lib/ws/time.ts`: `pragueToday`, `pragueParts`, `pragueToUtc` (přes letní/zimní čas), `weekStartOf`, `formatDayShort` („pá 9. 10.“), `formatRelativeDay` |
@@ -274,7 +276,7 @@ Jak je systém v kódu (S01, R-027):
 
 - `requireWorkspace` a `requireBusiness` jsou obalené `React.cache` — layout a stránka téhož požadavku se ptají jen jednou.
 - Detail se otevírá v pravém panelu přes `?detail=`, ne na nové stránce. Nový druh detailu = `DetailRef` v `detail-param.ts` + větev v `detail-slot.tsx`.
-- Formuláře „Nová rezervace“ a „Nová faktura“ jsou zatím jen náhled údajů (uložení S10, S14).
+- Akce, která ještě nefunguje, se neukazuje: přepínač ve `WS_FEATURES` zapne až sezení, které ji postaví (R-043).
 
 ## B10. Texty
 
@@ -291,7 +293,7 @@ Jak je systém v kódu (S01, R-027):
 
 ## B12. Testy a kontrola před commitem
 
-1. `npm run build` a `npm test` prochází.
+1. `npm run build` a `npm test` prochází. Když běží `next dev`, build jen přes `npm run build:check` (kopie repa), jinak přepíše sdílenou `.next`.
 2. Nové pravidlo (oddělení účtů, razítka, segmenty, webhooky) má test ve Vitestu.
 3. Admin stránky `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]` fungují jako předtím.
 4. UI změna: porovnat s mockupem a s pravidly Dílky, zkontrolovat šířku telefonu.

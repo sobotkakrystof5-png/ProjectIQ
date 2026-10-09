@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { WsBusiness, WsContext } from '@/lib/ws/context'
 import { detailValue, hrefWith, parseDetail, type DetailRef } from '@/lib/ws/detail-param'
+import { WS_FEATURES } from '@/lib/ws/features'
 import { getCustomerCard, getRequestDetail } from '@/lib/ws/today'
 import { formatDayShort, formatMinutes, formatRelativeDay, isIsoDate, pragueParts } from '@/lib/ws/time'
 import { NewRequestBlock, TimeRange } from '@/components/ws/brand'
@@ -20,6 +21,13 @@ const SOURCE_LABELS: Record<string, string> = {
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 
+/** Formuláře, které ještě neumí uložit, se neotevřou ani ze sdíleného odkazu (R-043). */
+function isAvailable(ref: DetailRef): boolean {
+  if (ref.kind === 'nova-rezervace') return WS_FEATURES.newBooking
+  if (ref.kind === 'nova-faktura') return WS_FEATURES.newInvoice
+  return true
+}
+
 /**
  * Pravý panel podle `?detail=` na kterékoli obrazovce byznysu. Data se čtou
  * na serveru přes kontext účtu; cizí nebo smazaný záznam = „není tu".
@@ -38,7 +46,7 @@ export async function DetailSlot({
   today: string
 }) {
   const ref = parseDetail(searchParams.detail)
-  if (!ref) return null
+  if (!ref || !isAvailable(ref)) return null
   // Zavřením panelu zmizí i předvyplněné údaje z příkazu ⌘K.
   const closeHref = hrefWith(pathname, searchParams, { detail: null, kdo: null, den: null, cas: null, sluzba: null })
   const key = detailValue(ref)

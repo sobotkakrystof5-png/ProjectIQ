@@ -15,6 +15,7 @@ import {
 import { searchAction } from '@/app/w/[business]/actions'
 import { normalize, parseCommand } from '@/lib/ws/command-parser'
 import { hrefWith } from '@/lib/ws/detail-param'
+import type { NewAction } from '@/lib/ws/features'
 import { navHref, type NavItem } from '@/lib/ws/nav'
 import type { SearchHit } from '@/lib/ws/search'
 import { formatDayShort, formatMinutes } from '@/lib/ws/time'
@@ -26,8 +27,8 @@ export type PaletteProps = {
   onOpenChange: (open: boolean) => void
   slug: string
   nav: NavItem[]
-  canBook: boolean
-  canInvoice: boolean
+  /** Jen hotové akce (lib/ws/features.ts, R-043). */
+  actions: NewAction[]
   orderUrl: string
   services: string[]
   today: string
@@ -41,7 +42,8 @@ const HIT_GROUP = { zakaznik: 'Zákazníci', poptavka: 'Poptávky', faktura: 'Fa
  * akce. „rezervace Tereza pátek 9:00" rozpozná parser a nabídne rezervaci
  * s předvyplněnými údaji (lib/ws/command-parser.ts).
  */
-export function CommandPalette({ open, onOpenChange, slug, nav, canBook, canInvoice, orderUrl, services, today }: PaletteProps) {
+export function CommandPalette({ open, onOpenChange, slug, nav, actions: available, orderUrl, services, today }: PaletteProps) {
+  const canBook = available.includes('booking')
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -99,17 +101,19 @@ export function CommandPalette({ open, onOpenChange, slug, nav, canBook, canInvo
   const navMatches = nav.filter((i) => matches(i.label))
 
   const actions: { key: string; label: string; icon: LucideIcon; run: () => void }[] = []
-  if (canBook) actions.push({ key: 'booking', label: 'Nová rezervace', icon: CalendarPlus, run: () => openDetail('nova-rezervace') })
-  if (canInvoice) actions.push({ key: 'invoice', label: 'Nová faktura', icon: FilePlus2, run: () => openDetail('nova-faktura') })
-  actions.push({
-    key: 'link',
-    label: 'Zkopírovat odkaz na objednání',
-    icon: Link2,
-    run: () => {
-      onOpenChange(false)
-      void copyOrderLink(orderUrl)
-    },
-  })
+  if (available.includes('booking')) actions.push({ key: 'booking', label: 'Nová rezervace', icon: CalendarPlus, run: () => openDetail('nova-rezervace') })
+  if (available.includes('invoice')) actions.push({ key: 'invoice', label: 'Nová faktura', icon: FilePlus2, run: () => openDetail('nova-faktura') })
+  if (available.includes('link')) {
+    actions.push({
+      key: 'link',
+      label: 'Zkopírovat odkaz na objednání',
+      icon: Link2,
+      run: () => {
+        onOpenChange(false)
+        void copyOrderLink(orderUrl)
+      },
+    })
+  }
   const visibleActions = actions.filter((a) => matches(a.label))
 
   const commandLabel = command

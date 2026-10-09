@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { hourRange, layoutWeek } from '../calendar-layout'
 import { parseCommand } from '../command-parser'
 import { detailValue, hrefWith, parseDetail } from '../detail-param'
+import { newActions, WS_FEATURES } from '../features'
 import { bottomBarSlots, navItemForSegment, navItems } from '../nav'
 import { plural } from '../plural'
 import {
@@ -158,6 +159,21 @@ describe('navigace podle zapnutých funkcí', () => {
     expect(slots[4]).toMatchObject({ segment: 'prijmy' })
     const bare = bottomBarSlots(new Set())
     expect(bare.map((s) => (s.kind === 'new' ? '+' : s.label))).toEqual(['Dnes', 'Poptávky', '+', 'Zákazníci'])
+  })
+})
+
+describe('nehotové akce (R-043)', () => {
+  const all = { orderLink: true, newBooking: true, newInvoice: true }
+  const none = { orderLink: false, newBooking: false, newInvoice: false }
+
+  it('vypnutá akce se nenabízí, zapnutá jen se zapnutou funkcí byznysu', () => {
+    expect(newActions(new Set(['calendar', 'invoices']), none)).toEqual([])
+    expect(newActions(new Set(['calendar', 'invoices']), all)).toEqual(['booking', 'invoice', 'link'])
+    expect(newActions(new Set(), all)).toEqual(['link'])
+  })
+
+  it('dokud S10, S11 a S14 nepostaví formuláře a /r, je všechno vypnuté', () => {
+    expect(WS_FEATURES).toEqual(none)
   })
 })
 

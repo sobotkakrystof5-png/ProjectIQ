@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:check": "bash scripts/build-check.sh",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run"

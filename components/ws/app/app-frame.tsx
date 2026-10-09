@@ -9,6 +9,7 @@ import { useCommandShortcut } from '@/components/ui/command'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Logo } from '@/components/ws/brand'
 import { rememberBusinessAction } from '@/app/w/[business]/actions'
+import { newActions } from '@/lib/ws/features'
 import { bottomBarSlots, navHref, navItems, type NavItem } from '@/lib/ws/nav'
 import { cn } from '@/lib/ws/utils'
 import { CommandPalette } from './command-palette'
@@ -54,9 +55,12 @@ export function AppFrame(props: AppFrameProps) {
 
   const enabled = useMemo(() => new Set(props.enabledModules), [props.enabledModules])
   const nav = useMemo(() => navItems(enabled), [enabled])
-  const slots = useMemo(() => bottomBarSlots(enabled), [enabled])
-  const canBook = enabled.has('calendar')
-  const canInvoice = enabled.has('invoices')
+  const actions = useMemo(() => newActions(enabled), [enabled])
+  // Bez hotové akce není „+“ ani ve spodní liště (R-043).
+  const slots = useMemo(
+    () => bottomBarSlots(enabled).filter((s) => s.kind !== 'new' || actions.length > 0),
+    [enabled, actions],
+  )
   const root = navHref(business.slug, '')
 
   useEffect(() => {
@@ -156,7 +160,7 @@ export function AppFrame(props: AppFrameProps) {
             </button>
             <NotificationsBell items={notifications.items} unread={notifications.unread} />
             <div className="hidden md:block">
-              <NewMenu variant="header" canBook={canBook} canInvoice={canInvoice} orderUrl={orderUrl} onSearch={openSearch} />
+              <NewMenu variant="header" actions={actions} orderUrl={orderUrl} onSearch={openSearch} />
             </div>
             <button
               type="button"
@@ -183,7 +187,7 @@ export function AppFrame(props: AppFrameProps) {
           {slots.map((slot) =>
             slot.kind === 'new' ? (
               <li key="new" className="flex items-start justify-center">
-                <NewMenu variant="bar" canBook={canBook} canInvoice={canInvoice} orderUrl={orderUrl} onSearch={openSearch} />
+                <NewMenu variant="bar" actions={actions} orderUrl={orderUrl} onSearch={openSearch} />
               </li>
             ) : (
               <li key={slot.key} className="flex flex-1">
@@ -262,8 +266,7 @@ export function AppFrame(props: AppFrameProps) {
         onOpenChange={setPaletteOpen}
         slug={business.slug}
         nav={nav}
-        canBook={canBook}
-        canInvoice={canInvoice}
+        actions={actions}
         orderUrl={orderUrl}
         services={props.services}
         today={props.today}
