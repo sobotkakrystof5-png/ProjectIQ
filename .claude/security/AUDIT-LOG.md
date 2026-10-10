@@ -16,6 +16,20 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-10 — review (S11, veřejné API, objednávací stránka, widget)
+Spouštěč: review před commitem S11 (pravidla `web-security-review`, AGENTS.md B13).
+Rozsah: `lib/ws/{keys,fields,accent}.ts`, `lib/ws/intake/*`, `app/api/public/v1/{requests,schema}`, `app/embed/[file]`, `app/r/**`, `app/w/[business]/nastaveni/**`, `components/ws/{order,settings}/*`, `middleware.ts`, migrace 076.
+Výsledek:
+- Klíče: tajný klíč jen HMAC-SHA256 s `WS_KEY_PEPPER` + prefix, porovnání `timingSafeEqual`, v čitelné podobě jen v odpovědi akce `rotateSecret` (nelogujeme, test: klíč není v `intake_log` ani v `requests`). Bez pepře selže zavřeně (503). Tajný klíč s hlavičkou `Origin` = 401 (únik do prohlížeče).
+- Účty: účet a byznys jen z ověřeného klíče nebo veřejného slugu přes 3 úzké `SECURITY DEFINER` funkce (DECISIONS #010), zápisy pod RLS. Služba cizího účtu neprojde (test), cizí účet nezmění napojení (složený cizí klíč, test).
+- Vstupy: Zod na tělo i vlastní kolonky, délky všech polí, tělo max 64 kB, `Idempotency-Key` tvarem omezený. Rate limit v DB (IP jako HMAC, ne čitelně). Honeypot `website`. Captcha zatím ne (DECISIONS #010).
+- CORS jen přesný origin z `allowed_origins`, bez `Allow-Credentials`, `Vary: Origin`; preflight z cizí domény 403 (testy). `frame-ancestors` pro `/r/<slug>` z DB, chyba = jen `'self'`.
+- XSS: widget vkládá data jen přes `textContent` (test: v zdrojáku není `innerHTML`, data v JSON escapovaná vůči `</script>` a U+2028). Objednávací stránka a Nastavení přes React, žádné `dangerouslySetInnerHTML`. Barva byznysu jen ověřený `#rrggbb`.
+- Nalezeno při ověření naostro: Next 14 ukládal odpovědi Neon HTTP (`fetch`) do data cache i v `force-dynamic` route handlerech — `/embed` a `/r` četly stará data (riziko: zrušený klíč by dál fungoval z cache). Opraveno `fetchOptions: { cache: 'no-store' }` v `lib/ws/db.ts` pro celý Workspace.
+- `npm audit`: beze změny, žádná nová závislost (QR kód přes existující `qrcode.react`).
+Nálezy: 1 (data cache, opraveno v commitu S11).
+Zůstává: `WS_KEY_PEPPER` do Vercelu; captcha zvážit podle provozu (DECISIONS #010); CORS z cizí domény v prohlížeči ověřen jen curl/testy (Chrome blokuje veřejný web → localhost).
+
 ## 2026-10-10 — review (S10, poptávky a kalendář)
 Spouštěč: kontrola podle `web-security-review` před commitem S10.
 Rozsah: `app/w/[business]/poptavky/actions.ts` (9 server actions), `lib/ws/{bookings,calendar}.ts`, `app/api/ws/[business]/zmeny/route.ts`, stránky `/poptavky`, `/kalendar`, `/zakazky`, `components/ws/app/{booking,calendar,jobs}/**`, `components/ws/app/detail-slot.tsx`. Grep na `innerHTML`/`dangerouslySetInnerHTML` (0), klíče v kódu (0).

@@ -73,13 +73,13 @@ export async function getTodayData(
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
-      WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.status = 'new'
+      WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.status = 'new' AND NOT r.is_test
       ORDER BY r.created_at DESC
       LIMIT ${INCOMING_LIMIT}
     `,
     q`
       SELECT count(*)::int AS n FROM ws.requests
-      WHERE account_id = ${accountId} AND business_id = ${businessId} AND status = 'new'
+      WHERE account_id = ${accountId} AND business_id = ${businessId} AND status = 'new' AND NOT is_test
     `,
     q`
       SELECT a.id, a.kind, a.starts_at, a.ends_at, a.customer_id, a.title,
@@ -100,7 +100,7 @@ export async function getTodayData(
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
-      WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.status = 'new'
+      WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.status = 'new' AND NOT r.is_test
         AND r.wanted_start IS NOT NULL AND r.wanted_start < ${to}
         AND COALESCE(r.wanted_end, r.wanted_start + interval '1 hour') > ${from}
       ORDER BY r.wanted_start
@@ -114,7 +114,7 @@ export async function getTodayData(
     `,
     q`
       SELECT
-        EXISTS (SELECT 1 FROM ws.requests WHERE account_id = ${accountId} AND business_id = ${businessId}) AS has_requests,
+        EXISTS (SELECT 1 FROM ws.requests WHERE account_id = ${accountId} AND business_id = ${businessId} AND NOT is_test) AS has_requests,
         EXISTS (SELECT 1 FROM ws.appointments WHERE account_id = ${accountId} AND business_id = ${businessId}) AS has_appointments,
         EXISTS (SELECT 1 FROM ws.customers WHERE account_id = ${accountId}) AS has_customers,
         (SELECT customer_id FROM ws.appointments

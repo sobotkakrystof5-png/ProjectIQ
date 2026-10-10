@@ -40,7 +40,7 @@ export async function searchWorkspace(
       SELECT r.id, r.status, r.created_at, COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS name
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
-      WHERE r.account_id = ${accountId} AND r.business_id = ${business.id}
+      WHERE r.account_id = ${accountId} AND r.business_id = ${business.id} AND NOT r.is_test
         AND (c.name ILIKE ${pattern} OR r.contact->>'name' ILIKE ${pattern} OR r.message ILIKE ${pattern})
       ORDER BY r.created_at DESC LIMIT ${LIMIT}
     `,

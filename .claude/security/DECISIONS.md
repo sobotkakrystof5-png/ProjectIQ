@@ -88,3 +88,12 @@ Důvod: Clerk je dané rozhodnutí (R-014, AGENTS.md B4). HttpOnly na `__session
 Zvažované alternativy: vlastní přihlášení (hesla, ověřování e-mailů a Google OAuth bychom psali sami — větší riziko než tahle výjimka); Clerk i pro admin (mimo rozsah, otevřená otázka v `memory/memory.md`).
 Přijaté riziko: XSS na `/w` by mohla číst session token a jednat jménem uživatele, dokud token platí. Hlavní obrana zůstává vynucená CSP s nonce na `/w` a zákaz vykreslování nedůvěryhodného HTML (B13).
 Revize: S19 (audit před spuštěním) · při upgradu Clerku na verzi s jinou správou session.
+
+## 010 — Veřejný příjem poptávek: klíče, funkce bez účtu, bez captchy
+Datum: 2026-10-10
+Rozhodnutí: (1) Tři nové `SECURITY DEFINER` funkce pro požadavky, které účet ještě neznají: `ws.integration_by_public_key`, `ws.integration_by_secret_prefix` (vrací hash k porovnání v aplikaci), `ws.business_by_public_slug` (veřejný klíč a povolené domény). Jen `EXECUTE` pro `ws_app`, nic o zákaznících. (2) Tajný klíč = prefix + HMAC-SHA256 s pepřem `WS_KEY_PEPPER` (env, ne DB). (3) Veřejný klíč widgetu sám nic nedovolí, platí jen s `Origin` ze seznamu. (4) Objednávací stránka a widget bez captchy: honeypot + rate limit (20/min IP, 300/h byznys, stránka 8/10 min).
+Důvod: pod RLS by veřejný požadavek bez účtu neviděl nic (R-035); pepř mimo DB znamená, že únik DB sám nestačí k útoku hrubou silou na klíče. Captcha (Turnstile) = skript třetí strany na stránce, kde zákazník píše osobní údaje, a další host v CSP; pro start stačí honeypot a limity.
+Zvažované alternativy: role s BYPASSRLS pro veřejné API (široké); bcrypt/argon2 na tajný klíč (klíč má 190 bitů náhody, pomalý hash nic nepřidá a zdrží každý požadavek); Turnstile hned (viz výše).
+Přijaté riziko: kdo zná slug, zjistí, že byznys existuje a jeho veřejný klíč (je i v kódu widgetu). Robot obcházející honeypot může v rámci limitů poslat spam poptávky (zákazníka založí) — vidět v záznamu Napojený web. Origin jde mimo prohlížeč podvrhnout: veřejný klíč tak umožní poslat poptávku i z curl, stejně jako vyplnit formulář — proto limity.
+Revize: S19 (audit před spuštěním) · při prvním spamu zapnout Turnstile na `/r` a ve widgetu.
+

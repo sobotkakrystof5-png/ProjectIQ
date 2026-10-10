@@ -3,8 +3,8 @@
 // ji tady zapne. Bez závislostí — čte ho server i prohlížeč.
 
 export const WS_FEATURES = {
-  /** Odkaz na objednávací stránku /r/[slug] — zapne S11, až stránka bude. */
-  orderLink: false,
+  /** Odkaz na objednávací stránku /r/[slug] — zapnulo S11. */
+  orderLink: true,
   /** Nová rezervace a blokace (panel, ⌘K příkaz „rezervace Tereza pátek 9:00“) — zapnulo S10. */
   newBooking: true,
   /** Nová faktura — zapne S14. */

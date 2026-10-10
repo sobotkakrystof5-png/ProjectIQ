@@ -30,7 +30,10 @@ function neonDriver(): WsDriver {
   if (!url) {
     throw new Error('Chybí DATABASE_URL_WS — Workspace se k DB připojuje jen rolí ws_app (docs/workspace/SETUP.md).')
   }
-  const sql = neon(url)
+  // Neon HTTP jde přes fetch a Next 14 by odpovědi uložil do data cache
+  // (i v route handlerech s force-dynamic) — veřejné stránky by pak četly
+  // stará data. Dotazy do DB se nikdy necachují.
+  const sql = neon(url, { fetchOptions: { cache: 'no-store' } })
   return {
     async transaction(queries) {
       const results = await sql.transaction(queries.map((x) => sql.query(x.text, [...x.params])))

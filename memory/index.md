@@ -21,6 +21,7 @@
 | [`../docs/workspace/SETUP.md`](../docs/workspace/SETUP.md) | Databáze Workspace: pořadí migrací 064+, založení role `ws_app`, výměna hesla, jak běží testy oddělení účtů v PGlite | Při práci na DB Workspace a nasazení | Když se mění postup nebo testy |
 | `../.claude/skills/zakaziq-*` | Projektové skilly: `design-dilky` (UI), `workspace-backend` (DB/API/Clerk/Stripe), `ux-texty-cs` (texty), `memory` (rituál sezení nad `memory/`) | Claude Code (podle úlohy) | Když se mění pravidla oblasti |
 | [`../new - area of zakaziq/prompty/00-README.md`](<../new - area of zakaziq/prompty/00-README.md>) | Prompty sezení S00–S19 pro výstavbu Workspace + landing page (jedno sezení = jedna konverzace) | Na začátku každého sezení Workspace | Když se mění plán sezení |
+| [`../docs/workspace/API.md`](../docs/workspace/API.md) | Veřejné API pro poptávky z webů (v1): klíče, schema, requests, kódy chyb, příklady Next.js a curl, widget (S11) | S11+, skill `zakaziq-napojeni`, prompt pro Claude Code | Když se mění API |
 | [`../docs/landing/PROJECT-BRIEF.md`](../docs/landing/PROJECT-BRIEF.md) | Brief landing page (S03): anti-šablona, sekce s texty, kontakt, CSP, SEO zadání pro S05 | S04, S05 a každá změna landing page | Když se mění struktura nebo texty landing page |
 | [`../docs/CLAUDE_BOOKING_PROMPT.md`](../docs/CLAUDE_BOOKING_PROMPT.md) | Historický prompt pro booking a komunikaci s klienty (z doby ProjectIQ) | Jen pro kontext historie | Ne |
 | `../graphify-out/` | Znalostní graf kódu (gitignored, lokální) — `/graphify` | Při orientaci v architektuře | Přegenerováním |
@@ -51,6 +52,7 @@
 | Workspace — přihlášení, registrace, nový byznys (Clerk) | `AGENTS.md` → B4 „Jak je to v kódu“, `middleware.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |
 | Workspace — kostra aplikace, Dnes, ⌘K, pravý panel | `AGENTS.md` → B9 „Jak je to v kódu (S09)“, `app/w/[business]/`, `components/ws/app/`, `lib/ws/{today,nav,detail-param,command-parser,calendar-layout,search}.ts`, ukázková data `scripts/ws-seed.mjs`, R-040 |
 | Workspace — poptávky, kalendář, zakázky, živé obnovení | `AGENTS.md` → B9 „Jak je to v kódu (S10)“, `lib/ws/{bookings,calendar}.ts`, `app/w/[business]/{poptavky,kalendar,zakazky}/`, `components/ws/app/{booking,calendar,jobs}/`, `app/api/ws/[business]/zmeny`, R-044 |
+| Workspace — veřejné API, objednávací stránka `/r`, widget `/embed`, Nastavení › Napojený web | `AGENTS.md` → B6 „Jak je to v kódu (S11)“, `../docs/workspace/API.md`, `lib/ws/{keys,fields}.ts`, `lib/ws/intake/`, `app/api/public/v1/`, `app/r/`, `app/embed/`, `app/w/[business]/nastaveni/`, R-045 |
 | Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `AGENTS.md` → B3 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `AGENTS.md` → B3; detail v `migrations/` |

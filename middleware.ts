@@ -3,6 +3,7 @@ import { withAuth, type NextRequestWithAuth } from 'next-auth/middleware'
 import { clerkMiddleware } from '@clerk/nextjs/server'
 import { buildCsp, clerkFrontendApiHost, cspProfileFor, createNonce, hasPrefix } from '@/lib/security/csp'
 import { frameAncestorsFor } from '@/lib/security/embed'
+import { embedOriginsForSlug, orderSlugFromPath } from '@/lib/ws/intake/embed-origins'
 import { WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
 
 /**
@@ -53,7 +54,18 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
   return withCsp(req)
 }
 
-function withCsp(req: NextRequest): NextResponse {
+/**
+ * Objednávací stránka se vkládá do iframe na weby klientů: `frame-ancestors`
+ * = vlastní doména + povolené domény byznysu (web_integrations.allowed_origins,
+ * S11). Neznámý slug nebo chyba DB = jen vlastní doména.
+ */
+async function frameAncestorsForPath(pathname: string): Promise<string[] | undefined> {
+  if (!hasPrefix(pathname, '/r')) return undefined
+  const slug = orderSlugFromPath(pathname)
+  return frameAncestorsFor(slug ? await embedOriginsForSlug(slug) : [])
+}
+
+async function withCsp(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl
   const nonce = createNonce()
   const { profile, mode } = cspProfileFor(pathname)
@@ -64,9 +76,7 @@ function withCsp(req: NextRequest): NextResponse {
     profile,
     mode,
     isDev: process.env.NODE_ENV === 'development',
-    // Objednávací stránka se vkládá na weby klientů. Povolené domény
-    // (web_integrations.allowed_origins) doplní S11; do té doby jen vlastní doména.
-    frameAncestors: hasPrefix(pathname, '/r') ? frameAncestorsFor([]) : undefined,
+    frameAncestors: await frameAncestorsForPath(pathname),
     clerkHost: CLERK_HOST,
   })
   const header = mode === 'enforce' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only'

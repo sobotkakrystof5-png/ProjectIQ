@@ -57,6 +57,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
 | Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
+| Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení a hash klíčů rate limitu. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) |
 | Workspace platby | `STRIPE_SECRET_KEY` (omezený `rk_…`, jen server), `STRIPE_WEBHOOK_SECRET` (`/api/stripe/webhook`, bez něj 503), `STRIPE_PRICE_MONTHLY` (cena 249 Kč), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (zatím nepoužitý). Postup `docs/workspace/SETUP.md` → Stripe |
 | Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
@@ -129,9 +130,9 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 33 tabulek | migrace `064_ws_zaklad` … `075_ws_audit_limity` (přehled níže) |
+| Schéma `ws` — 34 tabulek | migrace `064_ws_zaklad` … `076_ws_verejne_api` (přehled níže) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
-| Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505) |
+| Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
 | Cesty | `lib/ws/paths.ts` — `/w`, `/w/prihlaseni`, `/w/registrace`, `/w/novy` (bez závislostí, importuje i middleware) |
 | Založení účtu | `lib/ws/onboarding.ts`: `createAccountWithBusiness()` — účet, vlastník, byznys a šablona oboru v jedné transakci pod RLS s nově vygenerovaným `account_id`; obsazený slug zkusí s koncovkou, existující organizace vrátí její účet; `accountIdForOrg()`, `slugify()` |
@@ -162,6 +163,7 @@ Pravidla schématu:
 | 073 | `subscriptions`, `stripe_events`, `webhook_events` |
 | 074 | `message_settings`, `outbound_messages` (fronta), `notifications` |
 | 075 | `audit_log`, `idempotency_keys`, `rate_limits` |
+| 076 | `requests.is_test`, `intake_log` (záznam příjmu poptávek, 30 dní), funkce `ws.integration_by_public_key`, `ws.integration_by_secret_prefix`, `ws.business_by_public_slug` (S11) |
 
 ## B4. Přihlášení a role
 
@@ -221,6 +223,28 @@ Pravidla schématu:
 - Validace podle kolonek byznysu, rate limit, přiřazení zákazníka podle telefonu/e-mailu, notifikace, e-mail. Uložení poptávky nesmí nikdy shodit selhání e-mailu ani notifikace.
 - Chyby vrací `{ success: false, code, error }`, `error` česky a srozumitelně.
 
+### Jak je to v kódu (S11, R-045)
+
+Popis API s příklady pro weby klientů: **`docs/workspace/API.md`** (zdroj pro skill `zakaziq-napojeni`).
+
+| Co | Kde |
+|---|---|
+| Klíče | `lib/ws/keys.ts`: `pk_live_` + 24 znaků (v prohlížeči), `sk_live_<prefix 10>_<32>` (ukáže se jednou; v DB `secret_prefix` + HMAC-SHA256 s `WS_KEY_PEPPER`, porovnání `timingSafeEqual`). `ensureIntegration` (jedno napojení na byznys, zakládá se otevřením Nastavení › Napojený web), `rotateSecretKey`, `rotatePublicKey`, `setAllowedOrigins`, `resolvePublicKey`/`resolveSecretKey` přes `SECURITY DEFINER` funkce |
+| Příjem | `lib/ws/intake/intake.ts`: `ingestRequest(source, body)` — jediná cesta pro API, widget, objednávací stránku i „Ověřit napojení“. Konfigurace byznysu → Zod (`requestInputSchema` + `fieldValuesSchema` z `lib/ws/fields.ts`) → služba a čas (`SLOT_TAKEN` jen v režimu `slots`) → `Idempotency-Key` (`ws.idempotency_keys`) → zákazník (`findOrCreateCustomer`, ne u `test`) → uložení (`external_id` = bez duplicit) → potom záznam, upozornění, `last_used_at`, každé ve vlastním try/catch. Neaktivní předplatné = 202 + `notice` (R-045) |
+| Čas | `lib/ws/intake/slots.ts` (čistá funkce): režim `slots` (otevírací doba / směny, termíny a blokace pracovníka, blokace celého byznysu, krok 30 min, nejdřív za 60 min, 21 dní), `free` (bez otevírací doby — zákazník navrhne, R-045), `none` (bez kalendáře). Konstanty `BOOKING` v `intake.ts` |
+| HTTP | `lib/ws/intake/http.ts`: `authenticate` (tajný klíč jen bez `Origin`, veřejný jen z `allowed_origins`; nepovolená doména jde do záznamu), `respond` (CORS jen ověřenému originu), `readJson` (64 kB), `businessBySlug` |
+| Rate limit | `lib/ws/intake/rate-limit.ts` nad `ws.rate_limits` (pevné okno, klíč = HMAC hodnoty, ne IP): 20/min na IP, 300/h na byznys, schema 120/min, objednávací stránka 8/10 min, ověření 10/10 min |
+| Routy | `app/api/public/v1/requests/route.ts` (POST, OPTIONS), `app/api/public/v1/schema/route.ts` (GET, OPTIONS; tvar `lib/ws/intake/schema.ts`, cache 60 s) |
+| Objednávací stránka | `app/r/layout.tsx` (Dílky, `force-dynamic`), `app/r/[slug]/page.tsx`, akce `app/r/[slug]/actions.ts` (`getOrderSlots`, `submitOrder` — byznys jen ze slugu), UI `components/ws/order/order-flow.tsx` (služba → termín → kontakt → hotovo). Barva byznysu přes `lib/ws/accent.ts` (jen s kontrastem ≥ 4.5 k bílé) |
+| Widget | `app/embed/[file]/route.ts` (`/embed/<slug>.js`, cache 5 min), zdroják `lib/ws/intake/widget-script.ts` (bez frameworku, shadow DOM, jen `textContent`, `data-mode="inline"`, `data-label`) |
+| Rámování `/r` | `middleware.ts` → `lib/ws/intake/embed-origins.ts` (povolené domény ze slugu, cache 60 s v instanci, chyba = jen `'self'`) |
+| Nastavení › Napojený web | `/w/[byznys]/nastaveni/web` (jen vlastník): prompt pro Claude Code (`lib/ws/intake/claude-prompt.ts`), tajný klíč, Ověřit napojení, odkaz + QR (PNG/SVG, `qrcode.react`), kód widgetu, povolené weby, Poslat návod webáři (`mailto:`), posledních 20 požadavků (`lib/ws/intake/log.ts`). Akce `app/w/[business]/nastaveni/web/actions.ts`, UI `components/ws/settings/web-integration.tsx`. Rozcestník `/w/[byznys]/nastaveni` |
+| Zkušební poptávky | `requests.is_test`: `test: true` v API nebo Ověřit napojení. Nezakládají zákazníka ani upozornění; dotazy v `today.ts`, `calendar.ts`, `search.ts` je vynechávají (nový výpis poptávek = `AND NOT r.is_test`) |
+| Testy | `lib/ws/__tests__/ws-intake.test.ts` (klíče, rotace, cizí účet, kolonky, volné časy, SLOT_TAKEN, idempotence, externalId, neaktivní předplatné, honeypot, route: 401/403/CORS/429/413, schema, widget, frame-ancestors, prompt) |
+
+- E-mail zákazníkovi a majiteli po přijetí poptávky zatím není — doplní S15 v `afterSave` (`intake.ts`).
+- Volné časy nezohledňují nepotvrzené poptávky (potvrzuje majitel).
+
 ## B7. E-maily
 
 Resend z domény ZakazIQ, jako odesílatel jméno byznysu, Reply-To e-mail klienta. Šablony v React Email ve stylu Dílky v `lib/ws/email/`. Fronta `ws.outbound_messages` s opakováním. Každý typ e-mailu jde zapnout/vypnout a upravit v nastavení. Odhlašovací odkaz u všeho, co není transakční.
@@ -267,8 +291,8 @@ Jak je systém v kódu (S01, R-027):
 | Dnes | `app/w/[business]/page.tsx` + `components/ws/app/today/` (Příchozí, týdenní kalendář, agenda pro telefon, uvítání); data `lib/ws/today.ts` (`getTodayData`, `getCustomerCard`, `getRequestDetail`, `getNotifications`) v jedné transakci na volání; rozložení kalendáře `lib/ws/calendar-layout.ts` (čistá funkce, bez JS v prohlížeči); skeleton `loading.tsx` |
 | Stav v URL | `?detail=zakaznik:<id>` / `poptavka:<id>` / `nova-rezervace` / `nova-faktura` = pravý panel (`lib/ws/detail-param.ts`, `components/ws/app/detail-slot.tsx` na serveru, `detail-sheet.tsx` v prohlížeči; zavření odebere parametr). `?zakaznik=` karta vpravo na Dnes, `?tyden=` týden (pondělí) |
 | ⌘K | `components/ws/app/command-palette.tsx`: hledání `searchAction` → `lib/ws/search.ts` (zákazníci v účtu, poptávky a faktury v byznysu, ILIKE s escapováním), akce, přechod na obrazovky; příkaz „rezervace Tereza pátek 9:00“ rozpozná `lib/ws/command-parser.ts` (pravidla, ne AI) a otevře panel Nová rezervace s předvyplněním (jen se zapnutou akcí, viz níže) |
-| Nehotové akce | `lib/ws/features.ts` (`WS_FEATURES`, `newActions`, R-043): odkaz na objednání (zapne S11), Nová faktura (S14); Nová rezervace a blokace zapnuté od S10. Vypnutá akce není v „+ Nová“, ⌘K, uvítání ani v panelu (ani ze sdíleného odkazu). Bez hotové akce chybí „+ Nová“ i „+“ ve spodní liště |
-| Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost (od S10 Poptávky, Kalendář, Zakázky) |
+| Nehotové akce | `lib/ws/features.ts` (`WS_FEATURES`, `newActions`, R-043): Nová faktura (S14); Nová rezervace a blokace zapnuté od S10, odkaz na objednání od S11. Vypnutá akce není v „+ Nová“, ⌘K, uvítání ani v panelu (ani ze sdíleného odkazu). Bez hotové akce chybí „+ Nová“ i „+“ ve spodní liště |
+| Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost (od S10 Poptávky, Kalendář, Zakázky; od S11 Nastavení) |
 | Rezervované slugy | `RESERVED_BUSINESS_SLUGS` v `lib/ws/paths.ts` — pevné cesty pod `/w` (`novy`, `ucet`…). Nová pevná cesta pod `/w` = přidat sem, jinak by zakryla byznys se stejným slugem |
 | Čas | `lib/ws/time.ts`: `pragueToday`, `pragueParts`, `pragueToUtc` (přes letní/zimní čas), `weekStartOf`, `formatDayShort` („pá 9. 10.“), `formatRelativeDay` |
 | Ukázková data | `node scripts/ws-seed.mjs <slug> --ano` (smazání `--smazat --ano`), data v `lib/ws/demo-seed.ts` (bez runtime importů, Node 24 ho spustí bez překladu). Označená, jiných dat se nedotkne. Pozor: `.env.local` míří na produkční Neon |
@@ -347,7 +371,7 @@ Stav zabezpečení je v `.claude/security/`:
 | Statické hlavičky (HSTS, nosniff, X-Frame-Options, CORP, COOP, Permissions-Policy…) pro všechny odpovědi | `next.config.mjs` |
 | CSP s nonce per request (`strict-dynamic`), výběr profilu podle cesty | `middleware.ts` + `lib/security/csp.ts` |
 | Admin přihlášení (NextAuth), Workspace (Clerk jen `/w`, `/api/ws`) | `middleware.ts` — Clerk větev (`/w`, `/api/ws`) → admin NextAuth → CSP |
-| `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`) |
+| `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`); domény z `web_integrations.allowed_origins` — `/r` přes `lib/ws/intake/embed-origins.ts` v middleware, API přes `lib/ws/intake/http.ts` |
 | Hlášení zranitelností | `public/.well-known/security.txt` (`Expires` obnovit) |
 | CI: audit závislostí, gitleaks, kontrola hlaviček živého webu | `.github/workflows/security.yml`, skript `.claude/security/security-check.sh` |
 

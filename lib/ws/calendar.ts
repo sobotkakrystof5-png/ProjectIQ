@@ -46,7 +46,7 @@ export async function getCalendarData(ctx: WsContext, business: Biz, range: { fr
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
-      WHERE r.account_id = ${acc} AND r.business_id = ${biz} AND r.status = 'new'
+      WHERE r.account_id = ${acc} AND r.business_id = ${biz} AND r.status = 'new' AND NOT r.is_test
         AND r.wanted_start IS NOT NULL AND r.wanted_start < ${to}
         AND COALESCE(r.wanted_end, r.wanted_start + make_interval(mins => COALESCE(s.duration_min, 60))) > ${from}
       ORDER BY r.wanted_start
@@ -178,7 +178,7 @@ export async function getRequestsList(
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
-      WHERE r.account_id = $1 AND r.business_id = $2 AND (${shift(bucket.text, 3)}) = $3
+      WHERE r.account_id = $1 AND r.business_id = $2 AND NOT r.is_test AND (${shift(bucket.text, 3)}) = $3
       ORDER BY CASE WHEN $3 = 'nove' THEN r.created_at ELSE COALESCE(r.handled_at, r.created_at) END DESC
       LIMIT 200
     `,
@@ -188,7 +188,7 @@ export async function getRequestsList(
     text: `
       SELECT b, count(*)::int AS n FROM (
         SELECT (${shift(bucket.text, 2)}) AS b FROM ws.requests r
-        WHERE r.account_id = $1 AND r.business_id = $2
+        WHERE r.account_id = $1 AND r.business_id = $2 AND NOT r.is_test
       ) x GROUP BY b
     `,
     params: [acc, biz, ...bucket.params],
