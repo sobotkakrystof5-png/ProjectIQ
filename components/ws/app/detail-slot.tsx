@@ -6,13 +6,21 @@ import { getAppointmentDetail, getBookingOptions } from '@/lib/ws/calendar'
 import { detailValue, hrefWith, parseDetail, type DetailRef } from '@/lib/ws/detail-param'
 import { WS_FEATURES } from '@/lib/ws/features'
 import { getCustomerCard, getEnabledModules, getRequestDetail } from '@/lib/ws/today'
-import { formatDayShort, formatMinutes, formatRelativeDay, formatTimeRange, isIsoDate, pragueParts } from '@/lib/ws/time'
+import { formatDayShort, formatMinutes, formatRelativeDay, formatTimeRange, isIsoDate, pragueParts, pragueToUtc } from '@/lib/ws/time'
 import { ConfirmedBlock, NewRequestBlock, TimeRange } from '@/components/ws/brand'
 import { AppointmentActions } from './booking/appointment-actions'
 import { BlockForm } from './booking/block-form'
 import { BookingForm } from './booking/booking-form'
 import { ReopenRequestButton, RequestActions } from './booking/request-actions'
 import { CustomerSummary, formatPhone } from './customer-summary'
+import { CustomerDetail } from '@/components/ws/customers/customer-detail'
+import { MessageDraftForm } from '@/components/ws/customers/message-draft-form'
+import { VisitPayment } from '@/components/ws/customers/visit-payment'
+import { orderPageUrl } from '@/lib/ws/app-origin'
+import { getCustomerDetail } from '@/lib/ws/customers'
+import { loadIntakeConfig, loadSlots } from '@/lib/ws/intake/intake'
+import { getLoyaltyEvents, getLoyaltyProgram, getVisitPayment } from '@/lib/ws/loyalty'
+import { draftMessage, getContactableCustomer, pickSlotSuggestions } from '@/lib/ws/outreach'
 import { InvoiceForm } from '@/components/ws/money/forms'
 import { getInvoiceOptions } from '@/lib/ws/money/data'
 import { DetailSheet } from './detail-sheet'
@@ -90,9 +98,64 @@ async function panelContent(
 
   switch (ref.kind) {
     case 'zakaznik': {
-      const card = await getCustomerCard(ctx, business, ref.id)
-      if (!card) return notHere('Zákazník', env.closeHref)
-      return { title: 'Zákazník', body: <CustomerSummary card={card} today={env.today} businessName={business.name} /> }
+      const [customer, events] = await Promise.all([
+        getCustomerDetail(ctx, business, ref.id),
+        getLoyaltyEvents(ctx, business, ref.id),
+      ])
+      if (!customer) return notHere('Zákazník', env.closeHref)
+      return {
+        title: 'Zákazník',
+        body: (
+          <CustomerDetail
+            slug={business.slug}
+            customer={customer}
+            events={events}
+            today={env.today}
+            businessName={business.name}
+            termHref={(id) => hrefWith(env.pathname, env.searchParams, { detail: `termin:${id}`, ...FORM_PARAMS })}
+          />
+        ),
+      }
+    }
+
+    case 'zprava': {
+      const contact = await getContactableCustomer(ctx, ref.id)
+      if (!contact) {
+        return {
+          title: 'Připravit zprávu',
+          body: (
+            <p className="text-[15px] text-quiet">
+              Tomuhle zákazníkovi psát nemůžeme. Nemá souhlas s nabídkami nebo e-mail.
+            </p>
+          ),
+        }
+      }
+      const program = await getLoyaltyProgram(ctx, business)
+      let slots: Date[] = []
+      if (ref.topic === 'winback') {
+        const config = await loadIntakeConfig(ctx.accountId, business.id)
+        if (config) slots = pickSlotSuggestions(await loadSlots(ctx.accountId, config, null), 3, pragueToUtc)
+      }
+      const initial = draftMessage(ref.topic, {
+        businessName: business.name,
+        reward: program.enabled && program.rewardText ? program.rewardText : null,
+        orderUrl: orderPageUrl(business.slug),
+        slots,
+      })
+      return {
+        title: 'Připravit zprávu',
+        description: contact.name,
+        body: (
+          <MessageDraftForm
+            slug={business.slug}
+            customerId={contact.customerId}
+            topic={ref.topic}
+            email={contact.email}
+            initial={initial}
+            closeHref={env.closeHref}
+          />
+        ),
+      }
     }
 
     case 'poptavka': {
@@ -197,9 +260,10 @@ async function panelContent(
     case 'termin': {
       const a = await getAppointmentDetail(ctx, business, ref.id)
       if (!a) return notHere('Termín', env.closeHref)
-      const [card, options] = await Promise.all([
+      const [card, options, payment] = await Promise.all([
         a.customer_id ? getCustomerCard(ctx, business, a.customer_id) : null,
         a.status === 'confirmed' ? getBookingOptions(ctx, business) : null,
+        a.kind === 'visit' ? getVisitPayment(ctx, business, a.id) : null,
       ])
       const start = pragueParts(a.start)
       const block = a.kind === 'block'
@@ -218,6 +282,11 @@ async function panelContent(
               <ConfirmedBlock start={a.start} end={a.end} customer={a.customer_name ?? a.title ?? 'Termín'} service={a.service_name ?? undefined} />
             )}
             {a.status === 'cancelled' && <p className="text-[15px] text-quiet">{block ? 'Zrušená blokace.' : 'Zrušený termín.'}</p>}
+
+            {/* Zaplatit jde dnešní a proběhlý termín, ne budoucí. */}
+            {payment && (payment.status !== 'confirmed' || start.date <= env.today) && (
+              <VisitPayment slug={business.slug} appointmentId={a.id} state={payment} />
+            )}
 
             {a.status === 'confirmed' && options && (
               <AppointmentActions

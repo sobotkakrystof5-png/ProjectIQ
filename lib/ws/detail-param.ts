@@ -6,9 +6,14 @@ export type DetailRef =
   | { kind: 'zakaznik'; id: string }
   | { kind: 'poptavka'; id: string }
   | { kind: 'termin'; id: string }
+  /** „Komu napsat“ → Připravit zprávu (S12): zákazník a důvod. */
+  | { kind: 'zprava'; id: string; topic: MessageTopic }
   | { kind: 'nova-rezervace' }
   | { kind: 'nova-blokace' }
   | { kind: 'nova-faktura' }
+
+export const MESSAGE_TOPICS = ['birthday', 'almost', 'winback', 'thanks'] as const
+export type MessageTopic = (typeof MESSAGE_TOPICS)[number]
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -16,12 +21,16 @@ export function parseDetail(raw: string | string[] | undefined | null): DetailRe
   const value = Array.isArray(raw) ? raw[0] : raw
   if (!value || value.length > 60) return null
   if (value === 'nova-rezervace' || value === 'nova-blokace' || value === 'nova-faktura') return { kind: value }
-  const [kind, id] = value.split(':')
+  const [kind, id, topic] = value.split(':')
+  if (kind === 'zprava' && id && UUID_RE.test(id) && (MESSAGE_TOPICS as readonly string[]).includes(topic)) {
+    return { kind, id: id.toLowerCase(), topic: topic as MessageTopic }
+  }
   if ((kind === 'zakaznik' || kind === 'poptavka' || kind === 'termin') && id && UUID_RE.test(id)) return { kind, id: id.toLowerCase() }
   return null
 }
 
 export function detailValue(ref: DetailRef): string {
+  if (ref.kind === 'zprava') return `zprava:${ref.id}:${ref.topic}`
   return 'id' in ref ? `${ref.kind}:${ref.id}` : ref.kind
 }
 

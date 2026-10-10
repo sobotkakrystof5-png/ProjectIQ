@@ -6,15 +6,9 @@ import { addDays, pragueToUtc } from './time'
 // Data obrazovky Dnes (S09). Každý dotaz filtruje account_id z kontextu
 // a business_id ověřeného byznysu (requireBusiness) — RLS je jen pojistka.
 
-export type SegmentKey = 'new' | 'regular' | 'one_time' | 'dormant' | 'ended'
+import type { SegmentKey } from './segment-labels'
 
-export const SEGMENT_LABELS: Record<SegmentKey, string> = {
-  new: 'Noví',
-  regular: 'Stálí',
-  one_time: 'Jednorázoví',
-  dormant: 'Spící',
-  ended: 'Ukončení',
-}
+export { SEGMENT_LABELS, type SegmentKey } from './segment-labels'
 
 export type IncomingRequest = {
   id: string

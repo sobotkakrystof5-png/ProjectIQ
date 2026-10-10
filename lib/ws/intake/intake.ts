@@ -5,6 +5,7 @@ import { isUniqueViolation, q, wsDb, type WsRow } from '../db'
 import type { WsContext } from '../context'
 import { canWrite, getBillingState } from '../billing'
 import { findOrCreateCustomer, normalizePhone } from '../bookings'
+import { refreshSegmentsSafely } from '../segments'
 import { fieldValuesSchema, type FieldDefinition } from '../fields'
 import { addDays, formatDayShort, formatMinutes, isIsoDate, pragueParts, pragueToday, pragueToUtc } from '../time'
 import { computeSlots, isSlotFree, toRange, type DaySlots, type Range, type StaffAvailability } from './slots'
@@ -65,7 +66,7 @@ export const SUBSCRIPTION_NOTICE: ApiNotice = {
 
 export type BookingMode = 'slots' | 'free' | 'none'
 
-export type IntakeService = { id: string; name: string; duration_min: number; price: number | null; currency: string }
+export type IntakeService = { id: string; name: string; duration_min: number; buffer_min: number; price: number | null; currency: string }
 
 export type IntakeConfig = {
   business: { id: string; name: string; slug: string; color: string | null; industry: string }
@@ -95,7 +96,7 @@ export async function loadIntakeConfig(accountId: string, businessId: string): P
       WHERE account_id = ${accountId} AND id = ${businessId} AND archived_at IS NULL`,
     q`SELECT module FROM ws.business_modules
       WHERE account_id = ${accountId} AND business_id = ${businessId} AND enabled AND module = 'calendar'`,
-    q`SELECT id, name, duration_min, price, currency FROM ws.services
+    q`SELECT id, name, duration_min, buffer_min, price, currency FROM ws.services
       WHERE account_id = ${accountId} AND business_id = ${businessId} AND active AND show_on_web
       ORDER BY position, name LIMIT 100`,
     q`SELECT key, label, type, required, options, help_text FROM ws.field_definitions
@@ -126,6 +127,7 @@ export async function loadIntakeConfig(accountId: string, businessId: string): P
       id: String(s.id),
       name: String(s.name),
       duration_min: Number(s.duration_min),
+      buffer_min: Number(s.buffer_min ?? 0),
       price: s.price === null ? null : Number(s.price),
       currency: String(s.currency),
     })),
@@ -156,9 +158,12 @@ async function loadSlotData(accountId: string, config: IntakeConfig, serviceId: 
           OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))`,
     q`SELECT staff_id, weekday, opens::text AS opens, closes::text AS closes FROM ws.opening_hours
       WHERE account_id = ${accountId} AND business_id = ${biz} AND staff_id IS NOT NULL`,
-    q`SELECT staff_id, starts_at, ends_at FROM ws.appointments
-      WHERE account_id = ${accountId} AND business_id = ${biz} AND status <> 'cancelled'
-        AND starts_at < ${to} AND ends_at > ${from}
+    q`SELECT a.staff_id, a.starts_at,
+             a.ends_at + make_interval(mins => COALESCE(s.buffer_min, 0)) AS ends_at
+      FROM ws.appointments a
+      LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
+      WHERE a.account_id = ${accountId} AND a.business_id = ${biz} AND a.status <> 'cancelled'
+        AND a.starts_at < ${to} AND a.ends_at > ${from}
       LIMIT 5000`,
   ])
   const shifts = new Map<string, Map<number, Range[]>>()
@@ -180,7 +185,8 @@ async function loadSlotData(accountId: string, config: IntakeConfig, serviceId: 
   const service = config.services.find((s) => s.id === serviceId)
   return {
     now,
-    durationMin: service?.duration_min ?? 60,
+    // Rozestup blokuje další termín, ale neprodlužuje zobrazenou návštěvu.
+    durationMin: (service?.duration_min ?? 60) + (service?.buffer_min ?? 0),
     leadMin: BOOKING.leadMin,
     hours: config.hours,
     staff,
@@ -326,7 +332,7 @@ export async function logIntake(
 async function afterSave(
   src: IntakeSource,
   config: IntakeConfig,
-  saved: { id: string; name: string; service: string | null; start: Date | null; test: boolean },
+  saved: { id: string; name: string; service: string | null; start: Date | null; test: boolean; customerId: string | null },
 ): Promise<void> {
   const acc = src.accountId
   const tasks: Promise<unknown>[] = []
@@ -346,6 +352,8 @@ async function afterSave(
         VALUES (${acc}, ${src.businessId}, 'new_request', ${`Nová poptávka: ${saved.name}`.slice(0, 200)}, ${body || null},
                 ${`/w/${config.business.slug}/poptavky?detail=poptavka:${saved.id}`})`,
     )
+    // Nový zákazník hned mezi Novými (skupiny, S12); chyby si ošetří sám.
+    tasks.push(refreshSegmentsSafely({ accountId: acc }, { id: src.businessId }, [saved.customerId]))
     // E-mail zákazníkovi a majiteli přidá S15 (fronta ws.outbound_messages).
   }
   const results = await Promise.allSettled(tasks)
@@ -473,7 +481,7 @@ export async function ingestRequest(
     const result: IntakeResult = { status: duplicate ? 200 : 202, body }
 
     if (idem) await settleIdempotency(acc, idem, result).catch(() => undefined)
-    if (!duplicate) await afterSave(src, config, { id, name: input.name, service: service?.name ?? null, start, test: isTest })
+    if (!duplicate) await afterSave(src, config, { id, name: input.name, service: service?.name ?? null, start, test: isTest, customerId })
     return finish(result, id, isTest)
   } catch (e) {
     if (idem) await settleIdempotency(acc, idem, null).catch(() => undefined)

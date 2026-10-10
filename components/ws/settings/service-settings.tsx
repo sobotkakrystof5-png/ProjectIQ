@@ -1,0 +1,17 @@
+'use client'
+
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { toast } from '@/components/ui/toast'
+import { useWsAction } from '@/components/ws/app/booking/use-ws-action'
+import { hideService, saveServiceSettings } from '@/app/w/[business]/nastaveni/actions'
+
+type Service = { id: string; name: string; duration_min: number; price: string | null; currency: string; active: boolean; show_on_web: boolean; buffer_min: number }
+export function ServiceSettings({ slug, services, readOnly }: { slug: string; services: Service[]; readOnly: boolean }) {
+  const { run, pending } = useWsAction(); const [name, setName] = useState(''); const [duration, setDuration] = useState('60'); const [price, setPrice] = useState(''); const [buffer, setBuffer] = useState('0'); const [show, setShow] = useState(true)
+  const add = () => { const value = price.trim() ? Number(price.replace(',', '.')) : null; const minutes = Number(duration); const gap = Number(buffer); if (!name.trim() || !Number.isInteger(minutes) || !Number.isInteger(gap) || (value !== null && (!Number.isFinite(value) || value < 0))) { toast.error('Vyplňte název, délku, cenu a rozestup.') ; return } void run(() => saveServiceSettings({ slug, name, duration: minutes, price: value, currency: 'CZK', showOnWeb: show, buffer: gap }), () => { setName(''); setPrice(''); toast.success('Služba je uložená.') }) }
+  return <div className="flex flex-col gap-6"><ul className="flex flex-col gap-2">{services.map((s) => <li key={s.id} className="flex items-center justify-between gap-4 rounded-panel border bg-surface px-5 py-4"><div><p className="font-semibold text-ink">{s.name}</p><p className="text-sm text-quiet">{s.duration_min} min{s.buffer_min ? ` + ${s.buffer_min} min rozestup` : ''}{s.price !== null ? ` · ${s.price} ${s.currency}` : ''}{!s.show_on_web ? ' · jen uvnitř aplikace' : ''}</p></div><Switch checked={s.active} disabled={readOnly || pending} aria-label={`Skrýt ${s.name}`} onCheckedChange={(active) => void run(() => hideService({ slug, id: s.id, active }), () => toast.success(active ? 'Služba je znovu vidět.' : 'Služba je skrytá. Dřívější termíny zůstaly uložené.'))}/></li>)}</ul><fieldset disabled={readOnly || pending} className="grid gap-4 rounded-panel border bg-surface p-5 sm:grid-cols-2"><legend className="px-1 text-[16px] font-semibold">Přidat službu</legend><label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2"><span>Název</span><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="Například konzultace" /></label><label className="flex flex-col gap-1.5 text-sm font-medium">Délka v minutách<Input inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} /></label><label className="flex flex-col gap-1.5 text-sm font-medium">Cena v Kč, nepovinně<Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></label><label className="flex flex-col gap-1.5 text-sm font-medium">Rozestup po službě v minutách<Input inputMode="numeric" value={buffer} onChange={(e) => setBuffer(e.target.value)} /></label><div className="flex items-center justify-between gap-3"><Label htmlFor="sluzba-web">Ukázat na webu</Label><Switch id="sluzba-web" checked={show} onCheckedChange={setShow}/></div><Button className="sm:col-span-2" disabled={pending} onClick={add}>Přidat službu</Button></fieldset></div>
+}

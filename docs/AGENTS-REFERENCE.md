@@ -216,6 +216,9 @@ Pravidla schématu:
 | 074 | `message_settings`, `outbound_messages` (fronta), `notifications` |
 | 075 | `audit_log`, `idempotency_keys`, `rate_limits` |
 | 076 | `requests.is_test`, `intake_log` (záznam příjmu poptávek, 30 dní), funkce `ws.integration_by_public_key`, `ws.integration_by_secret_prefix`, `ws.business_by_public_slug` (S11) |
+| 077 | `outbound_messages.status = draft`, razítko pro zakázku a den návštěvy, `ws.loyalty_add_stamps`, `ws.merge_customers`, `ws.active_businesses` pro denní cron skupin (S12) |
+| 078 | `ws.loyalty_add_stamps` odmítne razítko za návštěvu, kde už byla uplatněná odměna (S12, ručně aplikovat na Neon) |
+| 079 | `ws.services.buffer_min` (0–240 minut) pro rozestup po službě při nabídce volných termínů (S13, ručně aplikovat na Neon) |
 | 080 | Peníze S14: accounts.invoice_sequences, invoices.issuer/supplied_on/pdf_data/pdf_filename, tax_settings.options; unique transakce za fakturu, ws.money_issue/pay a money_adopt_visit (SECURITY INVOKER); ručně aplikovat na Neon |
 
 ## B4. Přihlášení a role

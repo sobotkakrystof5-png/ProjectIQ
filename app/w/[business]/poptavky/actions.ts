@@ -6,7 +6,9 @@ import { assertWritable } from '@/lib/ws/billing'
 import * as bookings from '@/lib/ws/bookings'
 import type { BookingError, BookingResult } from '@/lib/ws/bookings'
 import { requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
+import { stampJob } from '@/lib/ws/loyalty'
 import { fail, ok, type Result } from '@/lib/ws/result'
+import { refreshSegmentsFor } from '@/lib/ws/segments'
 import { addDays, formatDayShort, formatMinutes, isIsoDate, pragueParts, pragueToUtc } from '@/lib/ws/time'
 
 // Akce poptávek, kalendáře a zakázek (S10). Každá: requireWorkspace →
@@ -82,7 +84,7 @@ export async function confirmRequest(raw: unknown): Promise<Result<{ message: st
   const p = await prepare(confirmSchema, raw)
   if (!p.ok) return p
   const { input, c } = p
-  return run(
+  const res = await run(
     'confirmRequest',
     c,
     () =>
@@ -93,6 +95,9 @@ export async function confirmRequest(raw: unknown): Promise<Result<{ message: st
       }),
     (r) => ({ message: r.start ? `Potvrzeno na ${label(r.start)}.` : 'Poptávka je přijatá.' }),
   )
+  // Nový zákazník se hned objeví mezi Novými (skupiny, S12).
+  if (res.ok) await refreshSegmentsFor(c.ctx, c.business, { requestId: input.requestId })
+  return res
 }
 
 const requestSchema = z.object({ slug, requestId: uuid })
@@ -137,7 +142,7 @@ export async function createManualBooking(raw: unknown): Promise<Result<{ messag
   const email = input.email || null
   if (email && !z.string().email().safeParse(email).success) return fail('E-mail nevypadá správně. Zkontrolujte ho prosím.')
 
-  return run(
+  const res = await run(
     'createManualBooking',
     c,
     () =>
@@ -151,6 +156,8 @@ export async function createManualBooking(raw: unknown): Promise<Result<{ messag
       }),
     (r) => ({ message: `Rezervace je uložená na ${label(toUtc(input.at))}.`, appointmentId: r.appointmentId }),
   )
+  if (res.ok) await refreshSegmentsFor(c.ctx, c.business, { appointmentId: res.data.appointmentId })
+  return res
 }
 
 const moveSchema = z.object({ slug, appointmentId: uuid, at: when, staffId: optionalUuid })
@@ -233,5 +240,16 @@ export async function moveJobStage(raw: unknown): Promise<Result<{ prevStageId: 
   const p = await prepare(stageSchema, raw)
   if (!p.ok) return p
   const { input, c } = p
-  return run('moveJobStage', c, () => bookings.setJobStage(c.ctx, c.business, input), (r) => r)
+  const res = await run('moveJobStage', c, () => bookings.setJobStage(c.ctx, c.business, input), (r) => r)
+  if (res.ok) {
+    // Hotová zakázka: razítko (program „dokončená zakázka“) a přepočet skupiny.
+    // Selhání nesmí vrátit přesun, který už proběhl.
+    try {
+      await stampJob(c.ctx, c.business, input.jobId)
+    } catch (e) {
+      console.error('moveJobStage.stamp', { accountId: c.ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
+    }
+    await refreshSegmentsFor(c.ctx, c.business, { jobId: input.jobId })
+  }
+  return res
 }

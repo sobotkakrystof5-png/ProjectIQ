@@ -30,7 +30,7 @@ const CUSTOMERS = [
   { key: 'jana', name: 'Jana Ukázková', phone: '+420000000102', email: 'jana.ukazkova@example.cz', segment: 'regular' },
   { key: 'petr', name: 'Petr Zkušební', phone: '+420000000103', email: null, segment: 'new' },
   { key: 'marie', name: 'Marie Vzorová', phone: '+420000000104', email: 'marie.vzorova@example.cz', segment: 'regular' },
-  { key: 'karel', name: 'Karel Pokusný', phone: '+420000000105', email: null, segment: 'dormant' },
+  { key: 'karel', name: 'Karel Pokusný', phone: '+420000000105', email: 'karel.pokusny@example.cz', segment: 'dormant' },
   { key: 'eva', name: 'Eva Demo', phone: '+420000000106', email: 'eva.demo@example.cz', segment: 'new' },
 ] as const
 
@@ -41,6 +41,11 @@ const phoneOf = (key: CustomerKey) => CUSTOMERS.find((c) => c.key === key)!.phon
 export function demoCleanupQueries({ accountId, businessId }: Omit<DemoScope, 'today' | 'slug'>): WsQuery[] {
   return [
     q`DELETE FROM ws.notifications WHERE account_id = ${accountId} AND business_id = ${businessId} AND type = 'demo'`,
+    q`DELETE FROM ws.transactions WHERE account_id = ${accountId} AND business_id = ${businessId} AND description = ${DEMO_MARK}`,
+    q`
+      DELETE FROM ws.outbound_messages m WHERE m.account_id = ${accountId} AND m.status = 'draft'
+        AND m.customer_id IN (SELECT id FROM ws.customers WHERE account_id = ${accountId} AND note = ${DEMO_MARK})
+    `,
     q`DELETE FROM ws.appointments WHERE account_id = ${accountId} AND business_id = ${businessId} AND note = ${DEMO_MARK}`,
     q`DELETE FROM ws.requests WHERE account_id = ${accountId} AND business_id = ${businessId} AND external_id LIKE 'ws-seed-%'`,
     q`DELETE FROM ws.customers WHERE account_id = ${accountId} AND note = ${DEMO_MARK}`,
@@ -85,22 +90,34 @@ export function demoSeedQueries(scope: DemoScope): WsQuery[] {
     return { text, params }
   }
 
+  // Souhlas s kontaktem a narozeniny pro panel „Komu napsat“ (S12).
+  const CONSENT: CustomerKey[] = ['jana', 'karel', 'tereza']
   for (const c of CUSTOMERS) {
     queries.push(q`
-      INSERT INTO ws.customers (account_id, name, phone, email, note)
-      VALUES (${accountId}, ${c.name}, ${c.phone}, ${c.email}, ${DEMO_MARK})
+      INSERT INTO ws.customers (account_id, name, phone, email, note, contact_consent_at, birthday)
+      VALUES (${accountId}, ${c.name}, ${c.phone}, ${c.email}, ${DEMO_MARK},
+        CASE WHEN ${CONSENT.includes(c.key)} THEN now() END,
+        CASE WHEN ${c.key === 'tereza'} THEN ${today}::date + 3 - interval '30 years' END)
     `)
   }
 
   queries.push(q`INSERT INTO ws.staff (account_id, business_id, name) VALUES (${accountId}, ${businessId}, ${DEMO_STAFF})`)
 
   // Termíny: [zákazník, den od dneška, začátek v minutách, délka, služba, stav]
+  // Historie odpovídá skupinám v CUSTOMERS (ověřuje ws-segments.test.ts):
+  // Jana a Marie chodí pravidelně (Stálé), Karel chodil po 50 dnech a půl roku
+  // nepřišel (Spící), ostatní zatím nepřišli (Noví).
   const visits: [CustomerKey, number, number, number, number, 'confirmed' | 'completed'][] = [
     ['jana', -70, 9 * 60, 60, 0, 'completed'],
     ['jana', -42, 9 * 60, 60, 0, 'completed'],
     ['jana', -14, 10 * 60, 60, 0, 'completed'],
+    ['marie', -95, 14 * 60, 120, 2, 'completed'],
+    ['marie', -60, 14 * 60, 120, 2, 'completed'],
     ['marie', -30, 14 * 60, 120, 2, 'completed'],
-    ['karel', -150, 16 * 60, 30, 1, 'completed'],
+    ['karel', -330, 16 * 60, 30, 1, 'completed'],
+    ['karel', -280, 16 * 60, 30, 1, 'completed'],
+    ['karel', -230, 16 * 60, 30, 1, 'completed'],
+    ['karel', -180, 16 * 60, 30, 1, 'completed'],
     ['jana', 0, 9 * 60, 60, 0, 'confirmed'],
     ['marie', 0, 13 * 60, 120, 2, 'confirmed'],
     ['karel', 0, 15 * 60 + 30, 30, 1, 'confirmed'],
@@ -125,6 +142,14 @@ export function demoSeedQueries(scope: DemoScope): WsQuery[] {
       ]),
     )
   }
+  // Platby za proběhlé návštěvy (útrata v Zákaznících). Částka je ukázková.
+  queries.push(q`
+    INSERT INTO ws.transactions (account_id, business_id, kind, amount, occurred_on, category, description, payment_method, customer_id, appointment_id)
+    SELECT account_id, business_id, 'income', 600, (starts_at AT TIME ZONE 'Europe/Prague')::date, 'visit', ${DEMO_MARK}, 'cash', customer_id, id
+    FROM ws.appointments
+    WHERE account_id = ${accountId} AND business_id = ${businessId} AND note = ${DEMO_MARK} AND status = 'completed'
+  `)
+
   // Blokace (oběd) — bez pracovníka, kolize ji nehlídá.
   queries.push(
     join([
@@ -197,7 +222,7 @@ export function demoSeedQueries(scope: DemoScope): WsQuery[] {
         customerId(who),
         fill === 'full'
           ? `, p.stamps_needed, 'full'`
-          : `, LEAST(3, p.stamps_needed - 1), 'active'`,
+          : `, GREATEST(p.stamps_needed - 1, 0), 'active'`,
         q` FROM ws.loyalty_programs p WHERE p.account_id = ${accountId} AND p.business_id = ${businessId}`,
       ]),
     )

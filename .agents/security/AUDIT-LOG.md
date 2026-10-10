@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-10 — review (S12, zákazníci, věrnost a skupiny)
+Spouštěč: kontrola podle `web-security-review` před dokončením S12.
+Rozsah: `lib/ws/{customers,loyalty,segments,outreach,cron}.ts`, akce a stránky `/w/[business]/{zakaznici,nastaveni/vernost,nastaveni/skupiny}`, cron, migrace 077 a 078.
+Výsledek: každá akce ověřuje přihlášený účet, byznys, roli vlastníka a vstup přes Zod; všechny dotazy mají `account_id`, PGlite testuje cizí účet. Textové vstupy se vykreslují Reactem, bez HTML sinků a nových skriptů. Cron přijímá jen správný `CRON_SECRET`.
+Nálezy: po uplatnění odměny šlo ručně přidat razítko k téže návštěvě; částková pravidla věrnosti mohla číst částku v EUR jako Kč.
+Opraveno: migrace 078 přidává atomickou kontrolu uplatněné odměny; věrnostní pravidla založená na částce se použijí jen pro CZK a historie návštěvy nesčítá různé měny. Pokryto regresními testy.
+Zůstává: migraci 078 vloží Kryštof ručně do Neon SQL editoru; CSP se nemění.
+
 ## 2026-10-10 — review (zkrácení instrukcí agentů)
 Spouštěč: požadavek zkrátit AGENTS.md při zachování kontextu a účelu (R-047).
 Rozsah: AGENTS.md, docs/AGENTS-REFERENCE.md, návazné odkazy v CLAUDE.md a paměti.
@@ -29,6 +37,16 @@ Výsledek: konfigurace obsahuje jen limit instrukcí a pracovní příkazy; nep�
 Nálezy: AGENTS.md je větší než výchozí limit instrukcí Codexu; nastaven limit 96 KiB a povinnost číst celý soubor při nenačtení konfigurace.
 Opraveno: pravidla práce obou agentů sjednocena, kontrola shody bezpečnostní paměti přidána. Hlavičky, CSP, přihlášení a aplikační kód se nemění.
 Zůstává: nastavení připojení služeb v novém worktree podle `.env.example`; dostupnost klientských nástrojů závisí na prostředí.
+
+## 2026-10-10 — review (S13, Nastavení)
+Spouštěč: kontrola podle `web-security-review` během implementace S13.
+Rozsah: `app/w/[business]/nastaveni/{actions,**/page}.tsx`, `components/ws/settings/{module,service,field,stage,appearance}-settings.tsx`, `lib/ws/settings.ts`, `lib/ws/intake/{intake,slots}.ts`, migrace 079.
+Výsledek:
+- Každá mutace začíná ověřeným Workspace kontextem, byznys z URL se znovu ověří proti účtu, nastavení mění jen vlastník a režim bez předplatného je pouze pro čtení. Vstupy mají Zod včetně UUID, délek, rozsahů minut, měny a hex barvy.
+- SQL používá `account_id` a `business_id` v každém dotazu. Odstranění stavu nejdřív v jedné transakci přesune zakázky jen do ověřeného stavu téhož byznysu.
+- Nejsou nové externí skripty, HTML vkládané do DOM ani změna CSP. Barva je omezená na hex a server znovu ověří kontrast s bílým textem. Logo se bez rozhodnutí o bezpečném úložišti nenahrává ani nevykresluje z nedůvěryhodné URL.
+- Rozestup služby je číselný 0–240 minut; veřejný výpočet obsadí i rozestup existující návštěvy. Migrace 079 není na Neonu spuštěná, uživatel ji vloží ručně před nasazením.
+Nálezy: 0. Zůstává: doplnit úpravy pracovníků, směn a řazení kolonek/stavů; po jejich implementaci review zopakovat.
 
 ## 2026-10-10 — review (S11, veřejné API, objednávací stránka, widget)
 Spouštěč: review před commitem S11 (pravidla `web-security-review`, AGENTS.md B13).

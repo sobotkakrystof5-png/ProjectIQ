@@ -4,7 +4,7 @@
 
 ## Co v databázi je
 
-- **Schéma `ws`** — všechny tabulky Workspace (migrace `064`–`076`). Admin tabulky v `public` se nemění.
+- **Schéma `ws`** — všechny tabulky Workspace (migrace `064`–`079`). Admin tabulky v `public` se nemění.
 - **Role `ws_app`** — jediná role, kterou se aplikace Workspace připojuje (`DATABASE_URL_WS`). Platí pro ni Row Level Security, do `public` nevidí.
 - **Vlastník tabulek** (`neondb_owner`, `DATABASE_URL`) — pouští migrace a čte `ws` pro admin stránku `/dashboard/klienti`. RLS pro něj neplatí.
 
@@ -19,7 +19,8 @@ node scripts/apply-migration.js \
   064_ws_zaklad.sql 065_ws_sluzby_pracovnici.sql 066_ws_kolonky_stavy.sql \
   067_ws_zakaznici.sql 068_ws_poptavky_zakazky_terminy.sql 069_ws_vernost.sql \
   070_ws_segmenty.sql 071_ws_penize.sql 072_ws_napojeni_webu.sql \
-  073_ws_predplatne_webhooky.sql 074_ws_emaily_upozorneni.sql 075_ws_audit_limity.sql 076_ws_verejne_api.sql
+  073_ws_predplatne_webhooky.sql 074_ws_emaily_upozorneni.sql 075_ws_audit_limity.sql 076_ws_verejne_api.sql \
+  077_ws_vernost_skupiny.sql 078_ws_vernost_odmena.sql 079_ws_sluzby_rozestupy.sql
 ```
 
 Jde to i ručně v Neon SQL editoru (obsah souborů po jednom, v tomhle pořadí). Migrace jsou idempotentní, opakované spuštění nic nerozbije.

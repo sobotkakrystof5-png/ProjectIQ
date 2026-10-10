@@ -23,3 +23,6 @@ GRANT EXECUTE ON FUNCTION ws.business_by_public_slug(text) TO ws_app;
 -- Tabulky z dalších migrací dostanou stejná práva samy. Audit-like tabulky
 -- v budoucích migracích si REVOKE dělají samy.
 ALTER DEFAULT PRIVILEGES IN SCHEMA ws GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ws_app;
+
+-- Denní cron skupin zákazníků a věrnosti (migrace 077, S12)
+GRANT EXECUTE ON FUNCTION ws.active_businesses() TO ws_app;

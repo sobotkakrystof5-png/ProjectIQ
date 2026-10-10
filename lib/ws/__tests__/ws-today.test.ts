@@ -96,7 +96,7 @@ describe('karta zákazníka a detail poptávky', () => {
     const card = await getCustomerCard(ctxA, bizA, await customerId('Jana Ukázková'), now)
     expect(card).toMatchObject({ name: 'Jana Ukázková', segment: 'regular', visits: 3 })
     expect(card?.nextVisit?.start.toISOString()).toBe('2026-10-09T07:00:00.000Z')
-    expect(card?.loyalty).toMatchObject({ stamps: 3, needed: 5 })
+    expect(card?.loyalty).toMatchObject({ stamps: 4, needed: 5 })
   })
 
   it('detail poptávky se zprávou a kontaktem', async () => {
