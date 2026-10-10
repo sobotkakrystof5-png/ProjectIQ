@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-10-10 (S11, Codex a zkrácení instrukcí)
+> **Poslední aktualizace:** 2026-10-10 (S11, Codex a zkrácení instrukcí) · S14 implementována v repu
 
 ---
 
@@ -40,7 +40,7 @@
 | S11 | Veřejné API, objednávací stránka, widget | hotovo (2026-10-10), migrace 076 na Neonu; Nastavení › Napojený web naostro s přihlášením neověřeno |
 | S12 | Zákazníci, věrnost, segmenty | čeká |
 | S13 | Nastavení: funkce, služby, kolonky, stavy | čeká |
-| S14 | Peníze: faktury, příjmy, daně | čeká |
+| S14 | Peníze: faktury, příjmy, daně | implementováno v repu (2026-10-10); migrace 080 čeká, e-maily S15 |
 | S15 | E-maily, upozornění, novinky | čeká |
 | S16 | Klientský portál | čeká |
 | S17 | Admin: klienti a novinky | čeká |
@@ -60,6 +60,8 @@
 **Poptávky a kalendář (S10):** poptávky jdou potvrdit jedním klikem z Dnes (Příchozí), z Poptávek (`/poptavky`, Nové / Potvrzené / Vyřízené) i z Kalendáře (tlačítko na čárkovaném bloku), v panelu navíc Jiný čas a Odmítnout s tipem „Termín je volný / Koliduje s…“. Kalendář `/kalendar` den / týden / měsíc, v pohledu Den sloupce podle pracovníků, přetažení termínu myší se „Zpět“, blokace, nová rezervace z panelu nebo kliknutím do mřížky; na telefonu seznam. Zakázky `/zakazky` jako tabule podle stavů. Odmítnutí, zrušení a přesuny jdou vrátit (toast 8 s). Živé obnovení po 10 s (`/api/ws/[byznys]/zmeny`, ETag). Nová rezervace zapnutá ve `WS_FEATURES`. Rozhodnutí R-044. Testy 270/270 (z toho 20 nových v `ws-bookings.test.ts`), build OK. Vzhled ověřen jen na dočasném náhledu s fiktivními daty (1440 px v Chromu, 390 px headless) — **s přihlášením naostro ne** (prohlížeč nebyl přihlášený).
 
 **Veřejné API a objednávání (S11):** `POST /api/public/v1/requests` a `GET /api/public/v1/schema` (tajný klíč ze serveru webu, veřejný klíč z povolené domény), objednávací stránka `/r/[slug]` (služba → termín → kontakt → hotovo, barva byznysu), widget `/embed/[slug].js` (shadow DOM, tlačítko nebo `data-mode="inline"`), Nastavení › Napojený web `/w/[byznys]/nastaveni/web` (prompt pro Claude Code, tajný klíč, Ověřit napojení, odkaz + QR, kód widgetu, povolené weby, návod webáři přes `mailto:`, posledních 20 požadavků). Dokumentace `docs/workspace/API.md`. Rozhodnutí R-045. Migrace 076 je na produkčním Neonu (ověřeno: 34 tabulek, RLS na `intake_log`, práva `ws_app`). `WS_KEY_PEPPER` je v `.env.local`, **ve Vercelu chybí**. Ověřeno naostro na `localhost:3001` (byznys `ahoj`): objednávka v Chromu na 390 px až po „Poptávka je odeslaná“ (v DB `source = page`, zákazník a upozornění vznikly), API s tajným klíčem 202 + idempotence, tajný klíč z prohlížeče 401, CORS jen pro povolenou doménu, widget 200 (~3 kB gzip), `frame-ancestors` z DB. Widget v prohlížeči z cizí domény neověřen (Chrome blokuje veřejný web → localhost), vzhled widgetu ověřen s podstrčenou odpovědí API. Nastavení › Napojený web jen na dočasném náhledu s fiktivními daty (smazán) — prohlížeč nebyl přihlášený. V byznysu `ahoj` zůstala poptávka „Zkouška S11“ (ze stránky, viditelná v Dnes) a jedna zkušební (skrytá); tajný klíč, který jsem pro test vygeneroval, nikdo nezná — v Nastavení ho vyměnit.
+
+**Peníze (S14):** faktury ručně/z hotové zakázky, PDF Dílky, přijaté PDF s volitelným AI přepisem, platby bez dvojího příjmu, přehled měsíce a graf 6/12 měsíců po měnách, celé IČO, odhad daní 2026 a ICS připomínky. Migrace 080 připravená, na Neon neaplikovaná. E-mail faktury je jen koncept pro S15. Postup a omezení: docs/workspace/MONEY.md; skutečný obrat DPH není totéž co přijaté příjmy. S přihlášením na skutečné DB neověřeno.
 
 **Další krok:** Kryštof s přihlášením projde Nastavení › Napojený web (vytvořit tajný klíč, Ověřit napojení, QR PNG/SVG, přidat doménu) a Dnes (poptávka „Zkouška S11“ s Potvrdit), plus S09 + S10 naostro. Ideálně testovací Next.js stránka s promptem z aplikace na Vercel Preview (https, skutečná cizí doména pro widget). Potom S12 (zákazníci, věrnost, segmenty) nebo S05 (SEO landing, `new - area of zakaziq/prompty/S05-landing-seo-texty.md`: metadata, OG obrázek, favicon, strukturovaná data, Lighthouse/LCP). Před nasazením `/w` na produkci: produkční webhook Stripe a Clerk (Otevřené problémy).
 
@@ -292,6 +294,11 @@
 
 ---
 
+### R-049 · Peníze: atomické doklady a ověřené sazby (2026-10-10)
+**Rozhodnutí:** číslo YYYY-NNNNNN za účet a faktura vzniknou ve stejné transakci se zámkem účtu; platba i převzetí stejné platby zakázky jsou atomické pod RLS. PDF používá stávající Puppeteer/Chromium a lokální písma, bez nové závislosti. Sazby 2026 jsou oddělené od adminu a ověřené na oficiálních zdrojích (docs/workspace/MONEY.md); sociální minimum a první pásmo paušální daně berou zpětnou novelu 2026.
+**Proč:** souběh nesmí tvořit duplicitní čísla, díry ani dva příjmy za stejnou platbu; admin předpokládá studentovu vedlejší činnost a má historické pravidlo DPH.
+**Důsledek:** DPH za kalendářní rok se dvěma hranicemi, posledních 12 měsíců jsou přehled. Příjmy jsou jen vodítko obratu DPH. Odhad skrytý pro jiný rok, EUR bez kurzu a plátce DPH; výjimky a zaměstnání nejsou zahrnuté. Koncept fakturačního e-mailu odešle až S15; ICS připomíná 7 dní předem.
+
 ## 3. Otevřené problémy
 
 - [ ] **Legacy routy:** `app/dashboard/projekty/**` zůstalo po přesunu Projektů do Hubu (R-007); `projekty-actions.ts` se liší od verze v `app/hub/projekty/`. Rozhodnout: smazat, nebo přesměrovat na `/hub/projekty` · od 2026-06-23
@@ -312,7 +319,7 @@
 - [ ] **Workspace — SMS poskytovatel** pro připomínky a „Komu napsat". Blokuje S12/S15 (lze odložit) · od 2026-10-08
 - [ ] **Workspace — zálohy online přes Stripe Connect** teď, nebo až po spuštění? Neblokuje · od 2026-10-08
 - [ ] **Workspace — admin přihlášení:** nechat NextAuth natrvalo, nebo později převést na Clerk? Neblokuje · od 2026-10-08
-- [ ] **Workspace — limit pro DPH a sazby pro odhad daní** ověřit před S14 · od 2026-10-08
+- [ ] **S14 — migrace 080:** ručně aplikovat migrations/080_ws_penize_provoz.sql v Neon SQL editoru po 078/079, potom ověřit obrazovky s přihlášením a PDF. Skutečná DB, externí AI přepis a e-mail S15 zatím neověřené · od 2026-10-10
 - [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
 - [ ] **Zranitelné závislosti:** po `npm audit fix` zbývá 11 (1 critical `next` 14 — opravy až v 15.5.24+; high: `nodemailer` 7 → oprava v 10, `next-auth` přes `next`, `postcss` přibalený v `next`, řetězec `tailwindcss` 3 → 4). Obě critical RCE (Image Optimizer s AVIF, Windows hosting) se aplikace netýkají — nepoužívá `next/image` a běží na Vercelu. Zbytek jsou hlavně DoS/SSRF v Server Actions a rewrites. Řešení = upgrade Next 15 + nodemailer 10 jako samostatný krok (AGENTS B2 ho dává až po spuštění) — rozhodnout nejpozději v S19, ideálně před spuštěním · od 2026-10-08
 - [ ] **Workspace — toasty přes adminův `<Toaster>`** (R-027): pozice a délka jsou společné s adminem (vpravo nahoře). Až bude potřeba vlastní toaster (např. spodní lišta na mobilu v S09/S18), řešit upgradem sonneru na 2.x (víc toasterů) nebo úpravou `app/layout.tsx` — obojí sahá na admin, chce souhlas · od 2026-10-08
@@ -338,6 +345,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-10
+- **feat** S14 — Peníze: faktury, PDF, přijaté doklady s AI přepisem, atomická platba/převzetí platby zakázky, příjmy/výdaje a grafy po měnách, přehled měsíce a celé IČO, odhad daní 2026 a ICS připomínky. Migrace 080 (aplikována: ne). Kód lib/ws/money/, components/ws/money/, app/w/[business]/{penize,faktury,prijmy,dane}, API PDF/kalendář; dokumentace docs/workspace/MONEY.md. Review v AUDIT-LOG, externalizace Chromium/Puppeteer pro binárky. Ověřeno: npm test 399/399 + 1 volitelný PDF test vynechaný, tsc OK, skutečný PDF smoke, izolovaný build bez diskové cache (málo místa), admin 200/307/404; fiktivní náhled přehledu/formuláře 1440/390 px bez přetékání. Na Neonu s přihlášením neověřeno. E-mail je koncept pro S15.
 - **docs** AGENTS.md zkrácen z 514 na 55 řádků (51 862 → 7 878 bajtů, −84,8 %). Úplný kontext zachován v závazné `docs/AGENTS-REFERENCE.md` s povinným čtením podle oblasti (R-047); hlavní zákazy, izolace, proces, ověření a git zůstaly ve stručném vstupu. Aktualizované návazné odkazy v CLAUDE.md, docs/CODEX.md, indexu a pravidlech paměti; bezpečnostní review v AUDIT-LOG a jeho synchronizovaná kopie. Ověřeno: shoda původní technické části od Hranic přes A/B1–B13 až po společná pravidla (kromě relativních odkazů), existence lokálních odkazů, `git diff --check` a shoda kontextu. Pouze dokumentace, aplikační testy/build nespouštěny.
 - **chore** Projekt připraven pro Codex (R-046): společná komunikace a protokol v `AGENTS.md`, odkazy místo duplicit v `CLAUDE.md`, `.codex/config.toml` s limitem 96 KiB, lokální prostředí se setupem a 5 akcemi, `scripts/codex-setup.sh`, `scripts/sync-agent-context.mjs`, návod `docs/CODEX.md`. Aktualizována pravidla a index paměti, review v bezpečnostním AUDIT-LOG a identické kopie v `.agents/`. Ověřeno: TOML a schéma podle instalovaného klienta, velikost instrukcí, syntaxe skriptů, setup `--check`, shoda kontextu a na dočasných datech kopie/detekce neshody/oprava/odmítnutí symlinku; `git diff --check` OK. Aplikační kód se nemění; build a aplikační testy pro tuto změnu nespouštěny. Automatické akce a setup v novém chatu klienta neověřeny.
 - **chore** `.claude/security/` zkopírována beze změn do `.agents/security/` (STATE, DECISIONS, CSP-LOG, AUDIT-LOG a `security-check.sh`, včetně oprávnění). Shoda ověřena pomocí `diff -r`.

@@ -16,6 +16,8 @@
   - `middleware.ts` + `lib/security/csp.ts` → CSP s nonce per request, admin přihlášení (NextAuth), místo pro Clerk (S07)
   - `lib/security/embed.ts` → `frame-ancestors` pro `/r/[slug]` a CORS pro `/api/public/v1/*`; domény z `web_integrations.allowed_origins` (`/r` přes `lib/ws/intake/embed-origins.ts` v middleware, API přes `lib/ws/intake/http.ts`)
 
+- Workspace PDF S14: /api/ws/[business]/faktury/[id]/pdf kontroluje účet/byznys/modul a vrací přílohu; generátor bez sítě/JavaScriptu, logo se stahuje s připnutou veřejnou IPv4 a limitem. Puppeteer/Chromium externalizované, binárky trasované pro PDF. CSP/hlavičky beze změny. Review v AUDIT-LOG.
+
 ## Threat model
 
 Co aplikace drží, a proto na čem záleží:

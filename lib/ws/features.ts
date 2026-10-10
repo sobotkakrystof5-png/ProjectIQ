@@ -7,8 +7,8 @@ export const WS_FEATURES = {
   orderLink: true,
   /** Nová rezervace a blokace (panel, ⌘K příkaz „rezervace Tereza pátek 9:00“) — zapnulo S10. */
   newBooking: true,
-  /** Nová faktura — zapne S14. */
-  newInvoice: false,
+  /** Nová faktura — zapnulo S14. */
+  newInvoice: true,
 } as const
 
 export type WsFeatures = { readonly [K in keyof typeof WS_FEATURES]: boolean }

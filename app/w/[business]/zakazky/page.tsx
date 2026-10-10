@@ -49,6 +49,7 @@ export default async function JobsPage({
       ) : (
         <JobBoard
           slug={business.slug}
+          invoices={modules.has('invoices')}
           stages={stages}
           jobs={jobs.map((j) => {
             const next = j.next_start ? pragueParts(j.next_start) : null

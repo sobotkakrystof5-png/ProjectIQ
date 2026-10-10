@@ -149,3 +149,9 @@ Na delší scénáře (obnova po měsíci, opakované pokusy o platbu) jsou v da
 ### 7. Live
 
 Před spuštěním (S19) totéž v live módu: produkt a cena, omezený klíč, Customer Portal, e-maily, šablona faktury, webhook endpoint. Live klíče a `whsec_…` jen do Vercelu (Production). Sandbox klíče zůstávají v Preview a lokálně.
+
+## Peníze (S14): migrace 080
+
+Po 078/079 ručně aplikovat migrations/080_ws_penize_provoz.sql v Neon SQL editoru rolí vlastníka. Přidává sloupce, unikátní platbu za fakturu a SECURITY INVOKER funkce; EXECUTE pro ws_app uděluje sama. Nevkládá ukázková data. Při starších duplicitních platbách index bezpečně selže a data se nemažou. Na skutečnou DB v S14 neaplikovaná.
+
+Postup a odhad daní: [MONEY.md](MONEY.md). Pro lokální PDF je potřeba Chrome/CHROME_PATH, pro Vercel kompletní @sparticuz/chromium včetně bin/chromium.br. Nová env není potřeba; AI používá existující serverový ANTHROPIC_API_KEY. E-mail je do S15 jen koncept.

@@ -1,0 +1,10 @@
+.bar {
+  animation: grow 1s cubic-bezier(.2,.8,.2,1) backwards;
+}
+@keyframes grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar { animation: none; }
+}

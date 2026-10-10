@@ -124,3 +124,14 @@ Zůstává: viz STATE.md → Otevřené položky (vynucení admin CSP, DNS, živ
 ## Incidenty
 
 (zatím žádné)
+
+## 2026-10-10 — S14: faktury, peníze, PDF a daně
+
+Rozsah: nové actions a API PDF/ICS, lib/ws/money/, components/ws/money/, migrace 080 a build balení next.config.mjs. Admin soubory neměněné.
+
+- Mutace: requireWorkspace, byznys, zapnutý modul, assertWritable; daňové nastavení jen vlastník. Parametrizované SQL + account_id a RLS. SECURITY INVOKER, bez výjimek RLS. Zámky/unikátní platba chrání proti duplicitám.
+- PDF do 4 MB s %PDF-, neveřejné bytea pod RLS, attachment/nosniff/private-no-store. PDF route kontroluje identitu/účet/byznys/modul, generování 20/10 min.
+- Generátor bez JavaScriptu/sítě; texty escapované. Logo HTTPS bez credentials/redirectů, připnutá veřejná IPv4, 512 kB a PNG/JPEG magic bytes; odmítnutí privátní sítě a SVG. Lokální písma, žádný nový skript či CSP host.
+- AI 10/h/účet, klíč jen server, dokument nedůvěryhodná data, výstup Zod a ruční kontrola. Logy bez kompletních chyb/payloadů. E-mail zatím koncept.
+- Opraveno: mobilní přetékání skrytých popisků grafu; externalizace Puppeteer/Chromium a tracing binárek pro PDF (bundling měnil jejich cestu). Hlavičky/CSP/auth beze změny.
+- Ověřeno: PGlite (izolace, idempotence migrace, řada za účet, oba směry převzetí platby), falešné/velké PDF, privátní logo, escapování HTML, skutečný lokální PDF smoke, typy/build a admin HTTP. Neon/Vercel a externí AI volání neověřené.

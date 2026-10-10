@@ -182,7 +182,7 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 34 tabulek | migrace `064_ws_zaklad` … `076_ws_verejne_api` (přehled níže) |
+| Schéma `ws` — 34 tabulek | migrace `064_ws_zaklad` … `080_ws_penize_provoz` (přehled níže) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
@@ -216,6 +216,7 @@ Pravidla schématu:
 | 074 | `message_settings`, `outbound_messages` (fronta), `notifications` |
 | 075 | `audit_log`, `idempotency_keys`, `rate_limits` |
 | 076 | `requests.is_test`, `intake_log` (záznam příjmu poptávek, 30 dní), funkce `ws.integration_by_public_key`, `ws.integration_by_secret_prefix`, `ws.business_by_public_slug` (S11) |
+| 080 | Peníze S14: accounts.invoice_sequences, invoices.issuer/supplied_on/pdf_data/pdf_filename, tax_settings.options; unique transakce za fakturu, ws.money_issue/pay a money_adopt_visit (SECURITY INVOKER); ručně aplikovat na Neon |
 
 ## B4. Přihlášení a role
 
@@ -343,7 +344,7 @@ Jak je systém v kódu (S01, R-027):
 | Dnes | `app/w/[business]/page.tsx` + `components/ws/app/today/` (Příchozí, týdenní kalendář, agenda pro telefon, uvítání); data `lib/ws/today.ts` (`getTodayData`, `getCustomerCard`, `getRequestDetail`, `getNotifications`) v jedné transakci na volání; rozložení kalendáře `lib/ws/calendar-layout.ts` (čistá funkce, bez JS v prohlížeči); skeleton `loading.tsx` |
 | Stav v URL | `?detail=zakaznik:<id>` / `poptavka:<id>` / `nova-rezervace` / `nova-faktura` = pravý panel (`lib/ws/detail-param.ts`, `components/ws/app/detail-slot.tsx` na serveru, `detail-sheet.tsx` v prohlížeči; zavření odebere parametr). `?zakaznik=` karta vpravo na Dnes, `?tyden=` týden (pondělí) |
 | ⌘K | `components/ws/app/command-palette.tsx`: hledání `searchAction` → `lib/ws/search.ts` (zákazníci v účtu, poptávky a faktury v byznysu, ILIKE s escapováním), akce, přechod na obrazovky; příkaz „rezervace Tereza pátek 9:00“ rozpozná `lib/ws/command-parser.ts` (pravidla, ne AI) a otevře panel Nová rezervace s předvyplněním (jen se zapnutou akcí, viz níže) |
-| Nehotové akce | `lib/ws/features.ts` (`WS_FEATURES`, `newActions`, R-043): Nová faktura (S14); Nová rezervace a blokace zapnuté od S10, odkaz na objednání od S11. Vypnutá akce není v „+ Nová“, ⌘K, uvítání ani v panelu (ani ze sdíleného odkazu). Bez hotové akce chybí „+ Nová“ i „+“ ve spodní liště |
+| Nehotové akce | `lib/ws/features.ts` (`WS_FEATURES`, `newActions`, R-043): Nová faktura zapnutá od S14; Nová rezervace a blokace zapnuté od S10, odkaz na objednání od S11. Vypnutá akce není v „+ Nová“, ⌘K, uvítání ani v panelu (ani ze sdíleného odkazu). Bez hotové akce chybí „+ Nová“ i „+“ ve spodní liště |
 | Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost (od S10 Poptávky, Kalendář, Zakázky; od S11 Nastavení) |
 | Rezervované slugy | `RESERVED_BUSINESS_SLUGS` v `lib/ws/paths.ts` — pevné cesty pod `/w` (`novy`, `ucet`…). Nová pevná cesta pod `/w` = přidat sem, jinak by zakryla byznys se stejným slugem |
 | Čas | `lib/ws/time.ts`: `pragueToday`, `pragueParts`, `pragueToUtc` (přes letní/zimní čas), `weekStartOf`, `formatDayShort` („pá 9. 10.“), `formatRelativeDay` |
@@ -370,6 +371,15 @@ Jak je systém v kódu (S01, R-027):
 - Odmítnutí, zrušení, přesun termínu i zakázky se provede hned a toast nabídne „Zpět“ na 8 s (`undoToast`). Potvrzení „Zpět“ nemá — termín jde zrušit.
 - Návštěva musí mít pracovníka: byznys bez pracovníků dostane při prvním termínu jednoho se jménem byznysu (`ensureStaff`, R-044). Sloupce a výběr „Kdo“ se ukazují až od dvou pracovníků.
 - Blokace bez pracovníka (celý byznys) DB omezení nehlídá — ukáže se v kalendáři a v tipu u poptávky, ruční rezervace přes ni projde.
+
+### Jak je to v kódu (S14, R-049)
+
+- Peníze: app/w/[business]/{penize,faktury,prijmy,dane}; společná serverová obrazovka components/ws/money/page.tsx a formuláře v pravém panelu. Parametry mesic, obdobi=6/12, rozsah=ucet; Daně vždy za celý účet. „Vše · jedno IČO“ také v přepínači.
+- lib/ws/money/{schema,calculations,data,ai,pdf,deadlines,reminders}: validace, haléře a měny, čtení pod RLS, vystavení/platba přes invoker funkce z 080. Adminové faktury/daně se neimportují a původní kód zůstává.
+- Nová faktura zapnutá ve WS_FEATURES; zakázka done/paid má předvyplněný panel. Hledání ⌘K vede přímo na detail faktury.
+- PDF API /api/ws/[business]/faktury/[id]/pdf kontroluje účet/byznys/modul, vrací attachment a private/no-store. Soubor max. 4 MB s magic bytes %PDF-. Puppeteer/Chromium externalizované v next.config.mjs, binárky přibalené do této routy; písma s OFL v lib/ws/money/assets/.
+- AI přepis: existující serverový ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN, max. 10/h/účet; při chybě ruční zadání. E-mail faktury zatím pouze draft ws.outbound_messages pro S15.
+- Odhad jen ověřené sazby 2026, neplátce a CZK; paušální/skutečný/paušální-daň režim, měsíce činnosti, vedlejší činnost, minima, sleva a zálohy. DPH za kalendářní rok, příjmy jen vodítko obratu. /api/ws/[business]/dane/kalendar nabízí ICS s připomínkou 7 dní předem. Zdroje a omezení: [MONEY.md](workspace/MONEY.md).
 
 ## B10. Texty
 

@@ -13,6 +13,8 @@ import { BlockForm } from './booking/block-form'
 import { BookingForm } from './booking/booking-form'
 import { ReopenRequestButton, RequestActions } from './booking/request-actions'
 import { CustomerSummary, formatPhone } from './customer-summary'
+import { InvoiceForm } from '@/components/ws/money/forms'
+import { getInvoiceOptions } from '@/lib/ws/money/data'
 import { DetailSheet } from './detail-sheet'
 
 type Params = Record<string, string | string[] | undefined>
@@ -41,7 +43,7 @@ const FORM_PARAMS = { kdo: null, den: null, cas: null, sluzba: null, pracovnik: 
 /** Formuláře, které ještě neumí uložit, se neotevřou ani ze sdíleného odkazu (R-043). */
 function isAvailable(ref: DetailRef, modules: Set<string>): boolean {
   if (ref.kind === 'nova-rezervace' || ref.kind === 'nova-blokace') return WS_FEATURES.newBooking && modules.has('calendar')
-  if (ref.kind === 'nova-faktura') return WS_FEATURES.newInvoice
+  if (ref.kind === 'nova-faktura') return WS_FEATURES.newInvoice && modules.has('invoices')
   return true
 }
 
@@ -300,12 +302,9 @@ async function panelContent(
     case 'nova-faktura':
       return {
         title: 'Nová faktura',
-        body: (
-          <p className="text-[15px] text-quiet">
-            Vystavování faktur přidáme v další verzi aplikace, spolu s příjmy a odhadem daní.
-          </p>
-        ),
+        body: <InvoiceForm slug={business.slug} today={env.today} options={await getInvoiceOptions(ctx, business)} closeHref={env.closeHref} />,
       }
+
   }
 }
 

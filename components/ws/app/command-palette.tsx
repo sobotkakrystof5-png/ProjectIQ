@@ -180,7 +180,7 @@ export function CommandPalette({ open, onOpenChange, slug, nav, actions: availab
                   key={`${h.kind}-${h.id}`}
                   value={`${h.kind}-${h.id}`}
                   onSelect={() =>
-                    h.kind === 'faktura' ? go(navHref(slug, 'faktury')) : openDetail(`${h.kind}:${h.id}`)
+                    h.kind === 'faktura' ? go(navHref(slug, 'faktury') + '?detail=faktura:' + h.id) : openDetail(`${h.kind}:${h.id}`)
                   }
                 >
                   <Icon size={18} strokeWidth={1.5} />

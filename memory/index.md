@@ -26,6 +26,7 @@
 | `../.claude/skills/zakaziq-*` | Projektové skilly: `design-dilky` (UI), `workspace-backend` (DB/API/Clerk/Stripe), `ux-texty-cs` (texty), `memory` (rituál sezení nad `memory/`) | Claude Code (podle úlohy) | Když se mění pravidla oblasti |
 | `../.agents/skills/zakaziq-*` | Kopie všech projektových skillů z `.claude/skills/`, včetně referencí | Codex a další agenti (podle úlohy) | Při synchronizaci s `.claude/skills/` |
 | [`../new - area of zakaziq/prompty/00-README.md`](<../new - area of zakaziq/prompty/00-README.md>) | Prompty sezení S00–S19 pro výstavbu Workspace + landing page (jedno sezení = jedna konverzace) | Na začátku každého sezení Workspace | Když se mění plán sezení |
+| [../docs/workspace/MONEY.md](../docs/workspace/MONEY.md) | Peníze S14: faktury/PDF/platby, přehledy, odhad daní a ověřené zdroje 2026, migrace 080 | S14/S15, finance | Při změně kódu, sazeb a postupu |
 | [`../docs/workspace/API.md`](../docs/workspace/API.md) | Veřejné API pro poptávky z webů (v1): klíče, schema, requests, kódy chyb, příklady Next.js a curl, widget (S11) | S11+, skill `zakaziq-napojeni`, prompt pro Claude Code | Když se mění API |
 | [`../docs/landing/PROJECT-BRIEF.md`](../docs/landing/PROJECT-BRIEF.md) | Brief landing page (S03): anti-šablona, sekce s texty, kontakt, CSP, SEO zadání pro S05 | S04, S05 a každá změna landing page | Když se mění struktura nebo texty landing page |
 | [`../docs/CLAUDE_BOOKING_PROMPT.md`](../docs/CLAUDE_BOOKING_PROMPT.md) | Historický prompt pro booking a komunikaci s klienty (z doby ProjectIQ) | Jen pro kontext historie | Ne |

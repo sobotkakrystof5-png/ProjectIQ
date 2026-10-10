@@ -172,8 +172,8 @@ describe('nehotové akce (R-043)', () => {
     expect(newActions(new Set(), all)).toEqual(['link'])
   })
 
-  it('S10 zapnulo Novou rezervaci, S11 odkaz na objednání; faktura (S14) zatím vypnutá', () => {
-    expect(WS_FEATURES).toEqual({ ...none, newBooking: true, orderLink: true })
+  it('S10–S14 zapnuly rezervaci, objednání a fakturu', () => {
+    expect(WS_FEATURES).toEqual(all)
   })
 })
 

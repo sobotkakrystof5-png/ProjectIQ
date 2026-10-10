@@ -136,6 +136,7 @@ export function AppFrame(props: AppFrameProps) {
                 </Link>
               )
             })}
+            {enabled.has('finance') && <Link href={navHref(business.slug, 'penize') + '?rozsah=ucet'} className={cn('inline-flex min-h-11 items-center rounded-full px-4 text-sm text-quiet hover:bg-navy-50', focusRing)}>Vše · jedno IČO</Link>}
           </nav>
 
           <div className="ml-auto flex items-center gap-1 md:gap-2">

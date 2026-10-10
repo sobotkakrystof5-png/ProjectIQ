@@ -30,7 +30,7 @@ const TYPE_DOT: Record<string, string> = {
  * Jen zobrazení a přesun mezi stavy: přetažením (myš) nebo výběrem stavu na
  * kartě (telefon, klávesnice). Přesun jde vrátit „Zpět“.
  */
-export function JobBoard({ slug, stages, jobs }: { slug: string; stages: BoardStage[]; jobs: BoardJob[] }) {
+export function JobBoard({ slug, stages, jobs, invoices = false }: { slug: string; stages: BoardStage[]; jobs: BoardJob[]; invoices?: boolean }) {
   const { run, pending } = useWsAction()
   const dragged = useRef<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
@@ -143,6 +143,7 @@ export function JobBoard({ slug, stages, jobs }: { slug: string; stages: BoardSt
                             ))}
                           </select>
                         </label>
+                        {invoices && (stage.type === 'done' || stage.type === 'paid') && <Link href={'/w/' + slug + '/faktury?detail=nova-faktura&zakazka=' + job.id} className="relative z-10 inline-flex min-h-11 items-center text-sm font-semibold text-navy-700 dark:text-navy-200">Vystavit fakturu</Link>}
                       </article>
                     </li>
                   ))}

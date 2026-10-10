@@ -28,6 +28,11 @@ const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   experimental: {
+    // PDF potřebuje skutečnou cestu k binárkám, webpack balíček nesmí přemístit.
+    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
+    outputFileTracingIncludes: {
+      '/api/ws/*/faktury/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    },
     serverActions: {
       // PDF faktury chodí server actionou jako FormData. Výchozí 1 MB by
       // propustilo jen ty nejmenší. Strop aplikace je 4 MB (MAX_PDF_BYTES
