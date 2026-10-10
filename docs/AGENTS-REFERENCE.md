@@ -183,7 +183,7 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 34 tabulek | migrace `064_ws_zaklad` … `080_ws_penize_provoz` (přehled níže) |
+| Schéma `ws` — 38 tabulek v repu | migrace `064_ws_zaklad` … `082_ws_klientsky_portal` (přehled níže; na Neonu zatím 34 tabulek po 077) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
@@ -222,6 +222,7 @@ Pravidla schématu:
 | 079 | `ws.services.buffer_min` (0–240 minut) pro rozestup po službě při nabídce volných termínů (S13, ručně aplikovat na Neon) |
 | 080 | Peníze S14: accounts.invoice_sequences, invoices.issuer/supplied_on/pdf_data/pdf_filename, tax_settings.options; unique transakce za fakturu, ws.money_issue/pay a money_adopt_visit (SECURITY INVOKER); ručně aplikovat na Neon |
 | 081 | E-maily S15: `message_settings` typy `booking_declined`, `invoice_overdue`, `vat_limit`; `outbound_messages.dedupe_key` (unikátní za účet); `action_tokens` (jednorázové odkazy majitele); `product_news` (globální, ws_app jen čte); `accounts.news_emails`, `members.news_seen_at`; `ws.accounts_with_due_messages()` (SECURITY DEFINER pro cron); ručně aplikovat na Neon |
+| 082 | Klientský portál S16: `appointments.public_token`, `jobs.result_url`, `job_updates`, `reviews`, typ e-mailu `job_update`; `ws.portal_lookup(uuid)` (SECURITY DEFINER, vrací jen ID); ručně aplikovat na Neon po 081 |
 
 ## B4. Přihlášení a role
 
@@ -328,7 +329,7 @@ Resend z domény ZakazIQ, jako odesílatel jméno byznysu, Reply-To e-mail klien
 | Nedoručené e-maily: webhook Resendu (podpis Svix, idempotence `webhook_events`), stížnost = odhlášení z nabídek | `lib/ws/email/resend-webhook.ts`, `app/api/resend/webhook` |
 
 - Nový e-mail = typ v `catalog.ts` (+ CHECK `message_settings` novou migrací), složení v `compose.ts` nebo `ownerEmail`, událost v `notify.ts` s `dedupeKey`.
-- Odkazy Přesunout/Zrušit pro zákazníka čekají na portál (S16); dnes „odpovězte na e-mail“. Web Push je S18.
+- Se zapnutým Klientským portálem obsahuje potvrzení, změna a připomínka termínu tlačítko „Přesunout nebo zrušit“; pravidla čte `portalRules`. Web Push je S18.
 
 ## B8. Design
 
@@ -338,7 +339,7 @@ Jak je systém v kódu (S01, R-027):
 
 | Co | Kde |
 |---|---|
-| Tokeny (CSS proměnné, světlý + tmavý) | `app/ws-tokens.css` — platí jen uvnitř `[data-app="ws"]`, importuje se jen v `app/w/layout.tsx` a `app/(marketing)/layout.tsx` |
+| Tokeny (CSS proměnné, světlý + tmavý) | `app/ws-tokens.css` — platí jen uvnitř `[data-app="ws"]`, importují ho layouty Workspace, marketingu, `/r` a `/z` |
 | Tailwind (`navy-*`, `ground`, `surface`, `ink`, `quiet`, `signal*`, `reward`, `danger`, `font-accent`, `font-num`, `rounded-tiny…hero`, `ease-zq`, `animate-zq-*`) | `lib/ws/tailwind-dilky.ts`, sloučeno do `tailwind.config.ts` (adminové klíče beze změny) |
 | Písma Instrument Sans/Serif, JetBrains Mono (`next/font`) | `lib/ws/fonts.ts` → `wsFontVariables` |
 | Kořen každé stránky Dílků | `components/ws/ws-root.tsx` (`WsRoot`): `data-app="ws"`, `data-theme`, písma, kontejner pro portály, `MotionConfig reducedMotion="user"`; téma přes `useWsTheme()` |
@@ -399,6 +400,18 @@ Jak je systém v kódu (S01, R-027):
 - Odmítnutí, zrušení, přesun termínu i zakázky se provede hned a toast nabídne „Zpět“ na 8 s (`undoToast`). Potvrzení „Zpět“ nemá — termín jde zrušit.
 - Návštěva musí mít pracovníka: byznys bez pracovníků dostane při prvním termínu jednoho se jménem byznysu (`ensureStaff`, R-044). Sloupce a výběr „Kdo“ se ukazují až od dvou pracovníků.
 - Blokace bez pracovníka (celý byznys) DB omezení nehlídá — ukáže se v kalendáři a v tipu u poptávky, ruční rezervace přes ni projde.
+
+### Jak je to v kódu (S16, R-051)
+
+| Co | Kde |
+|---|---|
+| Veřejný portál | `/z/[token]` bez přihlášení, Dílky + akcent byznysu; termín, postup zakázky, zprávy, věrnost, faktury a hodnocení. `app/z/layout.tsx` drží vynucenou CSP a `noindex` |
+| Oprávnění | náhodné UUID z DB; `ws.portal_lookup` vrátí jen účet/byznys/druh/ID, pak `lib/ws/portal.ts` použije `wsDb` s RLS a filtry. Neplatný, cizí, archivovaný i vypnutý odkaz = stejná 404 |
+| Termín | přesun a zrušení podle `businesses.settings.portal_change_hours`; volné časy z `lib/ws/intake`, současný termín se při výpočtu vynechá, konečná kolize zůstává atomicky v DB |
+| Zakázka | `ws.job_updates` jsou jediné zprávy viditelné zákazníkovi; interní poznámky, kontakty a `field_values` se nenačítají. Detail v pravém panelu: `?detail=zakazka:<uuid>`, zpráva, výsledek a odkaz |
+| Hodnocení a faktura | `ws.reviews`, jednou po dokončení; PDF `/z/[token]/faktura/[id]` jen pro vystavenou/zaplacenou fakturu dané zakázky, `private, no-store` |
+| Veřejné akce | `app/z/[token]/actions.ts`: Zod, honeypot hodnocení, limit IP i záznamu; účet ani byznys nepřijímá z klienta |
+| Testy | `lib/ws/__tests__/ws-portal.test.ts`: neplatný/cizí token, RLS, žádné interní poznámky, pravidla změny, kolize, zrušení, hodnocení a e-mail k zakázce |
 
 ### Jak je to v kódu (S14, R-049)
 

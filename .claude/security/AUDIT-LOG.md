@@ -166,3 +166,14 @@ Rozsah: nové actions a API PDF/ICS, lib/ws/money/, components/ws/money/, migrac
 - AI 10/h/účet, klíč jen server, dokument nedůvěryhodná data, výstup Zod a ruční kontrola. Logy bez kompletních chyb/payloadů. E-mail zatím koncept.
 - Opraveno: mobilní přetékání skrytých popisků grafu; externalizace Puppeteer/Chromium a tracing binárek pro PDF (bundling měnil jejich cestu). Hlavičky/CSP/auth beze změny.
 - Ověřeno: PGlite (izolace, idempotence migrace, řada za účet, oba směry převzetí platby), falešné/velké PDF, privátní logo, escapování HTML, skutečný lokální PDF smoke, typy/build a admin HTTP. Neon/Vercel a externí AI volání neověřené.
+
+## 2026-10-10 — review (S16, klientský portál)
+Spouštěč: `web-security-review` před commitem S16.
+Rozsah: migrace 082, `lib/ws/{portal,portal-rules,jobs}.ts`, `/z/[token]` včetně veřejné faktury a server actions, `components/ws/portal/`, zprávy a odkazy v e-mailech, detail zakázky/termínu. Kontrola vstupů, parametrizace SQL, RLS, tokenů, rate limitů, DOM sinků, odkazů a serverových secrets.
+Výsledek:
+- Token generuje DB jako UUID; `ws.portal_lookup` je jediná `SECURITY DEFINER` funkce a vrací jen ID. Následné dotazy mají `account_id` + `business_id` a RLS. Cizí, neplatný, archivovaný i vypnutý odkaz vrací stejnou 404.
+- Veřejné mutace validuje Zod, hodnocení má honeypot, limity jsou na IP i záznam. Přesun znovu ověřuje pravidlo a volný čas; kolizi rozhodne DB. PDF ověří modul, zakázku, typ a stav faktury, odpověď je `private, no-store` + `nosniff`.
+- Portál nenačítá `appointments.note`, `customers.note`, kontakty ani `field_values`; React vykresluje zprávy jako text. Nové `dangerouslySetInnerHTML`/`innerHTML`, klientské secrets ani skripty třetích stran: 0.
+- Ověřeno `ws-portal.test.ts` 13/13 (včetně cizího účtu, kolize a skrytých poznámek), celkem 434 testů + 1 vynechaný, TypeScript a produkční build. CSP se neměnila.
+Nálezy: 0 k opravě. Přijaté riziko trvalého odkazu a chybějící jednotlivé rotace: DECISIONS #012, revize S19.
+Zůstává: migrace 082 a skutečná data na Neonu nejsou ověřené.

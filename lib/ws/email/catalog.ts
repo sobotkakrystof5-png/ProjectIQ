@@ -23,6 +23,7 @@ export const MESSAGE_TYPES = [
   'monthly_digest',
   'invoice_overdue',
   'vat_limit',
+  'job_update',
 ] as const
 
 export type MessageType = (typeof MESSAGE_TYPES)[number]
@@ -39,6 +40,8 @@ export const TEMPLATE_VARS = {
   cislo: 'číslo faktury',
   castka: 'částka',
   splatnost: 'splatnost',
+  zakazka: 'název zakázky',
+  zprava: 'zpráva k zakázce',
 } as const
 
 export type TemplateVar = keyof typeof TEMPLATE_VARS
@@ -137,6 +140,16 @@ export const MESSAGES: Record<MessageType, MessageDef> = {
     subject: 'Faktura {cislo}',
     body: 'Dobrý den,\n\nv příloze posíláme fakturu {cislo} na {castka} se splatností {splatnost}.\n\nDěkujeme.\n{byznys}',
   },
+  job_update: {
+    label: 'Novinka k zakázce',
+    when: 'Když zákazníkovi napíšete zprávu k zakázce',
+    audience: 'customer',
+    needs: 'portal',
+    editable: true,
+    vars: ['jmeno', 'byznys', 'zakazka'],
+    subject: 'Novinka k zakázce: {zakazka}',
+    body: 'Dobrý den,\n\nk vaší zakázce máme novinku. Celý postup najdete na odkazu níže.\n\n{byznys}',
+  },
   new_request: {
     label: 'Nová poptávka',
     when: 'Okamžitě, s tlačítky Potvrdit a Jiný čas',
@@ -224,4 +237,6 @@ export const SAMPLE_VALUES: TemplateValues = {
   cislo: '2026-000012',
   castka: '1 850 Kč',
   splatnost: '27. 11. 2026',
+  zakazka: 'Oprava zámku vchodových dveří',
+  zprava: 'Náhradní vložka dorazila, ve čtvrtek ji namontujeme.',
 }

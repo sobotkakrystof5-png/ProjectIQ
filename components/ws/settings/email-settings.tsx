@@ -26,9 +26,11 @@ export function EmailSettings({
   ownerEmail,
   newsEmails,
   readOnly,
+  portal = false,
 }: {
   slug: string
   brand: { name: string; color: string | null }
+  portal?: boolean
   rows: Row[]
   replyTo: string | null
   ownerEmail: string | null
@@ -96,7 +98,7 @@ export function EmailSettings({
                 </div>
                 <Switch checked={r.enabled} disabled={readOnly || pending} aria-label={MESSAGES[r.type].label} onCheckedChange={(v) => void toggle(r, v)} />
               </div>
-              {open === r.type && <Editor slug={slug} brand={brand} row={r} readOnly={readOnly} onDone={() => setOpen(null)} />}
+              {open === r.type && <Editor slug={slug} brand={brand} portal={portal} row={r} readOnly={readOnly} onDone={() => setOpen(null)} />}
             </li>
           ))}
         </ul>
@@ -138,12 +140,14 @@ export function EmailSettings({
 function Editor({
   slug,
   brand,
+  portal,
   row,
   readOnly,
   onDone,
 }: {
   slug: string
   brand: { name: string; color: string | null }
+  portal: boolean
   row: Row
   readOnly: boolean
   onDone: () => void
@@ -153,7 +157,7 @@ function Editor({
   const [subject, setSubject] = useState(row.subject ?? def.subject)
   const [body, setBody] = useState(row.body ?? def.body)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
-  const preview = useMemo(() => previewCustomerEmail({ type: row.type, brand, subject, body }), [row.type, brand, subject, body])
+  const preview = useMemo(() => previewCustomerEmail({ type: row.type, brand, subject, body, portal }), [row.type, brand, subject, body, portal])
   const custom = subject !== def.subject || body !== def.body
 
   const insert = (key: string) => {

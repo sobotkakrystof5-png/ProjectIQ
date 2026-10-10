@@ -29,6 +29,8 @@ export type EmailSettingsData = {
   newsEmails: boolean
   /** Odesílání je nastavené (doména ověřená, WS_EMAIL_FROM). */
   sendingReady: boolean
+  /** Klientský portál zapnutý — e-maily k termínu mají tlačítko do portálu (S16). */
+  portal: boolean
 }
 
 export async function getEmailSettings(ctx: WsContext, business: Pick<WsBusiness, 'id' | 'settings'>): Promise<EmailSettingsData> {
@@ -59,6 +61,7 @@ export async function getEmailSettings(ctx: WsContext, business: Pick<WsBusiness
     myEmail: me[0]?.email ? String(me[0].email) : null,
     newsEmails: account[0] ? Boolean(account[0].news_emails) : true,
     sendingReady: Boolean(emailFromAddress() && process.env.RESEND_API_KEY),
+    portal: on.has('portal'),
   }
 }
 

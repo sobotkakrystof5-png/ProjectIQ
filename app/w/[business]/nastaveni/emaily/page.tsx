@@ -35,6 +35,7 @@ export default async function EmailSettingsPage({ params }: { params: { business
         replyTo={data.replyTo}
         ownerEmail={data.ownerEmail}
         newsEmails={data.newsEmails}
+        portal={data.portal}
         readOnly={!canWrite(billing)}
       />
     </main>

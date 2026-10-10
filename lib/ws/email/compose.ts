@@ -8,6 +8,8 @@ import { renderEmail, type EmailBlock, type RenderedEmail } from './layout'
 export type CustomerExtras = {
   /** Odkaz „Přidat do kalendáře“ (.ics). */
   calendarUrl?: string | null
+  /** Klientský portál (S16): termín nebo zakázka, label podle pravidel byznysu. */
+  portal?: { url: string; label: string } | null
   /** Stav věrnostní karty (poděkování, odměna). */
   card?: { stamps: number; needed: number; reward: string | null } | null
   unsubscribeUrl?: string | null
@@ -24,9 +26,11 @@ export type ComposeInput = {
 }
 
 function blocksFor(type: MessageType, v: TemplateValues, x: CustomerExtras): EmailBlock[] {
-  const calendar: EmailBlock[] = x.calendarUrl
-    ? [{ kind: 'buttons', items: [{ label: 'Přidat do kalendáře', url: x.calendarUrl }] }]
-    : []
+  const visitButtons = [
+    ...(x.calendarUrl ? [{ label: 'Přidat do kalendáře', url: x.calendarUrl }] : []),
+    ...(x.portal ? [{ label: x.portal.label, url: x.portal.url }] : []),
+  ]
+  const calendar: EmailBlock[] = visitButtons.length ? [{ kind: 'buttons', items: visitButtons }] : []
   const visit = (label: string): EmailBlock => ({
     kind: 'details',
     rows: [
@@ -48,6 +52,11 @@ function blocksFor(type: MessageType, v: TemplateValues, x: CustomerExtras): Ema
     case 'thank_you':
     case 'reward_ready':
       return x.card ? [{ kind: 'card', ...x.card }] : []
+    case 'job_update':
+      return [
+        { kind: 'note', text: v.zprava ?? '' },
+        ...(x.portal ? [{ kind: 'buttons', items: [{ label: x.portal.label, url: x.portal.url, primary: true }] } as EmailBlock] : []),
+      ]
     case 'invoice':
       return [
         {
@@ -81,12 +90,19 @@ export function composeCustomerEmail(input: ComposeInput): RenderedEmail {
 }
 
 /** Náhled v Nastavení: ukázkové údaje, karta a tlačítko jako ve skutečném e-mailu. */
-export function previewCustomerEmail(input: Omit<ComposeInput, 'values' | 'extras'>): RenderedEmail {
+export function previewCustomerEmail(input: Omit<ComposeInput, 'values' | 'extras'> & { portal?: boolean }): RenderedEmail {
+  const { portal, ...rest } = input
   return composeCustomerEmail({
-    ...input,
+    ...rest,
     values: SAMPLE_VALUES,
     extras: {
       calendarUrl: 'https://www.zakaziq.cz/',
+      portal:
+        input.type === 'job_update'
+          ? { url: 'https://www.zakaziq.cz/', label: 'Zobrazit zakázku' }
+          : portal
+            ? { url: 'https://www.zakaziq.cz/', label: 'Přesunout nebo zrušit' }
+            : null,
       card:
         input.type === 'reward_ready'
           ? { stamps: 10, needed: 10, reward: SAMPLE_VALUES.odmena ?? null }

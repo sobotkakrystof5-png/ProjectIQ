@@ -6,6 +6,8 @@ export type DetailRef =
   | { kind: 'zakaznik'; id: string }
   | { kind: 'poptavka'; id: string }
   | { kind: 'termin'; id: string }
+  /** Zakázka (S16): zprávy pro zákazníka, výsledek, hodnocení. */
+  | { kind: 'zakazka'; id: string }
   /** „Komu napsat“ → Připravit zprávu (S12): zákazník a důvod. */
   | { kind: 'zprava'; id: string; topic: MessageTopic }
   | { kind: 'nova-rezervace' }
@@ -25,7 +27,7 @@ export function parseDetail(raw: string | string[] | undefined | null): DetailRe
   if (kind === 'zprava' && id && UUID_RE.test(id) && (MESSAGE_TOPICS as readonly string[]).includes(topic)) {
     return { kind, id: id.toLowerCase(), topic: topic as MessageTopic }
   }
-  if ((kind === 'zakaznik' || kind === 'poptavka' || kind === 'termin') && id && UUID_RE.test(id)) return { kind, id: id.toLowerCase() }
+  if ((kind === 'zakaznik' || kind === 'poptavka' || kind === 'termin' || kind === 'zakazka') && id && UUID_RE.test(id)) return { kind, id: id.toLowerCase() }
   return null
 }
 

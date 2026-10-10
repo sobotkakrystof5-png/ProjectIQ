@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-10-10 · S15 hotová v repu (e-maily, upozornění, novinky)
+> **Poslední aktualizace:** 2026-10-10 · S16 hotová v repu (klientský portál)
 
 ---
 
@@ -42,7 +42,7 @@
 | S13 | Nastavení: funkce, služby, kolonky, stavy | rozpracováno v repu (2026-10-10); migrace 079 připravená k ručnímu vložení |
 | S14 | Peníze: faktury, příjmy, daně | hotovo v repu (2026-10-10, commit `35cba9f`); migrace 080 čeká, e-maily S15 |
 | S15 | E-maily, upozornění, novinky | hotovo v repu (2026-10-10); migrace 081 čeká, odesílání čeká na doménu v Resendu (`WS_EMAIL_FROM`) |
-| S16 | Klientský portál | čeká |
+| S16 | Klientský portál | hotovo v repu (2026-10-10); migrace 082 čeká, skutečná DB neověřena |
 | S17 | Admin: klienti a novinky | čeká |
 | S18 | Mobil, tmavý režim, GDPR | čeká |
 | S19 | Bezpečnostní audit a spuštění | čeká |
@@ -69,7 +69,9 @@
 
 **E-maily a upozornění (S15):** fronta `ws.outbound_messages` s klíčem události (nezdvojí), Resend za rozhraním (`lib/ws/email/`), odeslání hned po akci, při živém obnovení a denním cronem `/api/cron/ws-email` (R-050). Zákazníkům: přijatá poptávka, potvrzení s .ics, změna, odmítnutí/zrušení (60 s na „Zpět“), připomínka den předem ráno, poděkování s kartou, odměna, faktura s PDF, „Komu napsat“ s odhlášením. Majiteli: nová poptávka s tlačítky Potvrdit / Jiný čas bez přihlášení (`/z/odkaz`, 72 h, jednou), přehled dne/týdne/měsíce, faktura po splatnosti, limit DPH, neúspěšná platba. Nastavení › E-maily a upozornění (přepínače, text s proměnnými, živý náhled, zkušební e-mail, Reply-To, novinky). Zvonek po otevření přečtený, „Co je nového“ z `ws.product_news` (zápis S17). Webhook Resendu pro nedoručené. Testy `ws-email.test.ts` (21). **Neodesílá se nic, dokud není ověřená doména v Resendu a `WS_EMAIL_FROM`** (postup `docs/workspace/SETUP.md` → E-maily). Migrace 081 na Neonu není. Vzhled e-mailů ověřen headless (700 a 375 px), Nastavení s přihlášením neověřeno.
 
-**Další krok:** Kryštof ručně vloží do Neon SQL editoru migrace 078, 079, 080 a 081 (v tomhle pořadí) a znovu `scripts/ws-grants.sql`; ověří doménu `zakaziq.cz` v Resendu (DNS podle SETUP.md) a nastaví `WS_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`. Pak S16 (klientský portál, odkazy Přesunout/Zrušit v e-mailech) nebo dokončení S13.
+**Klientský portál (S16):** `/z/[token]` bez registrace ukazuje termín nebo zakázku, postup, zprávy firmy, věrnost, vystavené faktury a hodnocení. Zákazník může podle pravidla byznysu termín přesunout nebo zrušit; e-maily k termínu vedou do portálu. Zakázka má v pravém panelu odkaz, zprávy a výsledek. Interní poznámky ani kontakty se nenačítají (R-051). Migrace 082 není na Neonu. Vzhled schválen na počítači i telefonu z dočasného náhledu (smazán); skutečná data po migraci neověřena.
+
+**Další krok:** Kryštof ručně vloží do Neon SQL editoru migrace 078–082 v tomto pořadí a znovu `scripts/ws-grants.sql`; potom ověří `/z/[token]` na skutečném termínu a zakázce. Pro e-maily zbývá ověřit doménu `zakaziq.cz` v Resendu a nastavit `WS_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`. Pak S17 nebo dokončení S13.
 
 **Prostředí agentů:** Claude Code i Codex používají stručný `AGENTS.md` a podle úlohy čtou závaznou `docs/AGENTS-REFERENCE.md` (R-047); paměť je společná v `memory/`. Projektové skilly a bezpečnostní záznamy jsou synchronizované do `.agents/`; příprava Codexu a worktree viz `docs/CODEX.md` (R-046). Konfigurace a skripty ověřené lokálně; automatické spuštění setupu a akcí v novém chatu klienta nebylo ověřeno.
 
@@ -315,6 +317,11 @@
 **Proč:** rozhodl Kryštof v S15 (Vercel Hobby = cron 1× denně, R-006; doména zatím neověřená). React Email = 2 závislosti pro pár šablon. Toast „Zpět“ by jinak nestihl zastavit e-mail.
 **Důsledek:** `docs/AGENTS-REFERENCE.md` → B7 „Jak je to v kódu (S15)“, `.claude/security/DECISIONS.md` #011, `docs/workspace/SETUP.md` → E-maily. Odchylka od plánu (React Email, přesně 24 h). Při přechodu na Vercel Pro nebo externí cron stačí volat `flushAll` častěji.
 
+### R-051 · Klientský portál: trvalý náhodný odkaz a pravidla změn (2026-10-10)
+**Rozhodnutí:** Termín i zakázka mají náhodné UUID v DB pro `/z/[token]`. Odkaz platí, dokud existuje záznam a je zapnutý portál. Zákazník smí termín přesunout nebo zrušit jen do nastaveného počtu hodin předem (výchozí 24 h); konečné kolize hlídá DB. Viditelné zprávy jsou pouze v `ws.job_updates`, interní poznámky se nepublikují.
+**Proč:** Odkaz bez přihlášení musí fungovat z e-mailu i telefonu a zůstat jednoduchý; oddělená tabulka zpráv brání náhodnému zveřejnění poznámek.
+**Důsledek:** migrace 082, `lib/ws/portal.ts`, `/z/[token]`, Nastavení › Funkce a tlačítka v e-mailech. Veřejné akce mají Zod a limity; bezpečnostní kompromis je v `.claude/security/DECISIONS.md` #012.
+
 ## 3. Otevřené problémy
 
 - [ ] **Legacy routy:** `app/dashboard/projekty/**` zůstalo po přesunu Projektů do Hubu (R-007); `projekty-actions.ts` se liší od verze v `app/hub/projekty/`. Rozhodnout: smazat, nebo přesměrovat na `/hub/projekty` · od 2026-06-23
@@ -339,9 +346,9 @@
 - [ ] **Workspace — admin přihlášení:** nechat NextAuth natrvalo, nebo později převést na Clerk? Neblokuje · od 2026-10-08
 - [ ] **S14 — migrace 080:** ručně aplikovat migrations/080_ws_penize_provoz.sql v Neon SQL editoru po 078/079, potom ověřit obrazovky s přihlášením a PDF. Skutečná DB, externí AI přepis a e-mail S15 zatím neověřené · od 2026-10-10
 - [ ] **S15 — migrace 081:** ručně aplikovat `migrations/081_ws_emaily_odkazy_novinky.sql` po 080 a znovu `scripts/ws-grants.sql`. Bez ní nefungují odkazy z e-mailů ani fronta s klíčem události · od 2026-10-10
+- [ ] **S16 — migrace 082:** ručně aplikovat `migrations/082_ws_klientsky_portal.sql` po 081 a znovu `scripts/ws-grants.sql`; potom ověřit skutečný termín, zakázku, fakturu a hodnocení v `/z/[token]` · od 2026-10-10
 - [ ] **S15 — odesílání e-mailů:** doména `zakaziq.cz` v Resendu (DNS SPF/DKIM/DMARC), `WS_EMAIL_FROM`, endpoint webhooku + `RESEND_WEBHOOK_SECRET` (lokálně i Vercel). Do té doby nic neodchází. Postup `docs/workspace/SETUP.md` → E-maily · od 2026-10-10
 - [ ] **S15 — naostro neověřeno:** Nastavení › E-maily (náhled, zkušební e-mail) s přihlášením, skutečné doručení a vzhled v Gmailu/Outlooku/Apple Mailu, odkaz Potvrdit z telefonu, cron na Vercelu · od 2026-10-10
-- [ ] **E-maily — Přesunout/Zrušit pro zákazníka:** potvrzení termínu zatím jen „odpovězte na e-mail“; odkazy přidá portál S16 · od 2026-10-10
 - [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
 - [ ] **Zranitelné závislosti:** po `npm audit fix` zbývá 11 (1 critical `next` 14 — opravy až v 15.5.24+; high: `nodemailer` 7 → oprava v 10, `next-auth` přes `next`, `postcss` přibalený v `next`, řetězec `tailwindcss` 3 → 4). Obě critical RCE (Image Optimizer s AVIF, Windows hosting) se aplikace netýkají — nepoužívá `next/image` a běží na Vercelu. Zbytek jsou hlavně DoS/SSRF v Server Actions a rewrites. Řešení = upgrade Next 15 + nodemailer 10 jako samostatný krok (AGENTS B2 ho dává až po spuštění) — rozhodnout nejpozději v S19, ideálně před spuštěním · od 2026-10-08
 - [ ] **Workspace — toasty přes adminův `<Toaster>`** (R-027): pozice a délka jsou společné s adminem (vpravo nahoře). Až bude potřeba vlastní toaster (např. spodní lišta na mobilu v S09/S18), řešit upgradem sonneru na 2.x (víc toasterů) nebo úpravou `app/layout.tsx` — obojí sahá na admin, chce souhlas · od 2026-10-08
@@ -366,6 +373,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-10
+- **feat** S16 — klientský portál `/z/[token]` pro termíny a zakázky (R-051): přesun/zrušení podle pravidel byznysu, postup a zprávy, věrnost, faktury, výsledek a hodnocení; odkazy v e-mailech a pravý panel zakázky/termínu. Migrace 082 (aplikována: ne). Bezpečnost: náhodné UUID, `portal_lookup` vrací jen ID, potom RLS, Zod a limity; interní poznámky se nenačítají; DECISIONS #012 a AUDIT-LOG. Oveřeno: vzhled počítač + telefon (uživatel), dočasný náhled smazán, `ws-portal.test.ts` 13/13, `npm test` 434 + 1 vynechaný, `tsc` OK, `npm run build:check` OK; admin `/login` vykreslen, `/dashboard`, `/alteno`, `/hub` → přihlášení, `/p/<neplatný-token>` → 404. Neověřeno: admin za přihlášením a S16 nad skutečnou DB.
 - **feat** S15 — e-maily, upozornění, novinky (R-050). Fronta a odeslání `lib/ws/email/{queue,transport}.ts` (klíč události, SKIP LOCKED, 5 pokusů, idempotence u Resendu), šablony `catalog/layout/compose.ts`, události `notify.ts` napojené do příjmu poptávek, potvrzení, odmítnutí, přesunu, zrušení (se „Zpět“), placení návštěvy, hotové zakázky, faktury a Stripe webhooku; jednorázové odkazy majitele `/z/odkaz/[token]` (`action-link.ts`), odhlášení `/z/odhlasit/[token]` (+ jedním klikem), `.ics` `/z/kalendar/[token]`; denní cron `/api/cron/ws-email` (připomínky, přehledy, po splatnosti, limit DPH, novinky); Nastavení › E-maily a upozornění s živým náhledem; zvonek přečtený po otevření + „Co je nového“; webhook `/api/resend/webhook`. „Komu napsat“ a faktura už posílají místo konceptu. Migrace 081 (aplikována: ne). Nové env `WS_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET` (`.env.example`, reference; **Vercel zatím ne**). Bezpečnost: DECISIONS #011, STATE, AUDIT-LOG, CSP beze změny. Ověřeno: `npm test` 421/421 (+ 1 vynechaný), `tsc` OK, `npm run build:check` OK, admin `/login` 200, `/dashboard` `/alteno` `/hub` 307, `/p/<uuid>` 404; `/z` stránky 200/404, cron bez tajemství 401, webhook bez tajemství 503, náhled v `iframe srcdoc` pod vynucenou CSP funguje (headless Chrome), e-maily vyfocené 700/375 px. Neověřeno: s přihlášením, skutečné doručení.
 - **chore** Commity `35cba9f` (S14) a `eee361d` (S12 + rozpracovaná S13 — necommitnuté od předchozích sezení, S14 bez nich měla mezeru v migracích).
 - **feat** S14 — Peníze: faktury, PDF, přijaté doklady s AI přepisem, atomická platba/převzetí platby zakázky, příjmy/výdaje a grafy po měnách, přehled měsíce a celé IČO, odhad daní 2026 a ICS připomínky. Migrace 080 (aplikována: ne). Kód lib/ws/money/, components/ws/money/, app/w/[business]/{penize,faktury,prijmy,dane}, API PDF/kalendář; dokumentace docs/workspace/MONEY.md. Review v AUDIT-LOG, externalizace Chromium/Puppeteer pro binárky. Ověřeno: npm test 399/399 + 1 volitelný PDF test vynechaný, tsc OK, skutečný PDF smoke, izolovaný build bez diskové cache (málo místa), admin 200/307/404; fiktivní náhled přehledu/formuláře 1440/390 px bez přetékání. Na Neonu s přihlášením neověřeno. E-mail je koncept pro S15.

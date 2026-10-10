@@ -16,3 +16,6 @@ export function appOrigin(): string {
 }
 
 export const orderPageUrl = (slug: string): string => `${appOrigin()}${orderPagePath(slug)}`
+
+/** Klientský portál (S16): odkaz pro zákazníka na termín nebo zakázku. */
+export const portalPageUrl = (publicToken: string): string => `${appOrigin()}/z/${publicToken}`

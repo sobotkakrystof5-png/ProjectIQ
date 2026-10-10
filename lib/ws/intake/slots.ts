@@ -62,6 +62,23 @@ export function isSlotFree(input: Omit<SlotInput, 'fromDay' | 'days' | 'stepMin'
   )
 }
 
+/**
+ * Kdo má v čase `start` volno (pro přesun termínu z portálu, S16). Přednost má
+ * `prefer` (dosavadní pracovník). `null` = nikdo; byznys bez pracovníků vrací
+ * prázdný řetězec (pracovníka založí ensureStaff).
+ */
+export function freeStaffAt(input: Omit<SlotInput, 'fromDay' | 'days' | 'stepMin'>, start: Date, prefer: string | null = null): string | null {
+  if (!isSlotFree(input, start)) return null
+  if (!input.staff.length) return ''
+  const end = new Date(start.getTime() + input.durationMin * MINUTE)
+  const p = pragueParts(start)
+  const endMin = p.minutes + input.durationMin
+  const free = input.staff.filter(
+    (s) => fits(rangesFor(p.date, s, input.hours), p.minutes, endMin) && !s.busy.some((b) => overlaps(b, start, end)),
+  )
+  return (free.find((s) => s.id === prefer) ?? free[0])?.id ?? null
+}
+
 /** Volné časy po dnech (jen dny, kde něco je). Časy jako minuty dne v Praze. */
 export function computeSlots(input: SlotInput): DaySlots[] {
   const out: DaySlots[] = []

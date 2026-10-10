@@ -145,9 +145,13 @@ export async function loadIntakeConfig(accountId: string, businessId: string): P
   }
 }
 
-type SlotData = Omit<Parameters<typeof computeSlots>[0], 'fromDay' | 'days' | 'stepMin'>
+export type SlotData = Omit<Parameters<typeof computeSlots>[0], 'fromDay' | 'days' | 'stepMin'>
 
-async function loadSlotData(accountId: string, config: IntakeConfig, serviceId: string | null, now: Date): Promise<SlotData> {
+/** Přesun z portálu (S16): přesouvaný termín neblokuje sám sebe a délka je jeho vlastní. */
+export type SlotOptions = { excludeAppointmentId?: string | null; durationMin?: number }
+
+export async function loadSlotData(accountId: string, config: IntakeConfig, serviceId: string | null, now: Date, opts: SlotOptions = {}): Promise<SlotData> {
+  const exclude = opts.excludeAppointmentId ?? null
   const biz = config.business.id
   const from = now
   const to = new Date(now.getTime() + (BOOKING.slotDays + 2) * 86_400_000)
@@ -165,6 +169,7 @@ async function loadSlotData(accountId: string, config: IntakeConfig, serviceId: 
       LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
       WHERE a.account_id = ${accountId} AND a.business_id = ${biz} AND a.status <> 'cancelled'
         AND a.starts_at < ${to} AND a.ends_at > ${from}
+        AND a.id IS DISTINCT FROM ${exclude}::uuid
       LIMIT 5000`,
   ])
   const shifts = new Map<string, Map<number, Range[]>>()
@@ -187,7 +192,7 @@ async function loadSlotData(accountId: string, config: IntakeConfig, serviceId: 
   return {
     now,
     // Rozestup blokuje další termín, ale neprodlužuje zobrazenou návštěvu.
-    durationMin: (service?.duration_min ?? 60) + (service?.buffer_min ?? 0),
+    durationMin: opts.durationMin ?? (service?.duration_min ?? 60) + (service?.buffer_min ?? 0),
     leadMin: BOOKING.leadMin,
     hours: config.hours,
     staff,
@@ -203,9 +208,10 @@ export async function loadSlots(
   config: IntakeConfig,
   serviceId: string | null,
   now: Date = new Date(),
+  opts: SlotOptions = {},
 ): Promise<DaySlots[]> {
   if (config.booking !== 'slots') return []
-  const data = await loadSlotData(accountId, config, serviceId, now)
+  const data = await loadSlotData(accountId, config, serviceId, now, opts)
   return computeSlots({ ...data, fromDay: pragueToday(now), days: BOOKING.slotDays, stepMin: BOOKING.stepMin })
 }
 

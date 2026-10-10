@@ -60,7 +60,7 @@ export default async function JobsPage({
               customer: j.customer_name,
               when: next ? `${formatRelativeDay(next.date, today)} ${formatClock(j.next_start!)}` : null,
               price: j.price !== null ? formatMoney(Number(j.price), { currency: j.currency as WsCurrency }) : null,
-              href: link({ detail: j.customer_id ? `zakaznik:${j.customer_id}` : null }),
+              href: link({ detail: `zakazka:${j.id}` }),
             }
           })}
         />

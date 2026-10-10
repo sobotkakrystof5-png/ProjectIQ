@@ -105,3 +105,11 @@ Zvažované alternativy: JWT s expirací bez DB (nejde zneplatnit po použití);
 Přijaté riziko: odkaz je v URL, takže skončí v historii prohlížeče a v logu požadavků Vercelu — akční odkaz je jednorázový a do 72 h, odhlášení a .ics prozradí jen málo (název firmy, čas termínu). Přeposlaný e-mail majitele umožní příjemci jednou potvrdit poptávku. Změna `WS_KEY_PEPPER` zneplatní i všechny odeslané odkazy.
 Revize: S19 (audit před spuštěním).
 
+## 012 — Klientský portál přes trvalé náhodné UUID
+Datum: 2026-10-10
+Rozhodnutí: `/z/[token]` používá náhodné UUID generované DB pro termín nebo zakázku. Jediná funkce bez známého účtu, `ws.portal_lookup`, vrací jen `account_id`, `business_id`, druh a ID záznamu; vše ostatní běží pod RLS. Odkaz nemá vlastní expiraci, zneplatní ho smazání záznamu, archivace byznysu nebo vypnutí portálu.
+Důvod: Zákazník se nemá registrovat a stejný odkaz má zůstat použitelný z e-mailu i telefonu. UUID má dostatek náhody a neobsahuje osobní údaje.
+Zvažované alternativy: krátký podepsaný odkaz s expirací (zákazník by po čase ztratil přehled); veřejná role s BYPASSRLS (příliš široká); účet v URL (prozrazuje strukturu a svádí k důvěře klientskému vstupu).
+Přijaté riziko: kdo odkaz získá přeposláním nebo z historie prohlížeče, vidí omezený obsah a do termínu pravidel může termín přesunout nebo zrušit. Jednotlivý token zatím nemá tlačítko pro rotaci; akce jsou omezené podle IP i záznamu a všechny odkazy byznysu lze vypnout funkcí Klientský portál.
+Revize: S19 (audit před spuštěním; zvážit rotaci jednotlivého odkazu).
+

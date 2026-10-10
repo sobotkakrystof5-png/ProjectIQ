@@ -102,6 +102,8 @@ export async function seedAccount(db: PGlite, L: 'a' | 'b'): Promise<void> {
     INSERT INTO ws.idempotency_keys (account_id, key, request_hash) VALUES ('${i.account}', 'klic-1', 'hash');
     INSERT INTO ws.intake_log (account_id, business_id, integration_id, channel, status, request_id) VALUES ('${i.account}', '${i.business}', '${i.integration}', 'widget', 202, '${i.request}');
     INSERT INTO ws.action_tokens (account_id, business_id, request_id, expires_at) VALUES ('${i.account}', '${i.business}', '${i.request}', now() + interval '72 hours');
+    INSERT INTO ws.job_updates (account_id, business_id, job_id, body) VALUES ('${i.account}', '${i.business}', '${i.job}', 'Materiál je objednaný.');
+    INSERT INTO ws.reviews (account_id, business_id, customer_id, appointment_id, score) VALUES ('${i.account}', '${i.business}', '${i.customer}', '${i.appointment}', 9);
   `)
 }
 

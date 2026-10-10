@@ -6,7 +6,8 @@ import { assertWritable } from '@/lib/ws/billing'
 import { hasRole, requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
 import { usableAccent } from '@/lib/ws/accent'
 import { fail, ok, type Result } from '@/lib/ws/result'
-import { moveAndDeleteStage, saveAppearance, saveField, saveService, saveStage, setModule, setServiceActive } from '@/lib/ws/settings'
+import { moveAndDeleteStage, saveAppearance, saveField, savePortalRules, saveService, saveStage, setModule, setServiceActive } from '@/lib/ws/settings'
+import { ADDRESS_MAX, CHANGE_HOURS_OPTIONS } from '@/lib/ws/portal-rules'
 import { WS_MODULES } from '@/lib/ws/templates/types'
 
 const slug = z.string().min(1).max(60).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
@@ -88,4 +89,15 @@ export async function saveAppearanceSettings(raw: unknown): Promise<Result<null>
   if (!input.success || (input.data.color && !usableAccent(input.data.color))) return fail('Vyberte tmavší barvu, aby na ní byl čitelný bílý text.')
   try { await saveAppearance(p.ctx, p.business, input.data.color); return done(p.business) }
   catch (e) { log('settings.saveAppearance', p.ctx, e); return fail('Vzhled se nepodařilo uložit.') }
+}
+
+const portalInput = z.object({
+  changeHours: z.union([z.literal(CHANGE_HOURS_OPTIONS[0]), ...CHANGE_HOURS_OPTIONS.slice(1).map((h) => z.literal(h)), z.null()]),
+  address: z.string().trim().max(ADDRESS_MAX),
+})
+export async function savePortalSettings(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(raw); if (!p.ok) return p
+  const input = portalInput.safeParse(p.input); if (!input.success) return fail(`Zkontrolujte adresu (nejvýš ${ADDRESS_MAX} znaků).`)
+  try { await savePortalRules(p.ctx, p.business, { changeHours: input.data.changeHours, address: input.data.address || null }); return done(p.business) }
+  catch (e) { log('settings.savePortal', p.ctx, e); return fail('Nastavení odkazu se nepodařilo uložit. Zkuste to prosím znovu.') }
 }

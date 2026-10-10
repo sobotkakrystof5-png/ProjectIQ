@@ -30,3 +30,6 @@ GRANT EXECUTE ON FUNCTION ws.active_businesses() TO ws_app;
 -- E-maily, odkazy a novinky (migrace 081, S15). Novinky píše jen admin.
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ws.product_news FROM ws_app;
 GRANT EXECUTE ON FUNCTION ws.accounts_with_due_messages() TO ws_app;
+
+-- Klientský portál (migrace 082, S16)
+GRANT EXECUTE ON FUNCTION ws.portal_lookup(uuid) TO ws_app;

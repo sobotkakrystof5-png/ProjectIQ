@@ -87,3 +87,5 @@ export function emailOrigin(): string {
 export const actionLinkUrl = (token: string) => `${emailOrigin()}/z/odkaz/${token}`
 export const unsubscribeUrl = (token: string) => `${emailOrigin()}/z/odhlasit/${token}`
 export const calendarUrl = (token: string) => `${emailOrigin()}/z/kalendar/${token}`
+/** Klientský portál (S16): token z DB (ws.appointments/jobs.public_token), ne podepsaný odkaz. */
+export const portalUrl = (publicToken: string) => `${emailOrigin()}/z/${publicToken}`

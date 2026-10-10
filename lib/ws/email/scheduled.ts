@@ -8,7 +8,7 @@ import { SEGMENT_LABELS, type SegmentKey } from '../segment-labels'
 import { addDays, formatDayShort, formatMinutes, pragueParts, pragueToUtc, weekdayOf } from '../time'
 import type { EmailBlock } from './layout'
 import { emailOrigin, signLink, unsubscribeUrl } from './links'
-import { formatWhen, isOn, loadSender, ownerEmail, type Sender } from './notify'
+import { formatWhen, isOn, loadSender, ownerEmail, visitPortalButton, type Sender } from './notify'
 import { enqueueEmail, flushAll } from './queue'
 import { composeCustomerEmail } from './compose'
 import { renderEmail } from './layout'
@@ -44,7 +44,7 @@ export async function queueReminders(scope: Scope, sender: Sender, today: string
   if (!sender.customerMail || !isOn(sender, 'reminder')) return 0
   const tomorrow = addDays(today, 1)
   const rows = await wsDb(scope)`
-    SELECT a.id, a.starts_at, a.customer_id, c.name, c.email, s.name AS service
+    SELECT a.id, a.public_token, a.starts_at, a.customer_id, c.name, c.email, s.name AS service
     FROM ws.appointments a
     JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
     LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
@@ -61,7 +61,10 @@ export async function queueReminders(scope: Scope, sender: Sender, today: string
       subject: s?.subject,
       body: s?.body,
       values: { jmeno: String(a.name ?? ''), termin: formatWhen(start), sluzba: String(a.service ?? '') },
-      extras: { calendarUrl: `${emailOrigin()}/z/kalendar/${signLink({ kind: 'c', accountId: scope.accountId, id: String(a.id) })}` },
+      extras: {
+        calendarUrl: `${emailOrigin()}/z/kalendar/${signLink({ kind: 'c', accountId: scope.accountId, id: String(a.id) })}`,
+        portal: visitPortalButton(sender, a.public_token as string | null),
+      },
     })
     const id = await enqueueEmail(scope, {
       businessId: sender.business.id,

@@ -6,7 +6,8 @@ import { formatDayLong, formatMinutes, pragueParts } from '../time'
 import { isMessageType, MESSAGES, type MessageType, type TemplateValues } from './catalog'
 import { composeCustomerEmail, type CustomerExtras } from './compose'
 import { renderEmail, type EmailBlock } from './layout'
-import { actionLinkUrl, calendarUrl, emailOrigin, signLink } from './links'
+import { actionLinkUrl, calendarUrl, emailOrigin, portalUrl, signLink } from './links'
+import { portalRules, type PortalRules } from '../portal-rules'
 import { cancelQueued, enqueueEmail, flushAccount } from './queue'
 
 // Události → e-maily (S15). Každá funkce:
@@ -33,6 +34,8 @@ export type Sender = {
   owners: string[]
   replyTo: string | null
   customerMail: boolean
+  /** Pravidla klientského portálu; null = funkce Klientský portál je vypnutá (S16). */
+  portal: PortalRules | null
 }
 
 const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/
@@ -67,6 +70,7 @@ export async function loadSender(scope: Scope, businessId: string): Promise<Send
     owners: ownerEmails,
     replyTo,
     customerMail,
+    portal: (modules as WsRow[]).some((r) => r.module === 'portal') ? portalRules(b.settings) : null,
   }
 }
 
@@ -249,6 +253,7 @@ export async function notifyNewRequest(scope: Scope, businessId: string, request
 
 type AppointmentRow = {
   id: string
+  public_token: string
   starts_at: Date
   status: string
   kind: string
@@ -260,7 +265,7 @@ type AppointmentRow = {
 
 async function loadAppointment(scope: Scope, businessId: string, appointmentId: string): Promise<AppointmentRow | null> {
   const [a] = await wsDb(scope)`
-    SELECT a.id, a.starts_at, a.status, a.kind, a.customer_id, c.name, c.email, s.name AS service
+    SELECT a.id, a.public_token, a.starts_at, a.status, a.kind, a.customer_id, c.name, c.email, s.name AS service
     FROM ws.appointments a
     LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
     LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
@@ -277,6 +282,12 @@ const visitValues = (a: AppointmentRow): TemplateValues => ({
 
 const icsLink = (scope: Scope, appointmentId: string) => calendarUrl(signLink({ kind: 'c', accountId: scope.accountId, id: appointmentId }))
 
+/** Tlačítko do klientského portálu u termínu (S16). Bez zapnutého portálu nic. */
+export function visitPortalButton(sender: Pick<Sender, 'portal'>, publicToken: string | null | undefined): { url: string; label: string } | null {
+  if (!sender.portal || !publicToken) return null
+  return { url: portalUrl(publicToken), label: sender.portal.changeHours === null ? 'Zobrazit termín' : 'Přesunout nebo zrušit' }
+}
+
 /** Potvrzený termín (z poptávky, z e-mailu majitele nebo ruční rezervace). `changed` = jiný čas, než zákazník chtěl. */
 export async function notifyBookingConfirmed(scope: Scope, businessId: string, appointmentId: string, opts: { changed?: boolean } = {}): Promise<void> {
   try {
@@ -289,7 +300,11 @@ export async function notifyBookingConfirmed(scope: Scope, businessId: string, a
       opts.changed ? 'booking_changed' : 'booking_confirmed',
       { customerId: a.customer_id, email: a.email },
       visitValues(a),
-      { dedupeKey: `confirmed:${appointmentId}`, extras: { calendarUrl: icsLink(scope, appointmentId) }, validUntil: new Date(a.starts_at) },
+      {
+        dedupeKey: `confirmed:${appointmentId}`,
+        extras: { calendarUrl: icsLink(scope, appointmentId), portal: visitPortalButton(sender, a.public_token) },
+        validUntil: new Date(a.starts_at),
+      },
     )
   } catch (e) {
     log('confirmed', scope, e)
@@ -299,8 +314,15 @@ export async function notifyBookingConfirmed(scope: Scope, businessId: string, a
 /**
  * Přesun termínu. E-mail čeká UNDO_DELAY_MS; další přesun ho jen přepíše
  * a vrácení na čas, který zákazník zná, ho zruší (žádný e-mail navíc).
+ * `immediate`: přesunul zákazník sám v portálu (bez „Zpět“), potvrzení hned.
  */
-export async function notifyAppointmentMoved(scope: Scope, businessId: string, appointmentId: string, prevStart: Date): Promise<void> {
+export async function notifyAppointmentMoved(
+  scope: Scope,
+  businessId: string,
+  appointmentId: string,
+  prevStart: Date,
+  opts: { immediate?: boolean } = {},
+): Promise<void> {
   try {
     const sender = await loadSender(scope, businessId)
     const a = sender && (await loadAppointment(scope, businessId, appointmentId))
@@ -320,8 +342,8 @@ export async function notifyAppointmentMoved(scope: Scope, businessId: string, a
       visitValues(a),
       {
         dedupeKey: `changed:${appointmentId}:${Date.now()}`,
-        extras: { calendarUrl: icsLink(scope, appointmentId) },
-        sendAt: new Date(Date.now() + UNDO_DELAY_MS),
+        extras: { calendarUrl: icsLink(scope, appointmentId), portal: visitPortalButton(sender, a.public_token) },
+        sendAt: opts.immediate ? undefined : new Date(Date.now() + UNDO_DELAY_MS),
         validUntil: new Date(a.starts_at),
       },
     )
@@ -465,5 +487,92 @@ export async function notifyPaymentFailed(scope: Scope, stripeInvoiceId: string,
     await deliver(scope)
   } catch (e) {
     log('paymentFailed', scope, e)
+  }
+}
+
+// --- Klientský portál (S16) ---------------------------------------------------
+
+export type PortalEvent =
+  | { kind: 'moved'; appointmentId: string; prevStart: Date }
+  | { kind: 'cancelled'; appointmentId: string }
+  | { kind: 'review'; score: number; comment: string | null; jobId: string | null; appointmentId: string | null }
+
+/**
+ * Zákazník v portálu přesunul nebo zrušil termín, nebo poslal hodnocení:
+ * zvonek a u termínu i e-mail majiteli (chodí vždy — zrušený termín nesmí
+ * zapadnout). Nikdy nevyhodí.
+ */
+export async function notifyPortalEvent(scope: Scope, businessId: string, event: PortalEvent): Promise<void> {
+  try {
+    const sender = await loadSender(scope, businessId)
+    if (!sender) return
+    const slug = sender.business.slug
+    if (event.kind === 'review') {
+      const link = event.jobId ? `/w/${slug}/zakazky?detail=zakazka:${event.jobId}` : `/w/${slug}/kalendar?detail=termin:${event.appointmentId}`
+      const body = event.comment ? event.comment.slice(0, 300) : null
+      await wsDb(scope)`
+        INSERT INTO ws.notifications (account_id, business_id, type, title, body, link)
+        VALUES (${scope.accountId}, ${businessId}, 'review', ${`Nové hodnocení: ${event.score} z 10`}, ${body}, ${link})`
+      return
+    }
+    const a = await loadAppointment(scope, businessId, event.appointmentId)
+    if (!a) return
+    const who = a.name ?? 'Zákazník'
+    const when = formatWhen(new Date(a.starts_at))
+    const link = `/w/${slug}/kalendar?detail=termin:${event.appointmentId}`
+    const moved = event.kind === 'moved'
+    const title = moved ? `${who} přesunul(a) termín` : `${who} zrušil(a) termín`
+    const rows = moved
+      ? [
+          { label: 'Původně', value: formatWhen(event.prevStart) },
+          { label: 'Nově', value: when },
+          ...(a.service ? [{ label: 'Služba', value: a.service }] : []),
+        ]
+      : [{ label: 'Termín', value: when }, ...(a.service ? [{ label: 'Služba', value: a.service }] : [])]
+    await wsDb(scope)`
+      INSERT INTO ws.notifications (account_id, business_id, type, title, body, link)
+      VALUES (${scope.accountId}, ${businessId}, ${moved ? 'portal_moved' : 'portal_cancelled'}, ${title.slice(0, 200)},
+              ${moved ? `Nově ${when}` : when}, ${link})`
+    await ownerEmail(
+      scope,
+      sender,
+      moved ? 'portal_moved' : 'portal_cancelled',
+      {
+        subject: title,
+        body: moved
+          ? `${who} si v odkazu k termínu vybral(a) jiný čas. Termín je v kalendáři přesunutý.`
+          : `${who} termín v odkazu zrušil(a). Čas je v kalendáři zase volný.`,
+        blocks: [{ kind: 'details', rows }, { kind: 'buttons', items: [{ label: 'Otevřít v kalendáři', url: appUrl(link), primary: true }] }],
+        footer: 'Změny termínů od zákazníků chodí vždy. Do kdy je zákazník smí dělat, nastavíte v Nastavení › Funkce.',
+      },
+      { dedupeKey: `portal:${event.kind}:${event.appointmentId}:${new Date(a.starts_at).getTime()}` },
+    )
+  } catch (e) {
+    log('portalEvent', scope, e)
+  }
+}
+
+/** Zpráva firmy k zakázce (S16): e-mail zákazníkovi s odkazem do portálu. */
+export async function notifyJobUpdate(scope: Scope, businessId: string, jobId: string, updateId: string, message: string): Promise<boolean> {
+  try {
+    const sender = await loadSender(scope, businessId)
+    if (!sender?.portal) return false
+    const [j] = await wsDb(scope)`
+      SELECT j.title, j.public_token, j.customer_id, c.name, c.email
+      FROM ws.jobs j LEFT JOIN ws.customers c ON c.account_id = j.account_id AND c.id = j.customer_id
+      WHERE j.account_id = ${scope.accountId} AND j.business_id = ${businessId} AND j.id = ${jobId}`
+    if (!j) return false
+    const id = await customerEmail(
+      scope,
+      sender,
+      'job_update',
+      { customerId: (j.customer_id as string | null) ?? null, email: (j.email as string | null) ?? null },
+      { jmeno: String(j.name ?? ''), zakazka: String(j.title), zprava: message },
+      { dedupeKey: `job_update:${updateId}`, extras: { portal: { url: portalUrl(String(j.public_token)), label: 'Zobrazit zakázku' } } },
+    )
+    return id !== null
+  } catch (e) {
+    log('jobUpdate', scope, e)
+    return false
   }
 }

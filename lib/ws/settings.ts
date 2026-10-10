@@ -2,6 +2,7 @@ import 'server-only'
 
 import { q, wsDb, type WsRow } from './db'
 import type { WsBusiness, WsContext } from './context'
+import type { ChangeHours } from './portal-rules'
 import { ALWAYS_ON_MODULES, WS_MODULES, type FieldType, type StageType, type WsModule } from './templates/types'
 
 export const MODULE_DETAILS: Record<WsModule, { label: string; text: string; needs?: WsModule }> = {
@@ -13,8 +14,8 @@ export const MODULE_DETAILS: Record<WsModule, { label: string; text: string; nee
   invoices: { label: 'Faktury', text: 'Vystavené faktury a jejich stav.' },
   finance: { label: 'Příjmy', text: 'Přijaté platby a přehled peněz.' },
   taxes: { label: 'Daně', text: 'Podklady pro daně z příjmů.', needs: 'finance' },
-  portal: { label: 'Klientský portál', text: 'Zákazník vidí postup své zakázky.' },
-  reviews: { label: 'Hodnocení', text: 'Žádosti o hodnocení po dokončené práci.' },
+  portal: { label: 'Klientský portál', text: 'Zákazník dostane odkaz na svůj termín nebo zakázku. Termín si v něm může přesunout.' },
+  reviews: { label: 'Hodnocení', text: 'Po dokončení vás zákazník v odkazu ohodnotí od 1 do 10.', needs: 'portal' },
   reminders: { label: 'Připomínky', text: 'Připomene zákazníkovi blížící se termín.', needs: 'calendar' },
 }
 
@@ -66,6 +67,10 @@ export async function setModule(ctx: WsContext, business: WsBusiness, module: Ws
     UPDATE ws.business_modules SET enabled = false
     WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND module = 'taxes'
   `)
+  if (!forced && module === 'portal') queries.push(q`
+    UPDATE ws.business_modules SET enabled = false
+    WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND module = 'reviews'
+  `)
   if (!forced && module === 'calendar') queries.push(q`
     UPDATE ws.business_modules SET enabled = false
     WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND module = 'reminders'
@@ -103,6 +108,14 @@ export async function moveAndDeleteStage(ctx: WsContext, business: WsBusiness, i
     q`UPDATE ws.jobs SET stage_id = ${targetId} WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND stage_id = ${id} AND EXISTS (SELECT 1 FROM ws.stages WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${targetId})`,
     q`DELETE FROM ws.stages WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${id} AND ${id} <> ${targetId}`,
   ])
+}
+
+/** Pravidla klientského portálu (S16) v ws.businesses.settings, ostatní klíče zůstanou. */
+export async function savePortalRules(ctx: WsContext, business: WsBusiness, input: { changeHours: ChangeHours; address: string | null }): Promise<void> {
+  await wsDb(ctx)`
+    UPDATE ws.businesses
+    SET settings = settings || jsonb_build_object('portal_change_hours', ${JSON.stringify(input.changeHours)}::jsonb, 'address', ${input.address}::text)
+    WHERE account_id = ${ctx.accountId} AND id = ${business.id}`
 }
 
 export async function saveAppearance(ctx: WsContext, business: WsBusiness, color: string | null): Promise<void> {

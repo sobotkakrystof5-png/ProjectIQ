@@ -16,7 +16,10 @@ import { CustomerSummary, formatPhone } from './customer-summary'
 import { CustomerDetail } from '@/components/ws/customers/customer-detail'
 import { MessageDraftForm } from '@/components/ws/customers/message-draft-form'
 import { VisitPayment } from '@/components/ws/customers/visit-payment'
-import { orderPageUrl } from '@/lib/ws/app-origin'
+import { orderPageUrl, portalPageUrl } from '@/lib/ws/app-origin'
+import { getAppointmentPortal, getJobDetail } from '@/lib/ws/jobs'
+import { formatMoney, type WsCurrency } from '@/lib/ws/money'
+import { CopyPortalLink, JobResultForm, JobUpdates } from './jobs/job-portal'
 import { getCustomerDetail } from '@/lib/ws/customers'
 import { loadIntakeConfig, loadSlots } from '@/lib/ws/intake/intake'
 import { getLoyaltyEvents, getLoyaltyProgram, getVisitPayment } from '@/lib/ws/loyalty'
@@ -260,10 +263,11 @@ async function panelContent(
     case 'termin': {
       const a = await getAppointmentDetail(ctx, business, ref.id)
       if (!a) return notHere('Termín', env.closeHref)
-      const [card, options, payment] = await Promise.all([
+      const [card, options, payment, portal] = await Promise.all([
         a.customer_id ? getCustomerCard(ctx, business, a.customer_id) : null,
         a.status === 'confirmed' ? getBookingOptions(ctx, business) : null,
         a.kind === 'visit' ? getVisitPayment(ctx, business, a.id) : null,
+        a.kind === 'visit' && env.modules.has('portal') ? getAppointmentPortal(ctx, business, a.id) : null,
       ])
       const start = pragueParts(a.start)
       const block = a.kind === 'block'
@@ -300,10 +304,18 @@ async function panelContent(
               />
             )}
 
+            {portal && a.status !== 'cancelled' && <CopyPortalLink url={portalPageUrl(portal.publicToken)} />}
+
             <dl className="flex flex-col gap-3 text-[15px]">
               <Row label="Den">
                 <span className="font-num">{formatDayShort(start.date)}</span>
               </Row>
+              {portal?.review && (
+                <Row label="Hodnocení">
+                  <span className="font-num">{portal.review.score} / 10</span>
+                  {portal.review.comment && <span className="mt-1 block whitespace-pre-line text-quiet">{portal.review.comment}</span>}
+                </Row>
+              )}
               {!block && a.staff_name && options && options.staff.length > 1 && <Row label="Kdo">{a.staff_name}</Row>}
               {a.note && (
                 <Row label="Poznámka">
@@ -322,6 +334,81 @@ async function panelContent(
                 </Row>
               )}
             </dl>
+
+            {card && (
+              <section aria-label="Zákazník" className="border-t pt-5">
+                <CustomerSummary card={card} today={env.today} businessName={business.name} detailHref={customerLink(card.id)} />
+              </section>
+            )}
+          </div>
+        ),
+      }
+    }
+
+    case 'zakazka': {
+      const j = await getJobDetail(ctx, business, ref.id)
+      if (!j) return notHere('Zakázka', env.closeHref)
+      const portalOn = env.modules.has('portal')
+      const card = j.customerId ? await getCustomerCard(ctx, business, j.customerId) : null
+      const next = j.nextStart ? pragueParts(j.nextStart) : null
+      return {
+        title: j.title,
+        description: j.stageName ?? undefined,
+        body: (
+          <div className="flex flex-col gap-5">
+            <dl className="flex flex-col gap-3 text-[15px]">
+              {j.price !== null && (
+                <Row label="Cena">
+                  <span className="font-num">{formatMoney(j.price, { currency: j.currency as WsCurrency })}</span>
+                </Row>
+              )}
+              {next && (
+                <Row label="Termín">
+                  <span className="font-num">
+                    {formatRelativeDay(next.date, env.today)} {formatMinutes(next.minutes)}
+                  </span>
+                </Row>
+              )}
+              {j.review && (
+                <Row label="Hodnocení">
+                  <span className="font-num">{j.review.score} / 10</span>
+                  {j.review.comment && <span className="mt-1 block whitespace-pre-line text-quiet">{j.review.comment}</span>}
+                </Row>
+              )}
+              {j.requestId && (
+                <Row label="Z poptávky">
+                  <Link
+                    href={hrefWith(env.pathname, env.searchParams, { detail: `poptavka:${j.requestId}`, ...FORM_PARAMS })}
+                    scroll={false}
+                    className="font-semibold text-navy-700 underline-offset-4 hover:underline dark:text-navy-200"
+                  >
+                    Otevřít poptávku
+                  </Link>
+                </Row>
+              )}
+            </dl>
+
+            {portalOn ? (
+              <section aria-label="Pro zákazníka" className="flex flex-col gap-4 border-t pt-5">
+                <h3 className="text-[16px] font-semibold text-ink">Pro zákazníka</h3>
+                <p className="-mt-2 text-sm text-quiet">Zákazník v odkazu vidí postup podle stavů, vaše zprávy a výsledek. Poznámky z aplikace nevidí.</p>
+                <CopyPortalLink url={portalPageUrl(j.publicToken)} />
+                <JobUpdates
+                  slug={business.slug}
+                  jobId={j.id}
+                  canEmail={j.customerEmail}
+                  updates={j.updates.map((u) => {
+                    const p = pragueParts(u.at)
+                    return { id: u.id, body: u.body, when: `${formatDayShort(p.date)} · ${formatMinutes(p.minutes)}` }
+                  })}
+                />
+                <JobResultForm slug={business.slug} jobId={j.id} url={j.resultUrl} />
+              </section>
+            ) : (
+              <p className="border-t pt-5 text-sm text-quiet">
+                Když v Nastavení › Funkce zapnete Klientský portál, pošlete zákazníkovi odkaz, kde uvidí postup zakázky.
+              </p>
+            )}
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">

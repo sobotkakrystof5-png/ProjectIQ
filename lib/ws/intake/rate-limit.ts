@@ -20,6 +20,14 @@ export const LIMITS = {
   pagePerIp: { name: 'page-ip', max: 8, windowSec: 600 },
   /** „Ověřit napojení“ z aplikace */
   checkPerBusiness: { name: 'check-biz', max: 10, windowSec: 600 },
+  /** klientský portál /z/[token] — otevření stránky z jedné IP (S16) */
+  portalViewPerIp: { name: 'portal-view-ip', max: 120, windowSec: 60 },
+  /** klientský portál — přesun, zrušení, hodnocení z jedné IP */
+  portalActionPerIp: { name: 'portal-ip', max: 10, windowSec: 600 },
+  /** klientský portál — akce na jeden termín/zakázku (jako admin portál: pár pokusů za 10 min) */
+  portalActionPerItem: { name: 'portal-item', max: 5, windowSec: 600 },
+  /** klientský portál — stažení faktury (PDF se skládá na serveru) */
+  portalPdfPerIp: { name: 'portal-pdf-ip', max: 10, windowSec: 600 },
 } satisfies Record<string, Limit>
 
 /** Hash hodnoty pro klíč limitu. S pepřem, když je nastavený (IP adres je málo, holý hash by šel zpětně dohledat). */

@@ -356,7 +356,7 @@ describe('celá cesta', () => {
     // 4. Zaplaceno → poděkování se stavem karty.
     sent = []
     const [appt] = await rows<{ id: string }>(`SELECT id FROM ws.appointments WHERE request_id = $1`, [req])
-    const paid = await completeVisit(ctxA, { id: A.business, name: 'Byznys a' }, { appointmentId: appt.id, amount: 500, method: 'cash' })
+    const paid = await completeVisit(ctxA, { id: A.business }, { appointmentId: appt.id, amount: 500, method: 'cash' })
     expect(paid.ok).toBe(true)
     await notifyVisitPaid(scopeA, A.business, appt.id, { rewardReady: false })
     await flushAccount(scopeA)
