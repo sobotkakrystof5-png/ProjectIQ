@@ -305,6 +305,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-10
+- **fix** Checkout padal: nový účet Stripe má ve výchozím stavu zapnuté Managed Payments (Stripe jako prodejce), které chtějí daňový kód produktu. `createCheckoutSession` posílá `managed_payments: { enabled: false }` — prodejcem jsme my, neplátce bez Stripe Tax (R-018, R-039). `lib/ws/billing.ts`. Ověřeno: relace se založí, `ws-billing.test.ts` 20/20, `tsc` OK. Pozn.: `CLERK_SECRET_KEY` v `.env.local` byl prázdný, doplněn přes `clerk env pull` (dev instance).
 - **chore** Stripe sandbox „ZAKAZIQ sandbox“: produkt `prod_VPkYMgl7jKYsuX` „ZakazIQ“ a měsíční cena `price_1UOv3VISmnTvjLHaCC8geu9r` (249 Kč, `czk`, bez daně, R-018) založené přes API klíčem z `.env.local` (CLI bylo přihlášené do jiného sandboxu). `STRIPE_PRICE_MONTHLY` zapsaná do `.env.local`.
 - **chore** Lokální webhook Stripe: `STRIPE_WEBHOOK_SECRET` v `.env.local` byl ze sandboxu SHARES.cz, nahrazen podpisovým klíčem `stripe listen` sandboxu ZakazIQ. Listen přeposílá na `localhost:3001` (na 3000 běží jiný projekt). Ověřeno: nepodepsaný požadavek na `/api/stripe/webhook` → 400. Produkční endpoint až s nasazením `/w` na `main`, URL `https://www.zakaziq.cz/api/stripe/webhook` (holá doména přesměrovává).
 

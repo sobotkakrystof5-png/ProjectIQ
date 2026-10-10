@@ -272,6 +272,9 @@ export async function createCheckoutSession(
           }),
     },
     payment_method_collection: 'always',
+    // Prodejcem jsme my (neplátce, bez Stripe Tax, R-018). Nové účty Stripe mají
+    // Managed Payments (Stripe jako prodejce) zapnuté ve výchozím stavu.
+    managed_payments: { enabled: false },
     locale: 'cs',
     billing_address_collection: 'required',
     tax_id_collection: { enabled: true },
