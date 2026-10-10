@@ -8,8 +8,8 @@ import { daysBetween, formatDayShort, formatMinutes, pragueParts } from './time'
 // Panel „Komu napsat“ (S12, plán: Segmenty zákazníků). Návrhy jen pro
 // zákazníky se souhlasem s kontaktem, bez odhlášení, neukončené a s
 // e-mailem — SMS čeká na rozhodnutí o poskytovateli (Otevřené problémy).
-// „Připravit zprávu“ uloží koncept do ws.outbound_messages (status 'draft');
-// odeslání přes frontu doplní S15.
+// „Připravit zprávu“ uloží koncept do ws.outbound_messages (status 'draft')
+// a pošle ho frontou e-mailů (S15, lib/ws/email/outbox.ts).
 
 // Druhy návrhů sdílí s pravým panelem (`?detail=zprava:<id>:<druh>`).
 export const OUTREACH_KINDS = MESSAGE_TOPICS
@@ -182,6 +182,15 @@ export async function saveDraft(
   business: Pick<WsBusiness, 'id'>,
   input: { customerId: string; kind: OutreachKind; subject: string; body: string },
 ): Promise<boolean> {
+  return (await createDraft(ctx, business, input)) !== null
+}
+
+/** Jako saveDraft, ale vrátí ID konceptu (pro okamžité odeslání, S15). */
+export async function createDraft(
+  ctx: WsContext,
+  business: Pick<WsBusiness, 'id'>,
+  input: { customerId: string; kind: OutreachKind; subject: string; body: string },
+): Promise<string | null> {
   const [rows] = await wsDb(ctx).batch([
     {
       text: `
@@ -194,7 +203,8 @@ export async function saveDraft(
       params: [ctx.accountId, business.id, `outreach_${input.kind}`, input.subject, input.body, input.customerId],
     },
   ])
-  return (rows as WsRow[]).length > 0
+  const row = (rows as WsRow[])[0]
+  return row ? String(row.id) : null
 }
 
 export type DraftItem = { id: string; customerId: string | null; name: string; subject: string; createdAt: Date }

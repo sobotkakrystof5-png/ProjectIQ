@@ -335,7 +335,7 @@ export async function getRequestDetail(
 
 export type NotificationItem = { id: string; title: string; body: string | null; link: string | null; created_at: Date; read: boolean }
 
-/** Upozornění v aplikaci (zvonek). Zatím jen čtení, vznikat budou od S15. */
+/** Upozornění v aplikaci (zvonek). Vznikají z událostí (S15), přečtená po otevření zvonku. */
 export async function getNotifications(
   ctx: WsContext,
   business: Pick<WsBusiness, 'id'>,

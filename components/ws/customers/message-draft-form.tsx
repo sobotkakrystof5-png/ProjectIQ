@@ -12,7 +12,7 @@ import type { MessageTopic } from '@/lib/ws/detail-param'
 
 /**
  * „Připravit zprávu“ z panelu Komu napsat: předvyplněný e-mail, který jde
- * upravit. Uloží se jako koncept; odeslání přes frontu doplní S15.
+ * upravit. Odešle se frontou e-mailů s odkazem na odhlášení (S15).
  */
 export function MessageDraftForm({
   slug,
@@ -67,11 +67,11 @@ export function MessageDraftForm({
         />
       </div>
       <p className="rounded-chip bg-navy-50 px-3 py-2.5 text-sm text-navy-900 dark:bg-navy-800 dark:text-navy-50">
-        Zprávu uložíme jako připravenou. Odešleme ji, až v aplikaci zapneme e-maily.
+        Pod zprávu přidáme odkaz, kterým se zákazník může odhlásit. Odpovědi přijdou na váš e-mail.
       </p>
       <div>
         <Button type="submit" disabled={pending}>
-          Uložit zprávu
+          Odeslat
         </Button>
       </div>
     </form>

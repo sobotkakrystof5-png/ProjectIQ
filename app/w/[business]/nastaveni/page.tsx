@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ChevronRight, Clock3, FileText, Gift, Globe, ListChecks, Palette, SlidersHorizontal, Users, Wrench } from 'lucide-react'
+import { ChevronRight, Clock3, FileText, Gift, Globe, ListChecks, Mail, Palette, SlidersHorizontal, Users, Wrench } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
 import { AccentHeading } from '@/components/ws/brand'
 import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
@@ -17,6 +17,7 @@ const SECTIONS = [
   { path: 'oteviraci-doba', icon: Clock3, title: 'Otevírací doba a pracovníci', text: 'Směny, dostupnost a blokace v kalendáři' },
   { path: 'formular', icon: FileText, title: 'Formulář poptávky', text: 'Kolonky, které zákazník vyplní na webu' },
   { path: 'stavy', icon: ListChecks, title: 'Stavy zakázky', text: 'Vlastní postup práce od nové po hotovou zakázku' },
+  { path: 'emaily', icon: Mail, title: 'E-maily a upozornění', text: 'Co chodí zákazníkům a vám, texty e-mailů a náhled' },
   { path: 'web', icon: Globe, title: 'Napojený web', text: 'Odkaz na objednání, QR kód, widget a napojení vašeho webu' },
   { path: 'vernost', icon: Gift, title: 'Věrnost', text: 'Razítka, odměna a pravidla věrnostních karet' },
   { path: 'skupiny', icon: Users, title: 'Skupiny zákazníků', text: 'Kdy je zákazník nový, stálý nebo spící' },

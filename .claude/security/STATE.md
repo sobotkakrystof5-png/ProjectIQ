@@ -74,12 +74,12 @@ Doménu spravuje Kryštof (registrátor: doplnit). Nic z toho zatím není ově�
 |---|---|---|
 | DNSSEC | ❓ neověřeno | zapnout u registrátora |
 | CAA | ❓ | `0 issue "letsencrypt.org"` (Vercel vydává přes Let's Encrypt) + `0 iodef "mailto:info@vizeon.cz"` |
-| SPF | ❓ | Resend posílá ze subdomény (`send.zakaziq.cz`): `v=spf1 include:amazonses.com ~all` podle hodnot z Resend dashboardu; kořen domény bez pošty `v=spf1 -all` |
+| SPF | ❓ | Resend posílá ze subdomény (`send.zakaziq.cz`): MX `send` → `feedback-smtp.eu-west-1.amazonses.com` (10) a TXT `send` = `v=spf1 include:amazonses.com ~all` podle hodnot z Resend dashboardu; kořen domény bez pošty `v=spf1 -all`. Postup `docs/workspace/SETUP.md` → E-maily (S15) |
 | DKIM | ❓ | záznam `resend._domainkey` z Resend dashboardu |
-| DMARC | ❓ | začít `v=DMARC1; p=none; rua=mailto:…` → po 2–4 týdnech čistých reportů `p=quarantine` → `p=reject` |
+| DMARC | ❓ | TXT `_dmarc`: začít `v=DMARC1; p=none; rua=mailto:info@vizeon.cz` → po 2–4 týdnech čistých reportů `p=quarantine` → `p=reject` |
 | MX | ❓ | jen pokud bude doména přijímat poštu (Reply-To jde na e-mail klienta, takže nemusí) |
 
-Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
+Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odesílací adresa Workspace `rezervace@zakaziq.cz` (`WS_EMAIL_FROM`); dokud není nastavená, e-maily čekají ve frontě a nic neodchází (S15).
 
 ## Aplikace
 
@@ -88,6 +88,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 - Platby (S08): Stripe jen na serveru (`lib/ws/stripe.ts` se `server-only`, omezený klíč `rk_…`), Checkout a Customer Portal jako přesměrování, takže CSP se nemění. Webhook `/api/stripe/webhook`: podpis přes `constructEvent` ze syrového těla (tolerance 5 min), bez `STRIPE_WEBHOOK_SECRET` 503, limit těla 512 kB, idempotence `ws.stripe_events`, payload se neukládá a předplatné se vždy znovu načte ze Stripe. Účet z metadat podepsané události, návrat z Checkoutu ověří `client_reference_id` proti přihlášenému účtu. Spravovat předplatné smí jen vlastník
 - Rate limit: admin API a portál DB-backed (`lib/api-rate-limit.ts`, `isRateLimited`) ✅; Workspace veřejné vstupy `lib/ws/intake/rate-limit.ts` nad `ws.rate_limits` (IP jen jako HMAC) ✅ S11
 - Veřejné API `/api/public/v1/*` (S11): tajný klíč `sk_live_…` jen ze serveru (s `Origin` = 401), v DB prefix + HMAC-SHA256 s `WS_KEY_PEPPER`, `timingSafeEqual`; veřejný klíč `pk_live_…` jen z `allowed_origins`; Zod + délky, tělo 64 kB, `Idempotency-Key`, záznam `ws.intake_log` bez IP. Widget jen `textContent`. DECISIONS #010
+- E-maily (S15): jen přes frontu `ws.outbound_messages` a Resend na serveru (`lib/ws/email/transport.ts`, `server-only`). Veškerý text v HTML escapovaný, odkazy jen http/https, předmět bez konců řádků, jméno odesílatele očištěné. Odkazy z e-mailů podepsané HMAC (klíč odvozený z `WS_KEY_PEPPER`), akce majitele jednorázové 72 h (`ws.action_tokens`), GET nic nemění, `Referrer-Policy: no-referrer`. Hromadné zprávy jen se souhlasem (ověří se i těsně před odesláním), odkaz na odhlášení + `List-Unsubscribe` jedním klikem. Webhook `/api/resend/webhook`: podpis Svix, tolerance 5 min, idempotence `ws.webhook_events`, bez `RESEND_WEBHOOK_SECRET` 503. Novinky `ws.product_news` ws_app jen čte. DECISIONS #011
 - Captcha: žádná, honeypot `website` + rate limit (DECISIONS #010). Turnstile při prvním spamu
 - Secrets: jen env Vercelu, `.env*` v `.gitignore` (kromě vzorů), gitleaks v CI. Historie gitu 2026-10-08 čistá (90 commitů)
 - Session: NextAuth JWT (admin), Clerk (Workspace, jen pod `/w` a `/api/ws` — middleware Clerk jinde nespouští). Cookie `__session` Clerku není HttpOnly (DECISIONS #009)
@@ -108,7 +109,8 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar.
 | Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; Workspace zatím Zod jen na serveru (S07) — `z.config({ jitless: true })` až s prvním formulářem validovaným v prohlížeči | — | S10+ |
 | `npm audit` — 11 zranitelností (1 critical `next` 14) | CI job audit je dočasně jen upozornění (DECISIONS #006) | Kryštof | S19 |
 | `security.txt` — `Expires: 2027-10-01` | prošlý security.txt je horší než žádný | Kryštof | připomínka 2027-09 |
-| DNS `zakaziq.cz` (DNSSEC, CAA, SPF, DKIM, DMARC) | bez nich lze posílat poštu jménem domény | Kryštof | před prvním e-mailem z Resendu (S15) |
+| DNS `zakaziq.cz` (DNSSEC, CAA, SPF, DKIM, DMARC) + doména v Resendu | bez nich lze posílat poštu jménem domény a e-maily padají do spamu; postup `docs/workspace/SETUP.md` → E-maily (S15) | Kryštof | před nastavením `WS_EMAIL_FROM` |
+| `WS_EMAIL_FROM` a `RESEND_WEBHOOK_SECRET` do Vercelu (+ endpoint webhooku v Resendu) | bez `WS_EMAIL_FROM` Workspace neodešle žádný e-mail; bez webhooku se nedozvíme o nedoručených | Kryštof | po ověření domény v Resendu |
 | CI proměnná `SITE_URL` | job `headers` se jinak neprovede | Kryštof | po prvním nasazení Workspace |
 | Živý audit `security-check.sh` | hlavičky ověřené jen lokálně | Claude | po deployi (S19, a po každém deployi) |
 | HSTS preload | zděděné `preload` — ověřit stav na hstspreload.org pro produkční doménu adminu | Kryštof | S19 |

@@ -16,7 +16,7 @@ import { LiveRefresh } from './booking/live-refresh'
 import { CommandPalette } from './command-palette'
 import { NavIcon } from './nav-icon'
 import { NewMenu } from './new-menu'
-import { NotificationsBell, type BellItem } from './notifications-bell'
+import { NotificationsBell, type BellItem, type BellNews } from './notifications-bell'
 
 export type FrameBusiness = { name: string; slug: string }
 
@@ -28,7 +28,7 @@ export type AppFrameProps = {
   orderUrl: string
   services: string[]
   today: string
-  notifications: { items: BellItem[]; unread: number }
+  notifications: { items: BellItem[]; unread: number; news: BellNews[]; newsUnseen: boolean }
   /** Slug z cookie — když se liší od otevřeného byznysu, uloží se nový. */
   rememberedSlug: string | null
   children: React.ReactNode
@@ -160,7 +160,7 @@ export function AppFrame(props: AppFrameProps) {
             >
               <Search aria-hidden size={20} strokeWidth={1.5} />
             </button>
-            <NotificationsBell items={notifications.items} unread={notifications.unread} />
+            <NotificationsBell slug={business.slug} items={notifications.items} unread={notifications.unread} news={notifications.news} newsUnseen={notifications.newsUnseen} />
             <div className="hidden md:block">
               <NewMenu variant="header" actions={actions} orderUrl={orderUrl} onSearch={openSearch} />
             </div>

@@ -4,7 +4,7 @@
 
 ## Co v databázi je
 
-- **Schéma `ws`** — všechny tabulky Workspace (migrace `064`–`079`). Admin tabulky v `public` se nemění.
+- **Schéma `ws`** — všechny tabulky Workspace (migrace `064`–`081`). Admin tabulky v `public` se nemění.
 - **Role `ws_app`** — jediná role, kterou se aplikace Workspace připojuje (`DATABASE_URL_WS`). Platí pro ni Row Level Security, do `public` nevidí.
 - **Vlastník tabulek** (`neondb_owner`, `DATABASE_URL`) — pouští migrace a čte `ws` pro admin stránku `/dashboard/klienti`. RLS pro něj neplatí.
 
@@ -20,7 +20,8 @@ node scripts/apply-migration.js \
   067_ws_zakaznici.sql 068_ws_poptavky_zakazky_terminy.sql 069_ws_vernost.sql \
   070_ws_segmenty.sql 071_ws_penize.sql 072_ws_napojeni_webu.sql \
   073_ws_predplatne_webhooky.sql 074_ws_emaily_upozorneni.sql 075_ws_audit_limity.sql 076_ws_verejne_api.sql \
-  077_ws_vernost_skupiny.sql 078_ws_vernost_odmena.sql 079_ws_sluzby_rozestupy.sql
+  077_ws_vernost_skupiny.sql 078_ws_vernost_odmena.sql 079_ws_sluzby_rozestupy.sql \
+  080_ws_penize_provoz.sql 081_ws_emaily_odkazy_novinky.sql
 ```
 
 Jde to i ručně v Neon SQL editoru (obsah souborů po jednom, v tomhle pořadí). Migrace jsou idempotentní, opakované spuštění nic nerozbije.
@@ -155,4 +156,28 @@ Před spuštěním (S19) totéž v live módu: produkt a cena, omezený klíč, 
 
 Po 078/079 ručně aplikovat migrations/080_ws_penize_provoz.sql v Neon SQL editoru rolí vlastníka. Přidává sloupce, unikátní platbu za fakturu a SECURITY INVOKER funkce; EXECUTE pro ws_app uděluje sama. Nevkládá ukázková data. Při starších duplicitních platbách index bezpečně selže a data se nemažou. Na skutečnou DB v S14 neaplikovaná.
 
-Postup a odhad daní: [MONEY.md](MONEY.md). Pro lokální PDF je potřeba Chrome/CHROME_PATH, pro Vercel kompletní @sparticuz/chromium včetně bin/chromium.br. Nová env není potřeba; AI používá existující serverový ANTHROPIC_API_KEY. E-mail je do S15 jen koncept.
+Postup a odhad daní: [MONEY.md](MONEY.md). Pro lokální PDF je potřeba Chrome/CHROME_PATH, pro Vercel kompletní @sparticuz/chromium včetně bin/chromium.br. Nová env není potřeba; AI používá existující serverový ANTHROPIC_API_KEY. Fakturu e-mailem s PDF posílá od S15 fronta (níže).
+
+## E-maily (S15): migrace 081 a Resend
+
+### 1. Migrace
+
+Po 080 ručně aplikovat `migrations/081_ws_emaily_odkazy_novinky.sql` v Neon SQL editoru rolí vlastníka, potom znovu `scripts/ws-grants.sql` (odebere ws_app zápis do `ws.product_news`, dá EXECUTE na `ws.accounts_with_due_messages`). Data nemění. Bez 081 nefungují odkazy z e-mailů, připomínky ani přehledy (fronta potřebuje `dedupe_key`).
+
+### 2. Doména v Resendu
+
+1. Resend → Domains → Add domain `zakaziq.cz`, region EU (Irsko). Odesílá se z adresy `rezervace@zakaziq.cz`, jako jméno odesílatele se ukazuje název firmy klienta.
+2. Do DNS `zakaziq.cz` přidat přesně záznamy, které Resend ukáže (hodnoty DKIM jsou pro každý účet jiné):
+   - **DKIM**: TXT `resend._domainkey` = veřejný klíč z Resendu.
+   - **SPF** (na odesílací poddoméně Resendu, standardně `send`): MX `send` → `feedback-smtp.eu-west-1.amazonses.com` (priorita 10) a TXT `send` = `v=spf1 include:amazonses.com ~all`.
+   - **DMARC**: TXT `_dmarc` = `v=DMARC1; p=none; rua=mailto:info@vizeon.cz` (po pár týdnech bez problémů zpřísnit na `p=quarantine`).
+3. Počkat na „Verified“, pak nastavit `WS_EMAIL_FROM=rezervace@zakaziq.cz` (`.env.local`, Vercel Production i Preview). Bez ní fronta nic neodesílá a zprávy čekají — po zapnutí odejdou jen ty, kterým ještě neprošla platnost (připomínky po termínu se zruší).
+4. `RESEND_API_KEY` je sdílený s adminem (waitlist). Pro Workspace stačí klíč s právem Sending access na doménu `zakaziq.cz`.
+
+### 3. Webhook nedoručených e-mailů
+
+Resend → Webhooks → Add endpoint `https://www.zakaziq.cz/api/resend/webhook`, události `email.bounced`, `email.complained`, `email.failed`, `email.suppressed`. Podpisový klíč (`whsec_…`) do `RESEND_WEBHOOK_SECRET` (Vercel). Bez něj endpoint vrací 503 a nedoručené e-maily zůstanou ve frontě jako odeslané.
+
+### 4. Cron a ruční test
+
+Cron `/api/cron/ws-email` běží denně v 5:00 UTC (7:00 letního času, 6:00 zimního) s `CRON_SECRET`. Ručně: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3001/api/cron/ws-email`. Zkušební e-mail kteréhokoli typu jde poslat z Nastavení › E-maily a upozornění na adresu přihlášeného člena.

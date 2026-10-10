@@ -19,6 +19,9 @@ export const WS_MIGRATIONS = fs
 /** Tabulky bez dat účtů a bez RLS (migrace 073, 075). Nová tabulka sem patří jen s důvodem. */
 export const WS_SYSTEM_TABLES = ['rate_limits', 'stripe_events', 'webhook_events']
 
+/** Globální obsah bez dat účtů (novinky ZakazIQ, migrace 081): ws_app jen čte. */
+export const WS_GLOBAL_TABLES = ['product_news']
+
 const read = (file: string) => fs.readFileSync(file, 'utf8')
 
 export async function applyWsMigrations(db: PGlite): Promise<void> {
@@ -98,6 +101,7 @@ export async function seedAccount(db: PGlite, L: 'a' | 'b'): Promise<void> {
     INSERT INTO ws.audit_log (account_id, business_id, actor, action) VALUES ('${i.account}', '${i.business}', 'user_${L}', 'test');
     INSERT INTO ws.idempotency_keys (account_id, key, request_hash) VALUES ('${i.account}', 'klic-1', 'hash');
     INSERT INTO ws.intake_log (account_id, business_id, integration_id, channel, status, request_id) VALUES ('${i.account}', '${i.business}', '${i.integration}', 'widget', 202, '${i.request}');
+    INSERT INTO ws.action_tokens (account_id, business_id, request_id, expires_at) VALUES ('${i.account}', '${i.business}', '${i.request}', now() + interval '72 hours');
   `)
 }
 

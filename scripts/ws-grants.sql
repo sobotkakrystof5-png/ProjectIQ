@@ -26,3 +26,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA ws GRANT SELECT, INSERT, UPDATE, DELETE ON TA
 
 -- Denní cron skupin zákazníků a věrnosti (migrace 077, S12)
 GRANT EXECUTE ON FUNCTION ws.active_businesses() TO ws_app;
+
+-- E-maily, odkazy a novinky (migrace 081, S15). Novinky píše jen admin.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ws.product_news FROM ws_app;
+GRANT EXECUTE ON FUNCTION ws.accounts_with_due_messages() TO ws_app;

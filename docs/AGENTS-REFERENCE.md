@@ -109,7 +109,8 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
 | Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
-| Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení a hash klíčů rate limitu. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) |
+| Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení, hash klíčů rate limitu a (odvozeným klíčem) podpis odkazů v e-mailech. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) a e-maily s odkazy nevzniknou. Změna zneplatní klíče i odeslané odkazy |
+| Workspace e-maily | `WS_EMAIL_FROM` (adresa na doméně ověřené v Resendu, např. `rezervace@zakaziq.cz`; bez ní fronta nic neodešle), `RESEND_API_KEY` (sdílený s adminem), `RESEND_WEBHOOK_SECRET` (`/api/resend/webhook`, bez něj 503), `CRON_SECRET` (`/api/cron/ws-email`) |
 | Workspace platby | `STRIPE_SECRET_KEY` (omezený `rk_…`, jen server), `STRIPE_WEBHOOK_SECRET` (`/api/stripe/webhook`, bez něj 503), `STRIPE_PRICE_MONTHLY` (cena 249 Kč), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (zatím nepoužitý). Postup `docs/workspace/SETUP.md` → Stripe |
 | Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
@@ -220,6 +221,7 @@ Pravidla schématu:
 | 078 | `ws.loyalty_add_stamps` odmítne razítko za návštěvu, kde už byla uplatněná odměna (S12, ručně aplikovat na Neon) |
 | 079 | `ws.services.buffer_min` (0–240 minut) pro rozestup po službě při nabídce volných termínů (S13, ručně aplikovat na Neon) |
 | 080 | Peníze S14: accounts.invoice_sequences, invoices.issuer/supplied_on/pdf_data/pdf_filename, tax_settings.options; unique transakce za fakturu, ws.money_issue/pay a money_adopt_visit (SECURITY INVOKER); ručně aplikovat na Neon |
+| 081 | E-maily S15: `message_settings` typy `booking_declined`, `invoice_overdue`, `vat_limit`; `outbound_messages.dedupe_key` (unikátní za účet); `action_tokens` (jednorázové odkazy majitele); `product_news` (globální, ws_app jen čte); `accounts.news_emails`, `members.news_seen_at`; `ws.accounts_with_due_messages()` (SECURITY DEFINER pro cron); ručně aplikovat na Neon |
 
 ## B4. Přihlášení a role
 
@@ -298,12 +300,35 @@ Popis API s příklady pro weby klientů: **`docs/workspace/API.md`** (zdroj pro
 | Zkušební poptávky | `requests.is_test`: `test: true` v API nebo Ověřit napojení. Nezakládají zákazníka ani upozornění; dotazy v `today.ts`, `calendar.ts`, `search.ts` je vynechávají (nový výpis poptávek = `AND NOT r.is_test`) |
 | Testy | `lib/ws/__tests__/ws-intake.test.ts` (klíče, rotace, cizí účet, kolonky, volné časy, SLOT_TAKEN, idempotence, externalId, neaktivní předplatné, honeypot, route: 401/403/CORS/429/413, schema, widget, frame-ancestors, prompt) |
 
-- E-mail zákazníkovi a majiteli po přijetí poptávky zatím není — doplní S15 v `afterSave` (`intake.ts`).
+- E-mail zákazníkovi a majiteli po přijetí poptávky: `afterSave` (`intake.ts`) → `notifyNewRequest` (S15).
 - Volné časy nezohledňují nepotvrzené poptávky (potvrzuje majitel).
 
 ## B7. E-maily
 
-Resend z domény ZakazIQ, jako odesílatel jméno byznysu, Reply-To e-mail klienta. Šablony v React Email ve stylu Dílky v `lib/ws/email/`. Fronta `ws.outbound_messages` s opakováním. Každý typ e-mailu jde zapnout/vypnout a upravit v nastavení. Odhlašovací odkaz u všeho, co není transakční.
+Resend z domény ZakazIQ, jako odesílatel jméno byznysu, Reply-To e-mail klienta. Šablony ve stylu Dílky v `lib/ws/email/` (vlastní HTML, ne React Email — R-050). Fronta `ws.outbound_messages` s opakováním. Každý typ e-mailu jde zapnout/vypnout a upravit v nastavení. Odhlašovací odkaz u všeho, co není transakční.
+
+### Jak je to v kódu (S15, R-050)
+
+| Co | Kde |
+|---|---|
+| Katalog typů, výchozí texty, proměnné `{jmeno}` `{termin}` `{sluzba}` `{razitka}` `{odmena}` `{cislo}` `{castka}` `{splatnost}` | `lib/ws/email/catalog.ts` (bez importů serveru) |
+| Rozložení Dílků (tabulkové HTML, escapování, jen http/https odkazy) a složení zákaznického e-mailu | `lib/ws/email/{layout,compose}.ts` — stejná funkce pro náhled v Nastavení i odeslání |
+| Fronta: `enqueueEmail` (klíč události `dedupe_key`, `sendAt`, `validUntil`), `flushAccount` (claim `FOR UPDATE SKIP LOCKED`, 5 pokusů 1/5/30/120/720 min, obsah se po odeslání maže), `flushAll` (cron) | `lib/ws/email/queue.ts` |
+| Odeslání přes Resend (klíč idempotence = ID zprávy, tagy `account`/`message`/`type`), bez `WS_EMAIL_FROM` nic | `lib/ws/email/transport.ts` (`setEmailTransportForTests`) |
+| Události → e-maily; nikdy nevyhodí, zákazníkům jen s aktivním předplatným, majiteli vždy | `lib/ws/email/notify.ts`: `notifyNewRequest`, `notifyBookingConfirmed`, `notifyAppointmentMoved`, `notifyRequestDeclined`, `notifyAppointmentCancelled`, `cancelPendingNotice`, `notifyVisitPaid`, `notifyRewardForJob`, `notifyPaymentFailed`, `deliver` |
+| Odmítnutí, zrušení a přesun čekají 60 s (`UNDO_DELAY_MS`), „Zpět“ e-mail zruší; návrat na původní čas nepošle nic | `notify.ts` |
+| Odkazy z e-mailů: podpis HMAC (klíč odvozený z `WS_KEY_PEPPER`), druhy `a` (akce majitele), `u` (odhlášení zákazníka), `n` (odhlášení novinek), `c` (.ics) | `lib/ws/email/links.ts` |
+| Potvrdit / Jiný čas bez přihlášení: řádek `ws.action_tokens` (72 h, jednorázově, atomicky; selhání ho vrátí; GET nic nemění) | `lib/ws/email/action-link.ts`, stránka `/z/odkaz/[token]` |
+| Odhlášení `/z/odhlasit/[token]` (+ `POST …/jedno-kliknuti`, RFC 8058), termín do kalendáře `/z/kalendar/[token]` | `lib/ws/email/public-links.ts`, `app/z/` |
+| Ruční odeslání: „Komu napsat“ (koncept → fronta, souhlas se ověří i těsně před odesláním), faktura s PDF | `lib/ws/email/outbox.ts` |
+| Denní cron `0 5 * * *` UTC: připomínky na zítřek, faktura po splatnosti, limit DPH (80 % a 100 %), přehled dne (Po–Pá), týden (Po), měsíc (1.), novinky, odeslání fronty | `lib/ws/email/scheduled.ts`, `app/api/cron/ws-email` |
+| Odeslání během dne: po akci (`deliver`, limit 2,5 s) a při živém obnovení (`/api/ws/[byznys]/zmeny`) | R-050 (Hobby = cron 1× denně) |
+| Nastavení › E-maily a upozornění (přepínače, text, živý náhled v `iframe sandbox`, zkušební e-mail, Reply-To, novinky) | `app/w/[business]/nastaveni/emaily/`, `components/ws/settings/email-settings.tsx`, `lib/ws/email/settings.ts` |
+| Zvonek: po otevření přečteno, „Co je nového“ z `ws.product_news` | `lib/ws/email/inbox.ts`, `components/ws/app/notifications-bell.tsx` |
+| Nedoručené e-maily: webhook Resendu (podpis Svix, idempotence `webhook_events`), stížnost = odhlášení z nabídek | `lib/ws/email/resend-webhook.ts`, `app/api/resend/webhook` |
+
+- Nový e-mail = typ v `catalog.ts` (+ CHECK `message_settings` novou migrací), složení v `compose.ts` nebo `ownerEmail`, událost v `notify.ts` s `dedupeKey`.
+- Odkazy Přesunout/Zrušit pro zákazníka čekají na portál (S16); dnes „odpovězte na e-mail“. Web Push je S18.
 
 ## B8. Design
 

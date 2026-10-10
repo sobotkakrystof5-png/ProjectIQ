@@ -1,6 +1,7 @@
 import type Stripe from 'stripe'
-import { syncSubscription } from './billing'
+import { GRACE_DAYS, syncSubscription } from './billing'
 import { wsSystem } from './db'
+import { notifyPaymentFailed } from './email/notify'
 
 // Zpracování událostí ze Stripe (/api/stripe/webhook, S08). Podpis ověřuje
 // route handler, sem jde jen ověřená událost.
@@ -38,6 +39,12 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<StripeEven
 
   const subscriptionId = subscriptionOf(event)
   const accountId = subscriptionId ? await syncSubscription(subscriptionId) : null
+
+  // Neúspěšná platba: majitel dostane e-mail a upozornění (S15). Jen jednou
+  // na fakturu Stripe; chyba e-mailu zpracování události nezastaví.
+  if (accountId && event.type === 'invoice.payment_failed') {
+    await notifyPaymentFailed({ accountId }, event.data.object.id ?? event.id, GRACE_DAYS)
+  }
 
   await wsSystem`
     UPDATE ws.stripe_events SET processed_at = now(), account_id = ${accountId}

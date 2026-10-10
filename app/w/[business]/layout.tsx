@@ -9,6 +9,7 @@ import { orderPageUrl } from '@/lib/ws/app-origin'
 import { formatDayShort, formatMinutes, pragueParts } from '@/lib/ws/time'
 import { getBusinesses, getEnabledModules, getNotifications } from '@/lib/ws/today'
 import { wsDb } from '@/lib/ws/db'
+import { getNews } from '@/lib/ws/email/inbox'
 
 // Kostra aplikace pro jeden byznys (S09): postranní panel, hlavička,
 // spodní lišta, ⌘K. Byznys z URL se ověří proti účtu — cizí slug = 404.
@@ -25,7 +26,7 @@ export default async function BusinessLayout({
   // Účet, který nikdy neprošel Checkoutem, dokončí průvodce (S08, krok 2).
   if (billing.access === 'none') redirect(WS_ONBOARDING_PATH)
 
-  const [businesses, modules, notifications, services] = await Promise.all([
+  const [businesses, modules, notifications, services, news] = await Promise.all([
     getBusinesses(ctx),
     getEnabledModules(ctx, business),
     getNotifications(ctx, business),
@@ -34,6 +35,7 @@ export default async function BusinessLayout({
       WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND active
       ORDER BY position, name
     `,
+    getNews(ctx).catch(() => ({ items: [], unseen: false })),
   ])
   const isOwner = hasRole(ctx, 'owner')
   const now = new Date()
@@ -60,6 +62,8 @@ export default async function BusinessLayout({
             at: `${formatDayShort(at.date)} ${formatMinutes(at.minutes)}`,
           }
         }),
+        news: news.items.map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, at: formatDayShort(pragueParts(n.publishedAt).date) })),
+        newsUnseen: news.unseen,
       }}
       rememberedSlug={cookies().get(LAST_BUSINESS_COOKIE)?.value ?? null}
     >

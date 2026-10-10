@@ -1,5 +1,7 @@
 'use server'
 import { z } from 'zod'
+import { deliver } from '@/lib/ws/email/notify'
+import { sendInvoiceEmail } from '@/lib/ws/email/outbox'
 import { revalidatePath } from 'next/cache'
 import { requireBusiness, requireWorkspace, type WsContext, type WsBusiness } from '@/lib/ws/context'
 import { assertWritable } from '@/lib/ws/billing'
@@ -90,19 +92,22 @@ export async function extractInvoiceAction(fd:FormData):Promise<Result<Awaited<R
   return ok(await extractReceivedPdf((await readPdf(file)).base64))
  }catch(e){console.error('[ws/money] Přepis selhal.',{accountId:ctx.accountId,code:pgErrorCode(e)??'external'});return fail('Přepis se nepovedl. Fakturu můžete vyplnit ručně.')}
 }
-export async function queueInvoiceAction(raw:unknown):Promise<Result<null>> {
+export async function queueInvoiceAction(raw:unknown):Promise<Result<{message:string}>> {
  const ctx=await requireWorkspace(),p=z.object({slug:z.string().min(1).max(60),id:z.string().uuid()}).safeParse(raw)
  if(!p.success)return fail('Vyberte fakturu.')
  const b=await requireBusiness(ctx,p.data.slug),blocked=await writable(ctx,b,'invoices');if(blocked)return blocked
  try{
   const i=await getInvoice(ctx,b,p.data.id)
-  if(!i||i.direction!=='issued'||!['issued','paid'].includes(i.status))return fail('Tuhle fakturu nejde připravit k odeslání.')
+  if(!i||i.direction!=='issued'||!['issued','paid'].includes(i.status))return fail('Tuhle fakturu nejde poslat.')
   const email=z.string().email().max(254).safeParse(i.counterparty.email)
   if(!email.success)return fail('Na faktuře chybí e-mail odběratele.')
-  // S15 doplní odesílací frontu a přílohu. Do té doby jde o koncept, nikoli odeslaný e-mail.
-  await wsDb(ctx)`INSERT INTO ws.outbound_messages(account_id,business_id,customer_id,type,to_address,reply_to,subject,payload,status)
-   SELECT ${ctx.accountId},${b.id},${i.customerId},'invoice',${email.data},${i.issuer.email||null},${'Faktura '+i.number},${JSON.stringify({invoiceId:i.id})}::jsonb,'draft'
-   WHERE NOT EXISTS(SELECT 1 FROM ws.outbound_messages WHERE account_id=${ctx.accountId} AND business_id=${b.id} AND type='invoice' AND payload->>'invoiceId'=${i.id} AND status IN ('draft','queued','sending')) ON CONFLICT DO NOTHING`
-  revalidatePath('/w');return ok(null)
+  // Fronta e-mailů (S15): PDF se přiloží při odeslání, chyba odeslání se zkusí znovu.
+  const sent=await sendInvoiceEmail(ctx,b,i,email.data)
+  if(sent==='pending')return ok({message:'Faktura už se odesílá.'})
+  if(sent==='off')return fail('E-mail s fakturou máte vypnutý v Nastavení › E-maily a upozornění.')
+  if(sent==='read_only')return fail('Předplatné je pozastavené, e-maily zákazníkům teď neodcházejí.')
+  if(sent!=='queued')return fail('Fakturu se nepodařilo poslat. Zkuste to prosím znovu.')
+  await deliver(ctx,8000)
+  revalidatePath('/w');return ok({message:'Faktura je na cestě k odběrateli.'})
  }catch(e){return failure(e,ctx.accountId)}
 }

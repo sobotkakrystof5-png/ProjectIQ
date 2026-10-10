@@ -1,6 +1,6 @@
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { asApp, createWsTestDb, ids, pgCode, WS_MIGRATIONS, WS_SYSTEM_TABLES } from './helpers/ws-pglite'
+import { asApp, createWsTestDb, ids, pgCode, WS_GLOBAL_TABLES, WS_MIGRATIONS, WS_SYSTEM_TABLES } from './helpers/ws-pglite'
 
 // Schéma ws (migrace 064+): idempotence, oddělení účtů pro každou tabulku
 // a pravidla, která hlídá databáze (překryv termínů, razítka, webhooky).
@@ -20,7 +20,7 @@ beforeAll(async () => {
   `)
   accountTables = rows
     .map((r) => r.table_name)
-    .filter((t) => !WS_SYSTEM_TABLES.includes(t))
+    .filter((t) => !WS_SYSTEM_TABLES.includes(t) && !WS_GLOBAL_TABLES.includes(t))
     .map((t) => ({ table: t, column: t === 'accounts' ? 'id' : 'account_id' }))
 }, 60_000)
 
@@ -63,6 +63,15 @@ describe('migrace ws', () => {
     )
     const columns = rows.map((r) => `${r.table_name}.${r.column_name}`)
     expect(columns.filter((c) => /payload|email|phone|ip|body|name/.test(c.split('.')[1]))).toEqual([])
+  })
+
+  it('novinky ZakazIQ ws_app jen čte, nezapíše', async () => {
+    await db.query(`INSERT INTO ws.product_news (title, body, published_at) VALUES ('Novinka', 'Text', now())`)
+    const read = await asApp(db, A.account, (tx) => tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM ws.product_news`))
+    expect(read.rows[0].n).toBe(1)
+    expect(await pgCode(asApp(db, A.account, (tx) => tx.query(`INSERT INTO ws.product_news (title, body) VALUES ('x', 'y')`)))).toBe('42501')
+    expect(await pgCode(asApp(db, A.account, (tx) => tx.query(`UPDATE ws.product_news SET title = 'x'`)))).toBe('42501')
+    await db.query(`DELETE FROM ws.product_news`)
   })
 
   it('tabulky v public migrace nemění (jen ws)', async () => {

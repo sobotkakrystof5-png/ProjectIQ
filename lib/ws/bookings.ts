@@ -204,6 +204,11 @@ async function requestState(ctx: WsContext, business: Biz, requestId: string): P
   }
 }
 
+/** Stav poptávky (např. „rescheduled“ po potvrzení na jiný čas), null = není. */
+export async function requestStatus(ctx: WsContext, business: Biz, requestId: string): Promise<string | null> {
+  return (await requestState(ctx, business, requestId))?.status ?? null
+}
+
 export type ConfirmResult = { appointmentId: string | null; jobId: string | null; start: Date | null }
 
 /**

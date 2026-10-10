@@ -6,6 +6,7 @@ import type { WsContext } from '../context'
 import { canWrite, getBillingState } from '../billing'
 import { findOrCreateCustomer, normalizePhone } from '../bookings'
 import { refreshSegmentsSafely } from '../segments'
+import { deliver, notifyNewRequest } from '../email/notify'
 import { fieldValuesSchema, type FieldDefinition } from '../fields'
 import { addDays, formatDayShort, formatMinutes, isIsoDate, pragueParts, pragueToday, pragueToUtc } from '../time'
 import { computeSlots, isSlotFree, toRange, type DaySlots, type Range, type StaffAvailability } from './slots'
@@ -354,7 +355,9 @@ async function afterSave(
     )
     // Nový zákazník hned mezi Novými (skupiny, S12); chyby si ošetří sám.
     tasks.push(refreshSegmentsSafely({ accountId: acc }, { id: src.businessId }, [saved.customerId]))
-    // E-mail zákazníkovi a majiteli přidá S15 (fronta ws.outbound_messages).
+    // E-mail zákazníkovi a majiteli (S15): do fronty a krátký pokus o odeslání.
+    // Poptávka je v tu chvíli uložená, chyba e-mailu ji nezruší.
+    tasks.push(notifyNewRequest({ accountId: acc }, src.businessId, saved.id).then(() => deliver({ accountId: acc })))
   }
   const results = await Promise.allSettled(tasks)
   for (const r of results) {

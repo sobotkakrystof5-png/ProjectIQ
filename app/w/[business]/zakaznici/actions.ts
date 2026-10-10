@@ -8,7 +8,9 @@ import { requireBusiness, requireWorkspace, type WsBusiness, type WsContext } fr
 import * as customers from '@/lib/ws/customers'
 import * as loyalty from '@/lib/ws/loyalty'
 import type { StampOutcome } from '@/lib/ws/loyalty'
-import { OUTREACH_KINDS, saveDraft, setDraftDiscarded } from '@/lib/ws/outreach'
+import { deliver, notifyVisitPaid } from '@/lib/ws/email/notify'
+import { sendOutreachDraft, type SendOutcome } from '@/lib/ws/email/outbox'
+import { createDraft, OUTREACH_KINDS, setDraftDiscarded } from '@/lib/ws/outreach'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { refreshSegmentsSafely } from '@/lib/ws/segments'
 import { isIsoDate, pragueToday } from '@/lib/ws/time'
@@ -114,6 +116,10 @@ export async function completeVisit(raw: unknown): Promise<Result<{ message: str
     })
     if (!res.ok) return fail(COMPLETE_ERRORS[res.reason])
     await refreshSegmentsSafely(c.ctx, c.business, [res.data.customerId])
+    // Poděkování (a plná karta = odměna) zákazníkovi; chyba e-mailu platbu nevrátí.
+    const full = res.data.stamp?.result === 'added' && res.data.stamp.full
+    await notifyVisitPaid(c.ctx, c.business.id, input.appointmentId, { rewardReady: full })
+    await deliver(c.ctx)
     const base = res.data.redeemed ? 'Hotovo, odměna je uplatněná.' : 'Hotovo a zaplaceno.'
     return ok({
       message: stampMessage(res.data.stamp, base),
@@ -282,14 +288,40 @@ const draftSchema = z.object({
   body: z.string().trim().min(1, '!Napište prosím text zprávy.').max(4000, '!Zpráva je moc dlouhá.'),
 })
 
+const NO_CONSENT = 'Tomuhle zákazníkovi psát nemůžeme. Nemá souhlas s nabídkami nebo e-mail.'
+
+const SEND_ERRORS: Record<Exclude<SendOutcome, 'queued'>, string> = {
+  no_consent: NO_CONSENT,
+  gone: GONE,
+  off: 'Tenhle e-mail máte vypnutý v Nastavení.',
+  read_only: 'Předplatné je pozastavené, zprávy zákazníkům teď neodcházejí.',
+}
+
+/** „Připravit zprávu“ → odeslat (koncept vznikne a hned jde do fronty e-mailů). */
 export async function saveMessageDraft(raw: unknown): Promise<Result<{ message: string }>> {
   const p = await prepare(draftSchema, raw)
   if (!p.ok) return p
   const { input, c } = p
   return guard('saveMessageDraft', c, async () => {
-    const saved = await saveDraft(c.ctx, c.business, input)
-    if (!saved) return fail('Tomuhle zákazníkovi psát nemůžeme. Nemá souhlas s nabídkami nebo e-mail.')
-    return ok({ message: 'Zpráva je uložená jako koncept.' })
+    const id = await createDraft(c.ctx, c.business, input)
+    if (!id) return fail(NO_CONSENT)
+    const sent = await sendOutreachDraft(c.ctx, c.business, id)
+    if (sent !== 'queued') return ok({ message: `Zpráva je uložená jako koncept. ${SEND_ERRORS[sent]}` })
+    await deliver(c.ctx)
+    return ok({ message: 'Zpráva je na cestě.' })
+  })
+}
+
+/** Odeslat dřív uložený koncept (Připravené zprávy). */
+export async function sendMessageDraft(raw: unknown): Promise<Result<{ message: string }>> {
+  const p = await prepare(z.object({ slug, id: uuid }), raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  return guard('sendMessageDraft', c, async () => {
+    const sent = await sendOutreachDraft(c.ctx, c.business, input.id)
+    if (sent !== 'queued') return fail(SEND_ERRORS[sent])
+    await deliver(c.ctx)
+    return ok({ message: 'Zpráva je na cestě.' })
   })
 }
 

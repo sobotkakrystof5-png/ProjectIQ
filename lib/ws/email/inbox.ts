@@ -1,0 +1,36 @@
+import 'server-only'
+import { q, wsDb, type WsRow } from '../db'
+import type { WsBusiness, WsContext } from '../context'
+
+// Zvonek v aplikaci (S15): upozornění se po otevření označí jako přečtená,
+// „Co je nového“ ukazuje novinky ZakazIQ (ws.product_news, píše admin S17).
+
+export type NewsItem = { id: string; title: string; body: string; link: string | null; publishedAt: Date }
+
+/** Posledních pár novinek a jestli je člen už viděl. */
+export async function getNews(ctx: WsContext): Promise<{ items: NewsItem[]; unseen: boolean }> {
+  const [news, me] = await wsDb(ctx).batch([
+    q`SELECT id, title, body, link_url, published_at FROM ws.product_news
+      WHERE published_at IS NOT NULL AND published_at <= now() AND published_at > now() - interval '120 days'
+      ORDER BY published_at DESC LIMIT 3`,
+    q`SELECT news_seen_at FROM ws.members WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`,
+  ])
+  const items = news.map((n: WsRow) => ({
+    id: String(n.id),
+    title: String(n.title),
+    body: String(n.body),
+    link: (n.link_url as string | null) ?? null,
+    publishedAt: new Date(n.published_at as string),
+  }))
+  const seen = me[0]?.news_seen_at ? new Date(me[0].news_seen_at as string) : null
+  return { items, unseen: items.some((i) => !seen || i.publishedAt > seen) }
+}
+
+/** Otevřený zvonek: upozornění byznysu přečtená, novinky viděné. */
+export async function markBellSeen(ctx: WsContext, business: Pick<WsBusiness, 'id'>): Promise<void> {
+  await wsDb(ctx).batch([
+    q`UPDATE ws.notifications SET read_at = now()
+      WHERE account_id = ${ctx.accountId} AND (business_id = ${business.id} OR business_id IS NULL) AND read_at IS NULL`,
+    q`UPDATE ws.members SET news_seen_at = now() WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`,
+  ])
+}

@@ -16,6 +16,19 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-10 — review (S15, e-maily, odkazy z e-mailů, novinky)
+Spouštěč: kontrola podle `web-security-review` před commitem S15.
+Rozsah: `lib/ws/email/*`, `app/z/**` (odkaz majitele, odhlášení, .ics), `app/api/resend/webhook`, `app/api/cron/ws-email`, `app/w/[business]/nastaveni/emaily`, `app/w/[business]/zvonek`, napojení do akcí poptávek, zákazníků, faktur a Stripe webhooku, migrace 081.
+Výsledek:
+- Secrets jen na serveru (`RESEND_API_KEY`, `WS_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`, `WS_KEY_PEPPER`); klientská komponenta Nastavení importuje jen čisté šablony bez env.
+- Vstupy: Zod s délkami ve všech nových akcích, veřejná akce odkazu má rate limit, odkazy podepsané a ověřené `timingSafeEqual`, cizí účet z odkazu nepřijde (podpis zahrnuje účet).
+- XSS: HTML e-mailu escapuje každý vstup (test s `<script>`, `javascript:` odkazem a hlavičkou v předmětu), náhled v `iframe sandbox=""`. Na stránkách `/z` jen React text.
+- Oddělení účtů: nová `ws.action_tokens` pod RLS v testu „každá tabulka“, `ws.product_news` globální bez osobních údajů a ws_app jen čte (test 42501), SECURITY DEFINER `ws.accounts_with_due_messages` vrací jen ID účtů.
+- Pošta: hromadné zprávy jen se souhlasem a ověřením před odesláním, odhlášení jedním klikem, stížnost na spam = odhlášení. Obsah zprávy se po odeslání maže.
+- CSP beze změny (ověřeno: `srcdoc` náhled funguje pod vynucenou politikou /z).
+Nálezy: 0 blokujících. Přijatá rizika v DECISIONS #011 (token v URL, přeposlaný e-mail majitele).
+Zůstává: DNS a doména v Resendu, `WS_EMAIL_FROM` a webhook (STATE → Otevřené položky); migrace 081 ručně na Neon.
+
 ## 2026-10-10 — review (S12, zákazníci, věrnost a skupiny)
 Spouštěč: kontrola podle `web-security-review` před dokončením S12.
 Rozsah: `lib/ws/{customers,loyalty,segments,outreach,cron}.ts`, akce a stránky `/w/[business]/{zakaznici,nastaveni/vernost,nastaveni/skupiny}`, cron, migrace 077 a 078.

@@ -6,6 +6,7 @@ import { assertWritable } from '@/lib/ws/billing'
 import * as bookings from '@/lib/ws/bookings'
 import type { BookingError, BookingResult } from '@/lib/ws/bookings'
 import { requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
+import * as mail from '@/lib/ws/email/notify'
 import { stampJob } from '@/lib/ws/loyalty'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { refreshSegmentsFor } from '@/lib/ws/segments'
@@ -14,7 +15,8 @@ import { addDays, formatDayShort, formatMinutes, isIsoDate, pragueParts, pragueT
 // Akce poptávek, kalendáře a zakázek (S10). Každá: requireWorkspace →
 // Zod → byznys z URL ověřený proti účtu → assertWritable (bez předplatného
 // jen čtení) → jeden zápis v transakci (lib/ws/bookings.ts). Kolizi termínů
-// rozhodne DB, tady se jen převede na českou větu.
+// rozhodne DB, tady se jen převede na českou větu. E-mail zákazníkovi (S15)
+// jde až po úspěšném zápisu a jeho chyba akci nezruší (lib/ws/email/notify.ts).
 
 const MESSAGES: Record<BookingError, string> = {
   overlap: 'Tenhle čas už je obsazený. Vyberte prosím jiný.',
@@ -84,6 +86,7 @@ export async function confirmRequest(raw: unknown): Promise<Result<{ message: st
   const p = await prepare(confirmSchema, raw)
   if (!p.ok) return p
   const { input, c } = p
+  let appointmentId: string | null = null
   const res = await run(
     'confirmRequest',
     c,
@@ -93,10 +96,20 @@ export async function confirmRequest(raw: unknown): Promise<Result<{ message: st
         start: input.at ? toUtc(input.at) : null,
         staffId: input.staffId ?? null,
       }),
-    (r) => ({ message: r.start ? `Potvrzeno na ${label(r.start)}.` : 'Poptávka je přijatá.' }),
+    (r) => {
+      appointmentId = r.appointmentId
+      return { message: r.start ? `Potvrzeno na ${label(r.start)}.` : 'Poptávka je přijatá.' }
+    },
   )
-  // Nový zákazník se hned objeví mezi Novými (skupiny, S12).
-  if (res.ok) await refreshSegmentsFor(c.ctx, c.business, { requestId: input.requestId })
+  if (res.ok) {
+    // Nový zákazník se hned objeví mezi Novými (skupiny, S12).
+    await refreshSegmentsFor(c.ctx, c.business, { requestId: input.requestId })
+    if (appointmentId) {
+      const changed = Boolean(input.at) && (await bookings.requestStatus(c.ctx, c.business, input.requestId)) === 'rescheduled'
+      await mail.notifyBookingConfirmed(c.ctx, c.business.id, appointmentId, { changed })
+      await mail.deliver(c.ctx)
+    }
+  }
   return res
 }
 
@@ -106,13 +119,18 @@ const requestSchema = z.object({ slug, requestId: uuid })
 export async function declineRequest(raw: unknown): Promise<Result<null>> {
   const p = await prepare(requestSchema, raw)
   if (!p.ok) return p
-  return run('declineRequest', p.c, () => bookings.declineRequest(p.c.ctx, p.c.business, p.input.requestId), () => null)
+  const res = await run('declineRequest', p.c, () => bookings.declineRequest(p.c.ctx, p.c.business, p.input.requestId), () => null)
+  // E-mail odejde až po uplynutí „Zpět“; reopenRequest ho zruší.
+  if (res.ok) await mail.notifyRequestDeclined(p.c.ctx, p.c.business.id, p.input.requestId)
+  return res
 }
 
 export async function reopenRequest(raw: unknown): Promise<Result<null>> {
   const p = await prepare(requestSchema, raw)
   if (!p.ok) return p
-  return run('reopenRequest', p.c, () => bookings.reopenRequest(p.c.ctx, p.c.business, p.input.requestId), () => null)
+  const res = await run('reopenRequest', p.c, () => bookings.reopenRequest(p.c.ctx, p.c.business, p.input.requestId), () => null)
+  if (res.ok) await mail.cancelPendingNotice(p.c.ctx, `declined:${p.input.requestId}`)
+  return res
 }
 
 // --- Termíny ----------------------------------------------------------------
@@ -156,7 +174,11 @@ export async function createManualBooking(raw: unknown): Promise<Result<{ messag
       }),
     (r) => ({ message: `Rezervace je uložená na ${label(toUtc(input.at))}.`, appointmentId: r.appointmentId }),
   )
-  if (res.ok) await refreshSegmentsFor(c.ctx, c.business, { appointmentId: res.data.appointmentId })
+  if (res.ok) {
+    await refreshSegmentsFor(c.ctx, c.business, { appointmentId: res.data.appointmentId })
+    await mail.notifyBookingConfirmed(c.ctx, c.business.id, res.data.appointmentId)
+    await mail.deliver(c.ctx)
+  }
   return res
 }
 
@@ -169,7 +191,8 @@ export async function moveAppointment(
   const p = await prepare(moveSchema, raw)
   if (!p.ok) return p
   const { input, c } = p
-  return run(
+  let prevStart: Date | null = null
+  const res = await run(
     'moveAppointment',
     c,
     () =>
@@ -179,6 +202,7 @@ export async function moveAppointment(
         staffId: input.staffId ?? null,
       }),
     (r) => {
+      prevStart = r.prevStart
       const prev = toWhen(r.prevStart)
       return {
         message: `Přesunuto na ${label(r.start)}.`,
@@ -186,6 +210,9 @@ export async function moveAppointment(
       }
     },
   )
+  // Zákazník dostane e-mail po chvíli; „Zpět“ (přesun zpátky) ho zruší.
+  if (res.ok && prevStart) await mail.notifyAppointmentMoved(c.ctx, c.business.id, input.appointmentId, prevStart)
+  return res
 }
 
 const appointmentSchema = z.object({ slug, appointmentId: uuid })
@@ -194,13 +221,17 @@ const appointmentSchema = z.object({ slug, appointmentId: uuid })
 export async function cancelAppointment(raw: unknown): Promise<Result<null>> {
   const p = await prepare(appointmentSchema, raw)
   if (!p.ok) return p
-  return run('cancelAppointment', p.c, () => bookings.cancelAppointment(p.c.ctx, p.c.business, p.input.appointmentId), () => null)
+  const res = await run('cancelAppointment', p.c, () => bookings.cancelAppointment(p.c.ctx, p.c.business, p.input.appointmentId), () => null)
+  if (res.ok) await mail.notifyAppointmentCancelled(p.c.ctx, p.c.business.id, p.input.appointmentId)
+  return res
 }
 
 export async function restoreAppointment(raw: unknown): Promise<Result<null>> {
   const p = await prepare(appointmentSchema, raw)
   if (!p.ok) return p
-  return run('restoreAppointment', p.c, () => bookings.restoreAppointment(p.c.ctx, p.c.business, p.input.appointmentId), () => null)
+  const res = await run('restoreAppointment', p.c, () => bookings.restoreAppointment(p.c.ctx, p.c.business, p.input.appointmentId), () => null)
+  if (res.ok) await mail.cancelPendingNotice(p.c.ctx, `cancelled:${p.input.appointmentId}`)
+  return res
 }
 
 const blockSchema = z
@@ -245,7 +276,11 @@ export async function moveJobStage(raw: unknown): Promise<Result<{ prevStageId: 
     // Hotová zakázka: razítko (program „dokončená zakázka“) a přepočet skupiny.
     // Selhání nesmí vrátit přesun, který už proběhl.
     try {
-      await stampJob(c.ctx, c.business, input.jobId)
+      const stamp = await stampJob(c.ctx, c.business, input.jobId)
+      if (stamp?.result === 'added' && stamp.full) {
+        await mail.notifyRewardForJob(c.ctx, c.business.id, input.jobId)
+        await mail.deliver(c.ctx)
+      }
     } catch (e) {
       console.error('moveJobStage.stamp', { accountId: c.ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
     }
