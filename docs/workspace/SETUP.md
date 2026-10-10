@@ -125,7 +125,7 @@ ID ceny (`price_…`) → `STRIPE_PRICE_MONTHLY`. Bez Stripe Tax a bez `tax_beha
 
 Události: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`, `invoice.paid`, `invoice.payment_failed` (seznam je i v `HANDLED_EVENTS` v `lib/ws/stripe-webhook.ts`).
 
-**Lokálně** — Stripe CLI přeposílá události na dev server:
+**Lokálně** — Stripe CLI přeposílá události na dev server. Omezený klíč z `.env.local` na `stripe listen` nestačí (403), CLI musí být přihlášené do sandboxu ZakazIQ vlastním profilem: `stripe login --project-name zakaziq` a ke každému příkazu `--project-name zakaziq`.
 
 ```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhook \
