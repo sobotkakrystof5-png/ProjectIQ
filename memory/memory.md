@@ -34,7 +34,7 @@
 | S05 | Landing page — SEO a texty | čeká |
 | S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace a role `ws_app` na Neonu (2026-10-09) |
 | S07 | Clerk, registrace, nový byznys | hotovo (2026-10-09) |
-| S08 | Stripe předplatné 249 Kč | ověřeno v sandboxu (2026-10-10); zbývá omezený klíč, nastavení dashboardu a produkce (Otevřené problémy) |
+| S08 | Stripe předplatné 249 Kč | hotovo v sandboxu (2026-10-10); produkční webhook a live mód před spuštěním (Otevřené problémy) |
 | S09 | Kostra aplikace a obrazovka Dnes | hotovo (2026-10-09), naostro s přihlášením neověřeno |
 | S10 | Poptávky a kalendář | čeká |
 | S11 | Veřejné API, objednávací stránka, widget | čeká |
@@ -276,7 +276,7 @@
 - [ ] **Clerk — limit 5 členů na organizaci** (výchozí v Clerku). R-020 slibuje neomezeně pracovníků — pracovníci ve `ws.staff` se přihlašovat nemusí, ale přihlašovací účty pro tým (S13?) limit narazí. Ověřit, jestli jde zvednout na našem plánu Clerku · od 2026-10-09
 - [ ] **Clerk — e-maily s kódem** chodí z Clerku (šablona a jazyk podle nastavení instance). Ověřit při první registraci, že jsou česky a jménem ZakazIQ; jinak nastavit v dashboardu Clerku (Customization → Emails) · od 2026-10-09
 - [ ] **Clerk — `user.updated`** (změna jména/e-mailu) se do `ws.members` nepropisuje — webhook ho nezpracovává, payload nemá organizace. Řešit, až se jména členů budou někde zobrazovat (S13) · od 2026-10-09
-- [ ] **Stripe — dokončit sandbox ZakazIQ:** sandbox, klíče, cena a lokální webhook jsou hotové (2026-10-10). Zbývá: nastavení dashboardu podle `docs/workspace/SETUP.md` → Stripe § 4 (hlavně připomínka 7 dní před koncem zkušební doby). Pro lokální `stripe listen` chybí CLI profil ZakazIQ (`stripe login --project-name zakaziq`), omezený klíč na listen nestačí; po přihlášení dát jeho `whsec_` do `.env.local`. Blokuje ruční test S08 · od 2026-10-09
+- [ ] **Stripe — lokální webhook:** pro `stripe listen` chybí CLI profil ZakazIQ (`stripe login --project-name zakaziq`), omezený klíč na listen nestačí (403); po přihlášení dát jeho `whsec_` do `.env.local`. Potřeba jen při lokálním testu plateb · od 2026-10-09
 - [ ] **Stripe — live mód** (produkt, cena, Portal, e-maily, šablona faktury s IČO a „Nejsem plátce DPH“, webhook endpoint, live klíče jen do Vercelu Production) · před S19 · od 2026-10-09
 - [ ] **`ws.accounts.trial_ends_at`** se po R-038 nepoužívá. Nechat, nebo odstranit migrací (data se tím nemažou)? Neblokuje · od 2026-10-09
 - [ ] **Evidence migrací:** neexistuje tabulka, která by evidovala, které migrace jsou aplikované na produkční DB — stav se drží jen v changelogu (pravidlo: u každé migrace zapsat „aplikována: ano/ne") · od 2026-10-08
@@ -305,6 +305,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-10
+- **chore** Stripe sandbox ZakazIQ nastaven: Customer Portal přes API (karta, doklady, zrušení ke konci období, úprava údajů včetně IČO/DIČ, bez změny tarifu, nadpis „ZakazIQ — správa předplatného“); v dashboardu (Kryštof) připomínka 7 dní před koncem zkušební doby, veřejný název ZakazIQ, výpis na kartě `ZAKAZIQ.CZ`, Managed Payments vypnuté.
 - **chore** `STRIPE_SECRET_KEY` vyměněn za omezený `rk_test_…` (R-039) v `.env.local` i ve Vercelu (Production, Preview). Ověřeno voláním všech API, která aplikace používá (zákazník, Checkout, Portal, předplatné, doklady): vše OK, založení produktu odmítnuto. `stripe listen` s omezeným klíčem nejde (403) — `docs/workspace/SETUP.md` doplněn o přihlášení CLI profilem.
 - **chore** Vercel: proměnné Workspace (`CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `DATABASE_URL_WS`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`) přidané i pro Preview přes `vercel env add` z `.env.local`; `STRIPE_PRICE_MONTHLY` v Production přepsaná na `price_1UOv3V…`.
 - **chore** S08 ruční test přes Stripe API (sandbox ZakazIQ, Kryštofův účet): konec zkušební doby → platba 249 Kč, `active` v DB; zrušení ke konci období a jeho vrácení → `cancel_at_period_end` v DB sedí; Customer Portal se otevře. Neúspěšná platba naostro **neověřena** — na existujícím předplatném ji nejde vyvolat (zaplacené období = faktura 0 Kč), chce Test clock s novým zákazníkem; logiku `grace`/`read_only` kryje `ws-billing.test.ts`. Jedna událost dostala 404, protože na repu běžely tři `next dev` nad sdílenou `.next` (stav se srovnal další událostí). Kryštofův účet je teď `active`, další platba 2026-11-10 (sandbox).
