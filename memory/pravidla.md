@@ -6,7 +6,8 @@
 
 | Typ informace | Patří do | Nepatří do |
 |---------------|----------|-----------|
-| Jak má Claude Code pracovat a komunikovat (tón, protokol sezení) | `CLAUDE.md` | AGENTS.md, memory.md |
+| Společný tón a protokol sezení pro Codex a další agenty | `AGENTS.md` → Komunikace a protokol sezení | memory.md; CLAUDE.md má jen odkaz |
+| Automatické importy a specifika Claude Code | `CLAUDE.md` | AGENTS.md, memory.md |
 | Pravidlo pro všechny agenty (hranice v repu, git, pravidla Workspace, „nikdy") | `AGENTS.md` (CLAUDE.md smí mít jen výtah s odkazem) | memory.md |
 | Technický fakt o kódu, který platí, dokud se kód nezmění (tabulka, routa, env, API, kódové pravidlo) | `AGENTS.md` | memory.md |
 | Co se stalo a kdy | `memory.md` → Changelog | AGENTS.md, commit message jako jediné místo |

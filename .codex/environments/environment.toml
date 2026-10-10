@@ -1,0 +1,31 @@
+# ZakazIQ — lokální prostředí Codexu
+version = 1
+name = "ZakazIQ"
+
+[setup]
+script = "bash scripts/codex-setup.sh"
+
+[[actions]]
+name = "Vývoj"
+icon = "run"
+command = "npm run dev -- --port 3001"
+
+[[actions]]
+name = "Testy"
+icon = "test"
+command = "npm test"
+
+[[actions]]
+name = "Typy"
+icon = "debug"
+command = "npx tsc --noEmit"
+
+[[actions]]
+name = "Build"
+icon = "tool"
+command = "npm run build:check"
+
+[[actions]]
+name = "Kontext"
+icon = "tool"
+command = "node scripts/sync-agent-context.mjs --check"

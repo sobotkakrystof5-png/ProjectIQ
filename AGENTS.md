@@ -4,7 +4,57 @@
 >
 > **Než začneš pracovat:** přečti [`memory/index.md`](memory/index.md) → [`memory/memory.md`](memory/memory.md) (aktuální stav, rozhodnutí, otevřené problémy) a dodržuj [`memory/pravidla.md`](memory/pravidla.md) — včetně povinnosti zapsat každou dokončenou změnu do changelogu v `memory/memory.md`.
 >
-> Chování a proces specifické pro Claude Code jsou v [`CLAUDE.md`](CLAUDE.md) — krátký rozcestník sem. **Když se pravidla v těchto dvou souborech rozcházejí, platí `AGENTS.md` a rozpor oprav.** Stav práce a historie sem nepatří.
+> Společné chování a proces pro Codex i ostatní agenty jsou níže. [`CLAUDE.md`](CLAUDE.md) přidává automatické importy pro Claude Code. **Když se pravidla v těchto dvou souborech rozcházejí, platí `AGENTS.md` a rozpor oprav.** Stav práce a historie sem nepatří.
+
+## Komunikace a protokol sezení
+
+Kryštof píše česky, rychle a často s překlepy. Vyber smysl zadání, nedoptávej se na pravopis. Odpovídej česky, stručně a věcně; česky piš i nové komentáře v kódu, commity a paměť. Na začátku jednou větou řekni, co uděláš. Během delší práce informuj o podstatných zjištěních. Na konci uveď výsledek, ověření a případné kroky pro Kryštofa.
+
+**Začátek:**
+1. Přečti celý tento soubor a `memory/index.md`, `memory/memory.md`, `memory/pravidla.md`. Codex nepovažuje `@soubor` v `CLAUDE.md` za automatický import; paměť musí otevřít výslovně.
+2. Zkontroluj aktuální větev a `git status --short`. Navazuj na rozpracované; cizí změny nepřepisuj, nestaguj ani nevracej. Workspace patří na větev `workspace`; v samostatném worktree použij pracovní větev odvozenou z `workspace`.
+3. Přečti plán dotčené oblasti podle indexu. Rozsah Workspace určuje `docs/workspace/PLAN.md`, rozhodnutí v paměti mají přednost. Nezaměňuj pracovní kopie plánů v `new - area of zakaziq/` za zdroj pravdy.
+4. Načti skilly uvedené v zadání a skilly příslušné oblasti. Před bezpečnostní změnou čti `.claude/security/STATE.md` a relevantní rozhodnutí (B13).
+
+**Během práce:**
+- Před úpravou čti dotčený kód. Zadání proveď až do ověřeného výsledku; běžné vratné kroky v jeho rozsahu nevyžadují nové schválení.
+- Nové produktové rozhodnutí mimo zadání, změnu záměrného rozhodnutí v paměti, destruktivní operaci nebo nasazení nejdřív předlož Kryštofovi. Už udělený souhlas platí dál.
+- Migrace jsou nové a idempotentní. Spuštění proti skutečné DB, seed a změny externích služeb vyžadují výslovné zadání nebo předchozí souhlas; příprava SQL a ověření v PGlite jsou běžná součást práce.
+- Před commitem větší změny proveď kontroly B12. Když běží `next dev`, použij `npm run build:check`, aby se nerozbila jeho `.next`. `npm run lint` zatím spouští průvodce; pro typy používej `npx tsc --noEmit`.
+- Výsledek ověření hlas přesně: spuštěné kontroly, skutečné chyby a co nebylo ověřeno. Chybějící přístup nenahrazuj vymyšlenými výsledky.
+
+**Konec každé dokončené změny:**
+1. Zapiš changelog do `memory/memory.md` podle pravidel paměti; aktualizuj stav, rozhodnutí a otevřené problémy jen tam, kde se změnily.
+2. Aktualizuj popis změněných technických faktů v `AGENTS.md`; nový dokument přidej do `memory/index.md`.
+3. Změny skillů a bezpečnostní paměti synchronizuj příkazem níže a ověř shodu. Paměť patří do stejného commitu jako změna; commituj pouze vlastní soubory podle sekce Git.
+
+## Codex — projektové prostředí
+
+Konfigurace a postup: [`docs/CODEX.md`](docs/CODEX.md). `.codex/config.toml` nastavuje `project_doc_max_bytes = 98304`, protože tento dokument přesahuje výchozí limit 32 KiB. Při chybějící nebo nenačtené konfiguraci přečti celý `AGENTS.md` ručně, včetně B13 a Společných pravidel.
+
+| Co | Kde / příkaz |
+|---|---|
+| Příprava nového worktree | `bash scripts/codex-setup.sh` (Node.js 24+, `npm ci`, žádné migrace ani kopírování klíčů) |
+| Akce lokálního prostředí | `.codex/environments/environment.toml` — vývoj na portu 3001, testy, typy, izolovaný build, kontrola kontextu |
+| Projektové skilly pro Codex | `.agents/skills/`; Claude Code používá identický obsah v `.claude/skills/` |
+| Globální skilly pro Codex | `~/.agents/skills/` — nejsou součást repa ani automaticky přenositelné na jiný počítač |
+| Bezpečnostní paměť pro Codex | `.agents/security/` — identická kopie společného zdroje `.claude/security/` |
+| Synchronizace kontextu | `node scripts/sync-agent-context.mjs --write`; kontrola `node scripts/sync-agent-context.mjs --check` |
+
+Zdroj pro synchronizaci je `.claude/skills/` a `.claude/security/`; měň je a pak synchronizuj do `.agents/`. Záznamy mají jednu historii pro oba nástroje. Kopie se neupravují nezávisle (R-046). Znění skillů zůstává identické i tam, kde zmiňuje Claude Code; použij jeho postup s dostupnými nástroji Codexu. Nedostupný nástroj nebo konektor neznamená, že akce proběhla.
+
+V novém worktree nejsou ignorované `.env.local` ani `node_modules`. Používej jeho vlastní závislosti a build; klíče a připojení nastav jen pro potřebnou práci podle `.env.example` a `docs/workspace/SETUP.md`. Testy Workspace používají PGlite, nepotřebují produkční DB. Nezastavuj server jiné aplikace kvůli obsazenému portu; vyber jiný volný port a ověř návratové URL přihlášení a plateb.
+
+Projektové skilly:
+
+| Skill | Kdy |
+|---|---|
+| `zakaziq-design-dilky` | jakákoli UI práce mimo admin konzoli |
+| `zakaziq-workspace-backend` | DB, migrace, server actions, API, Clerk, Stripe, příjem poptávek |
+| `zakaziq-ux-texty-cs` | každý text aplikace, který uvidí uživatel nebo zákazník |
+| `zakaziq-memory` | navázání na stav projektu a zápis dokončené práce |
+
+Bezpečnostní skilly viz B13; marketing a SEO používají také `humanize-text-cs`, `frontend-design`, `seo` a `seo-quality-principles` podle úlohy. Dostupnost globálních skillů vždy ověř.
 
 Soubor má dvě části: **[A — Admin konzole](#část-a--admin-konzole)** (běžící osobní systém, popis kódu) a **[B — ZakazIQ Workspace](#část-b--zakaziq-workspace)** (SaaS ve výstavbě, pravidla pro nový kód). Společné jsou hranice v repu níže a sekce na konci (git, paměť, nikdy).
 
@@ -23,7 +73,7 @@ Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin),
 | API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/`, `app/api/clerk/` | nové |
 | UI kit | `components/ui/` (shadcn/ui, tokeny Dílky) | nový, admin ho nepoužívá |
 | DB | `migrations/064_*.sql` a dál | jen nové migrace, staré se nemění |
-| Bezpečnost (celé repo) | `middleware.ts`, `next.config.mjs` (hlavičky), `lib/security/`, `public/.well-known/`, `.github/workflows/security.yml`, `.claude/security/` | mění se jen spolu se zápisem do `.claude/security/` (B13) |
+| Bezpečnost (celé repo) | `middleware.ts`, `next.config.mjs` (hlavičky), `lib/security/`, `public/.well-known/`, `.github/workflows/security.yml`, `.claude/security/`, `.agents/security/` | mění se jen spolu se zápisem do `.claude/security/` a synchronizací do `.agents/security/` (B13) |
 
 Co se z adminu přebírá (příjem poptávek, časové helpery, faktury, daně, e-maily, portál), se **zkopíruje** do `lib/ws/` a tam zobecní. Původní soubor zůstává netknutý.
 

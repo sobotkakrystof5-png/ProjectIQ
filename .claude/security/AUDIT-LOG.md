@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-10 — review (projektové prostředí Codexu)
+Spouštěč: přizpůsobení projektu pro Codex (R-046).
+Rozsah: `.codex/config.toml`, `.codex/environments/environment.toml`, `scripts/codex-setup.sh`, `scripts/sync-agent-context.mjs` a společné instrukce.
+Výsledek: konfigurace obsahuje jen limit instrukcí a pracovní příkazy; nepřidává oprávnění ani klíče. Setup pouze instaluje závislosti a ověřuje kontext, nečte/kopíruje `.env.local`, nespouští migrace, seed ani externí zápisy. Synchronizace odmítá symlinky v kontextu a zachovává jednu bezpečnostní historii.
+Nálezy: AGENTS.md je větší než výchozí limit instrukcí Codexu; nastaven limit 96 KiB a povinnost číst celý soubor při nenačtení konfigurace.
+Opraveno: pravidla práce obou agentů sjednocena, kontrola shody bezpečnostní paměti přidána. Hlavičky, CSP, přihlášení a aplikační kód se nemění.
+Zůstává: nastavení připojení služeb v novém worktree podle `.env.example`; dostupnost klientských nástrojů závisí na prostředí.
+
 ## 2026-10-10 — review (S11, veřejné API, objednávací stránka, widget)
 Spouštěč: review před commitem S11 (pravidla `web-security-review`, AGENTS.md B13).
 Rozsah: `lib/ws/{keys,fields,accent}.ts`, `lib/ws/intake/*`, `app/api/public/v1/{requests,schema}`, `app/embed/[file]`, `app/r/**`, `app/w/[business]/nastaveni/**`, `components/ws/{order,settings}/*`, `middleware.ts`, migrace 076.

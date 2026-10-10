@@ -6,8 +6,10 @@
 
 | Soubor | Role | Kdo ho čte | Mění se |
 |--------|------|-----------|---------|
-| [`../CLAUDE.md`](../CLAUDE.md) | Chování a proces Claude Code (komunikace, protokol sezení, git) | Claude Code (auto) | Zřídka — když uživatel změní, jak chce pracovat |
+| [`../CLAUDE.md`](../CLAUDE.md) | Importy a specifika Claude Code; společná komunikace a protokol v AGENTS.md | Claude Code (auto) | Zřídka — když se mění specifika nástroje |
 | [`../AGENTS.md`](../AGENTS.md) | Pravidla a technická fakta pro všechny agenty: hranice v repu, A — příkazy a env (popis adminu viz `docs/admin/AGENTS-ADMIN.md`), B — Workspace (pravidla pro nový kód), git, „nikdy". Při rozporu s CLAUDE.md platí AGENTS.md | Každý AI nástroj | Při změně kódu, který popisuje, nebo pravidel Workspace |
+| [`../docs/CODEX.md`](../docs/CODEX.md) | Codex: otevření projektu, worktree, setup, akce, env, synchronizace skillů a bezpečnosti | Codex, VS Code, desktopový klient | Při změně prostředí Codexu |
+| `../.codex/` | Limit projektových instrukcí a lokální prostředí (setup + 5 akcí); skripty `codex-setup.sh` a `sync-agent-context.mjs` v `scripts/` | Codex | Při změně konfigurace nebo pracovních příkazů |
 | [`../docs/admin/AGENTS-ADMIN.md`](../docs/admin/AGENTS-ADMIN.md) | Popis kódu admin konzole: stack, DB model a katalog tabulek, struktura, server actions, routy, API, crony, stránky, e-maily, bezpečnost, UX, poznámky pro AI (R-042) | Sezení, které mění admin konzoli | Při změně admin kódu |
 | [`index.md`](index.md) | Tahle mapa | Každý AI nástroj | Nový dokument / nová oblast |
 | [`pravidla.md`](pravidla.md) | Meta-pravidla paměti — co kam, kdy, formát | Každý AI nástroj | Zřídka |
@@ -15,11 +17,13 @@
 | `archiv/` | Starší části changelogu: `2026-10.md`, `2026-06-az-09.md` (viz pravidla §4) | Při pátrání v historii | Při archivaci |
 | [`../.env.example`](../.env.example) | Zdroj pravdy pro env proměnné | — | Nová env proměnná |
 | [`../.claude/security/STATE.md`](../.claude/security/STATE.md) | Bezpečnostní stav: hlavičky, CSP, threat model, DNS, otevřené položky; vedle `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (R-029) | Sezení, které sahá na hlavičky, CSP, middleware, API, vstupy | Se každou bezpečnostní změnou |
+| [`../.agents/security/STATE.md`](../.agents/security/STATE.md) | Identická kopie `.claude/security/`, včetně záznamů a kontrolního skriptu | Codex a další agenti | Při synchronizaci s `.claude/security/` |
 | [`../docs/FINANCE_SYSTEM_PLAN.md`](../docs/FINANCE_SYSTEM_PLAN.md) | Plán finance/faktury/daně — **hotový** (fáze 0–8), zafixovaná rozhodnutí a daňové parametry 2026 | Při práci na Financích/fakturách/daních | Jen když se mění daňová pravidla |
 | [`../docs/POZNAMKY_NAKLADY_SABLONY_PLAN.md`](../docs/POZNAMKY_NAKLADY_SABLONY_PLAN.md) | Plán poznámek, sjednocení nákladů, šablon webu a drag-and-drop — implementováno | Při práci na Hovorech/poznámkách/nákladech/šablonách | — |
 | [`../docs/workspace/PLAN.md`](../docs/workspace/PLAN.md) | Produktový a designový plán Workspace — zdroj pravdy pro rozsah (export z Claude Docs; při rozporu platí Rozhodnutí v memory.md) | Při každém sezení Workspace | Novým exportem, když se změní plán |
 | [`../docs/workspace/SETUP.md`](../docs/workspace/SETUP.md) | Databáze Workspace: pořadí migrací 064+, založení role `ws_app`, výměna hesla, jak běží testy oddělení účtů v PGlite | Při práci na DB Workspace a nasazení | Když se mění postup nebo testy |
 | `../.claude/skills/zakaziq-*` | Projektové skilly: `design-dilky` (UI), `workspace-backend` (DB/API/Clerk/Stripe), `ux-texty-cs` (texty), `memory` (rituál sezení nad `memory/`) | Claude Code (podle úlohy) | Když se mění pravidla oblasti |
+| `../.agents/skills/zakaziq-*` | Kopie všech projektových skillů z `.claude/skills/`, včetně referencí | Codex a další agenti (podle úlohy) | Při synchronizaci s `.claude/skills/` |
 | [`../new - area of zakaziq/prompty/00-README.md`](<../new - area of zakaziq/prompty/00-README.md>) | Prompty sezení S00–S19 pro výstavbu Workspace + landing page (jedno sezení = jedna konverzace) | Na začátku každého sezení Workspace | Když se mění plán sezení |
 | [`../docs/workspace/API.md`](../docs/workspace/API.md) | Veřejné API pro poptávky z webů (v1): klíče, schema, requests, kódy chyb, příklady Next.js a curl, widget (S11) | S11+, skill `zakaziq-napojeni`, prompt pro Claude Code | Když se mění API |
 | [`../docs/landing/PROJECT-BRIEF.md`](../docs/landing/PROJECT-BRIEF.md) | Brief landing page (S03): anti-šablona, sekce s texty, kontakt, CSP, SEO zadání pro S05 | S04, S05 a každá změna landing page | Když se mění struktura nebo texty landing page |
