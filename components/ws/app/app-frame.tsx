@@ -12,6 +12,7 @@ import { rememberBusinessAction } from '@/app/w/[business]/actions'
 import { newActions } from '@/lib/ws/features'
 import { bottomBarSlots, navHref, navItems, type NavItem } from '@/lib/ws/nav'
 import { cn } from '@/lib/ws/utils'
+import { LiveRefresh } from './booking/live-refresh'
 import { CommandPalette } from './command-palette'
 import { NavIcon } from './nav-icon'
 import { NewMenu } from './new-menu'
@@ -175,6 +176,7 @@ export function AppFrame(props: AppFrameProps) {
       </header>
 
       <main id="obsah" className="pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
+        <LiveRefresh slug={business.slug} />
         {children}
       </main>
 

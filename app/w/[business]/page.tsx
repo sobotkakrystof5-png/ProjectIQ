@@ -11,7 +11,7 @@ import { hrefWith } from '@/lib/ws/detail-param'
 import { navHref } from '@/lib/ws/nav'
 import { orderPageUrl } from '@/lib/ws/app-origin'
 import { plural } from '@/lib/ws/plural'
-import { getCustomerCard, getTodayData, type CalendarEntry } from '@/lib/ws/today'
+import { getCustomerCard, getEnabledModules, getTodayData, type CalendarEntry } from '@/lib/ws/today'
 import { formatDayLong, isIsoDate, pragueParts, weekStartOf } from '@/lib/ws/time'
 
 export const metadata: Metadata = { title: 'Dnes' }
@@ -45,7 +45,7 @@ export default async function TodayPage({
   const selectedParam = first(searchParams.zakaznik)
   const selected = selectedParam && UUID_RE.test(selectedParam) ? selectedParam.toLowerCase() : null
 
-  const data = await getTodayData(ctx, business, { weekStart, now })
+  const [data, modules] = await Promise.all([getTodayData(ctx, business, { weekStart, now }), getEnabledModules(ctx, business)])
   const welcome = first(searchParams.vitejte) === '1'
   const detail = <DetailSlot ctx={ctx} business={business} pathname={pathname} searchParams={searchParams} today={today} />
 
@@ -65,7 +65,7 @@ export default async function TodayPage({
   const todayVisits = data.calendar.filter((e) => e.kind === 'visit' && pragueParts(e.start).date === today).length
   const link = (patch: Record<string, string | null>) => hrefWith(pathname, searchParams, patch)
   const detailLink = (e: CalendarEntry) =>
-    e.kind === 'request' ? link({ detail: `poptavka:${e.id}` }) : e.customer_id ? link({ detail: `zakaznik:${e.customer_id}` }) : null
+    e.kind === 'request' ? link({ detail: `poptavka:${e.id}` }) : link({ detail: `termin:${e.id}` })
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -84,6 +84,7 @@ export default async function TodayPage({
           now={now}
           hrefFor={(id) => link({ detail: `poptavka:${id}` })}
           allHref={navHref(business.slug, 'poptavky')}
+          actions={{ slug: business.slug, calendar: modules.has('calendar'), jobs: modules.has('jobs') }}
         />
 
         <div className="min-w-0 md:col-span-2 md:row-start-2 xl:col-span-1 xl:col-start-2 xl:row-start-1">
@@ -98,9 +99,11 @@ export default async function TodayPage({
               entry: (e) =>
                 e.kind === 'request'
                   ? link({ detail: `poptavka:${e.id}` })
-                  : e.customer_id
-                    ? link({ zakaznik: e.customer_id, detail: null })
-                    : null,
+                  : e.kind === 'block'
+                    ? link({ detail: `termin:${e.id}` })
+                    : e.customer_id
+                      ? link({ zakaznik: e.customer_id, detail: null })
+                      : link({ detail: `termin:${e.id}` }),
               week: (start) => link({ tyden: start || null, detail: null }),
             }}
           />

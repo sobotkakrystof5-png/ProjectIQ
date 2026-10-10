@@ -269,7 +269,10 @@ export type RequestDetail = {
   customer_id: string | null
   customer_name: string
   contact: { name?: string; phone?: string; email?: string }
+  service_id: string | null
   service_name: string | null
+  /** Délka služby v minutách (pro konec termínu, když zákazník zadal jen začátek). */
+  duration_min: number | null
   wanted_start: Date | null
   wanted_end: Date | null
   message: string | null
@@ -295,7 +298,7 @@ export async function getRequestDetail(
   const [rows, defs] = await wsDb(ctx).batch([
     q`
       SELECT r.id, r.status, r.source, r.customer_id, r.contact, r.field_values, r.message,
-             r.wanted_start, r.wanted_end, r.created_at, s.name AS service_name,
+             r.wanted_start, r.wanted_end, r.created_at, r.service_id, s.name AS service_name, s.duration_min,
              COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
@@ -325,7 +328,9 @@ export async function getRequestDetail(
     customer_id: (r.customer_id as string | null) ?? null,
     customer_name: String(r.customer_name),
     contact: { name: str(contact.name), phone: str(contact.phone), email: str(contact.email) },
+    service_id: (r.service_id as string | null) ?? null,
     service_name: (r.service_name as string | null) ?? null,
+    duration_min: r.duration_min === null || r.duration_min === undefined ? null : Number(r.duration_min),
     wanted_start: (r.wanted_start as Date | null) ?? null,
     wanted_end: (r.wanted_end as Date | null) ?? null,
     message: (r.message as string | null) ?? null,

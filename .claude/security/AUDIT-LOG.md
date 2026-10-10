@@ -16,6 +16,18 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-10 — review (S10, poptávky a kalendář)
+Spouštěč: kontrola podle `web-security-review` před commitem S10.
+Rozsah: `app/w/[business]/poptavky/actions.ts` (9 server actions), `lib/ws/{bookings,calendar}.ts`, `app/api/ws/[business]/zmeny/route.ts`, stránky `/poptavky`, `/kalendar`, `/zakazky`, `components/ws/app/{booking,calendar,jobs}/**`, `components/ws/app/detail-slot.tsx`. Grep na `innerHTML`/`dangerouslySetInnerHTML` (0), klíče v kódu (0).
+Výsledek:
+- Vstupy: každá akce Zod (UUID, slug regexem, den jako platné datum 2020–2100, minuty 0–1439, jméno max. 120, telefon max. 30 a normalizace E.164, e-mail max. 200, poznámka max. 1000, důvod blokace max. 80, blokace max. rok). Bez předplatného `assertWritable` (jen čtení).
+- Data: `account_id` jen z `requireWorkspace()`, byznys z URL přes `requireBusiness`. Pracovník, služba, zákazník a stav zakázky z formuláře se v SQL dohledají v účtu **a** byznysu, cizí = NULL/nenalezeno (kontrola cizího klíče sama nestačí, ověřuje jen účet). Testy: účet B nepotvrdí, neodmítne, nezruší, nepřesune ani nepřesune zakázku účtu A ani s byznysem A v ruce; pracovník a zákazník z cizího účtu do termínu nejdou.
+- Kolize: jen DB (`appointments_no_overlap`), souběžné potvrzení téže poptávky hlídá `UPDATE … WHERE status = 'new'` (testy souběhu).
+- `/api/ws/[business]/zmeny`: přihlášení přes `requireWorkspace`, vrací jen ETag (hash), žádná data, `Cache-Control: private, no-cache`. Polling fetch na vlastní origin — `connect-src 'self'` stačí, CSP beze změny.
+- Vykreslení: jména, zprávy, poznámky a kolonky jako text; parametry `?den`, `?cas`, `?pracovnik` ověřené (datum, rozsah, UUID z byznysu).
+Nálezy: 0.
+Zůstává: blokace celého byznysu (bez pracovníka) DB omezení nehlídá (R-035) — ruční rezervace přes ni jde zapsat; výpočet volných časů pro web ji zohlední v S11.
+
 ## 2026-10-09 — review (S09, kostra aplikace a Dnes)
 Spouštěč: skill `web-security-review` před commitem S09.
 Rozsah: `app/w/page.tsx`, `app/w/[business]/{layout,page,loading,actions}.tsx|ts`, `app/w/[business]/[section]/page.tsx`, `components/ws/app/**`, `lib/ws/{today,search,detail-param,command-parser,nav,app-origin,demo-seed}.ts`, `lib/ws/context.ts` (`React.cache`), `scripts/ws-seed.mjs`. Grep na `innerHTML`/`dangerouslySetInnerHTML` (0), klíče v kódu (0).

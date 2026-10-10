@@ -267,8 +267,8 @@ Jak je systém v kódu (S01, R-027):
 | Dnes | `app/w/[business]/page.tsx` + `components/ws/app/today/` (Příchozí, týdenní kalendář, agenda pro telefon, uvítání); data `lib/ws/today.ts` (`getTodayData`, `getCustomerCard`, `getRequestDetail`, `getNotifications`) v jedné transakci na volání; rozložení kalendáře `lib/ws/calendar-layout.ts` (čistá funkce, bez JS v prohlížeči); skeleton `loading.tsx` |
 | Stav v URL | `?detail=zakaznik:<id>` / `poptavka:<id>` / `nova-rezervace` / `nova-faktura` = pravý panel (`lib/ws/detail-param.ts`, `components/ws/app/detail-slot.tsx` na serveru, `detail-sheet.tsx` v prohlížeči; zavření odebere parametr). `?zakaznik=` karta vpravo na Dnes, `?tyden=` týden (pondělí) |
 | ⌘K | `components/ws/app/command-palette.tsx`: hledání `searchAction` → `lib/ws/search.ts` (zákazníci v účtu, poptávky a faktury v byznysu, ILIKE s escapováním), akce, přechod na obrazovky; příkaz „rezervace Tereza pátek 9:00“ rozpozná `lib/ws/command-parser.ts` (pravidla, ne AI) a otevře panel Nová rezervace s předvyplněním (jen se zapnutou akcí, viz níže) |
-| Nehotové akce | `lib/ws/features.ts` (`WS_FEATURES`, `newActions`, R-043): odkaz na objednání (zapne S11), Nová rezervace (S10), Nová faktura (S14). Vypnutá akce není v „+ Nová“, ⌘K, uvítání ani v panelu (ani ze sdíleného odkazu). Bez hotové akce chybí „+ Nová“ i „+“ ve spodní liště |
-| Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost |
+| Nehotové akce | `lib/ws/features.ts` (`WS_FEATURES`, `newActions`, R-043): odkaz na objednání (zapne S11), Nová faktura (S14); Nová rezervace a blokace zapnuté od S10. Vypnutá akce není v „+ Nová“, ⌘K, uvítání ani v panelu (ani ze sdíleného odkazu). Bez hotové akce chybí „+ Nová“ i „+“ ve spodní liště |
+| Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost (od S10 Poptávky, Kalendář, Zakázky) |
 | Rezervované slugy | `RESERVED_BUSINESS_SLUGS` v `lib/ws/paths.ts` — pevné cesty pod `/w` (`novy`, `ucet`…). Nová pevná cesta pod `/w` = přidat sem, jinak by zakryla byznys se stejným slugem |
 | Čas | `lib/ws/time.ts`: `pragueToday`, `pragueParts`, `pragueToUtc` (přes letní/zimní čas), `weekStartOf`, `formatDayShort` („pá 9. 10.“), `formatRelativeDay` |
 | Ukázková data | `node scripts/ws-seed.mjs <slug> --ano` (smazání `--smazat --ano`), data v `lib/ws/demo-seed.ts` (bez runtime importů, Node 24 ho spustí bez překladu). Označená, jiných dat se nedotkne. Pozor: `.env.local` míří na produkční Neon |
@@ -277,6 +277,23 @@ Jak je systém v kódu (S01, R-027):
 - `requireWorkspace` a `requireBusiness` jsou obalené `React.cache` — layout a stránka téhož požadavku se ptají jen jednou.
 - Detail se otevírá v pravém panelu přes `?detail=`, ne na nové stránce. Nový druh detailu = `DetailRef` v `detail-param.ts` + větev v `detail-slot.tsx`.
 - Akce, která ještě nefunguje, se neukazuje: přepínač ve `WS_FEATURES` zapne až sezení, které ji postaví (R-043).
+
+### Jak je to v kódu (S10, R-044)
+
+| Co | Kde |
+|---|---|
+| Zápisy | `lib/ws/bookings.ts` (`server-only`): `confirmRequest` (chtěný čas, nebo jiný → stav `rescheduled`; s kalendářem termín, se zakázkami zakázka v prvním rozpracovaném/novém stavu), `declineRequest`/`reopenRequest`, `createBooking` (zákazník přes `findOrCreateCustomer` podle telefonu, pak e-mailu), `moveAppointment` (vrací předchozí místo), `cancelAppointment`/`restoreAppointment`, `createBlock`, `setJobStage`, `checkSlot` (tip volno/koliduje), `ensureStaff`, `normalizePhone`. Každý zápis = jeden příkaz v transakci; pracovník, služba a stav z formuláře se dohledají v účtu i byznysu |
+| Server actions | `app/w/[business]/poptavky/actions.ts`: `confirmRequest`, `declineRequest`, `reopenRequest`, `createManualBooking`, `moveAppointment`, `cancelAppointment`, `restoreAppointment`, `createBlock`, `moveJobStage`. Vstup `{ slug, … }`, čas jako `{ day: 'YYYY-MM-DD', minutes }` (Praha); `assertWritable`; `revalidatePath('/w/<slug>', 'layout')`; chyby jako české věty |
+| Čtení | `lib/ws/calendar.ts`: `getCalendarData`, `getBookingOptions`, `getRequestsList` (Nové / Potvrzené = termín ještě nebyl nebo otevřená zakázka / Vyřízené), `getAppointmentDetail`, `getJobBoard`, `getChangeStamp` |
+| Obrazovky | `/w/[byznys]/poptavky` (`?stav=potvrzene` nebo `vyrizene`), `/kalendar` (`?pohled=den` nebo `mesic`, `?datum=`; Den = sloupce podle pracovníků + sloupec nových poptávek, na telefonu seznam), `/zakazky` (tabule podle `ws.stages`, přesun přetažením nebo výběrem) |
+| Pravý panel | `?detail=termin:<id>` (Přesunout, Zrušit), `nova-rezervace` (formulář, předvyplnění `kdo`, `den`, `cas`, `sluzba`, `pracovnik`), `nova-blokace`; poptávka má Potvrdit / Jiný čas / Odmítnout a tip „Termín je volný / Koliduje s…“ |
+| Komponenty | `components/ws/app/booking/` (tlačítka poptávky, formuláře, `useWsAction`, `undoToast` 8 s, `LiveRefresh`), `components/ws/app/calendar/` (`TimeGrid` s přetahováním, `MonthGrid`, `CalendarAgenda`), `components/ws/app/jobs/job-board.tsx`; karta nové poptávky `IncomingCard` v `today/incoming-list.tsx` |
+| Živé obnovení | `LiveRefresh` v `AppFrame` se každých 10 s ptá `GET /api/ws/[byznys]/zmeny` s `If-None-Match` (304 bez změny, jinak nový ETag → `router.refresh()`); skrytá karta se neptá |
+| Testy | `lib/ws/__tests__/ws-bookings.test.ts` (potvrzení, jiný čas, zakázka, kolize i souběžně, Zpět, cizí účet, zákazník a pracovník) |
+
+- Odmítnutí, zrušení, přesun termínu i zakázky se provede hned a toast nabídne „Zpět“ na 8 s (`undoToast`). Potvrzení „Zpět“ nemá — termín jde zrušit.
+- Návštěva musí mít pracovníka: byznys bez pracovníků dostane při prvním termínu jednoho se jménem byznysu (`ensureStaff`, R-044). Sloupce a výběr „Kdo“ se ukazují až od dvou pracovníků.
+- Blokace bez pracovníka (celý byznys) DB omezení nehlídá — ukáže se v kalendáři a v tipu u poptávky, ruční rezervace přes ni projde.
 
 ## B10. Texty
 

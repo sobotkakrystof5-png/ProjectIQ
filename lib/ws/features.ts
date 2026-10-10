@@ -5,8 +5,8 @@
 export const WS_FEATURES = {
   /** Odkaz na objednávací stránku /r/[slug] — zapne S11, až stránka bude. */
   orderLink: false,
-  /** Nová rezervace (panel, ⌘K příkaz „rezervace Tereza pátek 9:00“) — zapne S10. */
-  newBooking: false,
+  /** Nová rezervace a blokace (panel, ⌘K příkaz „rezervace Tereza pátek 9:00“) — zapnulo S10. */
+  newBooking: true,
   /** Nová faktura — zapne S14. */
   newInvoice: false,
 } as const

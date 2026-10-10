@@ -172,8 +172,8 @@ describe('nehotové akce (R-043)', () => {
     expect(newActions(new Set(), all)).toEqual(['link'])
   })
 
-  it('dokud S10, S11 a S14 nepostaví formuláře a /r, je všechno vypnuté', () => {
-    expect(WS_FEATURES).toEqual(none)
+  it('S10 zapnulo Novou rezervaci; odkaz na objednání (S11) a faktura (S14) zatím vypnuté', () => {
+    expect(WS_FEATURES).toEqual({ ...none, newBooking: true })
   })
 })
 
@@ -184,6 +184,8 @@ describe('?detail= v URL', () => {
     expect(parseDetail(`zakaznik:${id}`)).toEqual({ kind: 'zakaznik', id })
     expect(parseDetail(`poptavka:${id.toUpperCase()}`)).toEqual({ kind: 'poptavka', id })
     expect(parseDetail('nova-rezervace')).toEqual({ kind: 'nova-rezervace' })
+    expect(parseDetail('nova-blokace')).toEqual({ kind: 'nova-blokace' })
+    expect(parseDetail(`termin:${id}`)).toEqual({ kind: 'termin', id })
     expect(parseDetail('zakaznik:1 OR 1=1')).toBeNull()
     expect(parseDetail('faktura:' + id)).toBeNull()
     expect(parseDetail(undefined)).toBeNull()

@@ -50,6 +50,7 @@
 | Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `AGENTS.md` → Část B |
 | Workspace — přihlášení, registrace, nový byznys (Clerk) | `AGENTS.md` → B4 „Jak je to v kódu“, `middleware.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |
 | Workspace — kostra aplikace, Dnes, ⌘K, pravý panel | `AGENTS.md` → B9 „Jak je to v kódu (S09)“, `app/w/[business]/`, `components/ws/app/`, `lib/ws/{today,nav,detail-param,command-parser,calendar-layout,search}.ts`, ukázková data `scripts/ws-seed.mjs`, R-040 |
+| Workspace — poptávky, kalendář, zakázky, živé obnovení | `AGENTS.md` → B9 „Jak je to v kódu (S10)“, `lib/ws/{bookings,calendar}.ts`, `app/w/[business]/{poptavky,kalendar,zakazky}/`, `components/ws/app/{booking,calendar,jobs}/`, `app/api/ws/[business]/zmeny`, R-044 |
 | Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `AGENTS.md` → B3 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `AGENTS.md` → B3; detail v `migrations/` |

@@ -5,7 +5,9 @@
 export type DetailRef =
   | { kind: 'zakaznik'; id: string }
   | { kind: 'poptavka'; id: string }
+  | { kind: 'termin'; id: string }
   | { kind: 'nova-rezervace' }
+  | { kind: 'nova-blokace' }
   | { kind: 'nova-faktura' }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -13,9 +15,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function parseDetail(raw: string | string[] | undefined | null): DetailRef | null {
   const value = Array.isArray(raw) ? raw[0] : raw
   if (!value || value.length > 60) return null
-  if (value === 'nova-rezervace' || value === 'nova-faktura') return { kind: value }
+  if (value === 'nova-rezervace' || value === 'nova-blokace' || value === 'nova-faktura') return { kind: value }
   const [kind, id] = value.split(':')
-  if ((kind === 'zakaznik' || kind === 'poptavka') && id && UUID_RE.test(id)) return { kind, id: id.toLowerCase() }
+  if ((kind === 'zakaznik' || kind === 'poptavka' || kind === 'termin') && id && UUID_RE.test(id)) return { kind, id: id.toLowerCase() }
   return null
 }
 
