@@ -34,7 +34,7 @@
 | S05 | Landing page — SEO a texty | čeká |
 | S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace a role `ws_app` na Neonu (2026-10-09) |
 | S07 | Clerk, registrace, nový byznys | hotovo (2026-10-09) |
-| S08 | Stripe předplatné 249 Kč | kód hotový (2026-10-09), Checkout a webhook ověřené v sandboxu (2026-10-10), zbytek ručního testu čeká |
+| S08 | Stripe předplatné 249 Kč | ověřeno v sandboxu (2026-10-10); zbývá omezený klíč, nastavení dashboardu a produkce (Otevřené problémy) |
 | S09 | Kostra aplikace a obrazovka Dnes | hotovo (2026-10-09), naostro s přihlášením neověřeno |
 | S10 | Poptávky a kalendář | čeká |
 | S11 | Veřejné API, objednávací stránka, widget | čeká |
@@ -305,6 +305,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-10
+- **chore** S08 ruční test přes Stripe API (sandbox ZakazIQ, Kryštofův účet): konec zkušební doby → platba 249 Kč, `active` v DB; zrušení ke konci období a jeho vrácení → `cancel_at_period_end` v DB sedí; Customer Portal se otevře. Neúspěšná platba naostro **neověřena** — na existujícím předplatném ji nejde vyvolat (zaplacené období = faktura 0 Kč), chce Test clock s novým zákazníkem; logiku `grace`/`read_only` kryje `ws-billing.test.ts`. Jedna událost dostala 404, protože na repu běžely tři `next dev` nad sdílenou `.next` (stav se srovnal další událostí). Kryštofův účet je teď `active`, další platba 2026-11-10 (sandbox).
 - **chore** S08 Checkout ověřen naostro v sandboxu ZakazIQ (Kryštof, karta 4242): webhook doručil `checkout.session.completed`, `customer.subscription.created`, `invoice.paid` (vše 200, zpracováno), v `ws.subscriptions` 1 předplatné `trialing` do 2026-10-24. Návrat z Checkoutu skončil na 404, protože `NEXT_PUBLIC_APP_URL`/`NEXTAUTH_URL` v `.env.local` mířily na `localhost:3000`, kde běží jiný projekt — přepnuto na 3001. Zbývá z ručního testu: `/w/predplatne` návrat, `/w/ucet`, Portal, konec zkušební doby, neúspěšná platba, zrušení.
 - **fix** Checkout padal: nový účet Stripe má ve výchozím stavu zapnuté Managed Payments (Stripe jako prodejce), které chtějí daňový kód produktu. `createCheckoutSession` posílá `managed_payments: { enabled: false }` — prodejcem jsme my, neplátce bez Stripe Tax (R-018, R-039). `lib/ws/billing.ts`. Ověřeno: relace se založí, `ws-billing.test.ts` 20/20, `tsc` OK. Pozn.: `CLERK_SECRET_KEY` v `.env.local` byl prázdný, doplněn přes `clerk env pull` (dev instance).
 - **chore** Stripe sandbox „ZAKAZIQ sandbox“: produkt `prod_VPkYMgl7jKYsuX` „ZakazIQ“ a měsíční cena `price_1UOv3VISmnTvjLHaCC8geu9r` (249 Kč, `czk`, bez daně, R-018) založené přes API klíčem z `.env.local` (CLI bylo přihlášené do jiného sandboxu). `STRIPE_PRICE_MONTHLY` zapsaná do `.env.local`.
