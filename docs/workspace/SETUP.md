@@ -134,7 +134,7 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook \
 
 Vypíše podpisový klíč `whsec_…` → `STRIPE_WEBHOOK_SECRET` v `.env.local` (platí, dokud běží `stripe listen` se stejným přihlášením).
 
-**Produkce** — Developers → Webhooks → Add endpoint `https://zakaziq.cz/api/stripe/webhook`, stejné události, podpisový klíč → `STRIPE_WEBHOOK_SECRET` ve Vercelu. Bez klíče route vrací 503 (fail-closed).
+**Produkce** — Developers → Webhooks → Add endpoint `https://www.zakaziq.cz/api/stripe/webhook` (s `www` — holá `zakaziq.cz` přesměrovává a Stripe přesměrování nenásleduje), stejné události, podpisový klíč → `STRIPE_WEBHOOK_SECRET` ve Vercelu. Bez klíče route vrací 503 (fail-closed).
 
 ### 6. Ruční test (sandbox)
 
