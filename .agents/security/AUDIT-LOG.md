@@ -16,6 +16,12 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-10 — review (zkrácení instrukcí agentů)
+Spouštěč: požadavek zkrátit AGENTS.md při zachování kontextu a účelu (R-047).
+Rozsah: AGENTS.md, docs/AGENTS-REFERENCE.md, návazné odkazy v CLAUDE.md a paměti.
+Výsledek: úplná bezpečnostní pravidla B13, checklist a technický kontext jsou zachované v závazné referenci; stručný kořen ponechává hlavní zákazy a povinnost číst podrobnosti před bezpečnostní prací. Oprávnění, hlavičky, CSP, aplikace ani klíče se nemění.
+Ověření: porovnání přesunuté technické části s původním dokumentem, kontrola odkazů a synchronizace bezpečnostní paměti do .agents/security.
+
 ## 2026-10-10 — review (projektové prostředí Codexu)
 Spouštěč: přizpůsobení projektu pro Codex (R-046).
 Rozsah: `.codex/config.toml`, `.codex/environments/environment.toml`, `scripts/codex-setup.sh`, `scripts/sync-agent-context.mjs` a společné instrukce.

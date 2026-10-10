@@ -7,7 +7,8 @@
 | Soubor | Role | Kdo ho čte | Mění se |
 |--------|------|-----------|---------|
 | [`../CLAUDE.md`](../CLAUDE.md) | Importy a specifika Claude Code; společná komunikace a protokol v AGENTS.md | Claude Code (auto) | Zřídka — když se mění specifika nástroje |
-| [`../AGENTS.md`](../AGENTS.md) | Pravidla a technická fakta pro všechny agenty: hranice v repu, A — příkazy a env (popis adminu viz `docs/admin/AGENTS-ADMIN.md`), B — Workspace (pravidla pro nový kód), git, „nikdy". Při rozporu s CLAUDE.md platí AGENTS.md | Každý AI nástroj | Při změně kódu, který popisuje, nebo pravidel Workspace |
+| [`../AGENTS.md`](../AGENTS.md) | Stručná pravidla pro agenty a povinné čtení podle úlohy; při rozporu s CLAUDE.md má přednost | Každý AI nástroj | Při změně společných pravidel |
+| [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md) | Závazná podrobná pravidla a technická fakta z původního AGENTS.md: hranice, A (příkazy/env), B1–B13 (Workspace, testy, bezpečnost), git a paměť | Podle oblasti úlohy, povinně podle AGENTS.md | Při změně popsaného kódu nebo pravidel |
 | [`../docs/CODEX.md`](../docs/CODEX.md) | Codex: otevření projektu, worktree, setup, akce, env, synchronizace skillů a bezpečnosti | Codex, VS Code, desktopový klient | Při změně prostředí Codexu |
 | `../.codex/` | Limit projektových instrukcí a lokální prostředí (setup + 5 akcí); skripty `codex-setup.sh` a `sync-agent-context.mjs` v `scripts/` | Codex | Při změně konfigurace nebo pracovních příkazů |
 | [`../docs/admin/AGENTS-ADMIN.md`](../docs/admin/AGENTS-ADMIN.md) | Popis kódu admin konzole: stack, DB model a katalog tabulek, struktura, server actions, routy, API, crony, stránky, e-maily, bezpečnost, UX, poznámky pro AI (R-042) | Sezení, které mění admin konzoli | Při změně admin kódu |
@@ -52,14 +53,14 @@
 | Crony | `vercel.json`, `app/api/cron/**` |
 | Hub (osobní moduly) | `app/hub/**`, `components/HubSidebarNav.tsx` |
 | Landing page | `../docs/landing/PROJECT-BRIEF.md`, `app/(marketing)/` |
-| Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `AGENTS.md` → Část B |
-| Workspace — přihlášení, registrace, nový byznys (Clerk) | `AGENTS.md` → B4 „Jak je to v kódu“, `middleware.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |
-| Workspace — kostra aplikace, Dnes, ⌘K, pravý panel | `AGENTS.md` → B9 „Jak je to v kódu (S09)“, `app/w/[business]/`, `components/ws/app/`, `lib/ws/{today,nav,detail-param,command-parser,calendar-layout,search}.ts`, ukázková data `scripts/ws-seed.mjs`, R-040 |
-| Workspace — poptávky, kalendář, zakázky, živé obnovení | `AGENTS.md` → B9 „Jak je to v kódu (S10)“, `lib/ws/{bookings,calendar}.ts`, `app/w/[business]/{poptavky,kalendar,zakazky}/`, `components/ws/app/{booking,calendar,jobs}/`, `app/api/ws/[business]/zmeny`, R-044 |
-| Workspace — veřejné API, objednávací stránka `/r`, widget `/embed`, Nastavení › Napojený web | `AGENTS.md` → B6 „Jak je to v kódu (S11)“, `../docs/workspace/API.md`, `lib/ws/{keys,fields}.ts`, `lib/ws/intake/`, `app/api/public/v1/`, `app/r/`, `app/embed/`, `app/w/[business]/nastaveni/`, R-045 |
-| Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `AGENTS.md` → B3 |
+| Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `docs/AGENTS-REFERENCE.md` → Část B |
+| Workspace — přihlášení, registrace, nový byznys (Clerk) | `docs/AGENTS-REFERENCE.md` → B4 „Jak je to v kódu“, `middleware.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |
+| Workspace — kostra aplikace, Dnes, ⌘K, pravý panel | `docs/AGENTS-REFERENCE.md` → B9 „Jak je to v kódu (S09)“, `app/w/[business]/`, `components/ws/app/`, `lib/ws/{today,nav,detail-param,command-parser,calendar-layout,search}.ts`, ukázková data `scripts/ws-seed.mjs`, R-040 |
+| Workspace — poptávky, kalendář, zakázky, živé obnovení | `docs/AGENTS-REFERENCE.md` → B9 „Jak je to v kódu (S10)“, `lib/ws/{bookings,calendar}.ts`, `app/w/[business]/{poptavky,kalendar,zakazky}/`, `components/ws/app/{booking,calendar,jobs}/`, `app/api/ws/[business]/zmeny`, R-044 |
+| Workspace — veřejné API, objednávací stránka `/r`, widget `/embed`, Nastavení › Napojený web | `docs/AGENTS-REFERENCE.md` → B6 „Jak je to v kódu (S11)“, `../docs/workspace/API.md`, `lib/ws/{keys,fields}.ts`, `lib/ws/intake/`, `app/api/public/v1/`, `app/r/`, `app/embed/`, `app/w/[business]/nastaveni/`, R-045 |
+| Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `docs/AGENTS-REFERENCE.md` → B3 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
-| DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `AGENTS.md` → B3; detail v `migrations/` |
+| DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `docs/AGENTS-REFERENCE.md` → B3; detail v `migrations/` |
 | Testy | `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |
 
 ## Mimo tento repozitář

@@ -1,6 +1,6 @@
 # ZakazIQ — CLAUDE.md
 
-> **Chování a proces pro Claude Code.** Technická fakta o projektu jsou v `AGENTS.md`, stav práce a historie v `memory/memory.md`. Tenhle soubor neopakuje ani jedno — jen říká, *jak* v projektu pracovat.
+> **Chování a proces pro Claude Code.** Stručná pravidla jsou v `AGENTS.md`, technická fakta a úplné postupy v `docs/AGENTS-REFERENCE.md`, stav práce a historie v `memory/memory.md`. Tenhle soubor neopakuje ani jedno — jen říká, *jak* v projektu pracovat.
 
 Tyto soubory se načítají automaticky do každého sezení:
 
@@ -29,7 +29,7 @@ Společná pravidla komunikace, schvalování a začátku/konce sezení jsou v `
 
 ## Workspace — tvrdá pravidla
 
-Nejdůležitější výtah — úplná pravidla jsou v `AGENTS.md` → Hranice v repu a Část B.
+Nejdůležitější výtah — základy jsou v `AGENTS.md` → Hranice v repu; úplná pravidla v `docs/AGENTS-REFERENCE.md` → Část B (čti podle úlohy).
 
 - **Admin konzoli neměň.** Žádný soubor v `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/*-actions.ts`, `lib/business.ts` ani stávající `components/*.tsx`. Co se přebírá, zkopíruj do `lib/ws/` nebo `components/ws/` a uprav tam.
 - **Data klientů jsou oddělená.** Každý přístup do schématu `ws` jde přes `requireWorkspace()` a filtruje `account_id`. `account_id` nikdy nečti z formuláře ani z URL.
@@ -56,7 +56,7 @@ Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-se
 
 ## Kde co najdeš
 
-- `AGENTS.md` — pravidla a technická fakta pro všechny agenty; část A = příkazy a env (popis kódu adminu je v `docs/admin/AGENTS-ADMIN.md`), část B = Workspace (pravidla pro nový kód). Při rozporu s CLAUDE.md platí AGENTS.md
+- `AGENTS.md` — stručná závazná pravidla a povinné čtení podle úlohy; `docs/AGENTS-REFERENCE.md` — úplný přehled A/B1–B13. Při rozporu s CLAUDE.md platí AGENTS.md včetně reference
 - `memory/` — stav, rozhodnutí, otevřené problémy, changelog (mapa v `memory/index.md`)
 - `docs/workspace/PLAN.md` — produktový plán Workspace (zdroj pravdy pro rozsah; export z Claude Docs — při rozporu s Rozhodnutími v `memory/memory.md` platí Rozhodnutí)
 - `.claude/security/` — bezpečnostní stav: `STATE.md`, `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (S02)
@@ -64,14 +64,14 @@ Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-se
 
 ## Git
 
-Pravidla (větve, kdy commitovat, formát zpráv) jsou v `AGENTS.md` → Společné → Git. Zkráceně:
+Pravidla (větve, kdy commitovat, formát zpráv) jsou v `AGENTS.md` → B12. Ověření a Git. Zkráceně:
 - **Workspace + landing** → větev `workspace`, commit po každém uceleném kroku, `ws/oblast: …`.
 - **Admin konzole** → `main`, commit jen na požádání, `feat: …` / `fix: …`.
 - Push na `main` = produkční deploy → před pushem se zeptej. `.env.local` nikdy necommituj ani nevypisuj.
 
 ## Bezpečnost — povinné
 
-Plná pravidla jsou v **`AGENTS.md` → B13** (platí pro celé repo). Stav zabezpečení je v **`.claude/security/`**:
+Základy jsou v **`AGENTS.md` → B13**, plná závazná pravidla v **`docs/AGENTS-REFERENCE.md` → B13** (platí pro celé repo). Stav zabezpečení je v **`.claude/security/`**:
 
 - `STATE.md` — co teď platí, otevřené položky, co neměnit bez zeptání. **Čti na začátku sezení**, které sahá na hlavičky, CSP, middleware, API nebo vstupy.
 - `DECISIONS.md` — proč jsou výjimky, s datem revize. `CSP-LOG.md` — každá změna CSP a proč. `AUDIT-LOG.md` — audity a incidenty.

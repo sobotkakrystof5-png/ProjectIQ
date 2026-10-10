@@ -6,7 +6,7 @@ Projekt používá stejnou paměť a pravidla v Claude Code i v Codexu (R-046). 
 
 Ve VS Code s rozšířením Codex otevři kořen ZakazIQ. Pro práci v desktopovém Codexu otevři stejnou složku jako projekt. Začni na větvi `workspace`; samostatné úkoly mohou používat worktree a vlastní větev odvozenou z `workspace`. Rozpracované změny v původním checkoutu se do nového worktree nepřenášejí.
 
-Codex čte `AGENTS.md`. Soubor `.codex/config.toml` zvyšuje limit projektových instrukcí na 96 KiB, aby se načetla i bezpečnostní pravidla a git na konci dokumentu. Projektová konfigurace závisí na důvěře projektu v klientovi; jestli ji klient nenačte, přečti celé instrukce ručně. Nastavení nenutí model ani nepřepisuje oprávnění.
+Codex čte stručný `AGENTS.md`; před prací musí podle jeho tabulky otevřít příslušné části závazné `docs/AGENTS-REFERENCE.md`. Podrobný katalog se tak nenačítá automaticky do každého sezení (R-047). Soubor `.codex/config.toml` ponechává limit projektových instrukcí 96 KiB jako rezervu. Projektová konfigurace závisí na důvěře projektu v klientovi; jestli ji klient nenačte, přečti celé instrukce ručně. Nastavení nenutí model ani nepřepisuje oprávnění.
 
 ## Příprava a příkazy
 

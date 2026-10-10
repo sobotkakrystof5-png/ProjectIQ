@@ -9,7 +9,7 @@
 | Společný tón a protokol sezení pro Codex a další agenty | `AGENTS.md` → Komunikace a protokol sezení | memory.md; CLAUDE.md má jen odkaz |
 | Automatické importy a specifika Claude Code | `CLAUDE.md` | AGENTS.md, memory.md |
 | Pravidlo pro všechny agenty (hranice v repu, git, pravidla Workspace, „nikdy") | `AGENTS.md` (CLAUDE.md smí mít jen výtah s odkazem) | memory.md |
-| Technický fakt o kódu, který platí, dokud se kód nezmění (tabulka, routa, env, API, kódové pravidlo) | `AGENTS.md` | memory.md |
+| Technický fakt o kódu (tabulka, routa, env, API, kódové pravidlo) | `docs/AGENTS-REFERENCE.md` (admin detail v `docs/admin/AGENTS-ADMIN.md`); zásadní pravidla i stručně v `AGENTS.md` | memory.md |
 | Co se stalo a kdy | `memory.md` → Changelog | AGENTS.md, commit message jako jediné místo |
 | Proč je něco takhle (rozhodnutí, kompromis, zamítnutá alternativa) | `memory.md` → Rozhodnutí | AGENTS.md (tam jen výsledné pravidlo, s odkazem `R-xxx`) |
 | Co je rozbité / nedodělané / sporné | `memory.md` → Otevřené problémy | — |
@@ -25,8 +25,8 @@ Duplicitu nahraď odkazem. Narazíš-li na rozpor mezi soubory, **pravdu má kó
 | Událost | Co udělat |
 |---------|-----------|
 | Hotová feature / fix / refactor | Changelog + případně Aktuální stav |
-| Nová migrace | Changelog (číslo migrace + zda je aplikovaná na produkci) + katalog tabulek (admin `docs/admin/AGENTS-ADMIN.md`, Workspace `AGENTS.md` → B3) |
-| Nová routa / API / cron / env | AGENTS.md + changelog; env i do `.env.example` |
+| Nová migrace | Changelog (číslo migrace + zda je aplikovaná na produkci) + katalog tabulek (admin `docs/admin/AGENTS-ADMIN.md`, Workspace `docs/AGENTS-REFERENCE.md` → B3) |
+| Nová routa / API / cron / env | `docs/AGENTS-REFERENCE.md` + changelog; env i do `.env.example`; zásadní pravidlo i do AGENTS.md |
 | Uživatel rozhodl „takhle a ne jinak" | Rozhodnutí (nový `R-xxx`) |
 | Objevený bug, který se teď neopravuje | Otevřené problémy |
 | Opravený otevřený problém | Smazat z Otevřených problémů + changelog |

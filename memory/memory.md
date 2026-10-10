@@ -1,8 +1,8 @@
 # Paměť projektu — živý stav
 
-> Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Technická fakta: [`../AGENTS.md`](../AGENTS.md).
+> Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-10-10 (S11 a příprava prostředí Codexu)
+> **Poslední aktualizace:** 2026-10-10 (S11, Codex a zkrácení instrukcí)
 
 ---
 
@@ -63,7 +63,7 @@
 
 **Další krok:** Kryštof s přihlášením projde Nastavení › Napojený web (vytvořit tajný klíč, Ověřit napojení, QR PNG/SVG, přidat doménu) a Dnes (poptávka „Zkouška S11“ s Potvrdit), plus S09 + S10 naostro. Ideálně testovací Next.js stránka s promptem z aplikace na Vercel Preview (https, skutečná cizí doména pro widget). Potom S12 (zákazníci, věrnost, segmenty) nebo S05 (SEO landing, `new - area of zakaziq/prompty/S05-landing-seo-texty.md`: metadata, OG obrázek, favicon, strukturovaná data, Lighthouse/LCP). Před nasazením `/w` na produkci: produkční webhook Stripe a Clerk (Otevřené problémy).
 
-**Prostředí agentů:** Claude Code i Codex používají společný protokol v `AGENTS.md` a paměť v `memory/`. Projektové skilly a bezpečnostní záznamy jsou synchronizované do `.agents/`; příprava Codexu a worktree viz `docs/CODEX.md` (R-046). Konfigurace a skripty ověřené lokálně; automatické spuštění setupu a akcí v novém chatu klienta nebylo ověřeno.
+**Prostředí agentů:** Claude Code i Codex používají stručný `AGENTS.md` a podle úlohy čtou závaznou `docs/AGENTS-REFERENCE.md` (R-047); paměť je společná v `memory/`. Projektové skilly a bezpečnostní záznamy jsou synchronizované do `.agents/`; příprava Codexu a worktree viz `docs/CODEX.md` (R-046). Konfigurace a skripty ověřené lokálně; automatické spuštění setupu a akcí v novém chatu klienta nebylo ověřeno.
 
 ---
 
@@ -285,6 +285,11 @@
 **Proč:** Kryštof chce používat projekt stejně v obou nástrojích; nezávislé instrukce a bezpečnostní historie by se rozcházely. AGENTS.md přesahuje výchozí limit Codexu 32 KiB.
 **Důsledek:** `AGENTS.md` → Komunikace a protokol sezení / Codex, `docs/CODEX.md`, `.codex/`, `memory/pravidla.md`. Globální skilly a připojení služeb se na jiné prostředí automaticky nepřenášejí.
 
+### R-047 · Stručné vstupní instrukce, podrobnosti podle úlohy (2026-10-10)
+**Rozhodnutí:** AGENTS.md obsahuje stručné společné instrukce, kritické zásady a povinné čtení podle úlohy. Úplný původní kontext, postupy a katalogy jsou zachované v závazné docs/AGENTS-REFERENCE.md s číslováním A/B1–B13; mění se tam technická fakta. Paměť a pravidla zůstávají společné pro všechny agenty.
+**Proč:** Kryštof požaduje co největší zkrácení AGENTS.md bez ztráty účelu a kontextu; katalogy se nemají načítat při každé úloze.
+**Důsledek:** aktualizované odkazy v CLAUDE.md, docs/CODEX.md, memory/index.md a pravidla údržby. Rozhodnutí R-046 dál platí; limit 96 KiB je nyní rezerva, podrobnosti se čtou výslovně podle úlohy.
+
 ---
 
 ## 3. Otevřené problémy
@@ -333,6 +338,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-10
+- **docs** AGENTS.md zkrácen z 514 na 55 řádků (51 862 → 7 878 bajtů, −84,8 %). Úplný kontext zachován v závazné `docs/AGENTS-REFERENCE.md` s povinným čtením podle oblasti (R-047); hlavní zákazy, izolace, proces, ověření a git zůstaly ve stručném vstupu. Aktualizované návazné odkazy v CLAUDE.md, docs/CODEX.md, indexu a pravidlech paměti; bezpečnostní review v AUDIT-LOG a jeho synchronizovaná kopie. Ověřeno: shoda původní technické části od Hranic přes A/B1–B13 až po společná pravidla (kromě relativních odkazů), existence lokálních odkazů, `git diff --check` a shoda kontextu. Pouze dokumentace, aplikační testy/build nespouštěny.
 - **chore** Projekt připraven pro Codex (R-046): společná komunikace a protokol v `AGENTS.md`, odkazy místo duplicit v `CLAUDE.md`, `.codex/config.toml` s limitem 96 KiB, lokální prostředí se setupem a 5 akcemi, `scripts/codex-setup.sh`, `scripts/sync-agent-context.mjs`, návod `docs/CODEX.md`. Aktualizována pravidla a index paměti, review v bezpečnostním AUDIT-LOG a identické kopie v `.agents/`. Ověřeno: TOML a schéma podle instalovaného klienta, velikost instrukcí, syntaxe skriptů, setup `--check`, shoda kontextu a na dočasných datech kopie/detekce neshody/oprava/odmítnutí symlinku; `git diff --check` OK. Aplikační kód se nemění; build a aplikační testy pro tuto změnu nespouštěny. Automatické akce a setup v novém chatu klienta neověřeny.
 - **chore** `.claude/security/` zkopírována beze změn do `.agents/security/` (STATE, DECISIONS, CSP-LOG, AUDIT-LOG a `security-check.sh`, včetně oprávnění). Shoda ověřena pomocí `diff -r`.
 - **chore** Doplněny i globální skilly z `~/.claude/skills/` do `~/.agents/skills/`: 41 složek zkopírováno s celým obsahem, 11 již sdílených přes symlinky. Bajtová shoda všech 29 874 zdrojových souborů ověřena; `.trash` vynechán.
