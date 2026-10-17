@@ -1,0 +1,1 @@
+Písma pro OG obrázek (`../opengraph-image.tsx`): Instrument Sans 600, Instrument Serif kurzíva a JetBrains Mono 500 jako TTF z Google Fonts — `next/og` neumí woff2. Všechna pod SIL Open Font License 1.1 (Instrument Serif má stejné autory i licenci jako Instrument Sans).

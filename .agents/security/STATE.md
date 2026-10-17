@@ -48,6 +48,7 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 | X-XSS-Protection | ✅ 0 | |
 | X-DNS-Prefetch-Control | ✅ off | |
 | X-Powered-By | ✅ odstraněno (`poweredByHeader: false`) | |
+| X-Robots-Tag | ✅ `noindex, nofollow` | jen `/w`, `/r`, `/z`, `/embed`, `/api`, admin (`/dashboard`, `/alteno`, `/hub`, `/login`, `/p`, `/h`); landing indexovaná (S05). Nejde o ochranu — odkazy s tokenem se tím jen nedostanou do vyhledávačů |
 
 ## CSP
 

@@ -9,18 +9,26 @@ import { Modules } from '@/components/marketing/modules'
 import { OborMarquee } from '@/components/marketing/obor-marquee'
 import { Pricing } from '@/components/marketing/pricing'
 import { WhyBother } from '@/components/marketing/why-bother'
+import {
+  jsonLdString,
+  landingJsonLd,
+  OPEN_GRAPH_BASE,
+  SITE_DESCRIPTION,
+  SITE_TITLE,
+} from '@/components/marketing/seo'
 
-// Základní metadata. Klíčová slova, Open Graph a strukturovaná data doplní S05 (brief § 11).
+// Titulek a popis dědí z layoutu (components/marketing/seo.ts), tady kanonická adresa a og:url.
 export const metadata: Metadata = {
-  title: 'ZakazIQ · poptávky, kalendář a zákazníci na jednom místě',
-  description:
-    'Poptávka z vašeho webu se sama zařadí do kalendáře a potvrdíte ji jedním klikem. Pro kadeřnictví, řemeslníky a malé firmy. 249 Kč měsíčně, prvních 14 dní zdarma.',
+  alternates: { canonical: '/' },
+  openGraph: { ...OPEN_GRAPH_BASE, url: '/', title: SITE_TITLE, description: SITE_DESCRIPTION },
 }
 
 // Landing page ZakazIQ podle docs/landing/PROJECT-BRIEF.md (pořadí sekcí R-031).
 export default function LandingPage() {
   return (
     <>
+      {/* Datový blok, ne skript — CSP ho nespouští ani neblokuje. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(landingJsonLd()) }} />
       <a
         href="#obsah"
         className="sr-only z-50 rounded-full bg-white px-5 py-3 font-semibold text-navy-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"

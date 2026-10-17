@@ -69,7 +69,7 @@ Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin),
 | Oblast | Složky | Pravidlo |
 |---|---|---|
 | Admin konzole | `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/api/*` mimo `public/v1`, `ws`, `stripe`, `clerk`, `app/*-actions.ts`, `components/*.tsx` (kořen), `lib/*.ts` (kořen) | **neměnit**. Výjimky jen s výslovným souhlasem v zadání sezení (např. nová stránka `/dashboard/klienti`). |
-| Landing page | `app/(marketing)/`, `components/marketing/` | nová (`app/page.tsx` smazán, R-034) |
+| Landing page | `app/(marketing)/`, `components/marketing/`, `app/robots.ts`, `app/sitemap.ts` | nová (`app/page.tsx` smazán, R-034). SEO (S05, R-055): `components/marketing/seo.ts` (adresa webu, metadata, JSON-LD), OG obrázek `app/(marketing)/opengraph-image.tsx` + písma `_og/`, ikony `icon.svg`/`apple-icon.png` (Next jim v route group přidá koncovku, pro schéma je `public/zakaziq-logo.png`), noindex hlavičkou `X-Robots-Tag` v `next.config.mjs`. Nová veřejná stránka = canonical + řádek v `app/sitemap.ts` |
 | Workspace | `app/w/`, `components/ws/`, `lib/ws/` | nová |
 | Veřejné části Workspace | `app/r/` (objednávací stránka `/r/[slug]`), `app/embed/` (widget `/embed/[slug].js`), `app/z/` (klientský portál `/z/[token]`) | nové (R-016) |
 | API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/`, `app/api/clerk/` | nové |

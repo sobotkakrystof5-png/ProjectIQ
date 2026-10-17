@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-10-17 · S13 dokončena (R-054) a upgrade na Next 16.4 + React 19 na větvi `chore/next-16` (R-053)
+> **Poslední aktualizace:** 2026-10-17 · S05 základní SEO (R-055); S13 dokončena (R-054) a upgrade na Next 16.4 + React 19 na větvi `chore/next-16` (R-053)
 
 ---
 
@@ -31,7 +31,7 @@
 | S02 | Bezpečnostní základ | hotovo (2026-10-08) |
 | S03 | Brief landing page | hotovo (2026-10-08) |
 | S04 | Landing page — stavba a animace | hotovo (2026-10-08) |
-| S05 | Landing page — SEO a texty | čeká |
+| S05 | Landing page — SEO a texty | základní SEO hotovo (2026-10-17, R-055); klíčová slova vynechána, texty beze změny; oborové podstránky jen návrh (Otevřené problémy) |
 | S06 | Databáze a oddělení účtů | hotovo (2026-10-08), migrace a role `ws_app` na Neonu (2026-10-09) |
 | S07 | Clerk, registrace, nový byznys | hotovo (2026-10-09) |
 | S08 | Stripe předplatné 249 Kč | hotovo v sandboxu (2026-10-10); produkční webhook a live mód před spuštěním (Otevřené problémy) |
@@ -348,7 +348,16 @@
 **Proč:** rozhodl Kryštof 2026-10-17 (pravidla výmazu, 10 let, větev). Faktura je daňový doklad (zákon o DPH § 35, zákon o účetnictví § 31), GDPR čl. 17 odst. 3 písm. b výmaz nevyžaduje; e-mail není povinná náležitost a PDF ho netiskne. Čísla v historii drží přehledy a daně.
 **Důsledek:** migrace 084, `lib/ws/gdpr.ts`, `docs/AGENTS-REFERENCE.md` → B3 „GDPR, vzhled a PWA (S18)“, `.claude/security/DECISIONS.md` #014. Nový výpis zákazníků nemusí nic filtrovat (vymazaný zákazník neexistuje); nové osobní údaje v jiné tabulce = doplnit do `ws.erase_customer` a do exportu.
 
+### R-055 · Základní SEO landing page bez klíčových slov (2026-10-17)
+**Rozhodnutí:** (1) S05 = jen základní technické SEO: metadata, canonical, Open Graph/Twitter, OG obrázek, ikony, `robots.txt`, `sitemap.xml`, JSON-LD `Organization` + `WebSite` + `SoftwareApplication` (249 CZK měsíčně, bez hodnocení). Výzkum klíčových slov a přepis textů kvůli nim se nedělá. (2) Neveřejné cesty (`/w`, `/r`, `/z`, `/embed`, `/api`, admin) mají `X-Robots-Tag: noindex, nofollow`; `robots.txt` zakazuje jen `/api/`. (3) Právní stránky `noindex, follow` a mimo sitemapu, dokud mají `[DOPLNIT]`. (4) Bez `FAQPage`. (5) Oborové podstránky se nestaví, jen návrh.
+**Proč:** rozhodl Kryštof 2026-10-17 („základní SEO, klíčová slova nepotřebujeme“). Zákaz v `robots.txt` by robotovi nedovolil noindex přečíst a adresa z cizího odkazu by mohla skončit ve výsledcích bez obsahu (odchylka od briefu § 11). Bohaté výsledky FAQ Google v roce 2026 zrušil a jedna odpověď má `[DOPLNIT]`.
+**Důsledek:** `components/marketing/seo.ts`, `app/{robots,sitemap}.ts`, `app/(marketing)/{opengraph-image,twitter-image}.tsx`, `next.config.mjs`, `.claude/security/STATE.md`. `SITE_URL` bere `NEXT_PUBLIC_APP_URL` — musí to být hlavní produkční host (apex, nebo www). Po vyplnění právních textů odstranit `LEGAL_ROBOTS` a přidat stránky do sitemapy.
+
 ## 3. Otevřené problémy
+
+- [ ] **Landing — oborové podstránky (návrh R-055, nestavět bez rozhodnutí):** `/pro/kadernictvi`, `/pro/kosmetika`, `/pro/remeslnici` (zámečnictví, studnařství, stavba), `/pro/autoservis`, `/pro/uklid`; likvidace azbestu spíš jako sekce u řemeslníků. Každá jen s obsahem, který je opravdu jiný: služby a kolonky ze šablony oboru (`lib/ws/templates/`), ukázka objednávky pro obor, vlastní dotazy. Bez skutečných zákazníků z oboru hrozí tenké stránky, proto začít 1–2 obory, kde budou první reference. `/cenik` samostatně nedává smysl (jedna cena, kotva stačí) · od 2026-10-17
+- [ ] **Landing — po nasazení na `zakaziq.cz`:** ověřit `curl` canonical/robots/sitemap na produkčním hostu (apex vs. www podle `NEXT_PUBLIC_APP_URL`), schéma v Rich Results Test, odeslat sitemapu do Google Search Console a Bing Webmaster Tools · od 2026-10-17
+- [ ] **Landing — kontrast drobných popisků:** Lighthouse přístupnost 96: popisky `text-navy-400` 11 px na bílé a texty v živé ukázce během animace (`opacity-75`, nájezd) nemají 4,5:1. Design Dílků, řešit s mockupem · `components/marketing/{live-demo,features}.tsx` · od 2026-10-17
 
 - [ ] **S18 naostro:** migrace 084 na Neon, obrazovky s přihlášením na telefonu (390 px) a v tmavém režimu, export a výmaz na skutečné DB, zrušení a obnovení testovacího účtu, cron `ws-gdpr` na Vercelu, instalace PWA (Android i iPhone), test „člověk, který aplikaci neviděl“ · od 2026-10-17
 - [ ] **Zrušení účtu a nevyčerpané předplatné:** předplatné se ruší hned bez vrácení peněz za zbytek měsíce. Rozhodnout, jestli vracet poměrnou část (Stripe `prorate`/refund) a napsat to do podmínek · `app/w/ucet/actions.ts` · od 2026-10-17
@@ -405,6 +414,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-17
+- **feat** S05 základní SEO landing page (R-055): `components/marketing/seo.ts` (adresa webu, titulek, popis, Open Graph, JSON-LD Organization/WebSite/SoftwareApplication), metadata v `app/(marketing)/layout.tsx` (metadataBase, šablona titulku, OG, Twitter), canonical na `/` a právních stránkách, právní stránky `noindex, follow`, `app/robots.ts` (zakázané jen `/api/`), `app/sitemap.ts` (jen `/`), OG/Twitter obrázek 1200×630 přes `next/og` s písmy Dílků (TTF v `app/(marketing)/_og/`, OFL), favicon a apple ikona jen pro marketing (admin žádnou nedostal), `public/zakaziq-logo.png` pro schéma, `X-Robots-Tag: noindex, nofollow` pro `/w`, `/r`, `/z`, `/embed`, `/api` a admin v `next.config.mjs` (+ `.claude/security/STATE.md`). Texty landing page beze změny. Ověřeno: `tsc`, `npm run build:check`, `next start` (hlavičky na 12 cestách, `/podminky` bez hlavičky, ale s meta noindex), JSON-LD validní JSON, jeden H1, Lighthouse SEO 100, best practices 100, přístupnost 96 (kontrast, Otevřené problémy). Neověřeno: produkční host, Rich Results Test.
 - **feat** S18 GDPR (R-054), větev `ws/s18` z `chore/next-16`: výmaz zákazníka na žádost (`ws.erase_customer`, karta zákazníka s potvrzením jménem), export všech dat účtu ZIP s CSV a PDF faktur (`/w/ucet/export`, vlastní `lib/ws/zip.ts` bez závislosti), zrušení účtu s 30denní lhůtou a obnovením (`ws.close_account`/`reopen_account`, Stripe předplatné se zruší hned), denní cron `/api/cron/ws-gdpr` (faktury po 10 letech, smazání účtů + organizace v Clerku), záznam o zpracování `/w/ucet/zpracovani`, souhlas s nabídkami na `/r`, ve widgetu a v API (`marketingConsent`), fakta o lhůtách na `/podminky` a `/zpracovatelska-smlouva`. Migrace 084 (aplikována: ne). Testy `ws-gdpr.test.ts` (11) + souhlas v `ws-intake.test.ts`.
 - **feat** S18 mobil a PWA: manifest `public/zakaziq.webmanifest`, ikony z loga (`scripts/ws-pwa-icons.mjs` → `public/ikony/`), `public/sw.js` jen s offline stránkou `public/offline.html`, „Přidat na plochu“ v Účtu, kalendář na telefonu výchozí Den (User-Agent), „táhni pro obnovení“ na Dnes v aplikaci na ploše, `viewport-fit=cover`. Tmavý režim: přemapování světlých tříd a tmavé `signal`/`danger` v `app/ws-tokens.css`, opravené razítka a bílé prvky. Přepínač vzhledu s `aria-pressed`. Bezpečnostní review (0 nálezů, DECISIONS #014, AUDIT-LOG). Ověřeno: `npm test` 477 + 1 vynechaný, `tsc`, `npm run build:check`; vzhled na dočasném náhledu s fiktivními daty (smazán).
 - **feat** S13 dokončena (R-054): Nastavení › Otevírací doba a pracovníci (týden s přestávkami, pracovníci přidat/přejmenovat/skrýt, vlastní směny, dovolené a zavřeno po dnech se „Zpět“), Služby (úprava, „Kdo ji dělá“, cena s haléři), pořadí přetažením u služeb, pracovníků, kolonek a stavů (`@dnd-kit`, i klávesnicí). Bez migrace. Hláška u služby už nezmiňuje migraci. Soubory: `lib/ws/{hours,settings}.ts`, `app/w/[business]/nastaveni/{actions.ts,oteviraci-doba,sluzby,formular,stavy}`, `components/ws/settings/*`, test `ws-settings.test.ts` (12). Ověřeno: `tsc`, `npm test` 463 + 1 vynechaný, `next build`, vzhled na dočasném náhledu (1280/390 px, bez přetečení), přesun klávesnicí v Chromu; regrese `/login` 200, `/dashboard` `/alteno` `/hub` 307. Neověřeno s přihlášením. Pozn.: `/p/<ne-UUID>` vrací 500 (DB odmítne token), UUID 404 — starší chování adminu, beze změny.

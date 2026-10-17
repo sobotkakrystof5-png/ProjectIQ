@@ -31,6 +31,11 @@ const securityHeaders = [
 // /api/public/v1 (načítají se z cizí domény). DECISIONS.md #004.
 const notEmbeddable = '/((?!r/|r$|embed/|api/public/v1/).*)'
 
+// Do vyhledávačů smí jen landing page a právní stránky (S05). Aplikace, admin, API,
+// objednávací stránky klientů, widget a portály (/z, /p, /h — odkazy s tokenem) dostanou
+// noindex hlavičkou: funguje i pro soubory a přesměrování, kde meta značka není.
+const notIndexed = '/:area(w|r|z|embed|api|dashboard|alteno|hub|login|p|h)/:path*'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
@@ -54,6 +59,7 @@ const nextConfig = {
     // Při shodě více pravidel vyhrává pozdější hodnota stejné hlavičky.
     return [
       { source: '/:path*', headers: securityHeaders },
+      { source: notIndexed, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
       {
         source: notEmbeddable,
         headers: [
