@@ -15,10 +15,11 @@ import { toBusiness, projectPath } from '@/lib/business'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot } from '@/lib/types'
 
 interface PageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function AltenoProjectDetailPage({ params }: PageProps) {
+export default async function AltenoProjectDetailPage(props: PageProps) {
+  const params = await props.params
   const [rows, msgRows, progressRows, feedbackRows, slotRows] = await Promise.all([
     sql`SELECT * FROM projects WHERE id = ${params.id} LIMIT 1`,
     sql`SELECT * FROM client_messages WHERE project_id = ${params.id} ORDER BY created_at DESC`,

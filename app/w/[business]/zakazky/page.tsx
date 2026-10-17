@@ -19,13 +19,14 @@ type SearchParams = Record<string, string | string[] | undefined>
  * Zakázky (S10): tabule podle vlastních stavů byznysu. Zakázka vzniká
  * potvrzením poptávky. Nastavení stavů je v S13, tady jen přesun.
  */
-export default async function JobsPage({
-  params,
-  searchParams,
-}: {
-  params: { business: string }
-  searchParams: SearchParams
-}) {
+export default async function JobsPage(
+  props: {
+    params: Promise<{ business: string }>
+    searchParams: Promise<SearchParams>
+  }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   const modules = await getEnabledModules(ctx, business)

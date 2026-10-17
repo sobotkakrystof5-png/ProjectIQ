@@ -6,17 +6,15 @@ import { sql } from '@/lib/db'
 /**
  * Servírování PDF faktury.
  *
- * `middleware.ts` hlídá jen `/dashboard`, `/alteno` a `/hub` — na `/api`
+ * `proxy.ts` hlídá jen `/dashboard`, `/alteno` a `/hub` — na `/api`
  * nesahá. Auth check tady proto není pojistka navíc, ale jediná ochrana:
  * faktura nese údaje klienta (IČO, DIČ, adresu) a nesmí uniknout ven.
  *
  * bytea se čte jako base64 — neonový HTTP driver vrací binární sloupce
  * jako escapovaný text, přes `encode()` je výsledek jednoznačný.
  */
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-): Promise<NextResponse> {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
+  const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) {
     return new NextResponse('Neautorizovaný přístup', { status: 401 })

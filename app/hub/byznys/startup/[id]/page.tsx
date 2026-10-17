@@ -11,10 +11,11 @@ import { StartupProjectEditor } from '@/components/StartupProjectEditor'
 import { AiAssistantsSection } from '@/components/AiAssistantsSection'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function StartupDetailPage({ params }: Props) {
+export default async function StartupDetailPage(props: Props) {
+  const params = await props.params
   const [project, improvements, changelog] = await Promise.all([
     getStartupProject(params.id),
     getStartupImprovements(params.id),

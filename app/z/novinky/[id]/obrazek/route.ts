@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic'
 
 const NOT_FOUND = () => new NextResponse('Obrázek tu není.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const id = z.string().uuid().safeParse(params.id)
   if (!id.success) return NOT_FOUND()
   try {

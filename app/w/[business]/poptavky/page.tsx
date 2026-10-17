@@ -35,13 +35,14 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
  * Poptávky (S10, mockup C + rozložení detailu A): Nové / Potvrzené /
  * Vyřízené, detail v pravém panelu (`?detail=poptavka:<id>`).
  */
-export default async function RequestsPage({
-  params,
-  searchParams,
-}: {
-  params: { business: string }
-  searchParams: SearchParams
-}) {
+export default async function RequestsPage(
+  props: {
+    params: Promise<{ business: string }>
+    searchParams: Promise<SearchParams>
+  }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   const now = new Date()

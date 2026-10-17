@@ -1,7 +1,7 @@
 /**
  * Content-Security-Policy pro celé repo (admin, Workspace, landing page).
  *
- * Skládá ji `middleware.ts` pro každý request zvlášť: náhodný nonce +
+ * Skládá ji `proxy.ts` pro každý request zvlášť: náhodný nonce +
  * `strict-dynamic`, takže se spustí jen skripty, které vygeneroval náš server
  * (a skripty, které ony samy načtou — tak fungují chunky Nextu, Clerk i Stripe).
  * Next.js si nonce sám přečte z request hlavičky `Content-Security-Policy`

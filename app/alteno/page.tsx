@@ -11,7 +11,7 @@ import type { Project } from '@/lib/types'
 import { Suspense } from 'react'
 
 interface PageProps {
-  searchParams: { status?: string }
+  searchParams: Promise<{ status?: string }>
 }
 
 // Shared per-request cache — DB se zavolá jen jednou i přes dvě Suspense boundaries
@@ -99,7 +99,8 @@ async function ConsultationsSection() {
   return <UpcomingConsultations consultations={rows as UpcomingConsultation[]} business="alteno" />
 }
 
-export default function AltenoPage({ searchParams }: PageProps) {
+export default async function AltenoPage(props: PageProps) {
+  const searchParams = await props.searchParams
   const statusFilter = searchParams.status
 
   return (

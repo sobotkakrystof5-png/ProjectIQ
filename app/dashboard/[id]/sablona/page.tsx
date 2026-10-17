@@ -9,10 +9,11 @@ import { toBusiness, projectPath } from '@/lib/business'
 import type { Project } from '@/lib/types'
 
 interface PageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function ProjectTemplatePage({ params }: PageProps) {
+export default async function ProjectTemplatePage(props: PageProps) {
+  const params = await props.params
   const rows = await sql`SELECT * FROM projects WHERE id = ${params.id} LIMIT 1`
   if (!rows.length) notFound()
   const project = rows[0] as Project & { business?: string }

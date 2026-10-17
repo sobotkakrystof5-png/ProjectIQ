@@ -3,7 +3,7 @@ import { wsFontVariables } from '@/lib/ws/fonts'
 import '../ws-tokens.css'
 import './landing.css'
 
-// CSP na landing page je vynucená s nonce z middleware.ts (R-033, DECISIONS #007).
+// CSP na landing page je vynucená s nonce z proxy.ts (R-033, DECISIONS #007).
 // Nonce dostanou jen dynamicky renderované stránky — statická by měla skripty bez nonce.
 export const dynamic = 'force-dynamic'
 

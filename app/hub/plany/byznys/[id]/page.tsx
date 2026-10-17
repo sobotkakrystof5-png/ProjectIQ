@@ -5,10 +5,11 @@ import { getBusiness, getBusinessPhases } from '../byznys-plan-actions'
 import { ByznysDetailClient } from './ByznysDetailClient'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function ByznysDetailPage({ params }: Props) {
+export default async function ByznysDetailPage(props: Props) {
+  const params = await props.params
   const [business, phases] = await Promise.all([
     getBusiness(params.id),
     getBusinessPhases(params.id),

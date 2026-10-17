@@ -114,9 +114,11 @@ describe('requireBusiness a role', () => {
   })
 
   it('cizí, neexistující i nesmyslný slug = 404', async () => {
-    expect(await digestOf(requireBusiness(ctxA, 'byznys-b'))).toContain('NOT_FOUND')
-    expect(await digestOf(requireBusiness(ctxA, 'neni'))).toContain('NOT_FOUND')
-    expect(await digestOf(requireBusiness(ctxA, '../x'))).toContain('NOT_FOUND')
+    // Next 16 značí notFound() digestem `NEXT_HTTP_ERROR_FALLBACK;404`, dřív `NEXT_NOT_FOUND`.
+    const notFound = /NOT_FOUND|NEXT_HTTP_ERROR_FALLBACK;404/
+    expect(await digestOf(requireBusiness(ctxA, 'byznys-b'))).toMatch(notFound)
+    expect(await digestOf(requireBusiness(ctxA, 'neni'))).toMatch(notFound)
+    expect(await digestOf(requireBusiness(ctxA, '../x'))).toMatch(notFound)
   })
 
   it('pracovník na stránku jen pro vlastníka nesmí', async () => {

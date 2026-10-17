@@ -37,7 +37,8 @@ export async function rememberBusinessAction(raw: unknown): Promise<void> {
   const parsed = slugSchema.safeParse(raw)
   if (!parsed.success) return
   await requireBusiness(ctx, parsed.data)
-  cookies().set(LAST_BUSINESS_COOKIE, parsed.data, {
+  const jar = await cookies()
+  jar.set(LAST_BUSINESS_COOKIE, parsed.data, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

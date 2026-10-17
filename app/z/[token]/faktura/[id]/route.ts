@@ -16,7 +16,8 @@ export const maxDuration = 60
 
 const GONE = () => new NextResponse('Faktura tu není.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
 
-export async function GET(req: Request, { params }: { params: { token: string; id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ token: string; id: string }> }) {
+  const params = await props.params
   const id = z.string().uuid().safeParse(params.id)
   if (!id.success) return GONE()
   if (await hitLimit(LIMITS.portalPdfPerIp, clientIp(req.headers))) {

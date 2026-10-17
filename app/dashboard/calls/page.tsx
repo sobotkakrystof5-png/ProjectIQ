@@ -3,11 +3,12 @@ import LeadsTable from '@/components/LeadsTable'
 import ProjectCalculator from '@/components/ProjectCalculator'
 import type { ClientLead } from '@/lib/types'
 
-export default async function CallsPage({
-  searchParams,
-}: {
-  searchParams: { lead?: string }
-}) {
+export default async function CallsPage(
+  props: {
+    searchParams: Promise<{ lead?: string }>
+  }
+) {
+  const searchParams = await props.searchParams
   const [rows, notes] = await Promise.all([getLeads(), getAllLeadNotes()])
   const leads = rows as unknown as ClientLead[]
 

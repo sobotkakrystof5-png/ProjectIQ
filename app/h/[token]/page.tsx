@@ -6,10 +6,11 @@ import { SurveyForm } from '@/components/SurveyForm'
 export const revalidate = 0
 
 interface PageProps {
-  params: { token: string }
+  params: Promise<{ token: string }>
 }
 
-export default async function SurveyPage({ params }: PageProps) {
+export default async function SurveyPage(props: PageProps) {
+  const params = await props.params
   const rows = await sql`
     SELECT id, title, client_name FROM completed_projects WHERE survey_token = ${params.token} LIMIT 1
   `

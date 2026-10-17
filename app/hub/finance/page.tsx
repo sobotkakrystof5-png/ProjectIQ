@@ -24,11 +24,12 @@ const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: 'podnikani', label: 'Podnikání', icon: Briefcase },
 ]
 
-export default async function FinancePage({
-  searchParams,
-}: {
-  searchParams: { month?: string; tab?: string; year?: string }
-}) {
+export default async function FinancePage(
+  props: {
+    searchParams: Promise<{ month?: string; tab?: string; year?: string }>
+  }
+) {
+  const searchParams = await props.searchParams
   // Záložka žije v URL, ne ve state — odkaz na Podnikání se dá poslat
   // i uložit a přežije reload.
   const tab: Tab = searchParams.tab === 'podnikani' ? 'podnikani' : 'osobni'

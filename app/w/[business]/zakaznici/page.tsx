@@ -36,13 +36,14 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
  * filtry podle skupin, hledání a vpravo panel „Komu napsat“. Detail
  * zákazníka v pravém panelu (`?detail=zakaznik:<id>`).
  */
-export default async function CustomersPage({
-  params,
-  searchParams,
-}: {
-  params: { business: string }
-  searchParams: SearchParams
-}) {
+export default async function CustomersPage(
+  props: {
+    params: Promise<{ business: string }>
+    searchParams: Promise<SearchParams>
+  }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   const now = new Date()

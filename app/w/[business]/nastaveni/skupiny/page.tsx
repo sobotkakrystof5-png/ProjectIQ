@@ -11,7 +11,8 @@ import { getSegmentRules } from '@/lib/ws/segments'
 export const metadata: Metadata = { title: 'Skupiny zákazníků' }
 
 /** Nastavení › Skupiny zákazníků (S12). Jen vlastník. Výchozí hranice přišly se šablonou oboru. */
-export default async function SegmentSettingsPage({ params }: { params: { business: string } }) {
+export default async function SegmentSettingsPage(props: { params: Promise<{ business: string }> }) {
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   requireRole(ctx, 'owner')

@@ -36,7 +36,8 @@ ${input.businessName}`
 }
 
 /** Nastavení › Napojený web (S11). Jen vlastník. */
-export default async function WebIntegrationPage({ params }: { params: { business: string } }) {
+export default async function WebIntegrationPage(props: { params: Promise<{ business: string }> }) {
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   requireRole(ctx, 'owner')
@@ -47,8 +48,8 @@ export default async function WebIntegrationPage({ params }: { params: { busines
     getIntakeLog(ctx, business, 20),
     getBillingState(ctx.accountId),
   ])
-  const apiOrigin = appOrigin()
-  const orderUrl = orderPageUrl(business.slug)
+  const apiOrigin = await appOrigin()
+  const orderUrl = await orderPageUrl(business.slug)
   const widgetCode = `<script src="${apiOrigin}/embed/${business.slug}.js" async></script>`
   const schema = config ? buildPublicSchema(config, []) : null
 

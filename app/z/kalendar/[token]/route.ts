@@ -5,7 +5,8 @@ import { appointmentIcs } from '@/lib/ws/email/public-links'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: Request, { params }: { params: { token: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params
   try {
     const ics = await appointmentIcs(params.token)
     if (!ics) return new NextResponse('Tenhle termín už neplatí.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })

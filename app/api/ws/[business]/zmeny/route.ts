@@ -12,7 +12,8 @@ import { deliver } from '@/lib/ws/email/notify'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { business: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ business: string }> }) {
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   await deliver(ctx, 1500)

@@ -24,7 +24,8 @@ function script(body: string, status: number, cache: string): Response {
 
 const missing = () => script('/* ZakazIQ: tahle firma widget nemá zapnutý. */\n', 404, 'public, max-age=60')
 
-export async function GET(req: Request, { params }: { params: { file: string } }): Promise<Response> {
+export async function GET(req: Request, props: { params: Promise<{ file: string }> }): Promise<Response> {
+  const params = await props.params
   const m = FILE_RE.exec(params.file)
   if (!m || m[1].length > 60) return missing()
   try {

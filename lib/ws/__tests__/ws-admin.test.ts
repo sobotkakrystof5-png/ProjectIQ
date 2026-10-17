@@ -246,12 +246,12 @@ describe('novinky', () => {
     })
     const ctxA = { accountId: A.account, userId: 'user_a', role: 'owner' as const }
     expect((await getNews(ctxA)).items.find((n) => n.id === id)).toBeUndefined()
-    expect((await newsImage(new Request('http://x'), { params: { id } })).status).toBe(404)
+    expect((await newsImage(new Request('http://x'), { params: Promise.resolve({ id }) })).status).toBe(404)
 
     expect(await publishNews(id)).toBe(true)
     const item = (await getNews(ctxA)).items.find((n) => n.id === id)
     expect(item).toMatchObject({ tag: 'improvement', image: `/z/novinky/${id}/obrazek`, link: 'https://www.zakaziq.cz/novinky' })
-    const img = await newsImage(new Request('http://x'), { params: { id } })
+    const img = await newsImage(new Request('http://x'), { params: Promise.resolve({ id }) })
     expect(img.status).toBe(200)
     expect(img.headers.get('Content-Type')).toBe('image/png')
     expect(Buffer.from(await img.arrayBuffer()).equals(PNG)).toBe(true)

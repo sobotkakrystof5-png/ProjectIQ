@@ -7,7 +7,7 @@ import { embedOriginsForSlug, orderSlugFromPath } from '@/lib/ws/intake/embed-or
 import { WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
 
 /**
- * Jediný middleware celého repa. Pořadí:
+ * Jediný proxy (dřív middleware) celého repa; od Next 16 běží na Node runtime. Pořadí:
  *   1. Admin konzole — přihlášení přes NextAuth, chování beze změny
  *      (stejné cesty jako dřív, přesměrování na /api/auth/signin → /login).
  *   2. Workspace (`/w`, `/api/ws`) — Clerk. Běží jen tady, admin a landing page
@@ -40,7 +40,7 @@ const workspace = clerkMiddleware(
   { signInUrl: WS_SIGN_IN_PATH, signUpUrl: WS_SIGN_UP_PATH },
 )
 
-export default async function middleware(req: NextRequest, event: NextFetchEvent) {
+export default async function proxy(req: NextRequest, event: NextFetchEvent) {
   const { pathname } = req.nextUrl
 
   if (CLERK_PATHS.some((p) => hasPrefix(pathname, p))) return workspace(req, event)

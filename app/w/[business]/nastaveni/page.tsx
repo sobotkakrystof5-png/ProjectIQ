@@ -23,13 +23,14 @@ const SECTIONS = [
   { path: 'skupiny', icon: Users, title: 'Skupiny zákazníků', text: 'Kdy je zákazník nový, stálý nebo spící' },
   { path: 'vzhled', icon: Palette, title: 'Vzhled', text: 'Akcentová barva objednávací stránky, portálu a e-mailů' },
 ] as const
-export default async function SettingsPage({
-  params,
-  searchParams,
-}: {
-  params: { business: string }
-  searchParams: SearchParams
-}) {
+export default async function SettingsPage(
+  props: {
+    params: Promise<{ business: string }>
+    searchParams: Promise<SearchParams>
+  }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   const pathname = navHref(business.slug, 'nastaveni')

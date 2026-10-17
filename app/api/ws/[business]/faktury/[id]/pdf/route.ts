@@ -9,7 +9,8 @@ import { hitLimit } from '@/lib/ws/intake/rate-limit'
 export const runtime='nodejs'
 export const dynamic='force-dynamic'
 export const maxDuration=60
-export async function GET(_req:Request,{params}:{params:{business:string;id:string}}) {
+export async function GET(_req:Request, props:{params: Promise<{business:string;id:string}>}) {
+ const params = await props.params
  const ctx=await requireWorkspace()
  const id=z.string().uuid().safeParse(params.id)
  if(!id.success)return new NextResponse('Faktura tu není.',{status:404})

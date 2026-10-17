@@ -142,7 +142,7 @@ async function panelContent(
       const initial = draftMessage(ref.topic, {
         businessName: business.name,
         reward: program.enabled && program.rewardText ? program.rewardText : null,
-        orderUrl: orderPageUrl(business.slug),
+        orderUrl: await orderPageUrl(business.slug),
         slots,
       })
       return {
@@ -304,7 +304,7 @@ async function panelContent(
               />
             )}
 
-            {portal && a.status !== 'cancelled' && <CopyPortalLink url={portalPageUrl(portal.publicToken)} />}
+            {portal && a.status !== 'cancelled' && <CopyPortalLink url={await portalPageUrl(portal.publicToken)} />}
 
             <dl className="flex flex-col gap-3 text-[15px]">
               <Row label="Den">
@@ -392,7 +392,7 @@ async function panelContent(
               <section aria-label="Pro zákazníka" className="flex flex-col gap-4 border-t pt-5">
                 <h3 className="text-[16px] font-semibold text-ink">Pro zákazníka</h3>
                 <p className="-mt-2 text-sm text-quiet">Zákazník v odkazu vidí postup podle stavů, vaše zprávy a výsledek. Poznámky z aplikace nevidí.</p>
-                <CopyPortalLink url={portalPageUrl(j.publicToken)} />
+                <CopyPortalLink url={await portalPageUrl(j.publicToken)} />
                 <JobUpdates
                   slug={business.slug}
                   jobId={j.id}

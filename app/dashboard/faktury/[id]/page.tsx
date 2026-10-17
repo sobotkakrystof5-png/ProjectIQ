@@ -10,7 +10,7 @@ import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'
 
 interface PageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 function formatAmount(amount: number, currency: string) {
@@ -78,7 +78,8 @@ function aiRows(invoice: InvoiceDetail) {
     }))
 }
 
-export default async function InvoiceDetailPage({ params }: PageProps) {
+export default async function InvoiceDetailPage(props: PageProps) {
+  const params = await props.params
   const invoice = await getInvoiceDetail(params.id)
   if (!invoice) notFound()
 

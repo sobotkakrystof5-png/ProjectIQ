@@ -10,7 +10,7 @@ import { extractInvoiceFromPdf } from '@/lib/invoice-ai'
  * Nic neukládá — jen vrátí, co model vyčetl, aby si to uživatel v formuláři
  * prohlédl a případně přepsal. Uložení řeší až server action archivu.
  *
- * Stejně jako u servírování PDF platí, že `middleware.ts` na `/api` nesahá:
+ * Stejně jako u servírování PDF platí, že `proxy.ts` na `/api` nesahá:
  * `getServerSession` je jediná ochrana, ne pojistka navíc. Faktury nesou
  * údaje klientů a nesmí projít ven.
  */

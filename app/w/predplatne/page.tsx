@@ -13,7 +13,8 @@ export const metadata: Metadata = { title: 'Předplatné' }
 // relace musí patřit přihlášenému účtu (syncCheckoutSession). Pak do aplikace
 // s uvítáním (?vitejte=1, obrazovka Dnes v S09).
 
-export default async function PredplatnePage({ searchParams }: { searchParams: { session_id?: string | string[] } }) {
+export default async function PredplatnePage(props: { searchParams: Promise<{ session_id?: string | string[] }> }) {
+  const searchParams = await props.searchParams
   const ctx = await requireWorkspace()
   const sessionId = typeof searchParams.session_id === 'string' ? searchParams.session_id : ''
 

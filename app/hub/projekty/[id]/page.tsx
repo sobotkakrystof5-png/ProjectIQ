@@ -9,10 +9,11 @@ import {
 import { PersonalProjectEditor } from '@/components/PersonalProjectEditor'
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function PersonalProjectDetailPage({ params }: Props) {
+export default async function PersonalProjectDetailPage(props: Props) {
+  const params = await props.params
   const [project, improvements, changelog] = await Promise.all([
     getPersonalProject(params.id),
     getPersonalProjectImprovements(params.id),

@@ -9,7 +9,8 @@ import { verifyLink } from '@/lib/ws/email/links'
 
 export const metadata: Metadata = { title: 'Odhlášení', referrer: 'no-referrer' }
 
-export default async function UnsubscribePage({ params }: { params: { token: string } }) {
+export default async function UnsubscribePage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params
   const token = params.token
   if (verifyLink(token, 'n')) {
     return (

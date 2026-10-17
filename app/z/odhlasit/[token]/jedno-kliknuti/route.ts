@@ -6,7 +6,8 @@ import { unsubscribeCustomer, unsubscribeNews } from '@/lib/ws/email/public-link
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(_req: Request, { params }: { params: { token: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params
   try {
     const done = params.token.startsWith('n') ? await unsubscribeNews(params.token) : Boolean(await unsubscribeCustomer(params.token))
     return new NextResponse(null, { status: done ? 200 : 404 })

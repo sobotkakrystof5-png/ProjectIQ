@@ -31,7 +31,7 @@ const MESSAGES: Record<PortalFailure, string> = {
 
 /** Rate limit + token → záznam. Řetězec = chybová hláška pro zákazníka. */
 async function guard(raw: string): Promise<PortalRef | string> {
-  if (await hitLimit(LIMITS.portalActionPerIp, clientIp(headers()))) return BUSY
+  if (await hitLimit(LIMITS.portalActionPerIp, clientIp(await headers()))) return BUSY
   const ref = await resolvePortal(raw)
   if (!ref) return GONE
   if (await hitLimit(LIMITS.portalActionPerItem, ref.id)) return BUSY
@@ -47,7 +47,7 @@ export async function getMoveSlots(raw: unknown): Promise<{ ok: true; slots: Por
   if (!parsed.success) return { ok: false, error: GONE }
   try {
     // Výpis volných časů nic nemění — stačí limit na IP jako u objednávací stránky.
-    if (await hitLimit(LIMITS.schemaPerIp, clientIp(headers()))) return { ok: false, error: BUSY }
+    if (await hitLimit(LIMITS.schemaPerIp, clientIp(await headers()))) return { ok: false, error: BUSY }
     const ref = await resolvePortal(parsed.data.token)
     if (!ref) return { ok: false, error: GONE }
     const slots = await portalSlots(ref)

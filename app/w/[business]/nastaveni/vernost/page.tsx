@@ -12,7 +12,8 @@ import { navHref } from '@/lib/ws/nav'
 export const metadata: Metadata = { title: 'Věrnost' }
 
 /** Nastavení › Věrnost (S12). Jen vlastník. */
-export default async function LoyaltySettingsPage({ params }: { params: { business: string } }) {
+export default async function LoyaltySettingsPage(props: { params: Promise<{ business: string }> }) {
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   requireRole(ctx, 'owner')

@@ -27,13 +27,14 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
  * Stav v URL: `?tyden=` (pondělí týdne), `?zakaznik=` (karta vpravo),
  * `?detail=` (pravý panel). Všechno se vykreslí na serveru.
  */
-export default async function TodayPage({
-  params,
-  searchParams,
-}: {
-  params: { business: string }
-  searchParams: SearchParams
-}) {
+export default async function TodayPage(
+  props: {
+    params: Promise<{ business: string }>
+    searchParams: Promise<SearchParams>
+  }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   const now = new Date()
@@ -53,7 +54,7 @@ export default async function TodayPage({
     return (
       <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Heading today={today} />
-        <TodayWelcome welcome={welcome} orderUrl={orderPageUrl(business.slug)} />
+        <TodayWelcome welcome={welcome} orderUrl={await orderPageUrl(business.slug)} />
         {detail}
       </div>
     )

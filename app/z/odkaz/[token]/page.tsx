@@ -18,8 +18,15 @@ const GONE: Record<string, { title: string; text: string }> = {
   handled: { title: 'Poptávka je vyřízená', text: 'Tuhle poptávku už někdo potvrdil nebo odmítl.' },
 }
 
-export default async function ActionLinkPage({ params, searchParams }: { params: { token: string }; searchParams: { akce?: string } }) {
-  const state = await peekActionLink(params.token).catch(() => ({ ok: false, reason: 'invalid' }) as const)
+export default async function ActionLinkPage(
+  props: { params: Promise<{ token: string }>; searchParams: Promise<{ akce?: string }> }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
+  const state = await peekActionLink(params.token).catch(() => (({
+    ok: false,
+    reason: 'invalid'
+  }) as const))
   if (!state.ok) {
     const g = GONE[state.reason] ?? GONE.invalid
     return (

@@ -25,7 +25,7 @@ export async function getOrderSlots(raw: unknown): Promise<{ ok: true; slots: Or
   const parsed = z.object({ slug, serviceId: uuid.nullable() }).safeParse(raw)
   if (!parsed.success) return { ok: false, error: FAILED }
   try {
-    if (await hitLimit(LIMITS.schemaPerIp, clientIp(headers()))) return { ok: false, error: BUSY }
+    if (await hitLimit(LIMITS.schemaPerIp, clientIp(await headers()))) return { ok: false, error: BUSY }
     const biz = await businessBySlug(parsed.data.slug)
     if (!biz) return { ok: false, error: FAILED }
     const config = await loadIntakeConfig(biz.accountId, biz.businessId)
@@ -60,7 +60,7 @@ export async function submitOrder(raw: unknown): Promise<OrderResult> {
   if (!parsed.success) return { ok: false, error: 'Něco ve formuláři nesedí. Zkontrolujte ho prosím.' }
   const input = parsed.data
   try {
-    if (await hitLimit(LIMITS.pagePerIp, clientIp(headers()))) return { ok: false, error: BUSY }
+    if (await hitLimit(LIMITS.pagePerIp, clientIp(await headers()))) return { ok: false, error: BUSY }
     const biz = await businessBySlug(input.slug)
     if (!biz) return { ok: false, error: FAILED }
 

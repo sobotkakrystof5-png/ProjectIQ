@@ -22,7 +22,8 @@ const load = cache(async (slug: string) => {
   return config ? { biz, config } : null
 })
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params
   const data = await load(params.slug)
   if (!data) return { title: 'Stránka nenalezena', robots: { index: false } }
   const name = data.config.business.name
@@ -37,7 +38,8 @@ function initials(name: string): string {
   return (words.length > 1 ? `${words[0][0]}${words[1][0]}` : (words[0] ?? '?').slice(0, 2)).toUpperCase()
 }
 
-export default async function OrderPage({ params }: { params: { slug: string } }) {
+export default async function OrderPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params
   const data = await load(params.slug)
   if (!data) notFound()
   const { biz, config } = data

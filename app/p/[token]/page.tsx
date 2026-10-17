@@ -11,10 +11,11 @@ import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/li
 export const revalidate = 30
 
 interface PageProps {
-  params: { token: string }
+  params: Promise<{ token: string }>
 }
 
-export default async function ClientPortalPage({ params }: PageProps) {
+export default async function ClientPortalPage(props: PageProps) {
+  const params = await props.params
   const projectRows = await sql`
     SELECT id, client_name, description, focus, status, progress, deadline, updated_at, project_url
     FROM projects

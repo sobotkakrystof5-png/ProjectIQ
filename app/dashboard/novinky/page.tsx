@@ -10,7 +10,8 @@ import { NewsList } from './news-list'
 
 export const dynamic = 'force-dynamic'
 
-export default async function NovinkyPage({ searchParams }: { searchParams: { upravit?: string } }) {
+export default async function NovinkyPage(props: { searchParams: Promise<{ upravit?: string }> }) {
+  const searchParams = await props.searchParams
   const editId = z.string().uuid().safeParse(searchParams.upravit)
   let failed = false
   const [items, editing] = await Promise.all([

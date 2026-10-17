@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-// CSP na /w je vynucená s nonce z middleware.ts. Nonce dostanou jen dynamicky
+// CSP na /w je vynucená s nonce z proxy.ts. Nonce dostanou jen dynamicky
 // renderované stránky — statická by měla skripty bez nonce a prohlížeč je zablokuje.
 export const dynamic = 'force-dynamic'
 

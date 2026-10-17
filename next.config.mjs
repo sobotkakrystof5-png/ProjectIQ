@@ -1,6 +1,14 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Kořen projektu. V domovské složce leží cizí package-lock.json, podle kterého by
+// Next kořen odhadl špatně; Turbopack 16.2 navíc spadne na cestě s diakritikou
+// (`Podnikání`), pokud je kořen nad projektem (panic v ident.rs).
+const projectRoot = path.dirname(fileURLToPath(import.meta.url))
+
 /**
  * Statické bezpečnostní hlavičky pro všechny odpovědi (stránky, API, soubory).
- * CSP se skládá per request v `middleware.ts` (nonce), tady není.
+ * CSP se skládá per request v `proxy.ts` (nonce), tady není.
  * Stav a důvody každé výjimky: `.claude/security/STATE.md` a `DECISIONS.md`.
  */
 const securityHeaders = [
@@ -19,7 +27,7 @@ const securityHeaders = [
 ]
 
 // Co se vkládá na weby klientů: objednávací stránka /r/[slug] (iframe, rámování
-// řídí frame-ancestors z middleware) a widget /embed/[slug].js + veřejné API
+// řídí frame-ancestors z proxy.ts) a widget /embed/[slug].js + veřejné API
 // /api/public/v1 (načítají se z cizí domény). DECISIONS.md #004.
 const notEmbeddable = '/((?!r/|r$|embed/|api/public/v1/).*)'
 
@@ -27,12 +35,14 @@ const notEmbeddable = '/((?!r/|r$|embed/|api/public/v1/).*)'
 const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  turbopack: { root: projectRoot },
+  outputFileTracingRoot: projectRoot,
+  // PDF potřebuje skutečnou cestu k binárkám, bundler balíček nesmí přemístit.
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
+  outputFileTracingIncludes: {
+    '/api/ws/*/faktury/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+  },
   experimental: {
-    // PDF potřebuje skutečnou cestu k binárkám, webpack balíček nesmí přemístit.
-    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
-    outputFileTracingIncludes: {
-      '/api/ws/*/faktury/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
-    },
     serverActions: {
       // PDF faktury chodí server actionou jako FormData. Výchozí 1 MB by
       // propustilo jen ty nejmenší. Strop aplikace je 4 MB (MAX_PDF_BYTES

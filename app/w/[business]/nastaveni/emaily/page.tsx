@@ -10,7 +10,8 @@ import { navHref } from '@/lib/ws/nav'
 
 export const metadata: Metadata = { title: 'E-maily a upozornění' }
 
-export default async function EmailSettingsPage({ params }: { params: { business: string } }) {
+export default async function EmailSettingsPage(props: { params: Promise<{ business: string }> }) {
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   requireRole(ctx, 'owner')

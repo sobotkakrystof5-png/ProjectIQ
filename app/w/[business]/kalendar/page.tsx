@@ -54,13 +54,14 @@ function monthStart(day: string, shift = 0): string {
  * Nové poptávky jako čárkované bloky na chtěném čase, potvrzení na bloku,
  * přetažení termínu se „Zpět“, blokace. Stav v URL: `?pohled=`, `?datum=`.
  */
-export default async function CalendarPage({
-  params,
-  searchParams,
-}: {
-  params: { business: string }
-  searchParams: SearchParams
-}) {
+export default async function CalendarPage(
+  props: {
+    params: Promise<{ business: string }>
+    searchParams: Promise<SearchParams>
+  }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   const modules = await getEnabledModules(ctx, business)

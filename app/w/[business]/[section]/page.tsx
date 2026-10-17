@@ -15,18 +15,20 @@ import { pragueToday } from '@/lib/ws/time'
 
 type SearchParams = Record<string, string | string[] | undefined>
 
-export function generateMetadata({ params }: { params: { section: string } }): Metadata {
+export async function generateMetadata(props: { params: Promise<{ section: string }> }): Promise<Metadata> {
+  const params = await props.params
   const item = NAV_ITEMS.find((i) => i.segment === params.section && i.segment !== '')
   return { title: item?.label ?? 'Nenalezeno' }
 }
 
-export default async function SectionPlaceholder({
-  params,
-  searchParams,
-}: {
-  params: { business: string; section: string }
-  searchParams: SearchParams
-}) {
+export default async function SectionPlaceholder(
+  props: {
+    params: Promise<{ business: string; section: string }>
+    searchParams: Promise<SearchParams>
+  }
+) {
+  const searchParams = await props.searchParams
+  const params = await props.params
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, params.business)
   const item = navItemForSegment(params.section, await getEnabledModules(ctx, business))

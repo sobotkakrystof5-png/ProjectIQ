@@ -1,7 +1,7 @@
 import { wsSystem } from '../db'
 
 // Povolené domény pro `frame-ancestors` objednávací stránky /r/[slug] (S11).
-// Volá ho middleware (edge), proto bez `server-only` a bez Node API — jen
+// Volá ho proxy.ts, proto bez `server-only` a bez Node API — jen
 // SECURITY DEFINER funkce přes Neon HTTP. Krátká cache v paměti instance,
 // ať každé zobrazení stránky nejde do DB. Při chybě prázdný seznam, tedy
 // jen 'self' (selže zavřeně).

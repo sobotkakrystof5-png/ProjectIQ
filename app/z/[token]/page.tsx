@@ -19,8 +19,9 @@ const load = cache(async (token: string) => {
   return loadPortal(ref)
 })
 
-export default async function PortalPage({ params }: { params: { token: string } }) {
-  if (await hitLimit(LIMITS.portalViewPerIp, clientIp(headers()))) {
+export default async function PortalPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params
+  if (await hitLimit(LIMITS.portalViewPerIp, clientIp(await headers()))) {
     return (
       <PublicPage title="Chvilku strpení">
         <p className="text-[15px] text-quiet">Stránku teď otevíralo moc lidí najednou. Zkuste ji prosím načíst za minutu.</p>
