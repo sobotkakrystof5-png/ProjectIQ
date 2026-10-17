@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { assertWritable } from '@/lib/ws/billing'
 import { normalizePhone } from '@/lib/ws/bookings'
-import { requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
+import { hasRole, requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
 import * as customers from '@/lib/ws/customers'
+import { eraseCustomer as eraseCustomerData } from '@/lib/ws/gdpr'
 import * as loyalty from '@/lib/ws/loyalty'
 import type { StampOutcome } from '@/lib/ws/loyalty'
 import { deliver, notifyVisitPaid } from '@/lib/ws/email/notify'
@@ -259,6 +260,24 @@ export async function mergeCustomers(raw: unknown): Promise<Result<{ message: st
     if (!done) return fail(GONE)
     await refreshSegmentsSafely(c.ctx, c.business, [input.keepId])
     return ok({ message: 'Sloučeno. Návštěvy, poptávky i razítka jsou teď u jednoho zákazníka.' })
+  })
+}
+
+/**
+ * Výmaz na žádost zákazníka (GDPR, R-054). Nejde vrátit, proto potvrzení
+ * jménem v panelu. Jen majitel; funguje i bez předplatného — povinnost
+ * vyhovět žádosti trvá.
+ */
+export async function eraseCustomer(raw: unknown): Promise<Result<{ message: string }>> {
+  const p = await prepare(z.object({ slug, customerId: uuid }), raw, { write: false })
+  if (!p.ok) return p
+  const { input, c } = p
+  if (!hasRole(c.ctx, 'owner')) return fail('Zákazníka může smazat jen majitel účtu.')
+  return guard('eraseCustomer', c, async () => {
+    const done = await eraseCustomerData(c.ctx, input.customerId)
+    if (!done) return fail(GONE)
+    const kept = done.invoicesKept > 0 ? ' Vystavené faktury zůstaly, zákon je vyžaduje uchovat.' : ''
+    return ok({ message: `Zákazník je smazaný.${kept}` })
   })
 }
 

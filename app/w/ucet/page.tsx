@@ -1,20 +1,26 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowLeft, FileDown } from 'lucide-react'
+import { ArrowLeft, Download, FileDown, FileText } from 'lucide-react'
 import { AccentHeading, EmptyState, SectionLabel } from '@/components/ws/brand'
+import { CloseAccount, ReopenAccount } from '@/components/ws/account/close-account'
+import { InstallApp } from '@/components/ws/account/install-app'
+import { ThemeSwitch } from '@/components/ws/account/theme-switch'
 import { BillingActionButton } from '@/components/ws/billing/billing-action-button'
 import { formatBillingDate } from '@/components/ws/billing/format'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { getBillingState, listInvoices, type AccountInvoice, type BillingState } from '@/lib/ws/billing'
 import { requireRole, requireWorkspace } from '@/lib/ws/context'
+import { wsDb } from '@/lib/ws/db'
+import { ACCOUNT_DELETE_DAYS, getAccountClosing } from '@/lib/ws/gdpr'
 import { formatMoney } from '@/lib/ws/money'
 
 export const metadata: Metadata = { title: 'Účet' }
 
 // Účet → předplatné (S08): stav, další platba, Customer Portal Stripe (karta,
 // zrušení) a doklady od Stripe. Jen pro vlastníka — pracovník dostane 404.
-// Do kostry aplikace (postranní panel) ji zapojí S09.
+// Do kostry aplikace (postranní panel) ji zapojí S09. S18: vzhled, přidání
+// na plochu, export dat, záznam o zpracování a zrušení účtu (R-054).
 
 type Summary = { badge: string; variant: NonNullable<BadgeProps['variant']>; text: string }
 
@@ -68,7 +74,11 @@ export default async function UcetPage() {
   const ctx = await requireWorkspace()
   requireRole(ctx, 'owner')
 
-  const billing = await getBillingState(ctx.accountId)
+  const [billing, closing, [account]] = await Promise.all([
+    getBillingState(ctx.accountId),
+    getAccountClosing(ctx),
+    wsDb(ctx)<{ name: string }>`SELECT name FROM ws.accounts WHERE id = ${ctx.accountId}`,
+  ])
   let invoices: AccountInvoice[] | null
   try {
     invoices = await listInvoices(ctx)
@@ -80,13 +90,32 @@ export default async function UcetPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[880px] flex-col gap-8 bg-ground px-4 py-8 text-ink sm:px-8 lg:py-10">
-      <Link
-        href="/w"
-        className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-full text-sm text-quiet transition-colors duration-200 ease-zq hover:text-ink"
-      >
-        <ArrowLeft aria-hidden size={18} strokeWidth={1.5} />
-        Zpět do aplikace
-      </Link>
+      {!closing && (
+        <Link
+          href="/w"
+          className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-full text-sm text-quiet transition-colors duration-200 ease-zq hover:text-ink"
+        >
+          <ArrowLeft aria-hidden size={18} strokeWidth={1.5} />
+          Zpět do aplikace
+        </Link>
+      )}
+
+      {closing && (
+        <section role="status" className="flex flex-col gap-3 rounded-panel border border-danger/40 bg-surface p-6">
+          <h2 className="text-lg font-semibold tracking-[-0.01em]">Účet je zrušený</h2>
+          <p className="text-[15px] text-quiet">
+            Data smažeme <span className="font-num">{formatBillingDate(closing.deleteAfter)}</span>. Do té doby si je můžete stáhnout nebo účet
+            obnovit.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <ReopenAccount />
+            <a href="/w/ucet/export" className={buttonVariants({ variant: 'outline' })}>
+              <Download aria-hidden size={18} strokeWidth={1.5} />
+              Stáhnout data
+            </a>
+          </div>
+        </section>
+      )}
 
       <div className="flex flex-col gap-2">
         <SectionLabel>Účet</SectionLabel>
@@ -102,7 +131,9 @@ export default async function UcetPage() {
         </div>
         <p className="text-[15px] text-quiet">{s.text}</p>
         <div className="border-t border-navy-100 pt-5">
-          {billing.access === 'none' ? (
+          {closing ? (
+            <p className="text-sm text-quiet">Po obnovení účtu založíte předplatné znovu.</p>
+          ) : billing.access === 'none' ? (
             <Link href="/w/novy" className={buttonVariants()}>
               Založit předplatné
             </Link>
@@ -157,6 +188,55 @@ export default async function UcetPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="ucet-vzhled" className="flex flex-col gap-4 rounded-panel border border-navy-100 bg-surface p-6">
+        <h2 id="ucet-vzhled" className="text-lg font-semibold tracking-[-0.01em]">
+          Vzhled a telefon
+        </h2>
+        <div className="flex flex-col gap-2">
+          <p className="text-[15px] text-quiet">Vzhled platí pro tohle zařízení.</p>
+          <ThemeSwitch />
+        </div>
+        <div className="flex flex-col gap-2 border-t border-navy-100 pt-4">
+          <p className="text-[15px] text-ink">Mějte ZakazIQ na ploše telefonu jako aplikaci.</p>
+          <InstallApp />
+        </div>
+      </section>
+
+      <section aria-labelledby="ucet-data" className="flex flex-col gap-4 rounded-panel border border-navy-100 bg-surface p-6">
+        <h2 id="ucet-data" className="text-lg font-semibold tracking-[-0.01em]">
+          Vaše data
+        </h2>
+        <p className="text-[15px] text-quiet">
+          Všechno, co v ZakazIQ máte: zákazníci, poptávky, termíny, zakázky, faktury a platby. Tabulky otevřete v Excelu, faktury jsou v PDF.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a href="/w/ucet/export" className={buttonVariants({ variant: 'outline' })}>
+            <Download aria-hidden size={18} strokeWidth={1.5} />
+            Stáhnout všechna data
+          </a>
+        </div>
+        <ul className="flex flex-col gap-1 border-t border-navy-100 pt-4">
+          <li>
+            <Link href="/w/ucet/zpracovani" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900">
+              <FileText aria-hidden size={18} strokeWidth={1.5} />
+              Záznam o zpracování osobních údajů
+            </Link>
+          </li>
+          <li>
+            <Link href="/zpracovatelska-smlouva" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900">
+              <FileText aria-hidden size={18} strokeWidth={1.5} />
+              Zpracovatelská smlouva
+            </Link>
+          </li>
+        </ul>
+        {!closing && (
+          <div className="border-t border-navy-100 pt-4">
+            <p className="mb-2 text-sm text-quiet">Po zrušení účtu data držíme {ACCOUNT_DELETE_DAYS} dní, potom je smažeme.</p>
+            <CloseAccount accountName={account?.name ?? ''} />
+          </div>
         )}
       </section>
     </main>

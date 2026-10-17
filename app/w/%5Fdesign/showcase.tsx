@@ -154,7 +154,7 @@ function Panel({ title, className, children }: { title?: string; className?: str
 }
 
 export function DesignShowcase() {
-  const { theme, setTheme } = useWsTheme()
+  const { theme, setPref } = useWsTheme()
   const [commandOpen, setCommandOpen] = useState(false)
   const [date, setDate] = useState<Date | undefined>(new Date(2026, 9, 9))
   const [confirmed, setConfirmed] = useState(false)
@@ -191,7 +191,7 @@ export function DesignShowcase() {
             <Label htmlFor="theme" className="text-sm text-quiet">
               Tmavý režim
             </Label>
-            <Switch id="theme" checked={theme === 'dark'} onCheckedChange={(on) => setTheme(on ? 'dark' : 'light')} />
+            <Switch id="theme" checked={theme === 'dark'} onCheckedChange={(on) => setPref(on ? 'dark' : 'light')} />
           </div>
         </div>
       </header>

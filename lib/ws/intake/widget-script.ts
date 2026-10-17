@@ -50,6 +50,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--n700);outline-of
 .check{width:44px;height:44px;border-radius:999px;background:var(--n700);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 .foot{font-size:12px;color:var(--quiet);margin-top:4px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;min-height:44px}.check input{width:20px;height:20px;margin:2px 0 0;flex:none}
 `
 
 /** Zdroják widgetu pro jeden byznys. */
@@ -119,6 +120,8 @@ function render(target){
   });
   var msg=el("textarea",{name:"message",maxlength:"2000",rows:"3"});
   form.appendChild(field("Zpráva",msg,true));
+  var consent=el("input",{type:"checkbox",name:"consent"});
+  form.appendChild(el("label",{"class":"check"},[consent,el("span",{text:"Chci občas dostat nabídku nebo novinku od "+NAME+"."})]));
   var hp=el("input",{name:"website",tabindex:"-1",autocomplete:"off"});
   form.appendChild(el("div",{"class":"hp","aria-hidden":"true"},[hp]));
   var err=el("div");form.appendChild(err);
@@ -127,7 +130,7 @@ function render(target){
   form.addEventListener("submit",function(e){
     e.preventDefault();err.textContent="";
     var fields={};custom.forEach(function(c){if(c[1].value)fields[c[0]]=c[1].value});
-    var body={name:name.value,phone:phone.value||null,email:email.value||null,message:msg.value||null,fields:fields,website:hp.value};
+    var body={name:name.value,phone:phone.value||null,email:email.value||null,message:msg.value||null,fields:fields,website:hp.value,marketingConsent:consent.checked};
     if(svc&&svc.value)body.serviceId=svc.value;
     if(time&&time.value)body.start=time.value;
     if(fdate&&fdate.value&&ftime&&ftime.value){body.date=fdate.value;body.time=ftime.value}

@@ -159,7 +159,7 @@ export async function loadSlotData(accountId: string, config: IntakeConfig, serv
     q`SELECT st.id FROM ws.staff st
       WHERE st.account_id = ${accountId} AND st.business_id = ${biz} AND st.active
         AND (${serviceId}::uuid IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
+          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
           OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))`,
     q`SELECT staff_id, weekday, opens::text AS opens, closes::text AS closes FROM ws.opening_hours
       WHERE account_id = ${accountId} AND business_id = ${biz} AND staff_id IS NOT NULL`,
@@ -246,6 +246,8 @@ export const requestInputSchema = z
     externalId: optionalText(100),
     source: z.enum(['web', 'eshop']).optional(),
     test: z.boolean().optional(),
+    // Souhlas zákazníka s nabídkami (S18). Jen přidává, odvolat ho jde u firmy nebo odkazem v e-mailu.
+    marketingConsent: z.boolean().optional(),
     // Past na roboty: lidé tohle pole nevidí, vyplněné = robot.
     website: z.string().max(500).optional(),
   })
@@ -462,6 +464,10 @@ export async function ingestRequest(
   try {
     const phone = normalizePhone(input.phone)
     const customerId = isTest ? null : await findOrCreateCustomer(scope(acc), { name: input.name, phone, email: input.email })
+    if (customerId && input.marketingConsent) {
+      await wsDb({ accountId: acc })`UPDATE ws.customers SET contact_consent_at = COALESCE(contact_consent_at, now()), unsubscribed_at = NULL
+        WHERE account_id = ${acc} AND id = ${customerId}`
+    }
     const end = start ? new Date(start.getTime() + (service?.duration_min ?? 60) * 60_000) : null
     const contact = JSON.stringify({ name: input.name, phone: phone ?? undefined, email: input.email ?? undefined })
     const source = src.channel === 'secret' ? (input.source ?? 'web') : SOURCE[src.channel]

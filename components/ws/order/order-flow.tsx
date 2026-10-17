@@ -131,6 +131,7 @@ export function OrderFlow({
           message: text('message'),
           fields: values,
           website: text('website'),
+          marketingConsent: form.get('consent') === 'on',
         })
         if (res.ok) {
           setStep('done')
@@ -384,6 +385,11 @@ export function OrderFlow({
                   maxLength={2000}
                   className={cn(inputBase, 'h-auto min-h-[88px] py-2.5')}
                 />
+              </label>
+
+              <label className="flex min-h-11 items-start gap-3 text-[15px]">
+                <input type="checkbox" name="consent" className="mt-0.5 h-5 w-5 shrink-0 accent-navy-700" />
+                <span>Chci občas dostat nabídku nebo novinku od {businessName}.</span>
               </label>
 
               {/* Past na roboty: lidé pole nevidí ani na něj neskočí tabulátorem. */}

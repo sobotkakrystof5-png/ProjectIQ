@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
+import { cookies, headers } from 'next/headers'
 import { ClerkProvider } from '@clerk/nextjs'
 import { csCZ } from '@clerk/localizations'
 import { WsRoot } from '@/components/ws/ws-root'
 import { clerkAppearance } from '@/components/ws/auth/clerk-appearance'
 import { wsFontVariables } from '@/lib/ws/fonts'
 import { WS_HOME_PATH, WS_ONBOARDING_PATH, WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
+import { parseThemePref, THEME_COOKIE } from '@/lib/ws/theme'
 import '../ws-tokens.css'
 
 export const metadata: Metadata = {
@@ -20,7 +22,10 @@ export const dynamic = 'force-dynamic'
 // Layout aplikace Workspace. Clerk jen tady (ne v kořenovém layoutu adminu):
 // `dynamic` = ClerkProvider vezme nonce z hlavičky x-nonce a dá ho skriptu
 // clerk-js. Telemetrie vypnutá — jinak by potřebovala další host v CSP.
-export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
+export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
+  // Vzhled z Účtu (S18); nonce kvůli skriptu „Podle systému“ ve WsRoot.
+  const themePref = parseThemePref((await cookies()).get(THEME_COOKIE)?.value)
+  const nonce = (await headers()).get('x-nonce') ?? undefined
   return (
     <ClerkProvider
       dynamic
@@ -33,7 +38,9 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       signUpFallbackRedirectUrl={WS_ONBOARDING_PATH}
       afterSignOutUrl="/"
     >
-      <WsRoot fontClassName={wsFontVariables}>{children}</WsRoot>
+      <WsRoot fontClassName={wsFontVariables} themePref={themePref} nonce={nonce}>
+        {children}
+      </WsRoot>
     </ClerkProvider>
   )
 }

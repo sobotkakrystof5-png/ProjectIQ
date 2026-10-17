@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { Minus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
 import {
   adjustStamps,
+  eraseCustomer,
   findMergeCandidates,
   mergeCustomers,
   redeemReward,
@@ -372,5 +374,64 @@ export function MergeBox({
         </ul>
       )}
     </div>
+  )
+}
+
+// --- Výmaz na žádost (GDPR, S18) -------------------------------------------------------
+
+/**
+ * Smazání zákazníka, který o to požádal. Nejde vrátit, proto potvrzení
+ * jménem. Historie zůstane bez osobních údajů, vystavené faktury zůstanou.
+ */
+export function EraseCustomer({ slug, customerId, customerName }: { slug: string; customerId: string; customerName: string }) {
+  const { run, pending } = useWsAction()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [asking, setAsking] = useState(false)
+  const [text, setText] = useState('')
+  const matches = text.trim().toLocaleLowerCase('cs') === customerName.trim().toLocaleLowerCase('cs')
+
+  if (!asking) {
+    return (
+      <div>
+        <Button variant="ghost" className="text-danger hover:bg-danger/10" onClick={() => setAsking(true)}>
+          Smazat na žádost zákazníka
+        </Button>
+      </div>
+    )
+  }
+
+  const erase = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!matches) return
+    void run(
+      () => eraseCustomer({ slug, customerId }),
+      (r) => {
+        toast.success(r.message)
+        router.replace(pathname)
+      },
+    )
+  }
+
+  return (
+    <form onSubmit={erase} className="flex flex-col gap-3 rounded-box border border-danger/40 bg-ground p-4">
+      <p className="text-[15px] text-ink">
+        Smažeme kontakty, poznámky, věrnostní kartu, hodnocení a zprávy zákazníka <strong>{customerName}</strong>. V termínech, zakázkách
+        a poptávkách zůstane „Smazaný zákazník“, aby seděly přehledy. Vystavené faktury zůstanou, zákon je vyžaduje uchovat 10 let.
+        Vrátit to nejde.
+      </p>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`smazat-${customerId}`}>Pro potvrzení napište jméno zákazníka</Label>
+        <Input id={`smazat-${customerId}`} value={text} onChange={(e) => setText(e.target.value)} maxLength={200} autoComplete="off" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" variant="danger" disabled={pending || !matches}>
+          Smazat natrvalo
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setAsking(false)}>
+          Zavřít
+        </Button>
+      </div>
+    </form>
   )
 }

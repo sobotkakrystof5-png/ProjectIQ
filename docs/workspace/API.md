@@ -74,6 +74,7 @@ Typy kolonek: `text`, `address` (řádek textu), `number`, `date` (RRRR-MM-DD), 
 | `externalId` | nepovinné | číslo objednávky e-shopu; stejné číslo podruhé = žádná nová poptávka (`200`, `duplicate: true`) |
 | `source` | nepovinné | `web` (výchozí) nebo `eshop`, jen s tajným klíčem |
 | `test` | nepovinné | `true` = zkušební poptávka: uloží se, ale nezaloží zákazníka a neukáže se v Poptávkách ani v Dnes |
+| `marketingConsent` | nepovinné | `true` = zákazník zaškrtl, že chce dostávat nabídky (souhlas se uloží u zákazníka, S18). Políčko musí být nezaškrtnuté předem; `false` nebo chybějící souhlas neodvolá |
 | `website` | past na roboty | posílejte z neviditelné kolonky; vyplněná = robot, API odpoví úspěchem a nic neuloží |
 
 Hlavička `Idempotency-Key` (nepovinná, 1–200 znaků bez mezer, doporučeno nové UUID na jedno odeslání formuláře): opakovaný požadavek se stejným klíčem do 24 h vrátí stejnou odpověď s hlavičkou `Idempotent-Replayed: true`, nic nového se neuloží. Stejný klíč s jiným tělem = `422`.

@@ -7,7 +7,7 @@ import type { LoyaltyEvent } from '@/lib/ws/loyalty'
 import type { WsCurrency } from '@/lib/ws/money'
 import { plural } from '@/lib/ws/plural'
 import { formatDayShort, formatRelativeDay, pragueParts } from '@/lib/ws/time'
-import { ConsentSwitch, CustomerEditForm, EndCustomer, LoyaltyControls, MergeBox } from './customer-controls'
+import { ConsentSwitch, CustomerEditForm, EndCustomer, EraseCustomer, LoyaltyControls, MergeBox } from './customer-controls'
 import { SegmentBadge } from './segment-badge'
 
 const STATUS: Record<string, string> = {
@@ -202,6 +202,10 @@ export function CustomerDetail({
 
       <section className="border-t pt-5">
         <EndCustomer slug={slug} customerId={c.id} ended={c.ended} reason={c.endedReason} />
+      </section>
+
+      <section className="border-t pt-5">
+        <EraseCustomer slug={slug} customerId={c.id} customerName={c.name} />
       </section>
     </div>
   )

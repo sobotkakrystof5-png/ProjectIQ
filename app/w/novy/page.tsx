@@ -9,6 +9,7 @@ import { getBillingState, TRIAL_DAYS } from '@/lib/ws/billing'
 import { orgWithAccount, ownerProfile } from '@/lib/ws/clerk-orgs'
 import { hasRole, requireWorkspace } from '@/lib/ws/context'
 import { wsDb } from '@/lib/ws/db'
+import { getAccountClosing } from '@/lib/ws/gdpr'
 import { accountIdForOrg, ensureMember } from '@/lib/ws/onboarding'
 import { WS_HOME_PATH, WS_SIGN_IN_PATH } from '@/lib/ws/paths'
 
@@ -30,6 +31,7 @@ export default async function NovyPage() {
     await ensureMember(ctx, () => ownerProfile(userId)).catch((e) =>
       console.error('[ws/novy] člen se nezapsal', { error: e instanceof Error ? e.message : 'unknown' }),
     )
+    if (await getAccountClosing(ctx)) redirect('/w/ucet')
     const billing = await getBillingState(ctx.accountId)
     if (billing.access !== 'none') redirect(WS_HOME_PATH)
 

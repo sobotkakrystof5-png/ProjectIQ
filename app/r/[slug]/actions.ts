@@ -49,6 +49,7 @@ const orderSchema = z.object({
   message: z.string().max(2000),
   fields: z.record(z.string().max(40), z.string().max(1000)),
   website: z.string().max(500),
+  marketingConsent: z.boolean().optional(),
 })
 
 export type OrderResult =
@@ -75,6 +76,7 @@ export async function submitOrder(raw: unknown): Promise<OrderResult> {
         message: input.message,
         fields: input.fields,
         website: input.website,
+        marketingConsent: input.marketingConsent,
       },
     )
     if (result.body.success) return { ok: true }

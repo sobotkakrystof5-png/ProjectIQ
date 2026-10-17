@@ -235,6 +235,17 @@ describe('ingestRequest', () => {
     expect(await count(`SELECT count(*)::int AS n FROM ws.intake_log WHERE request_id = $1 AND status = 202`, [id])).toBe(1)
   })
 
+  it('souhlas s nabídkami se uloží jen zaškrtnutý a nikdy se neodvolá (S18)', async () => {
+    const consentOf = async (phone: string) =>
+      (await db.query<{ c: Date | null }>(`SELECT contact_consent_at AS c FROM ws.customers WHERE account_id = $1 AND phone = $2`, [A.account, phone])).rows[0]?.c ?? null
+    await ingestRequest(srcA(), valid({ phone: '777 000 111' }), { now: NOW })
+    expect(await consentOf('+420777000111')).toBeNull()
+    await ingestRequest(srcA(), valid({ phone: '777 000 111', marketingConsent: true }), { now: NOW })
+    expect(await consentOf('+420777000111')).toBeInstanceOf(Date)
+    await ingestRequest(srcA(), valid({ phone: '777 000 111', marketingConsent: false }), { now: NOW })
+    expect(await consentOf('+420777000111')).toBeInstanceOf(Date)
+  })
+
   it('zkušební poptávka: is_test, bez zákazníka a bez upozornění', async () => {
     const before = await count(`SELECT count(*)::int AS n FROM ws.customers WHERE account_id = $1`, [A.account])
     const res = await ingestRequest(srcA('check'), valid({ phone: '777 000 999', test: true }), { now: NOW })

@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getBillingState } from '@/lib/ws/billing'
 import { requireWorkspace } from '@/lib/ws/context'
+import { getAccountClosing } from '@/lib/ws/gdpr'
 import { LAST_BUSINESS_COOKIE, WS_ONBOARDING_PATH } from '@/lib/ws/paths'
 import { getBusinesses } from '@/lib/ws/today'
 
@@ -13,7 +14,9 @@ type SearchParams = Record<string, string | string[] | undefined>
 export default async function WorkspaceHome(props: { searchParams: Promise<SearchParams> }) {
   const searchParams = await props.searchParams
   const ctx = await requireWorkspace()
-  const [billing, businesses] = await Promise.all([getBillingState(ctx.accountId), getBusinesses(ctx)])
+  const [billing, businesses, closing] = await Promise.all([getBillingState(ctx.accountId), getBusinesses(ctx), getAccountClosing(ctx)])
+  // Rušený účet (S18): byznysy jsou archivované, zbývá jen Účet s obnovením.
+  if (closing) redirect('/w/ucet')
   if (billing.access === 'none' || businesses.length === 0) redirect(WS_ONBOARDING_PATH)
 
   const remembered = (await cookies()).get(LAST_BUSINESS_COOKIE)?.value

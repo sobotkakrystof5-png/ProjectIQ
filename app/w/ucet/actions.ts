@@ -2,9 +2,13 @@
 
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { createCheckoutSession, createPortalSession } from '@/lib/ws/billing'
+import { revalidatePath } from 'next/cache'
+import { createCheckoutSession, createPortalSession, syncSubscription } from '@/lib/ws/billing'
 import { hasRole, requireWorkspace } from '@/lib/ws/context'
-import { fail, type Result } from '@/lib/ws/result'
+import { wsDb } from '@/lib/ws/db'
+import { closeAccount, getAccountClosing, liveSubscriptionIds, reopenAccount } from '@/lib/ws/gdpr'
+import { fail, ok, type Result } from '@/lib/ws/result'
+import { getStripe } from '@/lib/ws/stripe'
 
 // Předplatné (S08). Spravovat ho smí jen vlastník účtu. Adresy Stripe vznikají
 // na serveru, z formuláře nepřichází nic — účet je vždy z requireWorkspace().
@@ -43,4 +47,56 @@ export async function startCheckout(raw: unknown): Promise<Result<never>> {
   }
   if ('updateCard' in result) return openBillingPortal()
   redirect('url' in result ? result.url : '/w')
+}
+
+// --- Zrušení účtu (S18, R-054) ------------------------------------------------
+
+const ACCOUNT_OWNER_ONLY = 'Účet může zrušit jen jeho majitel.'
+
+/**
+ * Zruší předplatné ve Stripe (nic dalšího se nezaplatí) a nastaví výmaz dat
+ * za 30 dní. Potvrzuje se názvem účtu, ten porovná server.
+ */
+export async function closeAccountAction(raw: unknown): Promise<Result<{ deleteAfter: string }>> {
+  const ctx = await requireWorkspace()
+  if (!hasRole(ctx, 'owner')) return fail(ACCOUNT_OWNER_ONLY)
+  const input = z.object({ confirm: z.string().trim().max(200) }).safeParse(raw)
+  if (!input.success) return fail('Napište prosím název účtu.')
+
+  try {
+    const [acc] = await wsDb(ctx)<{ name: string }>`SELECT name FROM ws.accounts WHERE id = ${ctx.accountId}`
+    if (!acc || acc.name.trim().toLocaleLowerCase('cs') !== input.data.confirm.toLocaleLowerCase('cs')) {
+      return fail(`Název nesedí. Napište přesně: ${acc?.name ?? 'název účtu'}`)
+    }
+    const existing = await getAccountClosing(ctx)
+    if (existing) return ok({ deleteAfter: existing.deleteAfter.toISOString() })
+
+    // Nejdřív Stripe: když selže, účet zůstane, jak byl, a jde to zkusit znovu.
+    for (const id of await liveSubscriptionIds(ctx)) {
+      const sub = await getStripe().subscriptions.retrieve(id)
+      if (sub.status !== 'canceled' && sub.status !== 'incomplete_expired') await getStripe().subscriptions.cancel(id)
+      await syncSubscription(id)
+    }
+    const until = await closeAccount(ctx)
+    if (!until) return fail('Účet se nepodařilo zrušit. Zkuste to prosím znovu.')
+    revalidatePath('/w', 'layout')
+    return ok({ deleteAfter: until.toISOString() })
+  } catch (e) {
+    console.error('[ws/ucet] zrušení účtu selhalo', { accountId: ctx.accountId, error: (e as Error).message })
+    return fail('Účet se nepodařilo zrušit. Zkuste to prosím za chvíli.')
+  }
+}
+
+/** Obnovení ve 30denní lhůtě. Předplatné se pak založí znovu (Obnovit předplatné). */
+export async function reopenAccountAction(): Promise<Result<null>> {
+  const ctx = await requireWorkspace()
+  if (!hasRole(ctx, 'owner')) return fail(ACCOUNT_OWNER_ONLY)
+  try {
+    if (!(await reopenAccount(ctx))) return fail('Účet už obnovit nejde.')
+    revalidatePath('/w', 'layout')
+    return ok(null)
+  } catch (e) {
+    console.error('[ws/ucet] obnovení účtu selhalo', { accountId: ctx.accountId, error: (e as Error).message })
+    return fail('Účet se nepodařilo obnovit. Zkuste to prosím znovu.')
+  }
 }
