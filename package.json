@@ -8,7 +8,6 @@
     "build": "next build",
     "build:check": "bash scripts/build-check.sh",
     "start": "next start",
-    "lint": "next lint",
     "test": "vitest run"
   },
   "keywords": [],
@@ -45,7 +44,7 @@
     "cmdk": "^1.1.1",
     "framer-motion": "^12.40.0",
     "lucide-react": "^0.544.0",
-    "next": "^16.2.12",
+    "next": "^16.4.2",
     "next-auth": "^4.24.14",
     "nodemailer": "^7.0.13",
     "postcss": "^8.4.49",

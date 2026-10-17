@@ -191,3 +191,14 @@ Výsledek:
 - Ověřeno `ws-portal.test.ts` 13/13 (včetně cizího účtu, kolize a skrytých poznámek), celkem 434 testů + 1 vynechaný, TypeScript a produkční build. CSP se neměnila.
 Nálezy: 0 k opravě. Přijaté riziko trvalého odkazu a chybějící jednotlivé rotace: DECISIONS #012, revize S19.
 Zůstává: migrace 082 a skutečná data na Neonu nejsou ověřené.
+
+## 2026-10-17 — review (upgrade na Next 16.4.2 a React 19)
+Spouštěč: `web-security-review` před commitem upgradu (R-053).
+Rozsah: `middleware.ts` → `proxy.ts` (Node runtime místo edge), `next.config.mjs` (`serverExternalPackages`, `turbopack.root`, `outputFileTracingRoot`), async `params`/`searchParams`/`cookies()`/`headers()` v ~70 souborech, závislosti (`next`, `react`, `qrcode.react`, `lucide-react`).
+Výsledek:
+- `proxy.ts`: pořadí větví (Clerk `/w` + `/api/ws` → NextAuth admin → CSP s nonce) a matcher beze změny. Ověřeno na produkčním buildu: `/dashboard`, `/alteno`, `/hub` → 307 na přihlášení, `/w` → `/w/prihlaseni`, `/api/public/v1/schema` bez klíče 401, `/p/<uuid>` 404; CSP s nonce na `/`, `/w/*`, `/r/*`, admin `/login` zůstává Report-Only. CSP se neoslabila.
+- `appOrigin()` je async (čte `headers()` jen jako vývojový záložní zdroj, ostrá adresa je `NEXT_PUBLIC_APP_URL`). Server action pro cookie byznysu: `cookies()` s `await`, atributy beze změny.
+- Tracing PDF: v `route.js.nft.json` jsou binárky `@sparticuz/chromium` (původní klíč `outputFileTracingIncludes` fungoval i pod Turbopackem).
+- `npm audit`: Next 16.2.12 byl dál označený (critical v `next/og`, Image Optimization, Windows hosting; opravy až od 16.3.8), proto cíl 16.4.2 — critical u `next` zmizely. Zbývá `nodemailer` 7, `next-auth` 4, řetězec `tailwindcss` 3 (DECISIONS #006).
+- Ověřeno: `tsc` čistý, `npm test` 451 + 1 vynechaný, `npm run build` (Turbopack) bez varování, smoke test produkčního serveru. Neověřeno: přihlášení do adminu a Clerku v prohlížeči, skutečné PDF na Vercelu, Vercel Preview.
+Nálezy: 0 k opravě.

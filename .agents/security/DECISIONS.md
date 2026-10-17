@@ -60,10 +60,10 @@ Revize: S19 — ověřit na hstspreload.org pro produkční doménu adminu i `za
 ## 006 — CI audit závislostí dočasně jen jako upozornění
 Datum: 2026-10-08
 Rozhodnutí: job `dependencies` v `.github/workflows/security.yml` má `continue-on-error: true`.
-Důvod: `npm audit --omit=dev --audit-level=high` dnes padá na `next` 14 (critical, oprava až v Next 15.5.24+), `nodemailer` 7, `next-auth`, `postcss`. Oprava = upgrade Next 15, který AGENTS.md B2 dává až po spuštění. Trvale červené CI učí CI ignorovat.
+Důvod: `npm audit --omit=dev --audit-level=high` padal na `next` 14 (critical), `nodemailer` 7, `next-auth`, `postcss`. Next je od 2026-10-17 na 16.4.2 (R-053), zbývá `nodemailer` 7 (oprava v 10), `next-auth` 4 a řetězec `tailwindcss` 3. Trvale červené CI učí CI ignorovat.
 Zvažované alternativy: `--audit-level=critical` (stejně padá na `next`); vypnout job (ztratíme přehled).
 Přijaté riziko: nová high/critical zranitelnost neshodí build, jen se objeví v logu jobu.
-Revize: S19 — po upgradu Next 15 a nodemailer 10 vrátit `continue-on-error: false`.
+Revize: S19 — po upgradu nodemailer 10 (a rozhodnutí o next-auth 4 / tailwindcss 4) vrátit `continue-on-error: false`. Next 16.2.12 audit neprošel (opravy od 16.3.8), proto cíl 16.4.2.
 
 ## 007 — Landing page dynamická s vynucenou CSP
 Datum: 2026-10-08

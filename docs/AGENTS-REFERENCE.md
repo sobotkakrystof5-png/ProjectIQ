@@ -22,7 +22,7 @@ Kryštof píše česky, rychle a často s překlepy. Vyber smysl zadání, nedop
 - Před úpravou čti dotčený kód. Zadání proveď až do ověřeného výsledku; běžné vratné kroky v jeho rozsahu nevyžadují nové schválení.
 - Nové produktové rozhodnutí mimo zadání, změnu záměrného rozhodnutí v paměti, destruktivní operaci nebo nasazení nejdřív předlož Kryštofovi. Už udělený souhlas platí dál.
 - Migrace jsou nové a idempotentní. Spuštění proti skutečné DB, seed a změny externích služeb vyžadují výslovné zadání nebo předchozí souhlas; příprava SQL a ověření v PGlite jsou běžná součást práce.
-- Před commitem větší změny proveď kontroly B12. Když běží `next dev`, použij `npm run build:check`, aby se nerozbila jeho `.next`. `npm run lint` zatím spouští průvodce; pro typy používej `npx tsc --noEmit`.
+- Před commitem větší změny proveď kontroly B12. Když běží `next dev`, použij `npm run build:check`, aby se nerozbila jeho `.next`. `npm run lint` není nastavený (Next 16 `next lint` odstranil); pro typy používej `npx tsc --noEmit`.
 - Výsledek ověření hlas přesně: spuštěné kontroly, skutečné chyby a co nebylo ověřeno. Chybějící přístup nenahrazuj vymyšlenými výsledky.
 
 **Konec každé dokončené změny:**
@@ -75,7 +75,7 @@ Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin),
 | API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/`, `app/api/clerk/` | nové |
 | UI kit | `components/ui/` (shadcn/ui, tokeny Dílky) | nový, admin ho nepoužívá |
 | DB | `migrations/064_*.sql` a dál | jen nové migrace, staré se nemění |
-| Bezpečnost (celé repo) | `middleware.ts`, `next.config.mjs` (hlavičky), `lib/security/`, `public/.well-known/`, `.github/workflows/security.yml`, `.claude/security/`, `.agents/security/` | mění se jen spolu se zápisem do `.claude/security/` a synchronizací do `.agents/security/` (B13) |
+| Bezpečnost (celé repo) | `proxy.ts`, `next.config.mjs` (hlavičky), `lib/security/`, `public/.well-known/`, `.github/workflows/security.yml`, `.claude/security/`, `.agents/security/` | mění se jen spolu se zápisem do `.claude/security/` a synchronizací do `.agents/security/` (B13) |
 
 Co se z adminu přebírá (příjem poptávek, časové helpery, faktury, daně, e-maily, portál), se **zkopíruje** do `lib/ws/` a tam zobecní. Původní soubor zůstává netknutý.
 
@@ -85,7 +85,7 @@ Co se z adminu přebírá (příjem poptávek, časové helpery, faktury, daně,
 
 > Kryštofův osobní produkční systém (VIZEON, ALTENO, Hub, klientský portál). **Úplný popis kódu adminu je v [`docs/admin/AGENTS-ADMIN.md`](../docs/admin/AGENTS-ADMIN.md)** — tech stack, databázový model a katalog tabulek, struktura aplikace, server actions, routy, API, crony, stránky, stavy zakázky, e-maily, bezpečnost, UX pravidla a poznámky pro AI. Přečti ho před jakoukoli změnou adminu (R-042). Tady zůstávají jen příkazy a env proměnné, které platí pro celé repo.
 
-Admin v kostce: Next.js 14 App Router, Neon přes `sql` tag z `lib/db.ts` (bez ORM), NextAuth s jedním adminem, e-maily přes Gmail SMTP v `lib/email.ts`, Vercel Hobby (crony max 1× denně). Neon vrací `date`/`timestamptz` jako `Date`, ne string. Částky v CZK a EUR se nikdy nesčítají.
+Admin v kostce: Next.js 16 App Router, Neon přes `sql` tag z `lib/db.ts` (bez ORM), NextAuth s jedním adminem, e-maily přes Gmail SMTP v `lib/email.ts`, Vercel Hobby (crony max 1× denně). Neon vrací `date`/`timestamptz` jako `Date`, ne string. Částky v CZK a EUR se nikdy nesčítají.
 
 ### Příkazy
 
@@ -94,7 +94,7 @@ npm run dev      # lokální vývoj (http://localhost:3000)
 npm run build    # produkční build — musí projít před commitem větší změny
 npm run build:check   # totéž v dočasné kopii repa — když běží `next dev` (sdílí .next, build by ho rozbil)
 npm test         # vitest run
-npm run lint     # next lint
+npm run lint     # není nastavený (Next 16 `next lint` odstranil), kontrolu dělá tsc
 node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace migrace na DATABASE_URL z .env.local
 node scripts/ws-create-role.js   # Workspace: role ws_app + práva + DATABASE_URL_WS do .env.local (docs/workspace/SETUP.md)
 node scripts/ws-seed.mjs <slug> --ano   # Workspace: ukázková data pro obrazovku Dnes (--smazat --ano je smaže)
@@ -159,7 +159,7 @@ ZakazIQ Workspace je SaaS pro malé firmy, které dostávají poptávky (kadeřn
 
 ## B2. Tech stack
 
-Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Neon Postgres (`@neondatabase/serverless`) · Clerk (klienti) · NextAuth (jen admin) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
+Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Neon Postgres (`@neondatabase/serverless`) · Clerk (klienti) · NextAuth (jen admin) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
 
 - Nové závislosti jen s důvodem zapsaným do `memory/memory.md` → Rozhodnutí.
 - UI kit stojí na Radix UI (`@radix-ui/react-*`), `class-variance-authority`, `cmdk` (⌘K) a `react-day-picker` (kalendář) — R-028.
@@ -187,7 +187,7 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
-| Cesty | `lib/ws/paths.ts` — `/w`, `/w/prihlaseni`, `/w/registrace`, `/w/novy` (bez závislostí, importuje i middleware) |
+| Cesty | `lib/ws/paths.ts` — `/w`, `/w/prihlaseni`, `/w/registrace`, `/w/novy` (bez závislostí, importuje i proxy) |
 | Založení účtu | `lib/ws/onboarding.ts`: `createAccountWithBusiness()` — účet, vlastník, byznys a šablona oboru v jedné transakci pod RLS s nově vygenerovaným `account_id`; obsazený slug zkusí s koncovkou, existující organizace vrátí její účet; `accountIdForOrg()`, `slugify()` |
 | Výsledek akcí | `lib/ws/result.ts` (`ok`, `fail`, `Result<T>`) |
 | Šablony oborů | `lib/ws/templates/` — 8 oborů, `templateSeedQueries()` naplní nový byznys (funkce, služby bez cen, kolonky, stavy, hranice skupin, vypnutá věrnost) |
@@ -246,15 +246,15 @@ Pravidla schématu:
 - Clerk: Organization = účet (firma, jedno IČO, předplatné). Role `owner`, `staff`.
 - Přihlášení bez hesla: e-mailový kód nebo Google.
 - Jedna doména: landing na `/`, aplikace na `/w/*`, jedna Clerk instance (R-017). Cesty veřejných částí viz Hranice v repu (R-016).
-- Jeden `middleware.ts`: veřejné cesty; Workspace přes Clerk; admin cesty přes NextAuth token jako dnes. Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
+- Jeden `proxy.ts` (dřív `proxy.ts`, Next 16, Node runtime): veřejné cesty; Workspace přes Clerk; admin cesty přes NextAuth token jako dnes. Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
 - Webhook Clerk (`/api/clerk/webhook`, ověření podpisu) synchronizuje účty a členy do `ws`.
 
 ### Jak je to v kódu (S07, R-037)
 
 | Co | Kde |
 |---|---|
-| SDK | `@clerk/nextjs` **6.39.7** (poslední s podporou Next 14; v7 chce Next 15) + `@clerk/localizations` (`csCZ`) |
-| Middleware | `middleware.ts`: `clerkMiddleware` jen pro `/w` a `/api/ws`; bez přihlášení `auth.protect()` → `/w/prihlaseni` (veřejné jen přihlášení, registrace a `/w/_design`). Admin a landing Clerk vůbec nespouští. CSP s nonce zůstává (`withCsp` uvnitř Clerku) |
+| SDK | `@clerk/nextjs` **6.39.7** (podporuje Next 14–16 i React 19, upgrade na v7 nebyl při přechodu na Next 16 potřeba) + `@clerk/localizations` (`csCZ`) |
+| Proxy | `proxy.ts`: `clerkMiddleware` jen pro `/w` a `/api/ws`; bez přihlášení `auth.protect()` → `/w/prihlaseni` (veřejné jen přihlášení, registrace a `/w/_design`). Admin a landing Clerk vůbec nespouští. CSP s nonce zůstává (`withCsp` uvnitř Clerku) |
 | Provider | `app/w/layout.tsx`: `ClerkProvider dynamic` (nonce z `x-nonce`), česky, `telemetry={false}`, po přihlášení `/w`, po registraci `/w/novy`. Kořenový `app/layout.tsx` beze změny |
 | Vzhled | `components/ws/auth/clerk-appearance.ts` (třídy Tailwindu s tokeny Dílků, `!`), rozložení `components/ws/auth/auth-shell.tsx` |
 | Stránky | `/w/prihlaseni/[[...prihlaseni]]`, `/w/registrace/[[...registrace]]` (catch-all kvůli krokům Clerku), `/w/novy` (průvodce), `/w` (přesměruje na `/w/[byznys]`, kostra a Dnes viz B9 „Jak je to v kódu (S09)“) |
@@ -313,7 +313,7 @@ Popis API s příklady pro weby klientů: **`docs/workspace/API.md`** (zdroj pro
 | Routy | `app/api/public/v1/requests/route.ts` (POST, OPTIONS), `app/api/public/v1/schema/route.ts` (GET, OPTIONS; tvar `lib/ws/intake/schema.ts`, cache 60 s) |
 | Objednávací stránka | `app/r/layout.tsx` (Dílky, `force-dynamic`), `app/r/[slug]/page.tsx`, akce `app/r/[slug]/actions.ts` (`getOrderSlots`, `submitOrder` — byznys jen ze slugu), UI `components/ws/order/order-flow.tsx` (služba → termín → kontakt → hotovo). Barva byznysu přes `lib/ws/accent.ts` (jen s kontrastem ≥ 4.5 k bílé) |
 | Widget | `app/embed/[file]/route.ts` (`/embed/<slug>.js`, cache 5 min), zdroják `lib/ws/intake/widget-script.ts` (bez frameworku, shadow DOM, jen `textContent`, `data-mode="inline"`, `data-label`) |
-| Rámování `/r` | `middleware.ts` → `lib/ws/intake/embed-origins.ts` (povolené domény ze slugu, cache 60 s v instanci, chyba = jen `'self'`) |
+| Rámování `/r` | `proxy.ts` → `lib/ws/intake/embed-origins.ts` (povolené domény ze slugu, cache 60 s v instanci, chyba = jen `'self'`) |
 | Nastavení › Napojený web | `/w/[byznys]/nastaveni/web` (jen vlastník): prompt pro Claude Code (`lib/ws/intake/claude-prompt.ts`), tajný klíč, Ověřit napojení, odkaz + QR (PNG/SVG, `qrcode.react`), kód widgetu, povolené weby, Poslat návod webáři (`mailto:`), posledních 20 požadavků (`lib/ws/intake/log.ts`). Akce `app/w/[business]/nastaveni/web/actions.ts`, UI `components/ws/settings/web-integration.tsx`. Rozcestník `/w/[byznys]/nastaveni` |
 | Zkušební poptávky | `requests.is_test`: `test: true` v API nebo Ověřit napojení. Nezakládají zákazníka ani upozornění; dotazy v `today.ts`, `calendar.ts`, `search.ts` je vynechávají (nový výpis poptávek = `AND NOT r.is_test`) |
 | Testy | `lib/ws/__tests__/ws-intake.test.ts` (klíče, rotace, cizí účet, kolonky, volné časy, SLOT_TAKEN, idempotence, externalId, neaktivní předplatné, honeypot, route: 401/403/CORS/429/413, schema, widget, frame-ancestors, prompt) |
@@ -469,7 +469,7 @@ Stav zabezpečení je v `.claude/security/`:
 
 | Soubor | Obsah | Kdy číst |
 |---|---|---|
-| `STATE.md` | současný stav, threat model, otevřené položky, „neměnit bez zeptání" | na začátku každého sezení, které sahá na hlavičky, CSP, middleware, API nebo vstupy |
+| `STATE.md` | současný stav, threat model, otevřené položky, „neměnit bez zeptání" | na začátku každého sezení, které sahá na hlavičky, CSP, proxy, API nebo vstupy |
 | `DECISIONS.md` | přijaté kompromisy a proč, s datem revize | před změnou čehokoli bezpečnostního |
 | `CSP-LOG.md` | každá změna CSP a funkce, která ji vyžádala | před sáhnutím na politiku |
 | `AUDIT-LOG.md` | audity, review, incidenty, rotace klíčů | při vyšetřování nebo hlášení |
@@ -489,9 +489,9 @@ Stav zabezpečení je v `.claude/security/`:
 | Co | Kde |
 |---|---|
 | Statické hlavičky (HSTS, nosniff, X-Frame-Options, CORP, COOP, Permissions-Policy…) pro všechny odpovědi | `next.config.mjs` |
-| CSP s nonce per request (`strict-dynamic`), výběr profilu podle cesty | `middleware.ts` + `lib/security/csp.ts` |
-| Admin přihlášení (NextAuth), Workspace (Clerk jen `/w`, `/api/ws`) | `middleware.ts` — Clerk větev (`/w`, `/api/ws`) → admin NextAuth → CSP |
-| `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`); domény z `web_integrations.allowed_origins` — `/r` přes `lib/ws/intake/embed-origins.ts` v middleware, API přes `lib/ws/intake/http.ts` |
+| CSP s nonce per request (`strict-dynamic`), výběr profilu podle cesty | `proxy.ts` + `lib/security/csp.ts` |
+| Admin přihlášení (NextAuth), Workspace (Clerk jen `/w`, `/api/ws`) | `proxy.ts` — Clerk větev (`/w`, `/api/ws`) → admin NextAuth → CSP |
+| `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`); domény z `web_integrations.allowed_origins` — `/r` přes `lib/ws/intake/embed-origins.ts` v proxy, API přes `lib/ws/intake/http.ts` |
 | Hlášení zranitelností | `public/.well-known/security.txt` (`Expires` obnovit) |
 | CI: audit závislostí, gitleaks, kontrola hlaviček živého webu | `.github/workflows/security.yml`, skript `.claude/security/security-check.sh` |
 

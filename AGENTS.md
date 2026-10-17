@@ -12,7 +12,7 @@ Platí pro Codex, Claude Code, Cursor, Copilot i lidi. Závaznou součástí je 
 
 ## Kontext a povinné čtení
 
-Jedna Next.js 14 App Router aplikace (React 18, TypeScript strict, Neon bez ORM, Vercel Hobby): osobní admin VIZEON/ALTENO/Hub (NextAuth), veřejná landing page a SaaS Workspace (Clerk, Stripe, Resend). Workspace: poptávky → kalendář → zákazníci/věrnost, zakázky, faktury, příjmy a daně. 249 Kč konečná cena/měsíc, 14 dní s kartou, 1 byznys a neomezeně pracovníků; další byznys v UI vypnutý.
+Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Neon bez ORM, Vercel Hobby): osobní admin VIZEON/ALTENO/Hub (NextAuth), veřejná landing page a SaaS Workspace (Clerk, Stripe, Resend). Workspace: poptávky → kalendář → zákazníci/věrnost, zakázky, faktury, příjmy a daně. 249 Kč konečná cena/měsíc, 14 dní s kartou, 1 byznys a neomezeně pracovníků; další byznys v UI vypnutý.
 
 | Úloha | Před prací čti |
 |---|---|
@@ -34,7 +34,7 @@ Jedna Next.js 14 App Router aplikace (React 18, TypeScript strict, Neon bez ORM,
 - Data jen přes `DATABASE_URL_WS`/`ws_app`, schéma `ws`, `requireWorkspace()` a filtr `account_id = ctx.accountId`; účet nikdy z URL/formuláře, byznys ověř proti účtu. RLS je další pojistka, nevypíná se. Vazby jsou složené `(account_id, id)`; novou tabulku doplň do `seedAccount()`.
 - Mutace ověřují `assertWritable`; příjem poptávek pokračuje i bez předplatného a selhání notifikace/e-mailu nesmí zrušit uložení. Účty ani data se kvůli neplacení nemažou.
 - Server components výchozí, mutace Server Actions + Zod včetně délek, výsledek `Result` bez throw do UI; žádné `any` ani tiché catch. Kolize atomicky v DB (`EXCLUDE`/UNIQUE), `23P01`/`23505` převeď na českou hlášku. Čas `lib/ws/time.ts`, Europe/Prague; peníze v haléřích či `numeric(12,2)`, měny nesčítej.
-- Nové závislosti zdůvodni rozhodnutím v paměti; upgrade Next 15 je samostatný krok. Novou env zapiš do `.env.example` i referenční tabulky a připomeň Vercel. Novou pevnou cestu `/w` přidej do rezervovaných slugů; zkušební poptávky ve výpisech vynechávej (`NOT r.is_test`).
+- Nové závislosti zdůvodni rozhodnutím v paměti; hlavní verze Next/React je samostatný krok s ověřením celého repa (R-053). Novou env zapiš do `.env.example` i referenční tabulky a připomeň Vercel. Novou pevnou cestu `/w` přidej do rezervovaných slugů; zkušební poptávky ve výpisech vynechávej (`NOT r.is_test`).
 - Mimo admin pouze **Dílky**: tokeny v `[data-app="ws"]`, překryvy do `WsRoot`, toast přes `components/ui/toast.tsx`; žádné barvy natvrdo, shadcn šedé, gradienty navíc, emoji ani `tailwindcss-animate`. Jedna hlavní akce, detail v pravém panelu, max. 2 kliky z Dnes, ⌘K, Zpět místo potvrzování, užitečný prázdný stav, plochy ≥44 px; začátek do 3 minut, nehotové akce skryté.
 - UI texty obyčejně česky, oslovení vy, bez technického žargonu; marketing/e-maily přes `humanize-text-cs`. Nevymýšlej data, čísla, reference ani citace; chybějící údaj `[DOPLNIT]`. Klientská data nemaž mimo výslovnou GDPR žádost.
 
@@ -44,7 +44,7 @@ Neoslabuj CSP (žádné nové `unsafe-inline`/`unsafe-eval` ve skriptech, wildca
 
 ## B12. Ověření a Git
 
-Větší změna: `npm test`, `npm run build` (při běžícím dev výhradně `npm run build:check`), regresní kontrola `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]`. Nová byznysová pravidla testuj Vitestem; UI porovnej s Dílky/mockupem i na telefonu. Typy: `npx tsc --noEmit`; `npm run lint` zatím nabízí průvodce. Nevydávej neprovedené kontroly za hotové.
+Větší změna: `npm test`, `npm run build` (při běžícím dev výhradně `npm run build:check`), regresní kontrola `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]`. Nová byznysová pravidla testuj Vitestem; UI porovnej s Dílky/mockupem i na telefonu. Typy: `npx tsc --noEmit`; `npm run lint` není nastavený (Next 16 `next lint` odstranil). Nevydávej neprovedené kontroly za hotové.
 
 Workspace/landing: větev `workspace` nebo worktree z ní, commit po uceleném kroku, česky `ws/oblast: co a proč`. Admin: `main`, commit jen na požádání, `feat:`/`fix:`/`chore:`/`docs:`. Push na `main` pouze se souhlasem (produkční deploy); žádný force, `--no-verify` ani přepis historie.
 

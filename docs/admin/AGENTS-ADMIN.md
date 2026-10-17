@@ -18,13 +18,13 @@
 
 | Vrstva | Technologie | Poznámka |
 |--------|-------------|----------|
-| Frontend | Next.js 14 (App Router) + TypeScript | SSR, App Router — nikdy Pages Router |
+| Frontend | Next.js 16 (App Router) + TypeScript | SSR, App Router — nikdy Pages Router |
 | Styling | Tailwind CSS (+ `clsx`, `tailwind-merge`) | Vlastní komponenty, brand-* barvy — shadcn/ui admin nepoužívá |
 | Animace | Framer Motion | Booking modal, success states |
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
 | Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
-| Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session, chráněno i přes `middleware.ts` |
+| Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session, chráněno i přes `proxy.ts` |
 | Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
 | Deployment | Vercel | Zero-ops, napojení na GitHub, Hobby plán (crony max 1× denně) |
 | AI | `@anthropic-ai/sdk` | AI asistenti (Startup) + AI přepis PDF faktur (`lib/invoice-ai.ts`) |
@@ -242,7 +242,7 @@ lib/
 ├── utils.ts
 └── types.ts
 
-middleware.ts                    ← jediný middleware: NextAuth pro /dashboard, /alteno, /hub (vč. podcest), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
+proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard, /alteno, /hub (vč. podcest), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -300,7 +300,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
-| `GET /api/invoices/[id]/pdf` | session (kontrola v route — middleware `/api` nehlídá) | PDF faktury |
+| `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury |
 | `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
 | `GET /api/fatsecret/search` | — | Vyhledávání jídla (dnes Open Food Facts, název je historický) |
 | `POST /api/school/sync` | session | Ruční spuštění školního scraperu (proxy na cron) |
@@ -425,8 +425,8 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 ## Bezpečnost
 
-- **NextAuth JWT session** — admin chráněn `middleware.ts` (matcher `/dashboard`, `/alteno`, `/hub` vč. podcest) + `getServerSession` v layoutu. `/api/*` middleware **nehlídá** — každá neveřejná API routa si session kontroluje sama
-- **Security hlavičky** v `next.config.mjs`, CSP s nonce v `middleware.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
+- **NextAuth JWT session** — admin chráněn `proxy.ts` (matcher `/dashboard`, `/alteno`, `/hub` vč. podcest) + `getServerSession` v layoutu. `/api/*` proxy **nehlídá** — každá neveřejná API routa si session kontroluje sama
+- **Security hlavičky** v `next.config.mjs`, CSP s nonce v `proxy.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
 - **Heslo uloženo jako bcrypt hash** v env proměnné `ADMIN_PASSWORD_HASH`

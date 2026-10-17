@@ -17,7 +17,7 @@
 | [`memory.md`](memory.md) | Živý stav, rozhodnutí s důvody, otevřené problémy, changelog | Každý AI nástroj | **Po každé dokončené změně** |
 | `archiv/` | Starší části changelogu: `2026-10.md`, `2026-06-az-09.md` (viz pravidla §4) | Při pátrání v historii | Při archivaci |
 | [`../.env.example`](../.env.example) | Zdroj pravdy pro env proměnné | — | Nová env proměnná |
-| [`../.claude/security/STATE.md`](../.claude/security/STATE.md) | Bezpečnostní stav: hlavičky, CSP, threat model, DNS, otevřené položky; vedle `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (R-029) | Sezení, které sahá na hlavičky, CSP, middleware, API, vstupy | Se každou bezpečnostní změnou |
+| [`../.claude/security/STATE.md`](../.claude/security/STATE.md) | Bezpečnostní stav: hlavičky, CSP, threat model, DNS, otevřené položky; vedle `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (R-029) | Sezení, které sahá na hlavičky, CSP, proxy, API, vstupy | Se každou bezpečnostní změnou |
 | [`../.agents/security/STATE.md`](../.agents/security/STATE.md) | Identická kopie `.claude/security/`, včetně záznamů a kontrolního skriptu | Codex a další agenti | Při synchronizaci s `.claude/security/` |
 | [`../docs/FINANCE_SYSTEM_PLAN.md`](../docs/FINANCE_SYSTEM_PLAN.md) | Plán finance/faktury/daně — **hotový** (fáze 0–8), zafixovaná rozhodnutí a daňové parametry 2026 | Při práci na Financích/fakturách/daních | Jen když se mění daňová pravidla |
 | [`../docs/POZNAMKY_NAKLADY_SABLONY_PLAN.md`](../docs/POZNAMKY_NAKLADY_SABLONY_PLAN.md) | Plán poznámek, sjednocení nákladů, šablon webu a drag-and-drop — implementováno | Při práci na Hovorech/poznámkách/nákladech/šablonách | — |
@@ -50,12 +50,12 @@
 | Šablony webu | `app/block-templates-actions.ts`, `app/project-blocks-actions.ts`, `components/Block*`, `ProjectBlockList.tsx` |
 | Emaily | `lib/email.ts` (+ `adminEmailFor` v `lib/business.ts`) |
 | Veřejná API — auth, rate limit | `lib/api-auth.ts`, `lib/api-rate-limit.ts` |
-| Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `middleware.ts`, `lib/security/`, `.claude/security/` |
+| Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `proxy.ts`, `lib/security/`, `.claude/security/` |
 | Crony | `vercel.json`, `app/api/cron/**` |
 | Hub (osobní moduly) | `app/hub/**`, `components/HubSidebarNav.tsx` |
 | Landing page | `../docs/landing/PROJECT-BRIEF.md`, `app/(marketing)/` |
 | Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `docs/AGENTS-REFERENCE.md` → Část B |
-| Workspace — přihlášení, registrace, nový byznys (Clerk) | `docs/AGENTS-REFERENCE.md` → B4 „Jak je to v kódu“, `middleware.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |
+| Workspace — přihlášení, registrace, nový byznys (Clerk) | `docs/AGENTS-REFERENCE.md` → B4 „Jak je to v kódu“, `proxy.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |
 | Workspace — kostra aplikace, Dnes, ⌘K, pravý panel | `docs/AGENTS-REFERENCE.md` → B9 „Jak je to v kódu (S09)“, `app/w/[business]/`, `components/ws/app/`, `lib/ws/{today,nav,detail-param,command-parser,calendar-layout,search}.ts`, ukázková data `scripts/ws-seed.mjs`, R-040 |
 | Workspace — poptávky, kalendář, zakázky, živé obnovení | `docs/AGENTS-REFERENCE.md` → B9 „Jak je to v kódu (S10)“, `lib/ws/{bookings,calendar}.ts`, `app/w/[business]/{poptavky,kalendar,zakazky}/`, `components/ws/app/{booking,calendar,jobs}/`, `app/api/ws/[business]/zmeny`, R-044 |
 | Workspace — veřejné API, objednávací stránka `/r`, widget `/embed`, Nastavení › Napojený web | `docs/AGENTS-REFERENCE.md` → B6 „Jak je to v kódu (S11)“, `../docs/workspace/API.md`, `lib/ws/{keys,fields}.ts`, `lib/ws/intake/`, `app/api/public/v1/`, `app/r/`, `app/embed/`, `app/w/[business]/nastaveni/`, R-045 |
