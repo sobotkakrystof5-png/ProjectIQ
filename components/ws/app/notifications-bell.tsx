@@ -8,9 +8,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { LiveDot } from '@/components/ws/brand'
 import { markBellSeenAction } from '@/app/w/[business]/zvonek/actions'
 import { cn } from '@/lib/ws/utils'
+import { NewsEntry, type NewsEntryData } from './news-entry'
 
 export type BellItem = { id: string; title: string; body: string | null; link: string | null; at: string; read: boolean }
-export type BellNews = { id: string; title: string; body: string; link: string | null; at: string }
+export type BellNews = NewsEntryData & { id: string }
 
 /**
  * Upozornění v aplikaci (S15). Po otevření se označí jako přečtená (tečky
@@ -58,17 +59,8 @@ export function NotificationsBell({
             <p className="px-2 pb-1 pt-1.5 font-num text-[11px] uppercase tracking-[0.08em] text-quiet">Co je nového</p>
             <ul className="flex flex-col">
               {news.map((n) => (
-                <li key={n.id} className="rounded-chip px-2 py-2">
-                  <span className="block text-[15px] font-semibold text-ink">{n.title}</span>
-                  <span className="mt-0.5 block whitespace-pre-line text-sm text-quiet">{n.body}</span>
-                  <span className="mt-1 flex items-center gap-3">
-                    <span className="font-num text-xs text-quiet">{n.at}</span>
-                    {n.link && (
-                      <a href={n.link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-navy-700 underline-offset-4 hover:underline">
-                        Více
-                      </a>
-                    )}
-                  </span>
+                <li key={n.id}>
+                  <NewsEntry item={n} />
                 </li>
               ))}
             </ul>

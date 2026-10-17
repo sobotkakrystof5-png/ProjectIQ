@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { CalendarDays, PhoneCall, CheckCircle2, Receipt, Inbox, Star, Bell, LayoutGrid, Layers, FileText } from 'lucide-react'
+import { CalendarDays, PhoneCall, CheckCircle2, Receipt, Inbox, Star, Bell, LayoutGrid, Layers, FileText, Building2, Megaphone } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { LogoutButton } from './LogoutButton'
@@ -127,6 +127,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
               >
                 <Layers size={14} strokeWidth={1.5} />
                 Šablony
+              </Link>
+              <Link
+                href="/dashboard/klienti"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+              >
+                <Building2 size={14} strokeWidth={1.5} />
+                Klienti
+              </Link>
+              <Link
+                href="/dashboard/novinky"
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+              >
+                <Megaphone size={14} strokeWidth={1.5} />
+                Novinky
               </Link>
             </nav>
           </div>

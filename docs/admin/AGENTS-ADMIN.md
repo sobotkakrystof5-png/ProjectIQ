@@ -276,7 +276,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Sekce | Routy |
 |-------|-------|
-| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/[id]/sablona` (šablona webu zakázky), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/sablony` (knihovna bloků), `/notifications`, `/profil` |
+| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/[id]/sablona` (šablona webu zakázky), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/sablony` (knihovna bloků), `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
 | ALTENO (`/alteno`) | `/alteno`, `/new`, `/[id]`, `/rezervace` |
 | Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/plany` (+ `/skola`, `/projekty`, `/byznys`, `/byznys/[id]`, `/sport`, `/finance`), `/projekty` (+ `/new`, `/[id]`), `/school`, `/sport` |
 | Legacy | `/dashboard/projekty/**` — z navigace odstraněno (přesunuto do Hubu), soubory zůstaly, viz `memory/memory.md` |

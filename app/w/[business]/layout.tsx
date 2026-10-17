@@ -62,7 +62,7 @@ export default async function BusinessLayout({
             at: `${formatDayShort(at.date)} ${formatMinutes(at.minutes)}`,
           }
         }),
-        news: news.items.map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, at: formatDayShort(pragueParts(n.publishedAt).date) })),
+        news: news.items.map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, tag: n.tag, image: n.image, at: formatDayShort(pragueParts(n.publishedAt).date) })),
         newsUnseen: news.unseen,
       }}
       rememberedSlug={cookies().get(LAST_BUSINESS_COOKIE)?.value ?? null}

@@ -1,6 +1,6 @@
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { asApp, createWsTestDb, ids, pgCode, WS_GLOBAL_TABLES, WS_MIGRATIONS, WS_SYSTEM_TABLES } from './helpers/ws-pglite'
+import { asApp, createWsTestDb, ids, pgCode, WS_ADMIN_TABLES, WS_GLOBAL_TABLES, WS_MIGRATIONS, WS_SYSTEM_TABLES } from './helpers/ws-pglite'
 
 // Schéma ws (migrace 064+): idempotence, oddělení účtů pro každou tabulku
 // a pravidla, která hlídá databáze (překryv termínů, razítka, webhooky).
@@ -20,7 +20,7 @@ beforeAll(async () => {
   `)
   accountTables = rows
     .map((r) => r.table_name)
-    .filter((t) => !WS_SYSTEM_TABLES.includes(t) && !WS_GLOBAL_TABLES.includes(t))
+    .filter((t) => !WS_SYSTEM_TABLES.includes(t) && !WS_GLOBAL_TABLES.includes(t) && !WS_ADMIN_TABLES.includes(t))
     .map((t) => ({ table: t, column: t === 'accounts' ? 'id' : 'account_id' }))
 }, 60_000)
 
@@ -72,6 +72,20 @@ describe('migrace ws', () => {
     expect(await pgCode(asApp(db, A.account, (tx) => tx.query(`INSERT INTO ws.product_news (title, body) VALUES ('x', 'y')`)))).toBe('42501')
     expect(await pgCode(asApp(db, A.account, (tx) => tx.query(`UPDATE ws.product_news SET title = 'x'`)))).toBe('42501')
     await db.query(`DELETE FROM ws.product_news`)
+  })
+
+  it('interní tabulky adminu mají RLS, ale ws_app k nim nesmí vůbec', async () => {
+    for (const table of WS_ADMIN_TABLES) {
+      const { rows } = await db.query<{ rls: boolean; policies: number }>(
+        `SELECT c.relrowsecurity AS rls, (SELECT count(*)::int FROM pg_policies WHERE schemaname = 'ws' AND tablename = $1) AS policies
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'ws' AND c.relname = $1`,
+        [table],
+      )
+      expect({ table, ...rows[0] }).toEqual({ table, rls: true, policies: 1 })
+      for (const sql of [`SELECT * FROM ws.${table}`, `DELETE FROM ws.${table}`, `INSERT INTO ws.${table} (account_id, note, updated_by) VALUES ('${A.account}', 'x', 'x')`]) {
+        expect({ table, sql, code: await pgCode(asApp(db, A.account, (tx) => tx.query(sql))) }).toEqual({ table, sql, code: '42501' })
+      }
+    }
   })
 
   it('tabulky v public migrace nemění (jen ws)', async () => {

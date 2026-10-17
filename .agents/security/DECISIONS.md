@@ -113,3 +113,11 @@ Zvažované alternativy: krátký podepsaný odkaz s expirací (zákazník by po
 Přijaté riziko: kdo odkaz získá přeposláním nebo z historie prohlížeče, vidí omezený obsah a do termínu pravidel může termín přesunout nebo zrušit. Jednotlivý token zatím nemá tlačítko pro rotaci; akce jsou omezené podle IP i záznamu a všechny odkazy byznysu lze vypnout funkcí Klientský portál.
 Revize: S19 (audit před spuštěním; zvážit rotaci jednotlivého odkazu).
 
+## 013 — Admin konzole čte schéma ws vlastníkem tabulek
+Datum: 2026-10-10
+Rozhodnutí: `/dashboard/klienti` a `/dashboard/novinky` (S17) čtou `ws` přes `DATABASE_URL` (vlastník tabulek, RLS nepodléhá) v `lib/ws/admin/db.ts` se `server-only`. Přístup hlídá NextAuth: middleware a layout `/dashboard`, každá server action znovu `getAdmin()`. Admin zapisuje jen do `ws.product_news`, `ws.account_admin_notes` a `ws.audit_log`; data klienta (založení účtu, klíče webu) mění přes `lib/ws` rolí `ws_app` pod RLS účtu, který admin ověřil podle ID z URL. Poznámky admina jsou v `ws.account_admin_notes` s RLS a bez jakýchkoli práv pro `ws_app`. Audit zapisuje `actor = 'admin'` bez e-mailu (audit účtu může číst i klient). Obrázky novinek jsou v DB (`bytea`, max. 600 kB, typ ověřený podle prvních bajtů — PNG, JPEG, WebP, nikdy SVG) a servíruje je veřejná `/z/novinky/[id]/obrazek` jen u zveřejněné novinky, s `Cross-Origin-Resource-Policy: cross-origin` (webmail načítá obrázek z cizí domény).
+Důvod: admin je jeden (R-001) a potřebuje přehled přes všechny účty; samostatná role pro admina by znamenala další connection string a správu práv bez přínosu. Obrázek z cizí domény by zablokovala CSP aplikace (`img-src 'self'`), úložiště souborů v projektu není.
+Zvažované alternativy: role `ws_admin` jen pro čtení (zápisy novinek a poznámek by stejně potřebovaly vlastníka nebo granty navíc); obrázek jako odkaz https (rozšíření `img-src` o libovolnou doménu); Vercel Blob (nová závislost a služba).
+Přijaté riziko: chyba v kódu adminu by mohla číst cizí účty bez pojistky RLS — omezeno tím, že admin vidí všechno záměrně, kód je jen v `lib/ws/admin/` a testy ověřují, že bez session akce nic neudělají. Zveřejněný obrázek může zůstat v cache až 1 h po skrytí novinky.
+Revize: S19 (audit před spuštěním).
+

@@ -39,12 +39,18 @@ export type EmailBlock =
   /** Věrnostní karta. */
   | { kind: 'card'; stamps: number; needed: number; reward: string | null }
   | { kind: 'note'; text: string }
+  /** Nadpis s malým štítkem nad ním (novinky ZakazIQ). */
+  | { kind: 'headline'; eyebrow?: string; text: string }
+  /** Obrázek na celou šířku karty, jen https/http adresa. */
+  | { kind: 'image'; url: string; alt: string }
 
 export type EmailContent = {
   brand: { name: string; color: string | null }
   subject: string
   /** Hlavní text (odstavce oddělené prázdným řádkem). */
   body: string
+  /** Bloky nad hlavním textem (nadpis, obrázek). */
+  intro?: EmailBlock[]
   blocks?: EmailBlock[]
   /** Text pod kartou (kdo e-mail poslal, proč ho dostáváte). */
   footer?: string
@@ -145,6 +151,16 @@ function block(b: EmailBlock, accent: string): string {
     }
     case 'note':
       return `<p style="margin:0 0 16px;font:400 14px/1.5 ${SANS};color:${C.quiet}">${escapeHtml(b.text)}</p>`
+    case 'headline':
+      return (
+        (b.eyebrow ? `<p style="margin:0 0 6px;font:500 11px/16px ${MONO};letter-spacing:.08em;text-transform:uppercase;color:${accent}">${escapeHtml(b.eyebrow)}</p>` : '') +
+        `<h1 style="margin:0 0 16px;font:600 22px/1.3 ${SANS};color:${C.ink};letter-spacing:-.01em">${escapeHtml(b.text)}</h1>`
+      )
+    case 'image': {
+      const url = safeUrl(b.url)
+      if (!url) return ''
+      return `<img src="${escapeHtml(url)}" alt="${escapeHtml(b.alt)}" width="510" style="display:block;width:100%;max-width:510px;height:auto;margin:0 0 20px;border:0;border-radius:16px">`
+    }
   }
 }
 
@@ -160,6 +176,10 @@ function blockText(b: EmailBlock): string {
       return b.stamps >= b.needed ? `Věrnostní karta: odměna připravena${b.reward ? ` (${b.reward})` : ''}` : `Věrnostní karta: ${b.stamps} z ${b.needed} razítek`
     case 'note':
       return b.text
+    case 'headline':
+      return b.eyebrow ? `${b.eyebrow.toUpperCase()}\n${b.text}` : b.text
+    case 'image':
+      return ''
   }
 }
 
@@ -174,6 +194,7 @@ export function renderEmail(content: EmailContent): RenderedEmail {
   const name = content.brand.name.trim() || 'ZakazIQ'
   const subject = cleanSubject(content.subject)
   const blocks = content.blocks ?? []
+  const intro = content.intro ?? []
   const unsubscribe = content.unsubscribeUrl ? safeUrl(content.unsubscribeUrl) : null
 
   const html = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(subject)}</title></head>
@@ -182,6 +203,7 @@ export function renderEmail(content: EmailContent): RenderedEmail {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
 <tr><td style="padding:0 4px 14px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td>${mark(accent)}</td><td style="padding-left:10px;font:600 17px/22px ${SANS};color:${C.ink};letter-spacing:-.01em">${escapeHtml(name)}</td></tr></table></td></tr>
 <tr><td style="background:${C.surface};border:1px solid ${C.line};border-radius:24px;padding:28px 24px 12px">
+${intro.map((b) => block(b, accent)).join('\n')}
 ${paragraphs(content.body, accent)}
 ${blocks.map((b) => block(b, accent)).join('\n')}
 </td></tr>
@@ -192,6 +214,7 @@ ${unsubscribe ? `<p style="margin:0"><a href="${escapeHtml(unsubscribe)}" style=
 </table></td></tr></table></body></html>`
 
   const text = [
+    ...intro.map(blockText).filter(Boolean),
     content.body.trim(),
     ...blocks.map(blockText).filter(Boolean),
     content.footer ?? '',

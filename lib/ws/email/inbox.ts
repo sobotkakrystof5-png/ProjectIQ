@@ -1,16 +1,27 @@
 import 'server-only'
 import { q, wsDb, type WsRow } from '../db'
 import type { WsBusiness, WsContext } from '../context'
+import { isNewsTag, type NewsTag } from '../news-format'
+import { newsImagePath } from './news-email'
 
 // Zvonek v aplikaci (S15): upozornění se po otevření označí jako přečtená,
 // „Co je nového“ ukazuje novinky ZakazIQ (ws.product_news, píše admin S17).
 
-export type NewsItem = { id: string; title: string; body: string; link: string | null; publishedAt: Date }
+export type NewsItem = {
+  id: string
+  title: string
+  body: string
+  link: string | null
+  tag: NewsTag
+  /** Cesta k obrázku na vlastní doméně (CSP), nebo null. */
+  image: string | null
+  publishedAt: Date
+}
 
 /** Posledních pár novinek a jestli je člen už viděl. */
 export async function getNews(ctx: WsContext): Promise<{ items: NewsItem[]; unseen: boolean }> {
   const [news, me] = await wsDb(ctx).batch([
-    q`SELECT id, title, body, link_url, published_at FROM ws.product_news
+    q`SELECT id, title, body, link_url, tag, image_type IS NOT NULL AS has_image, published_at FROM ws.product_news
       WHERE published_at IS NOT NULL AND published_at <= now() AND published_at > now() - interval '120 days'
       ORDER BY published_at DESC LIMIT 3`,
     q`SELECT news_seen_at FROM ws.members WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`,
@@ -20,6 +31,8 @@ export async function getNews(ctx: WsContext): Promise<{ items: NewsItem[]; unse
     title: String(n.title),
     body: String(n.body),
     link: (n.link_url as string | null) ?? null,
+    tag: isNewsTag(n.tag) ? n.tag : 'new',
+    image: n.has_image ? newsImagePath(String(n.id)) : null,
     publishedAt: new Date(n.published_at as string),
   }))
   const seen = me[0]?.news_seen_at ? new Date(me[0].news_seen_at as string) : null

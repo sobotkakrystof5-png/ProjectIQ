@@ -6,10 +6,10 @@ import { industrySummaries } from '@/components/ws/onboarding/industry-summaries
 import { NewBusinessWizard } from '@/components/ws/onboarding/new-business-wizard'
 import { SubscribeStep } from '@/components/ws/onboarding/subscribe-step'
 import { getBillingState, TRIAL_DAYS } from '@/lib/ws/billing'
-import { orgWithAccount } from '@/lib/ws/clerk-orgs'
+import { orgWithAccount, ownerProfile } from '@/lib/ws/clerk-orgs'
 import { hasRole, requireWorkspace } from '@/lib/ws/context'
 import { wsDb } from '@/lib/ws/db'
-import { accountIdForOrg } from '@/lib/ws/onboarding'
+import { accountIdForOrg, ensureMember } from '@/lib/ws/onboarding'
 import { WS_HOME_PATH, WS_SIGN_IN_PATH } from '@/lib/ws/paths'
 
 export const metadata: Metadata = { title: 'Nový byznys' }
@@ -26,6 +26,10 @@ export default async function NovyPage() {
 
   if (orgId && (await accountIdForOrg(orgId))) {
     const ctx = await requireWorkspace()
+    // Klient pozvaný z adminu (S17): účet existuje, člen ještě ne (bez webhooku Clerku).
+    await ensureMember(ctx, () => ownerProfile(userId)).catch((e) =>
+      console.error('[ws/novy] člen se nezapsal', { error: e instanceof Error ? e.message : 'unknown' }),
+    )
     const billing = await getBillingState(ctx.accountId)
     if (billing.access !== 'none') redirect(WS_HOME_PATH)
 

@@ -60,7 +60,8 @@
 | Workspace — poptávky, kalendář, zakázky, živé obnovení | `docs/AGENTS-REFERENCE.md` → B9 „Jak je to v kódu (S10)“, `lib/ws/{bookings,calendar}.ts`, `app/w/[business]/{poptavky,kalendar,zakazky}/`, `components/ws/app/{booking,calendar,jobs}/`, `app/api/ws/[business]/zmeny`, R-044 |
 | Workspace — veřejné API, objednávací stránka `/r`, widget `/embed`, Nastavení › Napojený web | `docs/AGENTS-REFERENCE.md` → B6 „Jak je to v kódu (S11)“, `../docs/workspace/API.md`, `lib/ws/{keys,fields}.ts`, `lib/ws/intake/`, `app/api/public/v1/`, `app/r/`, `app/embed/`, `app/w/[business]/nastaveni/`, R-045 |
 | Workspace — e-maily, upozornění, odkazy z e-mailů, novinky | `docs/AGENTS-REFERENCE.md` → B7 „Jak je to v kódu (S15)“, `lib/ws/email/`, `app/z/`, `app/w/[business]/nastaveni/emaily/`, `docs/workspace/SETUP.md` → E-maily, R-050 |
-| Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`075_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `docs/AGENTS-REFERENCE.md` → B3 |
+| Workspace z adminu — klienti, pozvání, klíče webu, novinky (S17) | `docs/AGENTS-REFERENCE.md` → B3 „Admin nad Workspace (S17, R-052)“, `app/dashboard/{klienti,novinky}/`, `lib/ws/admin/`, `lib/ws/news-format.ts`, `.claude/security/DECISIONS.md` #013 |
+| Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`083_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `docs/AGENTS-REFERENCE.md` → B3 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `docs/AGENTS-REFERENCE.md` → B3; detail v `migrations/` |
 | Testy | `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |

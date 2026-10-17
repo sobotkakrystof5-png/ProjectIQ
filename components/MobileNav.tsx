@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Menu, X, LayoutGrid, Inbox, CalendarDays, PhoneCall,
-  CheckCircle2, Star, Receipt, Layers, FileText,
+  CheckCircle2, Star, Receipt, Layers, FileText, Building2, Megaphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BUSINESSES, type Business } from '@/lib/business'
@@ -50,6 +50,8 @@ export function MobileNav({ business, pendingCount }: MobileNavProps) {
         { href: '/dashboard/naklady', label: 'Náklady', icon: Receipt },
         { href: '/dashboard/faktury', label: 'Faktury', icon: FileText },
         { href: '/dashboard/sablony', label: 'Šablony', icon: Layers },
+        { href: '/dashboard/klienti', label: 'Klienti', icon: Building2 },
+        { href: '/dashboard/novinky', label: 'Novinky', icon: Megaphone },
       ]
 
   const rootHrefs = ['/hub', BUSINESSES.vizeon.basePath, BUSINESSES.alteno.basePath]

@@ -47,7 +47,11 @@ export type NewAccountInput = {
   /** Název byznysu — zatím i název účtu (firmy), IČO a fakturační údaje se doplní v Nastavení. */
   name: string
   industry: IndustryKey
-  owner: { userId: string; name: string | null; email: string | null }
+  /**
+   * Vlastník z průvodce. `null` = účet zakládá admin pro pozvaného klienta
+   * (S17) — člen se zapíše, až pozvánku přijme (`ensureMember`).
+   */
+  owner: { userId: string; name: string | null; email: string | null } | null
 }
 
 export type NewAccountResult = { accountId: string; created: boolean }
@@ -70,10 +74,14 @@ export async function createAccountWithBusiness(input: NewAccountInput): Promise
     try {
       await wsDb({ accountId }).batch([
         q`INSERT INTO ws.accounts (id, clerk_org_id, name) VALUES (${accountId}, ${input.orgId}, ${input.name})`,
-        q`
-          INSERT INTO ws.members (account_id, clerk_user_id, role, name, email)
-          VALUES (${accountId}, ${input.owner.userId}, 'owner', ${input.owner.name}, ${input.owner.email})
-        `,
+        ...(input.owner
+          ? [
+              q`
+                INSERT INTO ws.members (account_id, clerk_user_id, role, name, email)
+                VALUES (${accountId}, ${input.owner.userId}, 'owner', ${input.owner.name}, ${input.owner.email})
+              `,
+            ]
+          : []),
         q`
           INSERT INTO ws.businesses (id, account_id, name, slug, industry)
           VALUES (${businessId}, ${accountId}, ${input.name}, ${slug}, ${template.key})
@@ -92,4 +100,26 @@ export async function createAccountWithBusiness(input: NewAccountInput): Promise
     }
   }
   throw new Error('createAccountWithBusiness: nenašel se volný slug')
+}
+
+/**
+ * Člen účtu podle organizace Clerku, když ho ws.members ještě nezná — klient
+ * pozvaný z adminu (S17) bez webhooku Clerku. Existující řádek nemění.
+ * Vrací true, když člena zapsal.
+ */
+export async function ensureMember(
+  ctx: { accountId: string; userId: string; role: 'owner' | 'staff' },
+  profile: () => Promise<{ name: string | null; email: string | null }>,
+): Promise<boolean> {
+  const db = wsDb(ctx)
+  const [known] = await db<{ id: string }>`
+    SELECT id FROM ws.members WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`
+  if (known) return false
+  const p = await profile()
+  const rows = await db<{ id: string }>`
+    INSERT INTO ws.members (account_id, clerk_user_id, role, name, email)
+    VALUES (${ctx.accountId}, ${ctx.userId}, ${ctx.role}, ${p.name}, ${p.email})
+    ON CONFLICT (account_id, clerk_user_id) DO NOTHING
+    RETURNING id`
+  return rows.length > 0
 }

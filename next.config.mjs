@@ -60,6 +60,11 @@ const nextConfig = {
         headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }],
       },
       {
+        // Obrázek novinky ZakazIQ v e-mailu — webmail ho načítá z cizí domény (S17).
+        source: '/z/novinky/:id/obrazek',
+        headers: [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }],
+      },
+      {
         // Náhled PDF faktury v <object> na /dashboard/faktury/[id] — stejný origin.
         source: '/api/invoices/:id/pdf',
         headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],

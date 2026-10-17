@@ -4,7 +4,7 @@
 
 ## Co v databázi je
 
-- **Schéma `ws`** — všechny tabulky Workspace (migrace `064`–`082`). Admin tabulky v `public` se nemění.
+- **Schéma `ws`** — všechny tabulky Workspace (migrace `064`–`083`). Admin tabulky v `public` se nemění.
 - **Role `ws_app`** — jediná role, kterou se aplikace Workspace připojuje (`DATABASE_URL_WS`). Platí pro ni Row Level Security, do `public` nevidí.
 - **Vlastník tabulek** (`neondb_owner`, `DATABASE_URL`) — pouští migrace a čte `ws` pro admin stránku `/dashboard/klienti`. RLS pro něj neplatí.
 
@@ -22,7 +22,7 @@ node scripts/apply-migration.js \
   073_ws_predplatne_webhooky.sql 074_ws_emaily_upozorneni.sql 075_ws_audit_limity.sql 076_ws_verejne_api.sql \
   077_ws_vernost_skupiny.sql 078_ws_vernost_odmena.sql 079_ws_sluzby_rozestupy.sql \
   080_ws_penize_provoz.sql 081_ws_emaily_odkazy_novinky.sql \
-  082_ws_klientsky_portal.sql
+  082_ws_klientsky_portal.sql 083_ws_admin_klienti_novinky.sql
 ```
 
 Jde to i ručně v Neon SQL editoru (obsah souborů po jednom, v tomhle pořadí). Migrace jsou idempotentní, opakované spuštění nic nerozbije.
@@ -182,3 +182,13 @@ Resend → Webhooks → Add endpoint `https://www.zakaziq.cz/api/resend/webhook`
 ### 4. Cron a ruční test
 
 Cron `/api/cron/ws-email` běží denně v 5:00 UTC (7:00 letního času, 6:00 zimního) s `CRON_SECRET`. Ručně: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3001/api/cron/ws-email`. Zkušební e-mail kteréhokoli typu jde poslat z Nastavení › E-maily a upozornění na adresu přihlášeného člena.
+
+## Admin: Klienti a Novinky (S17): migrace 083
+
+Po 082 aplikovat `migrations/083_ws_admin_klienti_novinky.sql` rolí vlastníka a znovu `scripts/ws-grants.sql` (odebere `ws_app` práva na `ws.account_admin_notes`; migrace to dělá i sama). Data nemění. Na Neonu ověřeno čtením 2026-10-10: sloupce novinek, tabulka poznámek s RLS a bez práv `ws_app`.
+
+- `/dashboard/klienti` a `/dashboard/novinky` čtou `ws` přes `DATABASE_URL` (stejná proměnná jako zbytek adminu), nová env není potřeba.
+- Pozvání klienta volá Clerk Backend API (`CLERK_SECRET_KEY`), pozvánku posílá Clerk e-mailem; odkaz vede na `NEXT_PUBLIC_APP_URL` + `/w/registrace`. V produkci musí být produkční instance Clerku (Otevřené problémy).
+- Klíče pro web potřebují `WS_KEY_PEPPER` jako Nastavení › Napojený web.
+- Novinky e-mailem odcházejí přes frontu S15 — bez `WS_EMAIL_FROM` čekají ve frontě.
+

@@ -44,7 +44,7 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 | Referrer-Policy | ✅ strict-origin-when-cross-origin | |
 | Permissions-Policy | ✅ vše zakázané (kamera, mikrofon, poloha, platby, USB…) | |
 | Cross-Origin-Opener-Policy | ✅ same-origin | Clerk popup OAuth by ho porušil — používat přesměrování (S07) |
-| Cross-Origin-Resource-Policy | ✅ same-origin | `cross-origin` pro `/embed/*` a `/api/public/v1/*` |
+| Cross-Origin-Resource-Policy | ✅ same-origin | `cross-origin` pro `/embed/*`, `/api/public/v1/*` a obrázek novinky `/z/novinky/[id]/obrazek` (DECISIONS #013) |
 | X-XSS-Protection | ✅ 0 | |
 | X-DNS-Prefetch-Control | ✅ off | |
 | X-Powered-By | ✅ odstraněno (`poweredByHeader: false`) | |
@@ -90,6 +90,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 - Veřejné API `/api/public/v1/*` (S11): tajný klíč `sk_live_…` jen ze serveru (s `Origin` = 401), v DB prefix + HMAC-SHA256 s `WS_KEY_PEPPER`, `timingSafeEqual`; veřejný klíč `pk_live_…` jen z `allowed_origins`; Zod + délky, tělo 64 kB, `Idempotency-Key`, záznam `ws.intake_log` bez IP. Widget jen `textContent`. DECISIONS #010
 - E-maily (S15): jen přes frontu `ws.outbound_messages` a Resend na serveru (`lib/ws/email/transport.ts`, `server-only`). Veškerý text v HTML escapovaný, odkazy jen http/https, předmět bez konců řádků, jméno odesílatele očištěné. Odkazy z e-mailů podepsané HMAC (klíč odvozený z `WS_KEY_PEPPER`), akce majitele jednorázové 72 h (`ws.action_tokens`), GET nic nemění, `Referrer-Policy: no-referrer`. Hromadné zprávy jen se souhlasem (ověří se i těsně před odesláním), odkaz na odhlášení + `List-Unsubscribe` jedním klikem. Webhook `/api/resend/webhook`: podpis Svix, tolerance 5 min, idempotence `ws.webhook_events`, bez `RESEND_WEBHOOK_SECRET` 503. Novinky `ws.product_news` ws_app jen čte. DECISIONS #011
 - Klientský portál (S16): `/z/[token]` bez přihlášení, token je DB UUID. `ws.portal_lookup` (SECURITY DEFINER) vrací jen účet/byznys/druh/ID; další čtení a zápisy jdou přes RLS s oběma filtry. Neplatný, cizí, archivovaný i vypnutý odkaz = stejná 404. Akce mají Zod, honeypot hodnocení, limity na IP i záznam; PDF kontroluje vazbu faktury na zakázku a vrací `private, no-store`. Interní poznámky, kontakty a vlastní kolonky se nenačítají. DECISIONS #012
+- Admin nad Workspace (S17): `/dashboard/klienti`, `/dashboard/novinky` čtou `ws` vlastníkem tabulek (`lib/ws/admin/db.ts`, `server-only`), každá akce `getAdmin()` (NextAuth). Zápis jen novinky, poznámky (`ws.account_admin_notes`, ws_app bez práv) a audit (`actor = 'admin'`); data klienta mění přes `lib/ws` pod RLS. Obrázek novinky z DB, jen PNG/JPEG/WebP podle bajtů, veřejný jen po zveřejnění. DECISIONS #013
 - Captcha: žádná, honeypot `website` + rate limit (DECISIONS #010). Turnstile při prvním spamu
 - Secrets: jen env Vercelu, `.env*` v `.gitignore` (kromě vzorů), gitleaks v CI. Historie gitu 2026-10-08 čistá (90 commitů)
 - Session: NextAuth JWT (admin), Clerk (Workspace, jen pod `/w` a `/api/ws` — middleware Clerk jinde nespouští). Cookie `__session` Clerku není HttpOnly (DECISIONS #009)

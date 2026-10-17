@@ -183,7 +183,7 @@ Next.js 14 App Router · React 18 · TypeScript strict · Tailwind CSS + shadcn/
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 38 tabulek v repu | migrace `064_ws_zaklad` … `082_ws_klientsky_portal` (přehled níže; na Neonu zatím 34 tabulek po 077) |
+| Schéma `ws` — 39 tabulek | migrace `064_ws_zaklad` … `083_ws_admin_klienti_novinky` (přehled níže; na Neonu všechny, ověřeno čtením 2026-10-10) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
@@ -199,7 +199,7 @@ Pravidla schématu:
 - Systémové tabulky bez RLS a bez osobních údajů: `stripe_events`, `webhook_events`, `rate_limits`. Nic dalšího bez důvodu.
 - Kolize termínů: `appointments_no_overlap` (`EXCLUDE USING gist` per `staff_id`, mimo `cancelled`). Blokace/dovolená = `appointments.kind = 'block'`.
 - `updated_at` hlídá trigger `touch_updated_at` (`ws.add_touch_trigger()`), není potřeba ho nastavovat v akci.
-- `ws_app` nemá `UPDATE`/`DELETE` na `audit_log`.
+- `ws_app` nemá `UPDATE`/`DELETE` na `audit_log` a žádná práva na `account_admin_notes` (interní tabulka adminu, v testech `WS_ADMIN_TABLES`).
 - Nová tabulka = řádek v `seedAccount()` v `lib/ws/__tests__/helpers/ws-pglite.ts`, jinak spadne test oddělení účtů.
 
 | Migrace | Tabulky |
@@ -223,6 +223,23 @@ Pravidla schématu:
 | 080 | Peníze S14: accounts.invoice_sequences, invoices.issuer/supplied_on/pdf_data/pdf_filename, tax_settings.options; unique transakce za fakturu, ws.money_issue/pay a money_adopt_visit (SECURITY INVOKER); ručně aplikovat na Neon |
 | 081 | E-maily S15: `message_settings` typy `booking_declined`, `invoice_overdue`, `vat_limit`; `outbound_messages.dedupe_key` (unikátní za účet); `action_tokens` (jednorázové odkazy majitele); `product_news` (globální, ws_app jen čte); `accounts.news_emails`, `members.news_seen_at`; `ws.accounts_with_due_messages()` (SECURITY DEFINER pro cron); ručně aplikovat na Neon |
 | 082 | Klientský portál S16: `appointments.public_token`, `jobs.result_url`, `job_updates`, `reviews`, typ e-mailu `job_update`; `ws.portal_lookup(uuid)` (SECURITY DEFINER, vrací jen ID); ručně aplikovat na Neon po 081 |
+| 083 | Admin S17: `product_news.tag` (`new`/`improvement`/`fix`), obrázek `image_data`/`image_type` (PNG/JPEG/WebP, max. 600 kB), `emailed_at`, `email_recipients`, `updated_at`; `account_admin_notes` (poznámka admina k účtu, RLS, ws_app bez práv) |
+
+### Admin nad Workspace (S17, R-052)
+
+| Co | Kde |
+|---|---|
+| Stránky (vzhled adminu, NextAuth) | `/dashboard/klienti` (přehled účtů: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, napojený web), `/dashboard/klienti/[id]` (detail, klíče a prompt, pozvánka znovu, poznámka, historie z auditu), `/dashboard/novinky` (editor s náhledem v aplikaci a e-mailu, seznam). Vykreslení v `clients-view.tsx`, `[id]/detail-view.tsx`, akce `actions.ts` |
+| Přístup do DB | `lib/ws/admin/db.ts`: `adminDb` přes `DATABASE_URL` (vlastník tabulek, mimo RLS), `server-only`, v testech `setAdminDriverForTests`. Jen z `lib/ws/admin/*` |
+| Kdo smí | `lib/ws/admin/auth.ts`: `getAdmin()` = NextAuth session; každá server action ho volá první (testy `setAdminAuthForTests`). Audit `actor = 'admin'` |
+| Přehled a detail | `lib/ws/admin/clients.ts`: `listClients`, `getClientDetail`, `getClientBusiness`, `auditAdmin`, `saveClientNote`. Poslední aktivita = nejnovější změna poptávek, termínů, zakázek, zákazníků, faktur. Žádné údaje zákazníků klientů |
+| Pozvat klienta | `lib/ws/admin/invite.ts`: Clerk organizace (bez vlastníka) → `createAccountWithBusiness({ owner: null })` → pozvánka `org:admin` s návratem na `/w/registrace`. Člen se zapíše až v průvodci `/w/novy` (`ensureMember` v `lib/ws/onboarding.ts`, bez webhooku Clerku). Klient pak projde Checkoutem (R-038) |
+| Klíče a prompt pro web | `lib/ws/admin/web-keys.ts`: `ensureIntegration` + `rotateSecretKey` + `buildClaudePrompt` jako Nastavení › Napojený web (S11), zápis rolí `ws_app` pod RLS účtu |
+| Novinky | `lib/ws/admin/news.ts` (koncept → `publishNews` → `sendNewsEmail` s potvrzeným počtem příjemců, jednou), `lib/ws/news-format.ts` (štítky, limity, kontrola obrázku podle bajtů, tipy „Učesat text“ bez AI), `lib/ws/email/news-email.ts` (jeden e-mail pro náhled, odeslání i cron), zvonek `components/ws/app/news-entry.tsx`, obrázek `/z/novinky/[id]/obrazek` (jen zveřejněná, CORP `cross-origin`) |
+| Testy | `lib/ws/__tests__/ws-admin.test.ts` |
+
+- Denní cron posílá e-mailem jen novinky s `emailed_at` (admin je výslovně odeslal) za posledních 14 dní a jen účtům založeným před odesláním (`queueNewsForAccount` v `lib/ws/email/scheduled.ts`).
+- Odeslanou novinku nejde skrýt ani smazat (CHECK `emailed_at` → `published_at`), koncept jde smazat.
 
 ## B4. Přihlášení a role
 

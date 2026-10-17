@@ -11,13 +11,14 @@ import { emailOrigin, signLink, unsubscribeUrl } from './links'
 import { formatWhen, isOn, loadSender, ownerEmail, visitPortalButton, type Sender } from './notify'
 import { enqueueEmail, flushAll } from './queue'
 import { composeCustomerEmail } from './compose'
-import { renderEmail } from './layout'
+import { newsImagePath, renderNewsEmail } from './news-email'
+import { isNewsTag } from '../news-format'
 
 // Denní e-maily Workspace (S15, cron /api/cron/ws-email ráno, R-006: jen 1× denně):
 //   - připomínky termínů na zítřek (zákazníkům, funkce Připomínky),
 //   - faktury po splatnosti a blížící se limit DPH (majiteli + zvonek),
 //   - ranní přehled (Po–Pá), týdenní (pondělí), měsíční (1. den),
-//   - novinky ZakazIQ (všem účtům, které je nevypnuly),
+//   - novinky ZakazIQ, které admin poslal e-mailem (všem účtům, které je nevypnuly),
 //   - nakonec odeslání celé fronty.
 // Každá zpráva má klíč události, takže opakovaný běh cronu nic nezdvojí.
 
@@ -305,34 +306,49 @@ async function queueMonthly(scope: Scope, sender: Sender, today: string): Promis
 
 // --- Novinky ZakazIQ ---------------------------------------------------------------
 
-async function queueNews(scope: Scope): Promise<number> {
+/**
+ * E-maily s novinkami, které admin poslal „e-mailem všem“ (S17, emailed_at)
+ * za posledních 14 dní. Jen účtům, které existovaly v okamžiku odeslání
+ * a novinky nevypnuly. Klíč události = každý majitel dostane novinku jednou,
+ * i když ji zařadí admin hned a pak znovu denní cron.
+ */
+export async function queueNewsForAccount(scope: Scope): Promise<number> {
   const acc = scope.accountId
   const [account, news, owners] = await wsDb(scope).batch([
-    q`SELECT news_emails FROM ws.accounts WHERE id = ${acc}`,
-    q`SELECT id, title, body, link_url FROM ws.product_news WHERE published_at IS NOT NULL AND published_at <= now()
-      AND published_at > now() - interval '14 days' ORDER BY published_at`,
+    q`SELECT news_emails, created_at FROM ws.accounts WHERE id = ${acc}`,
+    q`SELECT id, title, body, link_url, tag, image_type IS NOT NULL AS has_image, emailed_at FROM ws.product_news
+      WHERE published_at IS NOT NULL AND emailed_at IS NOT NULL AND emailed_at > now() - interval '14 days'
+      ORDER BY emailed_at`,
     q`SELECT email FROM ws.members WHERE account_id = ${acc} AND role = 'owner' AND email IS NOT NULL`,
   ])
   if (!account[0]?.news_emails || news.length === 0 || owners.length === 0) return 0
+  const accountCreated = new Date(account[0].created_at as string)
   const unsub = unsubscribeUrl(signLink({ kind: 'n', accountId: acc, id: null }))
+  const seen = new Set<string>()
   let n = 0
   for (const item of news) {
-    for (const o of owners) {
-      const email = renderEmail({
-        brand: { name: 'ZakazIQ', color: null },
-        subject: `Co jsme vylepšili: ${String(item.title)}`,
+    if (new Date(item.emailed_at as string) < accountCreated) continue
+    const email = renderNewsEmail(
+      {
+        title: String(item.title),
         body: String(item.body),
-        blocks: item.link_url ? [{ kind: 'buttons', items: [{ label: 'Více', url: String(item.link_url) }] }] : [],
-        footer: 'Novinky ZakazIQ posíláme jednou za čas. Upozornění na platby a bezpečnost chodí vždy.',
-        unsubscribeUrl: unsub,
-      })
+        tag: isNewsTag(item.tag) ? item.tag : 'new',
+        link: (item.link_url as string | null) ?? null,
+        imageUrl: item.has_image ? `${emailOrigin()}${newsImagePath(String(item.id))}` : null,
+      },
+      unsub,
+    )
+    for (const o of owners) {
+      const to = String(o.email).toLowerCase()
+      if (seen.has(`${String(item.id)}:${to}`)) continue
+      seen.add(`${String(item.id)}:${to}`)
       const id = await enqueueEmail(scope, {
         businessId: null,
         type: 'product_news',
         to: String(o.email),
         fromName: 'ZakazIQ',
         email,
-        dedupeKey: `news:${String(item.id)}:${String(o.email).toLowerCase()}`,
+        dedupeKey: `news:${String(item.id)}:${to}`,
         unsubscribeUrl: unsub,
       })
       if (id) n++
@@ -362,7 +378,7 @@ export async function runDailyEmails(now: Date = new Date()): Promise<DailyEmail
       if (weekday >= 1 && weekday <= 5) await queueDaily(scope, sender, today)
       if (weekday === 1) await queueWeekly(scope, sender, today)
       if (today.endsWith('-01')) await queueMonthly(scope, sender, today)
-      if (!accounts.has(b.account_id)) out.news += await queueNews(scope)
+      if (!accounts.has(b.account_id)) out.news += await queueNewsForAccount(scope)
     } catch (e) {
       out.failed++
       console.error('cron.ws-email', { accountId: b.account_id, error: e instanceof Error ? e.message : 'unknown' })

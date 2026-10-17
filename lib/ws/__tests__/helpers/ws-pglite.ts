@@ -22,6 +22,9 @@ export const WS_SYSTEM_TABLES = ['rate_limits', 'stripe_events', 'webhook_events
 /** Globální obsah bez dat účtů (novinky ZakazIQ, migrace 081): ws_app jen čte. */
 export const WS_GLOBAL_TABLES = ['product_news']
 
+/** Interní tabulky admin konzole (migrace 083): account_id a RLS mají, ws_app nemá žádná práva. */
+export const WS_ADMIN_TABLES = ['account_admin_notes']
+
 const read = (file: string) => fs.readFileSync(file, 'utf8')
 
 export async function applyWsMigrations(db: PGlite): Promise<void> {

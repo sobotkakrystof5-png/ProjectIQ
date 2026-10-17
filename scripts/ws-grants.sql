@@ -33,3 +33,6 @@ GRANT EXECUTE ON FUNCTION ws.accounts_with_due_messages() TO ws_app;
 
 -- Klientský portál (migrace 082, S16)
 GRANT EXECUTE ON FUNCTION ws.portal_lookup(uuid) TO ws_app;
+
+-- Admin konzole: poznámky k účtům klientů (migrace 083, S17). Interní, ws_app nic.
+REVOKE ALL ON ws.account_admin_notes FROM ws_app;

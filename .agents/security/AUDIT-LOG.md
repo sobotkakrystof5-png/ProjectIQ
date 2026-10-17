@@ -16,6 +16,20 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-10 — review (S17, admin: klienti a novinky)
+Spouštěč: kontrola podle `web-security-review` před commitem S17.
+Rozsah: `app/dashboard/{klienti,novinky}/**`, `lib/ws/admin/*`, `lib/ws/news-format.ts`, `lib/ws/email/news-email.ts`, `app/z/novinky/[id]/obrazek`, `ensureMember` v `/w/novy`, `next.config.mjs` (CORP), migrace 083 a `scripts/ws-grants.sql`.
+Výsledek:
+- Přístup: stránky za middleware NextAuth a layoutem `/dashboard` (curl bez session → 307 na přihlášení), každá akce znovu `getAdmin()`; test „bez admina nic“ projde 9 akcí a ověří, že se nic nezapsalo. Přihlášení Workspace (Clerk) admin nijak neotevírá.
+- Secrets: `DATABASE_URL` jen v modulu se `server-only`; tajný klíč webu se ukáže adminovi jednou, neloguje se a není v auditu ani promptu (test).
+- Vstupy: Zod s délkami ve všech akcích, odkaz novinky jen https, obrázek podle prvních bajtů (SVG odmítnuto testem), limit 600 kB i v DB (CHECK).
+- XSS: novinka v aplikaci jen jako React text, e-mail escapuje nadpis i text (test s `<b>`), `javascript:` obrázek se nevykreslí, náhled e-mailu v `iframe sandbox=""`.
+- Data: `ws.account_admin_notes` bez práv pro `ws_app` (test 42501 v PGlite a ověřeno čtením na Neonu), SQL jen parametrizované.
+- Pošta: novinky e-mailem jen po výslovném „Poslat e-mailem všem“ s potvrzeným počtem, jednou (atomicky `emailed_at`), jen účtům s `news_emails`, s odhlášením; klíč události brání dvojímu odeslání.
+Nálezy: 1 — audit nesl e-mail admina (`admin:<e-mail>`), přitom `ws.audit_log` může číst klient pod RLS.
+Opraveno: `actor = 'admin'` bez e-mailu (stejný commit).
+Zůstává: přijatá rizika v DECISIONS #013 (admin mimo RLS, cache obrázku 1 h).
+
 ## 2026-10-10 — review (S15, e-maily, odkazy z e-mailů, novinky)
 Spouštěč: kontrola podle `web-security-review` před commitem S15.
 Rozsah: `lib/ws/email/*`, `app/z/**` (odkaz majitele, odhlášení, .ics), `app/api/resend/webhook`, `app/api/cron/ws-email`, `app/w/[business]/nastaveni/emaily`, `app/w/[business]/zvonek`, napojení do akcí poptávek, zákazníků, faktur a Stripe webhooku, migrace 081.

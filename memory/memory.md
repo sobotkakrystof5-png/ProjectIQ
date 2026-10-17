@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-10-10 · S16 hotová v repu (klientský portál)
+> **Poslední aktualizace:** 2026-10-10 · S17 hotová v repu (admin: klienti a novinky)
 
 ---
 
@@ -38,12 +38,12 @@
 | S09 | Kostra aplikace a obrazovka Dnes | hotovo (2026-10-09), naostro s přihlášením neověřeno |
 | S10 | Poptávky a kalendář | hotovo (2026-10-10), naostro s přihlášením neověřeno |
 | S11 | Veřejné API, objednávací stránka, widget | hotovo (2026-10-10), migrace 076 na Neonu; Nastavení › Napojený web naostro s přihlášením neověřeno |
-| S12 | Zákazníci, věrnost, segmenty | hotovo v repu (2026-10-10); migrace 077 na Neonu, 078 připravená k ručnímu vložení |
-| S13 | Nastavení: funkce, služby, kolonky, stavy | rozpracováno v repu (2026-10-10); migrace 079 připravená k ručnímu vložení |
-| S14 | Peníze: faktury, příjmy, daně | hotovo v repu (2026-10-10, commit `35cba9f`); migrace 080 čeká, e-maily S15 |
-| S15 | E-maily, upozornění, novinky | hotovo v repu (2026-10-10); migrace 081 čeká, odesílání čeká na doménu v Resendu (`WS_EMAIL_FROM`) |
-| S16 | Klientský portál | hotovo v repu (2026-10-10); migrace 082 čeká, skutečná DB neověřena |
-| S17 | Admin: klienti a novinky | čeká |
+| S12 | Zákazníci, věrnost, segmenty | hotovo v repu (2026-10-10); migrace 077–078 na Neonu |
+| S13 | Nastavení: funkce, služby, kolonky, stavy | rozpracováno v repu (2026-10-10); migrace 079 na Neonu |
+| S14 | Peníze: faktury, příjmy, daně | hotovo v repu (2026-10-10, commit `35cba9f`); migrace 080 na Neonu |
+| S15 | E-maily, upozornění, novinky | hotovo v repu (2026-10-10); migrace 081 na Neonu, odesílání čeká na doménu v Resendu (`WS_EMAIL_FROM`) |
+| S16 | Klientský portál | hotovo v repu (2026-10-10); migrace 082 na Neonu, skutečná data neověřena |
+| S17 | Admin: klienti a novinky | hotovo v repu (2026-10-10); migrace 083 na Neonu, s přihlášením neověřeno |
 | S18 | Mobil, tmavý režim, GDPR | čeká |
 | S19 | Bezpečnostní audit a spuštění | čeká |
 
@@ -71,7 +71,9 @@
 
 **Klientský portál (S16):** `/z/[token]` bez registrace ukazuje termín nebo zakázku, postup, zprávy firmy, věrnost, vystavené faktury a hodnocení. Zákazník může podle pravidla byznysu termín přesunout nebo zrušit; e-maily k termínu vedou do portálu. Zakázka má v pravém panelu odkaz, zprávy a výsledek. Interní poznámky ani kontakty se nenačítají (R-051). Migrace 082 není na Neonu. Vzhled schválen na počítači i telefonu z dočasného náhledu (smazán); skutečná data po migraci neověřena.
 
-**Další krok:** Kryštof ručně vloží do Neon SQL editoru migrace 078–082 v tomto pořadí a znovu `scripts/ws-grants.sql`; potom ověří `/z/[token]` na skutečném termínu a zakázce. Pro e-maily zbývá ověřit doménu `zakaziq.cz` v Resendu a nastavit `WS_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`. Pak S17 nebo dokončení S13.
+**Admin: klienti a novinky (S17):** `/dashboard/klienti` (účty Workspace: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, web), detail s klíči a promptem pro web, opakovanou pozvánkou, interní poznámkou a historií z auditu; „Pozvat klienta“ založí Clerk organizaci, účet a byznys ze šablony a pošle pozvánku (klient pak zadá kartu v kroku 2). `/dashboard/novinky`: štítek, nadpis, text, obrázek, odkaz, náhled v aplikaci i e-mailu, tipy „Učesat text“ bez AI, Zveřejnit v aplikaci, Poslat e-mailem všem s potvrzeným počtem příjemců. R-052, DECISIONS #013. Na Neonu jsou migrace 078–083 (ověřeno čtením 2026-10-10, aplikoval Kryštof). Vzhled ověřen headless na náhledu s fiktivními daty (1280 a 390 px, smazán); s přihlášením adminu a skutečnou pozvánkou z Clerku neověřeno.
+
+**Další krok:** Kryštof v adminu projde `/dashboard/klienti` a `/dashboard/novinky` s přihlášením: pozve testovací e-mail, projde registraci z pozvánky (Clerk dev) až na krok 2, vygeneruje klíče a prompt, zveřejní novinku a zkontroluje zvonek ve `/w`. Ověřit `/z/[token]` na skutečném termínu (S16). Pro e-maily doména `zakaziq.cz` v Resendu, `WS_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`. Pak S18 nebo dokončení S13.
 
 **Prostředí agentů:** Claude Code i Codex používají stručný `AGENTS.md` a podle úlohy čtou závaznou `docs/AGENTS-REFERENCE.md` (R-047); paměť je společná v `memory/`. Projektové skilly a bezpečnostní záznamy jsou synchronizované do `.agents/`; příprava Codexu a worktree viz `docs/CODEX.md` (R-046). Konfigurace a skripty ověřené lokálně; automatické spuštění setupu a akcí v novém chatu klienta nebylo ověřeno.
 
@@ -322,6 +324,11 @@
 **Proč:** Odkaz bez přihlášení musí fungovat z e-mailu i telefonu a zůstat jednoduchý; oddělená tabulka zpráv brání náhodnému zveřejnění poznámek.
 **Důsledek:** migrace 082, `lib/ws/portal.ts`, `/z/[token]`, Nastavení › Funkce a tlačítka v e-mailech. Veřejné akce mají Zod a limity; bezpečnostní kompromis je v `.claude/security/DECISIONS.md` #012.
 
+### R-052 · Admin nad Workspace: pozvání, novinky, „Učesat text“ bez AI (2026-10-10)
+**Rozhodnutí:** (1) Admin čte `ws` vlastníkem tabulek (`lib/ws/admin/db.ts`), zapisuje jen novinky, interní poznámky (`ws.account_admin_notes`, `ws_app` bez práv) a audit (`actor = 'admin'`, bez e-mailu); data klienta mění přes `lib/ws` pod RLS. (2) „Pozvat klienta“ založí Clerk organizaci bez vlastníka, účet s byznysem ze šablony a pozvánku `org:admin`; člena zapíše průvodce `/w/novy` (`ensureMember`), takže to funguje i bez webhooku Clerku. Pozvaný klient platí jako každý jiný (R-038). (3) Novinky: koncept → Zveřejnit v aplikaci → Poslat e-mailem všem (jednou, s potvrzeným počtem příjemců, jen `news_emails`, jen účty existující v okamžiku odeslání). Denní cron posílá jen výslovně odeslané novinky — S15 posílal každou zveřejněnou. (4) Obrázek novinky v DB (PNG/JPEG/WebP do 600 kB podle bajtů), servíruje `/z/novinky/[id]/obrazek`. (5) „Učesat text“ = návod a místní tipy podle pravidel `humanize-text-cs` (`newsTextHints`), žádné volání AI. (6) Kromě 2 položek navigace (layout + `MobileNav`) se admin nemění.
+**Proč:** prompt S17 (pozvat bez SQL, novinka v aplikaci i e-mailem, „Učesat text“ jen návod — rozhodnout). AI volání by znamenalo náklady, latenci a text, který by stejně musel projít člověk; pravidla stylu jdou zkontrolovat místně. Obrázek z cizí domény by zablokovala CSP aplikace (`img-src 'self'`), úložiště souborů v projektu není. Webhook Clerku zatím není nastavený.
+**Důsledek:** `docs/AGENTS-REFERENCE.md` → B3 „Admin nad Workspace (S17, R-052)“, `.claude/security/DECISIONS.md` #013, migrace 083, `docs/workspace/SETUP.md`.
+
 ## 3. Otevřené problémy
 
 - [ ] **Legacy routy:** `app/dashboard/projekty/**` zůstalo po přesunu Projektů do Hubu (R-007); `projekty-actions.ts` se liší od verze v `app/hub/projekty/`. Rozhodnout: smazat, nebo přesměrovat na `/hub/projekty` · od 2026-06-23
@@ -337,16 +344,15 @@
 - [ ] **Stripe — live mód** (produkt, cena, Portal, e-maily, šablona faktury s IČO a „Nejsem plátce DPH“, webhook endpoint, live klíče jen do Vercelu Production) · před S19 · od 2026-10-09
 - [ ] **`ws.accounts.trial_ends_at`** se po R-038 nepoužívá. Nechat, nebo odstranit migrací (data se tím nemažou)? Neblokuje · od 2026-10-09
 - [ ] **Evidence migrací:** neexistuje tabulka, která by evidovala, které migrace jsou aplikované na produkční DB — stav se drží jen v changelogu (pravidlo: u každé migrace zapsat „aplikována: ano/ne") · od 2026-10-08
-- [ ] **S12 — migrace 078:** ručně vložit `migrations/078_ws_vernost_odmena.sql` v Neon SQL editoru; nezmění data, chrání jen budoucí dodatečné razítkování návštěvy s uplatněnou odměnou · od 2026-10-10
-- [ ] **S13 — migrace 079:** ručně vložit `migrations/079_ws_sluzby_rozestupy.sql` v Neon SQL editoru před nasazením S13; přidá jen výchozí rozestup 0 minut, data nemění · od 2026-10-10
 - [ ] **Resend jen kvůli waitlistu:** závislost `resend` slouží jedné funkci (`sendLaunchEmailBlast`). Zvážit převod na `lib/email.ts` (R-004) · od 2026-10-08
 - [ ] **Workspace — IČO a právní texty** (podmínky, ochrana údajů, zpracovatelská smlouva). V S04 zástupně `[DOPLNIT]` (R-023), skutečné texty blokují S19 · od 2026-10-08
 - [ ] **Workspace — SMS poskytovatel** pro připomínky a „Komu napsat". Blokuje S12/S15 (lze odložit) · od 2026-10-08
 - [ ] **Workspace — zálohy online přes Stripe Connect** teď, nebo až po spuštění? Neblokuje · od 2026-10-08
 - [ ] **Workspace — admin přihlášení:** nechat NextAuth natrvalo, nebo později převést na Clerk? Neblokuje · od 2026-10-08
-- [ ] **S14 — migrace 080:** ručně aplikovat migrations/080_ws_penize_provoz.sql v Neon SQL editoru po 078/079, potom ověřit obrazovky s přihlášením a PDF. Skutečná DB, externí AI přepis a e-mail S15 zatím neověřené · od 2026-10-10
-- [ ] **S15 — migrace 081:** ručně aplikovat `migrations/081_ws_emaily_odkazy_novinky.sql` po 080 a znovu `scripts/ws-grants.sql`. Bez ní nefungují odkazy z e-mailů ani fronta s klíčem události · od 2026-10-10
-- [ ] **S16 — migrace 082:** ručně aplikovat `migrations/082_ws_klientsky_portal.sql` po 081 a znovu `scripts/ws-grants.sql`; potom ověřit skutečný termín, zakázku, fakturu a hodnocení v `/z/[token]` · od 2026-10-10
+- [ ] **S14 naostro:** obrazovky Peněz s přihlášením, PDF na Vercelu a externí AI přepis neověřené (migrace 080 na Neonu) · od 2026-10-10
+- [ ] **S16 naostro:** ověřit skutečný termín, zakázku, fakturu a hodnocení v `/z/[token]` (migrace 082 na Neonu) · od 2026-10-10
+- [ ] **S17 — pozvaní klienti a platba:** pozvaný klient prochází stejným Checkoutem (14 dní s kartou, R-038). Rozhodnout, jestli klienti, kterým Kryštof staví web, mají mít Workspace zdarma nebo se slevou (kupón ve Stripe) · od 2026-10-10
+- [ ] **S17 naostro:** pozvánka Clerku (e-mail, registrace s `__clerk_ticket` na `/w/registrace`, aktivace organizace, `ensureMember`) a obě admin stránky s přihlášením neověřené · od 2026-10-10
 - [ ] **S15 — odesílání e-mailů:** doména `zakaziq.cz` v Resendu (DNS SPF/DKIM/DMARC), `WS_EMAIL_FROM`, endpoint webhooku + `RESEND_WEBHOOK_SECRET` (lokálně i Vercel). Do té doby nic neodchází. Postup `docs/workspace/SETUP.md` → E-maily · od 2026-10-10
 - [ ] **S15 — naostro neověřeno:** Nastavení › E-maily (náhled, zkušební e-mail) s přihlášením, skutečné doručení a vzhled v Gmailu/Outlooku/Apple Mailu, odkaz Potvrdit z telefonu, cron na Vercelu · od 2026-10-10
 - [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
@@ -373,6 +379,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-10
+- **feat** S17 — admin: Klienti a Novinky (R-052). `/dashboard/klienti` (+ `[id]`): přehled účtů Workspace, detail, Pozvat klienta (Clerk organizace + účet a byznys ze šablony + pozvánka), klíče a prompt pro web (logika S11), poznámka, historie z auditu. `/dashboard/novinky`: editor (štítek, nadpis, text, obrázek, odkaz), náhled v aplikaci a e-mailu, „Učesat text“ (tipy bez AI), zveřejnit / skrýt / smazat koncept, Poslat e-mailem všem s potvrzením počtu. Kód `lib/ws/admin/{db,auth,clients,invite,web-keys,news}.ts`, `lib/ws/news-format.ts`, `lib/ws/email/news-email.ts`, `components/ws/app/news-entry.tsx` (zvonek), `/z/novinky/[id]/obrazek`; `createAccountWithBusiness` umí účet bez vlastníka, `ensureMember` v `/w/novy`; cron posílá novinky jen po odeslání adminem. Admin: jen 2 položky navigace v `app/dashboard/layout.tsx` a `components/MobileNav.tsx`. Migrace 083 (aplikována: ano — na Neonu ověřeno čtením, stejně jako 078–082; `ws_app` bez práv na poznámky). CORP `cross-origin` pro obrázek novinky (`next.config.mjs`). Bezpečnost: DECISIONS #013, AUDIT-LOG (1 nález opraven: e-mail admina v auditu), STATE, synchronizace `.agents/`. Ověřeno: `ws-admin.test.ts` 16/16, `npm test` 451 + 1 vynechaný, `tsc` OK, `npm run build:check` OK; curl `/login` 200, `/dashboard`, `/dashboard/klienti`, `/dashboard/novinky`, `/alteno`, `/hub` → přihlášení, `/p/<uuid>` 404, obrázek neexistující novinky 404 s CORP; náhled s fiktivními daty headless 1280/390 px bez vodorovného posunu (smazán). Neověřeno: s přihlášením adminu, skutečná pozvánka Clerku, odeslání e-mailu (chybí `WS_EMAIL_FROM`).
 - **feat** S16 — klientský portál `/z/[token]` pro termíny a zakázky (R-051): přesun/zrušení podle pravidel byznysu, postup a zprávy, věrnost, faktury, výsledek a hodnocení; odkazy v e-mailech a pravý panel zakázky/termínu. Migrace 082 (aplikována: ne). Bezpečnost: náhodné UUID, `portal_lookup` vrací jen ID, potom RLS, Zod a limity; interní poznámky se nenačítají; DECISIONS #012 a AUDIT-LOG. Oveřeno: vzhled počítač + telefon (uživatel), dočasný náhled smazán, `ws-portal.test.ts` 13/13, `npm test` 434 + 1 vynechaný, `tsc` OK, `npm run build:check` OK; admin `/login` vykreslen, `/dashboard`, `/alteno`, `/hub` → přihlášení, `/p/<neplatný-token>` → 404. Neověřeno: admin za přihlášením a S16 nad skutečnou DB.
 - **feat** S15 — e-maily, upozornění, novinky (R-050). Fronta a odeslání `lib/ws/email/{queue,transport}.ts` (klíč události, SKIP LOCKED, 5 pokusů, idempotence u Resendu), šablony `catalog/layout/compose.ts`, události `notify.ts` napojené do příjmu poptávek, potvrzení, odmítnutí, přesunu, zrušení (se „Zpět“), placení návštěvy, hotové zakázky, faktury a Stripe webhooku; jednorázové odkazy majitele `/z/odkaz/[token]` (`action-link.ts`), odhlášení `/z/odhlasit/[token]` (+ jedním klikem), `.ics` `/z/kalendar/[token]`; denní cron `/api/cron/ws-email` (připomínky, přehledy, po splatnosti, limit DPH, novinky); Nastavení › E-maily a upozornění s živým náhledem; zvonek přečtený po otevření + „Co je nového“; webhook `/api/resend/webhook`. „Komu napsat“ a faktura už posílají místo konceptu. Migrace 081 (aplikována: ne). Nové env `WS_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET` (`.env.example`, reference; **Vercel zatím ne**). Bezpečnost: DECISIONS #011, STATE, AUDIT-LOG, CSP beze změny. Ověřeno: `npm test` 421/421 (+ 1 vynechaný), `tsc` OK, `npm run build:check` OK, admin `/login` 200, `/dashboard` `/alteno` `/hub` 307, `/p/<uuid>` 404; `/z` stránky 200/404, cron bez tajemství 401, webhook bez tajemství 503, náhled v `iframe srcdoc` pod vynucenou CSP funguje (headless Chrome), e-maily vyfocené 700/375 px. Neověřeno: s přihlášením, skutečné doručení.
 - **chore** Commity `35cba9f` (S14) a `eee361d` (S12 + rozpracovaná S13 — necommitnuté od předchozích sezení, S14 bez nich měla mezeru v migracích).
