@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
@@ -71,7 +72,10 @@ export default async function CalendarPage(
   const today = pragueParts(now).date
   const pathname = navHref(business.slug, 'kalendar')
   const viewParam = first(searchParams.pohled)
-  const view: View = viewParam === 'den' || viewParam === 'mesic' ? viewParam : 'tyden'
+  // Bez volby v URL: telefon začíná dnem (S18), počítač a tablet týdnem.
+  const phone = /iPhone|Android.+Mobile|Mobi/i.test((await headers()).get('user-agent') ?? '')
+  const view: View =
+    viewParam === 'den' || viewParam === 'tyden' || viewParam === 'mesic' ? viewParam : phone ? 'den' : 'tyden'
   const dateParam = first(searchParams.datum)
   const date = isIsoDate(dateParam) ? dateParam : today
 
@@ -182,7 +186,7 @@ export default async function CalendarPage(
           {VIEWS.map((v) => (
             <Link
               key={v.key}
-              href={link({ pohled: v.key === 'tyden' ? null : v.key, detail: null })}
+              href={link({ pohled: v.key, detail: null })}
               aria-current={v.key === view ? 'page' : undefined}
               className={cn(
                 'inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition-colors',

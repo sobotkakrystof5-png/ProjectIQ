@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Bez připojení · ZakazIQ</title>
+<style>
+  /* Statická stránka ze service workeru (S18). Barvy = tokeny Dílků (app/ws-tokens.css), písmo systémové. */
+  :root { --ground: #f4f6fb; --surface: #fff; --ink: #0c1a36; --quiet: #4a5878; --line: #dce7f7; --action: #23478b; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --ground: #0c1a36; --surface: #132850; --ink: #eef2fb; --quiet: #b8ceef; --line: #1b3868; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--ground); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 420px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 32px 24px; text-align: center; }
+  img { width: 56px; height: 56px; }
+  h1 { font-size: 24px; letter-spacing: -0.02em; margin: 20px 0 8px; }
+  p { color: var(--quiet); margin: 0 0 24px; }
+  a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 24px; border-radius: 999px;
+    background: var(--action); color: #fff; font-weight: 600; text-decoration: none; }
+  a:focus-visible { outline: 3px solid #5c8dd3; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/ikony/ikona-192.png" alt="ZakazIQ">
+  <h1>Teď nejste připojení</h1>
+  <p>Jakmile se telefon připojí k internetu, ZakazIQ se zase načte. Poptávky z webu se mezitím ukládají dál.</p>
+  <a href="/w">Zkusit znovu</a>
+</main>
+</body>
+</html>

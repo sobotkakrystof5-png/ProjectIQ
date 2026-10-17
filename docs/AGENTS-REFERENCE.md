@@ -110,7 +110,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
 | Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
 | Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení, hash klíčů rate limitu a (odvozeným klíčem) podpis odkazů v e-mailech. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) a e-maily s odkazy nevzniknou. Změna zneplatní klíče i odeslané odkazy |
-| Workspace e-maily | `WS_EMAIL_FROM` (adresa na doméně ověřené v Resendu, např. `rezervace@zakaziq.cz`; bez ní fronta nic neodešle), `RESEND_API_KEY` (sdílený s adminem), `RESEND_WEBHOOK_SECRET` (`/api/resend/webhook`, bez něj 503), `CRON_SECRET` (`/api/cron/ws-email`) |
+| Workspace e-maily | `WS_EMAIL_FROM` (adresa na doméně ověřené v Resendu, např. `rezervace@zakaziq.cz`; bez ní fronta nic neodešle), `RESEND_API_KEY` (sdílený s adminem), `RESEND_WEBHOOK_SECRET` (`/api/resend/webhook`, bez něj 503), `CRON_SECRET` (`/api/cron/ws-email`, `/api/cron/ws-gdpr`) |
 | Workspace platby | `STRIPE_SECRET_KEY` (omezený `rk_…`, jen server), `STRIPE_WEBHOOK_SECRET` (`/api/stripe/webhook`, bez něj 503), `STRIPE_PRICE_MONTHLY` (cena 249 Kč), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (zatím nepoužitý). Postup `docs/workspace/SETUP.md` → Stripe |
 | Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
@@ -183,7 +183,7 @@ Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind C
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 39 tabulek | migrace `064_ws_zaklad` … `083_ws_admin_klienti_novinky` (přehled níže; na Neonu všechny, ověřeno čtením 2026-10-10) |
+| Schéma `ws` — 39 tabulek | migrace `064_ws_zaklad` … `084_ws_gdpr` (přehled níže; na Neonu 064–083, ověřeno čtením 2026-10-10; 084 zatím ne) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
@@ -224,6 +224,21 @@ Pravidla schématu:
 | 081 | E-maily S15: `message_settings` typy `booking_declined`, `invoice_overdue`, `vat_limit`; `outbound_messages.dedupe_key` (unikátní za účet); `action_tokens` (jednorázové odkazy majitele); `product_news` (globální, ws_app jen čte); `accounts.news_emails`, `members.news_seen_at`; `ws.accounts_with_due_messages()` (SECURITY DEFINER pro cron); ručně aplikovat na Neon |
 | 082 | Klientský portál S16: `appointments.public_token`, `jobs.result_url`, `job_updates`, `reviews`, typ e-mailu `job_update`; `ws.portal_lookup(uuid)` (SECURITY DEFINER, vrací jen ID); ručně aplikovat na Neon po 081 |
 | 083 | Admin S17: `product_news.tag` (`new`/`improvement`/`fix`), obrázek `image_data`/`image_type` (PNG/JPEG/WebP, max. 600 kB), `emailed_at`, `email_recipients`, `updated_at`; `account_admin_notes` (poznámka admina k účtu, RLS, ws_app bez práv) |
+| 084 | GDPR S18 (R-054): `invoices.anonymize_after`, `accounts.closing_requested_at`/`delete_after`; `ws.erase_customer` (výmaz zákazníka v jedné transakci, faktury zůstanou s povinnými údaji, koncepty pryč), `ws.close_account`/`ws.reopen_account` (archivace byznysů, výmaz za 30 dní), pro cron `SECURITY DEFINER` `ws.anonymize_expired_invoices()` a `ws.purge_closed_accounts()` |
+
+### GDPR, vzhled a PWA (S18, R-054)
+
+| Co | Kde |
+|---|---|
+| Výmaz zákazníka na žádost | akce `eraseCustomer` v `app/w/[business]/zakaznici/actions.ts` (jen majitel, i bez předplatného) → `lib/ws/gdpr.ts` → `ws.erase_customer`; v kartě zákazníka `EraseCustomer` s potvrzením jménem |
+| Export všech dat účtu | `GET /w/ucet/export` (jen majitel, 5×/h): ZIP (`lib/ws/zip.ts`, bez komprese, bez závislosti) s CSV (`lib/ws/csv.ts`, středník + BOM) a PDF faktur; PDF bez uloženého souboru se vykreslí do 40 s, zbytek vypíše `CTI-MNE.txt` |
+| Zrušení účtu | `closeAccountAction` v `app/w/ucet/actions.ts`: potvrzení názvem účtu, zruší předplatné ve Stripe hned, `ws.close_account` (výmaz za 30 dní); rušený účet `/w` i `/w/novy` přesměrují na `/w/ucet` s „Obnovit účet“ |
+| Denní úklid | `/api/cron/ws-gdpr` (`0 3 * * *` UTC, `CRON_SECRET`): faktury po lhůtě, smazání účtů po 30 dnech + organizace v Clerku (chyba Clerku výmaz dat nezastaví) |
+| Záznam o zpracování | `/w/ucet/zpracovani` (čl. 30 odst. 2, subzpracovatelé, historie žádostí z `ws.audit_log`: `customer.erase`, `account.export`, `account.close`, `account.reopen`) |
+| Souhlas s nabídkami | pole `marketingConsent` v API v1, políčko na `/r` a ve widgetu (předem nezaškrtnuté); jen přidává `customers.contact_consent_at`, neodvolává |
+| Vzhled | cookie `ws_vzhled` (`system`/`light`/`dark`, `Path=/w`) čte `app/w/layout.tsx`, `WsRoot` nastaví `data-theme`; „Podle systému“ řeší inline skript s nonce bez bliknutí. Tmavé tokeny a přemapování světlých tříd (`bg-navy-50`, `border-navy-100`, `text-navy-700/900`…) v `app/ws-tokens.css`; prvek s vlastní třídou `dark:` má přednost, bílé prvky se nemění. `/r`, `/z` a landing zůstávají světlé |
+| PWA | `public/zakaziq.webmanifest` (scope `/w`), ikony `public/ikony/` (`node scripts/ws-pwa-icons.mjs`), `public/sw.js` jen offline stránka `public/offline.html`, registrace `components/ws/app/pwa-register.tsx` (jen produkce), „Přidat na plochu“ v Účtu |
+| Mobil | kalendář bez `?pohled=` na telefonu (User-Agent) začíná dnem; „táhni pro obnovení“ na Dnes jen v aplikaci na ploše (`components/ws/app/today/pull-to-refresh.tsx`) |
 
 ### Admin nad Workspace (S17, R-052)
 

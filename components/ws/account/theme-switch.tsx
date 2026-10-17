@@ -11,7 +11,7 @@ const ICONS: Record<ThemePref, typeof Sun> = { system: Monitor, light: Sun, dark
 export function ThemeSwitch() {
   const { pref, setPref } = useWsTheme()
   return (
-    <div role="radiogroup" aria-label="Vzhled aplikace" className="flex flex-wrap gap-2">
+    <div role="group" aria-label="Vzhled aplikace" className="flex flex-wrap gap-2">
       {THEME_PREFS.map((p) => {
         const Icon = ICONS[p]
         const active = pref === p
@@ -19,8 +19,7 @@ export function ThemeSwitch() {
           <button
             key={p}
             type="button"
-            role="radio"
-            aria-checked={active}
+            aria-pressed={active}
             onClick={() => setPref(p)}
             className={cn(
               'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors duration-200 ease-zq focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',

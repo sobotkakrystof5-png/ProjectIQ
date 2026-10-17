@@ -91,17 +91,17 @@
 /* Tmavý režim pro třídy, které obrazovky píšou jen ve světlé podobě (S18).
    Mapování podle skillu Dílky: plochy navy-800/900, okraje navy-800, text navy-50–300.
    Prvek s vlastní třídou dark: pro tutéž vlastnost má přednost (:not(...)).
-   Pozadí navy-950 (postranní panel) a navy-700 (hlavní akce) se nemění. */
+   Pozadí navy-950 (postranní panel), navy-700 (hlavní akce) a bílé prvky (razítka,
+   dílky loga, QR, světlé tlačítko) se nemění. */
 [data-app="ws"][data-theme="dark"] :is(.bg-navy-50, .bg-navy-50\/60, .bg-navy-50\/70):not([class*="dark:bg-"]) { background-color: rgb(var(--navy-800) / 0.45); }
 [data-app="ws"][data-theme="dark"] .bg-navy-100:not([class*="dark:bg-"]) { background-color: rgb(var(--navy-800)); }
 [data-app="ws"][data-theme="dark"] .bg-navy-200:not([class*="dark:bg-"]) { background-color: rgb(var(--navy-700)); }
-[data-app="ws"][data-theme="dark"] .bg-white:not([class*="dark:bg-"]) { background-color: rgb(var(--surface)); }
-[data-app="ws"][data-theme="dark"] :is(.hover\:bg-navy-50, .hover\:bg-navy-50\/60, .hover\:bg-navy-50\/70):hover:not([class*="dark:hover:bg-"]) { background-color: rgb(var(--navy-800) / 0.6); }
+[data-app="ws"][data-theme="dark"] :is(.hover\:bg-navy-50, .hover\:bg-navy-50\/60, .hover\:bg-navy-50\/70):hover:not([class*="dark:hover:bg-"]):not(.bg-white) { background-color: rgb(var(--navy-800) / 0.6); }
 [data-app="ws"][data-theme="dark"] .hover\:bg-navy-100:hover:not([class*="dark:hover:bg-"]) { background-color: rgb(var(--navy-800)); }
 [data-app="ws"][data-theme="dark"] :is(.border-navy-100, .border-navy-200, .divide-navy-100 > * + *):not([class*="dark:border-"]) { border-color: rgb(var(--navy-800)); }
 [data-app="ws"][data-theme="dark"] :is(.border-navy-300, .hover\:border-navy-300:hover):not([class*="dark:border-"]) { border-color: rgb(var(--navy-600)); }
-[data-app="ws"][data-theme="dark"] :is(.text-navy-500, .text-navy-700):not([class*="dark:text-"]) { color: rgb(var(--navy-300)); }
-[data-app="ws"][data-theme="dark"] :is(.text-navy-900, .text-navy-900\/75, .text-navy-950):not([class*="dark:text-"]) { color: rgb(var(--navy-100)); }
+[data-app="ws"][data-theme="dark"] :is(.text-navy-500, .text-navy-700):not([class*="dark:text-"]):not(.bg-white) { color: rgb(var(--navy-300)); }
+[data-app="ws"][data-theme="dark"] :is(.text-navy-900, .text-navy-900\/75):not([class*="dark:text-"]):not(.bg-white) { color: rgb(var(--navy-100)); }
 [data-app="ws"][data-theme="dark"] :is(.hover\:text-navy-700, .hover\:text-navy-900):hover:not([class*="dark:hover:text-"]) { color: rgb(var(--navy-50)); }
 [data-app="ws"][data-theme="dark"] :is(.text-danger, .hover\:text-danger:hover):not([class*="dark:text-"]) { color: rgb(var(--danger-ink)); }
 

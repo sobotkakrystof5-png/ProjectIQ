@@ -62,7 +62,8 @@
 | Workspace — e-maily, upozornění, odkazy z e-mailů, novinky | `docs/AGENTS-REFERENCE.md` → B7 „Jak je to v kódu (S15)“, `lib/ws/email/`, `app/z/`, `app/w/[business]/nastaveni/emaily/`, `docs/workspace/SETUP.md` → E-maily, R-050 |
 | Workspace — Nastavení (funkce, služby, otevírací doba, pracovníci, kolonky, stavy, pořadí) | `docs/AGENTS-REFERENCE.md` → B9 „Jak je to v kódu (S13)“, `app/w/[business]/nastaveni/`, `components/ws/settings/`, `lib/ws/{settings,hours}.ts`, R-054 |
 | Workspace z adminu — klienti, pozvání, klíče webu, novinky (S17) | `docs/AGENTS-REFERENCE.md` → B3 „Admin nad Workspace (S17, R-052)“, `app/dashboard/{klienti,novinky}/`, `lib/ws/admin/`, `lib/ws/news-format.ts`, `.claude/security/DECISIONS.md` #013 |
-| Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`083_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `docs/AGENTS-REFERENCE.md` → B3 |
+| Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`084_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `docs/AGENTS-REFERENCE.md` → B3 |
+| Workspace — GDPR (výmaz, export, zrušení účtu), vzhled, PWA (S18) | `docs/AGENTS-REFERENCE.md` → B3 „GDPR, vzhled a PWA (S18)“, `lib/ws/{gdpr,zip,csv,theme}.ts`, `app/w/ucet/`, `app/api/cron/ws-gdpr`, `public/{sw.js,offline.html,zakaziq.webmanifest}`, migrace 084, R-054 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `docs/AGENTS-REFERENCE.md` → B3; detail v `migrations/` |
 | Testy | `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |

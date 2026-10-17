@@ -121,3 +121,11 @@ Zvažované alternativy: role `ws_admin` jen pro čtení (zápisy novinek a pozn
 Přijaté riziko: chyba v kódu adminu by mohla číst cizí účty bez pojistky RLS — omezeno tím, že admin vidí všechno záměrně, kód je jen v `lib/ws/admin/` a testy ověřují, že bez session akce nic neudělají. Zveřejněný obrázek může zůstat v cache až 1 h po skrytí novinky.
 Revize: S19 (audit před spuštěním).
 
+## 014 — GDPR: výmaz, export, zrušení účtu a service worker
+Datum: 2026-10-17
+Rozhodnutí: (1) Výmaz zákazníka (`ws.erase_customer`) a zrušení/obnovení účtu (`ws.close_account`, `ws.reopen_account`) běží jako volající (`ws_app` pod RLS) a jen pro majitele (`hasRole owner`); výmaz funguje i bez předplatného. (2) Denní úklid volá dvě `SECURITY DEFINER` funkce bez parametrů s pevným `search_path` (`ws.anonymize_expired_invoices`, `ws.purge_closed_accounts`), `EXECUTE` má `ws_app`. Mažou jen řádky po lhůtě (`anonymize_after <= dnes`, `delete_after <= now()`). (3) Export `/w/ucet/export` jen pro majitele, limit 5 za hodinu na účet, zápis do auditu; názvy souborů v ZIPu očištěné (bez `/` a `..`), buňky CSV začínající `= + - @` dostanou apostrof. (4) Inline skript „Podle systému“ ve `WsRoot` je konstantní řetězec s nonce z `proxy.ts` (CSP beze změny). (5) Service worker `public/sw.js` se scope `/w` zachytává jen navigace a při chybě sítě vrátí `public/offline.html`; nic dalšího neukládá. `worker-src 'self'` a `manifest-src 'self'` už CSP měla.
+Důvod: GDPR čl. 17 a 20 (výmaz a přenositelnost) a čl. 28 (zpracovatel). Cron nemá kontext účtu, proto funkce bez parametrů místo obcházení RLS v aplikaci. Cache dat v telefonu by po ztrátě telefonu prozradila zákazníky.
+Zvažované alternativy: mazání účtů admin rolí z cronu (další connection string v cronu); offline režim s uloženými daty (riziko pro osobní údaje); ZIP knihovna (nová závislost).
+Přijaté riziko: kdokoli s rolí `ws_app` může úklid spustit dřív než cron — smaže ale jen to, co je po lhůtě. Smazáním účtu zmizí i jeho audit (kaskáda). Vystavené faktury vymazaného zákazníka zůstávají s jménem a adresou 10 let (zákonná povinnost, R-054).
+Revize: S19 (audit před spuštěním).
+

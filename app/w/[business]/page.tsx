@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
 import { CustomerSummary } from '@/components/ws/app/customer-summary'
 import { IncomingList } from '@/components/ws/app/today/incoming-list'
+import { PullToRefresh } from '@/components/ws/app/today/pull-to-refresh'
 import { TodayAgenda } from '@/components/ws/app/today/today-agenda'
 import { TodayWelcome } from '@/components/ws/app/today/welcome'
 import { WeekCalendar } from '@/components/ws/app/today/week-calendar'
@@ -69,69 +70,71 @@ export default async function TodayPage(
     e.kind === 'request' ? link({ detail: `poptavka:${e.id}` }) : link({ detail: `termin:${e.id}` })
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <Heading today={today}>
-        {plural(data.incomingTotal, ['nová poptávka', 'nové poptávky', 'nových poptávek'])}
-        {' · '}
-        {plural(todayVisits, ['termín dnes', 'termíny dnes', 'termínů dnes'])}
-      </Heading>
+    <PullToRefresh>
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <Heading today={today}>
+          {plural(data.incomingTotal, ['nová poptávka', 'nové poptávky', 'nových poptávek'])}
+          {' · '}
+          {plural(todayVisits, ['termín dnes', 'termíny dnes', 'termínů dnes'])}
+        </Heading>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
-        <IncomingList
-          className="md:col-start-1 md:row-start-1"
-          items={data.incoming}
-          total={data.incomingTotal}
-          today={today}
-          now={now}
-          hrefFor={(id) => link({ detail: `poptavka:${id}` })}
-          allHref={navHref(business.slug, 'poptavky')}
-          actions={{ slug: business.slug, calendar: modules.has('calendar'), jobs: modules.has('jobs') }}
-        />
-
-        <div className="min-w-0 md:col-span-2 md:row-start-2 xl:col-span-1 xl:col-start-2 xl:row-start-1">
-          <WeekCalendar
-            className="hidden md:block"
-            entries={data.calendar}
-            weekStart={weekStart}
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
+          <IncomingList
+            className="md:col-start-1 md:row-start-1"
+            items={data.incoming}
+            total={data.incomingTotal}
             today={today}
-            opening={data.opening}
-            links={{
-              // Termín vybere zákazníka do karty vpravo, poptávka otevře panel.
-              entry: (e) =>
-                e.kind === 'request'
-                  ? link({ detail: `poptavka:${e.id}` })
-                  : e.kind === 'block'
-                    ? link({ detail: `termin:${e.id}` })
-                    : e.customer_id
-                      ? link({ zakaznik: e.customer_id, detail: null })
-                      : link({ detail: `termin:${e.id}` }),
-              week: (start) => link({ tyden: start || null, detail: null }),
-            }}
+            now={now}
+            hrefFor={(id) => link({ detail: `poptavka:${id}` })}
+            allHref={navHref(business.slug, 'poptavky')}
+            actions={{ slug: business.slug, calendar: modules.has('calendar'), jobs: modules.has('jobs') }}
           />
-          <TodayAgenda className="md:hidden" entries={data.calendar} today={today} hrefFor={detailLink} />
+
+          <div className="min-w-0 md:col-span-2 md:row-start-2 xl:col-span-1 xl:col-start-2 xl:row-start-1">
+            <WeekCalendar
+              className="hidden md:block"
+              entries={data.calendar}
+              weekStart={weekStart}
+              today={today}
+              opening={data.opening}
+              links={{
+                // Termín vybere zákazníka do karty vpravo, poptávka otevře panel.
+                entry: (e) =>
+                  e.kind === 'request'
+                    ? link({ detail: `poptavka:${e.id}` })
+                    : e.kind === 'block'
+                      ? link({ detail: `termin:${e.id}` })
+                      : e.customer_id
+                        ? link({ zakaznik: e.customer_id, detail: null })
+                        : link({ detail: `termin:${e.id}` }),
+                week: (start) => link({ tyden: start || null, detail: null }),
+              }}
+            />
+            <TodayAgenda className="md:hidden" entries={data.calendar} today={today} hrefFor={detailLink} />
+          </div>
+
+          <section aria-labelledby="zakaznik" className="flex min-w-0 flex-col gap-3 md:col-start-2 md:row-start-1 xl:col-start-3">
+            <h2 id="zakaznik">
+              <SectionLabel>Zákazník</SectionLabel>
+            </h2>
+            <div className="rounded-panel border bg-surface p-5">
+              {card ? (
+                <CustomerSummary
+                  card={card}
+                  today={today}
+                  businessName={business.name}
+                  detailHref={link({ detail: `zakaznik:${card.id}` })}
+                />
+              ) : (
+                <p className="text-[15px] text-quiet">Klikněte na termín v kalendáři a uvidíte tu kartu zákazníka.</p>
+              )}
+            </div>
+          </section>
         </div>
 
-        <section aria-labelledby="zakaznik" className="flex min-w-0 flex-col gap-3 md:col-start-2 md:row-start-1 xl:col-start-3">
-          <h2 id="zakaznik">
-            <SectionLabel>Zákazník</SectionLabel>
-          </h2>
-          <div className="rounded-panel border bg-surface p-5">
-            {card ? (
-              <CustomerSummary
-                card={card}
-                today={today}
-                businessName={business.name}
-                detailHref={link({ detail: `zakaznik:${card.id}` })}
-              />
-            ) : (
-              <p className="text-[15px] text-quiet">Klikněte na termín v kalendáři a uvidíte tu kartu zákazníka.</p>
-            )}
-          </div>
-        </section>
+        {detail}
       </div>
-
-      {detail}
-    </div>
+    </PullToRefresh>
   )
 }
 

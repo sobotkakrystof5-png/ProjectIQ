@@ -16,6 +16,19 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-17 — review (S18, GDPR, PWA, tmavý režim)
+Spouštěč: kontrola podle `web-security-review` před commitem S18.
+Rozsah: migrace 084 a `scripts/ws-grants.sql`, `lib/ws/{gdpr,zip,csv,theme}.ts`, `/w/ucet/export`, `/w/ucet/zpracovani`, akce `eraseCustomer`, `closeAccountAction`, `reopenAccountAction`, `/api/cron/ws-gdpr`, `marketingConsent` v `lib/ws/intake/intake.ts`, `/r` a widgetu, `components/ws/ws-root.tsx` (inline skript), `public/sw.js`, `public/offline.html`, manifest.
+Výsledek:
+- Secrets: nic nového, žádná `NEXT_PUBLIC_` proměnná; cron ověřuje `CRON_SECRET` (`isCronAuthorized`), Clerk se volá ze serveru.
+- Vstupy: Zod u všech akcí (UUID, název účtu max. 200 znaků, `marketingConsent` boolean), export bez vstupu; potvrzení zrušení účtu porovnává server.
+- Přístup: výmaz, export, záznam o zpracování i zrušení jen majitel; výmaz cizího zákazníka vrátí null a nic nesmaže (test); po zrušení se zavřou objednávací stránka, widget, API i portál (archivace byznysů, test).
+- XSS a injekce: jediný `dangerouslySetInnerHTML` je konstantní skript s nonce; CSV s ochranou před vzorci (test), cesty v ZIPu očištěné; SQL jen parametrizované, funkce s pevným `search_path`.
+- Data v prohlížeči: service worker neukládá nic kromě offline stránky a ikony.
+Nálezy: 0 k opravě. Přijatý kompromis viz DECISIONS #014.
+Opraveno: —
+Zůstává: refundace nevyčerpaného období při zrušení účtu se neřeší (Otevřené problémy v `memory/memory.md`); rozesílané e-maily majiteli (přehledy dne) mohou v záznamu odeslaných zpráv (`ws.outbound_messages.payload`) dál nést jméno vymazaného zákazníka; výmaz maže jen zprávy s jeho id nebo klíčem.
+
 ## 2026-10-10 — review (S17, admin: klienti a novinky)
 Spouštěč: kontrola podle `web-security-review` před commitem S17.
 Rozsah: `app/dashboard/{klienti,novinky}/**`, `lib/ws/admin/*`, `lib/ws/news-format.ts`, `lib/ws/email/news-email.ts`, `app/z/novinky/[id]/obrazek`, `ensureMember` v `/w/novy`, `next.config.mjs` (CORP), migrace 083 a `scripts/ws-grants.sql`.
