@@ -6,7 +6,10 @@ import { assertWritable } from '@/lib/ws/billing'
 import { hasRole, requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
 import { usableAccent } from '@/lib/ws/accent'
 import { fail, ok, type Result } from '@/lib/ws/result'
-import { moveAndDeleteStage, saveAppearance, saveField, savePortalRules, saveService, saveStage, setModule, setServiceActive } from '@/lib/ws/settings'
+import { createBlock } from '@/lib/ws/bookings'
+import { MAX_RANGES_PER_DAY, weekToRows } from '@/lib/ws/hours'
+import { moveAndDeleteStage, reorder, saveAppearance, saveField, savePortalRules, saveService, saveStaff, saveStage, saveWeekHours, setModule, setServiceActive, setStaffActive } from '@/lib/ws/settings'
+import { addDays, isIsoDate, pragueToUtc } from '@/lib/ws/time'
 import { ADDRESS_MAX, CHANGE_HOURS_OPTIONS } from '@/lib/ws/portal-rules'
 import { WS_MODULES } from '@/lib/ws/templates/types'
 
@@ -45,12 +48,12 @@ export async function changeModule(raw: unknown): Promise<Result<null>> {
   catch (e) { log('settings.changeModule', p.ctx, e); return fail('Funkci se nepodařilo uložit. Zkuste to prosím znovu.') }
 }
 
-const service = z.object({ id: id.optional(), name: z.string().trim().min(1).max(120), duration: z.number().int().min(5).max(1440), price: money, currency: z.string().regex(/^[A-Z]{3}$/), showOnWeb: z.boolean(), buffer: z.number().int().min(0).max(240) })
+const service = z.object({ id: id.optional(), name: z.string().trim().min(1).max(120), duration: z.number().int().min(5).max(1440), price: money, currency: z.string().regex(/^[A-Z]{3}$/), showOnWeb: z.boolean(), buffer: z.number().int().min(0).max(240), staffIds: z.array(id).max(100).optional() })
 export async function saveServiceSettings(raw: unknown): Promise<Result<null>> {
   const p = await prepare(raw); if (!p.ok) return p
   const input = service.safeParse(p.input); if (!input.success) return fail('Zkontrolujte název, délku, cenu a rozestup služby.')
-  try { await saveService(p.ctx, p.business, input.data); return done(p.business) }
-  catch (e) { log('settings.saveService', p.ctx, e); return fail('Službu se nepodařilo uložit. Nejdřív ručně vložte migraci 079.') }
+  try { if (!(await saveService(p.ctx, p.business, input.data))) return fail('Služba už tu není. Obnovte prosím stránku.'); return done(p.business) }
+  catch (e) { log('settings.saveService', p.ctx, e); return fail('Službu se nepodařilo uložit. Zkuste to prosím znovu.') }
 }
 export async function hideService(raw: unknown): Promise<Result<null>> {
   const p = await prepare(raw); if (!p.ok) return p
@@ -100,4 +103,72 @@ export async function savePortalSettings(raw: unknown): Promise<Result<null>> {
   const input = portalInput.safeParse(p.input); if (!input.success) return fail(`Zkontrolujte adresu (nejvýš ${ADDRESS_MAX} znaků).`)
   try { await savePortalRules(p.ctx, p.business, { changeHours: input.data.changeHours, address: input.data.address || null }); return done(p.business) }
   catch (e) { log('settings.savePortal', p.ctx, e); return fail('Nastavení odkazu se nepodařilo uložit. Zkuste to prosím znovu.') }
+}
+
+// --- Otevírací doba, pracovníci, pořadí, dovolené -----------------------------
+
+const range = z.object({ opens: z.string().max(8), closes: z.string().max(8) })
+const week = z.array(z.array(range).max(MAX_RANGES_PER_DAY)).length(7)
+
+/** Otevírací doba firmy (`staffId` null) nebo směny pracovníka (`week` null = jako firma). */
+export async function saveHoursSettings(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(raw); if (!p.ok) return p
+  const input = z.object({ staffId: id.nullable(), week: week.nullable() }).safeParse(p.input)
+  if (!input.success || (input.data.staffId === null && input.data.week === null)) return fail('Časy nesedí. Obnovte prosím stránku a zkuste to znovu.')
+  let rows = null
+  if (input.data.week) {
+    const checked = weekToRows(input.data.week)
+    if (!checked.ok) return fail(checked.error)
+    if (input.data.staffId && !checked.rows.length) return fail('Vyberte aspoň jeden pracovní den, nebo nechte otevírací dobu firmy.')
+    rows = checked.rows
+  }
+  try {
+    if (!(await saveWeekHours(p.ctx, p.business, input.data.staffId, rows))) return fail('Pracovník už tu není. Obnovte prosím stránku.')
+    return done(p.business)
+  } catch (e) { log('settings.saveHours', p.ctx, e); return fail('Časy se nepodařilo uložit. Zkuste to prosím znovu.') }
+}
+
+export async function saveStaffSettings(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(raw); if (!p.ok) return p
+  const input = z.object({ id: id.optional(), name: z.string().trim().min(1).max(80) }).safeParse(p.input)
+  if (!input.success) return fail('Napište jméno pracovníka (nejvýš 80 znaků).')
+  try { if (!(await saveStaff(p.ctx, p.business, input.data))) return fail('Pracovník už tu není. Obnovte prosím stránku.'); return done(p.business) }
+  catch (e) { log('settings.saveStaff', p.ctx, e); return fail('Pracovníka se nepodařilo uložit. Zkuste to prosím znovu.') }
+}
+
+export async function changeStaffActive(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(raw); if (!p.ok) return p
+  const input = z.object({ id, active: z.boolean() }).safeParse(p.input); if (!input.success) return fail('Pracovník nesedí.')
+  try {
+    const res = await setStaffActive(p.ctx, p.business, input.data.id, input.data.active)
+    if (res === 'last') return fail('Aspoň jeden pracovník musí zůstat. Nejdřív přidejte jiného.')
+    if (res === 'not_found') return fail('Pracovník už tu není. Obnovte prosím stránku.')
+    return done(p.business)
+  } catch (e) { log('settings.staffActive', p.ctx, e); return fail('Pracovníka se nepodařilo uložit.') }
+}
+
+export async function reorderSettings(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(raw); if (!p.ok) return p
+  const input = z.object({ kind: z.enum(['services', 'staff', 'fields', 'stages']), ids: z.array(id).min(1).max(200) }).safeParse(p.input)
+  if (!input.success || new Set(input.data.ids).size !== input.data.ids.length) return fail('Pořadí nesedí. Obnovte prosím stránku.')
+  try { await reorder(p.ctx, p.business, input.data.kind, input.data.ids); return done(p.business) }
+  catch (e) { log('settings.reorder', p.ctx, e); return fail('Pořadí se nepodařilo uložit. Zkuste to prosím znovu.') }
+}
+
+const isoDay = z.string().refine(isIsoDate)
+/** Dovolená pracovníka nebo zavřeno pro celou firmu: celé dny od–do včetně. */
+export async function addTimeOff(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(raw); if (!p.ok) return p
+  const input = z.object({ staffId: id.nullable(), from: isoDay, to: isoDay, title: z.string().trim().min(1).max(80) }).safeParse(p.input)
+  if (!input.success || input.data.to < input.data.from) return fail('Zkontrolujte prosím, od kdy do kdy volno platí, a napište důvod.')
+  if (input.data.to > addDays(input.data.from, 365)) return fail('Volno může trvat nejdéle rok.')
+  const start = pragueToUtc(input.data.from, 0)
+  const end = pragueToUtc(addDays(input.data.to, 1), 0)
+  try {
+    const res = await createBlock(p.ctx, p.business, { staffId: input.data.staffId, start, end, title: input.data.title })
+    if (!res.ok) return fail(res.reason === 'overlap'
+      ? 'V těch dnech už má termíny. Přesuňte je v kalendáři, nebo zvolte jiné dny.'
+      : 'Pracovník už tu není. Obnovte prosím stránku.')
+    return done(p.business)
+  } catch (e) { log('settings.addTimeOff', p.ctx, e); return fail('Volno se nepodařilo uložit. Zkuste to prosím znovu.') }
 }

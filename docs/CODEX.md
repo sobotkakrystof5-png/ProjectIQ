@@ -18,7 +18,7 @@ bash scripts/codex-setup.sh          # čistá instalace závislostí pomocí np
 npm run dev -- --port 3001          # vývojový server
 npm test                            # Vitest, Workspace DB v PGlite
 npx tsc --noEmit                     # typová kontrola
-npm run build:check                  # build v dočasné kopii, zachová běžící dev
+npm run build:check                  # build při běžícím dev (Next 16: dev má .next/dev)
 node scripts/sync-agent-context.mjs --check
 ```
 

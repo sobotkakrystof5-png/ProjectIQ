@@ -22,7 +22,7 @@ Kryštof píše česky, rychle a často s překlepy. Vyber smysl zadání, nedop
 - Před úpravou čti dotčený kód. Zadání proveď až do ověřeného výsledku; běžné vratné kroky v jeho rozsahu nevyžadují nové schválení.
 - Nové produktové rozhodnutí mimo zadání, změnu záměrného rozhodnutí v paměti, destruktivní operaci nebo nasazení nejdřív předlož Kryštofovi. Už udělený souhlas platí dál.
 - Migrace jsou nové a idempotentní. Spuštění proti skutečné DB, seed a změny externích služeb vyžadují výslovné zadání nebo předchozí souhlas; příprava SQL a ověření v PGlite jsou běžná součást práce.
-- Před commitem větší změny proveď kontroly B12. Když běží `next dev`, použij `npm run build:check`, aby se nerozbila jeho `.next`. `npm run lint` není nastavený (Next 16 `next lint` odstranil); pro typy používej `npx tsc --noEmit`.
+- Před commitem větší změny proveď kontroly B12. Když běží `next dev`, použij `npm run build:check` (od Next 16 je to obyčejný build v repu, dev má vlastní `.next/dev`). `npm run lint` není nastavený (Next 16 `next lint` odstranil); pro typy používej `npx tsc --noEmit`.
 - Výsledek ověření hlas přesně: spuštěné kontroly, skutečné chyby a co nebylo ověřeno. Chybějící přístup nenahrazuj vymyšlenými výsledky.
 
 **Konec každé dokončené změny:**
@@ -92,7 +92,7 @@ Admin v kostce: Next.js 16 App Router, Neon přes `sql` tag z `lib/db.ts` (bez O
 ```bash
 npm run dev      # lokální vývoj (http://localhost:3000)
 npm run build    # produkční build — musí projít před commitem větší změny
-npm run build:check   # totéž v dočasné kopii repa — když běží `next dev` (sdílí .next, build by ho rozbil)
+npm run build:check   # build při běžícím `next dev` (Next 16: dev má `.next/dev`, build ho nepřepíše)
 npm test         # vitest run
 npm run lint     # není nastavený (Next 16 `next lint` odstranil), kontrolu dělá tsc
 node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace migrace na DATABASE_URL z .env.local
@@ -439,6 +439,18 @@ Jak je systém v kódu (S01, R-027):
 - AI přepis: existující serverový ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN, max. 10/h/účet; při chybě ruční zadání. E-mail faktury zatím pouze draft ws.outbound_messages pro S15.
 - Odhad jen ověřené sazby 2026, neplátce a CZK; paušální/skutečný/paušální-daň režim, měsíce činnosti, vedlejší činnost, minima, sleva a zálohy. DPH za kalendářní rok, příjmy jen vodítko obratu. /api/ws/[business]/dane/kalendar nabízí ICS s připomínkou 7 dní předem. Zdroje a omezení: [MONEY.md](workspace/MONEY.md).
 
+### Jak je to v kódu (S13, R-054)
+
+| Co | Kde |
+|---|---|
+| Rozcestník a podstránky | `app/w/[business]/nastaveni/{funkce,sluzby,oteviraci-doba,formular,stavy,vernost,skupiny,web,emaily,vzhled}` (jen vlastník, `requireRole(ctx,'owner')`). Akce `app/w/[business]/nastaveni/actions.ts` (`prepare`: Zod slugu, vlastník, `assertWritable`), data `lib/ws/settings.ts` → `getSettingsData` |
+| Otevírací doba a směny | `ws.opening_hours`: `staff_id NULL` = firma, jinak směny pracovníka; uložení nahradí celý týden (`saveWeekHours`). Pracovník bez řádků pracuje podle firmy. Týden ↔ řádky a kontrola překryvu `lib/ws/hours.ts` (bez DB, sdílí ho formulář), editor `components/ws/settings/week-hours-editor.tsx`. Prázdná doba firmy = zákazník si čas navrhne sám (R-045) |
+| Pracovníci | `saveStaff`, `setStaffActive` (posledního aktivního skrýt nejde — `ensureStaff` by založil nového); UI `components/ws/settings/team-settings.tsx` |
+| Dovolené a zavřeno | celé dny jako blokace `ws.appointments kind='block'` (`addTimeOff` → `bookings.createBlock`), s pracovníkem hlídá DB překryv, bez pracovníka = celá firma. Zrušení přes `cancelAppointment` + „Zpět“ |
+| Kdo dělá službu | `ws.service_staff` ukládá `saveService` se `staffIds` v jedné dávce; prázdné = kdokoli; pracovník z jiného byznysu se vynechá. Volba se ukazuje od dvou aktivních pracovníků |
+| Pořadí přetažením | `components/ws/settings/sortable-list.tsx` (`@dnd-kit`, myš, prst za úchyt, klávesnice, české hlášky pro čtečku), uloží `reorderSettings` → `reorder` (`unnest … WITH ORDINALITY`) pro služby, pracovníky, kolonky a stavy; při chybě se pořadí vrátí |
+| Testy | `lib/ws/__tests__/ws-settings.test.ts` (týden, směny a volné časy, cizí účet, poslední pracovník, přiřazení služeb, pořadí) |
+
 ## B10. Texty
 
 Česky, obyčejnými slovy, oslovení „vy". Žádná technická slova v UI („Potvrdit termín", ne „Změnit stav na confirmed"). Texty podle skillu `zakaziq-ux-texty-cs`; marketingové texty a e-maily projdou skillem `humanize-text-cs`. Nikdy si nevymýšlej čísla, reference ani citace; chybějící údaj = zástupný text `[DOPLNIT]`.
@@ -454,7 +466,7 @@ Jak je systém v kódu (S01, R-027):
 
 ## B12. Testy a kontrola před commitem
 
-1. `npm run build` a `npm test` prochází. Když běží `next dev`, build jen přes `npm run build:check` (kopie repa), jinak přepíše sdílenou `.next`.
+1. `npm run build` a `npm test` prochází. Když běží `next dev`, build přes `npm run build:check` (Next 16 má výstup dev serveru zvlášť v `.next/dev`).
 2. Nové pravidlo (oddělení účtů, razítka, segmenty, webhooky) má test ve Vitestu.
 3. Admin stránky `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]` fungují jako předtím.
 4. UI změna: porovnat s mockupem a s pravidly Dílky, zkontrolovat šířku telefonu.
