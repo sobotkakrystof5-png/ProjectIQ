@@ -1,17 +1,18 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, CircleCheck } from 'lucide-react'
 import type { WsBusiness, WsContext } from '@/lib/ws/context'
-import { checkSlot } from '@/lib/ws/bookings'
-import { getAppointmentDetail, getBookingOptions } from '@/lib/ws/calendar'
+import { getAppointmentDetail, getBookingOptions, getCustomerOption } from '@/lib/ws/calendar'
 import { detailValue, hrefWith, parseDetail, type DetailRef } from '@/lib/ws/detail-param'
 import { WS_FEATURES } from '@/lib/ws/features'
 import { getCustomerCard, getEnabledModules, getRequestDetail } from '@/lib/ws/today'
 import { formatDayShort, formatMinutes, formatRelativeDay, formatTimeRange, isIsoDate, pragueParts, pragueToUtc } from '@/lib/ws/time'
+import { navHref } from '@/lib/ws/nav'
 import { ConfirmedBlock, NewRequestBlock, TimeRange } from '@/components/ws/brand'
 import { AppointmentActions } from './booking/appointment-actions'
 import { BlockForm } from './booking/block-form'
 import { BookingForm } from './booking/booking-form'
+import { FindSlotForm } from './booking/find-slot-form'
+import { AdviceTip } from './booking/slot-advice-view'
 import { ReopenRequestButton, RequestActions } from './booking/request-actions'
 import { CustomerSummary, formatPhone } from './customer-summary'
 import { CustomerDetail } from '@/components/ws/customers/customer-detail'
@@ -28,6 +29,8 @@ import { draftMessage, getContactableCustomer, pickSlotSuggestions } from '@/lib
 import { InvoiceForm } from '@/components/ws/money/forms'
 import { getInvoiceOptions } from '@/lib/ws/money/data'
 import { DetailSheet } from './detail-sheet'
+import { getSlotAdvice } from '@/lib/ws/slot-advice'
+import { toAdviceDto } from '@/lib/ws/slot-suggest'
 
 type Params = Record<string, string | string[] | undefined>
 
@@ -54,7 +57,7 @@ const FORM_PARAMS = { kdo: null, den: null, cas: null, sluzba: null, pracovnik: 
 
 /** Formuláře, které ještě neumí uložit, se neotevřou ani ze sdíleného odkazu (R-043). */
 function isAvailable(ref: DetailRef, modules: Set<string>): boolean {
-  if (ref.kind === 'nova-rezervace' || ref.kind === 'nova-blokace') return WS_FEATURES.newBooking && modules.has('calendar')
+  if (ref.kind === 'nova-rezervace' || ref.kind === 'nova-blokace' || ref.kind === 'najit-cas') return WS_FEATURES.newBooking && modules.has('calendar')
   if (ref.kind === 'nova-faktura') return WS_FEATURES.newInvoice && modules.has('invoices')
   return true
 }
@@ -184,11 +187,25 @@ async function panelContent(
       const wantedEnd = r.wanted_start
         ? (r.wanted_end ?? new Date(r.wanted_start.getTime() + (r.duration_min ?? 60) * 60_000))
         : null
-      const [card, options, slot] = await Promise.all([
+      const wantedMin = r.wanted_start && wantedEnd ? Math.max(5, Math.round((wantedEnd.getTime() - r.wanted_start.getTime()) / 60_000)) : null
+      // Volno / kolize pro chtěný čas a tři nejbližší volné časy (RD05); bez času jen nejbližší volno.
+      const [card, options, advice] = await Promise.all([
         r.customer_id ? getCustomerCard(ctx, business, r.customer_id) : null,
         isNew ? getBookingOptions(ctx, business) : null,
-        isNew && calendar && r.wanted_start && wantedEnd
-          ? checkSlot(ctx, business, { start: r.wanted_start, end: wantedEnd, serviceId: r.service_id })
+        isNew && calendar
+          ? getSlotAdvice(ctx, business, {
+              start: r.wanted_start,
+              durationMin: wantedMin ?? (r.duration_min ?? null),
+              serviceId: r.service_id,
+              staffId: null,
+              count: 3,
+            })
+              .then((a) => toAdviceDto(a, env.today))
+              // Rada je doplněk: když selže, poptávku jde potvrdit i bez ní.
+              .catch((e) => {
+                console.error('slotAdvice.detail', { accountId: ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
+                return null
+              })
           : null,
       ])
       const wanted = r.wanted_start ? pragueParts(r.wanted_start) : null
@@ -217,7 +234,7 @@ async function panelContent(
               </div>
             )}
 
-            {slot && <SlotTip slot={slot} />}
+            {advice && <AdviceTip advice={advice} />}
 
             {isNew && options && (
               <RequestActions
@@ -228,6 +245,10 @@ async function panelContent(
                 jobs={env.modules.has('jobs')}
                 staff={options.staff}
                 today={env.today}
+                advice={advice}
+                serviceId={r.service_id}
+                durationMin={wantedMin ?? r.duration_min ?? null}
+                settingsHref={`${navHref(business.slug, 'nastaveni')}/oteviraci-doba`}
               />
             )}
 
@@ -312,6 +333,7 @@ async function panelContent(
                 appointmentId={a.id}
                 kind={a.kind}
                 at={{ day: start.date, minutes: start.minutes }}
+                durationMin={Math.round((a.end.getTime() - a.start.getTime()) / 60_000)}
                 staffId={a.staff_id}
                 staff={options.staff}
                 closeHref={env.closeHref}
@@ -438,7 +460,11 @@ async function panelContent(
       const day = first(env.searchParams.den)
       const minutesRaw = Number(first(env.searchParams.cas))
       const staffParam = first(env.searchParams.pracovnik)
-      const options = await getBookingOptions(ctx, business)
+      const customerParam = first(env.searchParams.zakaznik)
+      const [options, customer] = await Promise.all([
+        getBookingOptions(ctx, business),
+        customerParam && UUID_RE.test(customerParam) ? getCustomerOption(ctx, customerParam.toLowerCase()) : null,
+      ])
       return {
         title: 'Nová rezervace',
         body: (
@@ -450,11 +476,30 @@ async function panelContent(
             today={env.today}
             prefill={{
               name: first(env.searchParams.kdo)?.slice(0, 80) ?? '',
+              customer: customer ? { id: customer.id, name: customer.name } : null,
               day: isIsoDate(day) ? day : null,
               minutes: Number.isInteger(minutesRaw) && minutesRaw >= 0 && minutesRaw < 1440 ? minutesRaw : null,
               service: first(env.searchParams.sluzba)?.slice(0, 80) ?? '',
               staffId: staffParam && UUID_RE.test(staffParam) && options.staff.some((s) => s.id === staffParam) ? staffParam : null,
             }}
+          />
+        ),
+      }
+    }
+
+    case 'najit-cas': {
+      const options = await getBookingOptions(ctx, business)
+      return {
+        title: 'Najít volný čas',
+        description: 'Nejbližší volné časy podle vaší otevírací doby.',
+        body: (
+          <FindSlotForm
+            slug={business.slug}
+            services={options.services}
+            staff={options.staff}
+            pathname={env.pathname}
+            params={Object.fromEntries(Object.entries(env.searchParams).flatMap(([k, v]) => (first(v) === undefined ? [] : [[k, first(v) as string]])))}
+            settingsHref={`${navHref(business.slug, 'nastaveni')}/oteviraci-doba`}
           />
         ),
       }
@@ -476,27 +521,6 @@ async function panelContent(
       }
 
   }
-}
-
-/** Tip „Termín je volný / Koliduje s…“ — jen informace, kolizi rozhodne DB při potvrzení. */
-function SlotTip({ slot }: { slot: Awaited<ReturnType<typeof checkSlot>> }) {
-  if (slot.free) {
-    return (
-      <p className="flex items-start gap-2 rounded-chip bg-navy-50 px-3 py-2.5 text-sm text-navy-900 dark:bg-navy-800 dark:text-navy-50">
-        <CircleCheck aria-hidden size={18} strokeWidth={1.5} className="mt-px shrink-0 text-navy-700 dark:text-navy-300" />
-        <span>Termín je volný{slot.staffName ? `, vezme ho ${slot.staffName}` : ''}.</span>
-      </p>
-    )
-  }
-  const c = slot.conflict
-  return (
-    <p className="flex items-start gap-2 rounded-chip border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm text-danger">
-      <AlertTriangle aria-hidden size={18} strokeWidth={1.5} className="mt-px shrink-0" />
-      <span>
-        Koliduje s: {c.title}, <span className="font-num">{formatTimeRange(c.start, c.end)}</span>. Domluvte jiný čas.
-      </span>
-    </p>
-  )
 }
 
 function notHere(title: string, closeHref: string) {

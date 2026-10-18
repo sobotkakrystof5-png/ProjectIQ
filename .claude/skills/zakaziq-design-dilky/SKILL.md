@@ -46,7 +46,9 @@ Názvy v Tailwindu se záměrně liší od adminu, aby se nic nepřepsalo: `navy
 | `danger` | #b3261e | odmítnutí, mazání, po splatnosti |
 
 Pravidla: `signal` **jen** pro novou poptávku, živé upozornění a připravenou odměnu. Nikdy
-jako dekorace. Barvy, které se musí rozlišit (stavy), se liší i světlostí, ne jen odstínem.
+jako dekorace.
+
+**Barvy pracovníků** (kalendář, jen při víc pracovnících): uložená `ws.staff.color` (`#rrggbb`), jinak tokeny `--staff-1…5` (`lib/ws/staff-colors.ts`). Slouží jen k rozlišení termínů — jemný nádech plochy karty + levý okraj, text zůstává `ink`; nikdy jako stav ani varování. Barvy, které se musí rozlišit (stavy), se liší i světlostí, ne jen odstínem.
 
 ## 2. Písmo
 

@@ -20,6 +20,7 @@ export type BookingError =
   | 'needs_time'
   | 'invalid_staff'
   | 'invalid_customer'
+  | 'bad_length'
 
 export type BookingResult<T> = { ok: true; data: T } | { ok: false; reason: BookingError }
 
@@ -113,12 +114,20 @@ export type SlotCheck =
 export async function checkSlot(
   ctx: WsContext,
   business: Biz,
-  input: { start: Date; end: Date; serviceId: string | null; excludeAppointmentId?: string | null },
+  input: {
+    start: Date
+    end: Date
+    serviceId: string | null
+    excludeAppointmentId?: string | null
+    /** Ověřit jen tohoto pracovníka (sloupec kalendáře, výběr ve formuláři); jinak stačí kdokoli volný. */
+    staffId?: string | null
+  },
 ): Promise<SlotCheck> {
   const acc = ctx.accountId
   const biz = business.id
   const { start, end, serviceId } = input
   const exclude = input.excludeAppointmentId ?? null
+  const onlyStaff = input.staffId ?? null
   const [staffRows, conflicts] = await wsDb(ctx).batch([
     q`
       SELECT st.id, st.name, count(*) OVER ()::int AS total,
@@ -130,7 +139,8 @@ export async function checkSlot(
         ) AS busy
       FROM ws.staff st
       WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.active
-        AND (${serviceId}::uuid IS NULL
+        AND (${onlyStaff}::uuid IS NULL OR st.id = ${onlyStaff}::uuid)
+        AND (${onlyStaff}::uuid IS NOT NULL OR ${serviceId}::uuid IS NULL
           OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
           OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))
       ORDER BY st.position, st.created_at
@@ -141,6 +151,7 @@ export async function checkSlot(
       LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
       WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.status <> 'cancelled'
         AND a.id IS DISTINCT FROM ${exclude}::uuid
+        AND (${onlyStaff}::uuid IS NULL OR a.staff_id = ${onlyStaff}::uuid OR a.staff_id IS NULL)
         AND tstzrange(a.starts_at, a.ends_at, '[)') && tstzrange(${start}::timestamptz, ${end}::timestamptz, '[)')
       ORDER BY a.starts_at
       LIMIT 5
@@ -444,6 +455,46 @@ export async function moveAppointment(
       start: r.starts_at as Date,
       end: r.ends_at as Date,
     })
+  } catch (e) {
+    return no(asReason(e))
+  }
+}
+
+export type ResizedAppointment = { prevDurationMin: number; start: Date; end: Date }
+
+/** Nejkratší a nejdelší termín, který jde změnit tažením nebo výběrem délky. */
+export const MIN_DURATION_MIN = 15
+export const MAX_DURATION_MIN = 12 * 60
+
+/**
+ * Změní délku termínu (nebo blokace), začátek zůstává. Kolizi s dalším
+ * termínem pracovníka rozhodne DB (23P01 → 'overlap'), stejně jako u přesunu.
+ * Vrací předchozí délku pro „Zpět“.
+ */
+export async function resizeAppointment(
+  ctx: WsContext,
+  business: Biz,
+  input: { appointmentId: string; durationMin: number },
+): Promise<BookingResult<ResizedAppointment>> {
+  const acc = ctx.accountId
+  const biz = business.id
+  const minutes = Math.round(input.durationMin)
+  if (!Number.isFinite(minutes) || minutes < MIN_DURATION_MIN || minutes > MAX_DURATION_MIN) return no('bad_length')
+  try {
+    const rows = await wsDb(ctx)`
+      WITH old AS (
+        SELECT id, starts_at, ends_at FROM ws.appointments
+        WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.appointmentId} AND status = 'confirmed'
+        FOR UPDATE
+      )
+      UPDATE ws.appointments a SET ends_at = old.starts_at + make_interval(mins => ${minutes}::int)
+      FROM old
+      WHERE a.account_id = ${acc} AND a.id = old.id
+      RETURNING (extract(epoch FROM old.ends_at - old.starts_at) / 60)::int AS prev_min, a.starts_at, a.ends_at
+    `
+    const r = rows[0]
+    if (!r) return no('not_found')
+    return done({ prevDurationMin: Number(r.prev_min), start: r.starts_at as Date, end: r.ends_at as Date })
   } catch (e) {
     return no(asReason(e))
   }

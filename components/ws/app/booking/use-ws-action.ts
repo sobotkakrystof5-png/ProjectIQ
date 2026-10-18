@@ -12,6 +12,8 @@ export const UNDO_MS = 8_000
  * Volání server action z tlačítka: čeká, chybu ukáže v toastu, úspěch
  * podle `onDone`. Data obnoví revalidatePath v akci, router.refresh je
  * pojistka pro případ, že akce běžela z jiné stránky než ta otevřená.
+ * `refresh: false` ho vynechá (tažení v kalendáři: revalidatePath už vrátil
+ * čerstvou stránku v odpovědi akce, druhý požadavek by jen zdržoval).
  */
 export function useWsAction() {
   const router = useRouter()
@@ -19,7 +21,7 @@ export function useWsAction() {
   const [busy, setBusy] = useState(false)
 
   const run = useCallback(
-    <T,>(call: () => Promise<Result<T>>, onDone?: (data: T) => void): Promise<boolean> =>
+    <T,>(call: () => Promise<Result<T>>, onDone?: (data: T) => void, opts: { refresh?: boolean } = {}): Promise<boolean> =>
       new Promise((resolve) => {
         setBusy(true)
         start(async () => {
@@ -31,7 +33,7 @@ export function useWsAction() {
               return
             }
             onDone?.(res.data)
-            router.refresh()
+            if (opts.refresh !== false) router.refresh()
             resolve(true)
           } catch {
             toast.error('Spojení se nepovedlo. Zkuste to prosím znovu.')

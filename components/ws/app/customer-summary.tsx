@@ -3,14 +3,11 @@ import { Mail, Phone } from 'lucide-react'
 import { LoyaltyCard, TimeRange } from '@/components/ws/brand'
 import { SEGMENT_LABELS, type CustomerCard } from '@/lib/ws/today'
 import { formatRelativeDay, pragueParts } from '@/lib/ws/time'
+import { formatPhone } from '@/lib/ws/format-phone'
 import { plural } from '@/lib/ws/plural'
 import { cn } from '@/lib/ws/utils'
 
-/** „+420777123456" → „+420 777 123 456" (jen české číslo, jinak beze změny). */
-export function formatPhone(phone: string): string {
-  const m = phone.match(/^\+420(\d{3})(\d{3})(\d{3})$/)
-  return m ? `+420 ${m[1]} ${m[2]} ${m[3]}` : phone
-}
+export { formatPhone }
 
 /**
  * Karta zákazníka: skupina, kontakt, návštěvy, příští termín, věrnostní karta.

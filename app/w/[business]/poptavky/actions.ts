@@ -7,10 +7,13 @@ import * as bookings from '@/lib/ws/bookings'
 import type { BookingError, BookingResult } from '@/lib/ws/bookings'
 import { requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
 import * as mail from '@/lib/ws/email/notify'
+import { findCustomersForBooking, type CustomerOption } from '@/lib/ws/calendar'
 import { stampJob } from '@/lib/ws/loyalty'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { refreshSegmentsFor } from '@/lib/ws/segments'
-import { addDays, formatDayShort, formatMinutes, isIsoDate, pragueParts, pragueToUtc } from '@/lib/ws/time'
+import { getSlotAdvice } from '@/lib/ws/slot-advice'
+import { toAdviceDto, type AdviceDto } from '@/lib/ws/slot-suggest'
+import { addDays, formatDayShort, formatMinutes, isIsoDate, pragueParts, pragueToday, pragueToUtc } from '@/lib/ws/time'
 
 // Akce poptávek, kalendáře a zakázek (S10). Každá: requireWorkspace →
 // Zod → byznys z URL ověřený proti účtu → assertWritable (bez předplatného
@@ -25,6 +28,7 @@ const MESSAGES: Record<BookingError, string> = {
   needs_time: 'Vyberte prosím den a čas termínu.',
   invalid_staff: 'Vybraný pracovník tu není. Vyberte prosím jiného.',
   invalid_customer: 'Zákazník se nenašel. Vyberte ho prosím znovu.',
+  bad_length: 'Termín může trvat nejméně 15 minut a nejvýš 12 hodin.',
 }
 
 const BAD_INPUT = 'Něco v údajích nesedí. Zkontrolujte je prosím.'
@@ -145,6 +149,8 @@ const bookingSchema = z
     serviceId: optionalUuid,
     staffId: optionalUuid,
     at: when,
+    /** Délka z rychlého zadání (tažením v mřížce); bez ní platí délka služby. */
+    durationMin: z.number().int().min(15).max(720).nullable().optional(),
     note: z.string().trim().max(1000).optional(),
   })
   .refine((v) => v.customerId || v.name, { path: ['name'] })
@@ -170,6 +176,7 @@ export async function createManualBooking(raw: unknown): Promise<Result<{ messag
         serviceId: input.serviceId ?? null,
         staffId: input.staffId ?? null,
         start: toUtc(input.at),
+        durationMin: input.durationMin ?? null,
         note: input.note || null,
       }),
     (r) => ({ message: `Rezervace je uložená na ${label(toUtc(input.at))}.`, appointmentId: r.appointmentId }),
@@ -213,6 +220,32 @@ export async function moveAppointment(
   // Zákazník dostane e-mail po chvíli; „Zpět“ (přesun zpátky) ho zruší.
   if (res.ok && prevStart) await mail.notifyAppointmentMoved(c.ctx, c.business.id, input.appointmentId, prevStart)
   return res
+}
+
+const resizeSchema = z.object({
+  slug,
+  appointmentId: uuid,
+  durationMin: z.number().int().min(bookings.MIN_DURATION_MIN).max(bookings.MAX_DURATION_MIN),
+})
+
+const durationText = (min: number) =>
+  min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`
+
+/**
+ * Změna délky termínu (tažením za spodní okraj nebo výběrem v detailu).
+ * Začátek zůstává, kolizi s dalším termínem rozhodne DB. Zákazník o změně
+ * délky e-mail nedostane (čas začátku se nemění). Vrací předchozí délku pro „Zpět“.
+ */
+export async function resizeAppointment(raw: unknown): Promise<Result<{ message: string; prevDurationMin: number }>> {
+  const p = await prepare(resizeSchema, raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  return run(
+    'resizeAppointment',
+    c,
+    () => bookings.resizeAppointment(c.ctx, c.business, { appointmentId: input.appointmentId, durationMin: input.durationMin }),
+    (r) => ({ message: `Termín trvá ${durationText(input.durationMin)}.`, prevDurationMin: r.prevDurationMin }),
+  )
 }
 
 const appointmentSchema = z.object({ slug, appointmentId: uuid })
@@ -260,6 +293,61 @@ export async function createBlock(raw: unknown): Promise<Result<{ message: strin
     () => bookings.createBlock(c.ctx, c.business, { staffId: input.staffId ?? null, start, end, title: input.title }),
     (r) => ({ message: 'Blokace je v kalendáři.', appointmentId: r.appointmentId }),
   )
+}
+
+// --- Rady k času a hledání (čtení; funguje i při pozastaveném předplatném) -----
+
+const adviceSchema = z.object({
+  slug,
+  at: when.nullable().optional(),
+  durationMin: z.number().int().min(5).max(720).nullable().optional(),
+  serviceId: optionalUuid,
+  staffId: optionalUuid,
+  excludeAppointmentId: optionalUuid,
+  count: z.number().int().min(1).max(8).optional(),
+})
+
+/**
+ * Je čas volný, je v otevírací době a které volné časy jsou nejblíž?
+ * Rychlé zadání, Jiný čas u poptávky i „Najít volný čas“ ptají na jedno
+ * místo, takže pravidlo je všude stejné jako u objednávky na webu.
+ */
+export async function slotAdvice(raw: unknown): Promise<Result<AdviceDto>> {
+  const ctx = await requireWorkspace()
+  const parsed = adviceSchema.safeParse(raw)
+  if (!parsed.success) return fail(BAD_INPUT)
+  const business = await requireBusiness(ctx, parsed.data.slug)
+  const i = parsed.data
+  try {
+    const advice = await getSlotAdvice(ctx, business, {
+      start: i.at ? toUtc(i.at) : null,
+      durationMin: i.durationMin ?? null,
+      serviceId: i.serviceId ?? null,
+      staffId: i.staffId ?? null,
+      excludeAppointmentId: i.excludeAppointmentId ?? null,
+      count: i.count,
+    })
+    return ok(toAdviceDto(advice, pragueToday()))
+  } catch (e) {
+    console.error('slotAdvice', { accountId: ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
+    return fail('Volné časy se nepodařilo načíst. Zkuste to prosím znovu.')
+  }
+}
+
+const customerSearchSchema = z.object({ slug, query: z.string().trim().max(80) })
+
+/** Hledání zákazníka v rychlém zadání rezervace (jméno, telefon, e-mail). */
+export async function searchCustomers(raw: unknown): Promise<Result<CustomerOption[]>> {
+  const ctx = await requireWorkspace()
+  const parsed = customerSearchSchema.safeParse(raw)
+  if (!parsed.success) return fail('Hledaný text je moc dlouhý. Zkraťte ho prosím.')
+  await requireBusiness(ctx, parsed.data.slug)
+  try {
+    return ok(await findCustomersForBooking(ctx, parsed.data.query))
+  } catch (e) {
+    console.error('searchCustomers', { accountId: ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
+    return fail('Hledání se nepovedlo. Zkuste to prosím znovu.')
+  }
 }
 
 // --- Zakázky ----------------------------------------------------------------

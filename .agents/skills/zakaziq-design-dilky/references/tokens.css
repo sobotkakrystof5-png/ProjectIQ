@@ -28,6 +28,15 @@
   --reward: 255 210 138;    /* #ffd28a  „Odměna připravena" na tmavém */
   --danger: 179 38 30;      /* #b3261e */
 
+  /* barvy pracovníků v kalendáři (RD05): střídají se, když pracovník nemá vlastní barvu;
+     tmavé varianty (světlejší) jsou v app/ws-tokens.css */
+  --staff-1: 35 71 139;     /* = navy-700 */
+  --staff-2: 13 124 117;    /* #0d7c75 */
+  --staff-3: 109 76 170;    /* #6d4caa */
+  --staff-4: 166 83 94;     /* #a6535e */
+  --staff-5: 115 120 40;    /* #737828 */
+  --staff-tint: 16%;
+
   /* shadcn/ui čte hsl(var(--x)) — uvnitř Workspace jim dáme HSL hodnoty Dílků */
   --background: 223 47% 97%;
   --foreground: 220 64% 13%;

@@ -107,3 +107,113 @@ export function layoutWeek<T extends CalendarInput>(
   }
   return placed
 }
+
+// --- Otevírací doba a mezery (RD05) ------------------------------------------
+// Mřížka stíní dobu mimo otevírací dobu a ukazuje velké volné mezery. Čisté
+// funkce nad minutami dne; řádky otevírací doby dodá lib/ws/calendar.ts.
+
+export type MinuteRange = { from: number; to: number }
+export type OpeningRow = { staff_id: string | null; weekday: number; from: number; to: number }
+
+/**
+ * Otevřené úseky dne (minuty). Pracovník s vlastními směnami se řídí jimi
+ * (den bez směny = nepracuje), jinak otevírací doba byznysu — stejné pravidlo
+ * jako ve volných časech objednávky (lib/ws/intake/slots.ts). Bez jakékoli
+ * nastavené doby `null` (nic se nestíní).
+ */
+export function openRangesFor(rows: readonly OpeningRow[], weekday: number, staffId: string | null): MinuteRange[] | null {
+  if (rows.length === 0) return null
+  const own = staffId ? rows.filter((r) => r.staff_id === staffId) : []
+  const source = own.length > 0 ? own : rows.filter((r) => r.staff_id === null)
+  return source
+    .filter((r) => r.weekday === weekday)
+    .map((r) => ({ from: r.from, to: r.to }))
+    .sort((a, b) => a.from - b.from)
+}
+
+/** Sloučí překrývající se a navazující úseky (seřazené podle začátku). */
+function union(ranges: readonly MinuteRange[]): MinuteRange[] {
+  const sorted = ranges.filter((r) => r.to > r.from).slice().sort((a, b) => a.from - b.from)
+  const out: MinuteRange[] = []
+  for (const r of sorted) {
+    const last = out[out.length - 1]
+    if (last && r.from <= last.to) last.to = Math.max(last.to, r.to)
+    else out.push({ ...r })
+  }
+  return out
+}
+
+/** Co zbude z `base`, když se odečte `cut`. */
+function subtract(base: readonly MinuteRange[], cut: readonly MinuteRange[]): MinuteRange[] {
+  const cuts = union(cut)
+  const out: MinuteRange[] = []
+  for (const b of base) {
+    let from = b.from
+    for (const c of cuts) {
+      if (c.to <= from || c.from >= b.to) continue
+      if (c.from > from) out.push({ from, to: c.from })
+      from = Math.max(from, c.to)
+    }
+    if (from < b.to) out.push({ from, to: b.to })
+  }
+  return out
+}
+
+/**
+ * Úseky mřížky mimo otevírací dobu v % výšky (top/height jako u položek).
+ * `open === null` = doba není nastavená, nestíní se nic.
+ */
+export function closedSegments(
+  open: readonly MinuteRange[] | null,
+  hours: { from: number; to: number },
+): { top: number; height: number }[] {
+  if (open === null) return []
+  const window: MinuteRange = { from: hours.from * 60, to: hours.to * 60 }
+  const span = window.to - window.from
+  return subtract([window], open).map((r) => ({
+    top: ((r.from - window.from) / span) * 100,
+    height: ((r.to - r.from) / span) * 100,
+  }))
+}
+
+/**
+ * Volné mezery uvnitř otevírací doby, kam se vejde aspoň `minGap` minut.
+ * `notBefore` = minuta dne, před kterou se nic nenabízí (dnešek: co už
+ * uplynulo, není volné).
+ */
+export function freeGaps(
+  open: readonly MinuteRange[],
+  busy: readonly MinuteRange[],
+  minGap: number,
+  notBefore = 0,
+): MinuteRange[] {
+  const clipped = open
+    .map((r) => ({ from: Math.max(r.from, notBefore), to: r.to }))
+    .filter((r) => r.to > r.from)
+  return subtract(clipped, busy).filter((r) => r.to - r.from >= minGap)
+}
+
+/** „volno 45 min“, „volno 2 h“, „volno 1 h 30 min“. */
+export function formatGap(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `volno ${m} min`
+  return `volno ${h} h${m ? ` ${m} min` : ''}`
+}
+
+/** Mezery (minuty dne) → úseky mřížky v % výšky s popiskem, oříznuté na viditelné hodiny. */
+export function gapSegments(
+  gaps: readonly MinuteRange[],
+  hours: { from: number; to: number },
+): { top: number; height: number; label: string }[] {
+  const start = hours.from * 60
+  const span = (hours.to - hours.from) * 60
+  return gaps
+    .map((g) => ({ from: Math.max(g.from, start), to: Math.min(g.to, hours.to * 60), length: g.to - g.from }))
+    .filter((g) => g.to > g.from)
+    .map((g) => ({
+      top: ((g.from - start) / span) * 100,
+      height: ((g.to - g.from) / span) * 100,
+      label: formatGap(g.length),
+    }))
+}

@@ -48,6 +48,19 @@ function fits(ranges: Range[], fromMin: number, toMin: number): boolean {
   return ranges.some((r) => fromMin >= r.opens && toMin <= r.closes)
 }
 
+/**
+ * Vejde se termín do otevírací doby (byznysu, nebo směny aspoň jednoho
+ * pracovníka)? Bez ohledu na obsazenost a předstih — pro upozornění
+ * „mimo otevírací dobu“ v kalendáři majitele.
+ */
+export function isWithinHours(input: Pick<SlotInput, 'durationMin' | 'hours' | 'staff'>, start: Date): boolean {
+  const p = pragueParts(start)
+  const endMin = p.minutes + input.durationMin
+  if (endMin > 24 * 60) return false
+  const candidates: (StaffAvailability | null)[] = input.staff.length ? input.staff : [null]
+  return candidates.some((s) => fits(rangesFor(p.date, s, input.hours), p.minutes, endMin))
+}
+
 /** Je čas `start` volný? (Stejná pravidla jako výpis, pro kontrolu při odeslání.) */
 export function isSlotFree(input: Omit<SlotInput, 'fromDay' | 'days' | 'stepMin'>, start: Date): boolean {
   const end = new Date(start.getTime() + input.durationMin * MINUTE)

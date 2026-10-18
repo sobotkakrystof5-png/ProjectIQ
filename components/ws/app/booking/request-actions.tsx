@@ -5,7 +5,10 @@ import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { confirmRequest, declineRequest, reopenRequest } from '@/app/w/[business]/poptavky/actions'
+import type { AdviceDto } from '@/lib/ws/slot-suggest'
 import { cn } from '@/lib/ws/utils'
+import { AdviceTip, SuggestionChips } from './slot-advice-view'
+import { useSlotAdvice } from './use-slot-advice'
 import { undoToast, useWsAction } from './use-ws-action'
 import { clockValue, parseClock, StaffSelect, WhenFields } from './when-fields'
 
@@ -22,6 +25,13 @@ export type RequestActionsProps = {
   today: string
   /** `compact` = jen hlavní tlačítko (seznamy, Dnes); `full` = panel s Jiný čas a Odmítnout. */
   variant?: 'compact' | 'full'
+  /** Rada k chtěnému času z serveru (RD05): tři nejbližší volné časy k jednomu kliknutí. */
+  advice?: AdviceDto | null
+  serviceId?: string | null
+  /** Délka chtěného termínu v minutách (pro hledání volna). */
+  durationMin?: number | null
+  /** Kam vede „nastavte otevírací dobu“. */
+  settingsHref?: string
   className?: string
 }
 
@@ -30,12 +40,19 @@ export type RequestActionsProps = {
  * čas; odmítnutí se provede hned a toast nabídne „Zpět“ (B9).
  */
 export function RequestActions(props: RequestActionsProps) {
-  const { slug, requestId, wanted, calendar, jobs, staff, today, variant = 'full', className } = props
+  const { slug, requestId, wanted, calendar, jobs, staff, today, variant = 'full', advice = null, serviceId = null, durationMin = null, settingsHref, className } = props
   const { run, pending } = useWsAction()
   const [other, setOther] = useState(false)
   const [day, setDay] = useState(wanted?.day ?? today)
   const [time, setTime] = useState(wanted ? clockValue(wanted.minutes) : '')
   const [staffId, setStaffId] = useState('')
+  const typed = parseClock(time)
+  // Zadáváte jiný čas: kolize a volné časy podle toho, co píšete.
+  const live = useSlotAdvice(
+    other && calendar && day && typed !== null
+      ? { slug, at: { day, minutes: typed }, durationMin, serviceId, staffId: staffId || null }
+      : null,
+  )
 
   // S časem potvrzuje termín; bez času jen přijme (zakázka), nebo musí vybrat čas.
   const oneClick = wanted !== null || !calendar || jobs
@@ -92,6 +109,16 @@ export function RequestActions(props: RequestActionsProps) {
         </Button>
       </div>
 
+      {calendar && advice && !other && oneClick && (
+        <SuggestionChips
+          advice={advice}
+          settingsHref={settingsHref}
+          disabled={pending}
+          heading={wanted ? 'Nebo potvrdit na jiný volný čas' : 'Nejbližší volné časy'}
+          onPick={(s) => void confirm({ day: s.day, minutes: s.minutes })}
+        />
+      )}
+
       {calendar && (other || !oneClick) && (
         <form onSubmit={submitOther} className="flex flex-col gap-3 rounded-box border bg-ground p-4 dark:bg-navy-950">
           <p className="text-sm text-quiet">
@@ -99,6 +126,19 @@ export function RequestActions(props: RequestActionsProps) {
           </p>
           <WhenFields idPrefix={`jiny-${requestId}`} day={day} time={time} onDay={setDay} onTime={setTime} />
           <StaffSelect id={`kdo-${requestId}`} staff={staff} value={staffId} onChange={setStaffId} emptyLabel="Kdo bude mít volno" />
+          {live.advice && (
+            <div className="flex flex-col gap-3">
+              <AdviceTip advice={live.advice} />
+              <SuggestionChips
+                advice={live.advice}
+                settingsHref={settingsHref}
+                onPick={(s) => {
+                  setDay(s.day)
+                  setTime(clockValue(s.minutes))
+                }}
+              />
+            </div>
+          )}
           <div>
             <Button type="submit" disabled={pending}>
               {wanted ? 'Potvrdit jiný čas' : 'Potvrdit termín'}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarPlus, FilePlus2, FileText, Inbox, Link2, User, type LucideIcon } from 'lucide-react'
+import { CalendarPlus, CalendarSearch, FilePlus2, FileText, Inbox, Link2, User, type LucideIcon } from 'lucide-react'
 import {
   CommandDialog,
   CommandEmpty,
@@ -106,6 +106,7 @@ export function CommandPalette({ open, onOpenChange, slug, nav, accountLinks, ac
 
   const actions: { key: string; label: string; icon: LucideIcon; run: () => void }[] = []
   if (available.includes('booking')) actions.push({ key: 'booking', label: 'Nová rezervace', icon: CalendarPlus, run: () => openDetail('nova-rezervace') })
+  if (available.includes('booking')) actions.push({ key: 'slot', label: 'Najít volný čas', icon: CalendarSearch, run: () => openDetail('najit-cas') })
   if (available.includes('invoice')) actions.push({ key: 'invoice', label: 'Nová faktura', icon: FilePlus2, run: () => openDetail('nova-faktura') })
   if (available.includes('link')) {
     actions.push({

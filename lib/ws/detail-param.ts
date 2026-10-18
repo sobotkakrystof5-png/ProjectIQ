@@ -12,6 +12,8 @@ export type DetailRef =
   | { kind: 'zprava'; id: string; topic: MessageTopic }
   | { kind: 'nova-rezervace' }
   | { kind: 'nova-blokace' }
+  /** Najít volný čas pro službu (RD05) — nejbližší volné termíny, klik zapíše rezervaci. */
+  | { kind: 'najit-cas' }
   | { kind: 'nova-faktura' }
 
 export const MESSAGE_TOPICS = ['birthday', 'almost', 'winback', 'thanks'] as const
@@ -22,7 +24,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function parseDetail(raw: string | string[] | undefined | null): DetailRef | null {
   const value = Array.isArray(raw) ? raw[0] : raw
   if (!value || value.length > 60) return null
-  if (value === 'nova-rezervace' || value === 'nova-blokace' || value === 'nova-faktura') return { kind: value }
+  if (value === 'nova-rezervace' || value === 'nova-blokace' || value === 'najit-cas' || value === 'nova-faktura') return { kind: value }
   const [kind, id, topic] = value.split(':')
   if (kind === 'zprava' && id && UUID_RE.test(id) && (MESSAGE_TOPICS as readonly string[]).includes(topic)) {
     return { kind, id: id.toLowerCase(), topic: topic as MessageTopic }

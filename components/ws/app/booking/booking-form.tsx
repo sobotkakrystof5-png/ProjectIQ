@@ -31,13 +31,22 @@ export function BookingForm({
   services: (Option & { duration_min: number })[]
   staff: Option[]
   today: string
-  prefill: { name: string; day: string | null; minutes: number | null; service: string; staffId: string | null }
+  prefill: {
+    name: string
+    /** Stálý zákazník vybraný v rychlém zadání (jinak se podle jména/telefonu založí nový). */
+    customer: { id: string; name: string } | null
+    day: string | null
+    minutes: number | null
+    service: string
+    staffId: string | null
+  }
 }) {
   const router = useRouter()
   const { run, pending } = useWsAction()
   const matched = prefill.service
     ? services.find((s) => s.name.toLocaleLowerCase('cs').startsWith(prefill.service.toLocaleLowerCase('cs')))
     : undefined
+  const [customer, setCustomer] = useState(prefill.customer)
   const [name, setName] = useState(prefill.name)
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -50,7 +59,7 @@ export function BookingForm({
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const minutes = parseClock(time)
-    if (!name.trim() || !day || minutes === null) {
+    if ((!customer && !name.trim()) || !day || minutes === null) {
       toast.error('Vyplňte prosím jméno, den a čas.')
       return
     }
@@ -58,9 +67,10 @@ export function BookingForm({
       () =>
         createManualBooking({
           slug,
-          name,
-          phone: phone || undefined,
-          email: email || undefined,
+          customerId: customer?.id ?? null,
+          name: customer ? undefined : name,
+          phone: customer ? undefined : phone || undefined,
+          email: customer ? undefined : email || undefined,
           serviceId: serviceId || null,
           staffId: staffId || null,
           at: { day, minutes },
@@ -75,20 +85,41 @@ export function BookingForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="rez-jmeno">Jméno zákazníka</Label>
-        <Input id="rez-jmeno" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required autoComplete="off" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      {customer ? (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rez-telefon">Telefon (nepovinné)</Label>
-          <Input id="rez-telefon" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} className="font-num" />
+          <span className="text-sm font-medium text-ink">Zákazník</span>
+          <div className="flex min-h-11 items-center gap-2 rounded-chip border border-input bg-navy-50 px-3 dark:bg-navy-900">
+            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">{customer.name}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setName(customer.name)
+                setCustomer(null)
+              }}
+              className="inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-sm font-semibold text-navy-700 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-navy-200"
+            >
+              Změnit
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rez-email">E-mail (nepovinné)</Label>
-          <Input id="rez-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} />
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="rez-jmeno">Jméno zákazníka</Label>
+            <Input id="rez-jmeno" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required autoComplete="off" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rez-telefon">Telefon (nepovinné)</Label>
+              <Input id="rez-telefon" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} className="font-num" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="rez-email">E-mail (nepovinné)</Label>
+              <Input id="rez-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} />
+            </div>
+          </div>
+        </>
+      )}
       {services.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="rez-sluzba">Služba</Label>
@@ -115,7 +146,7 @@ export function BookingForm({
           className="w-full rounded-chip border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink transition-colors focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         />
       </div>
-      <p className="text-sm text-quiet">Podle telefonu nebo e-mailu poznáme stálého zákazníka. Jinak ho založíme.</p>
+      {!customer && <p className="text-sm text-quiet">Podle telefonu nebo e-mailu poznáme stálého zákazníka. Jinak ho založíme.</p>}
       <div>
         <Button type="submit" disabled={pending}>
           Uložit rezervaci

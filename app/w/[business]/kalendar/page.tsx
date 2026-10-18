@@ -2,21 +2,25 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
 import { IncomingList } from '@/components/ws/app/today/incoming-list'
+import { CalendarActions } from '@/components/ws/app/calendar/calendar-actions'
 import { CalendarAgenda } from '@/components/ws/app/calendar/agenda'
+import { DateJump } from '@/components/ws/app/calendar/date-jump'
 import { MonthGrid } from '@/components/ws/app/calendar/month-grid'
+import { StaffFilter } from '@/components/ws/app/calendar/staff-filter'
+import { SwipeDays } from '@/components/ws/app/calendar/swipe-days'
 import { TimeGrid, type GridColumn, type GridItem } from '@/components/ws/app/calendar/time-grid'
-import { AccentHeading } from '@/components/ws/brand'
-import { PillNav } from '@/components/ws/app/toolbar'
-import { buttonVariants } from '@/components/ui/button'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
 import { getCalendarData, type CalEntry } from '@/lib/ws/calendar'
-import { hourRange, layoutWeek } from '@/lib/ws/calendar-layout'
+import { closedSegments, freeGaps, gapSegments, hourRange, layoutWeek, openRangesFor, type MinuteRange } from '@/lib/ws/calendar-layout'
 import { requireBusiness, requireWorkspace } from '@/lib/ws/context'
 import { hrefWith } from '@/lib/ws/detail-param'
 import { WS_FEATURES } from '@/lib/ws/features'
 import { navHref, navItemForSegment } from '@/lib/ws/nav'
+import { staffAccent } from '@/lib/ws/staff-colors'
 import {
   addDays,
   formatDayLong,
@@ -25,6 +29,7 @@ import {
   isIsoDate,
   pragueParts,
   pragueToUtc,
+  weekdayOf,
   weekStartOf,
 } from '@/lib/ws/time'
 import { getEnabledModules, getIncoming } from '@/lib/ws/today'
@@ -58,6 +63,9 @@ function monthStart(day: string, shift = 0): string {
  * přetažení termínu se „Zpět“, blokace. Stav v URL: `?pohled=`, `?datum=`.
  * Redesign (R-057): mřížka je hlavní plocha, vpravo pruh Příchozí se všemi
  * čekajícími poptávkami (i mimo zobrazený týden); pod 1280 px je pod kalendářem.
+ * RD05: jedna lišta (pohled, šipky, skok na datum, Dnes, pracovník), rychlé
+ * zadání rezervace přímo v mřížce, barvy pracovníků, stínování mimo otevírací
+ * dobu a velké volné mezery, přejetí mezi dny na telefonu.
  */
 export default async function CalendarPage(
   props: {
@@ -99,6 +107,18 @@ export default async function CalendarPage(
   const newBookingBase = canBook ? hrefWith(pathname, searchParams, { detail: 'nova-rezervace', den: null, cas: null, pracovnik: null }) : null
   const multiStaff = data.staff.length > 1
 
+  // Filtr „kdo“: jen pracovník z tohoto byznysu (cizí hodnota z adresy se ignoruje).
+  const kdoParam = first(searchParams.kdo)
+  const staffFilter = multiStaff && kdoParam && data.staff.some((s) => s.id === kdoParam) ? kdoParam : null
+  const entries = staffFilter
+    ? data.entries.filter((e) => e.kind === 'request' || e.staff_id === staffFilter || (e.kind === 'block' && e.staff_id === null))
+    : data.entries
+  const accentOf = (staffId: string | null): string | undefined => {
+    if (!multiStaff || !staffId) return undefined
+    const i = data.staff.findIndex((s) => s.id === staffId)
+    return i < 0 ? undefined : staffAccent(data.staff[i].color, i)
+  }
+
   const step = (dir: -1 | 1) =>
     view === 'den' ? addDays(date, dir) : view === 'tyden' ? addDays(rangeStart, dir * 7) : monthStart(date, dir)
   const label =
@@ -114,6 +134,11 @@ export default async function CalendarPage(
   const toItem = (e: CalEntry, column: string, p: { top: number; height: number; lane: number; lanes: number }, key: string): GridItem => {
     const start = pragueParts(e.start)
     const when = formatTimeRange(e.start, e.end)
+    // přetáhnout jde jednodenní termín; blokaci celého byznysu jen v detailu
+    const movable =
+      e.kind !== 'request' &&
+      start.date === pragueParts(new Date(e.end.getTime() - 1)).date &&
+      !(view === 'den' && e.kind === 'block' && e.staff_id === null)
     return {
       key,
       id: e.id,
@@ -127,70 +152,88 @@ export default async function CalendarPage(
         .join(', '),
       href: hrefFor(e),
       startMinutes: start.minutes,
-      // přetáhnout jde jednodenní termín; blokaci celého byznysu jen v detailu
-      movable:
-        e.kind !== 'request' &&
-        start.date === pragueParts(new Date(e.end.getTime() - 1)).date &&
-        !(view === 'den' && e.kind === 'block' && e.staff_id === null),
+      durationMin: Math.round((e.end.getTime() - e.start.getTime()) / 60_000),
+      movable,
+      resizable: movable,
       confirm: e.kind === 'request' ? { day: start.date, minutes: start.minutes } : undefined,
+      accent: e.kind === 'visit' ? accentOf(e.staff_id) : undefined,
     }
   }
+
+  // Minuty dne, do kterých už dnešek uplynul (co je před nimi, není „volné“).
+  const nowMinutes = pragueParts(now).minutes
+  const settingsHref = navHref(business.slug, 'nastaveni') + '/oteviraci-doba'
+  const openFor = (day: string, staffId: string | null) => openRangesFor(data.openingRows, weekdayOf(day), staffId)
 
   let columns: GridColumn[] = []
   let items: GridItem[] = []
   if (view === 'tyden') {
     columns = Array.from({ length: 7 }, (_, i) => {
       const day = addDays(rangeStart, i)
-      return { key: day, day, label: formatDayShort(day), today: day === today }
+      return { key: day, day, label: formatDayShort(day), today: day === today, closed: closedSegments(openFor(day, staffFilter), hours) }
     })
-    items = layoutWeek(data.entries, rangeStart, hours).map((p) =>
+    items = layoutWeek(entries, rangeStart, hours).map((p) =>
       toItem(p.item, columns[p.dayIndex].key, p, `${p.item.kind}-${p.item.id}-${p.dayIndex}`),
     )
   } else if (view === 'den') {
-    const requests = data.entries.filter((e) => e.kind === 'request')
+    const requests = entries.filter((e) => e.kind === 'request')
+    const shown = staffFilter ? data.staff.filter((s) => s.id === staffFilter) : data.staff
+    const minutesOf = (e: CalEntry): MinuteRange => {
+      const s = pragueParts(e.start)
+      const en = pragueParts(e.end)
+      return { from: s.date < date ? 0 : s.minutes, to: en.date > date ? 24 * 60 : en.minutes }
+    }
+    const notBefore = date === today ? nowMinutes : date < today ? 24 * 60 : 0
+    const listFor = (staffId: string | undefined) =>
+      // blokace celého byznysu patří do každého sloupce
+      entries.filter(
+        (e) => e.kind !== 'request' && (staffId === undefined || e.staff_id === staffId || (e.kind === 'block' && e.staff_id === null)),
+      )
+    const makeColumn = (staffId: string | undefined, base: Omit<GridColumn, 'closed' | 'gaps'>): GridColumn => {
+      const open = openFor(date, staffId ?? null)
+      const list = listFor(staffId)
+      const gaps =
+        open && list.some((e) => e.kind === 'visit')
+          ? gapSegments(freeGaps(open, list.map(minutesOf), 60, notBefore), hours)
+          : undefined
+      return { ...base, closed: closedSegments(open, hours), gaps }
+    }
     const staffCols: GridColumn[] =
       data.staff.length > 0
-        ? data.staff.map((s) => ({ key: s.id, day: date, staffId: s.id, label: s.name, today: false }))
-        : [{ key: 'vse', day: date, label: business.name }]
+        ? shown.map((s) => {
+            const i = data.staff.findIndex((x) => x.id === s.id)
+            return makeColumn(s.id, { key: s.id, day: date, staffId: s.id, label: s.name, today: false, accent: accentOf(s.id) ?? (multiStaff ? staffAccent(s.color, i) : undefined) })
+          })
+        : [makeColumn(undefined, { key: 'vse', day: date, label: business.name })]
     columns = [...(requests.length ? [{ key: 'poptavky', day: date, label: 'Nové poptávky', requests: true }] : []), ...staffCols]
     const place = (list: CalEntry[], col: string) =>
       layoutWeek(list, date, hours)
         .filter((p) => p.dayIndex === 0)
         .map((p) => toItem(p.item, col, p, `${p.item.kind}-${p.item.id}-${col}`))
     if (requests.length) items.push(...place(requests, 'poptavky'))
-    for (const col of staffCols) {
-      // blokace celého byznysu patří do každého sloupce
-      const list = data.entries.filter(
-        (e) => e.kind !== 'request' && (col.staffId === undefined || e.staff_id === col.staffId || (e.kind === 'block' && e.staff_id === null)),
-      )
-      items.push(...place(list, col.key))
-    }
+    for (const col of staffCols) items.push(...place(listFor(col.staffId ?? undefined), col.key))
   }
 
   const agendaDays = view === 'den' ? [date] : Array.from({ length: 7 }, (_, i) => addDays(rangeStart, i))
+  const flatParams = Object.fromEntries(
+    Object.entries(searchParams).flatMap(([k, v]) => {
+      const one = first(v)
+      return one === undefined ? [] : [[k, one]]
+    }),
+  )
+  const findHref = canBook ? link({ detail: 'najit-cas' }) : null
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <AccentHeading accent="na svém místě.">Každý termín</AccentHeading>
-        <div className="flex flex-wrap gap-2">
-          {canBook && (
-            <Link href={link({ detail: 'nova-blokace' })} scroll={false} className={buttonVariants({ variant: 'outline' })}>
-              Blokace
-            </Link>
-          )}
-          {newBookingBase && (
-            <Link href={newBookingBase} scroll={false} className={buttonVariants()}>
-              <Plus aria-hidden size={18} strokeWidth={1.5} />
-              Nová rezervace
-            </Link>
-          )}
-        </div>
-      </div>
+    <PageShell width="wide">
+      <PageHeader
+        title="Každý termín"
+        accent="na svém místě."
+        action={<CalendarActions bookHref={newBookingBase} findHref={findHref} blockHref={canBook ? link({ detail: 'nova-blokace' }) : null} />}
+      />
 
       <div data-detail-grid className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-5">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <Toolbar>
             <PillNav
               label="Pohled"
               variant="segmented"
@@ -212,7 +255,7 @@ export default async function CalendarPage(
                 <ChevronRight aria-hidden size={20} strokeWidth={1.5} />
               </Link>
             </div>
-            <h2 className="font-num text-[15px] text-ink first-letter:uppercase">{label}</h2>
+            <DateJump label={label} date={date} pathname={pathname} params={flatParams} />
             {!showsToday && (
               <Link
                 href={link({ datum: null, detail: null })}
@@ -221,7 +264,22 @@ export default async function CalendarPage(
                 Dnes
               </Link>
             )}
-          </div>
+          </Toolbar>
+
+          {multiStaff && view !== 'mesic' && (
+            <StaffFilter
+              items={[
+                { key: 'vsichni', label: 'Všichni', href: link({ kdo: null, detail: null }), active: staffFilter === null },
+                ...data.staff.map((s, i) => ({
+                  key: s.id,
+                  label: s.name,
+                  href: link({ kdo: s.id, detail: null }),
+                  active: staffFilter === s.id,
+                  accent: staffAccent(s.color, i),
+                })),
+              ]}
+            />
+          )}
 
           {view === 'mesic' ? (
             <MonthGrid
@@ -234,9 +292,30 @@ export default async function CalendarPage(
           ) : (
             <>
               <section className="hidden min-w-0 rounded-panel border bg-surface p-4 sm:p-5 md:block">
-                <TimeGrid slug={business.slug} columns={columns} items={items} hours={hours} newBookingHref={newBookingBase} />
+                <TimeGrid
+                  slug={business.slug}
+                  columns={columns}
+                  items={items}
+                  hours={hours}
+                  newBookingHref={newBookingBase}
+                  services={data.services}
+                  staff={data.staff.map((s) => ({ id: s.id, name: s.name }))}
+                  today={today}
+                  settingsHref={settingsHref}
+                />
               </section>
-              <CalendarAgenda className="md:hidden" entries={data.entries} days={agendaDays} today={today} hrefFor={hrefFor} showStaff={multiStaff} />
+              <SwipeDays prevHref={link({ datum: step(-1), detail: null })} nextHref={link({ datum: step(1), detail: null })} className="md:hidden">
+                <CalendarAgenda
+                  entries={entries}
+                  days={agendaDays}
+                  today={today}
+                  hrefFor={hrefFor}
+                  showStaff={multiStaff}
+                  addHref={canBook ? (day) => hrefWith(pathname, searchParams, { detail: 'nova-rezervace', den: day, cas: null, pracovnik: null }) : null}
+                  findHref={findHref}
+                  accentFor={(e) => accentOf(e.staff_id)}
+                />
+              </SwipeDays>
             </>
           )}
         </div>
@@ -255,6 +334,6 @@ export default async function CalendarPage(
       </div>
 
       <DetailSlot ctx={ctx} business={business} pathname={pathname} searchParams={searchParams} today={today} />
-    </div>
+    </PageShell>
   )
 }

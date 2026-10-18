@@ -2,6 +2,8 @@ import 'server-only'
 import { q, wsDb, type WsRow } from './db'
 import type { WsBusiness, WsContext } from './context'
 import type { CalendarEntry } from './today'
+import type { OpeningRow } from './calendar-layout'
+import { likePattern } from './search'
 
 // Data obrazovek Poptávky, Kalendář a Zakázky (S10). Stejná pravidla jako
 // lib/ws/today.ts: account_id z kontextu, business_id ověřeného byznysu.
@@ -9,6 +11,8 @@ import type { CalendarEntry } from './today'
 type Biz = Pick<WsBusiness, 'id'>
 
 export type StaffItem = { id: string; name: string }
+/** Pracovník v kalendáři: uložená barva (nebo null → barva podle pořadí, lib/ws/staff-colors.ts). */
+export type CalStaff = StaffItem & { color: string | null }
 export type ServiceItem = { id: string; name: string; duration_min: number }
 
 /** Položka kalendáře s pracovníkem (sloupce v pohledu Den). */
@@ -16,9 +20,11 @@ export type CalEntry = CalendarEntry & { staff_id: string | null; staff_name: st
 
 export type CalendarData = {
   entries: CalEntry[]
-  staff: StaffItem[]
+  staff: CalStaff[]
   services: ServiceItem[]
   opening: { from: number; to: number } | null
+  /** Otevírací doba a směny po úsecích (minuty dne); prázdné = doba není nastavená. */
+  openingRows: OpeningRow[]
 }
 
 /** Termíny, blokace a nové poptávky s časem v intervalu [from, to). */
@@ -53,7 +59,7 @@ export async function getCalendarData(ctx: WsContext, business: Biz, range: { fr
       LIMIT 300
     `,
     q`
-      SELECT id, name FROM ws.staff
+      SELECT id, name, color FROM ws.staff
       WHERE account_id = ${acc} AND business_id = ${biz} AND active
       ORDER BY position, created_at
     `,
@@ -63,8 +69,9 @@ export async function getCalendarData(ctx: WsContext, business: Biz, range: { fr
       ORDER BY position, name
     `,
     q`
-      SELECT min(extract(hour FROM opens))::int AS opens,
-             max(ceil(extract(epoch FROM closes) / 3600))::int AS closes
+      SELECT staff_id, weekday,
+             (extract(epoch FROM opens) / 60)::int AS from_min,
+             (extract(epoch FROM closes) / 60)::int AS to_min
       FROM ws.opening_hours
       WHERE account_id = ${acc} AND business_id = ${biz}
     `,
@@ -101,14 +108,50 @@ export async function getCalendarData(ctx: WsContext, business: Biz, range: { fr
     }),
   ]
 
-  const open = (opening as WsRow[])[0]
+  const openingRows: OpeningRow[] = (opening as WsRow[]).map((r) => ({
+    staff_id: (r.staff_id as string | null) ?? null,
+    weekday: Number(r.weekday),
+    from: Number(r.from_min),
+    to: Number(r.to_min),
+  }))
   return {
     entries,
-    staff: (staff as WsRow[]).map((r) => ({ id: String(r.id), name: String(r.name) })),
+    staff: (staff as WsRow[]).map((r) => ({ id: String(r.id), name: String(r.name), color: (r.color as string | null) ?? null })),
     services: (services as WsRow[]).map((r) => ({ id: String(r.id), name: String(r.name), duration_min: Number(r.duration_min) })),
-    opening:
-      open && open.opens !== null && open.closes !== null ? { from: Number(open.opens), to: Number(open.closes) } : null,
+    // Rozsah hodin mřížky: nejdřív otevřeno … nejpozději zavřeno (zaokrouhleno na celé hodiny).
+    opening: openingRows.length
+      ? {
+          from: Math.floor(Math.min(...openingRows.map((r) => r.from)) / 60),
+          to: Math.ceil(Math.max(...openingRows.map((r) => r.to)) / 60),
+        }
+      : null,
+    openingRows,
   }
+}
+
+/** Zákazníci pro rychlé zadání rezervace: hledání podle jména, telefonu nebo e-mailu. */
+export type CustomerOption = { id: string; name: string; phone: string | null; email: string | null }
+
+export async function findCustomersForBooking(ctx: WsContext, rawQuery: string): Promise<CustomerOption[]> {
+  const text = rawQuery.trim().slice(0, 80)
+  if (text.length < 2) return []
+  const pattern = likePattern(text)
+  const digits = text.replace(/\D/g, '')
+  const phonePattern = digits.length >= 3 ? likePattern(digits) : null
+  const [rows] = await wsDb(ctx).batch([
+    q`
+      SELECT id, name, phone, email FROM ws.customers
+      WHERE account_id = ${ctx.accountId}
+        AND (name ILIKE ${pattern} OR email ILIKE ${pattern} OR (${phonePattern}::text IS NOT NULL AND phone LIKE ${phonePattern}))
+      ORDER BY name LIMIT 6
+    `,
+  ])
+  return (rows as WsRow[]).map((r) => ({
+    id: String(r.id),
+    name: String(r.name),
+    phone: (r.phone as string | null) ?? null,
+    email: (r.email as string | null) ?? null,
+  }))
 }
 
 /** Pracovníci a služby pro formuláře (Nová rezervace, Blokace, Jiný čas). */
@@ -322,4 +365,15 @@ export async function getChangeStamp(ctx: WsContext, business: Biz): Promise<str
   ])
   const r = (rows as WsRow[])[0] ?? {}
   return `${r.r}|${r.a}|${r.j}`
+}
+
+/** Zákazník podle id (předvyplnění formuláře z rychlého zadání); cizí nebo neexistující = null. */
+export async function getCustomerOption(ctx: WsContext, id: string): Promise<CustomerOption | null> {
+  const [rows] = await wsDb(ctx).batch([
+    q`SELECT id, name, phone, email FROM ws.customers WHERE account_id = ${ctx.accountId} AND id = ${id}`,
+  ])
+  const r = (rows as WsRow[])[0]
+  return r
+    ? { id: String(r.id), name: String(r.name), phone: (r.phone as string | null) ?? null, email: (r.email as string | null) ?? null }
+    : null
 }
