@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
 import { useWsAction } from '@/components/ws/app/booking/use-ws-action'
 import { hideService, saveServiceSettings } from '@/app/w/[business]/nastaveni/actions'
+import { hasWholeMinor } from '@/lib/ws/money'
 import { cn } from '@/lib/ws/utils'
 import { SortableList } from './sortable-list'
 
@@ -27,7 +28,7 @@ function parse(d: Draft) {
   if (!d.name.trim()) { toast.error('Napište název služby.'); return null }
   if (!Number.isInteger(duration) || duration < 5 || duration > 1440) { toast.error('Délka musí být celé číslo od 5 do 1440 minut.'); return null }
   if (!Number.isInteger(buffer) || buffer < 0 || buffer > 240) { toast.error('Rozestup může být 0 až 240 minut.'); return null }
-  if (price !== null && (!Number.isFinite(price) || price < 0 || Math.round(price * 100) !== price * 100)) { toast.error('Cenu napište jako číslo, třeba 450 nebo 450,50.'); return null }
+  if (price !== null && (!Number.isFinite(price) || price < 0 || !hasWholeMinor(price))) { toast.error('Cenu napište jako číslo, třeba 450 nebo 450,50.'); return null }
   return { name: d.name, duration, price, buffer, showOnWeb: d.showOnWeb, currency: 'CZK' }
 }
 

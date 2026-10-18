@@ -5,29 +5,29 @@ const directive = (csp: string, name: string) =>
   csp.split('; ').find((d) => d === name || d.startsWith(`${name} `))
 
 describe('cspProfileFor', () => {
-  it('Workspace naostro, admin Report-Only', () => {
+  it('Workspace i admin naostro, každý svým profilem', () => {
     expect(cspProfileFor('/w')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/w/dnes')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/r/kadernictvi')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/z/abc')).toEqual({ profile: 'workspace', mode: 'enforce' })
-    expect(cspProfileFor('/dashboard')).toEqual({ profile: 'admin', mode: 'report-only' })
-    expect(cspProfileFor('/p/abc')).toEqual({ profile: 'admin', mode: 'report-only' })
+    expect(cspProfileFor('/dashboard')).toEqual({ profile: 'admin', mode: 'enforce' })
+    expect(cspProfileFor('/p/abc')).toEqual({ profile: 'admin', mode: 'enforce' })
   })
 
   it('landing page naostro jen na přesných cestách, ne jako prefix /', () => {
     for (const path of ['/', '/podminky', '/ochrana-udaju', '/zpracovatelska-smlouva', '/podminky/']) {
       expect(cspProfileFor(path)).toEqual({ profile: 'workspace', mode: 'enforce' })
     }
-    expect(cspProfileFor('/login')).toEqual({ profile: 'admin', mode: 'report-only' })
-    expect(cspProfileFor('/hub/finance')).toEqual({ profile: 'admin', mode: 'report-only' })
-    expect(cspProfileFor('/podminky-stare')).toEqual({ profile: 'admin', mode: 'report-only' })
-    expect(cspProfileFor('/h/abc')).toEqual({ profile: 'admin', mode: 'report-only' })
+    expect(cspProfileFor('/login')).toEqual({ profile: 'admin', mode: 'enforce' })
+    expect(cspProfileFor('/hub/finance')).toEqual({ profile: 'admin', mode: 'enforce' })
+    expect(cspProfileFor('/podminky-stare')).toEqual({ profile: 'admin', mode: 'enforce' })
+    expect(cspProfileFor('/h/abc')).toEqual({ profile: 'admin', mode: 'enforce' })
   })
 
   it('prefix nechytá podobné cesty', () => {
     expect(hasPrefix('/wiki', '/w')).toBe(false)
     expect(hasPrefix('/hubert', '/hub')).toBe(false)
-    expect(cspProfileFor('/wiki').mode).toBe('report-only')
+    expect(cspProfileFor('/wiki').profile).toBe('admin')
   })
 })
 

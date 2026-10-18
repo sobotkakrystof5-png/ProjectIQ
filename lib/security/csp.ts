@@ -6,7 +6,8 @@
  * (a skripty, které ony samy načtou — tak fungují chunky Nextu, Clerk i Stripe).
  * Next.js si nonce sám přečte z request hlavičky `Content-Security-Policy`
  * a dá ho na své `<script>` — ale jen u dynamicky renderovaných stránek.
- * Statická stránka nonce nemá a její skripty by vynucená CSP zablokovala.
+ * Statická stránka nonce nemá a její skripty by vynucená CSP zablokovala,
+ * proto je `/login` dynamický (`app/(auth)/login/layout.tsx`).
  *
  * Každá změna zdrojů → `.claude/security/CSP-LOG.md` (s funkcí, která ji
  * potřebuje) a řádek CSP v `.claude/security/STATE.md`. Nikdy `unsafe-inline`
@@ -19,14 +20,14 @@ export type CspMode = 'enforce' | 'report-only'
 
 type Directives = Record<string, string[]>
 
-/** Cesty Workspace, kde CSP platí naostro (DECISIONS.md #003). */
-const ENFORCED_PREFIXES = ['/w', '/r', '/z'] as const
+/** Cesty Workspace s profilem `workspace` (DECISIONS.md #003). */
+const WORKSPACE_PREFIXES = ['/w', '/r', '/z'] as const
 
 /**
- * Landing page a její právní stránky — naostro jako přesné cesty (DECISIONS.md #007).
+ * Landing page a její právní stránky — profil `workspace` jako přesné cesty (DECISIONS.md #007).
  * Nikdy prefix `/`: ten by chytil celý web včetně adminu.
  */
-const ENFORCED_PATHS = ['/', '/podminky', '/ochrana-udaju', '/zpracovatelska-smlouva'] as const
+const WORKSPACE_PATHS = ['/', '/podminky', '/ochrana-udaju', '/zpracovatelska-smlouva'] as const
 
 /** Prefix bez „vedlejších" shod: `/w` sedí na `/w` a `/w/…`, ne na `/wiki`. */
 export function hasPrefix(pathname: string, prefix: string): boolean {
@@ -35,15 +36,16 @@ export function hasPrefix(pathname: string, prefix: string): boolean {
 
 /**
  * Které CSP pro danou cestu. Workspace a landing page (layout `app/(marketing)` je
- * dynamický) naostro, všechno ostatní admin profil v Report-Only — admin běží
- * v produkci a `/login` a 404 jsou statické (bez nonce).
+ * dynamický) profil `workspace`, všechno ostatní profil `admin`. Od S19 naostro
+ * obojí (DECISIONS.md #001 → #015). Jedinou statickou stránkou bez nonce zůstává
+ * výchozí 404 — HTML se zobrazí, jen se nehydratuje (DECISIONS.md #015).
  */
 export function cspProfileFor(pathname: string): { profile: CspProfile; mode: CspMode } {
   const path = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
-  if (ENFORCED_PREFIXES.some((p) => hasPrefix(path, p)) || (ENFORCED_PATHS as readonly string[]).includes(path)) {
+  if (WORKSPACE_PREFIXES.some((p) => hasPrefix(path, p)) || (WORKSPACE_PATHS as readonly string[]).includes(path)) {
     return { profile: 'workspace', mode: 'enforce' }
   }
-  return { profile: 'admin', mode: 'report-only' }
+  return { profile: 'admin', mode: 'enforce' }
 }
 
 function base(nonce: string, isDev: boolean): Directives {

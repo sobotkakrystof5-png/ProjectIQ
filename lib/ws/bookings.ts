@@ -69,7 +69,7 @@ function staffExpr(acc: string, biz: string, staffId: string | null, serviceId: 
       SELECT st.id FROM ws.staff st
       WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.active
         AND (${serviceId}::uuid IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
+          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
           OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))
       ORDER BY EXISTS (
           SELECT 1 FROM ws.appointments a
@@ -131,7 +131,7 @@ export async function checkSlot(
       FROM ws.staff st
       WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.active
         AND (${serviceId}::uuid IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
+          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
           OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))
       ORDER BY st.position, st.created_at
     `,

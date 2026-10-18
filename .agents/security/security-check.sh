@@ -41,6 +41,20 @@ head1() { echo; echo "${B}=== $1 ===${N}"; }
 
 need() { command -v "$1" >/dev/null 2>&1; }
 
+# `timeout` is not part of macOS by default. Prefer GNU coreutils when present,
+# but keep the checks usable on a stock Mac where stdin EOF bounds s_client.
+timed() {
+  local seconds="$1"
+  shift
+  if need timeout; then
+    timeout "$seconds" "$@"
+  elif need gtimeout; then
+    gtimeout "$seconds" "$@"
+  else
+    "$@"
+  fi
+}
+
 echo
 echo "Kontrola zabezpečení: ${URL}"
 echo "Datum: $(date '+%Y-%m-%d %H:%M')"
@@ -243,7 +257,7 @@ fi
 head1 "5. TLS"
 
 if need openssl; then
-  CERT="$(echo | timeout 15 openssl s_client -servername "$DOMAIN" -connect "${DOMAIN}:443" 2>/dev/null | openssl x509 -noout -dates -issuer -subject 2>/dev/null)"
+  CERT="$(echo | timed 15 openssl s_client -servername "$DOMAIN" -connect "${DOMAIN}:443" 2>/dev/null | openssl x509 -noout -dates -issuer -subject 2>/dev/null)"
   if [[ -n "$CERT" ]]; then
     NOT_AFTER="$(printf '%s' "$CERT" | grep 'notAfter=' | cut -d= -f2-)"
     ISSUER="$(printf '%s' "$CERT" | grep 'issuer=' | sed 's/.*CN *= *//')"
@@ -268,14 +282,14 @@ if need openssl; then
 
   # Staré protokoly
   for proto in tls1 tls1_1; do
-    if echo | timeout 10 openssl s_client -"$proto" -connect "${DOMAIN}:443" >/dev/null 2>&1; then
+    if echo | timed 10 openssl s_client -"$proto" -servername "$DOMAIN" -connect "${DOMAIN}:443" >/dev/null 2>&1; then
       bad "Server přijímá zastaralý protokol ${proto}"
     else
       ok "${proto} je odmítnut"
     fi
   done
 
-  if echo | timeout 10 openssl s_client -tls1_3 -connect "${DOMAIN}:443" >/dev/null 2>&1; then
+  if echo | timed 10 openssl s_client -tls1_3 -servername "$DOMAIN" -connect "${DOMAIN}:443" >/dev/null 2>&1; then
     ok "TLS 1.3 podporováno"
   else
     warn "TLS 1.3 nepodporováno"

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type Stripe from 'stripe'
 import { getStripe } from '@/lib/ws/stripe'
 import { handleStripeEvent } from '@/lib/ws/stripe-webhook'
+import { readBodyLimited } from '@/lib/security/request-body'
 
 // Webhook Stripe → ws.subscriptions (AGENTS.md B5, S08). Bez přihlášení, pouští
 // ho jen platný podpis (STRIPE_WEBHOOK_SECRET) s čerstvým časovým razítkem
@@ -24,13 +25,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return reply(503, { success: false, code: 'NOT_CONFIGURED' })
   }
 
-  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
-    return reply(413, { success: false, code: 'TOO_LARGE' })
-  }
-
   const signature = req.headers.get('stripe-signature')
-  const body = await req.text()
-  if (!signature || body.length > MAX_BODY_BYTES) {
+  const bounded = await readBodyLimited(req, MAX_BODY_BYTES)
+  if (!bounded.ok) return reply(413, { success: false, code: 'TOO_LARGE' })
+  const body = Buffer.from(bounded.bytes).toString('utf8')
+  if (!signature) {
     return reply(400, { success: false, code: 'INVALID_SIGNATURE' })
   }
 

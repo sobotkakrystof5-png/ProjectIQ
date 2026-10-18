@@ -4,7 +4,9 @@ import { setWsDriverForTests } from '../db'
 import type { WsBusiness, WsContext } from '../context'
 import { rowsToWeek, summarizeWeek, weekToRows, type Week } from '../hours'
 import { reorder, saveService, saveStaff, saveWeekHours, setStaffActive } from '../settings'
+import { createBooking } from '../bookings'
 import { loadIntakeConfig, loadSlots } from '../intake/intake'
+import { hasWholeMinor } from '../money'
 import { createWsTestDb, ids, pgliteDriver } from './helpers/ws-pglite'
 
 vi.mock('server-only', () => ({}))
@@ -162,5 +164,27 @@ describe('služby a pořadí', () => {
 
     await reorder(ctxA, bizA, 'fields', [A.field])
     await reorder(ctxA, bizA, 'stages', [A.stage])
+  })
+})
+
+describe('ceny a skrytí pracovníci', () => {
+  it('cena s haléři projde i tam, kde plovoucí čárka zaokrouhlí', () => {
+    for (const ok of [19.99, 0.29, 1.13, 0.07, 450.5, 249, 0]) expect(hasWholeMinor(ok)).toBe(true)
+    for (const bad of [19.999, 0.001, Number.NaN, Number.POSITIVE_INFINITY]) expect(hasWholeMinor(bad)).toBe(false)
+  })
+
+  it('služba přiřazená jen skrytému pracovníkovi jde objednat u ostatních', async () => {
+    const [jana] = await all<{ id: string }>(`SELECT id FROM ws.staff WHERE business_id = $1 AND name = 'Jana N.'`, [A.business])
+    await saveService(ctxA, bizA, { id: A.service, name: 'Služba', duration: 45, price: 19.99, currency: 'CZK', showOnWeb: true, buffer: 0, staffIds: [jana.id] })
+    expect(await setStaffActive(ctxA, bizA, jana.id, false)).toBe('ok')
+    // Nastavení pak ukazuje „dělá kdokoli“ — termín bez vybraného pracovníka musí jít uložit.
+    const booked = await createBooking(ctxA, bizA, { serviceId: A.service, staffId: null, start: new Date('2026-12-07T09:00:00Z'), note: null })
+    expect(booked.ok).toBe(true)
+    if (booked.ok) {
+      const [row] = await all<{ staff_id: string }>(`SELECT staff_id FROM ws.appointments WHERE id = $1`, [booked.data.appointmentId])
+      expect(row.staff_id).not.toBe(jana.id)
+    }
+    expect(await setStaffActive(ctxA, bizA, jana.id, true)).toBe('ok')
+    await saveService(ctxA, bizA, { id: A.service, name: 'Služba', duration: 45, price: 300, currency: 'CZK', showOnWeb: true, buffer: 0, staffIds: [] })
   })
 })

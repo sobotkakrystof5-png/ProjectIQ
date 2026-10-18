@@ -3,7 +3,7 @@
 > Současný stav. Přepisuje se — historie je v ostatních souborech.
 > Čti na začátku každého sezení, které sahá na hlavičky, CSP, proxy, API nebo vstupy.
 
-**Poslední aktualizace:** 2026-10-10, sezení S16 (klientský portál)
+**Poslední aktualizace:** 2026-10-17, S19 (Preview, živý audit a Nodemailer 10)
 
 ## Projekt
 
@@ -38,7 +38,7 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 | Hlavička | Stav | Poznámka |
 |---|---|---|
 | Strict-Transport-Security | ✅ `max-age=63072000; includeSubDomains; preload` | `preload` zděděný, DECISIONS #005 |
-| Content-Security-Policy | ⚠️ admin Report-Only, `/w` `/r` `/z` vynucená | DECISIONS #001, #003 |
+| Content-Security-Policy | ✅ vynucená pro všechny cesty; profily `admin` a `workspace` | DECISIONS #003, #007, #015; živé ověření čeká na Preview |
 | X-Content-Type-Options | ✅ nosniff | |
 | X-Frame-Options | ✅ DENY | mimo `/r/*`, `/embed/*`, `/api/public/v1/*`; PDF faktury `SAMEORIGIN` (DECISIONS #004) |
 | Referrer-Policy | ✅ strict-origin-when-cross-origin | |
@@ -52,8 +52,8 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 
 ## CSP
 
-Verze: **v4** (CSP-LOG.md)
-Režim: admin + zbytek **Report-Only**, Workspace (`/w`, `/r`, `/z`) a landing page (přesné cesty `/`, `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`, DECISIONS #007) **vynucená**
+Verze: **v5** (CSP-LOG.md)
+Režim: **vynucená pro všechny cesty**. Admin používá profil `admin`, Workspace a přesné cesty landing page profil `workspace`.
 Výběr profilu: `cspProfileFor()` v `lib/security/csp.ts`
 
 Společný základ: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'nonce-…' 'strict-dynamic' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; frame-src 'none'; worker-src 'self' blob:; manifest-src 'self'` (+ `upgrade-insecure-requests` jen vynucená). Dev navíc `'unsafe-eval'` a `ws:`/`wss:`.
@@ -65,16 +65,16 @@ Třetí strany:
 
 Známé výjimky: `style-src 'unsafe-inline'` (DECISIONS #002).
 
-**Proč admin ještě není vynucený:** `/login` a 404 stránka jsou statické → jejich skripty nemají nonce (ověřeno: 14 hlášení na `/login`). Vynucení vyžaduje `/login` dynamický (`export const dynamic = 'force-dynamic'` v `app/(auth)/login`) — zásah do adminu, chce souhlas. Ostatní admin stránky jsou čisté (CSP-LOG v1 → Ověřeno).
+`/login` je nově dynamický (`app/(auth)/login/layout.tsx`) a dostává nonce. Výchozí 404 zůstává statická; její skripty se nemohou hydratovat, ale stránka neobsahuje citlivá ani uživatelská data (DECISIONS #015). Ruční průchod adminu, Chrome/Safari a produkční build čekají na Preview.
 
 ## DNS a pošta (`zakaziq.cz`)
 
-Doménu spravuje Kryštof (registrátor: doplnit). Nic z toho zatím není ověřené — doména ještě nemá web.
+Doménu spravuje Kryštof (registrátor: doplnit). Vercel API potvrzuje `zakaziq.cz` a `www.zakaziq.cz` jako ověřené domény projektu `project-iq`; produkční nasazení je stále starší `main` (SHA `d9484001`). Živý audit `www.zakaziq.cz` 2026-10-17: HTTPS 308/200, TLS 1.3 a platný certifikát ověřeny; produkce postrádá CSP, COOP a CORP, posílá `x-powered-by: next.js`, SPF a DMARC chybí. Audit hlásil nedostupný `security.txt`, ale soubor je v repu i Preview deploymentu; HTTP odpověď vyžaduje ověření po odblokování Vercel challenge. Přímé DNS dotazy pro apex nevrátily DS/CAA/TXT. Po skenu Vercel dočasně vracel challenge 403; neopakovat hromadné požadavky. Detail v `AUDIT-LOG.md`.
 
 | Položka | Stav | Cíl |
 |---|---|---|
-| DNSSEC | ❓ neověřeno | zapnout u registrátora |
-| CAA | ❓ | `0 issue "letsencrypt.org"` (Vercel vydává přes Let's Encrypt) + `0 iodef "mailto:info@vizeon.cz"` |
+| DNSSEC | ⚠️ apex dotaz DS bez záznamu; Vercel domény jsou ověřené | ověřit správu DNS a zapnout DNSSEC |
+| CAA | ⚠️ apex dotaz CAA bez záznamu; audit `www` ukázal CAA odpověď | potvrdit CAA pro apex a potřebné CA |
 | SPF | ❓ | Resend posílá ze subdomény (`send.zakaziq.cz`): MX `send` → `feedback-smtp.eu-west-1.amazonses.com` (10) a TXT `send` = `v=spf1 include:amazonses.com ~all` podle hodnot z Resend dashboardu; kořen domény bez pošty `v=spf1 -all`. Postup `docs/workspace/SETUP.md` → E-maily (S15) |
 | DKIM | ❓ | záznam `resend._domainkey` z Resend dashboardu |
 | DMARC | ❓ | TXT `_dmarc`: začít `v=DMARC1; p=none; rua=mailto:info@vizeon.cz` → po 2–4 týdnech čistých reportů `p=quarantine` → `p=reject` |
@@ -102,7 +102,6 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
 | `DATABASE_URL_WS` do Vercelu (Production + Preview) | migrace `ws` i role `ws_app` jsou na Neonu od 2026-10-09 (ověřeno: bez BYPASSRLS, do `public` nevidí); bez proměnné ve Vercelu Workspace v produkci nemá DB. Roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli | Kryštof | před nasazením `/w` |
-| Admin CSP → vynucená | Report-Only nic nechrání. Potřeba dynamický `/login` (souhlas se zásahem do adminu) a 404 | Kryštof + Claude | do S19 |
 | Clerk produkční instance (`clerk deploy`, `clerk.zakaziq.cz`, produkční klíče, Google OAuth s vlastními údaji) | dev klíče mají limity a dev banner, dev instance nesmí do produkce | Kryštof + Claude | před spuštěním (S19) |
 | Webhook Clerku: endpoint v Clerk dashboardu + `CLERK_WEBHOOK_SECRET` (lokálně i Vercel) | bez něj se nesynchronizují členové a název účtu (route vrací 503) | Kryštof | po prvním nasazení `/w` |
 | Google OAuth přes přesměrování, ne popup | COOP `same-origin` by popup rozbil; Clerk SignIn ve výchozím stavu přesměrovává — ověřit ručně | Kryštof | při prvním přihlášení Googlem |
@@ -110,12 +109,13 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 | Stripe live mód (produkt, cena, Portal, e-maily, šablona faktury s IČO, webhook) | sandbox nesmí do produkce | Kryštof + Claude | S19 |
 | `WS_KEY_PEPPER` do Vercelu (Production + Preview, jiná hodnota než lokálně) | bez něj tajné klíče webů nejde vytvořit ani ověřit (API 503). Po nastavení už neměnit — změna zneplatní všechny tajné klíče | Kryštof | před nasazením `/w` |
 | Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; Workspace zatím Zod jen na serveru (S07) — `z.config({ jitless: true })` až s prvním formulářem validovaným v prohlížeči | — | S10+ |
-| `npm audit` — bez critical po upgradu na Next 16.4.2; zbývá `nodemailer` 7 (→ 10), `next-auth` 4, řetězec `tailwindcss` 3 (`braces`/`micromatch`/`postcss`) | CI job audit je dočasně jen upozornění (DECISIONS #006) | Kryštof | S19 |
-| `security.txt` — `Expires: 2027-10-01` | prošlý security.txt je horší než žádný | Kryštof | připomínka 2027-09 |
+| `npm audit` — Nodemailer 10.1.2 odstranil svůj high nález; zbývá 5 high a 2 moderate v řetězci Tailwind 3. Oprava vyžaduje Tailwind 4 major migraci | CI audit zůstává upozorněním, viz DECISIONS #006 | Kryštof | před obnovením blokujícího CI |
+| `security.txt` | Audit neobdržel 200; soubor existuje v `public/.well-known/security.txt` a v Preview balíčku, produkce běží ze staršího commitu; kontakt a HTTP cestu ověřit | po přístupu k doméně |
 | DNS `zakaziq.cz` (DNSSEC, CAA, SPF, DKIM, DMARC) + doména v Resendu | bez nich lze posílat poštu jménem domény a e-maily padají do spamu; postup `docs/workspace/SETUP.md` → E-maily (S15) | Kryštof | před nastavením `WS_EMAIL_FROM` |
 | `WS_EMAIL_FROM` a `RESEND_WEBHOOK_SECRET` do Vercelu (+ endpoint webhooku v Resendu) | bez `WS_EMAIL_FROM` Workspace neodešle žádný e-mail; bez webhooku se nedozvíme o nedoručených | Kryštof | po ověření domény v Resendu |
 | CI proměnná `SITE_URL` | job `headers` se jinak neprovede | Kryštof | po prvním nasazení Workspace |
-| Živý audit `security-check.sh` | hlavičky ověřené jen lokálně | Claude | po deployi (S19, a po každém deployi) |
+| Živý audit produkce | `www.zakaziq.cz`: chybí CSP, COOP, CORP, `security.txt`, SPF a DMARC; `x-powered-by` zůstává. Produkce je starší `main`; opravy jsou v Preview/kódu | před spuštěním |
+| Chrome/Safari průchod vynucené CSP | Preview build READY; Chrome načetl landing page, ale konzole hlásí chybu konfigurace NextAuth; přihlášení Workspace i Safari čekají na ruční ověření | po doplnění Preview env |
 | HSTS preload | zděděné `preload` — ověřit stav na hstspreload.org pro produkční doménu adminu | Kryštof | S19 |
 | Test obnovy zálohy Neonu | zálohu, kterou nikdo neobnovil, nelze brát jako zálohu | Kryštof | před spuštěním |
 

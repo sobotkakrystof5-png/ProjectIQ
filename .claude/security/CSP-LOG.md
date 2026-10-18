@@ -61,6 +61,12 @@ Změna: `frame-ancestors` na `/r/<slug>` = `'self'` + povolené domény byznysu 
 Kvůli: vložení objednávací stránky do iframe na webu klienta (S11). Domény bere middleware přes `lib/ws/intake/embed-origins.ts` (SECURITY DEFINER `ws.business_by_public_slug`, cache 60 s v instanci, chyba DB nebo neznámý slug = jen `'self'`), každá prochází `normalizeOrigin` (jen `https://host[:port]`, bez wildcardu). Widget `/embed/*.js` a API `/api/public/v1/*` CSP nemají (běží na cizím webu / JSON).
 Ověřeno: lokálně dev 2026-10-10 — `/r/ahoj` bez povolené domény `frame-ancestors 'self'`, s `https://example.com` `frame-ancestors 'self' https://example.com`; stránka v Chromu na 390 px funguje s vynucenou CSP. Produkční build a Safari neověřeno.
 
+## v5 — 2026-10-17
+Změna: CSP přepnuta do vynuceného režimu pro všechny cesty (`cspProfileFor()` vrací `mode: 'enforce'` i pro profil `admin`). Nový externí zdroj nepřibyl. `/login` dostal dynamický layout (`app/(auth)/login/layout.tsx`), aby Next.js připojil nonce ke skriptům.
+Kvůli: S19 vyžaduje vynucenou CSP před spuštěním; předchozí blokace statického `/login` je odstraněna. Zásah do adminu je součástí výslovného zadání S19.
+Ověřeno: CSP hlavičky Preview S19 obsahují `default-src`, `frame-ancestors`, `base-uri`, `form-action`, `object-src 'none'`; bez holého `unsafe-inline`, `unsafe-eval` a wildcard ve `script-src`. Chrome landing page se vykreslila a v zaznamenaných warn/error zprávách nebylo CSP porušení. Vercel Preview build READY. Safari, admin login a přihlášení Workspace neověřeny; Chrome konzole hlásila chybu konfigurace NextAuth. Produkce stále běží ze staršího `main` bez CSP.
+Poznámka: výchozí statická 404 může být bez hydratace; viz DECISIONS #015. Do produkce nenasazovat, dokud se CSP neověří po deployi.
+
 ## Čeká (zapsat jako vN při přidání)
 - Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.

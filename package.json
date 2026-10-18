@@ -46,7 +46,7 @@
     "lucide-react": "^0.544.0",
     "next": "^16.4.2",
     "next-auth": "^4.24.14",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^10.1.2",
     "postcss": "^8.4.49",
     "puppeteer-core": "^25.1.0",
     "qrcode.react": "^4.2.0",

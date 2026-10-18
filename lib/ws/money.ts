@@ -30,3 +30,12 @@ export function formatMoney(amount: number, opts: { currency?: WsCurrency; minor
   const whole = Math.round(Math.abs(value) * 100) % 100 === 0
   return formatter(currency, whole ? 0 : 2).format(value)
 }
+
+/**
+ * Má částka nejvýš dvě desetinná místa? 19,99 * 100 je v plovoucí čárce
+ * 1998,9999999999998, proto tolerance místo přesného porovnání.
+ */
+export function hasWholeMinor(amount: number): boolean {
+  const minor = amount * 100
+  return Number.isFinite(minor) && Math.abs(minor - Math.round(minor)) < 1e-6
+}

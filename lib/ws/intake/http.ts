@@ -1,5 +1,6 @@
 import 'server-only'
 import { corsHeaders, normalizeOrigin, normalizeOrigins } from '@/lib/security/embed'
+import { readBodyLimited } from '@/lib/security/request-body'
 import { wsSystem } from '../db'
 import { KeyConfigError, resolvePublicKey, resolveSecretKey, type ResolvedKey } from '../keys'
 import { apiError, logIntake, type IntakeChannel, type IntakeResult } from './intake'
@@ -93,14 +94,11 @@ export function respond(
 
 /** Tělo jako JSON s limitem velikosti. */
 export async function readJson(req: Request): Promise<{ ok: true; value: unknown } | { ok: false; result: IntakeResult }> {
-  const declared = Number(req.headers.get('content-length') ?? '0')
-  if (declared > MAX_BODY_BYTES) {
+  const bounded = await readBodyLimited(req, MAX_BODY_BYTES)
+  if (!bounded.ok) {
     return { ok: false, result: apiError(413, 'INVALID_BODY', 'Poptávka je moc velká. Zkraťte prosím text.') }
   }
-  const text = await req.text()
-  if (Buffer.byteLength(text) > MAX_BODY_BYTES) {
-    return { ok: false, result: apiError(413, 'INVALID_BODY', 'Poptávka je moc velká. Zkraťte prosím text.') }
-  }
+  const text = Buffer.from(bounded.bytes).toString('utf8')
   try {
     return { ok: true, value: JSON.parse(text) as unknown }
   } catch {

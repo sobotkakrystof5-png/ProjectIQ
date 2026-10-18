@@ -16,6 +16,25 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-17 — review S19 (částečné, před nasazením)
+Spouštěč: bezpečnostní audit a spuštění S19.
+Rozsah: dřívější detailní review S06–S18 v tomto logu; aktuální rozdíly veřejného příjmu poptávek, rate limitů, cen a CSP; webhooky Stripe/Clerk/Resend; čtení těla veřejného API; CSP pro všechny cesty.
+Nálezy:
+- **Střední, opraveno:** Stripe, Resend a veřejné API kontrolovaly limit těla až po `req.text()`; Clerk kontroloval jen deklarovaný `content-length`. Chunked požadavek tak mohl být celý načten před limitem. Nové `lib/security/request-body.ts` počítá bajty průběžně a odmítne tělo nad limit; použito pro Stripe, Clerk, Resend a veřejné API. Podpisy webhooků se ověřují až po omezeném načtení.
+- Při kontrole dosavadních auditních záznamů S06–S18 a aktuálního diffu se nenašel nový nález vysoké závažnosti v kontrolovaných změnách. Produkční kód nebylo možné nezávisle načíst.
+Ověřeno: celá sada `npm test` — 480 prošlo, 1 přeskočen; CSP a stream-limit testy 17/17; `npx tsc --noEmit` prošel; `npx next build --webpack` prošel. Standardní `npm run build:check` s Turbopackem stále padá při bindu lokálního portu (`Operation not permitted`). `npm audit --omit=dev --audit-level=high` neproběhl, protože prostředí nepřeložilo `registry.npmjs.org`. `security-check.sh` neprošel k HTTP kontrole, protože prostředí nepřeložilo `www.zakaziq.cz` (`curl` 6; lokální `dig` blokován). Vercel konektor nenašel projekt.
+Zůstává: Vercel Preview a Chrome/Safari, živý audit hlaviček/TLS/DNS, audit závislostí, produkční konfigurace a ruční ověření spouštěcích položek v `docs/workspace/LAUNCH.md`. S19 není dokončen a spuštění není schváleno.
+
+## 2026-10-17 — živý audit S19 a Preview
+Spouštěč: pokračování bezpečnostního auditu a ověření připravenosti ke spuštění.
+Rozsah: Vercel projekt `project-iq`, živá `www.zakaziq.cz`, Preview `project-pnfallur8-sobotkakrystof5-pngs-projects.vercel.app`, produkční `npm audit --omit=dev`, Chrome landing.
+Výsledek produkce: Vercel API uvádí `zakaziq.cz` i `www.zakaziq.cz` jako ověřené; produkční alias je stále starší `main`, SHA `d9484001`. `security-check.sh www.zakaziq.cz` v 12:19: 16 prošlo, 5 varování, 4 chyby. HTTPS přesměrování 308 a odpověď 200. Nálezy: CSP, COOP a CORP chybí; `x-powered-by: next.js`; skript nedostal 200 z `/.well-known/security.txt`, SPF a DMARC chybí. Zdrojový soubor `public/.well-known/security.txt` je v repu i Preview deployment package; obsah endpointu zůstává k ověření po Vercel challenge. Přímý `curl -v` později ověřil certifikát `www.zakaziq.cz` i TLS 1.3. Přímé DNS dotazy apexu nevrátily DS, CAA ani TXT. Vercel po automatických kontrolách začal vracet challenge 403; znovu nespouštět hromadné HTTP sondy.
+Výsledek Preview: build `dpl_D51psLjGaMLpS9H8tBTDCtshoF3o` READY; první build selhal na peer rozsahu `next-auth@4`/Nodemailer 10, `.npmrc` s `legacy-peer-deps=true` umožnil opakovaný build. `security-check.sh` na Preview: 26 prošlo, 6 varování, 1 chyba; CSP, COOP, CORP a další hlavičky jsou přítomné. Chyba načtení certifikátu i výsledek „TLS 1.3 nepodporováno“ jsou falešné: skript vyžadoval `timeout`, který v prostředí/macOS není nainstalovaný. Skript opraven funkcí `timed` (timeout/gtimeout, jinak přímé volání s EOF); `bash -n` prošel. DNS/e-mailové kontroly na hostu `vercel.app` nejsou relevantní pro custom doménu. Preview audit později chránil Vercel challenge, ruční requesty zastaveny.
+Chrome: landing page se vykreslila; console obsahovala `[next-auth][error][CLIENT_FETCH_ERROR]` s hlášením o server konfiguraci. CSP porušení nebyla v zaznamenaných warn/error zprávách. Přihlášení Workspace/adminu ani Safari neověřeny. Žádný formulář ani citlivé údaje nebyly odeslány.
+Závislosti: Nodemailer aktualizován na 10.1.2; přibylo `.npmrc` kvůli nepovinnému peer NextAuth 4 EmailProvider (aplikace používá CredentialsProvider). `npm audit --omit=dev --audit-level=high`: 5 high a 2 moderate, zbývá řetězec Tailwind 3 (`braces`/`micromatch`/`postcss`); `npm audit fix --legacy-peer-deps` bez `--force` nepřinesl opravy. Full audit vyžaduje samostatnou Tailwind 4 migraci. CI audit zůstává neblokující podle rozhodnutí #006.
+Ověřeno: Preview Vercel build a všechny routy v build outputu; Chrome landing; `npm test` 480 prošlo, 1 přeskočen; `npx tsc --noEmit`; `npm ci --dry-run`; `bash -n .claude/security/security-check.sh`; `curl` TLS. Produkce se nenasazovala.
+Otevřené: opravit produkční hlavičky až v autorizovaném deployi; nastavit SPF/DMARC/DNSSEC/CAA; publikovat security.txt po doplnění skutečného kontaktu; vyřešit NextAuth konfiguraci Preview; Chrome/Safari login a Workspace; záloha/obnova, produkční Clerk/Stripe/Resend, právní texty, podpora a pilot podle `docs/workspace/LAUNCH.md`.
+
 ## 2026-10-17 — review (S18, GDPR, PWA, tmavý režim)
 Spouštěč: kontrola podle `web-security-review` před commitem S18.
 Rozsah: migrace 084 a `scripts/ws-grants.sql`, `lib/ws/{gdpr,zip,csv,theme}.ts`, `/w/ucet/export`, `/w/ucet/zpracovani`, akce `eraseCustomer`, `closeAccountAction`, `reopenAccountAction`, `/api/cron/ws-gdpr`, `marketingConsent` v `lib/ws/intake/intake.ts`, `/r` a widgetu, `components/ws/ws-root.tsx` (inline skript), `public/sw.js`, `public/offline.html`, manifest.
@@ -215,3 +234,9 @@ Výsledek:
 - `npm audit`: Next 16.2.12 byl dál označený (critical v `next/og`, Image Optimization, Windows hosting; opravy až od 16.3.8), proto cíl 16.4.2 — critical u `next` zmizely. Zbývá `nodemailer` 7, `next-auth` 4, řetězec `tailwindcss` 3 (DECISIONS #006).
 - Ověřeno: `tsc` čistý, `npm test` 451 + 1 vynechaný, `npm run build` (Turbopack) bez varování, smoke test produkčního serveru. Neověřeno: přihlášení do adminu a Clerku v prohlížeči, skutečné PDF na Vercelu, Vercel Preview.
 Nálezy: 0 k opravě.
+
+## 2026-10-17 — review redesignu Landing a Dnes
+Spouštěč: `web-security-review` před lokálním commitem redesignu.
+Rozsah: `components/marketing/{hero,live-demo,features,how-it-works}.tsx`, `components/ws/app/today/{today-board,week-calendar}.tsx`, `app/w/[business]/{page,loading}.tsx`, lokální CSS landing page.
+Výsledek: 0 nálezů. Ukázka používá pouze statická fiktivní data a místní stav Reactu; nepřijímá vstup z URL, nevolá API, neodesílá e-maily. Žádné nové HTML sinky, externí skripty, balíčky, env, autentizační či DB operace. Dnes předává stejná serverová data a odkazy do stávajících komponent; account_id ani mutace se nemění. CSP beze změny.
+Ověření: 475 testů + 1 přeskočený, typová kontrola; Chrome nad upravenými komponentami s fiktivními daty. Kompletní produkční build blokují podmínky worktree a DNS Google Fonts. Přihlášení ani externí služby nebyly použity.

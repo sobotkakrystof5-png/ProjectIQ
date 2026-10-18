@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { verifyWebhook } from '@clerk/nextjs/webhooks'
 import { handleClerkEvent } from '@/lib/ws/clerk-webhook'
+import { readBodyLimited } from '@/lib/security/request-body'
 
 // Webhook Clerku → ws.accounts, ws.members (AGENTS.md B4, S07). Bez přihlášení,
 // pouští ho jen platný podpis Svix (CLERK_WEBHOOK_SECRET) s čerstvým časovým
@@ -21,13 +22,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return reply(503, { success: false, code: 'NOT_CONFIGURED' })
   }
 
-  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
-    return reply(413, { success: false, code: 'TOO_LARGE' })
-  }
+  const bounded = await readBodyLimited(req, MAX_BODY_BYTES)
+  if (!bounded.ok) return reply(413, { success: false, code: 'TOO_LARGE' })
 
   let evt: Awaited<ReturnType<typeof verifyWebhook>>
   try {
-    evt = await verifyWebhook(req, { signingSecret })
+    const signedRequest = new NextRequest(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: Buffer.from(bounded.bytes),
+    })
+    evt = await verifyWebhook(signedRequest, { signingSecret })
   } catch {
     return reply(400, { success: false, code: 'INVALID_SIGNATURE' })
   }

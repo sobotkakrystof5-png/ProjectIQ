@@ -9,6 +9,7 @@ import { fail, ok, type Result } from '@/lib/ws/result'
 import { createBlock } from '@/lib/ws/bookings'
 import { MAX_RANGES_PER_DAY, weekToRows } from '@/lib/ws/hours'
 import { moveAndDeleteStage, reorder, saveAppearance, saveField, savePortalRules, saveService, saveStaff, saveStage, saveWeekHours, setModule, setServiceActive, setStaffActive } from '@/lib/ws/settings'
+import { hasWholeMinor } from '@/lib/ws/money'
 import { addDays, isIsoDate, pragueToUtc } from '@/lib/ws/time'
 import { ADDRESS_MAX, CHANGE_HOURS_OPTIONS } from '@/lib/ws/portal-rules'
 import { WS_MODULES } from '@/lib/ws/templates/types'
@@ -17,7 +18,7 @@ const slug = z.string().min(1).max(60).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
 const id = z.string().uuid()
 const fieldType = z.enum(['text', 'choice', 'select', 'number', 'date', 'slot', 'contact', 'address', 'file'])
 const stageType = z.enum(['new', 'in_progress', 'done', 'paid', 'cancelled'])
-const money = z.number().min(0).max(1_000_000).refine((v) => Math.round(v * 100) === v * 100).nullable()
+const money = z.number().min(0).max(1_000_000).refine(hasWholeMinor).nullable()
 
 type Prepared = { ok: true; ctx: WsContext; business: WsBusiness; input: Record<string, unknown> }
 type PreparationFailure = { ok: false; error: string }

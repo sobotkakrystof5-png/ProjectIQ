@@ -64,6 +64,8 @@ Důvod: `npm audit --omit=dev --audit-level=high` padal na `next` 14 (critical),
 Zvažované alternativy: `--audit-level=critical` (stejně padá na `next`); vypnout job (ztratíme přehled).
 Přijaté riziko: nová high/critical zranitelnost neshodí build, jen se objeví v logu jobu.
 Revize: S19 — po upgradu nodemailer 10 (a rozhodnutí o next-auth 4 / tailwindcss 4) vrátit `continue-on-error: false`. Next 16.2.12 audit neprošel (opravy od 16.3.8), proto cíl 16.4.2.
+Revize S19 (2026-10-17): Nodemailer je 10.1.2 a odstranil vlastní high nález. Peer rozsah `next-auth@4` stále uvádí nepovinný Nodemailer 7; projekt používá pouze CredentialsProvider, proto instalace používá `.npmrc` `legacy-peer-deps=true` (R-056). Audit stále hlásí 5 high + 2 moderate v Tailwind 3 řetězci; `npm audit fix` vyžaduje Tailwind 4 major. CI zůstává neblokující do migračního rozhodnutí a opravy nálezů.
+Revize S19 (2026-10-17): Nodemailer je 10.1.2 a odstranil vlastní high nález. Peer rozsah `next-auth@4` stále uvádí volitelný Nodemailer 7; projekt používá pouze CredentialsProvider, proto instalace používá `.npmrc` `legacy-peer-deps=true` (R-056). Audit stále hlásí 5 high + 2 moderate v Tailwind 3 řetězci; `npm audit fix` vyžaduje Tailwind 4 major. CI zůstává non-blocking do migračního rozhodnutí a opravy nálezů.
 
 ## 007 — Landing page dynamická s vynucenou CSP
 Datum: 2026-10-08
@@ -128,4 +130,12 @@ Důvod: GDPR čl. 17 a 20 (výmaz a přenositelnost) a čl. 28 (zpracovatel). Cr
 Zvažované alternativy: mazání účtů admin rolí z cronu (další connection string v cronu); offline režim s uloženými daty (riziko pro osobní údaje); ZIP knihovna (nová závislost).
 Přijaté riziko: kdokoli s rolí `ws_app` může úklid spustit dřív než cron — smaže ale jen to, co je po lhůtě. Smazáním účtu zmizí i jeho audit (kaskáda). Vystavené faktury vymazaného zákazníka zůstávají s jménem a adresou 10 let (zákonná povinnost, R-054).
 Revize: S19 (audit před spuštěním).
+
+## 015 — Vynucená CSP pro všechny cesty
+Datum: 2026-10-17
+Rozhodnutí: V S19 přepnout CSP admin profilu i všech ostatních cest z Report-Only do vynuceného režimu. `/login` je dynamický (`app/(auth)/login/layout.tsx`), aby Next.js přidal nonce. Prázdná výchozí 404 zůstává statická; CSP může zablokovat její hydrataci, ale neobsahuje citlivé ani uživatelské údaje.
+Důvod: před veřejným spuštěním má CSP vynucovat pravidla napříč aplikací; dřívější blokace na statickém `/login` je odstraněna dynamickým layoutem. Zásah do adminu je výslovnou součástí S19.
+Zvažované alternativy: ponechat admin v Report-Only (nechrání před skripty) nebo uvolnit `script-src` (nepřijatelné oslabení CSP).
+Přijaté riziko: statická 404 může být zobrazena bez klientské hydratace. Při přidání vlastní chybové stránky ověřit nonce a vynucenou CSP.
+Revize: po ručním průchodu adminu a Workspace v Chrome i Safari na Vercel Preview.
 

@@ -47,7 +47,7 @@ const orderSchema = z.object({
   phone: z.string().max(40),
   email: z.string().max(200),
   message: z.string().max(2000),
-  fields: z.record(z.string().max(40), z.string().max(1000)),
+  fields: z.record(z.string().max(40), z.string().max(1000)).refine((f) => Object.keys(f).length <= 200),
   website: z.string().max(500),
   marketingConsent: z.boolean().optional(),
 })
@@ -64,6 +64,8 @@ export async function submitOrder(raw: unknown): Promise<OrderResult> {
     if (await hitLimit(LIMITS.pagePerIp, clientIp(await headers()))) return { ok: false, error: BUSY }
     const biz = await businessBySlug(input.slug)
     if (!biz) return { ok: false, error: FAILED }
+    // Stejný strop na byznys jako API — limit na IP nestačí proti robotům z mnoha adres.
+    if (await hitLimit(LIMITS.requestsPerBusiness, biz.businessId)) return { ok: false, error: BUSY }
 
     const result = await ingestRequest(
       { accountId: biz.accountId, businessId: biz.businessId, integrationId: null, channel: 'page', origin: null },
