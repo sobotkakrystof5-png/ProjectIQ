@@ -65,7 +65,11 @@ export async function ensureStaff(ctx: WsContext, business: Biz): Promise<void> 
  */
 function staffExpr(acc: string, biz: string, staffId: string | null, serviceId: string | null, start: Date, end: Date) {
   return q`(CASE WHEN ${staffId}::uuid IS NOT NULL THEN (
-      SELECT id FROM ws.staff WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${staffId}::uuid
+      SELECT st.id FROM ws.staff st WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.id = ${staffId}::uuid
+        AND st.active
+        AND (${serviceId}::uuid IS NULL
+          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
+          OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))
     ) ELSE (
       SELECT st.id FROM ws.staff st
       WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.active
@@ -184,6 +188,7 @@ type RequestState = {
   wanted_start: Date | null
   wanted_end: Date | null
   service_id: string | null
+  requested_staff_id: string | null
   duration_min: number | null
   calendar: boolean
   jobs: boolean
@@ -192,7 +197,7 @@ type RequestState = {
 async function requestState(ctx: WsContext, business: Biz, requestId: string): Promise<RequestState | null> {
   const [rows] = await wsDb(ctx).batch([
     q`
-      SELECT r.status, r.wanted_start, r.wanted_end, r.service_id, s.duration_min,
+      SELECT r.status, r.wanted_start, r.wanted_end, r.service_id, r.requested_staff_id, s.duration_min,
         EXISTS (SELECT 1 FROM ws.business_modules m WHERE m.account_id = r.account_id AND m.business_id = r.business_id
                 AND m.module = 'calendar' AND m.enabled) AS calendar,
         EXISTS (SELECT 1 FROM ws.business_modules m WHERE m.account_id = r.account_id AND m.business_id = r.business_id
@@ -209,6 +214,7 @@ async function requestState(ctx: WsContext, business: Biz, requestId: string): P
     wanted_start: (r.wanted_start as Date | null) ?? null,
     wanted_end: (r.wanted_end as Date | null) ?? null,
     service_id: (r.service_id as string | null) ?? null,
+    requested_staff_id: (r.requested_staff_id as string | null) ?? null,
     duration_min: r.duration_min === null || r.duration_min === undefined ? null : Number(r.duration_min),
     calendar: Boolean(r.calendar),
     jobs: Boolean(r.jobs),
@@ -269,7 +275,7 @@ export async function confirmRequest(
     appt AS (
       INSERT INTO ws.appointments (account_id, business_id, kind, staff_id, customer_id, job_id, request_id, service_id, starts_at, ends_at)
       SELECT ${acc}, ${biz}, 'visit', `)
-  if (withAppointment) sql.add(staffExpr(acc, biz, input.staffId ?? null, st.service_id, start!, end!))
+  if (withAppointment) sql.add(staffExpr(acc, biz, input.staffId ?? st.requested_staff_id, st.service_id, start!, end!))
   else sql.add(q`NULL::uuid`)
   sql.add(q`, req.customer_id, (SELECT id FROM job), req.id, req.service_id, ${start}::timestamptz, ${end}::timestamptz
       FROM req WHERE ${withAppointment}::boolean

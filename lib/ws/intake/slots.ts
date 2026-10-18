@@ -13,6 +13,7 @@ export type Interval = { start: Date; end: Date }
 
 export type StaffAvailability = {
   id: string
+  name?: string
   /** Vlastní směny podle dne v týdnu (1–7); null = otevírací doba byznysu. */
   shifts: Map<number, Range[]> | null
   /** Obsazené časy (termíny a blokace pracovníka). */
@@ -73,6 +74,16 @@ export function isSlotFree(input: Omit<SlotInput, 'fromDay' | 'days' | 'stepMin'
   return candidates.some(
     (s) => fits(rangesFor(p.date, s, input.hours), p.minutes, endMin) && !(s?.busy ?? []).some((b) => overlaps(b, start, end)),
   )
+}
+
+/** Je čas volný pro konkrétního pracovníka? Neznámý nebo nezpůsobilý pracovník = ne. */
+export function isSlotFreeForStaff(
+  input: Omit<SlotInput, 'fromDay' | 'days' | 'stepMin'>,
+  start: Date,
+  staffId: string,
+): boolean {
+  const staff = input.staff.find((s) => s.id === staffId)
+  return staff ? isSlotFree({ ...input, staff: [staff] }, start) : false
 }
 
 /**

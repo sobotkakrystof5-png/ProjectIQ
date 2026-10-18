@@ -30,6 +30,8 @@ export type RequestActionsProps = {
   serviceId?: string | null
   /** Délka chtěného termínu v minutách (pro hledání volna). */
   durationMin?: number | null
+  /** Pracovník, kterého zákazník preferuje; ve výběru se předvolí. */
+  preferredStaffId?: string | null
   /** Kam vede „nastavte otevírací dobu“. */
   settingsHref?: string
   className?: string
@@ -40,12 +42,12 @@ export type RequestActionsProps = {
  * čas; odmítnutí se provede hned a toast nabídne „Zpět“ (B9).
  */
 export function RequestActions(props: RequestActionsProps) {
-  const { slug, requestId, wanted, calendar, jobs, staff, today, variant = 'full', advice = null, serviceId = null, durationMin = null, settingsHref, className } = props
+  const { slug, requestId, wanted, calendar, jobs, staff, today, variant = 'full', advice = null, serviceId = null, durationMin = null, preferredStaffId = null, settingsHref, className } = props
   const { run, pending } = useWsAction()
   const [other, setOther] = useState(false)
   const [day, setDay] = useState(wanted?.day ?? today)
   const [time, setTime] = useState(wanted ? clockValue(wanted.minutes) : '')
-  const [staffId, setStaffId] = useState('')
+  const [staffId, setStaffId] = useState(() => preferredStaffId && staff.some((person) => person.id === preferredStaffId) ? preferredStaffId : '')
   const typed = parseClock(time)
   // Zadáváte jiný čas: kolize a volné časy podle toho, co píšete.
   const live = useSlotAdvice(
@@ -108,6 +110,18 @@ export function RequestActions(props: RequestActionsProps) {
           Odmítnout
         </Button>
       </div>
+
+      {calendar && preferredStaffId && staff.length > 0 && !other && (
+        <div className="max-w-sm">
+          <StaffSelect
+            id={`predvoleny-${requestId}`}
+            staff={staff}
+            value={staffId}
+            onChange={setStaffId}
+            emptyLabel="Vyberte pracovníka"
+          />
+        </div>
+      )}
 
       {calendar && advice && !other && oneClick && (
         <SuggestionChips

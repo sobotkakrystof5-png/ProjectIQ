@@ -24,7 +24,7 @@ import { pragueToUtc } from './time'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export type PortalRef = { accountId: string; businessId: string; kind: 'appointment' | 'job'; id: string }
+export type PortalRef = { accountId: string; businessId: string; kind: 'appointment' | 'job' | 'request'; id: string }
 
 /** Kontext pro sdílené funkce (bookings, intake): jen účet, žádný přihlášený člověk. */
 const portalCtx = (accountId: string): WsContext => ({ userId: 'system:portal', accountId, role: 'staff' })
@@ -36,7 +36,7 @@ export async function resolvePortal(token: unknown): Promise<PortalRef | null> {
   const ref: PortalRef = {
     accountId: String(row.account_id),
     businessId: String(row.business_id),
-    kind: row.kind === 'job' ? 'job' : 'appointment',
+    kind: row.kind === 'job' || row.kind === 'request' ? row.kind : 'appointment',
     id: String(row.record_id),
   }
   const [on] = await wsDb(ref)`
@@ -76,11 +76,19 @@ export type PortalJob = {
   visits: { start: Date; end: Date; service: string | null; token: string }[]
 }
 
+export type PortalRequest = {
+  status: string
+  start: Date | null
+  end: Date | null
+  service: string | null
+}
+
 export type PortalView = {
   brand: PortalBrand
   firstName: string | null
   visit: PortalVisit | null
   job: PortalJob | null
+  request: PortalRequest | null
   loyalty: { stamps: number; needed: number; reward: string } | null
   /** null = hodnocení je vypnuté. */
   review: { eligible: boolean; done: { score: number; comment: string | null } | null } | null
@@ -107,7 +115,15 @@ async function loadBase(ref: PortalRef): Promise<Base | null> {
           LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
           LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
           WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.id = ${ref.id} AND a.kind = 'visit'`
-      : q`SELECT j.title, j.stage_id, j.closed_at, j.result_url, j.customer_id, c.name AS customer_name, st.type AS stage_type
+      : ref.kind === 'request'
+        ? q`SELECT r.status, r.wanted_start AS starts_at, r.wanted_end AS ends_at,
+                   r.customer_id, c.name AS customer_name, s.name AS service
+            FROM ws.requests r
+            LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
+            LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
+            WHERE r.account_id = ${acc} AND r.business_id = ${biz} AND r.id = ${ref.id}
+              AND NOT r.is_test AND r.customer_id IS NOT NULL`
+        : q`SELECT j.title, j.stage_id, j.closed_at, j.result_url, j.customer_id, c.name AS customer_name, st.type AS stage_type
           FROM ws.jobs j
           LEFT JOIN ws.customers c ON c.account_id = j.account_id AND c.id = j.customer_id
           LEFT JOIN ws.stages st ON st.account_id = j.account_id AND st.id = j.stage_id
@@ -171,6 +187,22 @@ function jobFinished(base: Base): { finished: boolean; cancelled: boolean } {
 export async function loadPortal(ref: PortalRef, now: Date = new Date()): Promise<PortalView | null> {
   const base = await loadBase(ref)
   if (!base) return null
+  if (ref.kind === 'request') {
+    return {
+      brand: base.brand,
+      firstName: base.customerName ? base.customerName.trim().split(/\s+/)[0].slice(0, 40) || null : null,
+      visit: null,
+      job: null,
+      request: {
+        status: String(base.row.status),
+        start: (base.row.starts_at as Date | null) ?? null,
+        end: (base.row.ends_at as Date | null) ?? null,
+        service: (base.row.service as string | null) ?? null,
+      },
+      loyalty: null,
+      review: null,
+    }
+  }
   const acc = ref.accountId
   const biz = ref.businessId
   const cust = base.customerId
@@ -252,6 +284,7 @@ export async function loadPortal(ref: PortalRef, now: Date = new Date()): Promis
     firstName: base.customerName ? base.customerName.trim().split(/\s+/)[0].slice(0, 40) || null : null,
     visit: ref.kind === 'appointment' ? visitView(ref, base, now) : null,
     job,
+    request: null,
     loyalty: l ? { stamps: Number(l.stamps ?? 0), needed: Number(l.stamps_needed), reward: String(l.reward_text ?? '') } : null,
     review: reviewsOn
       ? {
@@ -341,6 +374,7 @@ export async function portalCancel(ref: PortalRef, now: Date = new Date()): Prom
 }
 
 export async function portalReview(ref: PortalRef, score: number, comment: string | null, now: Date = new Date()): Promise<PortalOutcome> {
+  if (ref.kind === 'request') return failed('not_allowed')
   const view = await loadPortal(ref, now)
   if (!view) return failed('not_found')
   if (!view.review) return failed('not_allowed')

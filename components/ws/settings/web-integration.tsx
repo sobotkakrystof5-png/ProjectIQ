@@ -285,8 +285,8 @@ export function WebIntegration({
 
       <Panel number="03" title="Widget pro jiný web" id="napojeni-widget">
         <p className="max-w-prose text-[15px] text-quiet">
-          Pro weby na WordPressu, Wixu nebo Shoptetu: vložte tenhle řádek tam, kde má být tlačítko. Pro formulář přímo ve
-          stránce přidejte <span className="font-num text-ink">data-mode=&quot;inline&quot;</span>.
+          Pro weby na WordPressu, Wixu nebo Shoptetu vložte tenhle řádek tam, kde má být tlačítko. Po kliknutí se otevře
+          objednávka. Formulář přímo ve stránce zobrazíte přidáním <span className="font-num text-ink">data-mode=&quot;inline&quot;</span>.
         </p>
         <CodeBox value={widgetCode} label="Kód" />
 

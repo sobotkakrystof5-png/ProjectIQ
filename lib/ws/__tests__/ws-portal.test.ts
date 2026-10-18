@@ -121,6 +121,36 @@ describe('token', () => {
     const view = await loadPortal(refB, NOW)
     expect(view?.brand.name).toBe('Byznys b')
   })
+
+  it('odkaz na čekající poptávku se po potvrzení otevře jako termín', async () => {
+    const [request] = await rows<{ id: string; public_token: string }>(
+      `INSERT INTO ws.requests (account_id, business_id, customer_id, service_id, wanted_start, wanted_end, contact, status)
+       VALUES ($1, $2, $3, $4, $5, $6, '{"email":"zakaznik@example.cz","phone":"+420600000001"}', 'new')
+       RETURNING id, public_token`,
+      [A.account, A.business, A.customer, A.service, at(WED, 10), at(WED, 11)],
+    )
+    const pending = await ref(request.public_token)
+    expect(pending).toMatchObject({ kind: 'request', id: request.id })
+    expect((await loadPortal(pending, NOW))?.request).toMatchObject({ status: 'new', service: 'Služba' })
+    const pendingView = await loadPortal(pending, NOW)
+    expect(pendingView?.request?.start?.toISOString()).toBe(at(WED, 10).toISOString())
+    expect(pendingView?.visit).toBeNull()
+    expect(JSON.stringify(pendingView)).not.toContain('zakaznik@example.cz')
+    expect(JSON.stringify(pendingView)).not.toContain('+420600000001')
+    expect(await portalReview(pending, 10, null, NOW)).toEqual({ ok: false, reason: 'not_allowed' })
+
+    const [appointment] = await rows<{ id: string }>(
+      `INSERT INTO ws.appointments (account_id, business_id, staff_id, customer_id, service_id, request_id, starts_at, ends_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [A.account, A.business, A.staff, A.customer, A.service, request.id, at(WED, 10), at(WED, 11)],
+    )
+    expect(await resolvePortal(request.public_token)).toMatchObject({ kind: 'appointment', id: appointment.id })
+    expect((await loadPortal(await ref(request.public_token), NOW))?.visit).toMatchObject({ state: 'upcoming', service: 'Služba' })
+
+    // Výmaz zákazníka odpojí i odkaz na čekající poptávku.
+    await db.query(`UPDATE ws.requests SET customer_id = NULL WHERE id = $1`, [request.id])
+    expect(await resolvePortal(request.public_token)).toBeNull()
+  })
 })
 
 describe('co portál ukazuje', () => {

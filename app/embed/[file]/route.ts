@@ -3,9 +3,9 @@ import { businessBySlug } from '@/lib/ws/intake/http'
 import { loadIntakeConfig } from '@/lib/ws/intake/intake'
 import { widgetScript } from '@/lib/ws/intake/widget-script'
 
-// GET /embed/<slug>.js — widget pro cizí weby (S11, R-016). Skript je veřejný
-// (obsahuje jen veřejný klíč), poptávky z něj API přijme jen z povolených
-// domén byznysu. Cache 5 minut, ať změna klíče nebo služeb doběhne brzy.
+// GET /embed/<slug>.js — veřejný launcher widgetu (S11, RD07). Vkládá stejnou
+// objednávku jako /r; stránku v iframe omezí frame-ancestors na domény byznysu.
+// Samotný skript neobsahuje API klíč. Cache 5 minut.
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +37,7 @@ export async function GET(req: Request, props: { params: Promise<{ file: string 
     return script(
       widgetScript({
         apiOrigin,
-        publicKey: biz.publicKey,
+        slug: m[1]!,
         businessName: config.business.name,
         accent: usableAccent(config.business.color),
       }),

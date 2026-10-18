@@ -4,7 +4,7 @@ import { ReviewForm } from './review-form'
 import { VisitActions } from './visit-actions'
 import { accentVars } from '@/lib/ws/accent'
 import type { WsCurrency } from '@/lib/ws/money'
-import type { PortalJob, PortalView, PortalVisit } from '@/lib/ws/portal'
+import type { PortalJob, PortalRequest, PortalView, PortalVisit } from '@/lib/ws/portal'
 import { cn } from '@/lib/ws/utils'
 import { formatClock, formatDayLong, formatDayShort, formatTimeRange, pragueParts } from '@/lib/ws/time'
 
@@ -35,12 +35,13 @@ export function PortalScreen({ token, view }: { token: string; view: PortalView 
           </span>
           <div className="flex min-w-0 flex-col">
             <p className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink">{brand.name}</p>
-            <p className="text-[14px] text-quiet">{view.job ? 'Vaše zakázka' : 'Váš termín'}</p>
+            <p className="text-[14px] text-quiet">{view.job ? 'Vaše zakázka' : view.request ? 'Vaše poptávka' : 'Váš termín'}</p>
           </div>
         </header>
 
         {view.visit && <VisitSection token={token} visit={view.visit} address={brand.address} />}
         {view.job && <JobSection token={token} job={view.job} address={brand.address} />}
+        {view.request && <RequestSection request={view.request} />}
 
         {view.loyalty && view.loyalty.reward && (
           <section aria-labelledby="vernost" className="flex flex-col gap-3">
@@ -79,6 +80,43 @@ export function PortalScreen({ token, view }: { token: string; view: PortalView 
         </footer>
       </main>
     </div>
+  )
+}
+
+function RequestSection({ request }: { request: PortalRequest }) {
+  const status = request.status === 'new'
+    ? 'Čeká na potvrzení'
+    : request.status === 'declined'
+      ? 'Poptávka byla odmítnuta'
+      : 'Poptávka je přijatá'
+  return (
+    <section aria-labelledby="poptavka" className="flex flex-col gap-4 rounded-panel border border-navy-100 bg-surface p-5 sm:p-6">
+      <div className="flex flex-col gap-2">
+        <p className="font-num text-[12px] uppercase tracking-[0.08em] text-navy-500">{status}</p>
+        <h1 id="poptavka" className="text-[24px] font-semibold leading-tight tracking-[-0.02em] text-ink">Vaše objednávka</h1>
+        {request.service && <p className="text-[15px] text-quiet">{request.service}</p>}
+        {request.start && (
+          <p className="text-[15px] text-ink">
+            {longWhen(request.start)}{request.end ? `–${formatClock(request.end)}` : ''}
+          </p>
+        )}
+      </div>
+      {request.status === 'new' && (
+        <p className="rounded-chip bg-ground p-3 text-[15px] leading-relaxed text-quiet">
+          Vybraný termín ještě není potvrzený. Firma vám dá vědět, jakmile poptávku vyřídí.
+        </p>
+      )}
+      {request.status === 'declined' && (
+        <p className="rounded-chip bg-ground p-3 text-[15px] leading-relaxed text-quiet">
+          Firma tento termín nemůže přijmout.
+        </p>
+      )}
+      {(request.status === 'confirmed' || request.status === 'rescheduled') && (
+        <p className="rounded-chip bg-ground p-3 text-[15px] leading-relaxed text-quiet">
+          Firma vaši poptávku přijala. Pokud se domluvíte na termínu, najdete ho zde.
+        </p>
+      )}
+    </section>
   )
 }
 

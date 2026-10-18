@@ -9,7 +9,7 @@ import { refreshSegmentsSafely } from '../segments'
 import { deliver, notifyNewRequest } from '../email/notify'
 import { fieldValuesSchema, type FieldDefinition } from '../fields'
 import { addDays, formatDayShort, formatMinutes, isIsoDate, pragueParts, pragueToday, pragueToUtc } from '../time'
-import { computeSlots, isSlotFree, toRange, type DaySlots, type Range, type StaffAvailability } from './slots'
+import { computeSlots, isSlotFree, isSlotFreeForStaff, toRange, type DaySlots, type Range, type StaffAvailability } from './slots'
 
 // Příjem poptávek z webů klientů (S11, B6, skill zakaziq-workspace-backend § 5).
 // Jedna cesta pro všechny vstupy: API s tajným klíčem (server webu), API
@@ -156,7 +156,7 @@ export async function loadSlotData(accountId: string, config: IntakeConfig, serv
   const from = now
   const to = new Date(now.getTime() + (BOOKING.slotDays + 2) * 86_400_000)
   const [staffRows, shiftRows, busyRows] = await wsDb({ accountId }).batch([
-    q`SELECT st.id FROM ws.staff st
+    q`SELECT st.id, st.name FROM ws.staff st
       WHERE st.account_id = ${accountId} AND st.business_id = ${biz} AND st.active
         AND (${serviceId}::uuid IS NULL
           OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
@@ -183,6 +183,7 @@ export async function loadSlotData(accountId: string, config: IntakeConfig, serv
   const busy = busyRows as WsRow[]
   const staff: StaffAvailability[] = (staffRows as WsRow[]).map((s) => ({
     id: String(s.id),
+    name: String(s.name),
     shifts: shifts.get(String(s.id)) ?? null,
     busy: busy
       .filter((a) => a.staff_id === s.id)
@@ -215,6 +216,29 @@ export async function loadSlots(
   return computeSlots({ ...data, fromDay: pragueToday(now), days: BOOKING.slotDays, stepMin: BOOKING.stepMin })
 }
 
+export type PublicStaffOption = { id: string; name: string }
+export type OrderAvailability = { slots: DaySlots[]; staff: PublicStaffOption[] }
+
+/** Volné časy a veřejná jména pracovníků pro objednávku. `staffId` omezí časy na jednoho pracovníka. */
+export async function loadOrderAvailability(
+  accountId: string,
+  config: IntakeConfig,
+  serviceId: string | null,
+  staffId: string | null = null,
+  now: Date = new Date(),
+): Promise<OrderAvailability> {
+  if (config.booking !== 'slots') return { slots: [], staff: [] }
+  const data = await loadSlotData(accountId, config, serviceId, now)
+  const staff = data.staff.map((s) => ({ id: s.id, name: s.name ?? '' }))
+  const selected = staffId ? data.staff.filter((s) => s.id === staffId) : data.staff
+  return {
+    slots: staffId && selected.length === 0
+      ? []
+      : computeSlots({ ...data, staff: selected, fromDay: pragueToday(now), days: BOOKING.slotDays, stepMin: BOOKING.stepMin }),
+    staff,
+  }
+}
+
 // --- Vstup ------------------------------------------------------------------
 
 const optionalText = (max: number) =>
@@ -233,6 +257,8 @@ export const requestInputSchema = z
     phone: optionalText(40),
     email: optionalText(200).transform((v) => (v ? v.toLowerCase() : null)),
     serviceId: z.string().uuid('Služba: vyberte prosím službu ze seznamu.').nullish(),
+    // Volitelné a zpětně kompatibilní: pouze veřejný požadavek na konkrétního pracovníka.
+    staffId: z.string().uuid('Pracovník: vyberte prosím ze seznamu.').nullish(),
     start: z
       .string()
       .max(40)
@@ -433,6 +459,11 @@ export async function ingestRequest(
     }
   }
 
+  if (input.staffId && (config.booking !== 'slots' || !input.start && !(input.date && input.time))) {
+    const msg = 'Pracovníka lze vybrat jen u volného termínu.'
+    return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'staffId', message: msg }]), null, false)
+  }
+
   let start: Date | null = input.start
     ? new Date(input.start)
     : input.date && input.time
@@ -445,10 +476,14 @@ export async function ingestRequest(
       const msg = 'Čas: vyberte prosím termín v budoucnu.'
       return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'start', message: msg }]), null, false)
     }
-    if (config.booking === 'slots' && !isTest) {
+    if (config.booking === 'slots' && (!isTest || input.staffId)) {
       const data = await loadSlotData(acc, config, service?.id ?? null, now)
-      if (!isSlotFree(data, start)) {
-        return finish(apiError(409, 'SLOT_TAKEN', 'Tenhle čas už je obsazený. Vyberte prosím jiný.'), null, false)
+      if (input.staffId && !data.staff.some((s) => s.id === input.staffId)) {
+        const msg = 'Tento pracovník danou službu nenabízí. Vyberte prosím jiného.'
+        return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'staffId', message: msg }]), null, false)
+      }
+      if (!isTest && !(input.staffId ? isSlotFreeForStaff(data, start, input.staffId) : isSlotFree(data, start))) {
+        return finish(apiError(409, 'SLOT_TAKEN', 'Tenhle čas už není volný. Vyberte prosím jiný.'), null, false)
       }
     }
   }
@@ -473,9 +508,9 @@ export async function ingestRequest(
     const source = src.channel === 'secret' ? (input.source ?? 'web') : SOURCE[src.channel]
 
     const [insertedRows, existingRows] = await wsDb({ accountId: acc }).batch([
-      q`INSERT INTO ws.requests (account_id, business_id, customer_id, service_id, integration_id, wanted_start, wanted_end,
+      q`INSERT INTO ws.requests (account_id, business_id, customer_id, service_id, requested_staff_id, integration_id, wanted_start, wanted_end,
                                  contact, field_values, message, source, external_id, is_test)
-        VALUES (${acc}, ${src.businessId}, ${customerId}::uuid, ${service?.id ?? null}::uuid, ${src.integrationId}::uuid,
+        VALUES (${acc}, ${src.businessId}, ${customerId}::uuid, ${service?.id ?? null}::uuid, ${input.staffId ?? null}::uuid, ${src.integrationId}::uuid,
                 ${start}::timestamptz, ${end}::timestamptz, ${contact}::jsonb, ${JSON.stringify(fieldsParsed.data)}::jsonb,
                 ${input.message}, ${source}, ${input.externalId}, ${isTest})
         ON CONFLICT (business_id, external_id) WHERE external_id IS NOT NULL DO NOTHING

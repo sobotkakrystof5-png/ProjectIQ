@@ -18,7 +18,7 @@ Tajný klíč patří **jen na server**. Požadavek s tajným klíčem a hlavič
 
 Služby, vlastní kolonky a nabídka času byznysu. Odpověď se smí cachovat 60 s.
 
-Parametry: `serviceId` (nepovinné) — volné časy pro tuhle službu (jinak pro první).
+Parametry: `serviceId` (nepovinné) — volné časy pro tuhle službu (jinak pro první); `staffId` (nepovinné) — časy konkrétního pracovníka. V `booking.staff` dostanete seznam pracovníků, kteří službu nabízejí.
 
 ```bash
 curl https://zakaziq.cz/api/public/v1/schema \
@@ -32,7 +32,7 @@ curl https://zakaziq.cz/api/public/v1/schema \
   "business": { "name": "Kadeřnictví Lenka", "slug": "kadernictvi-lenka", "color": "#23478b" },
   "services": [{ "id": "7e2d…", "name": "Dámský střih", "durationMin": 60, "price": 650, "currency": "CZK" }],
   "fields": [{ "key": "delka_vlasu", "label": "Délka vlasů", "type": "choice", "required": false, "options": ["Krátké", "Střední", "Dlouhé"] }],
-  "booking": { "mode": "slots", "stepMin": 30, "slots": [{ "date": "2026-10-12", "label": "po 12. 10.", "times": [{ "time": "9:00", "start": "2026-10-12T07:00:00.000Z" }] }] },
+  "booking": { "mode": "slots", "stepMin": 30, "slots": [{ "date": "2026-10-12", "label": "po 12. 10.", "times": [{ "time": "9:00", "start": "2026-10-12T07:00:00.000Z" }] }], "staff": [{ "id": "6a32…", "name": "Jana" }, { "id": "7e2d…", "name": "Lenka" }] },
   "contact": { "name": "required", "phoneOrEmail": "required" }
 }
 ```
@@ -68,6 +68,7 @@ Typy kolonek: `text`, `address` (řádek textu), `number`, `date` (RRRR-MM-DD), 
 | `name` | povinné | 2–120 znaků |
 | `phone`, `email` | aspoň jedno | telefon se uloží jako +420…, e-mail malými písmeny; podle nich se najde existující zákazník |
 | `serviceId` | nepovinné | jen služba z `schema` |
+| `staffId` | nepovinné | ID pracovníka z `booking.staff`; jen v režimu `slots`, dostupnost se znovu zkontroluje při uložení. Bez něj se čas nabídne podle všech pracovníků služby. |
 | `start` nebo `date` + `time` | podle `booking.mode` | ISO 8601 s časovým pásmem, nebo pražský den a čas; jen budoucnost |
 | `message` | nepovinné | do 2000 znaků |
 | `fields` | podle kolonek | klíče, které byznys nezná, se zahodí |
@@ -107,7 +108,7 @@ Chyba — `error` a `issues[].message` jsou česky a dají se ukázat přímo u 
 | `INVALID_BODY` | 400 / 413 | tělo není JSON, je moc velké nebo má špatnou hlavičku `Idempotency-Key` |
 | `UNAUTHORIZED` | 401 | špatný nebo chybějící klíč, tajný klíč z prohlížeče — zalogovat, zákazníkovi obecná hláška |
 | `FORBIDDEN_ORIGIN` | 403 | widget z domény, která není povolená |
-| `SLOT_TAKEN` | 409 | čas mezitím někdo vzal — načíst volné časy znovu |
+| `SLOT_TAKEN` | 409 | čas mezitím někdo vzal — načíst `GET /schema` znovu se stejnými `serviceId` a případně `staffId` |
 | `IN_PROGRESS` | 409 | stejný `Idempotency-Key` se právě zpracovává — zkusit za chvíli |
 | `IDEMPOTENCY_MISMATCH` | 422 | stejný klíč, jiné tělo — poslat nový klíč |
 | `RATE_LIMITED` | 429 | moc požadavků (20/min z jedné IP, 300/h na firmu), hlavička `Retry-After` |
@@ -172,13 +173,13 @@ curl -X POST https://zakaziq.cz/api/public/v1/requests \
 
 ```html
 <script src="https://zakaziq.cz/embed/kadernictvi-lenka.js" async></script>
-<!-- formulář přímo ve stránce -->
+<!-- objednávkový formulář přímo ve stránce -->
 <script src="https://zakaziq.cz/embed/kadernictvi-lenka.js" data-mode="inline" async></script>
 <!-- vlastní text tlačítka -->
 <script src="https://zakaziq.cz/embed/kadernictvi-lenka.js" data-label="Rezervovat termín" async></script>
 ```
 
-Skript (do 15 kB gzip, bez knihoven) se vykreslí do shadow DOM, takže ho styly webu nerozbijí. Volá API s veřejným klíčem — web musí být v Povolených webech. Když web používá vlastní CSP, potřebuje `script-src` a `connect-src https://zakaziq.cz`.
+Skript (bez knihoven) vloží tentýž objednávkový formulář jako `/r` do izolovaného iframe; styly webu ho nerozbijí a ve widgetu se neopakuje vlastní formulář ani API klíč. Když web používá vlastní CSP, potřebuje `script-src https://zakaziq.cz`, `style-src https://zakaziq.cz` a `frame-src https://zakaziq.cz`. Objednávka v iframe je omezena sandboxem a stránka `/r` ji dovolí zobrazit jen na doménách povolených v Nastavení › Napojený web.
 
 ## Objednávací stránka ve vlastním rámu
 

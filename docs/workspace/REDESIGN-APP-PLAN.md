@@ -66,7 +66,7 @@
 1. **Region:** `"regions": ["fra1"]` ve `vercel.json` (Hobby dovoluje jeden). Nejdřív ověřit současné nastavení projektu ve Vercelu. Projeví se až po deployi (D-6).
 2. **Méně kol do DB:** jedna SQL funkce vrátí účet + byznys + předplatné najednou; data layoutu (byznysy, funkce, upozornění, služby, novinky) jedním `wsDb.batch`. Cíl: nejvýš 2 kola na navigaci (kontext + layout, data stránky).
 3. **Streaming:** `loading.tsx` pro každou obrazovku, `Suspense` kolem karty zákazníka, grafu, seznamu faktur a `DetailSlot`, aby panel nikdy neblokoval stránku.
-4. **Dotazy (RD03):** součty a rozpady v SQL místo v JS (Peníze), `EXPLAIN` na `getTodayData` a `getFinance`, chybějící indexy do migrace 085.
+4. **Dotazy (RD03):** součty a rozpady v SQL místo v JS (Peníze), `EXPLAIN` na `getTodayData` a `getFinance`, chybějící indexy do migrace 086.
 5. **Klient (RD03):** prefetch odkazů v postranním panelu, optimistické akce tam, kde jich ještě není (zaplaceno, razítko), levnější živé obnovení (`router.refresh()` jen při skutečné změně), dynamický import grafu, `dnd-kit` a `cmdk`.
 6. Cache dat účtu jen s klíčem účtu a tagy, jinak ne (oddělení účtů má přednost). Volitelné, rozhodne se podle měření.
 
@@ -88,7 +88,7 @@
 ### F5 — Rezervační systém (RD07, RD08, RD09)
 - **Zákaznická objednávka (`/r`, widget) — RD07:** nejvýš 3 obrazovky, krok služby se přeskočí u jediné služby, nahoře „Nejbližší volný termín“, kalendář dnů s dostupností, výběr pracovníka „kdokoli“ / konkrétní, při obsazení hned nabídnout nejbližší jiný čas, potvrzení s „Přidat do kalendáře“ a odkazem do portálu. Lehčí bundle (animace jen u změny kroku).
 - **Vaše rezervace — RD08:** z kalendáře (klik/tažení), z karty zákazníka „Objednat znovu“, ⌘K (existuje). Volitelně opakování („každé 4 týdny“), jen pokud ho chcete (D-5).
-- **Více služeb v jedné rezervaci — RD08:** zákazník vybere víc služeb, součet délek, jeden souvislý blok. Datově: `ws.appointments.group_id` (společné potvrzení/zrušení/přesun) + `ws.request_services` (pořadí služeb v poptávce). `EXCLUDE` na pracovníka zůstává, takže kolize hlídá dál DB. Migrace 085 + testy v PGlite.
+- **Více služeb v jedné rezervaci — RD08:** zákazník vybere víc služeb, součet délek, jeden souvislý blok. Datově: `ws.appointments.group_id` (společné potvrzení/zrušení/přesun) + `ws.request_services` (pořadí služeb v poptávce). `EXCLUDE` na pracovníka zůstává, takže kolize hlídá dál DB. Migrace 088 + testy v PGlite.
 - **Pracovníci — RD07:** výběr „kdokoli“ spojí volné časy všech, kdo službu dělá. Bez sdílených zdrojů (židle, místnost), to je další úroveň.
 - **Kapacita — RD09, volitelné, po D-4:** (1) skupinové termíny s N místy (kurz, lekce) = nová entita `ws.sessions` + `ws.session_attendees`; (2) více zákazníků naráz u jednoho pracovníka. Doporučuji RD08 hotové dřív a kapacitu (1) jako samostatný krok.
 
@@ -152,8 +152,8 @@ Pořadí je doporučené. Po RD04 jsou RD05–RD06, RD10–RD13 na sobě nezávi
 | RD04 | Dnes + hlavička + společné komponenty | M | — | D-3 | hotovo v kódu 2026-10-18 (hlavní věc `pickFocus` + `TodayFocus`, karta zákazníka v panelu, `PageShell`/`PageHeader`/`Toolbar`/`PillNav`/`EmptyState compact` na Dnes, Poptávkách, Zákaznících; vzhled ověřen na dočasné stránce s fiktivními daty na 390/768/1280/1440 px světle i tmavě; **s přihlášením neověřeno**) |
 | RD05 | Kalendář | M–L | — | — | hotovo v kódu 2026-10-18 (jedna lišta, rychlé zadání klikem i tažením včetně výběru doby v dotykovém režimu, aktuální čas v dnešním sloupci, rady k času a kolize, tři nejbližší volné časy u poptávky, Najít volný čas v ⌘K/menu/panelu, barvy pracovníků a filtr, stínování mimo otevírací dobu a mezery, délka tažením a v detailu, skok na datum, přejetí na telefonu; původní vzhled ověřen na dočasné stránce s fiktivními daty, **nový dotykový režim neověřený na zařízení, s přihlášením neověřeno**; R-059) |
 | RD06 | Zakázky | S–M | — | — | hotovo v kódu 2026-10-18 (tabule i seznam, filtry Čeká na mě / Po termínu / Bez termínu v URL, kompaktní karta, shrnutí, stav a historie stavů v panelu, výběr stavu jako klávesnicová náhrada tažení; historie bez migrace přes `audit_log`; vzhled ověřen na dočasné stránce, **s přihlášením neověřeno**; R-059) |
-| RD07 | Zákaznická objednávka `/r` + widget + pracovníci | M–L | — | — | nezačato |
-| RD08 | Více služeb + vaše rezervace | L | 085 | D-5 (opakování) | nezačato |
+| RD07 | Zákaznická objednávka `/r` + widget + pracovníci | M–L | 087 | — | hotovo v kódu 2026-10-18 (3 kroky podle počtu služeb, nejbližší termín, dny bez dostupnosti vypnuté, kdokoli / konkrétní pracovník, ihned obnovené časy při kolizi, předběžný ICS a portálový odkaz; widget používá stejný formulář v sandboxovaném iframe; preference pracovníka se uloží a předvolí při potvrzení). Migrace 087 připravená, na Neonu neaplikovaná. Ověřeno: 71 cílených testů, celý `npm test` (551 + 1 přeskočený), `tsc`, `next build --webpack` a lokální vizuální průchod s fiktivními daty v úzkém (614 px) a širokém (1228 px) zobrazení. `build:check` blokuje sandbox při spuštění procesu/portu; Preview a chování po migraci 087 zbývají. |
+| RD08 | Více služeb + vaše rezervace | L | 088 | D-5 (opakování) | nezačato |
 | RD09 | Kapacita / skupinové termíny (volitelné) | L | ano | D-4 | nezačato |
 | RD10 | Fakturace | M–L | možná (profil dodavatele) | D-5 (QR) | nezačato |
 | RD11 | Přehled peněz, Daně, soukromí | M (+ L při šifrování) | — | D-1 | nezačato |

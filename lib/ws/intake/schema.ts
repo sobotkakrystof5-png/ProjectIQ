@@ -1,11 +1,11 @@
 import 'server-only'
 import { webFields } from '../fields'
 import { formatDayShort, formatMinutes, pragueToUtc } from '../time'
-import { BOOKING, type IntakeConfig } from './intake'
+import { BOOKING, type IntakeConfig, type PublicStaffOption } from './intake'
 import type { DaySlots } from './slots'
 
-// Tvar odpovědi GET /api/public/v1/schema (S11). Stejná data dostane widget
-// a z nich se skládá prompt pro Claude Code. Jen to, co smí vidět veřejnost:
+// Tvar odpovědi GET /api/public/v1/schema (S11). Z těchto dat se skládá i
+// prompt pro Claude Code. Jen to, co smí vidět veřejnost:
 // název, služby, kolonky, volné časy — nic o zákaznících.
 
 export type PublicSchema = {
@@ -15,7 +15,7 @@ export type PublicSchema = {
   services: { id: string; name: string; durationMin: number; price: number | null; currency: string }[]
   fields: { key: string; label: string; type: string; required: boolean; options?: string[]; help?: string }[]
   booking:
-    | { mode: 'slots'; stepMin: number; slots: { date: string; label: string; times: { time: string; start: string }[] }[] }
+    | { mode: 'slots'; stepMin: number; slots: { date: string; label: string; times: { time: string; start: string }[] }[]; staff?: PublicStaffOption[] }
     | { mode: 'free'; stepMin: number; maxDays: number; from: string; to: string }
     | { mode: 'none' }
   contact: { name: 'required'; phoneOrEmail: 'required' }
@@ -38,10 +38,15 @@ export function orderSlots(slots: DaySlots[]) {
   }))
 }
 
-export function buildPublicSchema(config: IntakeConfig, slots: DaySlots[]): PublicSchema {
+export function buildPublicSchema(config: IntakeConfig, slots: DaySlots[], staff: PublicStaffOption[] = []): PublicSchema {
   const booking: PublicSchema['booking'] =
     config.booking === 'slots'
-      ? { mode: 'slots', stepMin: BOOKING.stepMin, slots: slotsForPublic(slots) }
+      ? {
+          mode: 'slots',
+          stepMin: BOOKING.stepMin,
+          slots: slotsForPublic(slots),
+          ...(staff.length > 1 ? { staff } : {}),
+        }
       : config.booking === 'free'
         ? {
             mode: 'free',

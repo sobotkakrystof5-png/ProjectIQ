@@ -394,6 +394,8 @@ export type RequestDetail = {
   contact: { name?: string; phone?: string; email?: string }
   service_id: string | null
   service_name: string | null
+  requested_staff_id: string | null
+  requested_staff_name: string | null
   /** Délka služby v minutách (pro konec termínu, když zákazník zadal jen začátek). */
   duration_min: number | null
   wanted_start: Date | null
@@ -422,10 +424,12 @@ export async function getRequestDetail(
     q`
       SELECT r.id, r.status, r.source, r.customer_id, r.contact, r.field_values, r.message,
              r.wanted_start, r.wanted_end, r.created_at, r.service_id, s.name AS service_name, s.duration_min,
+             r.requested_staff_id, st.name AS requested_staff_name,
              COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
+      LEFT JOIN ws.staff st ON st.account_id = r.account_id AND st.business_id = r.business_id AND st.id = r.requested_staff_id
       WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.id = ${requestId}
     `,
     q`
@@ -453,6 +457,8 @@ export async function getRequestDetail(
     contact: { name: str(contact.name), phone: str(contact.phone), email: str(contact.email) },
     service_id: (r.service_id as string | null) ?? null,
     service_name: (r.service_name as string | null) ?? null,
+    requested_staff_id: (r.requested_staff_id as string | null) ?? null,
+    requested_staff_name: (r.requested_staff_name as string | null) ?? null,
     duration_min: r.duration_min === null || r.duration_min === undefined ? null : Number(r.duration_min),
     wanted_start: (r.wanted_start as Date | null) ?? null,
     wanted_end: (r.wanted_end as Date | null) ?? null,

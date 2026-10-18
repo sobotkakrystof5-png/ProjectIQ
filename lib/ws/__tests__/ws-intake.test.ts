@@ -17,9 +17,9 @@ import {
   secretPrefixOf,
   setAllowedOrigins,
 } from '../keys'
-import { ingestRequest, loadIntakeConfig, loadSlots, type IntakeSource } from '../intake/intake'
+import { ingestRequest, loadIntakeConfig, loadOrderAvailability, loadSlots, type IntakeSource } from '../intake/intake'
 import { businessBySlug } from '../intake/http'
-import { computeSlots, isSlotFree } from '../intake/slots'
+import { computeSlots, isSlotFree, isSlotFreeForStaff } from '../intake/slots'
 import { pragueToUtc } from '../time'
 import { POST as requestsPost, OPTIONS as requestsOptions } from '@/app/api/public/v1/requests/route'
 import { GET as schemaGet } from '@/app/api/public/v1/schema/route'
@@ -207,6 +207,17 @@ describe('volné časy', () => {
     expect(isSlotFree({ ...base, staff }, pragueToUtc('2026-10-12', 11 * 60 + 30))).toBe(false)
     expect(isSlotFree({ ...base, staff, now: new Date(MONDAY_9.getTime() - 30 * 60_000) }, MONDAY_9)).toBe(false)
   })
+
+  it('konkrétní pracovník musí mít čas volný sám pro sebe', () => {
+    const staff = [
+      { id: 's1', shifts: null, busy: [{ start: MONDAY_9, end: MONDAY_10 }] },
+      { id: 's2', shifts: null, busy: [] },
+    ]
+    expect(isSlotFree({ ...base, staff }, MONDAY_9)).toBe(true)
+    expect(isSlotFreeForStaff({ ...base, staff }, MONDAY_9, 's1')).toBe(false)
+    expect(isSlotFreeForStaff({ ...base, staff }, MONDAY_9, 's2')).toBe(true)
+    expect(isSlotFreeForStaff({ ...base, staff }, MONDAY_9, 'unknown')).toBe(false)
+  })
 })
 
 describe('ingestRequest', () => {
@@ -292,6 +303,42 @@ describe('ingestRequest', () => {
     const slots = await loadSlots(A.account, config!, A.service, NOW)
     expect(slots[0]).toMatchObject({ date: '2026-10-12' })
     expect(slots[0].times).not.toContain(9 * 60)
+  })
+
+  it('nabídne pracovníky služby, omezí časy podle výběru a uloží preferenci', async () => {
+    const [second] = await db.query<{ id: string }>(
+      `INSERT INTO ws.staff (account_id, business_id, name) VALUES ($1, $2, 'Jana') RETURNING id`,
+      [A.account, A.business],
+    ).then((r) => r.rows)
+    try {
+      await db.query(
+        `INSERT INTO ws.service_staff (account_id, business_id, service_id, staff_id) VALUES ($1, $2, $3, $4)`,
+        [A.account, A.business, A.service, second.id],
+      )
+      await db.query(
+        `INSERT INTO ws.appointments (account_id, business_id, staff_id, starts_at, ends_at) VALUES ($1, $2, $3, $4, $5)`,
+        [A.account, A.business, second.id, MONDAY_10, new Date(MONDAY_10.getTime() + 60 * 60_000)],
+      )
+
+      const config = await loadIntakeConfig(A.account, A.business)
+      expect(config).not.toBeNull()
+      const all = await loadOrderAvailability(A.account, config!, A.service, null, NOW)
+      const onlySecond = await loadOrderAvailability(A.account, config!, A.service, second.id, NOW)
+      expect(all.staff).toEqual(expect.arrayContaining([{ id: A.staff, name: 'Pracovník' }, { id: second.id, name: 'Jana' }]))
+      expect(all.slots.find((d) => d.date === '2026-10-12')?.times).toContain(10 * 60)
+      expect(onlySecond.slots.find((d) => d.date === '2026-10-12')?.times).not.toContain(10 * 60)
+
+      const taken = await ingestRequest(srcA(), valid({ serviceId: A.service, staffId: second.id, start: MONDAY_10.toISOString() }), { now: NOW })
+      expect(taken.body).toMatchObject({ code: 'SLOT_TAKEN' })
+      const saved = await ingestRequest(srcA(), valid({ serviceId: A.service, staffId: second.id, start: pragueToUtc('2026-10-12', 11 * 60).toISOString() }), { now: NOW })
+      expect(saved.status).toBe(202)
+      const id = saved.body.success ? saved.body.id : ''
+      expect(await count(`SELECT count(*)::int AS n FROM ws.requests WHERE id = $1 AND requested_staff_id = $2`, [id, second.id])).toBe(1)
+    } finally {
+      await db.query(`DELETE FROM ws.appointments WHERE account_id = $1 AND staff_id = $2`, [A.account, second.id])
+      await db.query(`DELETE FROM ws.service_staff WHERE account_id = $1 AND staff_id = $2`, [A.account, second.id])
+      await db.query(`DELETE FROM ws.staff WHERE account_id = $1 AND id = $2`, [A.account, second.id])
+    }
   })
 
   it('bez otevírací doby si zákazník čas navrhne sám', async () => {
@@ -424,6 +471,12 @@ describe('POST /api/public/v1/requests', () => {
     expect(body).toMatchObject({ success: true, version: 1, business: { slug: 'byznys-a' }, booking: { mode: 'slots' } })
     expect(body.fields.map((f: { key: string }) => f.key)).toEqual(['poznamka', 'delka'])
     expect(JSON.stringify(body)).not.toContain('zakaznik@example.cz')
+    const badStaff = await schemaGet(
+      new Request(`https://zakaziq.cz/api/public/v1/schema?key=${publicKey}&staffId=neplatne`, {
+        headers: { origin: ORIGIN_A, 'x-forwarded-for': nextIp() },
+      }),
+    )
+    expect(badStaff.status).toBe(400)
     const foreign = await schemaGet(
       new Request(`https://zakaziq.cz/api/public/v1/schema?key=${publicKey}`, {
         headers: { origin: 'https://cizi.example', 'x-forwarded-for': nextIp() },
@@ -446,7 +499,7 @@ describe('widget /embed/[slug].js', () => {
     const { gzipSync } = await import('zlib')
     const src = widgetScript({
       apiOrigin: 'https://zakaziq.cz',
-      publicKey: 'pk_live_ABCDEFGHIJKLMNOPQRSTUVWX',
+      slug: 'salon',
       businessName: 'Salon </script><img src=x onerror=alert(1)> ',
       accent: '#23478b',
     })
@@ -454,19 +507,33 @@ describe('widget /embed/[slug].js', () => {
     expect(src).not.toContain('</script>')
     expect(src).not.toContain('<img')
     expect(gzipSync(src).length).toBeLessThan(15 * 1024)
+    expect(src).toContain('/r/')
+    expect(src).toContain('allow-forms allow-scripts allow-same-origin allow-downloads')
+    expect(src).toContain('/embed/widget.css')
+    expect(src).not.toContain('<style')
+    expect(src).not.toContain('pk_live_')
     // Data z nastavení jen přes textContent, innerHTML se nepoužívá vůbec.
     expect(src).not.toMatch(/innerHTML/)
   })
 
-  it('route: známý slug vrátí skript s veřejným klíčem, neznámý 404', async () => {
+  it('route: známý slug vrátí objednávkový iframe, neznámý 404', async () => {
     const { GET } = await import('@/app/embed/[file]/route')
-    const { public_key } = await ensureIntegration(ctxA, bizA)
+    await ensureIntegration(ctxA, bizA)
     const res = await GET(new Request('https://zakaziq.cz/embed/byznys-a.js'), { params: Promise.resolve({ file: 'byznys-a.js' }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toMatch(/javascript/)
     const body = await res.text()
-    expect(body).toContain(public_key)
+    expect(body).toContain('"/r/"')
+    expect(body).toContain('"?embed=1"')
+    expect(body).toContain('"byznys-a"')
+    expect(body).not.toContain('pk_live_')
     expect(body).not.toMatch(/sk_live_/)
+    const { GET: cssGet } = await import('@/app/embed/widget.css/route')
+    const css = await cssGet(new Request('https://zakaziq.cz/embed/widget.css?accent=%23ffffff%3B%20%7D%20body%20%7B%20color%3Ared'))
+    expect(css.headers.get('content-type')).toMatch(/text\/css/)
+    const cssBody = await css.text()
+    expect(cssBody).toContain('background:#23478b')
+    expect(cssBody).not.toContain('color:red')
     const none = await GET(new Request('https://zakaziq.cz/embed/neni.js'), { params: Promise.resolve({ file: 'neni.js' }) })
     expect(none.status).toBe(404)
     const bad = await GET(new Request('https://zakaziq.cz/embed/x'), { params: Promise.resolve({ file: '../x' }) })

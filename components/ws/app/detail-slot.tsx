@@ -249,6 +249,7 @@ async function panelContent(
                 advice={advice}
                 serviceId={r.service_id}
                 durationMin={wantedMin ?? r.duration_min ?? null}
+                preferredStaffId={r.requested_staff_id}
                 settingsHref={`${navHref(business.slug, 'nastaveni')}/oteviraci-doba`}
               />
             )}
@@ -258,6 +259,11 @@ async function panelContent(
                 <Row label="Chtěný termín">
                   <span className="font-num">{formatDayShort(wanted!.date)} </span>
                   <TimeRange start={r.wanted_start} end={r.wanted_end ?? undefined} />
+                </Row>
+              )}
+              {r.requested_staff_id && (
+                <Row label="Požadovaný pracovník">
+                  {r.requested_staff_name ?? 'Už není dostupný'}
                 </Row>
               )}
               {r.contact.phone && (

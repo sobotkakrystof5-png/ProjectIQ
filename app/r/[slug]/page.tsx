@@ -5,11 +5,11 @@ import { OrderFlow } from '@/components/ws/order/order-flow'
 import { Logo } from '@/components/ws/brand'
 import { accentVars } from '@/lib/ws/accent'
 import { businessBySlug } from '@/lib/ws/intake/http'
-import { loadIntakeConfig, loadSlots } from '@/lib/ws/intake/intake'
+import { loadIntakeConfig, loadOrderAvailability } from '@/lib/ws/intake/intake'
 import { orderSlots } from '@/lib/ws/intake/schema'
 import { webFields } from '@/lib/ws/fields'
 import { pragueToday } from '@/lib/ws/time'
-import type { OrderSlots } from './actions'
+import type { OrderAvailability } from './actions'
 
 // Objednávací stránka byznysu /r/[slug] (S11, R-016, plán „Odkaz, žádný kód“).
 // Bez přihlášení, ve stylu Dílků s barvou byznysu. Neznámý nebo archivovaný
@@ -38,22 +38,25 @@ function initials(name: string): string {
   return (words.length > 1 ? `${words[0][0]}${words[1][0]}` : (words[0] ?? '?').slice(0, 2)).toUpperCase()
 }
 
-export default async function OrderPage(props: { params: Promise<{ slug: string }> }) {
+export default async function OrderPage(props: { params: Promise<{ slug: string }>; searchParams?: Promise<{ embed?: string }> }) {
   const params = await props.params
+  const searchParams = await props.searchParams
+  const embedded = searchParams?.embed === '1'
   const data = await load(params.slug)
   if (!data) notFound()
   const { biz, config } = data
   const { business } = config
 
   // Jedna (nebo žádná) služba = volné časy hned; jinak až po výběru služby.
-  let initialSlots: OrderSlots | null = null
+  let initialAvailability: OrderAvailability | null = null
   if (config.booking === 'slots' && config.services.length <= 1) {
-    initialSlots = orderSlots(await loadSlots(biz.accountId, config, config.services[0]?.id ?? null))
+    const availability = await loadOrderAvailability(biz.accountId, config, config.services[0]?.id ?? null)
+    initialAvailability = { slots: orderSlots(availability.slots), staff: availability.staff }
   }
 
   return (
     <div style={accentVars(business.color)} className="min-h-screen bg-ground">
-      <main className="mx-auto flex w-full max-w-[560px] flex-col gap-8 px-4 pb-16 pt-8 sm:pt-12">
+      <main className={`mx-auto flex w-full max-w-[560px] flex-col gap-8 px-4 pb-16 ${embedded ? 'pt-5' : 'pt-8 sm:pt-12'}`}>
         <header className="flex items-center gap-3">
           <span
             aria-hidden
@@ -70,6 +73,7 @@ export default async function OrderPage(props: { params: Promise<{ slug: string 
         <OrderFlow
           slug={business.slug}
           businessName={business.name}
+          embedded={embedded}
           services={config.services.map((s) => ({
             id: s.id,
             name: s.name,
@@ -86,14 +90,14 @@ export default async function OrderPage(props: { params: Promise<{ slug: string 
             help: f.help_text ?? null,
           }))}
           booking={config.booking}
-          initialSlots={initialSlots}
+          initialAvailability={initialAvailability}
           today={pragueToday()}
         />
 
-        <footer className="mt-auto flex items-center gap-2 pt-6 text-[13px] text-quiet">
+        {!embedded && <footer className="mt-auto flex items-center gap-2 pt-6 text-[13px] text-quiet">
           <Logo size={18} />
           <span>Poptávky přes ZakazIQ</span>
-        </footer>
+        </footer>}
       </main>
     </div>
   )

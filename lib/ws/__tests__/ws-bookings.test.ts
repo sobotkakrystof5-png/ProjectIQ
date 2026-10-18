@@ -37,11 +37,11 @@ const bizB = { id: B.business, name: 'Byznys b' }
 const at = (iso: string) => new Date(iso)
 
 /** Nová poptávka účtu A (jako vlastník DB, mimo RLS). */
-async function newRequest(start: string | null, opts: { end?: string; service?: string | null } = {}): Promise<string> {
+async function newRequest(start: string | null, opts: { end?: string; service?: string | null; requestedStaff?: string | null } = {}): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO ws.requests (account_id, business_id, customer_id, service_id, wanted_start, wanted_end, source)
-     VALUES ($1, $2, $3, $4, $5, $6, 'web') RETURNING id`,
-    [A.account, A.business, A.customer, opts.service === undefined ? A.service : opts.service, start, opts.end ?? null],
+    `INSERT INTO ws.requests (account_id, business_id, customer_id, service_id, wanted_start, wanted_end, requested_staff_id, source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'web') RETURNING id`,
+    [A.account, A.business, A.customer, opts.service === undefined ? A.service : opts.service, start, opts.end ?? null, opts.requestedStaff ?? null],
   )
   return rows[0].id
 }
@@ -87,6 +87,29 @@ describe('potvrzení poptávky', () => {
     expect(appt.request_id).toBe(id)
     expect(appt.customer_id).toBe(A.customer)
     expect(res.data.jobId).toBeNull() // byznys A nemá zapnuté zakázky
+  })
+
+  it('při potvrzení předvolí pracovníka požadovaného zákazníkem', async () => {
+    const [other] = await db.query<{ id: string }>(
+      `INSERT INTO ws.staff (account_id, business_id, name) VALUES ($1, $2, 'Jana') RETURNING id`,
+      [A.account, A.business],
+    ).then((r) => r.rows)
+    await db.query(
+      `INSERT INTO ws.service_staff (account_id, business_id, service_id, staff_id) VALUES ($1, $2, $3, $4)`,
+      [A.account, A.business, A.service, other.id],
+    )
+    try {
+      const id = await newRequest('2026-11-03T09:00:00Z', { requestedStaff: other.id })
+      const res = await confirmRequest(ctxA, bizA, { requestId: id })
+      expect(res.ok).toBe(true)
+      if (!res.ok) return
+      const appt = await row<{ staff_id: string }>(`SELECT staff_id FROM ws.appointments WHERE id = $1`, [res.data.appointmentId])
+      expect(appt.staff_id).toBe(other.id)
+    } finally {
+      await db.query(`DELETE FROM ws.appointments WHERE account_id = $1 AND staff_id = $2`, [A.account, other.id])
+      await db.query(`DELETE FROM ws.service_staff WHERE account_id = $1 AND staff_id = $2`, [A.account, other.id])
+      await db.query(`DELETE FROM ws.staff WHERE account_id = $1 AND id = $2`, [A.account, other.id])
+    }
   })
 
   it('jiný čas = stav „rescheduled“ a termín na novém čase', async () => {
