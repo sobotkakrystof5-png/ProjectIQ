@@ -22,7 +22,7 @@ export type QuickBookingStart = {
   day: string
   minutes: number
   staffId: string | null
-  /** Délka vytažená myší v mřížce; `null` = platí délka služby. */
+  /** Délka vybraná tažením v mřížce; `null` = platí délka služby. */
   durationMin: number | null
 }
 

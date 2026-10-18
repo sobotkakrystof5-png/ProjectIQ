@@ -56,3 +56,13 @@
     display: none;
   }
 }
+
+.calendar-touch-select-control {
+  display: none;
+}
+
+@media (any-pointer: coarse) {
+  .calendar-touch-select-control {
+    display: flex;
+  }
+}

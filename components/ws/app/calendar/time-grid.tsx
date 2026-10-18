@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { confirmRequest, moveAppointment, resizeAppointment } from '@/app/w/[business]/poptavky/actions'
+import { Button } from '@/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { toast } from '@/components/ui/toast'
 import { NowIndicator } from '@/components/ws/app/calendar/now-indicator'
@@ -137,6 +138,7 @@ export function TimeGrid({
   const pick = useRef<{ col: GridColumn; el: HTMLElement; startY: number; from: number; dragging: boolean; range: Selection | null } | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [quick, setQuick] = useState<Quick | null>(null)
+  const [touchSelect, setTouchSelect] = useState(false)
   const box = quick?.range ?? selection
   const firstColumnByDay = new Map<string, string>()
   for (const col of columns) {
@@ -185,13 +187,13 @@ export function TimeGrid({
     if (!canPick(col) || e.button !== 0 || e.target !== e.currentTarget) return
     const el = e.currentTarget
     pick.current = { col, el, startY: e.clientY, from: clampMin(minutesAt(el, e.clientY)), dragging: false, range: null }
-    // Dotyk si nechává posouvání stránky, výběr tažením je jen pro myš a pero.
-    if (e.pointerType !== 'touch') el.setPointerCapture(e.pointerId)
+    // Dotyk si běžně nechává posouvání stránky; tažení povolí až výslovný režim.
+    if (e.pointerType !== 'touch' || touchSelect) el.setPointerCapture(e.pointerId)
   }
 
   const pickMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const p = pick.current
-    if (!p || e.pointerType === 'touch') return
+    if (!p || (e.pointerType === 'touch' && !touchSelect)) return
     if (!p.dragging && Math.abs(e.clientY - p.startY) < DRAG_THRESHOLD_PX) return
     p.dragging = true
     const now = clampMin(minutesAt(p.el, e.clientY))
@@ -223,11 +225,13 @@ export function TimeGrid({
       range,
       start: { day: p.col.day, minutes: range.from, staffId: p.col.staffId ?? null, durationMin },
     })
+    if (touchSelect) setTouchSelect(false)
   }
 
   const pickCancel = () => {
     pick.current = null
     setSelection(null)
+    if (touchSelect) setTouchSelect(false)
   }
 
   const fullFormHref = (s: { name: string; customerId: string; day: string; minutes: number; serviceName: string; staffId: string }) => {
@@ -302,6 +306,24 @@ export function TimeGrid({
   return (
     <Popover open={quick !== null} onOpenChange={(o) => !o && setQuick(null)}>
       <div className={cn('overflow-x-auto', className)}>
+        <div className="calendar-touch-select-control sticky left-0 z-30 mb-3 w-fit items-center gap-3 rounded-box bg-surface">
+          <Button
+            variant="outline"
+            aria-pressed={touchSelect}
+            onClick={() => {
+              pick.current = null
+              setSelection(null)
+              setTouchSelect((active) => !active)
+            }}
+          >
+            {touchSelect ? 'Zrušit výběr' : 'Vybrat dobu'}
+          </Button>
+          {touchSelect && (
+            <p role="status" className="text-sm text-quiet">
+              Táhněte prstem od začátku do konce; krátký dotyk vybere začátek a délku určí služba.
+            </p>
+          )}
+        </div>
         <div className="grid min-w-[560px]" style={{ gridTemplateColumns: `44px repeat(${columns.length}, minmax(0, 1fr))` }}>
           <div aria-hidden />
           {columns.map((c) => (
@@ -341,6 +363,7 @@ export function TimeGrid({
                   col.requests && 'bg-signal-bg/30',
                   over === col.key && 'bg-navy-100/50 dark:bg-navy-800/50',
                   canPick(col) && 'cursor-cell',
+                  canPick(col) && touchSelect && 'touch-pan-x',
                 )}
                 style={{
                   height,
@@ -486,7 +509,7 @@ export function TimeGrid({
         </div>
         <p className="sr-only">
           Termín přesunete v jeho detailu tlačítkem Přesunout, délku změníte tamtéž. Myší ho můžete přetáhnout a za spodní okraj natáhnout.
-          Novou rezervaci založíte tlačítkem Nová rezervace.
+          Na dotykové obrazovce můžete zapnout Vybrat dobu a tažením prstu zvolit její délku. Novou rezervaci založíte tlačítkem Nová rezervace.
         </p>
       </div>
 
