@@ -146,7 +146,7 @@ Pořadí je doporučené. Po RD04 jsou RD05–RD06, RD10–RD13 na sobě nezávi
 | Sezení | Obsah | Velikost | Migrace | Potřebná rozhodnutí | Stav |
 |---|---|---|---|---|---|
 | RD00 | Příprava, větev, testovací DB, měření, R-058 | S | — | D-7, D-8, všechna ke schválení | rozpracováno 2026-10-18: rozhodnutí a R-058 hotové, větev a commity hotové; zbývá Neon branch, měření a průchod s přihlášením |
-| RD01 | Menu a Účet: Nastavení do Účtu, Peníze sloučeno | S–M | — | D-9 (rozhodnuto) | nezačato |
+| RD01 | Menu a Účet: Nastavení do Účtu, Peníze sloučeno | S–M | — | D-9 (rozhodnuto) | hotovo 2026-10-18 (kód, testy, náhled na 4 šířkách světle i tmavě; s přihlášením neověřeno) |
 | RD02 | Rychlost I: region, kola do DB, streaming | M | — | D-6 | nezačato |
 | RD03 | Rychlost II: dotazy, indexy, klient, bundle | M | možná indexy | — | nezačato |
 | RD04 | Dnes + hlavička + společné komponenty | M | — | D-3 | nezačato |

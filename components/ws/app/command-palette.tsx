@@ -16,9 +16,10 @@ import { searchAction } from '@/app/w/[business]/actions'
 import { normalize, parseCommand } from '@/lib/ws/command-parser'
 import { hrefWith } from '@/lib/ws/detail-param'
 import type { NewAction } from '@/lib/ws/features'
-import { navHref, type NavItem } from '@/lib/ws/nav'
+import { navHref, type AccountLink, type NavItem } from '@/lib/ws/nav'
 import type { SearchHit } from '@/lib/ws/search'
 import { formatDayShort, formatMinutes } from '@/lib/ws/time'
+import { ACCOUNT_ICONS } from './account-menu'
 import { copyOrderLink } from './copy-order-link'
 import { NavIcon } from './nav-icon'
 
@@ -27,6 +28,8 @@ export type PaletteProps = {
   onOpenChange: (open: boolean) => void
   slug: string
   nav: NavItem[]
+  /** Nastavení a Účet (jen majitel, RD01) — v hlavním menu nejsou, ⌘K je dál najde. */
+  accountLinks: AccountLink[]
   /** Jen hotové akce (lib/ws/features.ts, R-043). */
   actions: NewAction[]
   orderUrl: string
@@ -42,7 +45,7 @@ const HIT_GROUP = { zakaznik: 'Zákazníci', poptavka: 'Poptávky', faktura: 'Fa
  * akce. „rezervace Tereza pátek 9:00" rozpozná parser a nabídne rezervaci
  * s předvyplněnými údaji (lib/ws/command-parser.ts).
  */
-export function CommandPalette({ open, onOpenChange, slug, nav, actions: available, orderUrl, services, today }: PaletteProps) {
+export function CommandPalette({ open, onOpenChange, slug, nav, accountLinks, actions: available, orderUrl, services, today }: PaletteProps) {
   const canBook = available.includes('booking')
   const router = useRouter()
   const pathname = usePathname()
@@ -99,6 +102,7 @@ export function CommandPalette({ open, onOpenChange, slug, nav, actions: availab
   const q = normalize(query.trim())
   const matches = (label: string) => !q || normalize(label).includes(q)
   const navMatches = nav.filter((i) => matches(i.label))
+  const accountMatches = accountLinks.filter((l) => matches(l.paletteLabel))
 
   const actions: { key: string; label: string; icon: LucideIcon; run: () => void }[] = []
   if (available.includes('booking')) actions.push({ key: 'booking', label: 'Nová rezervace', icon: CalendarPlus, run: () => openDetail('nova-rezervace') })
@@ -203,7 +207,7 @@ export function CommandPalette({ open, onOpenChange, slug, nav, actions: availab
           </CommandGroup>
         )}
 
-        {navMatches.length > 0 && (
+        {navMatches.length + accountMatches.length > 0 && (
           <CommandGroup heading="Přejít na">
             {navMatches.map((item) => (
               <CommandItem key={item.key} value={`nav-${item.key}`} onSelect={() => go(navHref(slug, item.segment))}>
@@ -211,6 +215,15 @@ export function CommandPalette({ open, onOpenChange, slug, nav, actions: availab
                 {item.label}
               </CommandItem>
             ))}
+            {accountMatches.map((l) => {
+              const Icon = ACCOUNT_ICONS[l.key]
+              return (
+                <CommandItem key={l.key} value={`ucet-${l.key}`} onSelect={() => go(l.href)}>
+                  <Icon aria-hidden size={18} strokeWidth={1.5} />
+                  {l.paletteLabel}
+                </CommandItem>
+              )
+            })}
           </CommandGroup>
         )}
       </CommandList>

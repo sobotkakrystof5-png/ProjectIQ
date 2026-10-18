@@ -3,7 +3,8 @@ import { hourRange, layoutWeek } from '../calendar-layout'
 import { parseCommand } from '../command-parser'
 import { detailValue, hrefWith, parseDetail } from '../detail-param'
 import { newActions, WS_FEATURES } from '../features'
-import { bottomBarSlots, navItemForSegment, navItems } from '../nav'
+import { accountLinks, bottomBarSlots, isAccountActive, isNavActive, moneyItem, navItemForSegment, navItems, paletteItems } from '../nav'
+import { WS_MODULES } from '../templates/types'
 import { plural } from '../plural'
 import {
   addDays,
@@ -145,18 +146,84 @@ describe('rozložení týdenního kalendáře', () => {
 })
 
 describe('navigace podle zapnutých funkcí', () => {
-  it('vypnutá funkce v menu není, Poptávky/Zákazníci/Nastavení vždy', () => {
+  const labels = (items: { label: string }[]) => items.map((i) => i.label)
+
+  it('vypnutá funkce v menu není, Poptávky a Zákazníci vždy', () => {
     const keys = navItems(new Set(['calendar'])).map((i) => i.key)
-    expect(keys).toEqual(['dnes', 'poptavky', 'kalendar', 'zakaznici', 'nastaveni'])
+    expect(keys).toEqual(['dnes', 'poptavky', 'kalendar', 'zakaznici'])
     expect(navItemForSegment('faktury', new Set(['calendar']))).toBeNull()
     expect(navItemForSegment('faktury', new Set(['invoices']))?.label).toBe('Faktury')
     expect(navItemForSegment('', new Set())).toBeNull()
   })
 
+  it('hlavní menu má při všech funkcích šest položek a Nastavení v něm není (RD01)', () => {
+    const all = new Set<string>(WS_MODULES)
+    expect(labels(navItems(all))).toEqual(['Dnes', 'Poptávky', 'Kalendář', 'Zákazníci', 'Zakázky', 'Peníze'])
+    expect(navItems(all).some((i) => i.key === 'nastaveni')).toBe(false)
+    // Faktury, Příjmy a Daně jsou jen záložky uvnitř Peněz.
+    expect(navItems(all).some((i) => ['faktury', 'prijmy', 'dane'].includes(i.key))).toBe(false)
+  })
+
+  it('Peníze mizí, když není zapnutá žádná peněžní funkce', () => {
+    expect(labels(navItems(new Set(['calendar', 'jobs'])))).toEqual(['Dnes', 'Poptávky', 'Kalendář', 'Zákazníci', 'Zakázky'])
+    expect(moneyItem(new Set(['calendar']))).toBeNull()
+    expect(bottomBarSlots(new Set(['calendar'])).some((s) => s.kind === 'link' && s.label === 'Peníze')).toBe(false)
+  })
+
+  it('Peníze vedou na první zapnutou peněžní funkci', () => {
+    expect(moneyItem(new Set(['finance', 'invoices', 'taxes']))).toMatchObject({ label: 'Peníze', segment: 'penize' })
+    expect(moneyItem(new Set(['invoices', 'taxes']))).toMatchObject({ segment: 'faktury' })
+    expect(moneyItem(new Set(['taxes']))).toMatchObject({ segment: 'dane' })
+  })
+
+  it('staré adresy fungují dál: Nastavení, Faktury, Příjmy i Daně', () => {
+    expect(navItemForSegment('nastaveni', new Set())?.label).toBe('Nastavení')
+    expect(navItemForSegment('prijmy', new Set(['finance']))?.label).toBe('Příjmy')
+    expect(navItemForSegment('dane', new Set(['taxes']))?.label).toBe('Daně')
+    expect(navItemForSegment('dane', new Set(['finance']))).toBeNull()
+  })
+
+  it('Peníze svítí na všech svých záložkách, ostatní položky jen na sobě', () => {
+    const money = { key: 'penize', segment: 'faktury' } as const
+    for (const part of ['penize', 'faktury', 'prijmy', 'dane', 'faktury/neco']) {
+      expect(isNavActive(`/w/lenka/${part}`, 'lenka', money)).toBe(true)
+    }
+    expect(isNavActive('/w/lenka/zakazky', 'lenka', money)).toBe(false)
+    expect(isNavActive('/w/lenka/fakturyx', 'lenka', money)).toBe(false)
+    expect(isNavActive('/w/lenka', 'lenka', { key: 'dnes', segment: '' })).toBe(true)
+    expect(isNavActive('/w/lenka/kalendar', 'lenka', { key: 'dnes', segment: '' })).toBe(false)
+    expect(isNavActive('/w/lenka/kalendar', 'lenka', { key: 'kalendar', segment: 'kalendar' })).toBe(true)
+  })
+
+  it('⌘K najde i záložky Peněz, které v menu samostatně nejsou', () => {
+    expect(labels(paletteItems(new Set(['finance', 'invoices', 'taxes'])))).toEqual([
+      'Dnes', 'Poptávky', 'Zákazníci', 'Peníze', 'Faktury', 'Příjmy', 'Daně',
+    ])
+    expect(labels(paletteItems(new Set()))).toEqual(['Dnes', 'Poptávky', 'Zákazníci'])
+  })
+
+  it('Účet: majitel má Nastavení, Předplatné a Zpracování údajů, pracovník žádný odkaz', () => {
+    const links = accountLinks('lenka', true)
+    expect(links.map((l) => l.label)).toEqual(['Nastavení firmy', 'Předplatné a doklady', 'Zpracování údajů'])
+    expect(links.map((l) => l.href)).toEqual(['/w/lenka/nastaveni', '/w/ucet', '/w/ucet/zpracovani'])
+    expect(links.map((l) => l.paletteLabel)).toContain('Účet a předplatné')
+    expect(accountLinks('lenka', false)).toEqual([])
+  })
+
+  it('Účet svítí na stránkách účtu i na Nastavení, jinde ne', () => {
+    for (const path of ['/w/ucet', '/w/ucet/zpracovani', '/w/lenka/nastaveni', '/w/lenka/nastaveni/vernost']) {
+      expect(isAccountActive(path, 'lenka')).toBe(true)
+    }
+    expect(isAccountActive('/w/lenka', 'lenka')).toBe(false)
+    expect(isAccountActive('/w/lenka/nastaveniX', 'lenka')).toBe(false)
+  })
+
   it('spodní lišta: Dnes, Kalendář, +, Zákazníci, Peníze', () => {
     const slots = bottomBarSlots(new Set(['calendar', 'invoices', 'finance']))
     expect(slots.map((s) => (s.kind === 'new' ? '+' : s.label))).toEqual(['Dnes', 'Kalendář', '+', 'Zákazníci', 'Peníze'])
-    expect(slots[4]).toMatchObject({ segment: 'prijmy' })
+    // Stejný cíl jako Peníze v hlavním menu.
+    expect(slots[4]).toMatchObject({ segment: 'penize' })
+    expect(bottomBarSlots(new Set(['invoices']))[4]).toMatchObject({ label: 'Peníze', segment: 'faktury' })
     const bare = bottomBarSlots(new Set())
     expect(bare.map((s) => (s.kind === 'new' ? '+' : s.label))).toEqual(['Dnes', 'Poptávky', '+', 'Zákazníci'])
   })

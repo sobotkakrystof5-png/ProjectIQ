@@ -3,15 +3,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { SignOutButton } from '@clerk/nextjs'
-import { LogOut, Menu, Search } from 'lucide-react'
+import { Menu, Search } from 'lucide-react'
 import { useCommandShortcut } from '@/components/ui/command'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Logo } from '@/components/ws/brand'
 import { rememberBusinessAction } from '@/app/w/[business]/actions'
 import { newActions } from '@/lib/ws/features'
-import { bottomBarSlots, navHref, navItems, type NavItem } from '@/lib/ws/nav'
+import {
+  accountLinks,
+  bottomBarSlots,
+  isAccountActive,
+  isNavActive,
+  navHref,
+  navItems,
+  paletteItems,
+  type NavItem,
+} from '@/lib/ws/nav'
 import { cn } from '@/lib/ws/utils'
+import { AccountMenu, AccountSheetSection } from './account-menu'
 import { LiveRefresh } from './booking/live-refresh'
 import { CommandPalette } from './command-palette'
 import { NavIcon } from './nav-icon'
@@ -34,18 +43,13 @@ export type AppFrameProps = {
   children: React.ReactNode
 }
 
-const ACCOUNT_PATH = '/w/ucet'
-
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
-function isActive(pathname: string, href: string, root: string): boolean {
-  return href === root ? pathname === root : pathname === href || pathname.startsWith(`${href}/`)
-}
 
 /**
  * Kostra aplikace Workspace (S09, mockup C a D): postranní panel navy-950
  * jen se zapnutými funkcemi, hlavička s přepínačem byznysů, hledáním (⌘K),
  * zvonkem a „+ Nová"; na telefonu spodní lišta a menu v panelu.
+ * Hlavní menu má nejvýš šest položek; Nastavení a předplatné jsou v Účtu (RD01).
  */
 export function AppFrame(props: AppFrameProps) {
   const { business, businesses, isOwner, orderUrl, notifications, rememberedSlug, children } = props
@@ -56,6 +60,8 @@ export function AppFrame(props: AppFrameProps) {
 
   const enabled = useMemo(() => new Set(props.enabledModules), [props.enabledModules])
   const nav = useMemo(() => navItems(enabled), [enabled])
+  const palette = useMemo(() => paletteItems(enabled), [enabled])
+  const account = useMemo(() => accountLinks(business.slug, isOwner), [business.slug, isOwner])
   const actions = useMemo(() => newActions(enabled), [enabled])
   // Bez hotové akce není „+“ ani ve spodní liště (R-043).
   const slots = useMemo(
@@ -89,24 +95,15 @@ export function AppFrame(props: AppFrameProps) {
         </Link>
         <nav aria-label="Hlavní" className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
           {nav.map((item) => (
-            <SideLink key={item.key} item={item} href={navHref(business.slug, item.segment)} active={isActive(pathname, navHref(business.slug, item.segment), root)} />
+            <SideLink key={item.key} item={item} href={navHref(business.slug, item.segment)} active={isNavActive(pathname, business.slug, item)} />
           ))}
         </nav>
         <div className="flex w-full flex-col items-center gap-1 px-2">
-          {isOwner && (
-            <SideLink
-              item={{ key: 'nastaveni', label: 'Účet', segment: '', module: null }}
-              icon="ucet"
-              href={ACCOUNT_PATH}
-              active={pathname.startsWith(ACCOUNT_PATH)}
-            />
-          )}
-          <SignOutButton redirectUrl="/">
-            <button type="button" className={cn(sideItemClass(false), focusRing)}>
-              <LogOut aria-hidden size={22} strokeWidth={1.5} />
-              <span>Odhlásit</span>
-            </button>
-          </SignOutButton>
+          <AccountMenu
+            businessName={business.name}
+            links={account}
+            triggerClassName={cn(sideItemClass(isAccountActive(pathname, business.slug)), focusRing)}
+          />
         </div>
       </aside>
 
@@ -196,7 +193,7 @@ export function AppFrame(props: AppFrameProps) {
               <li key={slot.key} className="flex flex-1">
                 {(() => {
                   const href = navHref(business.slug, slot.segment)
-                  const active = isActive(pathname, href, root)
+                  const active = isNavActive(pathname, business.slug, slot)
                   return (
                     <Link
                       href={href}
@@ -247,20 +244,11 @@ export function AppFrame(props: AppFrameProps) {
             {nav.map((item) => {
               const href = navHref(business.slug, item.segment)
               return (
-                <MenuLink key={item.key} href={href} icon={item.key} label={item.label} active={isActive(pathname, href, root)} />
+                <MenuLink key={item.key} href={href} icon={item.key} label={item.label} active={isNavActive(pathname, business.slug, item)} />
               )
             })}
-            {isOwner && <MenuLink href={ACCOUNT_PATH} icon="ucet" label="Účet a předplatné" active={pathname.startsWith(ACCOUNT_PATH)} />}
           </nav>
-          <SignOutButton redirectUrl="/">
-            <button
-              type="button"
-              className={cn('mt-auto flex min-h-11 items-center gap-3 rounded-chip px-3 text-[15px] text-quiet hover:bg-accent hover:text-ink', focusRing)}
-            >
-              <LogOut aria-hidden size={20} strokeWidth={1.5} />
-              Odhlásit se
-            </button>
-          </SignOutButton>
+          <AccountSheetSection links={account} pathname={pathname} />
         </SheetContent>
       </Sheet>
 
@@ -268,7 +256,8 @@ export function AppFrame(props: AppFrameProps) {
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         slug={business.slug}
-        nav={nav}
+        nav={palette}
+        accountLinks={account}
         actions={actions}
         orderUrl={orderUrl}
         services={props.services}
@@ -285,16 +274,16 @@ function sideItemClass(active: boolean) {
   )
 }
 
-function SideLink({ item, href, active, icon }: { item: NavItem; href: string; active: boolean; icon?: 'ucet' }) {
+function SideLink({ item, href, active }: { item: NavItem; href: string; active: boolean }) {
   return (
     <Link href={href} aria-current={active ? 'page' : undefined} className={cn(sideItemClass(active), focusRing)}>
-      <NavIcon name={icon ?? item.key} />
+      <NavIcon name={item.key} />
       <span className="max-w-full truncate">{item.label}</span>
     </Link>
   )
 }
 
-function MenuLink({ href, icon, label, active }: { href: string; icon: NavItem['key'] | 'ucet'; label: string; active: boolean }) {
+function MenuLink({ href, icon, label, active }: { href: string; icon: NavItem['key']; label: string; active: boolean }) {
   return (
     <Link
       href={href}

@@ -10,6 +10,7 @@ export type NavKey =
   | 'kalendar'
   | 'zakaznici'
   | 'zakazky'
+  | 'penize'
   | 'faktury'
   | 'prijmy'
   | 'dane'
@@ -24,12 +25,14 @@ export type NavItem = {
   module: WsModule | null
 }
 
+/** Všechny obrazovky pod /w/[byznys]. Hlavní menu z nich bere jen část (`navItems`). */
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'dnes', label: 'Dnes', segment: '', module: null },
   { key: 'poptavky', label: 'Poptávky', segment: 'poptavky', module: 'requests' },
   { key: 'kalendar', label: 'Kalendář', segment: 'kalendar', module: 'calendar' },
   { key: 'zakaznici', label: 'Zákazníci', segment: 'zakaznici', module: 'customers' },
   { key: 'zakazky', label: 'Zakázky', segment: 'zakazky', module: 'jobs' },
+  { key: 'penize', label: 'Peníze', segment: 'penize', module: 'finance' },
   { key: 'faktury', label: 'Faktury', segment: 'faktury', module: 'invoices' },
   { key: 'prijmy', label: 'Příjmy', segment: 'prijmy', module: 'finance' },
   { key: 'dane', label: 'Daně', segment: 'dane', module: 'taxes' },
@@ -42,8 +45,34 @@ const ALWAYS: readonly WsModule[] = ['requests', 'customers']
 export const isModuleOn = (enabled: ReadonlySet<string>, module: WsModule | null): boolean =>
   module === null || ALWAYS.includes(module) || enabled.has(module)
 
+const byKey = (key: NavKey): NavItem => NAV_ITEMS.find((i) => i.key === key)!
+
+/** Hlavní menu mimo Peníze, v pořadí, v jakém se ukazuje. */
+const WORK_KEYS: readonly NavKey[] = ['dnes', 'poptavky', 'kalendar', 'zakaznici', 'zakazky']
+
+/**
+ * Obrazovky, které jsou záložkami jedné stránky Peníze (RD01). Pořadí = pořadí
+ * záložek; Peníze vedou na první zapnutou, Přehled měsíce má přednost.
+ */
+const MONEY_KEYS = ['penize', 'faktury', 'prijmy', 'dane'] as const satisfies readonly NavKey[]
+
+/** Jedna položka Peníze, nebo `null`, když není zapnutá žádná peněžní funkce. */
+export function moneyItem(enabled: ReadonlySet<string>): NavItem | null {
+  const first = MONEY_KEYS.map(byKey).find((i) => isModuleOn(enabled, i.module))
+  return first ? { key: 'penize', label: 'Peníze', segment: first.segment, module: first.module } : null
+}
+
+/** Hlavní menu: Dnes, Poptávky, Kalendář, Zákazníci, Zakázky, Peníze (podle zapnutých funkcí). */
 export function navItems(enabled: ReadonlySet<string>): NavItem[] {
-  return NAV_ITEMS.filter((item) => isModuleOn(enabled, item.module))
+  const work = WORK_KEYS.map(byKey).filter((i) => isModuleOn(enabled, i.module))
+  const money = moneyItem(enabled)
+  return money ? [...work, money] : work
+}
+
+/** Cíle pro ⌘K „Přejít na“: hlavní menu a navíc záložky Peněz, které v menu samostatně nejsou. */
+export function paletteItems(enabled: ReadonlySet<string>): NavItem[] {
+  const tabs = (['faktury', 'prijmy', 'dane'] as const).map(byKey).filter((i) => isModuleOn(enabled, i.module))
+  return [...navItems(enabled), ...tabs]
 }
 
 export function navHref(slug: string, segment: string): string {
@@ -56,32 +85,65 @@ export function navItemForSegment(segment: string, enabled: ReadonlySet<string>)
   return item && isModuleOn(enabled, item.module) ? item : null
 }
 
+/** Svítí položka na téhle cestě? Peníze svítí na všech svých záložkách. */
+export function isNavActive(pathname: string, slug: string, item: Pick<NavItem, 'key' | 'segment'>): boolean {
+  if (item.segment === '') return pathname === navHref(slug, '')
+  const segments: readonly string[] = item.key === 'penize' ? MONEY_KEYS.map((k) => byKey(k).segment) : [item.segment]
+  return segments.some((s) => {
+    const href = navHref(slug, s)
+    return pathname === href || pathname.startsWith(`${href}/`)
+  })
+}
+
+/** Cesta k účtu mimo byznys (S08). */
+export const ACCOUNT_PATH = '/w/ucet'
+
+export type AccountLinkKey = 'nastaveni' | 'predplatne' | 'zpracovani'
+
+export type AccountLink = {
+  key: AccountLinkKey
+  /** Text v menu Účet. */
+  label: string
+  /** Text v ⌘K. */
+  paletteLabel: string
+  href: string
+}
+
+/**
+ * Odkazy z menu Účet, které mění jen majitel (RD01). Pracovník jich nemá žádný,
+ * v Účtu vidí jen Vzhled a Odhlásit. Adresy Nastavení se nemění (e-maily, ⌘K).
+ */
+export function accountLinks(slug: string, isOwner: boolean): AccountLink[] {
+  if (!isOwner) return []
+  return [
+    { key: 'nastaveni', label: 'Nastavení firmy', paletteLabel: 'Nastavení', href: navHref(slug, 'nastaveni') },
+    { key: 'predplatne', label: 'Předplatné a doklady', paletteLabel: 'Účet a předplatné', href: ACCOUNT_PATH },
+    { key: 'zpracovani', label: 'Zpracování údajů', paletteLabel: 'Zpracování údajů', href: `${ACCOUNT_PATH}/zpracovani` },
+  ]
+}
+
+/** Účet svítí na stránkách účtu i na Nastavení. */
+export function isAccountActive(pathname: string, slug: string): boolean {
+  const settings = navHref(slug, 'nastaveni')
+  return pathname === ACCOUNT_PATH || pathname.startsWith(`${ACCOUNT_PATH}/`) || pathname === settings || pathname.startsWith(`${settings}/`)
+}
+
 export type BottomBarSlot =
-  | { kind: 'link'; key: NavKey | 'penize'; label: string; segment: string }
+  | { kind: 'link'; key: NavKey; label: string; segment: string }
   | { kind: 'new' }
 
 /**
  * Spodní lišta na telefonu (mockup D): Dnes, Kalendář, +, Zákazníci, Peníze.
- * Bez kalendáře je na jeho místě Poptávky; Peníze vedou na první zapnutou
- * peněžní funkci (Příjmy → Faktury → Daně), bez nich je tam Zakázky nebo nic.
+ * Bez kalendáře je na jeho místě Poptávky; Peníze vedou stejně jako v hlavním
+ * menu na první zapnutou peněžní funkci, bez nich je tam Zakázky nebo nic.
  */
 export function bottomBarSlots(enabled: ReadonlySet<string>): BottomBarSlot[] {
-  const link = (item: NavItem, label = item.label, key: NavKey | 'penize' = item.key): BottomBarSlot => ({
-    kind: 'link',
-    key,
-    label,
-    segment: item.segment,
-  })
-  const byKey = (key: NavKey) => NAV_ITEMS.find((i) => i.key === key)!
+  const link = (item: NavItem): BottomBarSlot => ({ kind: 'link', key: item.key, label: item.label, segment: item.segment })
   const on = (key: NavKey) => isModuleOn(enabled, byKey(key).module)
 
   const second = on('kalendar') ? byKey('kalendar') : byKey('poptavky')
-  const money = (['prijmy', 'faktury', 'dane'] as const).find(on)
-  const fifth: BottomBarSlot | null = money
-    ? link(byKey(money), 'Peníze', 'penize')
-    : on('zakazky')
-      ? link(byKey('zakazky'))
-      : null
+  const money = moneyItem(enabled)
+  const fifth: BottomBarSlot | null = money ? link(money) : on('zakazky') ? link(byKey('zakazky')) : null
 
   return [link(byKey('dnes')), link(second), { kind: 'new' }, link(byKey('zakaznici')), ...(fifth ? [fifth] : [])]
 }
