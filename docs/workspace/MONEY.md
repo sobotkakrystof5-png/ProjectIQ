@@ -1,4 +1,4 @@
-# Peníze ve Workspace (S14)
+# Peníze ve Workspace (S14, RD10)
 
 Kód je v lib/ws/money/ a components/ws/money/. Obrazovky /w/[byznys]/{penize,faktury,prijmy,dane} jsou oddělené od adminu. Parametr rozsah=ucet zahrne všechny byznysy účtu, mesic=YYYY-MM vybere měsíc. Daně jsou vždy za celé IČO. Vypnutí modulu nemaže data.
 
@@ -8,7 +8,13 @@ Vystavení ručně nebo z hotové/zaplacené zakázky. Položky, CZK/EUR, údaje
 
 Řada YYYY-NNNNNN je společná účtu. Funkce ws.money_issue zamkne účet a ve stejné transakci přidělí číslo a vloží fakturu; chyba vrátí i počítadlo. Jedna nestornovaná vystavená faktura za zakázku. Existující čísla zůstávají.
 
+Profil dodavatele je uložený jednou v `ws.accounts.invoice_profile` a upravuje ho pouze vlastník v Nastavení › Firma a fakturace. Při vystavení se údaje zkopírují do faktury; pozdější úprava profilu starší doklady nemění. Nová faktura nabízí zákazníka nebo hotovou zakázku, předvyplní známé údaje, dovolí vložit službu z ceníku jedním klikem a má výchozí splatnost 14 dní. Datum plnění, měna, DPH a poznámka jsou pod „Další údaje“.
+
 Funkce ws.money_pay zamkne fakturu a zapíše příjem/výdaj právě jednou. Nezaplacená faktura příjem nevytváří. Stejnou již evidovanou platbu zakázky převezme; odlišné či částečné platby vyžadují ruční kontrolu. Trigger money_adopt_visit hlídá také opačné pořadí: faktura zaplacena před návštěvou.
+
+Seznam vystavených faktur má filtry K zaplacení / Po splatnosti / Zaplacené a součet zvlášť pro každou měnu. „Zaplaceno“ zapíše platbu dnešním datem a převodem; „Zpět“ je dostupné 8 sekund v rozhraní a databáze ho přijme nejvýše 60 sekund. Migrace 088 označuje nově vytvořenou platbu proti převzaté. Zpět smaže jen nově vytvořený příjem, pokud ho mezitím nepoužila návštěva; existující platbu zakázky nebo příjem navázaný na termín od faktury odpojí a zachová.
+
+PDF obsahuje QR platbu SPAYD jen u nezaplacené vystavené faktury v CZK a pouze při platném IBANu s kontrolním součtem. Běžné číslo účtu ani EUR QR nevytvoří. Bez připraveného odesílání (ověřená odesílací adresa v `WS_EMAIL_FROM`, `RESEND_API_KEY` a zapnutá šablona faktury) se nabídne vystavení a stažení PDF; jinak lze odeslat přes existující frontu S15.
 
 Přijaté PDF max. 4 MB, kontrola magic bytes %PDF-, soubor v DB pod RLS, stažení jako příloha. AI přepis je volitelný, max. 10/h na účet, přes existující serverový ANTHROPIC_API_KEY (případně ANTHROPIC_AUTH_TOKEN). Model je převzatý z adminu; přepis vyčítá dodavatele a nikdy nenastavuje zaplacení. Uživatel ověří hodnoty před uložením. Chyba umožní ruční zadání.
 
@@ -50,6 +56,8 @@ Admin lib/tax*.ts má historické hodnoty a zůstává beze změny. Neslouží j
 
 ## Instalace a ověření
 
-Po migracích 078/079 ručně aplikovat [080_ws_penize_provoz.sql](../../migrations/080_ws_penize_provoz.sql) v Neon SQL editoru rolí vlastníka. Idempotentní: nové sloupce, omezení, SECURITY INVOKER funkce a EXECUTE pro ws_app. Nevkládá ukázková data. Pokud starší data obsahují více transakcí za jednu fakturu, unikátní index migraci zastaví; záznamy se automaticky nemažou.
+Základ peněz tvoří [080_ws_penize_provoz.sql](../../migrations/080_ws_penize_provoz.sql), která se po migracích 078/079 ručně aplikuje v Neon SQL editoru rolí vlastníka. Idempotentní: nové sloupce, omezení, SECURITY INVOKER funkce a EXECUTE pro ws_app. Nevkládá ukázková data. Pokud starší data obsahují více transakcí za jednu fakturu, unikátní index migraci zastaví; záznamy se automaticky nemažou.
+
+RD10 přidává [088_ws_faktury_profil_a_zpet.sql](../../migrations/088_ws_faktury_profil_a_zpet.sql): profil dodavatele na účtu, původ platby a bezpečnou SECURITY INVOKER funkci `ws.money_unpay`. Aplikovat ručně po předchozích migracích Workspace; připravená, dosud neaplikovaná na Neonu. RD08 používá následující číslo 089. Migrace se v tomto sezení nespouštěla.
 
 Běžné testy: npm test, npx tsc --noEmit, izolovaný produkční build. Skutečné PDF: WS_PDF_SMOKE=1 npx vitest run lib/ws/__tests__/ws-money.test.ts (vyžaduje místní Chrome / CHROME_PATH). Běžná sada ho přeskočí pro prostředí bez browseru. Po aplikaci migrace projít obrazovky s přihlášením, vystavení z hotové zakázky a PDF. Testy používají místní PGlite a fiktivní data; nevytvářejí skutečný doklad ani e-mail.

@@ -2,26 +2,36 @@ import 'server-only'
 import { q, wsDb, type WsRow } from '../db'
 import type { WsBusiness, WsContext } from '../context'
 import { invoiceTotal, type MoneyEntry } from './calculations'
-import { DEFAULT_TAX, taxSchema, type IssueInput, type Party, type TaxSettings, type InvoiceItem } from './schema'
+import { DEFAULT_TAX, issuerProfileSchema, taxSchema, type IssueInput, type Party, type TaxSettings, type InvoiceItem } from './schema'
 
 type Biz = Pick<WsBusiness,'id'>
-export type Invoice = { id:string; businessId:string; direction:'issued'|'received'; number:string; customerId:string|null; jobId:string|null;
+export type IssuerProfile = { name:string; address:string; ico:string; dic:string; bank:string; vatPayer:boolean }
+function issuerProfileFrom(account:WsRow|undefined):IssuerProfile {
+ const saved=account?.invoice_profile&&typeof account.invoice_profile==='object'&&!Array.isArray(account.invoice_profile)
+   ?account.invoice_profile as Record<string,unknown>:{}
+ const stringValue=(key:string,fallback:unknown)=>typeof saved[key]==='string'?String(saved[key]):String(fallback??'')
+ return {name:stringValue('name',account?.name),address:stringValue('address',''),ico:stringValue('ico',account?.ico),
+  dic:stringValue('dic',''),bank:stringValue('bank',''),vatPayer:typeof saved.vatPayer==='boolean'?saved.vatPayer:false}
+}
+export type Invoice = { id:string; businessId:string; businessSlug:string; direction:'issued'|'received'; number:string; customerId:string|null; jobId:string|null;
  counterparty:Party; issuer:Party & {vatPayer:boolean}; issuedOn:string; suppliedOn:string; dueOn:string; paidOn:string|null;
  amount:number; currency:'CZK'|'EUR'; items:InvoiceItem[]; status:string; note:string; hasPdf:boolean }
 function invoiceRow(r:WsRow):Invoice {
- return {id:String(r.id),businessId:String(r.business_id),direction:r.direction as Invoice['direction'],number:String(r.number??''),
+ return {id:String(r.id),businessId:String(r.business_id),businessSlug:String(r.business_slug??''),direction:r.direction as Invoice['direction'],number:String(r.number??''),
  customerId:r.customer_id?String(r.customer_id):null,jobId:r.job_id?String(r.job_id):null,counterparty:r.counterparty as Party,issuer:r.issuer as Invoice['issuer'],
  issuedOn:String(r.issued_on??''),suppliedOn:String(r.supplied_on??''),dueOn:String(r.due_on??''),paidOn:r.paid_on?String(r.paid_on):null,
  amount:Number(r.amount),currency:r.currency as Invoice['currency'],items:r.items as InvoiceItem[],status:String(r.status),note:String(r.note??''),hasPdf:Boolean(r.has_pdf)}
 }
 export async function listInvoices(ctx:WsContext,business:Biz,all=false):Promise<Invoice[]> {
- const rows=await wsDb(ctx)`SELECT id,business_id,direction,number,customer_id,job_id,counterparty,issuer,issued_on::text,supplied_on::text,due_on::text,paid_on::text,amount,currency,items,status,note,pdf_data IS NOT NULL AS has_pdf
- FROM ws.invoices WHERE account_id=${ctx.accountId} AND (${all} OR business_id=${business.id}) ORDER BY issued_on DESC NULLS LAST,created_at DESC LIMIT 500`
+ const rows=await wsDb(ctx)`SELECT i.id,i.business_id,b.slug AS business_slug,i.direction,i.number,i.customer_id,i.job_id,i.counterparty,i.issuer,i.issued_on::text,i.supplied_on::text,i.due_on::text,i.paid_on::text,i.amount,i.currency,i.items,i.status,i.note,i.pdf_data IS NOT NULL AS has_pdf
+ FROM ws.invoices i JOIN ws.businesses b ON b.account_id=i.account_id AND b.id=i.business_id
+ WHERE i.account_id=${ctx.accountId} AND (${all} OR i.business_id=${business.id}) ORDER BY i.issued_on DESC NULLS LAST,i.created_at DESC LIMIT 500`
  return rows.map(invoiceRow)
 }
 export async function getInvoice(ctx:WsContext,business:Biz,id:string):Promise<Invoice|null> {
- const [r]=await wsDb(ctx)`SELECT id,business_id,direction,number,customer_id,job_id,counterparty,issuer,issued_on::text,supplied_on::text,due_on::text,paid_on::text,amount,currency,items,status,note,pdf_data IS NOT NULL AS has_pdf
- FROM ws.invoices WHERE account_id=${ctx.accountId} AND business_id=${business.id} AND id=${id}`
+ const [r]=await wsDb(ctx)`SELECT i.id,i.business_id,b.slug AS business_slug,i.direction,i.number,i.customer_id,i.job_id,i.counterparty,i.issuer,i.issued_on::text,i.supplied_on::text,i.due_on::text,i.paid_on::text,i.amount,i.currency,i.items,i.status,i.note,i.pdf_data IS NOT NULL AS has_pdf
+ FROM ws.invoices i JOIN ws.businesses b ON b.account_id=i.account_id AND b.id=i.business_id
+ WHERE i.account_id=${ctx.accountId} AND i.business_id=${business.id} AND i.id=${id}`
  return r?invoiceRow(r):null
 }
 export async function issueInvoice(ctx:WsContext,business:Biz,input:IssueInput) {
@@ -32,6 +42,9 @@ export async function issueInvoice(ctx:WsContext,business:Biz,input:IssueInput) 
 export async function payInvoice(ctx:WsContext,business:Biz,id:string,day:string,method:string) {
  const [r]=await wsDb(ctx)`SELECT ws.money_pay(${business.id}::uuid,${id}::uuid,${day}::date,${method}) AS id`
  return r.id?String(r.id):null
+}
+export async function undoInvoicePayment(ctx:WsContext,business:Biz,id:string) {
+ await wsDb(ctx)`SELECT ws.money_unpay(${business.id}::uuid,${id}::uuid)`
 }
 export type FinanceEntry = { id:string; businessId:string; kind:'income'|'expense'; amount:number;currency:'CZK'|'EUR';day:string;category:string;description:string;method:string;customer:string;service:string;source:string;segment:string }
 export async function getFinance(ctx:WsContext,business:Biz,from:string,to:string,all=false):Promise<FinanceEntry[]> {
@@ -79,17 +92,30 @@ export async function saveTaxSettings(ctx:WsContext,settings:TaxSettings) {
  VALUES(${ctx.accountId},${settings.mode},${settings.flatRate},${settings.vatPayer},${settings.sideActivity},${JSON.stringify(settings)}::jsonb)
  ON CONFLICT(account_id) DO UPDATE SET mode=EXCLUDED.mode,flat_rate=EXCLUDED.flat_rate,vat_payer=EXCLUDED.vat_payer,side_activity=EXCLUDED.side_activity,options=EXCLUDED.options WHERE ws.tax_settings.account_id=${ctx.accountId}`
 }
+export async function getIssuerProfile(ctx:WsContext):Promise<IssuerProfile> {
+ const [account]=await wsDb(ctx)`SELECT name,ico,invoice_profile FROM ws.accounts WHERE id=${ctx.accountId}`
+ return issuerProfileFrom(account)
+}
+export async function saveIssuerProfile(ctx:WsContext,profile:IssuerProfile) {
+ await wsDb(ctx)`UPDATE ws.accounts SET invoice_profile=${JSON.stringify(profile)}::jsonb WHERE id=${ctx.accountId}`
+}
 export async function getInvoiceOptions(ctx:WsContext,business:Biz) {
- const [accounts,customers,jobs]=await wsDb(ctx).batch([
- q`SELECT name,ico FROM ws.accounts WHERE id=${ctx.accountId}`,
+ const [accounts,customers,jobs,services,messages]=await wsDb(ctx).batch([
+  q`SELECT name,ico,invoice_profile FROM ws.accounts WHERE id=${ctx.accountId}`,
  q`SELECT id,name,email,phone FROM ws.customers WHERE account_id=${ctx.accountId} AND ended_at IS NULL ORDER BY name LIMIT 500`,
  q`SELECT j.id,j.title,j.customer_id,j.price,j.currency FROM ws.jobs j JOIN ws.stages s ON s.account_id=j.account_id AND s.business_id=j.business_id AND s.id=j.stage_id
  WHERE j.account_id=${ctx.accountId} AND j.business_id=${business.id} AND s.type IN ('done','paid') AND NOT EXISTS(SELECT 1 FROM ws.invoices i WHERE i.account_id=j.account_id AND i.business_id=j.business_id AND i.job_id=j.id AND i.direction='issued' AND i.status<>'cancelled')
  AND NOT EXISTS(SELECT 1 FROM ws.requests r WHERE r.account_id=j.account_id AND r.id=j.request_id AND r.is_test)
  ORDER BY j.updated_at DESC LIMIT 100`,
+  q`SELECT id,name,price,currency FROM ws.services WHERE account_id=${ctx.accountId} AND business_id=${business.id} AND active=true ORDER BY position,name LIMIT 200`,
+  q`SELECT enabled FROM ws.message_settings WHERE account_id=${ctx.accountId} AND business_id=${business.id} AND type='invoice'`,
  ])
- return {account:{name:String(accounts[0]?.name??''),ico:String(accounts[0]?.ico??'')},customers:customers.map(r=>({id:String(r.id),name:String(r.name),email:String(r.email??'')})),
- jobs:jobs.map(r=>({id:String(r.id),title:String(r.title),customerId:r.customer_id?String(r.customer_id):null,price:r.price===null?null:Number(r.price),currency:String(r.currency)}))}
+ const account=accounts[0]
+ const profile=issuerProfileFrom(account)
+ return {profile,customers:customers.map(r=>({id:String(r.id),name:String(r.name),email:String(r.email??'')})),
+ jobs:jobs.map(r=>({id:String(r.id),title:String(r.title),customerId:r.customer_id?String(r.customer_id):null,price:r.price===null?null:Number(r.price),currency:String(r.currency)})),
+ services: services.map(r=>({id:String(r.id),name:String(r.name),price:r.price===null?null:Number(r.price),currency:String(r.currency)})),
+ emailReady:Boolean(process.env.WS_EMAIL_FROM&&process.env.RESEND_API_KEY&&(messages[0]?.enabled??true))}
 }
 export async function monthMetrics(ctx:WsContext,business:Biz,from:string,to:string,all=false) {
  const [rows]=await wsDb(ctx).batch([q`SELECT count(*)::int AS requests,count(*) FILTER(WHERE source IN ('web','widget','page','eshop'))::int AS online,

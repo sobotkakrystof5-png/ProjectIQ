@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ChevronRight, Clock3, FileText, Gift, Globe, ListChecks, Mail, Palette, SlidersHorizontal, Users, Wrench } from 'lucide-react'
+import { Building2, ChevronRight, Clock3, FileText, Gift, Globe, ListChecks, Mail, Palette, SlidersHorizontal, Users, Wrench } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
 import { AccentHeading } from '@/components/ws/brand'
 import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
@@ -12,6 +12,7 @@ export const metadata: Metadata = { title: 'Nastavení' }
 type SearchParams = Record<string, string | string[] | undefined>
 
 const SECTIONS = [
+  { path: 'firma', icon: Building2, title: 'Firma a fakturace', text: 'Údaje dodavatele na vašich fakturách' },
   { path: 'funkce', icon: SlidersHorizontal, title: 'Funkce', text: 'Zapněte jen to, co ve své firmě opravdu používáte' },
   { path: 'sluzby', icon: Wrench, title: 'Služby a ceník', text: 'Délka, cena, rozestup a nabídka pro objednání' },
   { path: 'oteviraci-doba', icon: Clock3, title: 'Otevírací doba a pracovníci', text: 'Směny, dostupnost a blokace v kalendáři' },

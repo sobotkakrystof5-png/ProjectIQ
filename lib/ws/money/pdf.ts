@@ -50,7 +50,22 @@ async function fontCss() {
  for(const name of names)css=css.replaceAll('FONT:'+name,'data:font/woff2;base64,'+(await readFile(path.join(dir,name))).toString('base64'))
  return css
 }
-const CSS = '@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:InvoiceSans,sans-serif;font-size:13px;color:rgb(var(--ink));background:rgb(var(--surface))}h1{font-size:32px;letter-spacing:-.03em;margin:0}p{margin:5px 0;white-space:pre-line;overflow-wrap:anywhere}.brand{display:flex;align-items:center;gap:16px;border-bottom:2px solid rgb(var(--navy-100));padding-bottom:20px}.brand img{max-width:100px;max-height:60px}.tiles{display:grid;grid-template-columns:12px 12px;gap:4px}.tiles i{height:12px;border-radius:3px;background:rgb(var(--navy-700))}.parties{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:30px 0}small{color:rgb(var(--quiet))}.numbers{font-family:InvoiceMono,monospace}table{border-collapse:collapse;width:100%;margin:24px 0}th{text-align:left;color:rgb(var(--quiet));font-weight:500}td,th{padding:12px 6px;border-bottom:1px solid rgb(var(--navy-100))}tr{break-inside:avoid}td:last-child{text-align:right}.total{border-radius:20px;padding:20px;background:rgb(var(--navy-50));text-align:right;font-size:22px}.foot{margin-top:25px;font-size:12px}'
+const CSS = '@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:InvoiceSans,sans-serif;font-size:13px;color:rgb(var(--ink));background:rgb(var(--surface))}h1{font-size:32px;letter-spacing:-.03em;margin:0}p{margin:5px 0;white-space:pre-line;overflow-wrap:anywhere}.brand{display:flex;align-items:center;gap:16px;border-bottom:2px solid rgb(var(--navy-100));padding-bottom:20px}.brand img{max-width:100px;max-height:60px}.tiles{display:grid;grid-template-columns:12px 12px;gap:4px}.tiles i{height:12px;border-radius:3px;background:rgb(var(--navy-700))}.parties{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:30px 0}small{color:rgb(var(--quiet))}.numbers{font-family:InvoiceMono,monospace}table{border-collapse:collapse;width:100%;margin:24px 0}th{text-align:left;color:rgb(var(--quiet));font-weight:500}td,th{padding:12px 6px;border-bottom:1px solid rgb(var(--navy-100))}tr{break-inside:avoid}td:last-child{text-align:right}.total{border-radius:20px;padding:20px;background:rgb(var(--navy-50));text-align:right;font-size:22px}.foot{margin-top:25px;font-size:12px}.payment-qr{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:24px;padding:18px;border:1px solid rgb(var(--navy-100));border-radius:16px;break-inside:avoid}.payment-qr svg{width:148px;height:148px;flex:none}.payment-qr h2{font-size:16px;margin:0 0 8px}'
+
+export function spaydPaymentString(invoice:Invoice):string|null {
+ if(invoice.direction!=='issued'||invoice.status!=='issued'||invoice.currency!=='CZK'||typeof invoice.issuer?.bank!=='string')return null
+ const iban=invoice.issuer.bank.replace(/\s/g,'').toUpperCase()
+ if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)||iban.length>34)return null
+ const rearranged=iban.slice(4)+iban.slice(0,4)
+ let remainder=0
+ for(const char of rearranged){
+  const digits=char>='A'&&char<='Z'?String(char.charCodeAt(0)-55):char
+  for(const digit of digits)remainder=(remainder*10+Number(digit))%97
+ }
+ if(remainder!==1)return null
+ const variableSymbol=invoice.number.replace(/\D/g,'').slice(0,10)
+ return 'SPD*1.0*ACC:'+iban+'*AM:'+invoice.amount.toFixed(2)+'*CC:CZK'+(variableSymbol?'*X-VS:'+variableSymbol:'')
+}
 export async function invoiceHtml(invoice:Invoice,brand:{name:string;logo:string|null}) {
  let logo:string|null=null
  try {logo=await logoData(brand.logo)}catch {console.warn('[ws/money] Logo se do PDF nepodařilo načíst.')}
@@ -63,6 +78,14 @@ export async function invoiceHtml(invoice:Invoice,brand:{name:string;logo:string
  const rows=invoice.items.map(i=>'<tr><td>'+text(i.description)+'</td><td class="numbers">'+text(i.quantity)+'</td><td class="numbers">'+amount(i.unitPrice)+'</td>'+
   (invoice.issuer.vatPayer?'<td class="numbers">'+text(i.vatRate)+' %<br>'+amount(itemTotals(i).vat)+'</td>':'')+
   '<td class="numbers">'+amount(itemTotals(i).total)+'</td></tr>').join('')
+ const spayd=spaydPaymentString(invoice)
+ let qr=''
+ if(spayd){
+  const [{createElement},{renderToStaticMarkup},{QRCodeSVG}]=await Promise.all([
+   import('react'),import('react-dom/server'),import('qrcode.react'),
+  ])
+  qr=renderToStaticMarkup(createElement(QRCodeSVG,{value:spayd,size:148,level:'M',marginSize:2}))
+ }
  // Uživatelské hodnoty se serializují pouze jako escapovaný text, nikdy HTML.
  return '<!doctype html><html lang="cs"><head><meta charset="utf-8">'+
   '<meta http-equiv="Content-Security-Policy" content="default-src '+text("'none'")+"; img-src data:; font-src data:; style-src "+text("'unsafe-inline'")+'">'+
@@ -77,6 +100,7 @@ export async function invoiceHtml(invoice:Invoice,brand:{name:string;logo:string
   '<div class="total">Celkem k úhradě <strong class="numbers">'+amount(invoice.amount)+'</strong></div>'+
   (invoice.issuer.bank?'<p>Účet: '+num(invoice.issuer.bank)+'</p>':'')+
   '<p>Variabilní symbol: '+num(invoice.number.replace(/\\D/g,''))+'</p>'+
+  (qr?'<section class="payment-qr"><div><h2>Zaplatit QR kódem</h2><p>Částka '+amount(invoice.amount)+'</p><p>Účet '+num(invoice.issuer.bank)+'</p><p>Variabilní symbol '+num(invoice.number.replace(/\\D/g,''))+'</p></div>'+qr+'</section>':'')+
   (invoice.paidOn?'<p>Zaplaceno '+text(formatDayShort(invoice.paidOn))+'</p>':'')+
   '<p class="foot">'+text(invoice.note)+'</p>'+(!invoice.issuer.vatPayer?'<p class="foot">Dodavatel není plátce DPH.</p>':'')+'</body></html>'
 }

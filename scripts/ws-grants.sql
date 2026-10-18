@@ -40,3 +40,13 @@ REVOKE ALL ON ws.account_admin_notes FROM ws_app;
 -- GDPR: denní úklid faktur a zrušených účtů (migrace 084, S18)
 GRANT EXECUTE ON FUNCTION ws.anonymize_expired_invoices() TO ws_app;
 GRANT EXECUTE ON FUNCTION ws.purge_closed_accounts() TO ws_app;
+
+-- Faktury (migrace 088, RD10). Skript lze spustit i před touto migrací.
+DO $$
+BEGIN
+  IF to_regprocedure('ws.money_pay(uuid,uuid,date,text)') IS NOT NULL
+     AND to_regprocedure('ws.money_unpay(uuid,uuid)') IS NOT NULL THEN
+    GRANT EXECUTE ON FUNCTION ws.money_pay(uuid,uuid,date,text), ws.money_unpay(uuid,uuid) TO ws_app;
+  END IF;
+END
+$$;

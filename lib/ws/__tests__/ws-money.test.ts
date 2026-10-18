@@ -3,11 +3,11 @@ import type { PGlite } from '@electric-sql/pglite'
 import { q,setWsDriverForTests,wsDb } from '../db'
 import { createWsTestDb,ids,pgliteDriver } from './helpers/ws-pglite'
 import type { WsContext } from '../context'
-import { getFinance,getInvoice,getInvoiceOptions,getTaxSettings,issueInvoice,payInvoice } from '../money/data'
+import { getFinance,getInvoice,getInvoiceOptions,getIssuerProfile,getTaxSettings,issueInvoice,payInvoice,saveIssuerProfile,undoInvoicePayment,type Invoice } from '../money/data'
 import { currencyTotals,estimateTax,invoiceTotal,monthSeries } from '../money/calculations'
 import { DEFAULT_TAX } from '../money/defaults'
 import { issueSchema,type IssueInput } from '../money/schema'
-import { readPdf,isPublicV4,invoiceHtml,renderInvoicePdf } from '../money/pdf'
+import { readPdf,isPublicV4,invoiceHtml,renderInvoicePdf,spaydPaymentString } from '../money/pdf'
 import { moneyDeadlines,taxCalendar } from '../money/reminders'
 
 vi.mock('server-only',()=>({}))
@@ -69,6 +69,49 @@ describe('Peníze: transakce pod RLS',()=>{
   await expect(payInvoice(ctxB,{id:B.business},id,'2026-10-10','transfer')).rejects.toThrow()
   await expect(issueInvoice(ctxB,biz,input())).rejects.toThrow()
  })
+ it('Zpět smaže jen příjem vytvořený fakturou a dovolí platbu znovu zapsat',async()=>{
+  const id=await issueInvoice(ctx,biz,input())
+  await payInvoice(ctx,biz,id,'2026-10-10','transfer')
+  await undoInvoicePayment(ctx,biz,id)
+  const [invoice]=await wsDb(ctx)`SELECT status,paid_on FROM ws.invoices WHERE account_id=${ctx.accountId} AND id=${id}`
+  const [transactions]=await wsDb(ctx)`SELECT count(*)::int AS count FROM ws.transactions WHERE account_id=${ctx.accountId} AND invoice_id=${id}`
+  expect(invoice.status).toBe('issued');expect(invoice.paid_on).toBeNull();expect(transactions.count).toBe(0)
+  await payInvoice(ctx,biz,id,'2026-10-10','transfer')
+  const [again]=await wsDb(ctx)`SELECT count(*)::int AS count FROM ws.transactions WHERE account_id=${ctx.accountId} AND invoice_id=${id}`
+  expect(again.count).toBe(1)
+ })
+ it('Zpět funguje i u nulové faktury bez účetní transakce',async()=>{
+  const id=await issueInvoice(ctx,biz,input({items:[{description:'Bez částky',quantity:1,unitPrice:0,vatRate:0}]}))
+  await payInvoice(ctx,biz,id,'2026-10-10','transfer')
+  await undoInvoicePayment(ctx,biz,id)
+  const [invoice]=await wsDb(ctx)`SELECT status,paid_on FROM ws.invoices WHERE account_id=${ctx.accountId} AND id=${id}`
+  expect(invoice.status).toBe('issued');expect(invoice.paid_on).toBeNull()
+ })
+ it('Zpět odpojí převzatou platbu zakázky, ale příjem zachová',async()=>{
+  await db.query('UPDATE ws.stages SET type=$1 WHERE id=$2',['done',A.stage])
+  const [{id:job}]=await wsDb(ctx)`INSERT INTO ws.jobs(account_id,business_id,stage_id,customer_id,title,price) VALUES(${ctx.accountId},${A.business},${A.stage},${A.customer},'Převzatá platba',1000) RETURNING id`
+  const [{id:transaction}]=await wsDb(ctx)`INSERT INTO ws.transactions(account_id,business_id,kind,amount,currency,occurred_on,job_id) VALUES(${ctx.accountId},${A.business},'income',1000,'CZK','2026-10-08',${job}) RETURNING id`
+  const id=await issueInvoice(ctx,biz,input({jobId:String(job)}))
+  await payInvoice(ctx,biz,id,'2026-10-10','transfer')
+  await undoInvoicePayment(ctx,biz,id)
+  const [payment]=await wsDb(ctx)`SELECT invoice_id,job_id FROM ws.transactions WHERE account_id=${ctx.accountId} AND id=${transaction}`
+  expect(payment.invoice_id).toBeNull();expect(payment.job_id).toBe(job)
+  const [count]=await wsDb(ctx)`SELECT count(*)::int AS value FROM ws.transactions WHERE account_id=${ctx.accountId} AND job_id=${job}`
+  expect(count.value).toBe(1)
+ })
+ it('souběžné zaplacení a Zpět neudělá dvojí příjem',async()=>{
+  const id=await issueInvoice(ctx,biz,input())
+  await Promise.all([payInvoice(ctx,biz,id,'2026-10-10','transfer'),payInvoice(ctx,biz,id,'2026-10-10','transfer')])
+  await Promise.allSettled([undoInvoicePayment(ctx,biz,id),undoInvoicePayment(ctx,biz,id)])
+  const [invoice]=await wsDb(ctx)`SELECT status FROM ws.invoices WHERE account_id=${ctx.accountId} AND id=${id}`
+  const [count]=await wsDb(ctx)`SELECT count(*)::int AS value FROM ws.transactions WHERE account_id=${ctx.accountId} AND invoice_id=${id}`
+  expect(invoice.status).toBe('issued');expect(count.value).toBe(0)
+ })
+ it('cizí účet platbu faktury nevrátí',async()=>{
+  const id=await issueInvoice(ctx,biz,input());await payInvoice(ctx,biz,id,'2026-10-10','transfer')
+  await expect(undoInvoicePayment(ctxB,{id:B.business},id)).rejects.toThrow()
+  expect((await getInvoice(ctx,biz,id))?.paidOn).toBe('2026-10-10')
+ })
  it('opakované i souběžné zaplacení vytvoří právě jeden příjem',async()=>{
   const id=await issueInvoice(ctx,biz,input())
   await Promise.all([payInvoice(ctx,biz,id,'2026-10-10','transfer'),payInvoice(ctx,biz,id,'2026-10-10','transfer')])
@@ -100,6 +143,16 @@ describe('Peníze: transakce pod RLS',()=>{
   expect((await getInvoiceOptions(ctx,biz)).customers.every(r=>r.id!==B.customer)).toBe(true)
   expect((await getTaxSettings(ctx)).mode).toBe('flat_expenses')
  })
+ it('profil dodavatele zůstává oddělený podle účtu a služby jsou dostupné pro fakturu',async()=>{
+  await saveIssuerProfile(ctx,{name:'Firma A',address:'Ulice 1',ico:'12345678',dic:'',bank:'CZ6508000000192000145399',vatPayer:false})
+  await saveIssuerProfile(ctxB,{name:'Firma B',address:'Ulice 2',ico:'87654321',dic:'',bank:'',vatPayer:false})
+  expect(await getIssuerProfile(ctx)).toMatchObject({name:'Firma A',ico:'12345678'})
+  expect(await getIssuerProfile(ctxB)).toMatchObject({name:'Firma B',ico:'87654321'})
+  const [service]=await wsDb(ctx)`SELECT id FROM ws.services WHERE account_id=${ctx.accountId} AND business_id=${A.business}`
+  await wsDb(ctx)`UPDATE ws.services SET price=450,currency='CZK' WHERE account_id=${ctx.accountId} AND id=${service.id}`
+  expect((await getInvoiceOptions(ctx,biz)).services).toContainEqual(expect.objectContaining({id:String(service.id),name:'Služba',price:450}))
+  expect((await getInvoiceOptions(ctxB,{id:B.business})).services.every(item=>item.id!==String(service.id))).toBe(true)
+ })
  it('zakázka musí být hotová, nesmí dostat druhou fakturu',async()=>{
   await expect(issueInvoice(ctx,biz,input({jobId:A.job}))).rejects.toThrow()
   await db.query('UPDATE ws.stages SET type=$1 WHERE id=$2',['done',A.stage])
@@ -117,6 +170,17 @@ describe('Peníze: transakce pod RLS',()=>{
  })
 })
 describe('PDF a síť',()=>{
+ it('QR používá platný český IBAN a ignoruje běžné číslo účtu',async()=>{
+  const invoice:Invoice={id:'x',businessId:'x',businessSlug:'x',direction:'issued',number:'2026-000042',customerId:null,jobId:null,
+   counterparty:party,issuer:{...party,bank:'CZ6508000000192000145399',vatPayer:false},issuedOn:'2026-10-10',suppliedOn:'2026-10-10',dueOn:'2026-10-24',paidOn:null,
+   amount:1250.5,currency:'CZK',items:[],status:'issued',note:'',hasPdf:false}
+  expect(spaydPaymentString(invoice)).toBe('SPD*1.0*ACC:CZ6508000000192000145399*AM:1250.50*CC:CZK*X-VS:2026000042')
+  const html=await invoiceHtml(invoice,{name:'Test',logo:null})
+  expect(html).toContain('Zaplatit QR kódem');expect(html).toContain('<svg')
+  expect(await invoiceHtml({...invoice,status:'paid',paidOn:'2026-10-10'},{name:'Test',logo:null})).not.toContain('Zaplatit QR kódem')
+  expect(spaydPaymentString({...invoice,issuer:{...invoice.issuer,bank:'19-2000145399/0800'}})).toBeNull()
+  expect(spaydPaymentString({...invoice,currency:'EUR'})).toBeNull()
+ })
  it('odmítne falešné PDF i velikost',async()=>{
   await expect(readPdf(new File(['<script>x</script>'],'invoice.pdf'))).rejects.toThrow('money_pdf_type')
   await expect(readPdf(new File([new Uint8Array(4*1024*1024+1)],'x.pdf'))).rejects.toThrow('money_pdf_size')

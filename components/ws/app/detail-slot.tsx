@@ -27,7 +27,7 @@ import { getCustomerDetail } from '@/lib/ws/customers'
 import { loadIntakeConfig, loadSlots } from '@/lib/ws/intake/intake'
 import { getLoyaltyEvents, getLoyaltyProgram, getVisitPayment } from '@/lib/ws/loyalty'
 import { draftMessage, getContactableCustomer, pickSlotSuggestions } from '@/lib/ws/outreach'
-import { InvoiceForm } from '@/components/ws/money/forms'
+import { InvoiceForm } from '@/components/ws/money/invoice-form'
 import { getInvoiceOptions } from '@/lib/ws/money/data'
 import { DetailSheet } from './detail-sheet'
 import { getSlotAdvice } from '@/lib/ws/slot-advice'
@@ -133,6 +133,7 @@ async function panelContent(
             events={events}
             today={env.today}
             businessName={business.name}
+            invoiceHref={env.modules.has('invoices')?navHref(business.slug,'faktury')+'?detail=nova-faktura&zakaznik='+customer.id:null}
             termHref={(id) => hrefWith(env.pathname, env.searchParams, { detail: `termin:${id}`, ...FORM_PARAMS })}
           />
         ),
@@ -253,6 +254,8 @@ async function panelContent(
                 settingsHref={`${navHref(business.slug, 'nastaveni')}/oteviraci-doba`}
               />
             )}
+
+            {r.customer_id&&env.modules.has('invoices')&&<Link href={navHref(business.slug,'faktury')+'?detail=nova-faktura&zakaznik='+r.customer_id} scroll={false} className="inline-flex min-h-11 items-center justify-center self-start rounded-full border px-5 text-sm font-semibold text-ink hover:bg-accent">Vystavit fakturu</Link>}
 
             <dl className="flex flex-col gap-3 text-[15px]">
               {!isNew && r.wanted_start && (
@@ -526,7 +529,7 @@ async function panelContent(
     case 'nova-faktura':
       return {
         title: 'Nová faktura',
-        body: <InvoiceForm slug={business.slug} today={env.today} options={await getInvoiceOptions(ctx, business)} closeHref={env.closeHref} />,
+        body: <InvoiceForm slug={business.slug} today={env.today} options={await getInvoiceOptions(ctx, business)} closeHref={env.closeHref} customerId={first(env.searchParams.zakaznik)} />,
       }
 
   }

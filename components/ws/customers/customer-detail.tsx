@@ -50,6 +50,7 @@ export function CustomerDetail({
   events,
   today,
   businessName,
+  invoiceHref,
   termHref,
 }: {
   slug: string
@@ -57,6 +58,7 @@ export function CustomerDetail({
   events: LoyaltyEvent[]
   today: string
   businessName: string
+  invoiceHref?: string | null
   termHref: (appointmentId: string) => string
 }) {
   const day = (d: Date) => formatRelativeDay(pragueParts(d).date, today)
@@ -86,6 +88,8 @@ export function CustomerDetail({
           )}
         </ul>
       </div>
+
+      {invoiceHref&&<Link href={invoiceHref} scroll={false} className="inline-flex min-h-11 items-center justify-center self-start rounded-full border px-5 text-sm font-semibold text-ink hover:bg-accent">Vystavit fakturu</Link>}
 
       <dl className="grid grid-cols-2 gap-3">
         <Stat label="Návštěvy za rok">{plural(c.visits, ['návštěva', 'návštěvy', 'návštěv'])}</Stat>

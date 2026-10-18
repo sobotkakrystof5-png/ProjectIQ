@@ -4,7 +4,7 @@
 
 ## Co v databázi je
 
-- **Schéma `ws`** — všechny tabulky Workspace (migrace `064`–`084`). Admin tabulky v `public` se nemění.
+- **Schéma `ws`** — tabulky Workspace a navazující funkce/indexy (migrace `064`–`088`). Admin tabulky v `public` se nemění.
 - **Role `ws_app`** — jediná role, kterou se aplikace Workspace připojuje (`DATABASE_URL_WS`). Platí pro ni Row Level Security, do `public` nevidí.
 - **Vlastník tabulek** (`neondb_owner`, `DATABASE_URL`) — pouští migrace a čte `ws` pro admin stránku `/dashboard/klienti`. RLS pro něj neplatí.
 
@@ -22,7 +22,9 @@ node scripts/apply-migration.js \
   073_ws_predplatne_webhooky.sql 074_ws_emaily_upozorneni.sql 075_ws_audit_limity.sql 076_ws_verejne_api.sql \
   077_ws_vernost_skupiny.sql 078_ws_vernost_odmena.sql 079_ws_sluzby_rozestupy.sql \
   080_ws_penize_provoz.sql 081_ws_emaily_odkazy_novinky.sql \
-  082_ws_klientsky_portal.sql 083_ws_admin_klienti_novinky.sql 084_ws_gdpr.sql
+  082_ws_klientsky_portal.sql 083_ws_admin_klienti_novinky.sql 084_ws_gdpr.sql \
+  085_ws_kontext_jednim_dotazem.sql 086_ws_indexy_rychlost.sql \
+  087_ws_objednavka_pracovnik_a_portal.sql 088_ws_faktury_profil_a_zpet.sql
 ```
 
 Jde to i ručně v Neon SQL editoru (obsah souborů po jednom, v tomhle pořadí). Migrace jsou idempotentní, opakované spuštění nic nerozbije.
@@ -198,4 +200,10 @@ Po 083 aplikovat `migrations/084_ws_gdpr.sql` rolí vlastníka a znovu `scripts/
 
 - Cron `/api/cron/ws-gdpr` je ve `vercel.json`, potřebuje `CRON_SECRET` (už existuje) a pro smazání organizace `CLERK_SECRET_KEY`.
 - Ověření po migraci: `SELECT proname FROM pg_proc WHERE pronamespace = 'ws'::regnamespace AND proname IN ('erase_customer','close_account','reopen_account','anonymize_expired_invoices','purge_closed_accounts')` vrátí 5 řádků.
+
+## Fakturace (RD10): migrace 088
+
+Po 087, při již aplikované základní migraci peněz 080, aplikovat `migrations/088_ws_faktury_profil_a_zpet.sql` rolí vlastníka. Přidá profil dodavatele k účtu a původ platby k faktuře, nahradí `ws.money_pay` a přidá `ws.money_unpay`. Funkce jsou `SECURITY INVOKER`; migrace jim odebere `PUBLIC` a při existující roli `ws_app` přidá `EXECUTE`. Po založení role nebo při opakovaném nastavení práv spusťte `node scripts/ws-create-role.js` (znovu použije `scripts/ws-grants.sql`). Data nemaže. **Připravená, na Neonu dosud neaplikovaná.**
+
+RD08 potřebuje další číslo 089. Tuto migraci nespouštějte před 087 ani před základními funkcemi peněz z 080.
 

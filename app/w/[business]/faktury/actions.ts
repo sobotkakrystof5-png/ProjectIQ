@@ -8,8 +8,8 @@ import { assertWritable } from '@/lib/ws/billing'
 import { wsDb, pgErrorCode } from '@/lib/ws/db'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { getEnabledModules } from '@/lib/ws/today'
-import { getInvoice, issueInvoice, payInvoice, saveTaxSettings } from '@/lib/ws/money/data'
-import { amountSchema,currencySchema,dateSchema,issueSchema,paymentSchema,taxSchema,transactionSchema } from '@/lib/ws/money/schema'
+import { getInvoice, issueInvoice, payInvoice, saveIssuerProfile, saveTaxSettings, undoInvoicePayment } from '@/lib/ws/money/data'
+import { amountSchema,currencySchema,dateSchema,invoicePaymentUndoSchema,issueSchema,paymentSchema,saveIssuerProfileSchema,taxSchema,transactionSchema } from '@/lib/ws/money/schema'
 import { readPdf } from '@/lib/ws/money/pdf'
 import { extractReceivedPdf } from '@/lib/ws/money/ai'
 import { hitLimit } from '@/lib/ws/intake/rate-limit'
@@ -46,6 +46,22 @@ export async function payInvoiceAction(raw:unknown):Promise<Result<null>> {
  if(p.data.day>pragueToday())return fail('Platbu nejde zapsat do budoucna.')
  const b=await requireBusiness(ctx,p.data.slug),blocked=await writable(ctx,b,'invoices');if(blocked)return blocked
  try{await payInvoice(ctx,b,p.data.id,p.data.day,p.data.method);revalidatePath('/w');return ok(null)}catch(e){return failure(e,ctx.accountId)}
+}
+export async function undoInvoicePaymentAction(raw:unknown):Promise<Result<null>> {
+ const ctx=await requireWorkspace(),p=invoicePaymentUndoSchema.safeParse(raw)
+ if(!p.success)return fail('Vyberte fakturu.')
+ const b=await requireBusiness(ctx,p.data.slug),blocked=await writable(ctx,b,'invoices');if(blocked)return blocked
+ try{await undoInvoicePayment(ctx,b,p.data.id);revalidatePath('/w');return ok(null)}
+ catch(e){if(e instanceof Error&&e.message.includes('money_payment_undo_expired'))return fail('Zpět už nejde použít. Zkontrolujte fakturu a případnou opravu zapište v příjmech.')
+  return failure(e,ctx.accountId)}
+}
+export async function saveIssuerProfileAction(raw:unknown):Promise<Result<null>> {
+ const ctx=await requireWorkspace(),p=saveIssuerProfileSchema.safeParse(raw)
+ if(ctx.role!=='owner')return fail('Údaje dodavatele může měnit jen vlastník účtu.')
+ if(!p.success)return fail('Zkontrolujte jméno, adresu, IČO a DIČ dodavatele.')
+ const blocked=await assertWritable(ctx);if(blocked)return blocked
+ try{const {slug:_,email:__,...profile}=p.data;await saveIssuerProfile(ctx,profile);revalidatePath('/w');return ok(null)}
+ catch(e){return failure(e,ctx.accountId)}
 }
 export async function addTransactionAction(raw:unknown):Promise<Result<null>> {
  const ctx=await requireWorkspace(),p=transactionSchema.safeParse(raw)

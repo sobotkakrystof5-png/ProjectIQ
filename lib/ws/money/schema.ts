@@ -9,6 +9,11 @@ export const partySchema = z.object({
  name: text(160).min(1), address: text(400).min(1), ico: text(8).regex(/^\d{8}$/).or(z.literal('')),
  dic: text(20), email: text(254).email().or(z.literal('')), bank: text(80),
 })
+export const issuerProfileSchema = partySchema.extend({
+ vatPayer: z.boolean(),
+}).omit({ email: true }).extend({ email: z.string().max(254).email().or(z.literal('')).default('') })
+ .refine(v => v.ico.length === 8, 'Doplňte IČO dodavatele.')
+ .refine(v => !v.vatPayer || v.dic.length > 0, 'Doplňte DIČ dodavatele.')
 export const itemSchema = z.object({
  description: text(200).min(1), quantity: z.number().finite().positive().max(100000).multipleOf(0.001),
  unitPrice: amountSchema, vatRate: z.union([z.literal(0), z.literal(12), z.literal(21)]),
@@ -26,6 +31,8 @@ export type IssueInput = z.infer<typeof issueSchema>
 export type Party = z.infer<typeof partySchema>
 export type InvoiceItem = z.infer<typeof itemSchema>
 export const paymentSchema = z.object({ slug: text(60).min(1), id: z.string().uuid(), day: dateSchema, method: z.enum(['cash','card','transfer','other']) })
+export const invoicePaymentUndoSchema = z.object({ slug: text(60).min(1), id: z.string().uuid() })
+export const saveIssuerProfileSchema = issuerProfileSchema.extend({ slug: text(60).min(1) })
 export const transactionSchema = z.object({
  slug: text(60).min(1), kind: z.enum(['income','expense']), amount: amountSchema.refine(v=>v>0), currency: currencySchema,
  day: dateSchema, category: text(80).min(1), description: text(500), method: z.enum(['cash','card','transfer','other']),

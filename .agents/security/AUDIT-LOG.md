@@ -276,3 +276,14 @@ Výsledek: bez nálezů.
 - Token poptávky generuje DB. `ws.portal_lookup` vrací pouze účet/byznys/druh/ID; čekající portál čte jen status, požadovaný čas, službu a jméno pro pozdrav, nikdy kontakty. Zkušební a odpojené zákazníky vylučuje. Po propojení na potvrzený termín se vrací běžný termínový portál; akce hodnocení čekající poptávky odmítne. Výmaz zákazníka odkaz zneplatní.
 - Bez nových závislostí, env proměnných, externích skriptů ani změny CSP aplikace. Migrace 087 je připravená, na skutečné DB nebyla spuštěna.
 Ověřeno: `npm test` (551 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`; lokální vizuální průchod s fiktivními daty v úzkém (614 px) a širokém (1228 px) zobrazení. `npm run build:check` neprošel kvůli sandboxovému zákazu vytvoření procesu/vazby na interní port; stejný zdroj úspěšně sestavil Webpack. Živý Preview se skutečným přihlášením, cizí doména widgetu a chování po migraci 087 zatím ověřeny nebyly.
+
+## 2026-10-18 — review RD10 (fakturace)
+Spouštěč: dokončení RD10 redesignu faktur před commitem, skill `web-security-review`.
+Rozsah: `migrations/088_ws_faktury_profil_a_zpet.sql`, `scripts/ws-grants.sql`, akce v `app/w/[business]/faktury/actions.ts`, `lib/ws/money/{schema,data,pdf}.ts`, profil a fakturační formuláře/seznam, QR v PDF.
+Výsledek:
+- Zod ověřuje profil, fakturu, datum i platbu; zápis profilu vyžaduje roli vlastníka, `assertWritable` a ukládá jen pod `ctx.accountId`. Profil je účetní, ale každá faktura si ponechává vlastní snímek. Všechny datové dotazy dál filtrují účet a u faktury také byznys; zákazník/zakázka/služba se načítají jen v daném účtu/byznysu.
+- `money_pay` a `money_unpay` jsou `SECURITY INVOKER`, mají pevný `search_path`, odebírají `PUBLIC` a udělují `EXECUTE` jen `ws_app` (migrace, `scripts/ws-grants.sql`). Funkce zamykají fakturu i transakci, platbu opakovaně nevytvoří a kontrolují účet/byznys. „Zpět“ odstraní pouze příjem vytvořený fakturou; převzatou nebo kalendářem použitou platbu odpojí a zachová. Nulová faktura se vrátí bez falešné transakce.
+- IBAN se před SPAYD kontroluje délkou, formátem a mod97; QR je jen pro neuhrazenou vystavenou fakturu v CZK. HTML text je escapovaný; vložené SVG generuje pouze `qrcode.react` z kontrolovaného SPAYD řetězce. Žádná nová závislost, env proměnná, externí skript ani změna CSP.
+Nálezy: 0 k opravě.
+Ověřeno: `npx tsc --noEmit`, cílené `ws-money.test.ts` (33 prošlo, 1 přeskočený), celé `npm test` (558 prošlo, 1 přeskočený), `npx next build --webpack`. `npm run build:check` narazil na sandboxové omezení vytváření procesu/portu; Webpack sestavení prošlo.
+Zůstává: vizuální a přihlášený Preview, PDF v prohlížeči, skutečné nastavení ověřené domény Resendu a migrací 080/087/088 na určené DB.

@@ -183,7 +183,7 @@ Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind C
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 39 tabulek | migrace `064_ws_zaklad` … `086_ws_indexy_rychlost` (přehled níže; na Neonu 064–083, ověřeno čtením 2026-10-10; 084–086 zatím ne) |
+| Schéma `ws` — 39 tabulek | migrace `064_ws_zaklad` … `088_ws_faktury_profil_a_zpet` (přehled níže; na Neonu 064–083 a 085–086, ověřeno čtením 2026-10-18; 084, 087 a 088 zatím ne) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
@@ -229,7 +229,8 @@ Pravidla schématu:
 | 084 | GDPR S18 (R-054): `invoices.anonymize_after`, `accounts.closing_requested_at`/`delete_after`; `ws.erase_customer` (výmaz zákazníka v jedné transakci, faktury zůstanou s povinnými údaji, koncepty pryč), `ws.close_account`/`ws.reopen_account` (archivace byznysů, výmaz za 30 dní), pro cron `SECURITY DEFINER` `ws.anonymize_expired_invoices()` a `ws.purge_closed_accounts()` |
 | 085 | RD02 (R-058): `ws.business_scope(org_id, business_slug)` — SECURITY DEFINER, vrací jsonb s účtem, byznysem podle slugu, byznysy účtu, zapnutými funkcemi a předplatným jedné Clerk organizace; `EXECUTE` jen `ws_app`; **ručně aplikovat na Neon (testovací větev, pak produkce)**, bez ní běží pomalejší záložní postup |
 | 086 | RD03 (R-058): indexy z `EXPLAIN` — `transactions_customer_idx` (součet plateb zákazníka v seznamu), `transactions_business_day_idx`, `requests_changed_idx`, `appointments_changed_idx`, `jobs_changed_idx` (nahrazují `*_account_business_idx`, jsou jejich začátkem), `appointments_request_idx` (termín poptávky); **ručně aplikovat na Neon**, dotazy fungují i bez něj, jen pomaleji |
-| 087 | RD07: `requests.requested_staff_id` (předvolba pracovníka při potvrzení), `requests.public_token` (portál čekající poptávky); `ws.portal_lookup` přepne stejný odkaz na vzniklý termín. **Připravit a ručně aplikovat na Neon** |
+| 087 | RD07: `requests.requested_staff_id` (předvolba pracovníka při potvrzení), `requests.public_token` (portál čekající poptávky); `ws.portal_lookup` přepne stejný odkaz na vzniklý termín. **Připravená, ručně aplikovat na Neon** |
+| 088 | RD10: `accounts.invoice_profile`, `invoices.payment_origin`; nahrazuje `ws.money_pay` a přidává `ws.money_unpay` jako `SECURITY INVOKER` s `EXECUTE` jen pro `ws_app`. **Připravená, ručně aplikovat po předchozích migracích; na Neonu neaplikovaná** |
 
 ### GDPR, vzhled a PWA (S18, R-054)
 
@@ -428,7 +429,7 @@ Jak je systém v kódu (S01, R-027):
 | Hlavní věc na Dnes | `pickFocus` v `lib/ws/today.ts` (čistá funkce): nejdéle čekající nová poptávka → nejbližší dnešní termín, který neskončil → nejstarší vystavená faktura po splatnosti (jen se zapnutou funkcí Faktury, `getTodayData(…, { invoices })`) → nic. Podklady jdou v téže dávce jako zbytek Dnes (3 dotazy navíc, bez nového kola do DB), nezávisí na zobrazeném týdnu. Termín je omezený na poslední dva dny, aby index `(byznys, začátek)` neprocházel historii. Komponenta `components/ws/app/today/focus.tsx` (`TodayFocus`): poptávka se potvrdí jedním klikem (`IncomingCard` + `RequestActions`), termín a faktura vedou odkazem do panelu, resp. na Faktury, prázdný stav nabízí odkaz na objednání. Poptávka z hlavní věci se ve výpisu „Další poptávky“ neopakuje |
 | Karta zákazníka | už není třetí sloupec. Klik na termín nebo poptávku v kalendáři otevře panel (`termin:` / `poptavka:`), ten má kartu zákazníka v sobě; `?zakaznik=<id>` přesměruje na `?detail=zakaznik:<id>` |
 | Společné komponenty obrazovek | `components/ws/app/page-header.tsx`: `PageShell` (šířka `narrow` 960 / `default` 1280 / `wide` 1440, okraje a rytmus 24 px) a `PageHeader` (nadpis s akcentem, podnadpis, jedna hlavní akce vpravo, slot `help` pro „?“ z RD14). `components/ws/app/toolbar.tsx`: `Toolbar` (řádek filtrů) a `PillNav` (odkazy v pilulkách, `chips` se stavy nebo `segmented` s pohledem). `EmptyState` má třetí velikost `compact` do úzkého sloupce a karty |
-| Kde se používají | Dnes, Poptávky, Zákazníci (`PageShell` + `PageHeader` + `PillNav`) a pohled Kalendáře (`PillNav` segmented). Kalendář a Zakázky (RD05, RD06) mají `PageShell` + `PageHeader` + `Toolbar`/`PillNav`; Peníze a Nastavení převezmou v RD10–RD13. Ukázky všech variant v `/w/_design` (oddíl 09) |
+| Kde se používají | Dnes, Poptávky, Zákazníci (`PageShell` + `PageHeader` + `PillNav`) a pohled Kalendáře (`PillNav` segmented). Kalendář a Zakázky (RD05, RD06) mají `PageShell` + `PageHeader` + `Toolbar`/`PillNav`; Peníze a Daně se upravují v RD11, Nastavení v RD13. Ukázky všech variant v `/w/_design` (oddíl 09) |
 | Testy | `ws-today.test.ts`: pořadí `pickFocus`, nejstarší poptávka mimo omezený seznam a nezávislost na týdnu, dnešní termín (skončený, zrušený, zítřejší se přeskočí), faktura po splatnosti (jen s funkcí, koncept a zaplacená ne, termín má přednost), oddělení účtů |
 
 ### Jak je to v kódu (RD05 + RD06, R-059)
@@ -479,18 +480,18 @@ Jak je systém v kódu (S01, R-027):
 
 ### Jak je to v kódu (S14, R-049)
 
-- Peníze: app/w/[business]/{penize,faktury,prijmy,dane}; společná serverová obrazovka components/ws/money/page.tsx a formuláře v pravém panelu. Parametry mesic, obdobi=6/12, rozsah=ucet; Daně vždy za celý účet. „Vše · jedno IČO“ také v přepínači.
-- lib/ws/money/{schema,calculations,data,ai,pdf,deadlines,reminders}: validace, haléře a měny, čtení pod RLS, vystavení/platba přes invoker funkce z 080. Adminové faktury/daně se neimportují a původní kód zůstává.
-- Nová faktura zapnutá ve WS_FEATURES; zakázka done/paid má předvyplněný panel. Hledání ⌘K vede přímo na detail faktury.
-- PDF API /api/ws/[business]/faktury/[id]/pdf kontroluje účet/byznys/modul, vrací attachment a private/no-store. Soubor max. 4 MB s magic bytes %PDF-. Puppeteer/Chromium externalizované v next.config.mjs, binárky přibalené do této routy; písma s OFL v lib/ws/money/assets/.
-- AI přepis: existující serverový ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN, max. 10/h/účet; při chybě ruční zadání. E-mail faktury zatím pouze draft ws.outbound_messages pro S15.
+- Peníze: `app/w/[business]/{penize,faktury,prijmy,dane}`; obrazovka `components/ws/money/page.tsx`, formuláře a seznam odděleně v `invoice-form.tsx`, `invoice-list.tsx` a `forms.tsx`. Filtr vystavených faktur je v URL (`stav=open|overdue|paid`), součty se drží po měně; `rozsah=ucet` zahrne byznysy účtu.
+- `lib/ws/money/{schema,calculations,data,ai,pdf,deadlines,reminders}`: validace, haléře a oddělené měny, čtení pod RLS, vystavení/platba přes SECURITY INVOKER funkce. Řadu a `money_issue` hlídá 080 (R-049); 088 přidává `invoice_profile` na účet a bezpečné `money_unpay`.
+- Nový profil dodavatele (`app/w/[business]/nastaveni/firma`, `components/ws/money/issuer-profile-form.tsx`) smí měnit jen vlastník. `ws.accounts.invoice_profile` je výchozí pro nové doklady; uložené údaje starších faktur se nemění. Nová faktura předvyplní zákazníka z karty, poptávky nebo zakázky, hotovou zakázku a službu s cenou z ceníku. Filtry mají jedno kliknutí „Zaplaceno“ a krátké „Zpět“; 088 rozlišuje platbu vytvořenou fakturou a převzatou ze zakázky, aby se existující příjem nesmazal.
+- PDF API `/api/ws/[business]/faktury/[id]/pdf` kontroluje účet/byznys/modul, vrací attachment a `private, no-store`. Přijatý soubor max. 4 MB s magic bytes `%PDF-`. Puppeteer/Chromium je externalizované v `next.config.mjs`, binárky přibalené k routě; písma s OFL v `lib/ws/money/assets/`. PDF dostane SPAYD QR pouze na nezaplacené vystavené faktuře v CZK s platným IBANem.
+- AI přepis: existující serverový `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`, max. 10/h/účet; při chybě ruční zadání. Odeslání faktury využívá frontu S15; tlačítko se nabízí jen při `WS_EMAIL_FROM`, `RESEND_API_KEY` a zapnuté šabloně. Nastavení odesílatele a ověření domény: `docs/workspace/SETUP.md`.
 - Odhad jen ověřené sazby 2026, neplátce a CZK; paušální/skutečný/paušální-daň režim, měsíce činnosti, vedlejší činnost, minima, sleva a zálohy. DPH za kalendářní rok, příjmy jen vodítko obratu. /api/ws/[business]/dane/kalendar nabízí ICS s připomínkou 7 dní předem. Zdroje a omezení: [MONEY.md](workspace/MONEY.md).
 
 ### Jak je to v kódu (S13, R-054)
 
 | Co | Kde |
 |---|---|
-| Rozcestník a podstránky | `app/w/[business]/nastaveni/{funkce,sluzby,oteviraci-doba,formular,stavy,vernost,skupiny,web,emaily,vzhled}` (jen vlastník, `requireRole(ctx,'owner')`). Akce `app/w/[business]/nastaveni/actions.ts` (`prepare`: Zod slugu, vlastník, `assertWritable`), data `lib/ws/settings.ts` → `getSettingsData` |
+| Rozcestník a podstránky | `app/w/[business]/nastaveni/{firma,funkce,sluzby,oteviraci-doba,formular,stavy,vernost,skupiny,web,emaily,vzhled}`; profil dodavatele v `firma` mění jen vlastník, ostatní Nastavení vyžaduje `requireRole(ctx,'owner')`. Akce `app/w/[business]/nastaveni/actions.ts` (`prepare`: Zod slugu, vlastník, `assertWritable`), data `lib/ws/settings.ts` → `getSettingsData` |
 | Otevírací doba a směny | `ws.opening_hours`: `staff_id NULL` = firma, jinak směny pracovníka; uložení nahradí celý týden (`saveWeekHours`). Pracovník bez řádků pracuje podle firmy. Týden ↔ řádky a kontrola překryvu `lib/ws/hours.ts` (bez DB, sdílí ho formulář), editor `components/ws/settings/week-hours-editor.tsx`. Prázdná doba firmy = zákazník si čas navrhne sám (R-045) |
 | Pracovníci | `saveStaff`, `setStaffActive` (posledního aktivního skrýt nejde — `ensureStaff` by založil nového); UI `components/ws/settings/team-settings.tsx` |
 | Dovolené a zavřeno | celé dny jako blokace `ws.appointments kind='block'` (`addTimeOff` → `bookings.createBlock`), s pracovníkem hlídá DB překryv, bez pracovníka = celá firma. Zrušení přes `cancelAppointment` + „Zpět“ |
