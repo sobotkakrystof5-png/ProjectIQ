@@ -1,7 +1,7 @@
 import 'server-only'
 import { q, wsDb, type WsRow } from '../db'
 import type { WsBusiness, WsContext } from '../context'
-import { invoiceTotal } from './calculations'
+import { invoiceTotal, type MoneyEntry } from './calculations'
 import { DEFAULT_TAX, taxSchema, type IssueInput, type Party, type TaxSettings, type InvoiceItem } from './schema'
 
 type Biz = Pick<WsBusiness,'id'>
@@ -49,6 +49,23 @@ export async function getFinance(ctx:WsContext,business:Biz,from:string,to:strin
  ORDER BY t.occurred_on DESC,t.created_at DESC`
  return rows.map(r=>({id:String(r.id),businessId:String(r.business_id),kind:r.kind as FinanceEntry['kind'],amount:Number(r.amount),currency:r.currency as FinanceEntry['currency'],day:String(r.day),
  category:String(r.category??'Ostatní'),description:String(r.description??''),method:String(r.payment_method??'other'),customer:String(r.customer??''),service:String(r.service??'Bez služby'),source:String(r.source??'manual'),segment:String(r.segment??'unassigned')}))
+}
+/**
+ * Součty plateb po měsících, měnách a druhu přímo v SQL (RD03). Vrací jeden
+ * záznam na (měsíc, měna, druh) ve tvaru `MoneyEntry` s datem prvního dne
+ * měsíce, takže `currencyTotals` a `monthSeries` dávají stejný výsledek jako
+ * nad řádky z `getFinance` — bez přenosu a sčítání tisíců řádků v JS. Stejný
+ * filtr: platby spojené se zkušební poptávkou se nepočítají. Měny se nesčítají.
+ */
+export async function getMoneyTotals(ctx:WsContext,business:Biz,from:string,to:string,all=false):Promise<MoneyEntry[]> {
+ const rows=await wsDb(ctx)`SELECT to_char(t.occurred_on,'YYYY-MM') AS month,t.currency,t.kind,sum(round(t.amount*100))::text AS cents
+ FROM ws.transactions t
+ LEFT JOIN ws.appointments a ON a.account_id=t.account_id AND a.business_id=t.business_id AND a.id=t.appointment_id
+ LEFT JOIN ws.jobs j ON j.account_id=t.account_id AND j.business_id=t.business_id AND j.id=t.job_id
+ WHERE t.account_id=${ctx.accountId} AND (${all} OR t.business_id=${business.id}) AND t.occurred_on>=${from}::date AND t.occurred_on<=${to}::date
+ AND NOT EXISTS (SELECT 1 FROM ws.requests test WHERE test.account_id=t.account_id AND test.business_id=t.business_id AND test.id=COALESCE(a.request_id,j.request_id) AND test.is_test)
+ GROUP BY 1,2,3 ORDER BY 1,2,3`
+ return rows.map(r=>({kind:r.kind as MoneyEntry['kind'],amount:Number(r.cents)/100,currency:String(r.currency),day:String(r.month)+'-01'}))
 }
 export async function getTaxSettings(ctx:WsContext):Promise<TaxSettings> {
  const [r]=await wsDb(ctx)`SELECT mode,flat_rate,vat_payer,side_activity,options FROM ws.tax_settings WHERE account_id=${ctx.accountId}`

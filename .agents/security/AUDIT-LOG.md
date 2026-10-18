@@ -250,3 +250,12 @@ Výsledek:
 - Streamování: promise s doplňky (zvonek, služby) vzniká na serveru v layoutu s kontextem přihlášeného, nese jen jeho data; chyba se loguje a vrací prázdné hodnoty (nic nepadá, nic se neukáže cizímu). Žádné nové `dangerouslySetInnerHTML`, balíčky, env ani skripty třetích stran. CSP beze změny; ověřeno v Chromu bez chyb v konzoli (kromě varování Clerku o vývojových klíčích).
 - `vercel.json` `regions: ["fra1"]` jen přesouvá běh funkcí blíž Neonu; projeví se po deployi.
 Nálezy: 0 k opravě. Zůstává: migrace 085 není na Neonu (do té doby běží záložní postup), obrazovky s přihlášením neověřeny.
+
+## 2026-10-18 — review RD03 (rychlost: indexy, součty v SQL, živé obnovení, balíček)
+Spouštěč: `web-security-review` před commitem.
+Rozsah: `migrations/086_ws_indexy_rychlost.sql`, `lib/ws/money/data.ts` (`getMoneyTotals`), `lib/ws/calendar.ts` (`getChangeStamp`), `app/api/ws/[business]/zmeny/route.ts`, `components/ws/{ws-root,app/app-frame}.tsx`.
+Výsledek:
+- Migrace jen indexy (žádná data, práva ani RLS). `getMoneyTotals` je parametrizovaný dotaz se stejným filtrem účtu a zkušebních poptávek jako `getFinance`, test `ws-money-totals.test.ts` ověřuje, že cizí účet nic nevrátí.
+- Route `/zmeny`: ověření beze změny (proxy `auth.protect` + `loadBusinessScope` ověří organizaci a slug proti účtu), vrací jen ETag. Odesílání e-mailů jde přes `after()` pod stejným kontextem účtu a chyba se loguje bez osobních údajů.
+- Žádné nové závislosti, env, `dangerouslySetInnerHTML` ani skripty třetích stran; CSP beze změny (dynamický import je vlastní chunk z `'self'`).
+Nálezy: 0 k opravě.

@@ -148,7 +148,7 @@ Pořadí je doporučené. Po RD04 jsou RD05–RD06, RD10–RD13 na sobě nezávi
 | RD00 | Příprava, větev, testovací DB, měření, R-058 | S | — | D-7, D-8, všechna ke schválení | rozpracováno 2026-10-18: rozhodnutí a R-058 hotové, větev a commity hotové; zbývá Neon branch, měření a průchod s přihlášením |
 | RD01 | Menu a Účet: Nastavení do Účtu, Peníze sloučeno | S–M | — | D-9 (rozhodnuto) | hotovo 2026-10-18 (kód, testy, náhled na 4 šířkách světle i tmavě; s přihlášením neověřeno) |
 | RD02 | Rychlost I: region, kola do DB, streaming | M | 085 | D-6 | hotovo v kódu 2026-10-18 (region `fra1` v `vercel.json`, kontext jedním dotazem, doplňky kostry streamem, `loading.tsx`, Suspense; **migrace 085 neaplikována, nenasazeno, čas před/po neměřen** — viz oddíl 9) |
-| RD03 | Rychlost II: dotazy, indexy, klient, bundle | M | možná indexy | — | nezačato |
+| RD03 | Rychlost II: dotazy, indexy, klient, bundle | M | 086 | — | hotovo v kódu 2026-10-18 (indexy, součty plateb v SQL, živé obnovení, balíček −9 až −12 %; **migrace 086 neaplikována, čas na Neonu neměřen, optimistické akce nejsou** — viz oddíl 9) |
 | RD04 | Dnes + hlavička + společné komponenty | M | — | D-3 | nezačato |
 | RD05 | Kalendář | M–L | — | — | nezačato |
 | RD06 | Zakázky | S–M | — | — | nezačato |
@@ -204,3 +204,35 @@ Měření času po kliknutí (RD00, krok 5) zatím neproběhlo: chybí testovac�
 | Clerk `auth()` | neměřeno | neměřeno | — |
 
 Zbývá změřit s přihlášením na testovací větvi: čas do kostry a do obsahu pro Dnes, Kalendář, Zákazníci, Peníze, před (větev `ws/redesign-app` bez commitu RD02) a po. Dokud nejsou čísla, tvrzení „rychlejší“ platí jen o počtu kol, ne o milisekundách.
+
+### RD03 — dotazy, živé obnovení, balíček (2026-10-18)
+
+**Dotazy.** `EXPLAIN (ANALYZE)` na skutečných dotazech aplikace v PGlite (Postgres ve WASM) nad syntetickými daty: 2 účty, na každém 5 000 zákazníků a 20 000 poptávek, termínů a plateb (platby 2025–2026), 3 000 faktur. **Čísla jsou z PGlite, ne z Neonu**: absolutně zkreslená (WASM je pomalejší), poměr před/po ale platí. „Před“ = bez migrace 086, „po“ = s ní.
+
+| Dotaz | Před | Po | Příčina |
+|---|---|---|---|
+| Seznam zákazníků (`getCustomersList`) | 563 ms | 46 ms | součet plateb zákazníka procházel 20 000 plateb pro každý ze 300 řádků; index `transactions_customer_idx` |
+| Seznam zákazníků s hledáním | 216 ms | 26 ms | totéž |
+| Poptávky, záložka Nové (`getRequestsList`) | 543 ms | 44 ms | nejnovější termín poptávky procházel všechny termíny pro každý z 200 řádků; index `appointments_request_idx` |
+| Otisk změn pro živé obnovení (`getChangeStamp`) | 20–22 ms | < 0,1 ms | `count(*)` + `max` přes všechny řádky; teď jen `max(updated_at)` z indexu (účet, byznys, updated_at DESC) |
+| Platby za 12 měsíců | 58 ms, 10 578 řádků | 33–35 ms, 48 řádků (součty ze SQL) | graf, srovnání s minulým měsícem a Daně už nečtou řádky; řádky se čtou jen za zvolený měsíc (20 ms, ~900 řádků) |
+| Dnes (`getTodayData`), Kalendář týden, Zakázky, Faktury, měsíční metriky | 2–8 ms | beze změny | bez zásahu |
+
+Rozpady „podle skupin, služeb a zdroje“ jsem do SQL nepřesouval: počítají se z řádků zvoleného měsíce, které se stejně vykreslují v seznamu plateb, takže další dotaz by nic neušetřil. Shodnost součtů ze SQL s výpočtem nad řádky hlídá `ws-money-totals.test.ts` (po měsících a měnách, hranice měsíců, zkušební poptávky, `all`, cizí účet).
+
+**Živé obnovení.** Dotaz na změny běžel každých 10 s u každé viditelné karty a dělal 4 dotazy za sebou do DB (účet, byznys, odeslání e-mailů, otisk) a čekal na SMTP až 1,5 s. Teď jeden dotaz na kontext (`loadBusinessScope`), otisk druhým a e-maily po odpovědi (`after`). Skrytá karta se dál neptá a `router.refresh()` běží jen při změně otisku (to už platilo).
+
+**Balíček (první načtení JS, gzip, `route-bundle-stats.json` z `next build`):**
+
+| Trasa | Před | Po |
+|---|---|---|
+| `/w/[business]` (Dnes) | 334 kB | 302 kB (−9 %) |
+| `/w/[business]/kalendar` | 335 kB | 303 kB |
+| `/w/[business]/penize` | 333 kB | 301 kB |
+| `/r/[slug]` (objednávací stránka) | 211 kB | 186 kB (−12 %) |
+| `/z/[token]` | 212 kB | 187 kB |
+| `/` (landing) | 223 kB | 198 kB |
+
+Příčiny: `WsRoot` importoval celý Framer Motion (43 kB gz v každé stránce), teď `LazyMotion` s `m` a funkcemi načítanými až po vykreslení (`lib/ws/motion-features.ts`), a `app-frame` importoval cmdk jen kvůli zkratce ⌘K (hook je teď v `components/ui/use-command-shortcut.ts`, paleta se načte v klidu nebo při prvním otevření). Stráží to `ws-bundle-guard.test.ts`. Graf je obyčejné SVG (žádná knihovna) a `@dnd-kit` je jen na stránkách Nastavení, takže tam se nic neměnilo.
+
+**Neprovedeno z RD03:** (1) čas po kliknutí na Neonu a s přihlášením (chybí testovací větev a přihlášení), (2) optimistické akce (potvrzení poptávky, zaplacení faktury, razítko): dělají vlastní stavy rozhraní, které bez ověření s přihlášením nejde bezpečně dodělat naslepo, vhodnější je RD04, kde se seznamy stejně přepracovávají, (3) začátek každé server action má pořád 3 dotazy za sebou (účet, byznys, předplatné); po přesunu do `fra1` to jsou jednotky milisekund, tak jsem na ~25 místech nic nepřepisoval, (4) cache dat účtu, protože měření ji neukázalo jako nutnou.

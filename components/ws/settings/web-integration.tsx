@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Check, Copy, Download, ExternalLink, KeyRound, Mail, Plus, Sparkles, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -193,7 +193,7 @@ export function WebIntegration({
         </div>
 
         {verified && (
-          <motion.div {...zqStamp} role="status" className="flex items-start gap-3 rounded-box bg-navy-50 px-4 py-3">
+          <m.div {...zqStamp} role="status" className="flex items-start gap-3 rounded-box bg-navy-50 px-4 py-3">
             <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy-700 text-white">
               <Check aria-hidden size={16} strokeWidth={2} />
             </span>
@@ -203,7 +203,7 @@ export function WebIntegration({
                 ? `Z vašeho webu naposledy dorazila poptávka ${when(verified.lastWeb)}.`
                 : 'Z vašeho webu zatím nic nedorazilo — pošlete zkušební formulář na webu a zkuste to znovu.'}
             </p>
-          </motion.div>
+          </m.div>
         )}
 
         <div className="flex flex-col gap-3 border-t border-navy-100 pt-5">

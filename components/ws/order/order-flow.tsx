@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { Check, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -173,7 +173,7 @@ export function OrderFlow({
           <ol className="flex flex-1 gap-1.5" aria-label={`Krok ${stepIndex + 1} ze ${steps.length}`}>
             {steps.map((s, i) => (
               <li key={s} className="h-1.5 flex-1 overflow-hidden rounded-full bg-navy-100">
-                <motion.span
+                <m.span
                   className="block h-full rounded-full bg-navy-700"
                   initial={false}
                   animate={{ width: i <= stepIndex ? '100%' : '0%' }}
@@ -192,7 +192,7 @@ export function OrderFlow({
       )}
 
       <AnimatePresence mode="wait" initial={false}>
-        <motion.section
+        <m.section
           key={step}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -415,7 +415,7 @@ export function OrderFlow({
           )}
 
           {step === 'done' && (
-            <motion.div {...zqIn} className="flex flex-col items-start gap-4 rounded-panel bg-surface p-6 shadow-sm">
+            <m.div {...zqIn} className="flex flex-col items-start gap-4 rounded-panel bg-surface p-6 shadow-sm">
               <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-navy-700 text-white">
                 <Check aria-hidden size={24} strokeWidth={2} />
               </span>
@@ -425,9 +425,9 @@ export function OrderFlow({
                   ? `Termín ${formatDayShort(chosenWhen.day)} v ${formatMinutes(chosenWhen.minutes)} vám brzy potvrdíme.`
                   : 'Brzy se vám ozveme.'}
               </p>
-            </motion.div>
+            </m.div>
           )}
-        </motion.section>
+        </m.section>
       </AnimatePresence>
     </div>
   )

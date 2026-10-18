@@ -5,6 +5,7 @@ import { Command as CommandPrimitive } from 'cmdk'
 import { Search } from 'lucide-react'
 import { cn } from '@/lib/ws/utils'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './dialog'
+import { useCommandShortcut } from './use-command-shortcut'
 
 // ⌘K — najde cokoli (AGENTS.md → B9). Data do něj dodá obrazovka, která ho otevírá.
 
@@ -45,20 +46,6 @@ function CommandDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-/** Otevře/zavře paletu na ⌘K (Mac) i Ctrl+K (Windows). */
-function useCommandShortcut(setOpen: React.Dispatch<React.SetStateAction<boolean>>) {
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setOpen((o) => !o)
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [setOpen])
 }
 
 const CommandInput = React.forwardRef<

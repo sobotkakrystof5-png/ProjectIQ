@@ -1,10 +1,11 @@
 'use client'
 
 import { Suspense, use, useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, Search } from 'lucide-react'
-import { useCommandShortcut } from '@/components/ui/command'
+import { useCommandShortcut } from '@/components/ui/use-command-shortcut'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Logo } from '@/components/ws/brand'
 import { rememberBusinessAction } from '@/app/w/[business]/actions'
@@ -23,7 +24,6 @@ import {
 import { cn } from '@/lib/ws/utils'
 import { AccountMenu, AccountSheetSection } from './account-menu'
 import { LiveRefresh } from './booking/live-refresh'
-import { CommandPalette } from './command-palette'
 import { NavIcon } from './nav-icon'
 import { NewMenu } from './new-menu'
 import { NotificationsBell } from './notifications-bell'
@@ -44,6 +44,10 @@ export type AppFrameProps = {
   children: React.ReactNode
 }
 
+// ⌘K (cmdk + dialog) se nestahuje s první stránkou: načte se v klidu po
+// vykreslení nebo při prvním otevření (RD03). Pád načtení palety kostru nesráží.
+const CommandPalette = dynamic(() => import('./command-palette').then((m) => m.CommandPalette), { ssr: false })
+
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 /**
@@ -58,7 +62,20 @@ export function AppFrame(props: AppFrameProps) {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [services, setServices] = useState<string[]>([])
+  const [paletteMounted, setPaletteMounted] = useState(false)
   useCommandShortcut(setPaletteOpen)
+
+  // Paleta se zavěsí při prvním otevření, nebo když je prohlížeč v klidu (aby první ⌘K nečekal na stažení).
+  useEffect(() => {
+    if (paletteOpen) setPaletteMounted(true)
+  }, [paletteOpen])
+  useEffect(() => {
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
+    const handle = idle ? idle(() => setPaletteMounted(true)) : window.setTimeout(() => setPaletteMounted(true), 2000)
+    return () => {
+      if (!idle) window.clearTimeout(handle)
+    }
+  }, [])
 
   useEffect(() => {
     let current = true
@@ -264,17 +281,19 @@ export function AppFrame(props: AppFrameProps) {
         </SheetContent>
       </Sheet>
 
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        slug={business.slug}
-        nav={palette}
-        accountLinks={account}
-        actions={actions}
-        orderUrl={orderUrl}
-        services={services}
-        today={props.today}
-      />
+      {paletteMounted && (
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          slug={business.slug}
+          nav={palette}
+          accountLinks={account}
+          actions={actions}
+          orderUrl={orderUrl}
+          services={services}
+          today={props.today}
+        />
+      )}
     </div>
   )
 }

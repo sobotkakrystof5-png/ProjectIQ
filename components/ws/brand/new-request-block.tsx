@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { cn } from '@/lib/ws/utils'
 import { zqIn } from '@/lib/ws/motion'
 import { LiveDot } from './live-dot'
@@ -33,7 +33,7 @@ export function NewRequestBlock({
   children?: React.ReactNode
 }) {
   return (
-    <motion.div
+    <m.div
       {...(appear ? zqIn : {})}
       className={cn(
         'rounded-chip border-[1.5px] border-dashed border-signal-line bg-signal-bg p-3 text-signal-ink',
@@ -55,6 +55,6 @@ export function NewRequestBlock({
       <p className="mt-1.5 text-[15px] font-semibold leading-snug">{customer}</p>
       {service && <p className="text-sm leading-snug opacity-80">{service}</p>}
       {children && <div className="mt-3 flex flex-wrap gap-2">{children}</div>}
-    </motion.div>
+    </m.div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { MotionConfig } from 'framer-motion'
+import { LazyMotion, MotionConfig } from 'framer-motion'
 import { PortalContainerProvider } from '@/components/ui/portal'
 import { setToastTheme } from '@/components/ui/toast'
 import { SYSTEM_THEME_SCRIPT, themeCookie, type Theme, type ThemePref } from '@/lib/ws/theme'
@@ -17,6 +17,9 @@ export function useWsTheme() {
 }
 
 const DARK_QUERY = '(prefers-color-scheme: dark)'
+
+// Animace se doplní, až je prohlížeč stáhne; do té doby se prvky ukážou bez pohybu.
+const loadMotionFeatures = () => import('@/lib/ws/motion-features').then((mod) => mod.default)
 
 /**
  * Kořen všeho, co vypadá podle Dílků (Workspace, landing page, portál a objednávací
@@ -66,20 +69,22 @@ export function WsRoot({
   const waitingForSystem = pref === 'system' && systemDark === null
   return (
     <ThemeContext.Provider value={value}>
-      <MotionConfig reducedMotion="user">
-        <div
-          ref={setContainer}
-          data-app="ws"
-          {...(waitingForSystem ? {} : { 'data-theme': theme })}
-          suppressHydrationWarning
-          className={cn(fontClassName, 'min-h-screen antialiased', className)}
-        >
-          {themePref === 'system' && (
-            <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: SYSTEM_THEME_SCRIPT }} />
-          )}
-          <PortalContainerProvider value={container}>{children}</PortalContainerProvider>
-        </div>
-      </MotionConfig>
+      <LazyMotion features={loadMotionFeatures}>
+        <MotionConfig reducedMotion="user">
+          <div
+            ref={setContainer}
+            data-app="ws"
+            {...(waitingForSystem ? {} : { 'data-theme': theme })}
+            suppressHydrationWarning
+            className={cn(fontClassName, 'min-h-screen antialiased', className)}
+          >
+            {themePref === 'system' && (
+              <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: SYSTEM_THEME_SCRIPT }} />
+            )}
+            <PortalContainerProvider value={container}>{children}</PortalContainerProvider>
+          </div>
+        </MotionConfig>
+      </LazyMotion>
     </ThemeContext.Provider>
   )
 }

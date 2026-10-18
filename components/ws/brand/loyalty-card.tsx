@@ -1,6 +1,6 @@
 'use client'
 
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { cn } from '@/lib/ws/utils'
 import { zqStamp } from '@/lib/ws/motion'
 
@@ -55,7 +55,7 @@ export function LoyaltyCard({
             <span className="absolute inset-0 rounded-tiny border border-dashed border-white/35" aria-hidden />
             <AnimatePresence initial={false}>
               {i < filled && (
-                <motion.span
+                <m.span
                   key="stamp"
                   {...zqStamp}
                   exit={{ opacity: 0, transition: { duration: 0.2 } }}

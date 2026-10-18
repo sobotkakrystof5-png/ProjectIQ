@@ -302,16 +302,22 @@ export async function getJobBoard(
 }
 
 /**
- * Otisk změn pro živé obnovení (polling): poslední změna a počet nových
- * poptávek, termínů a zakázek byznysu. Změní se → aplikace si načte data znovu.
+ * Otisk změn pro živé obnovení (polling): čas poslední změny poptávek, termínů
+ * a zakázek byznysu. Změní se → aplikace si načte data znovu.
+ *
+ * Každý zápis (vložení i změna) posune `updated_at` (výchozí hodnota a trigger
+ * `touch`), takže stačí `max`; ten čte jen konec indexu (účet, byznys,
+ * updated_at DESC, migrace 086). Dřív se k tomu počítal i `count(*)`, což
+ * procházelo všechny řádky při každém dotazu (každých 10 s u každé otevřené
+ * karty). Aplikace tyto řádky nemaže, smazání by otisk nezměnilo.
  */
 export async function getChangeStamp(ctx: WsContext, business: Biz): Promise<string> {
   const [rows] = await wsDb(ctx).batch([
     q`
       SELECT
-        (SELECT coalesce(max(updated_at)::text, '') || ':' || count(*) FROM ws.requests WHERE account_id = ${ctx.accountId} AND business_id = ${business.id}) AS r,
-        (SELECT coalesce(max(updated_at)::text, '') || ':' || count(*) FROM ws.appointments WHERE account_id = ${ctx.accountId} AND business_id = ${business.id}) AS a,
-        (SELECT coalesce(max(updated_at)::text, '') || ':' || count(*) FROM ws.jobs WHERE account_id = ${ctx.accountId} AND business_id = ${business.id}) AS j
+        (SELECT coalesce(max(updated_at)::text, '') FROM ws.requests WHERE account_id = ${ctx.accountId} AND business_id = ${business.id}) AS r,
+        (SELECT coalesce(max(updated_at)::text, '') FROM ws.appointments WHERE account_id = ${ctx.accountId} AND business_id = ${business.id}) AS a,
+        (SELECT coalesce(max(updated_at)::text, '') FROM ws.jobs WHERE account_id = ${ctx.accountId} AND business_id = ${business.id}) AS j
     `,
   ])
   const r = (rows as WsRow[])[0] ?? {}

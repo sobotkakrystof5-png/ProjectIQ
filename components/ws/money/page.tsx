@@ -12,7 +12,7 @@ import { hrefWith } from '@/lib/ws/detail-param'
 import { pragueToday,formatDayShort } from '@/lib/ws/time'
 import { formatMoney } from '@/lib/ws/money'
 import { currencyTotals,estimateTax,monthSeries,RATES } from '@/lib/ws/money/calculations'
-import { getFinance,getInvoice,getInvoiceOptions,getTaxSettings,listInvoices,monthMetrics,type FinanceEntry } from '@/lib/ws/money/data'
+import { getFinance,getInvoice,getInvoiceOptions,getMoneyTotals,getTaxSettings,listInvoices,monthMetrics,type FinanceEntry } from '@/lib/ws/money/data'
 import { wsDb } from '@/lib/ws/db'
 import { aiConfigured } from '@/lib/ws/money/ai'
 import { moneyDeadlines } from '@/lib/ws/money/reminders'
@@ -46,8 +46,9 @@ export async function MoneyPage({slug,section,searchParams}:{slug:string;section
  const year=Number(month.slice(0,4)),all=one(searchParams.rozsah)==='ucet',pathname='/w/'+slug+'/'+section
  const link=(patch:Record<string,string|null>)=>hrefWith(pathname,searchParams,patch)
  const from=monthOffset(month,0),next=monthOffset(month,1),end=new Date(new Date(next).getTime()-86400000).toISOString().slice(0,10)
- const [entries,invoices,tax,businesses]=await Promise.all([getFinance(ctx,business,monthOffset(month,-11),end,all),section==='faktury'?listInvoices(ctx,business,all):[],getTaxSettings(ctx),wsDb(ctx)<{id:string;name:string;slug:string}>`SELECT id,name,slug FROM ws.businesses WHERE account_id=${ctx.accountId} AND archived_at IS NULL`])
- const current=entries.filter(t=>t.day>=from&&t.day<=end),previous=entries.filter(t=>t.day>=monthOffset(month,-1)&&t.day<from)
+ // Řádky jen za zvolený měsíc (seznam plateb, rozpady); starší měsíce pro graf a srovnání jdou jako součty z SQL (RD03).
+ const [current,series,invoices,tax,businesses]=await Promise.all([getFinance(ctx,business,from,end,all),getMoneyTotals(ctx,business,monthOffset(month,-11),end,all),section==='faktury'?listInvoices(ctx,business,all):[],getTaxSettings(ctx),wsDb(ctx)<{id:string;name:string;slug:string}>`SELECT id,name,slug FROM ws.businesses WHERE account_id=${ctx.accountId} AND archived_at IS NULL`])
+ const previous=series.filter(t=>t.day>=monthOffset(month,-1)&&t.day<from)
  const detail=one(searchParams.detail),id=detail?.startsWith('faktura:')?detail.slice(8):null
  const invoice=id&&/^[0-9a-f-]{36}$/i.test(id)?await getInvoice(ctx,business,id):null
  const closeHref=link({detail:null,zakazka:null})
@@ -73,7 +74,7 @@ export async function MoneyPage({slug,section,searchParams}:{slug:string;section
  <Totals entries={current}/>
  {section==='penize'&&<><section className={panel}><h2 className="text-lg font-semibold">Oproti minulému měsíci</h2>{Object.entries(currencyTotals(current)).map(([currency,v])=>{const p=currencyTotals(previous)[currency]?.income??0;return <p key={currency} className="mt-2 font-num">{currency}: {formatMoney(v.income-p,{currency:currency as 'CZK'|'EUR'})}{p>0?' ('+Math.round((v.income-p)/p*100)+' %)':''}</p>})}</section>
  <Suspense fallback={<MetricsSkeleton/>}><MonthMetrics ctx={ctx} business={business} from={from} end={end} all={all}/></Suspense></>}
- <section className={panel}><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">Příjmy a výdaje</h2><div className="flex gap-2">{[6,12].map(n=><Link key={n} href={link({obdobi:String(n)})} className={buttonVariants({variant:count===n?'outline':'ghost'})}>{n} měsíců</Link>)}</div></div><MoneyChart rows={monthSeries(entries,month,count)}/></section>
+ <section className={panel}><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">Příjmy a výdaje</h2><div className="flex gap-2">{[6,12].map(n=><Link key={n} href={link({obdobi:String(n)})} className={buttonVariants({variant:count===n?'outline':'ghost'})}>{n} měsíců</Link>)}</div></div><MoneyChart rows={monthSeries(series,month,count)}/></section>
  <div className="grid gap-4 lg:grid-cols-3">{(['segment','service','source'] as const).map(key=><section key={key} className={panel}><h2 className="mb-3 text-lg font-semibold">{{segment:'Podle skupin',service:'Podle služeb',source:'Podle zdroje'}[key]}</h2>
  {group(current,key).length===0?<p className="text-sm text-quiet">Zatím bez příjmů.</p>:group(current,key).map(g=><div key={g.name} className="border-t py-3 text-sm"><p>{key==='source'?SOURCE[g.name]??g.name:key==='segment'?SEGMENT[g.name]??g.name:g.name}</p>{Object.entries(g.totals).map(([c,v])=><p key={c} className="font-num">{formatMoney(v.income,{currency:c as 'CZK'|'EUR'})}</p>)}</div>)}</section>)}</div>
  <section className={panel}><h2 className="mb-3 text-lg font-semibold">Platby za měsíc</h2>{current.length===0?<p className="text-quiet">Zapište první platbu. Faktura se tu objeví až po zaplacení.</p>:<ul className="divide-y">{current.map(t=><li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-3"><div><p className="text-sm">{t.description||t.category}</p><p className="font-num text-xs text-quiet">{formatDayShort(t.day)} · {t.kind==='income'?'Příjem':'Výdaj'} · {t.category}</p></div><span className="font-num text-sm">{t.kind==='expense'?'−':''}{formatMoney(t.amount,{currency:t.currency})}</span></li>)}</ul>}</section>
@@ -94,10 +95,10 @@ async function MonthMetrics({ctx,business,from,end,all}:{ctx:Parameters<typeof m
 }
 async function TaxPanel({ctx,business,year,today,settings}:{ctx:Parameters<typeof getFinance>[0];business:Parameters<typeof getFinance>[1] & {slug:string};year:number;today:string;settings:Awaited<ReturnType<typeof getTaxSettings>>}) {
  // Daň a DPH vždy za celý účet. Pohled jednoho byznysu nesmí zkrátit obrat.
- const entries=await getFinance(ctx,business,year+'-01-01',year+'-12-31',true)
+ // Jen součty ze SQL, bez řádků plateb (RD03); dva dotazy běží zároveň.
+ const [entries,trailing]=await Promise.all([getMoneyTotals(ctx,business,year+'-01-01',year+'-12-31',true),getMoneyTotals(ctx,business,monthOffset(today.slice(0,7),-11),today,true)])
  const czk=currencyTotals(entries).CZK??{income:0,expense:0,balance:0}
  const foreign=entries.some(e=>e.currency!=='CZK'),estimate=foreign||settings.vatPayer?null:estimateTax(czk.income,czk.expense,settings,year)
- const trailing=await getFinance(ctx,business,monthOffset(today.slice(0,7),-11),today,true)
  const annualProjection=czk.income/Math.max(1,Number(today.slice(5,7)))*12
  const deadlines=moneyDeadlines(today,settings).slice(0,3)
  return <section className={panel}><h2 className="text-lg font-semibold">Daně za {year} · celé IČO</h2><p className="mt-2 text-sm text-quiet">Odhad, ne daňové poradenství. Z placených příjmů evidovaných v účtu. Nezahrnuje příjmy mimo tuto aplikaci.</p>
