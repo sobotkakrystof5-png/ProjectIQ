@@ -1,66 +1,242 @@
+'use client'
+
+import { useState, type ComponentType, type ReactNode } from 'react'
 import { cn } from '@/lib/ws/utils'
-import { MODULES } from './content'
+import { CTA_LABEL, MODULES, ROUTES } from './content'
+import {
+  CalendarPreview,
+  CustomersPreview,
+  EmailPreview,
+  IncomePreview,
+  InvoicePreview,
+  JobsPreview,
+  LoyaltyPreview,
+  RequestsPreview,
+  TaxPreview,
+} from './module-previews'
 import { Reveal } from './reveal'
 import { SectionHead } from './section-head'
 
-// Odstíny dlaždic jako v LP-D — mřížka má působit jako skládačka, ne tabulka.
-// `a`/`b` = dílky znaku 2×2, které si při hoveru prohodí odstín (třídy musí být celé kvůli Tailwindu).
-const SHADES = [
-  { tile: 'bg-navy-700 text-white', sub: 'text-navy-200', a: 'bg-white group-hover:bg-navy-400', b: 'bg-navy-400 group-hover:bg-white' },
-  { tile: 'bg-navy-100 text-ink', sub: 'text-quiet', a: 'bg-navy-700 group-hover:bg-navy-300', b: 'bg-navy-300 group-hover:bg-navy-700' },
-  { tile: 'border border-navy-100 bg-surface text-ink', sub: 'text-quiet', a: 'bg-navy-700 group-hover:bg-navy-200', b: 'bg-navy-200 group-hover:bg-navy-700' },
-  { tile: 'bg-navy-100 text-ink', sub: 'text-quiet', a: 'bg-navy-700 group-hover:bg-navy-300', b: 'bg-navy-300 group-hover:bg-navy-700' },
-  { tile: 'bg-navy-800 text-white', sub: 'text-navy-200', a: 'bg-white group-hover:bg-navy-500', b: 'bg-navy-500 group-hover:bg-white' },
-  { tile: 'border border-navy-100 bg-surface text-ink', sub: 'text-quiet', a: 'bg-navy-700 group-hover:bg-navy-200', b: 'bg-navy-200 group-hover:bg-navy-700' },
-]
+// 04 Funkce, „Skládejte si to po dílcích". Každá karta je dílek: ukazuje kus aplikace
+// a přepínač ukáže, co se stane, když funkci vypnete. Pravidla přepínačů jsou stejná
+// jako v Nastavení › Funkce (lib/ws/settings.ts): Daně potřebují Příjmy.
 
-/** Znak 2×2 v rohu dlaždice; při hoveru dva dílky prohodí odstín („složí se"). */
-function SwapGlyph({ a, b }: { a: string; b: string }) {
+type SwitchKey = 'calendar' | 'jobs' | 'loyalty' | 'invoices' | 'finance' | 'taxes'
+type Toggles = Record<SwitchKey, boolean>
+type Tone = 'dark' | 'light' | 'soft'
+type Control = { kind: 'switch'; key: SwitchKey } | { kind: 'locked' } | { kind: 'settings'; where: string }
+type Layout = { span: string; tone: Tone; control: Control; Preview: ComponentType }
+
+// Rozvržení jako skládačka: dvě velké karty nahoře, tři střední, čtyři malé.
+// Tmavé karty jsou dvě (Poptávky a Daně), ať nejsou všechny stejné.
+const LAYOUT: Record<(typeof MODULES)[number]['n'], Layout> = {
+  '01': { span: 'sm:col-span-2 lg:col-span-5', tone: 'dark', control: { kind: 'locked' }, Preview: RequestsPreview },
+  '02': { span: 'sm:col-span-2 lg:col-span-7', tone: 'light', control: { kind: 'switch', key: 'calendar' }, Preview: CalendarPreview },
+  '03': { span: 'lg:col-span-6 xl:col-span-4', tone: 'light', control: { kind: 'locked' }, Preview: CustomersPreview },
+  '04': { span: 'lg:col-span-6 xl:col-span-4', tone: 'soft', control: { kind: 'switch', key: 'loyalty' }, Preview: LoyaltyPreview },
+  '05': { span: 'sm:col-span-2 lg:col-span-12 xl:col-span-4', tone: 'light', control: { kind: 'switch', key: 'jobs' }, Preview: JobsPreview },
+  '06': { span: 'lg:col-span-6 xl:col-span-3', tone: 'light', control: { kind: 'switch', key: 'invoices' }, Preview: InvoicePreview },
+  '07': { span: 'lg:col-span-6 xl:col-span-3', tone: 'soft', control: { kind: 'switch', key: 'finance' }, Preview: IncomePreview },
+  '08': { span: 'lg:col-span-6 xl:col-span-3', tone: 'dark', control: { kind: 'switch', key: 'taxes' }, Preview: TaxPreview },
+  '09': { span: 'lg:col-span-6 xl:col-span-3', tone: 'light', control: { kind: 'settings', where: 'V nastavení' }, Preview: EmailPreview },
+}
+
+const TILES = MODULES.map((module) => ({ ...module, ...LAYOUT[module.n] }))
+type ModuleTile = (typeof TILES)[number]
+
+const ALL_ON: Toggles = { calendar: true, jobs: true, loyalty: true, invoices: true, finance: true, taxes: true }
+
+/** Stejná pravidla jako při ukládání modulů: Daně nejdou bez Příjmů, vypnutí Příjmů vypne Daně. */
+function applyRules(state: Toggles, key: SwitchKey, value: boolean): Toggles {
+  const next = { ...state, [key]: value }
+  if (value && key === 'taxes') next.finance = true
+  if (!value && key === 'finance') next.taxes = false
+  return next
+}
+
+const TONE: Record<Tone, { surface: string; sub: string; muted: string }> = {
+  dark: { surface: 'bg-navy-950 text-white', sub: 'text-navy-200', muted: 'text-navy-300' },
+  light: { surface: 'border border-navy-100 bg-surface text-ink', sub: 'text-quiet', muted: 'text-quiet' },
+  soft: { surface: 'bg-navy-50 text-ink', sub: 'text-quiet', muted: 'text-quiet' },
+}
+const OFF_TONE = { surface: 'border border-dashed border-navy-300 bg-transparent text-ink', sub: 'text-quiet', muted: 'text-quiet' }
+
+/** Dílek znaku: plný, když je funkce zapnutá; prázdný a čárkovaný, když je vypnutá. */
+function Dilek({ on, dark }: { on: boolean; dark: boolean }) {
   return (
     <span aria-hidden className="grid grid-cols-2 gap-[3px]">
-      {[0, 1, 2, 3].map((i) => (
-        <span
-          key={i}
-          className={cn('block h-[7px] w-[7px] rounded-[2px] transition-colors duration-300 ease-zq', i === 0 || i === 3 ? a : b)}
-        />
-      ))}
+      {[0, 1, 2, 3].map((i) => {
+        const strong = i === 0 || i === 3
+        const fill = dark ? (strong ? 'bg-white' : 'bg-navy-400') : strong ? 'bg-navy-700' : 'bg-navy-300'
+        return (
+          <span
+            key={i}
+            className={cn(
+              'block h-2.5 w-2.5 rounded-[3px] transition-colors duration-300 ease-zq',
+              on ? fill : 'border border-dashed border-navy-300',
+            )}
+          />
+        )
+      })}
     </span>
   )
 }
 
-/** 04 Funkce — „Skládejte si to po dílcích" (brief § 4.6). */
-export function Modules() {
+function Switch({
+  id,
+  checked,
+  dark,
+  onChange,
+}: {
+  id: string
+  checked: boolean
+  dark: boolean
+  onChange: (value: boolean) => void
+}) {
   return (
-    <section id="funkce-seznam" aria-labelledby="moduly-title" className="mx-auto max-w-[1200px] px-5 pt-[72px] sm:px-7 md:pt-[120px]">
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={id}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+        dark ? 'focus-visible:outline-navy-300' : 'focus-visible:outline-navy-500',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'relative inline-block h-6 w-10 rounded-full transition-colors duration-300 ease-zq',
+          checked && (dark ? 'bg-navy-300' : 'bg-navy-700'),
+          !checked && (dark ? 'bg-navy-800' : 'bg-navy-100 ring-1 ring-inset ring-navy-300'),
+        )}
+      >
+        <span
+          className={cn(
+            'absolute left-[3px] top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform duration-300 ease-zq',
+            checked && 'translate-x-4',
+            checked && dark && 'bg-navy-950',
+          )}
+        />
+      </span>
+    </button>
+  )
+}
+
+function Pill({ dark, children }: { dark: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'whitespace-nowrap rounded-full border px-3 py-1.5 font-num text-[12px] uppercase tracking-[0.06em]',
+        dark ? 'border-navy-600 text-navy-200' : 'border-navy-200 text-quiet',
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
+function OffSlot() {
+  return (
+    <div className="flex min-h-[180px] flex-1 flex-col justify-center gap-2 rounded-chip border border-dashed border-navy-300 p-5">
+      <p className="font-semibold">Vypnuto</p>
+      <p className="text-[15px] leading-relaxed text-quiet">Z menu zmizí, data zůstanou. Kdykoli to můžete zapnout zpět.</p>
+    </div>
+  )
+}
+
+function ModuleCard({
+  tile,
+  on,
+  onToggle,
+}: {
+  tile: ModuleTile
+  on: boolean
+  onToggle: (value: boolean) => void
+}) {
+  const titleId = `modul-${tile.n}`
+  const dark = on && tile.tone === 'dark'
+  const tone = on ? TONE[tile.tone] : OFF_TONE
+  const { Preview } = tile
+  return (
+    <div
+      className={cn(
+        'flex h-full flex-col rounded-box p-5 transition-[background-color,border-color,transform] duration-300 ease-zq sm:p-6',
+        tone.surface,
+        on && 'hover:-translate-y-0.5',
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className={cn('font-num text-[13px]', tone.muted)}>{tile.n}</span>
+          <Dilek on={on} dark={dark} />
+        </div>
+        {tile.control.kind === 'switch' ? (
+          <Switch id={titleId} checked={on} dark={dark} onChange={onToggle} />
+        ) : (
+          <Pill dark={dark}>{tile.control.kind === 'locked' ? 'Vždy v menu' : tile.control.where}</Pill>
+        )}
+      </div>
+      <div className="mt-6">
+        <h3 id={titleId} className="text-[20px] font-semibold leading-tight tracking-[-0.015em] sm:text-[22px]">
+          {tile.title}
+        </h3>
+        <p className={cn('mt-1 text-[15px] leading-snug', tone.sub)}>{tile.text}</p>
+      </div>
+      <div className="mt-6 flex flex-1 flex-col">{on ? <Preview /> : <OffSlot />}</div>
+    </div>
+  )
+}
+
+/** 04 Funkce: „Skládejte si to po dílcích" (brief § 4.6, redesign R-057). */
+export function Modules() {
+  const [on, setOn] = useState<Toggles>(ALL_ON)
+  const [note, setNote] = useState('')
+
+  const isOn = (tile: ModuleTile) => (tile.control.kind === 'switch' ? on[tile.control.key] : true)
+
+  function change(tile: ModuleTile, value: boolean) {
+    if (tile.control.kind !== 'switch') return
+    const key = tile.control.key
+    setOn((state) => applyRules(state, key, value))
+    setNote(`${tile.title}: ${value ? 'zapnuto' : 'vypnuto'}`)
+  }
+
+  return (
+    <section id="funkce-seznam" aria-labelledby="moduly-title" className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]">
       <SectionHead id="moduly-title" number="04" label="Funkce · všechny v ceně" title="Skládejte si to" accent="po dílcích." />
-      <p className="mt-6 max-w-[560px] text-[17px] leading-relaxed text-quiet">
-        Zapnete si jen to, co potřebujete. Vypnutá funkce zmizí z menu a data zůstanou.
+      <p className="mt-6 max-w-[560px] text-[19px] leading-relaxed text-quiet">
+        Zapněte si jen to, co potřebujete. Vypnutá funkce zmizí z menu a data zůstanou.
+      </p>
+      <p className="mt-3 max-w-[560px] text-base leading-relaxed text-quiet">
+        Přepínače na kartách si můžete vyzkoušet. Je to jen ukázka, vaše nastavení se tím nemění.
       </p>
 
-      <ul className="mt-12 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-        {MODULES.map((m, j) => {
-          const shade = SHADES[(j * 2 + Math.floor(j / 3)) % SHADES.length]
-          return (
-            <Reveal as="li" key={m.n} delay={(j % 3) * 90}>
-              <div
-                className={cn(
-                  'group flex h-full min-h-[150px] flex-col justify-between gap-6 rounded-[22px] p-5 transition-transform duration-300 ease-zq hover:-translate-y-0.5 sm:p-6',
-                  shade.tile,
-                )}
-              >
-                <div className="flex items-start justify-between">
-                  <span className="font-num text-xs opacity-70">{m.n}</span>
-                  <SwapGlyph a={shade.a} b={shade.b} />
-                </div>
-                <div>
-                  <h3 className="text-[17px] font-semibold leading-tight tracking-[-0.01em] sm:text-lg">{m.title}</h3>
-                  <p className={cn('mt-1 text-sm', shade.sub)}>{m.text}</p>
-                </div>
-              </div>
-            </Reveal>
-          )
-        })}
+      <ul className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-12">
+        {TILES.map((tile, j) => (
+          <Reveal as="li" key={tile.n} delay={(j % 3) * 90} className={tile.span}>
+            <ModuleCard tile={tile} on={isOn(tile)} onToggle={(value) => change(tile, value)} />
+          </Reveal>
+        ))}
       </ul>
+
+      <p role="status" className="sr-only">
+        {note}
+      </p>
+
+      <div className="mt-10 flex flex-col gap-5 border-t border-navy-100 pt-10 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-[46ch] text-lg leading-relaxed text-ink">
+          Všechno, co tu vidíte, je v jednom tarifu. Prvních 14 dní je zdarma.
+        </p>
+        <a
+          href={ROUTES.signUp}
+          className="inline-flex min-h-[54px] shrink-0 items-center justify-center rounded-full bg-navy-700 px-7 text-lg font-semibold text-white transition-colors duration-200 ease-zq hover:bg-navy-800"
+        >
+          {CTA_LABEL}
+        </a>
+      </div>
     </section>
   )
 }

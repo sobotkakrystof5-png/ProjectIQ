@@ -5,7 +5,7 @@ function Row({ hidden = false }: { hidden?: boolean }) {
   return (
     <ul aria-hidden={hidden || undefined} aria-label={hidden ? undefined : 'Obory'} className="flex shrink-0 items-center">
       {OBORY.map((obor) => (
-        <li key={obor} className="flex items-center gap-3 whitespace-nowrap px-6 text-[17px] font-medium tracking-[-0.01em] text-ink">
+        <li key={obor} className="flex items-center gap-3 whitespace-nowrap px-6 text-[19px] font-medium tracking-[-0.01em] text-ink">
           <TileGlyph />
           {obor}
         </li>

@@ -16,13 +16,13 @@ export function LegalPage({ title, accent, facts }: { title: string; accent?: st
           {title}
         </AccentHeading>
         {facts && facts.length > 0 && (
-          <ul className="mt-8 flex list-disc flex-col gap-3 pl-5 text-[17px] leading-relaxed text-ink">
+          <ul className="mt-8 flex list-disc flex-col gap-3 pl-5 text-[19px] leading-relaxed text-ink">
             {facts.map((f) => (
               <li key={f}>{f}</li>
             ))}
           </ul>
         )}
-        <p className="mt-8 text-[17px] leading-relaxed text-quiet">[DOPLNIT]</p>
+        <p className="mt-8 text-[19px] leading-relaxed text-quiet">[DOPLNIT]</p>
       </main>
       <Footer />
     </>

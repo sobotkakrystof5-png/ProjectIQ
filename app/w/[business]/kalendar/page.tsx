@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { IncomingList } from '@/components/ws/app/today/incoming-list'
 import { CalendarAgenda } from '@/components/ws/app/calendar/agenda'
 import { MonthGrid } from '@/components/ws/app/calendar/month-grid'
 import { TimeGrid, type GridColumn, type GridItem } from '@/components/ws/app/calendar/time-grid'
@@ -25,7 +26,7 @@ import {
   pragueToUtc,
   weekStartOf,
 } from '@/lib/ws/time'
-import { getEnabledModules } from '@/lib/ws/today'
+import { getEnabledModules, getIncoming } from '@/lib/ws/today'
 import { cn } from '@/lib/ws/utils'
 
 export const metadata: Metadata = { title: 'Kalendář' }
@@ -54,6 +55,8 @@ function monthStart(day: string, shift = 0): string {
  * Kalendář (S10, mockup C): Den (sloupce podle pracovníků), Týden, Měsíc.
  * Nové poptávky jako čárkované bloky na chtěném čase, potvrzení na bloku,
  * přetažení termínu se „Zpět“, blokace. Stav v URL: `?pohled=`, `?datum=`.
+ * Redesign (R-057): mřížka je hlavní plocha, vpravo pruh Příchozí se všemi
+ * čekajícími poptávkami (i mimo zobrazený týden); pod 1280 px je pod kalendářem.
  */
 export default async function CalendarPage(
   props: {
@@ -81,10 +84,13 @@ export default async function CalendarPage(
 
   const rangeStart = view === 'den' ? date : view === 'tyden' ? weekStartOf(date) : weekStartOf(monthStart(date))
   const rangeDays = view === 'den' ? 1 : view === 'tyden' ? 7 : 42
-  const data = await getCalendarData(ctx, business, {
-    from: pragueToUtc(rangeStart, 0),
-    to: pragueToUtc(addDays(rangeStart, rangeDays), 0),
-  })
+  const [data, incoming] = await Promise.all([
+    getCalendarData(ctx, business, {
+      from: pragueToUtc(rangeStart, 0),
+      to: pragueToUtc(addDays(rangeStart, rangeDays), 0),
+    }),
+    getIncoming(ctx, business),
+  ])
 
   const link = (patch: Record<string, string | null>) => hrefWith(pathname, searchParams, patch)
   const hrefFor = (e: CalEntry) => link({ detail: e.kind === 'request' ? `poptavka:${e.id}` : `termin:${e.id}` })
@@ -181,65 +187,81 @@ export default async function CalendarPage(
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <nav aria-label="Pohled" className="flex gap-1 rounded-full bg-navy-50 p-1 dark:bg-navy-900">
-          {VIEWS.map((v) => (
-            <Link
-              key={v.key}
-              href={link({ pohled: v.key, detail: null })}
-              aria-current={v.key === view ? 'page' : undefined}
-              className={cn(
-                'inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition-colors',
-                v.key === view ? 'bg-navy-700 text-white' : 'text-navy-900 hover:bg-navy-100 dark:text-navy-100 dark:hover:bg-navy-800',
-              )}
-            >
-              {v.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="flex items-center gap-1">
-          <Link
-            href={link({ datum: step(-1), detail: null })}
-            aria-label="Předchozí"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-quiet hover:bg-accent hover:text-ink"
-          >
-            <ChevronLeft aria-hidden size={20} strokeWidth={1.5} />
-          </Link>
-          <Link
-            href={link({ datum: step(1), detail: null })}
-            aria-label="Další"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-quiet hover:bg-accent hover:text-ink"
-          >
-            <ChevronRight aria-hidden size={20} strokeWidth={1.5} />
-          </Link>
-        </div>
-        <h2 className="font-num text-[15px] text-ink first-letter:uppercase">{label}</h2>
-        {!showsToday && (
-          <Link
-            href={link({ datum: null, detail: null })}
-            className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-navy-700 hover:bg-accent dark:text-navy-200"
-          >
-            Dnes
-          </Link>
-        )}
-      </div>
+      <div data-detail-grid className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <nav aria-label="Pohled" className="flex gap-1 rounded-full bg-navy-50 p-1 dark:bg-navy-900">
+              {VIEWS.map((v) => (
+                <Link
+                  key={v.key}
+                  href={link({ pohled: v.key, detail: null })}
+                  aria-current={v.key === view ? 'page' : undefined}
+                  className={cn(
+                    'inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition-colors',
+                    v.key === view ? 'bg-navy-700 text-white' : 'text-navy-900 hover:bg-navy-100 dark:text-navy-100 dark:hover:bg-navy-800',
+                  )}
+                >
+                  {v.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="flex items-center gap-1">
+              <Link
+                href={link({ datum: step(-1), detail: null })}
+                aria-label="Předchozí"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-quiet hover:bg-accent hover:text-ink"
+              >
+                <ChevronLeft aria-hidden size={20} strokeWidth={1.5} />
+              </Link>
+              <Link
+                href={link({ datum: step(1), detail: null })}
+                aria-label="Další"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-quiet hover:bg-accent hover:text-ink"
+              >
+                <ChevronRight aria-hidden size={20} strokeWidth={1.5} />
+              </Link>
+            </div>
+            <h2 className="font-num text-[15px] text-ink first-letter:uppercase">{label}</h2>
+            {!showsToday && (
+              <Link
+                href={link({ datum: null, detail: null })}
+                className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-navy-700 hover:bg-accent dark:text-navy-200"
+              >
+                Dnes
+              </Link>
+            )}
+          </div>
 
-      {view === 'mesic' ? (
-        <MonthGrid
-          gridStart={rangeStart}
-          month={monthStart(date).slice(0, 7)}
-          today={today}
-          entries={data.entries}
-          dayHref={(day) => link({ pohled: 'den', datum: day, detail: null })}
-        />
-      ) : (
-        <>
-          <section className="hidden min-w-0 rounded-panel border bg-surface p-4 sm:p-5 md:block">
-            <TimeGrid slug={business.slug} columns={columns} items={items} hours={hours} newBookingHref={newBookingBase} />
-          </section>
-          <CalendarAgenda className="md:hidden" entries={data.entries} days={agendaDays} today={today} hrefFor={hrefFor} showStaff={multiStaff} />
-        </>
-      )}
+          {view === 'mesic' ? (
+            <MonthGrid
+              gridStart={rangeStart}
+              month={monthStart(date).slice(0, 7)}
+              today={today}
+              entries={data.entries}
+              dayHref={(day) => link({ pohled: 'den', datum: day, detail: null })}
+            />
+          ) : (
+            <>
+              <section className="hidden min-w-0 rounded-panel border bg-surface p-4 sm:p-5 md:block">
+                <TimeGrid slug={business.slug} columns={columns} items={items} hours={hours} newBookingHref={newBookingBase} />
+              </section>
+              <CalendarAgenda className="md:hidden" entries={data.entries} days={agendaDays} today={today} hrefFor={hrefFor} showStaff={multiStaff} />
+            </>
+          )}
+        </div>
+
+        <div data-detail-hide className={cn('min-w-0', incoming.total === 0 && 'hidden xl:block')}>
+          <IncomingList
+            items={incoming.items}
+            total={incoming.total}
+            today={today}
+            now={now}
+            hrefFor={(id) => link({ detail: `poptavka:${id}` })}
+            allHref={navHref(business.slug, 'poptavky')}
+            actions={{ slug: business.slug, calendar: true, jobs: modules.has('jobs') }}
+          />
+        </div>
+      </div>
 
       <DetailSlot ctx={ctx} business={business} pathname={pathname} searchParams={searchParams} today={today} />
     </div>

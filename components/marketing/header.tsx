@@ -68,7 +68,7 @@ function NavLinks({ active, onDark, onNavigate }: { active: string | null; onDar
           onClick={onNavigate}
           aria-current={active === item.id ? 'location' : undefined}
           className={cn(
-            'inline-flex min-h-[40px] items-center rounded-full px-4 text-sm transition-colors duration-200 ease-zq',
+            'inline-flex min-h-[40px] items-center rounded-full px-4 text-base transition-colors duration-200 ease-zq',
             onDark
               ? active === item.id
                 ? 'bg-white text-navy-950'
@@ -134,10 +134,10 @@ export function Header({ variant = 'hero' }: { variant?: 'hero' | 'page' }) {
       </nav>
 
       <div className="flex items-center gap-1.5">
-        <SignInLink className="hidden min-h-[44px] items-center rounded-full px-4 text-sm text-navy-100 transition-colors hover:text-white sm:inline-flex" />
+        <SignInLink className="hidden min-h-[44px] items-center rounded-full px-4 text-base text-navy-100 transition-colors hover:text-white sm:inline-flex" />
         <a
           href={ROUTES.signUp}
-          className="inline-flex min-h-[44px] items-center rounded-full bg-white px-5 text-sm font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50"
+          className="inline-flex min-h-[44px] items-center rounded-full bg-white px-5 text-base font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50"
         >
           <span className="sm:hidden">Začít</span>
           <span className="hidden sm:inline">Začít za 249 Kč</span>
@@ -185,12 +185,12 @@ export function Header({ variant = 'hero' }: { variant?: 'hero' | 'page' }) {
                 key={item.id}
                 href={`/#${item.id}`}
                 onClick={() => setOpen(false)}
-                className="flex min-h-[48px] items-center rounded-chip px-4 text-base text-navy-100 hover:bg-white/10"
+                className="flex min-h-[48px] items-center rounded-chip px-4 text-lg text-navy-100 hover:bg-white/10"
               >
                 {item.label}
               </a>
             ))}
-            <SignInLink className="flex min-h-[48px] items-center rounded-chip px-4 text-base text-navy-100 hover:bg-white/10" />
+            <SignInLink className="flex min-h-[48px] items-center rounded-chip px-4 text-lg text-navy-100 hover:bg-white/10" />
           </nav>
         </div>
       )}

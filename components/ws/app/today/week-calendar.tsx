@@ -37,6 +37,7 @@ export function WeekCalendar({
   today,
   opening,
   links,
+  selectedId,
   className,
 }: {
   entries: CalendarEntry[]
@@ -44,6 +45,8 @@ export function WeekCalendar({
   today: string
   opening: { from: number; to: number } | null
   links: CalendarLinks
+  /** Poptávka nebo termín otevřený v pravém panelu — zvýrazní se (R-057). */
+  selectedId?: string | null
   className?: string
 }) {
   const hours = hourRange(entries, opening)
@@ -58,7 +61,7 @@ export function WeekCalendar({
     <section aria-labelledby="tyden" className={cn('min-w-0 rounded-panel border bg-surface p-4 sm:p-5', className)}>
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
         <h2 id="tyden" className="flex items-baseline gap-3">
-          <SectionLabel>Týden</SectionLabel>
+          <SectionLabel>Kalendář</SectionLabel>
           <span className="font-num text-sm text-ink">{range}</span>
         </h2>
         <div className="ml-auto flex items-center gap-1">
@@ -126,6 +129,7 @@ export function WeekCalendar({
                   const when = formatTimeRange(e.start, e.end)
                   const label = `${KIND_LABEL[e.kind]}: ${e.title}${e.subtitle ? `, ${e.subtitle}` : ''}, ${formatDayShort(pragueParts(e.start).date)} ${when}`
                   const short = p.height * (height / 100) < 34
+                  const selected = selectedId != null && e.id === selectedId
                   const body = (
                     <>
                       <span className="block truncate font-num text-[10px] leading-tight opacity-80">{formatClock(e.start)}</span>
@@ -136,6 +140,7 @@ export function WeekCalendar({
                     'absolute block overflow-hidden rounded-tiny px-1.5 py-1 transition-[filter] duration-200',
                     KIND_CLASS[e.kind],
                     href && 'hover:brightness-[0.97] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    selected && 'z-10 ring-2 ring-navy-700 ring-offset-1 ring-offset-surface dark:ring-navy-200',
                   )
                   const style = {
                     top: `${p.top}%`,
@@ -146,7 +151,7 @@ export function WeekCalendar({
                   return (
                     <li key={`${e.kind}-${e.id}-${dayIndex}`}>
                       {href ? (
-                        <Link href={href} scroll={false} aria-label={label} title={label} className={cls} style={style}>
+                        <Link href={href} scroll={false} aria-label={label} aria-current={selected ? 'true' : undefined} title={label} className={cls} style={style}>
                           {body}
                         </Link>
                       ) : (

@@ -1,176 +1,177 @@
-'use client'
+import { AccentHeading, LoyaltyCard, SectionLabel } from '@/components/ws/brand'
 
-import { useEffect, useRef, useState } from 'react'
-import { ConfirmedBlock, LoyaltyCard, NewRequestBlock, SectionLabel } from '@/components/ws/brand'
-import { cn } from '@/lib/ws/utils'
-import { SectionHead } from './section-head'
-import { useInView, useReducedMotion } from './use-in-view'
-
-// Ukázkové termíny (pražský čas): čt 8. 10. 16:00, pá 9. 10. 9:00.
-const MAREK_START = '2026-10-08T14:00:00Z'
-const MAREK_END = '2026-10-08T14:45:00Z'
-const TEREZA_START = '2026-10-09T07:00:00Z'
-const TEREZA_END = '2026-10-09T08:30:00Z'
-
-/** Výšky sloupců grafu příjmů v % — ilustrace, žádná skutečná data. */
-const BARS = [46, 58, 40, 64, 80, 96]
-const MONTHS = ['kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj']
-
-function UkazkaChip() {
-  return (
-    <span className="rounded-full bg-surface/80 px-2 py-0.5 font-num text-[10px] uppercase tracking-[0.12em] text-quiet">
-      ukázka
-    </span>
-  )
-}
-
-/** Karta 1: nová poptávka přijede pod potvrzený termín, když karta přijede na obrazovku. */
-function RequestsIllustration() {
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { once: true, threshold: 0.4 })
-  const reduced = useReducedMotion()
-  const show = inView || reduced
-  return (
-    <div ref={ref} className="flex h-full flex-col gap-3">
-      <ConfirmedBlock start={MAREK_START} end={MAREK_END} customer="Marek Dušek" service="Pánský střih" />
-      <div className="min-h-[132px]">
-        {show && (
-          <NewRequestBlock start={TEREZA_START} end={TEREZA_END} customer="Tereza Malá" service="Barvení + střih" appear>
-            <span className="inline-flex h-9 items-center rounded-full bg-navy-700 px-4 text-sm font-semibold text-white">
-              Potvrdit jedním klikem
-            </span>
-          </NewRequestBlock>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/** Karta 2: razítka přibývají, dokud není karta plná. */
-function LoyaltyIllustration() {
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { once: true, threshold: 0.4 })
-  const reduced = useReducedMotion()
-  const [stamps, setStamps] = useState(2)
-
-  useEffect(() => {
-    if (reduced) {
-      setStamps(5)
-      return
-    }
-    if (!inView) return
-    const id = window.setInterval(() => {
-      setStamps((s) => {
-        if (s >= 5) window.clearInterval(id)
-        return Math.min(s + 1, 5)
-      })
-    }, 700)
-    return () => window.clearInterval(id)
-  }, [inView, reduced])
-
-  return (
-    <div ref={ref} className="flex h-full items-center justify-center">
-      <LoyaltyCard customer="Tereza Malá" stamps={stamps} total={5} reward="střih zdarma" business="Věrnostní karta" />
-    </div>
-  )
-}
-
-/** Karta 3: sloupce příjmů vyrostou zdola (`zq-grow`, stagger 120 ms), jednou. */
-function MoneyIllustration() {
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { once: true, threshold: 0.4 })
-  return (
-    <div ref={ref} className="flex h-full flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="font-num text-[11px] uppercase tracking-[0.12em] text-quiet">Příjmy · kvě–říj</span>
-        <UkazkaChip />
-      </div>
-      <div className="flex h-[120px] items-end gap-2">
-        {BARS.map((h, i) => (
-          <div key={MONTHS[i]} className="flex h-full flex-1 flex-col justify-end gap-1.5">
-            <span
-              className={cn(
-                'block origin-bottom rounded-t-[6px] rounded-b-[3px]',
-                i === BARS.length - 1 ? 'bg-navy-700' : 'bg-navy-200',
-                inView ? 'animate-zq-grow' : 'scale-y-0 motion-reduce:scale-y-100',
-              )}
-              style={{ height: `${h}%`, animationDelay: inView ? `${i * 120}ms` : undefined }}
-            />
-            <span className="text-center font-num text-[10px] text-quiet">{MONTHS[i]}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function FeatureCard({
-  number,
-  label,
-  title,
-  text,
-  className,
-  illustrationClassName,
-  children,
-}: {
-  number: string
-  label: string
-  title: string
-  text: string
-  className?: string
-  illustrationClassName?: string
-  children: React.ReactNode
-}) {
-  return (
-    <article className={cn('flex flex-col overflow-hidden rounded-panel border border-navy-100 bg-surface', className)}>
-      <div aria-hidden className={cn('relative bg-navy-50 p-5 sm:p-6', illustrationClassName)}>
-        {children}
-      </div>
-      <div className="flex flex-col gap-2 p-5 sm:p-6">
-        <SectionLabel number={number}>{label}</SectionLabel>
-        <h3 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] sm:text-[26px]">{title}</h3>
-        <p className="max-w-[46ch] text-[15px] leading-relaxed text-quiet sm:text-base">{text}</p>
-      </div>
-    </article>
-  )
-}
-
-/** 02 Co to umí — tři karty, každá s vlastní kompozicí a ilustrací z aplikace (brief § 4.4). */
+/** Dvě kapitoly pokračují stejnou ukázkovou návštěvou jako kalendář v úvodu. */
 export function Features() {
   return (
-    <section id="funkce" aria-labelledby="funkce-title" className="mx-auto max-w-[1200px] px-5 pt-[72px] sm:px-7 md:pt-[120px]">
-      <SectionHead id="funkce-title" number="02" label="Co to umí" title="Tři věci, které vám" accent="vrátí čas." />
-
-      <div className="mt-12 grid gap-5 lg:grid-cols-3 lg:grid-rows-2">
-        <FeatureCard
-          number="01"
-          label="Poptávky"
-          title="Poptávka rovnou v kalendáři"
-          text="Z webu, e-shopu i telefonu. Potvrdíte ji v aplikaci nebo přímo z e-mailu."
-          className="lg:col-span-2 lg:row-span-2"
-          illustrationClassName="flex flex-1 flex-col justify-center sm:p-10 lg:px-16 lg:py-14"
+    <section
+      id="funkce"
+      aria-labelledby="funkce-title"
+      className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]"
+    >
+      <div className="mb-10 flex flex-col gap-4">
+        <SectionLabel number="02">Co to umí</SectionLabel>
+        <AccentHeading
+          id="funkce-title"
+          as="h2"
+          size="section"
+          accent="navazují další dílky."
         >
-          <div className="mx-auto w-full max-w-[420px]">
-            <RequestsIllustration />
-          </div>
-        </FeatureCard>
-        <FeatureCard
-          number="02"
-          label="Zákazníci"
-          title="Zákazníci se vracejí"
-          text="Karta se razítkuje sama. A když někdo dlouho nepřišel, ZakazIQ vám řekne, komu napsat."
-        >
-          <LoyaltyIllustration />
-        </FeatureCard>
-        <FeatureCard
-          number="03"
-          label="Peníze"
-          title="Víte, kolik vyděláváte"
-          text="Faktury, příjmy, výdaje a odhad daní. Každý měsíc vám přijde přehled e-mailem."
-        >
-          <MoneyIllustration />
-        </FeatureCard>
+          Na jeden termín
+        </AccentHeading>
       </div>
+
+      <article
+        id="ukazka-zakaznik"
+        aria-labelledby="zakaznici-title"
+        className="grid scroll-mt-28 items-center gap-10 border-t border-navy-100 py-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 md:py-20"
+      >
+        <div>
+          <SectionLabel>Zákazníci</SectionLabel>
+          <h3
+            id="zakaznici-title"
+            className="mt-4 text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]"
+          >
+            Termín skončí.
+            <br />
+            <span className="font-accent font-normal text-navy-500">
+              Zákaznice zůstává.
+            </span>
+          </h3>
+          <p className="mt-5 max-w-[38ch] text-lg leading-relaxed text-quiet">
+            Historie návštěv, poznámky i věrnostní karta patří k zákaznici. A
+            když dlouho nepřišla, ZakazIQ vám řekne, komu napsat.
+          </p>
+          <a
+            href="#ukazka-penize"
+            className="mt-5 inline-flex min-h-11 items-center rounded-full text-base font-semibold text-navy-700 underline underline-offset-4"
+          >
+            A co po zaplacení?
+          </a>
+        </div>
+        <div className="min-w-0 rounded-slab bg-navy-50 p-4 sm:p-8">
+          <div className="flex items-center justify-between gap-3 border-b border-navy-200 pb-5">
+            <div>
+              <span className="font-num text-[13px] text-quiet">
+                KARTA ZÁKAZNICE
+              </span>
+              <p className="mt-1 text-2xl font-semibold tracking-[-0.02em]">
+                Tereza Malá
+              </p>
+            </div>
+            <span className="font-num text-[13px] text-quiet">UKÁZKA</span>
+          </div>
+          <div className="grid items-start gap-6 pt-6 sm:grid-cols-[1fr_1.2fr]">
+            <div>
+              <p className="font-num text-[13px] text-quiet">
+                HISTORIE NÁVŠTĚV
+              </p>
+              <ol className="mt-5 space-y-6 border-l border-navy-200 pl-4 text-base">
+                <li>
+                  <span className="font-num text-[13px] text-quiet">
+                    9. 10. 2026 · 9:00
+                  </span>
+                  <p className="mt-1 font-semibold">Barvení + střih</p>
+                  <p className="mt-1 text-quiet">Návštěva dokončena</p>
+                </li>
+                <li>
+                  <span className="font-num text-[13px] text-quiet">
+                    PŘEDCHOZÍ NÁVŠTĚVY
+                  </span>
+                  <p className="mt-1 text-quiet">Vše na jedné kartě</p>
+                </li>
+              </ol>
+            </div>
+            <div className="min-w-0">
+              <LoyaltyCard
+                customer="Tereza Malá"
+                stamps={4}
+                total={5}
+                reward="střih zdarma"
+                business="Věrnostní karta"
+              />
+              <div className="mt-5 border-t border-navy-200 pt-4">
+                <p className="font-num text-[13px] text-quiet">
+                  KDY PŘIBUDE RAZÍTKO
+                </p>
+                <p className="mt-2 text-lg font-semibold leading-snug text-navy-900">
+                  Po návštěvě a zaznamenání platby.
+                </p>
+                <p className="mt-1 text-base leading-relaxed text-quiet">
+                  Podle nastavení věrnosti v byznysu. Nic se nepřidá samo.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article
+        id="ukazka-penize"
+        aria-labelledby="penize-title"
+        className="overflow-hidden rounded-slab bg-navy-950 p-5 text-white sm:p-10 md:p-14"
+      >
+        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div>
+            <SectionLabel onDark>Peníze</SectionLabel>
+            <h3
+              id="penize-title"
+              className="mt-4 text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]"
+            >
+              Zaplacená návštěva.
+              <br />
+              <span className="font-accent font-normal text-navy-300">
+                Příjem v přehledu.
+              </span>
+            </h3>
+          </div>
+          <p className="max-w-[36ch] text-lg leading-relaxed text-navy-200">
+            Faktury, příjmy, výdaje a odhad daní. Každý měsíc vám přijde přehled
+            e-mailem.
+          </p>
+        </div>
+        <div className="mt-10 overflow-hidden rounded-panel bg-surface text-ink">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-100 p-5 sm:px-8">
+            <span className="font-semibold">Příjmy · říjen 2026</span>
+            <span className="font-num text-[13px] text-quiet">
+              UKÁZKA · FIKTIVNÍ ČÁSTKY
+            </span>
+          </div>
+          <div className="grid md:grid-cols-[1fr_1.25fr]">
+            <div className="bg-navy-50 p-5 sm:p-8">
+              <p className="text-base text-quiet">
+                Zaznamenaná platba za návštěvu
+              </p>
+              <p className="mt-3 font-num text-[40px] tracking-[-0.04em] sm:text-[52px]">
+                1 850 <span className="text-xl text-quiet">Kč</span>
+              </p>
+              <p className="mt-3 text-base text-quiet">
+                Tereza Malá · barvení + střih
+              </p>
+              <p className="mt-6 max-w-[34ch] border-t border-navy-200 pt-4 text-sm leading-relaxed text-quiet">
+                Příjem vzniká po zaznamenání platby. Samotné potvrzení termínu
+                příjmy nezvýší.
+              </p>
+            </div>
+            <div className="p-5 sm:p-8">
+              <p className="font-num text-[13px] text-quiet">9. ŘÍJNA 2026</p>
+              <dl className="mt-6 space-y-5 text-base">
+                <div className="flex justify-between gap-3 border-b border-navy-100 pb-5">
+                  <dt>Návštěva</dt>
+                  <dd className="font-medium">Barvení + střih</dd>
+                </div>
+                <div className="flex justify-between gap-3 border-b border-navy-100 pb-5">
+                  <dt>Zákaznice</dt>
+                  <dd className="font-medium">Tereza Malá</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt>Přijatá platba</dt>
+                  <dd className="font-num">1 850 Kč</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </article>
     </section>
   )
 }

@@ -105,6 +105,15 @@
 [data-app="ws"][data-theme="dark"] :is(.hover\:text-navy-700, .hover\:text-navy-900):hover:not([class*="dark:hover:text-"]) { color: rgb(var(--navy-50)); }
 [data-app="ws"][data-theme="dark"] :is(.text-danger, .hover\:text-danger:hover):not([class*="dark:text-"]) { color: rgb(var(--danger-ink)); }
 
+/* Zadokovaný detail (R-057): od 1280 px pravý panel nepřekrývá obsah. Stránka se
+   vedle něj zúží a postranní pruh (Příchozí, karta zákazníka) se schová — jeho roli
+   převezme detail. Pod 1280 px zůstává vysouvací panel přes obsah. */
+@media (min-width: 1280px) {
+  [data-app="ws"]:has([data-detail-docked]) [data-ws-frame] { padding-right: 480px; }
+  [data-app="ws"]:has([data-detail-docked]) [data-detail-grid] { grid-template-columns: minmax(0, 1fr); }
+  [data-app="ws"]:has([data-detail-docked]) [data-detail-hide] { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-app="ws"] *, [data-app="ws"] *::before, [data-app="ws"] *::after {
     animation: none !important;

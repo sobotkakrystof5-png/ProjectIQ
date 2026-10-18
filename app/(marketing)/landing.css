@@ -13,3 +13,11 @@ html:has([data-page="landing"]) {
     scroll-behavior: auto;
   }
 }
+
+/* Na nízké obrazovce scéna nesmí zakrýt ovládání a navazující text. */
+@media (max-height: 700px) {
+  [data-page="landing"] .story-scene {
+    position: relative;
+    top: auto;
+  }
+}

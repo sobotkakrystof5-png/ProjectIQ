@@ -47,6 +47,36 @@ const INCOMING_LIMIT = 20
 
 type Row = Record<string, unknown>
 
+/** Nové poptávky (bez zkušebních), nejnovější nahoře — Dnes i pruh v Kalendáři. */
+const incomingQuery = (accountId: string, businessId: string) => q`
+  SELECT r.id, r.customer_id,
+         COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
+         s.name AS service_name, r.wanted_start, r.wanted_end, r.created_at, r.source
+  FROM ws.requests r
+  LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
+  LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
+  WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.status = 'new' AND NOT r.is_test
+  ORDER BY r.created_at DESC
+  LIMIT ${INCOMING_LIMIT}
+`
+
+const incomingCountQuery = (accountId: string, businessId: string) => q`
+  SELECT count(*)::int AS n FROM ws.requests
+  WHERE account_id = ${accountId} AND business_id = ${businessId} AND status = 'new' AND NOT is_test
+`
+
+/** Jen příchozí poptávky — Kalendář je ukazuje v pruhu vedle mřížky. */
+export async function getIncoming(
+  ctx: WsContext,
+  business: Pick<WsBusiness, 'id'>,
+): Promise<{ items: IncomingRequest[]; total: number }> {
+  const [items, total] = await wsDb(ctx).batch([
+    incomingQuery(ctx.accountId, business.id),
+    incomingCountQuery(ctx.accountId, business.id),
+  ])
+  return { items: items as unknown as IncomingRequest[], total: Number((total as Row[])[0]?.n ?? 0) }
+}
+
 export async function getTodayData(
   ctx: WsContext,
   business: Pick<WsBusiness, 'id'>,
@@ -60,21 +90,8 @@ export async function getTodayData(
   const db = wsDb(ctx)
 
   const [incoming, total, visits, wanted, opening, flags, services] = await db.batch([
-    q`
-      SELECT r.id, r.customer_id,
-             COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
-             s.name AS service_name, r.wanted_start, r.wanted_end, r.created_at, r.source
-      FROM ws.requests r
-      LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
-      LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
-      WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.status = 'new' AND NOT r.is_test
-      ORDER BY r.created_at DESC
-      LIMIT ${INCOMING_LIMIT}
-    `,
-    q`
-      SELECT count(*)::int AS n FROM ws.requests
-      WHERE account_id = ${accountId} AND business_id = ${businessId} AND status = 'new' AND NOT is_test
-    `,
+    incomingQuery(accountId, businessId),
+    incomingCountQuery(accountId, businessId),
     q`
       SELECT a.id, a.kind, a.starts_at, a.ends_at, a.customer_id, a.title,
              c.name AS customer_name, s.name AS service_name, st.name AS staff_name

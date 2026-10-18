@@ -74,7 +74,7 @@ export function AppFrame(props: AppFrameProps) {
   const openSearch = () => setPaletteOpen(true)
 
   return (
-    <div className="min-h-screen bg-ground text-ink md:pl-[92px]">
+    <div data-ws-frame className="min-h-screen bg-ground text-ink md:pl-[92px]">
       <a
         href="#obsah"
         className="sr-only z-50 rounded-full bg-surface px-4 py-2 text-sm font-semibold focus:not-sr-only focus:fixed focus:left-4 focus:top-3"

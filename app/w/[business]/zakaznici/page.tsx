@@ -65,7 +65,7 @@ export default async function CustomersPage(
     <div className="mx-auto flex max-w-[1280px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <AccentHeading accent="se vracejí.">Zákazníci</AccentHeading>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div data-detail-grid className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
           <nav aria-label="Skupiny zákazníků" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             <FilterChip href={link({ skupina: null, detail: null })} active={!segment} label="Všichni" count={list.counts.all} />
@@ -124,12 +124,15 @@ export default async function CustomersPage(
           )}
         </div>
 
-        <OutreachPanel
-          slug={business.slug}
-          suggestions={suggestions}
-          drafts={drafts}
-          hrefFor={(customerId, kind) => link({ detail: `zprava:${customerId}:${kind}` })}
-        />
+        {/* Při otevřeném detailu na širokém displeji se schová (R-057, app/ws-tokens.css). */}
+        <div data-detail-hide className="min-w-0">
+          <OutreachPanel
+            slug={business.slug}
+            suggestions={suggestions}
+            drafts={drafts}
+            hrefFor={(customerId, kind) => link({ detail: `zprava:${customerId}:${kind}` })}
+          />
+        </div>
       </div>
 
       <DetailSlot ctx={ctx} business={business} pathname={pathname} searchParams={searchParams} today={today} />

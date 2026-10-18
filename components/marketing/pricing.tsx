@@ -21,7 +21,7 @@ function PriceTiles() {
 /** 06 Ceník — jedna cena, žádné balíčky (R-018, R-026, R-038). */
 export function Pricing() {
   return (
-    <section id="cenik" aria-labelledby="cenik-title" className="mx-auto max-w-[1200px] px-3 pt-[72px] sm:px-7 md:pt-[120px]">
+    <section id="cenik" aria-labelledby="cenik-title" className="mx-auto max-w-[1200px] px-3 pt-[56px] sm:px-7 md:pt-[96px]">
       <div className="relative grid overflow-hidden rounded-slab bg-navy-950 text-white lg:grid-cols-2">
         <div className="relative overflow-hidden px-5 py-12 sm:px-10 md:py-16">
           <PriceTiles />
@@ -38,7 +38,7 @@ export function Pricing() {
                 <span className="font-num text-white">Kč</span> / měsíc
               </span>
             </p>
-            <p className="max-w-[420px] font-num text-xs leading-relaxed text-navy-300">
+            <p className="max-w-[420px] font-num text-sm leading-relaxed text-navy-300">
               konečná cena, nic se nepřipočítává · prvních 14 dní zdarma · zrušíte kdykoli · karta, Apple Pay, Google Pay
             </p>
           </div>
@@ -46,10 +46,10 @@ export function Pricing() {
 
         <div className="flex flex-col justify-center gap-8 border-t border-navy-800 px-5 py-12 sm:px-10 md:py-16 lg:border-l lg:border-t-0">
           <div>
-            <h3 className="font-num text-xs uppercase tracking-[0.12em] text-navy-400">V ceně</h3>
+            <h3 className="font-num text-sm uppercase tracking-[0.12em] text-navy-400">V ceně</h3>
             <ul className="mt-5 flex flex-col gap-3.5">
               {PRICE_INCLUDES.map((item) => (
-                <li key={item} className="flex items-start gap-3 text-[17px] text-navy-50">
+                <li key={item} className="flex items-start gap-3 text-[19px] text-navy-50">
                   <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] bg-navy-800">
                     <Check size={14} strokeWidth={1.5} className="text-navy-200" aria-hidden />
                   </span>
@@ -60,7 +60,7 @@ export function Pricing() {
           </div>
           <a
             href={ROUTES.signUp}
-            className="inline-flex min-h-[54px] items-center justify-center self-start rounded-full bg-white px-7 text-base font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50 sm:text-[17px]"
+            className="inline-flex min-h-[54px] items-center justify-center self-start rounded-full bg-white px-7 text-lg font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50 sm:text-[19px]"
           >
             {CTA_LABEL}
           </a>

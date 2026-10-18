@@ -1,144 +1,203 @@
-'use client'
-
-import { useRef } from 'react'
-import { motion } from 'framer-motion'
-import { MessageSquare, Mail, Instagram, BookOpen, Table2, type LucideIcon } from 'lucide-react'
-import { zqEase } from '@/lib/ws/motion'
+import { ArrowDown } from 'lucide-react'
 import { cn } from '@/lib/ws/utils'
+import { Reveal } from './reveal'
 import { SectionHead } from './section-head'
-import { useRevealState } from './use-in-view'
 
-interface Piece {
-  icon: LucideIcon
-  from: string
-  text: string
-  /** Rozházená poloha vlevo (desktop). */
-  scatter: string
-  /** Jak to vypadá v ZakazIQ. */
-  tidy: { label: string; title: string; state: 'new' | 'confirmed' | 'plain' }
+type Artifact = 'request' | 'move' | 'payment' | 'sleeping'
+type Tone = 'dark' | 'light' | 'soft'
+
+interface Moment {
+  /** Kdy se to stane: čas, nebo „Za půl roku“. */
+  when: string
+  problem: { title: string; today: string }
+  /** Co udělá ZakazIQ, jedna nebo dvě věty. */
+  solution: string
+  artifact: Artifact
+  tone: Tone
 }
 
-const PIECES: Piece[] = [
+// Každé řešení je existující funkce (docs/landing/PROJECT-BRIEF.md § 4.3), nic navíc.
+// Jedna zákaznice (Tereza Malá) prochází dnem: poptávka, přesun, platba. Jana je ukázka spící zákaznice.
+const MOMENTS: Moment[] = [
   {
-    icon: MessageSquare,
-    from: 'SMS',
-    text: 'Dobrý den, máte v pátek volno?',
-    scatter: 'self-start -rotate-2 md:left-0 md:top-0 md:-rotate-[4deg]',
-    tidy: { label: 'Poptávka · SMS', title: 'pá 9:00 čeká na potvrzení', state: 'new' },
+    when: '10:40',
+    problem: {
+      title: 'Stříháte a telefon pípne.',
+      today: '„Máte v pátek volno?“ Odpovíte až večer. Zákaznice mezitím může jít jinam.',
+    },
+    solution: 'Zákaznice si vybere čas sama. Vy potvrdíte jedním klikem, až budete mít chvilku.',
+    artifact: 'request',
+    tone: 'dark',
   },
   {
-    icon: Instagram,
-    from: 'Instagram',
-    text: 'Kolik stojí melír?',
-    scatter: 'self-end rotate-2 md:left-[54%] md:top-[19%] md:rotate-[5deg]',
-    tidy: { label: 'Poptávka · Instagram', title: 'Melír, dotaz na cenu', state: 'new' },
+    when: '14:05',
+    problem: {
+      title: 'Zákazník volá, že to nestihne.',
+      today: 'Přepisujete termín v diáři a doufáte, že nekoliduje s jiným.',
+    },
+    solution: 'Termín posunete. Obsazený čas kalendář nepustí a zákazník dostane e-mail se změnou.',
+    artifact: 'move',
+    tone: 'light',
   },
   {
-    icon: Mail,
-    from: 'E-mail',
-    text: 'Poptávka: výměna zámku',
-    scatter: 'ml-4 self-start rotate-1 md:left-[3%] md:top-[38%] md:ml-0 md:rotate-[2deg]',
-    tidy: { label: 'Termín', title: 'st 9:00 výměna zámku', state: 'confirmed' },
+    when: '19:30',
+    problem: {
+      title: 'Večer počítáte, kdo zaplatil.',
+      today: 'Něco přišlo na účet, něco v hotovosti. Faktury máte v tabulce a na konci roku to skládáte znovu.',
+    },
+    solution: 'Platba se zapíše k návštěvě a objeví se v přehledu měsíce. Odhad daní vidíte během roku.',
+    artifact: 'payment',
+    tone: 'soft',
   },
   {
-    icon: BookOpen,
-    from: 'Diář',
-    text: '~~čt 14:00~~ Novák, přesunout',
-    scatter: 'self-end -rotate-2 md:left-[50%] md:top-[60%] md:-rotate-[6deg]',
-    tidy: { label: 'Kalendář', title: 'Novák přesunut na čt 16:00', state: 'confirmed' },
-  },
-  {
-    icon: Table2,
-    from: 'Tabulka',
-    text: 'faktura 03: zaplaceno?',
-    scatter: 'ml-8 self-start rotate-2 md:left-[12%] md:top-[80%] md:ml-0 md:rotate-[3deg]',
-    tidy: { label: 'Faktura 03', title: 'zaplaceno', state: 'plain' },
+    when: 'Za půl roku',
+    problem: {
+      title: 'Stálá zákaznice přestala chodit.',
+      today: 'Všimnete si, až ji potkáte na ulici.',
+    },
+    solution: 'ZakazIQ ji zařadí mezi Spící. Zprávu pro ni máte připravenou v panelu Komu napsat.',
+    artifact: 'sleeping',
+    tone: 'light',
   },
 ]
 
-/** Text kousku; `~~…~~` = přeškrtnutý termín v diáři. */
-function PieceText({ text }: { text: string }) {
-  const parts = text.split(/~~(.+?)~~/)
-  return (
-    <>
-      {parts.map((part, i) => (i % 2 === 1 ? <s key={i} className="decoration-quiet">{part}</s> : part))}
-    </>
-  )
+const TONE: Record<Tone, { band: string; time: string; label: string; title: string; text: string }> = {
+  dark: { band: 'bg-navy-950 text-white', time: 'text-navy-300', label: 'text-navy-300', title: 'text-white', text: 'text-navy-200' },
+  light: { band: 'border border-navy-100 bg-surface text-ink', time: 'text-navy-500', label: 'text-quiet', title: 'text-ink', text: 'text-quiet' },
+  soft: { band: 'bg-navy-50 text-ink', time: 'text-navy-500', label: 'text-quiet', title: 'text-ink', text: 'text-quiet' },
+}
+
+const mono = 'font-num text-[13px] uppercase tracking-[0.08em]'
+
+/** Kousek skutečného rozhraní k řešení. Jen ilustrace (text vedle říká totéž), proto aria-hidden. */
+function ArtifactView({ kind }: { kind: Artifact }) {
+  switch (kind) {
+    case 'request':
+      return (
+        <div className="rounded-panel border-[1.5px] border-dashed border-signal-line bg-signal-bg p-4 text-signal-ink">
+          <div className="flex items-center justify-between gap-3 font-num text-[13px] font-medium uppercase tracking-[0.08em]">
+            <span>Nová poptávka</span>
+            <span className="normal-case tracking-normal">pá 9:00–10:30</span>
+          </div>
+          <p className="mt-2 text-[20px] font-semibold leading-tight">Tereza Malá</p>
+          <p className="text-[15px] leading-snug">barvení + střih · z webu</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="inline-flex min-h-11 items-center rounded-full bg-navy-700 px-5 text-[16px] font-semibold text-white">
+              Potvrdit termín
+            </span>
+            <span className="inline-flex min-h-11 items-center rounded-full border border-signal-line px-5 text-[16px] font-medium">
+              Jiný čas
+            </span>
+          </div>
+        </div>
+      )
+    case 'move':
+      return (
+        <div className="rounded-panel border border-navy-100 bg-ground p-4 text-ink">
+          <p className={cn(mono, 'text-quiet')}>Pátek · přesunuto</p>
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="rounded-chip border border-dashed border-navy-300 px-4 py-3 text-quiet">
+              <s className="font-num text-[15px] decoration-quiet">9:00–10:30</s>
+              <p className="text-[15px]">Tereza Malá</p>
+            </div>
+            <ArrowDown aria-hidden size={16} strokeWidth={1.5} className="mx-auto text-navy-500" />
+            <div className="rounded-chip border-l-[3px] border-navy-700 bg-navy-100 px-4 py-3 text-navy-900">
+              <p className="font-num text-[15px]">11:00–12:30</p>
+              <p className="text-[18px] font-semibold leading-snug">Tereza Malá</p>
+              <p className="text-[15px]">barvení + střih</p>
+            </div>
+          </div>
+        </div>
+      )
+    case 'payment':
+      return (
+        <div className="rounded-panel border border-navy-100 bg-surface p-4 text-ink">
+          <div className="flex items-center justify-between gap-3">
+            <span className={cn(mono, 'text-quiet')}>Příjmy · říjen</span>
+            <span className="rounded-full bg-navy-50 px-3 py-1 font-num text-[13px] text-navy-700">Zaplaceno</span>
+          </div>
+          <p className="mt-4 font-num text-[36px] leading-none tracking-[-0.03em]">
+            1 850 <span className="text-[18px] text-quiet">Kč</span>
+          </p>
+          <p className="mt-3 text-[17px] font-semibold">Tereza Malá</p>
+          <p className="text-[15px] text-quiet">barvení + střih</p>
+        </div>
+      )
+    case 'sleeping':
+      return (
+        <div className="rounded-panel bg-navy-50 p-4 text-ink">
+          <div className="flex items-center justify-between gap-3">
+            <span className="rounded-full bg-surface px-3 py-1 font-num text-[13px] uppercase text-navy-700">Spící</span>
+            <span className="font-num text-[13px] text-quiet">naposledy 14. 4.</span>
+          </div>
+          <p className="mt-3 text-[20px] font-semibold leading-tight">Jana</p>
+          <p className="text-[15px] text-quiet">Dřív chodila každý měsíc.</p>
+          <span className="mt-4 inline-flex min-h-11 items-center rounded-full bg-navy-700 px-5 text-[16px] font-semibold text-white">
+            Připravit zprávu
+          </span>
+        </div>
+      )
+  }
 }
 
 /**
- * 01 Proč to řešit (R-031): vlevo rozházené kousky z telefonu, diáře a tabulky, vpravo totéž
- * srovnané v dílcích. Dílky se jednou poskládají, když sekce přijede na obrazovku.
+ * 01 Proč to řešit (R-031, přepracováno 2026-10-17 podle R-057): čtyři chvíle jednoho dne jako pásy.
+ * Vlevo čas a problem, vpravo řešení s výřezem skutečného rozhraní. Pás 10:40 je hlavní moment
+ * (tmavý, s poptávkou ve signální barvě). Jeden jednorázový nájezd (`Reveal`), bez smyček.
  */
 export function WhyBother() {
-  const ref = useRef<HTMLDivElement>(null)
-  const reveal = useRevealState(ref, 0.3)
-  const hidden = reveal === 'pending'
-
   return (
-    <section id="proc" aria-labelledby="proc-title" className="mx-auto max-w-[1200px] px-5 pt-[72px] sm:px-7 md:pt-[120px]">
-      <SectionHead
-        id="proc-title"
-        number="01"
-        label="Proč to řešit"
-        title="Poptávky chodí odevšad."
-        accent="Přehled máte na jednom místě."
-      />
-      <p className="mt-6 max-w-[620px] text-[17px] leading-relaxed text-quiet">
-        Poptávka přijde esemeskou, další na Instagram a třetí do e-mailu. Termín skončí v diáři, faktura v tabulce a kdo
-        dlouho nepřišel, to si nikdo nepamatuje. ZakazIQ jsem udělal, aby tohle všechno leželo na jedné obrazovce.
+    <section id="proc" aria-labelledby="proc-title" className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]">
+      <SectionHead id="proc-title" number="01" label="Proč to řešit" title="Práce nepočká." accent="Poptávka taky ne." />
+      <p className="mt-5 max-w-[620px] text-[17px] leading-relaxed text-quiet">
+        Firmu vedete z telefonu a diáře. Něco občas uteče, hlavně když máte plné ruce. ZakazIQ jsem postavil pro tyhle chvíle.
       </p>
 
-      <div ref={ref} className="mt-12 grid gap-10 md:grid-cols-[5fr_7fr] md:gap-8">
-        {/* Dnes */}
-        <div>
-          <p className="font-num text-xs uppercase tracking-[0.12em] text-quiet">Dnes</p>
-          <ul className="mt-4 flex flex-col gap-3 md:relative md:h-[400px]">
-            {PIECES.map(({ icon: Icon, from, text, scatter }) => (
-              <li
-                key={from}
-                className={cn(
-                  'flex w-max max-w-[280px] items-start gap-3 rounded-chip border border-navy-100 bg-surface px-3.5 py-3 text-[15px] text-quiet shadow-sm shadow-navy-950/5 md:absolute',
-                  scatter,
-                )}
-              >
-                <Icon size={18} strokeWidth={1.5} className="mt-0.5 shrink-0 text-navy-400" aria-hidden />
-                <span>
-                  <span className="block font-num text-[11px] uppercase tracking-[0.08em] text-navy-400">{from}</span>
-                  <PieceText text={text} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Se ZakazIQ */}
-        <div>
-          <p className="font-num text-xs uppercase tracking-[0.12em] text-navy-500">Se ZakazIQ</p>
-          <div className="mt-4 rounded-slab border border-navy-100 bg-surface p-3 sm:p-4">
-            <ul className="grid gap-2.5 sm:grid-cols-2">
-              {PIECES.map(({ from, tidy }, i) => (
-                <motion.li
-                  key={from}
-                  initial={false}
-                  animate={hidden ? { opacity: 0, x: -24 } : { opacity: 1, x: 0 }}
-                  transition={{ duration: 0.7, ease: zqEase, delay: hidden ? 0 : i * 0.08 }}
+      <ol className="mt-10 flex flex-col gap-3 md:mt-12 md:gap-4">
+        {MOMENTS.map((m) => {
+          const t = TONE[m.tone]
+          return (
+            <Reveal
+              as="li"
+              key={m.when}
+              className={cn(
+                'grid gap-6 rounded-panel p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-center lg:gap-12 lg:p-8',
+                t.band,
+              )}
+            >
+              <div className="flex min-w-0 flex-col">
+                <p
                   className={cn(
-                    'flex min-h-[84px] flex-col justify-between gap-2 rounded-box p-4',
-                    tidy.state === 'new' && 'border-[1.5px] border-dashed border-signal-line bg-signal-bg text-signal-ink',
-                    tidy.state === 'confirmed' && 'border-l-[3px] border-navy-700 bg-navy-100 text-navy-900',
-                    tidy.state === 'plain' && 'bg-navy-50 text-ink',
-                    i === PIECES.length - 1 && 'sm:col-span-2',
+                    'font-num leading-none',
+                    m.when.length > 5 ? 'text-[20px] uppercase tracking-[0.04em]' : 'text-[36px]',
+                    t.time,
                   )}
                 >
-                  <span className="font-num text-[11px] uppercase tracking-[0.08em] opacity-75">{tidy.label}</span>
-                  <span className="text-[15px] font-semibold leading-snug">{tidy.title}</span>
-                </motion.li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
+                  {m.when}
+                </p>
+                <p className={cn(mono, 'mt-4', t.label)}>Dnes</p>
+                <h3 className={cn('mt-2 text-[24px] font-semibold leading-tight tracking-[-0.02em] sm:text-[28px]', t.title)}>
+                  {m.problem.title}
+                </h3>
+                <p className={cn('mt-2 max-w-[46ch] text-[17px] leading-relaxed', t.text)}>{m.problem.today}</p>
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-4">
+                <div>
+                  <p className={cn(mono, t.label)}>Se ZakazIQ</p>
+                  <p className={cn('mt-2 text-[18px] font-semibold leading-snug', t.title)}>{m.solution}</p>
+                </div>
+                <div className="w-full max-w-[340px]">
+                  <p className={cn(mono, 'mb-3', t.label)}>Ukázka</p>
+                  <div aria-hidden>
+                    <ArtifactView kind={m.artifact} />
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          )
+        })}
+      </ol>
     </section>
   )
 }

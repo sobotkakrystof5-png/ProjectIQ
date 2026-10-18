@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { confirmRequest, moveAppointment } from '@/app/w/[business]/poptavky/actions'
 import { toast } from '@/components/ui/toast'
@@ -73,6 +73,8 @@ export function TimeGrid({
   className?: string
 }) {
   const router = useRouter()
+  // Blok otevřený v pravém panelu je zvýrazněný (R-057) — panel a mřížka k sobě patří.
+  const openDetail = useSearchParams().get('detail')
   const { run, pending } = useWsAction()
   const height = (hours.to - hours.from) * HOUR_PX
   const span = (hours.to - hours.from) * 60
@@ -187,6 +189,7 @@ export function TimeGrid({
                   const px = (it.height / 100) * height
                   // potvrzovací tlačítko se vejde do bloku od ~40 px (40 min)
                   const roomy = px >= 40
+                  const selected = openDetail !== null && new URLSearchParams(it.href.split('?')[1] ?? '').get('detail') === openDetail
                   return (
                     <li
                       key={it.key}
@@ -202,6 +205,7 @@ export function TimeGrid({
                         href={it.href}
                         scroll={false}
                         aria-label={it.label}
+                        aria-current={selected ? 'true' : undefined}
                         title={it.label}
                         draggable={it.movable}
                         onDragStart={(e) => {
@@ -221,6 +225,7 @@ export function TimeGrid({
                           KIND_CLASS[it.kind],
                           it.movable && 'cursor-grab active:cursor-grabbing',
                           it.confirm && roomy && 'pr-9',
+                          selected && 'ring-2 ring-navy-700 ring-offset-1 ring-offset-surface dark:ring-navy-200',
                           pending && moved[it.id] && 'opacity-70',
                         )}
                       >

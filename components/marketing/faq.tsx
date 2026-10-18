@@ -20,7 +20,7 @@ function Answer({ text }: { text: string }) {
 /** 07 Dotazy — akordeon přes <details>, funguje i bez JavaScriptu a z klávesnice. */
 export function Faq() {
   return (
-    <section id="dotazy" aria-labelledby="dotazy-title" className="mx-auto max-w-[1200px] px-5 pt-[72px] sm:px-7 md:pt-[120px]">
+    <section id="dotazy" aria-labelledby="dotazy-title" className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]">
       <div className="grid gap-10 lg:grid-cols-[4fr_7fr] lg:gap-16">
         <div className="flex flex-col gap-6 lg:sticky lg:top-28 lg:self-start">
           <SectionLabel number="07">Dotazy</SectionLabel>
@@ -32,7 +32,7 @@ export function Faq() {
         <div className="border-t border-navy-100">
           {FAQ.map((item) => (
             <details key={item.q} className="group border-b border-navy-100">
-              <summary className="flex min-h-[64px] cursor-pointer list-none items-center justify-between gap-6 py-4 text-[17px] font-semibold tracking-[-0.01em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-lg [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-[64px] cursor-pointer list-none items-center justify-between gap-6 py-4 text-[19px] font-semibold tracking-[-0.01em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-lg [&::-webkit-details-marker]:hidden">
                 {item.q}
                 <Plus
                   size={20}
@@ -41,7 +41,7 @@ export function Faq() {
                   className="shrink-0 text-navy-500 transition-transform duration-200 ease-zq group-open:rotate-45"
                 />
               </summary>
-              <p className="max-w-[60ch] pb-6 text-base leading-relaxed text-quiet">
+              <p className="max-w-[60ch] pb-6 text-lg leading-relaxed text-quiet">
                 <Answer text={item.a} />
               </p>
             </details>
