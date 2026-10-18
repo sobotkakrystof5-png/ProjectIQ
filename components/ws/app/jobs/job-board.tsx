@@ -1,65 +1,24 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { moveJobStage } from '@/app/w/[business]/poptavky/actions'
+import { useRef, useState } from 'react'
 import { cn } from '@/lib/ws/utils'
-import { undoToast, useWsAction } from '../booking/use-ws-action'
+import { JobCard, TYPE_DOT, useLocalStages, type BoardJob, type CommonProps } from './job-card'
+import { useMoveJob } from './use-move-job'
 
-export type BoardStage = { id: string; name: string; type: string }
-export type BoardJob = {
-  id: string
-  stageId: string | null
-  title: string
-  customer: string | null
-  when: string | null
-  price: string | null
-  href: string
-}
-
-const TYPE_DOT: Record<string, string> = {
-  new: 'bg-signal',
-  in_progress: 'bg-navy-500',
-  done: 'bg-navy-700',
-  paid: 'bg-navy-900 dark:bg-navy-200',
-  cancelled: 'bg-navy-200 dark:bg-navy-700',
-}
+export type { BoardJob, BoardStage } from './job-card'
 
 /**
  * Tabule zakázek podle vlastních stavů (S10, rozložení B ve vzhledu Dílků).
- * Jen zobrazení a přesun mezi stavy: přetažením (myš) nebo výběrem stavu na
- * kartě (telefon, klávesnice). Přesun jde vrátit „Zpět“.
+ * Přesun mezi stavy: přetažením (myš) nebo výběrem stavu na kartě (telefon,
+ * klávesnice). Přesun jde vrátit „Zpět“.
  */
-export function JobBoard({ slug, stages, jobs, invoices = false }: { slug: string; stages: BoardStage[]; jobs: BoardJob[]; invoices?: boolean }) {
-  const { run, pending } = useWsAction()
+export function JobBoard({ slug, stages, jobs, invoices = false }: CommonProps) {
+  const { move, pending } = useMoveJob(slug, stages)
   const dragged = useRef<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
-  const [local, setLocal] = useState<Record<string, string>>({})
-  useEffect(() => setLocal({}), [jobs])
+  const { local, stageOf, optimistic } = useLocalStages(jobs, stages)
 
-  const stageOf = (j: BoardJob) => local[j.id] ?? j.stageId ?? stages[0]?.id
-  const stageName = (id: string) => stages.find((s) => s.id === id)?.name ?? ''
-
-  const move = (job: BoardJob, stageId: string) => {
-    const from = stageOf(job)
-    if (!from || from === stageId) return
-    setLocal((l) => ({ ...l, [job.id]: stageId }))
-    void run(
-      () => moveJobStage({ slug, jobId: job.id, stageId }),
-      (r) => {
-        const prev = r.prevStageId ?? from
-        undoToast(`Přesunuto do: ${stageName(stageId)}.`, () => moveJobStage({ slug, jobId: job.id, stageId: prev }), {
-          done: `Zakázka je zpátky v: ${stageName(prev)}.`,
-        })
-      },
-    ).then((ok) => {
-      if (!ok) setLocal((l) => {
-        const next = { ...l }
-        delete next[job.id]
-        return next
-      })
-    })
-  }
+  const moveJob = (job: BoardJob, stageId: string) => void move(job.id, stageOf(job), stageId, optimistic(job.id, stageId))
 
   return (
     <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -84,7 +43,7 @@ export function JobBoard({ slug, stages, jobs, invoices = false }: { slug: strin
                 setOver(null)
                 const job = jobs.find((j) => j.id === dragged.current)
                 dragged.current = null
-                if (job) move(job, stage.id)
+                if (job) moveJob(job, stage.id)
               }}
             >
               <h2 className="flex items-center gap-2 px-1 pt-1">
@@ -98,7 +57,15 @@ export function JobBoard({ slug, stages, jobs, invoices = false }: { slug: strin
                 <ul className="flex flex-col gap-2">
                   {list.map((job) => (
                     <li key={job.id}>
-                      <article
+                      <JobCard
+                        slug={slug}
+                        job={job}
+                        stage={stage}
+                        stages={stages}
+                        invoices={invoices}
+                        pending={pending && Boolean(local[job.id])}
+                        showStage={false}
+                        onMove={(id) => moveJob(job, id)}
                         draggable
                         onDragStart={(e) => {
                           dragged.current = job.id
@@ -109,42 +76,7 @@ export function JobBoard({ slug, stages, jobs, invoices = false }: { slug: strin
                           dragged.current = null
                           setOver(null)
                         }}
-                        className={cn(
-                          'relative flex cursor-grab flex-col gap-2 rounded-chip border bg-surface p-3 shadow-sm shadow-navy-950/5 active:cursor-grabbing',
-                          pending && local[job.id] && 'opacity-70',
-                        )}
-                      >
-                        <Link
-                          href={job.href}
-                          scroll={false}
-                          className="text-[15px] font-semibold leading-snug text-ink after:absolute after:inset-0 after:rounded-chip focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring"
-                        >
-                          {job.customer ?? job.title}
-                        </Link>
-                        {job.customer && <p className="-mt-1.5 text-sm text-quiet">{job.title}</p>}
-                        {(job.when || job.price) && (
-                          <p className="flex flex-wrap gap-x-3 font-num text-xs text-quiet">
-                            {job.when && <span>{job.when}</span>}
-                            {job.price && <span>{job.price}</span>}
-                          </p>
-                        )}
-                        <label className="relative z-10 flex items-center gap-2 text-xs text-quiet">
-                          <span className="sr-only">Přesunout do stavu</span>
-                          <select
-                            value={stage.id}
-                            disabled={pending}
-                            onChange={(e) => move(job, e.target.value)}
-                            className="h-9 w-full rounded-full border border-input bg-surface px-3 text-[13px] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                          >
-                            {stages.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        {invoices && (stage.type === 'done' || stage.type === 'paid') && <Link href={'/w/' + slug + '/faktury?detail=nova-faktura&zakazka=' + job.id} className="relative z-10 inline-flex min-h-11 items-center text-sm font-semibold text-navy-700 dark:text-navy-200">Vystavit fakturu</Link>}
-                      </article>
+                      />
                     </li>
                   ))}
                 </ul>
@@ -156,3 +88,4 @@ export function JobBoard({ slug, stages, jobs, invoices = false }: { slug: strin
     </div>
   )
 }
+

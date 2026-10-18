@@ -20,8 +20,9 @@ import { MessageDraftForm } from '@/components/ws/customers/message-draft-form'
 import { VisitPayment } from '@/components/ws/customers/visit-payment'
 import { orderPageUrl, portalPageUrl } from '@/lib/ws/app-origin'
 import { getAppointmentPortal, getJobDetail } from '@/lib/ws/jobs'
-import { formatMoney, type WsCurrency } from '@/lib/ws/money'
 import { CopyPortalLink, JobResultForm, JobUpdates } from './jobs/job-portal'
+import { JobStageControl } from './jobs/job-stage-control'
+import { JobHistory, JobSummary } from './jobs/job-summary'
 import { getCustomerDetail } from '@/lib/ws/customers'
 import { loadIntakeConfig, loadSlots } from '@/lib/ws/intake/intake'
 import { getLoyaltyEvents, getLoyaltyProgram, getVisitPayment } from '@/lib/ws/loyalty'
@@ -386,43 +387,43 @@ async function panelContent(
       if (!j) return notHere('Zakázka', env.closeHref)
       const portalOn = env.modules.has('portal')
       const card = j.customerId ? await getCustomerCard(ctx, business, j.customerId) : null
-      const next = j.nextStart ? pragueParts(j.nextStart) : null
+      const invoices = env.modules.has('invoices')
       return {
         title: j.title,
         description: j.stageName ?? undefined,
         body: (
           <div className="flex flex-col gap-5">
-            <dl className="flex flex-col gap-3 text-[15px]">
-              {j.price !== null && (
-                <Row label="Cena">
-                  <span className="font-num">{formatMoney(j.price, { currency: j.currency as WsCurrency })}</span>
-                </Row>
-              )}
-              {next && (
-                <Row label="Termín">
-                  <span className="font-num">
-                    {formatRelativeDay(next.date, env.today)} {formatMinutes(next.minutes)}
-                  </span>
-                </Row>
-              )}
-              {j.review && (
-                <Row label="Hodnocení">
-                  <span className="font-num">{j.review.score} / 10</span>
-                  {j.review.comment && <span className="mt-1 block whitespace-pre-line text-quiet">{j.review.comment}</span>}
-                </Row>
-              )}
-              {j.requestId && (
-                <Row label="Z poptávky">
-                  <Link
-                    href={hrefWith(env.pathname, env.searchParams, { detail: `poptavka:${j.requestId}`, ...FORM_PARAMS })}
-                    scroll={false}
-                    className="font-semibold text-navy-700 underline-offset-4 hover:underline dark:text-navy-200"
-                  >
-                    Otevřít poptávku
-                  </Link>
-                </Row>
-              )}
-            </dl>
+            <JobSummary job={j} today={env.today} now={new Date()} customerHref={j.customerId ? customerLink(j.customerId) : null} />
+
+            <JobStageControl
+              slug={business.slug}
+              jobId={j.id}
+              stageId={j.stageId}
+              stages={j.stages}
+              invoiceHref={invoices ? navHref(business.slug, 'faktury') + '?detail=nova-faktura&zakazka=' + j.id : null}
+            />
+
+            {(j.review || j.requestId) && (
+              <dl className="flex flex-col gap-3 text-[15px]">
+                {j.review && (
+                  <Row label="Hodnocení">
+                    <span className="font-num">{j.review.score} / 10</span>
+                    {j.review.comment && <span className="mt-1 block whitespace-pre-line text-quiet">{j.review.comment}</span>}
+                  </Row>
+                )}
+                {j.requestId && (
+                  <Row label="Z poptávky">
+                    <Link
+                      href={hrefWith(env.pathname, env.searchParams, { detail: `poptavka:${j.requestId}`, ...FORM_PARAMS })}
+                      scroll={false}
+                      className="font-semibold text-navy-700 underline-offset-4 hover:underline dark:text-navy-200"
+                    >
+                      Otevřít poptávku
+                    </Link>
+                  </Row>
+                )}
+              </dl>
+            )}
 
             {portalOn ? (
               <section aria-label="Pro zákazníka" className="flex flex-col gap-4 border-t pt-5">
@@ -445,6 +446,8 @@ async function panelContent(
                 Když v Nastavení › Funkce zapnete Klientský portál, pošlete zákazníkovi odkaz, kde uvidí postup zakázky.
               </p>
             )}
+
+            <JobHistory job={j} today={env.today} />
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">

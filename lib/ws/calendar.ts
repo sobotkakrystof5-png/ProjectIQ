@@ -301,6 +301,9 @@ export type JobCard = {
   customer_id: string | null
   customer_name: string | null
   next_start: Date | null
+  /** Konec posledního domluveného termínu (i proběhlého); `null` = zakázka žádný termín nemá. */
+  last_end: Date | null
+  closed_at: Date | null
   price: string | null
   currency: string
   updated_at: Date
@@ -317,9 +320,11 @@ export async function getJobBoard(
   const [stages, jobs] = await wsDb(ctx).batch([
     q`SELECT id, name, type FROM ws.stages WHERE account_id = ${acc} AND business_id = ${biz} ORDER BY position, created_at`,
     q`
-      SELECT j.id, j.stage_id, j.title, j.customer_id, j.price, j.currency, j.updated_at, c.name AS customer_name,
+      SELECT j.id, j.stage_id, j.title, j.customer_id, j.price, j.currency, j.updated_at, j.closed_at, c.name AS customer_name,
              (SELECT min(a.starts_at) FROM ws.appointments a WHERE a.account_id = j.account_id AND a.job_id = j.id
-                AND a.status = 'confirmed' AND a.ends_at > ${now}::timestamptz) AS next_start
+                AND a.status = 'confirmed' AND a.ends_at > ${now}::timestamptz) AS next_start,
+             (SELECT max(a.ends_at) FROM ws.appointments a WHERE a.account_id = j.account_id AND a.job_id = j.id
+                AND a.status = 'confirmed') AS last_end
       FROM ws.jobs j
       LEFT JOIN ws.customers c ON c.account_id = j.account_id AND c.id = j.customer_id
       WHERE j.account_id = ${acc} AND j.business_id = ${biz}
@@ -337,6 +342,8 @@ export async function getJobBoard(
       customer_id: (r.customer_id as string | null) ?? null,
       customer_name: (r.customer_name as string | null) ?? null,
       next_start: (r.next_start as Date | null) ?? null,
+      last_end: (r.last_end as Date | null) ?? null,
+      closed_at: (r.closed_at as Date | null) ?? null,
       price: r.price === null || r.price === undefined ? null : String(r.price),
       currency: String(r.currency),
       updated_at: r.updated_at as Date,

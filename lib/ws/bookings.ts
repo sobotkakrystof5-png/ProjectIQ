@@ -558,7 +558,12 @@ export async function createBlock(
 
 const CLOSED_TYPES = ['done', 'paid', 'cancelled']
 
-/** Přesun zakázky do jiného stavu (tabule). Vrací předchozí stav pro „Zpět“. */
+/**
+ * Přesun zakázky do jiného stavu (tabule, seznam, panel). Vrací předchozí stav
+ * pro „Zpět“. Změna se zapíše do ws.audit_log (`job.stage_changed`, názvy stavů
+ * jsou opsané, takže historie přežije přejmenování), z čehož čte „Historie
+ * stavů“ v detailu zakázky. Přesun do téhož stavu nic nezapisuje.
+ */
 export async function setJobStage(
   ctx: WsContext,
   business: Biz,
@@ -568,19 +573,31 @@ export async function setJobStage(
   const biz = business.id
   const rows = await wsDb(ctx)`
     WITH old AS (
-      SELECT id, stage_id FROM ws.jobs
-      WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.jobId}
-      FOR UPDATE
+      SELECT j.id, j.stage_id, os.name AS stage_name
+      FROM ws.jobs j
+      LEFT JOIN ws.stages os ON os.account_id = j.account_id AND os.id = j.stage_id
+      WHERE j.account_id = ${acc} AND j.business_id = ${biz} AND j.id = ${input.jobId}
+      FOR UPDATE OF j
     ),
     stage AS (
-      SELECT id, type FROM ws.stages WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.stageId}
+      SELECT id, type, name FROM ws.stages WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.stageId}
+    ),
+    upd AS (
+      UPDATE ws.jobs j SET
+        stage_id = stage.id,
+        closed_at = CASE WHEN stage.type = ANY(${CLOSED_TYPES}::text[]) THEN COALESCE(j.closed_at, now()) ELSE NULL END
+      FROM old, stage
+      WHERE j.account_id = ${acc} AND j.id = old.id
+      RETURNING j.id AS job_id, old.stage_id AS prev_stage, old.stage_name AS prev_name, stage.id AS new_stage, stage.name AS new_name
+    ),
+    logged AS (
+      INSERT INTO ws.audit_log (account_id, business_id, actor, action, entity, entity_id, details)
+      SELECT ${acc}, ${biz}, ${ctx.userId}, 'job.stage_changed', 'job', job_id,
+             jsonb_build_object('from', jsonb_build_object('id', prev_stage, 'name', prev_name),
+                                'to', jsonb_build_object('id', new_stage, 'name', new_name))
+      FROM upd WHERE prev_stage IS DISTINCT FROM new_stage
     )
-    UPDATE ws.jobs j SET
-      stage_id = stage.id,
-      closed_at = CASE WHEN stage.type = ANY(${CLOSED_TYPES}::text[]) THEN COALESCE(j.closed_at, now()) ELSE NULL END
-    FROM old, stage
-    WHERE j.account_id = ${acc} AND j.id = old.id
-    RETURNING old.stage_id AS prev_stage
+    SELECT prev_stage FROM upd
   `
   if (!rows[0]) return no('not_found')
   return done({ prevStageId: (rows[0].prev_stage as string | null) ?? null })
