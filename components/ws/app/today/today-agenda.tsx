@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { SectionLabel } from '@/components/ws/brand'
+import { EmptyState, SectionLabel } from '@/components/ws/brand'
 import type { CalendarEntry } from '@/lib/ws/today'
 import { formatRelativeDay, formatTimeRange, pragueParts } from '@/lib/ws/time'
 import { cn } from '@/lib/ws/utils'
@@ -41,9 +41,11 @@ export function TodayAgenda({
         <SectionLabel>Kalendář</SectionLabel>
       </h2>
       {upcoming.length === 0 ? (
-        <div className="rounded-box border border-dashed px-4 py-6 text-[15px] text-quiet">
-          Do konce týdne nic domluveného. Nové poptávky s termínem se ukážou tady.
-        </div>
+        <EmptyState
+          size="compact"
+          title="Do konce týdne nic domluveného"
+          description="Nové poptávky s termínem se ukážou tady."
+        />
       ) : (
         uniqueDays.map((day) => (
           <div key={day} className="flex flex-col gap-2">

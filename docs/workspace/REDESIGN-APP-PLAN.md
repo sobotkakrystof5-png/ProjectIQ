@@ -147,9 +147,9 @@ Pořadí je doporučené. Po RD04 jsou RD05–RD06, RD10–RD13 na sobě nezávi
 |---|---|---|---|---|---|
 | RD00 | Příprava, větev, testovací DB, měření, R-058 | S | — | D-7, D-8, všechna ke schválení | rozpracováno 2026-10-18: rozhodnutí a R-058 hotové, větev a commity hotové; zbývá Neon branch, měření a průchod s přihlášením |
 | RD01 | Menu a Účet: Nastavení do Účtu, Peníze sloučeno | S–M | — | D-9 (rozhodnuto) | hotovo 2026-10-18 (kód, testy, náhled na 4 šířkách světle i tmavě; s přihlášením neověřeno) |
-| RD02 | Rychlost I: region, kola do DB, streaming | M | 085 | D-6 | hotovo v kódu 2026-10-18 (region `fra1` v `vercel.json`, kontext jedním dotazem, doplňky kostry streamem, `loading.tsx`, Suspense; **migrace 085 neaplikována, nenasazeno, čas před/po neměřen** — viz oddíl 9) |
-| RD03 | Rychlost II: dotazy, indexy, klient, bundle | M | 086 | — | hotovo v kódu 2026-10-18 (indexy, součty plateb v SQL, živé obnovení, balíček −9 až −12 %; **migrace 086 neaplikována, čas na Neonu neměřen, optimistické akce nejsou** — viz oddíl 9) |
-| RD04 | Dnes + hlavička + společné komponenty | M | — | D-3 | nezačato |
+| RD02 | Rychlost I: region, kola do DB, streaming | M | 085 | D-6 | hotovo v kódu 2026-10-18 (region `fra1` v `vercel.json`, kontext jedním dotazem, doplňky kostry streamem, `loading.tsx`, Suspense; migrace 085 aplikovaná (Kryštof, ověřeno čtením 2026-10-18: funkce `ws.business_scope` existuje); **nenasazeno, čas před/po neměřen** — viz oddíl 9) |
+| RD03 | Rychlost II: dotazy, indexy, klient, bundle | M | 086 | — | hotovo v kódu 2026-10-18 (indexy, součty plateb v SQL, živé obnovení, balíček −9 až −12 %; migrace 086 aplikovaná (ověřeno čtením 2026-10-18: všech šest indexů existuje, staré dva jsou pryč); **čas na Neonu neměřen, optimistické akce nejsou** — viz oddíl 9) |
+| RD04 | Dnes + hlavička + společné komponenty | M | — | D-3 | hotovo v kódu 2026-10-18 (hlavní věc `pickFocus` + `TodayFocus`, karta zákazníka v panelu, `PageShell`/`PageHeader`/`Toolbar`/`PillNav`/`EmptyState compact` na Dnes, Poptávkách, Zákaznících; vzhled ověřen na dočasné stránce s fiktivními daty na 390/768/1280/1440 px světle i tmavě; **s přihlášením neověřeno**) |
 | RD05 | Kalendář | M–L | — | — | nezačato |
 | RD06 | Zakázky | S–M | — | — | nezačato |
 | RD07 | Zákaznická objednávka `/r` + widget + pracovníci | M–L | — | — | nezačato |
@@ -194,7 +194,7 @@ Po odsouhlasení plánu (RD00): R-058 (rozsah a pořadí) v `memory/memory.md`. 
 
 ## 9. Naměřeno
 
-Měření času po kliknutí (RD00, krok 5) zatím neproběhlo: chybí testovací Neon branch a přihlášení v Chromu, a produkční Neon se k měření nepoužívá. Čísla času proto **nejsou**. Co je ověřené:
+Migrace 085 a 086 jsou aplikované (ověřeno čtením 2026-10-18; `DATABASE_URL_WS` míří na stejný endpoint jako admin databáze a je v ní jeden skutečný účet bez ukázkových dat, takže jde o produkční Neon nebo jeho kopii; seed se nepouštěl). Měření času po kliknutí (RD00, krok 5) zatím neproběhlo: chybí testovací Neon branch a přihlášení v Chromu, a produkční Neon se k měření nepoužívá. Čísla času proto **nejsou**. Co je ověřené:
 
 | Co | Před RD02 | Po RD02 | Jak zjištěno |
 |---|---|---|---|

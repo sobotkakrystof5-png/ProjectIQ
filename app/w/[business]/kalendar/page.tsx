@@ -9,6 +9,7 @@ import { CalendarAgenda } from '@/components/ws/app/calendar/agenda'
 import { MonthGrid } from '@/components/ws/app/calendar/month-grid'
 import { TimeGrid, type GridColumn, type GridItem } from '@/components/ws/app/calendar/time-grid'
 import { AccentHeading } from '@/components/ws/brand'
+import { PillNav } from '@/components/ws/app/toolbar'
 import { buttonVariants } from '@/components/ui/button'
 import { getCalendarData, type CalEntry } from '@/lib/ws/calendar'
 import { hourRange, layoutWeek } from '@/lib/ws/calendar-layout'
@@ -190,21 +191,11 @@ export default async function CalendarPage(
       <div data-detail-grid className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-5">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <nav aria-label="Pohled" className="flex gap-1 rounded-full bg-navy-50 p-1 dark:bg-navy-900">
-              {VIEWS.map((v) => (
-                <Link
-                  key={v.key}
-                  href={link({ pohled: v.key, detail: null })}
-                  aria-current={v.key === view ? 'page' : undefined}
-                  className={cn(
-                    'inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold transition-colors',
-                    v.key === view ? 'bg-navy-700 text-white' : 'text-navy-900 hover:bg-navy-100 dark:text-navy-100 dark:hover:bg-navy-800',
-                  )}
-                >
-                  {v.label}
-                </Link>
-              ))}
-            </nav>
+            <PillNav
+              label="Pohled"
+              variant="segmented"
+              items={VIEWS.map((v) => ({ key: v.key, label: v.label, href: link({ pohled: v.key, detail: null }), active: v.key === view }))}
+            />
             <div className="flex items-center gap-1">
               <Link
                 href={link({ datum: step(-1), detail: null })}

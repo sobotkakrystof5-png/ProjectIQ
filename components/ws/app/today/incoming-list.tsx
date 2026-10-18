@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { NewRequestBlock, SectionLabel } from '@/components/ws/brand'
+import { EmptyState, NewRequestBlock, SectionLabel } from '@/components/ws/brand'
 import type { IncomingRequest } from '@/lib/ws/today'
 import { formatRelativeDay, pragueParts } from '@/lib/ws/time'
 import { cn } from '@/lib/ws/utils'
 import { RequestActions } from '../booking/request-actions'
 
-const JUST_ARRIVED_MS = 15 * 60_000
+const JUST_ARRIVED_MS = 15 * 60_000 // tečka „právě dorazilo“
 
 /**
  * Příchozí: nové poptávky, nejnovější nahoře. Klik otevře poptávku v pravém
@@ -19,6 +19,7 @@ export function IncomingList({
   hrefFor,
   allHref,
   actions,
+  label = 'Příchozí',
   className,
 }: {
   items: IncomingRequest[]
@@ -29,21 +30,25 @@ export function IncomingList({
   allHref: string
   /** Potvrzení jedním klikem; bez něj je karta jen odkaz na detail. */
   actions?: { slug: string; calendar: boolean; jobs: boolean }
+  /** Nadpis sekce; na Dnes „Další poptávky“, když první je nahoře jako hlavní věc. */
+  label?: string
   className?: string
 }) {
   return (
     <section aria-labelledby="prichozi" className={cn('flex min-w-0 flex-col gap-3', className)}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 id="prichozi">
-          <SectionLabel>Příchozí</SectionLabel>
+          <SectionLabel>{label}</SectionLabel>
         </h2>
         {total > 0 && <span className="font-num text-xs text-quiet">{total}</span>}
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-box border border-dashed px-4 py-6 text-[15px] text-quiet">
-          Žádná nová poptávka. Až přijde z webu, ukáže se tady a v kalendáři.
-        </div>
+        <EmptyState
+          size="compact"
+          title="Žádná nová poptávka"
+          description="Až přijde z webu, ukáže se tady a v kalendáři."
+        />
       ) : (
         <ul className="flex flex-col gap-2.5">
           {items.map((r) => (

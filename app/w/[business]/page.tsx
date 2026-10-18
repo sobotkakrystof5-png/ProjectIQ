@@ -1,26 +1,21 @@
-import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { Skeleton } from '@/components/ui/skeleton'
+import { redirect } from 'next/navigation'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
-import { CustomerSummary } from '@/components/ws/app/customer-summary'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { TodayFocus } from '@/components/ws/app/today/focus'
 import { IncomingList } from '@/components/ws/app/today/incoming-list'
 import { PullToRefresh } from '@/components/ws/app/today/pull-to-refresh'
 import { TodayBoard } from '@/components/ws/app/today/today-board'
 import { TodayAgenda } from '@/components/ws/app/today/today-agenda'
 import { TodayWelcome } from '@/components/ws/app/today/welcome'
 import { WeekCalendar } from '@/components/ws/app/today/week-calendar'
-import { AccentHeading, SectionLabel } from '@/components/ws/brand'
 import { requireBusiness, requireWorkspace } from '@/lib/ws/context'
 import { hrefWith, parseDetail } from '@/lib/ws/detail-param'
+import { WS_FEATURES } from '@/lib/ws/features'
 import { navHref } from '@/lib/ws/nav'
 import { orderPageUrl } from '@/lib/ws/app-origin'
 import { plural } from '@/lib/ws/plural'
-import {
-  getCustomerCard,
-  getEnabledModules,
-  getTodayData,
-  type CalendarEntry,
-} from '@/lib/ws/today'
+import { getEnabledModules, getTodayData, type CalendarEntry } from '@/lib/ws/today'
 import {
   formatDayLong,
   isIsoDate,
@@ -38,9 +33,10 @@ const first = (v: string | string[] | undefined) =>
   Array.isArray(v) ? v[0] : v
 
 /**
- * Dnes (S09, mockup C/D): Příchozí | týdenní kalendář | karta zákazníka.
- * Stav v URL: `?tyden=` (pondělí týdne), `?zakaznik=` (karta vpravo),
- * `?detail=` (pravý panel). Všechno se vykreslí na serveru.
+ * Dnes (S09, RD04): nahoře jedna hlavní věc („Teď na řadě“), pod ní týdenní
+ * kalendář a zbylé poptávky. Karta zákazníka je v pravém panelu.
+ * Stav v URL: `?tyden=` (pondělí týdne), `?detail=` (pravý panel).
+ * Starý odkaz `?zakaznik=<id>` panel otevře (přesměruje na `?detail=zakaznik:<id>`).
  */
 export default async function TodayPage(props: {
   params: Promise<{ business: string }>
@@ -53,19 +49,24 @@ export default async function TodayPage(props: {
   const now = new Date()
   const today = pragueParts(now).date
   const pathname = navHref(business.slug, '')
+  const link = (patch: Record<string, string | null>) =>
+    hrefWith(pathname, searchParams, patch)
 
   const wanted = first(searchParams.tyden)
   const weekStart = isIsoDate(wanted) ? weekStartOf(wanted) : weekStartOf(today)
   const selectedParam = first(searchParams.zakaznik)
-  const selected =
-    selectedParam && UUID_RE.test(selectedParam)
-      ? selectedParam.toLowerCase()
-      : null
+  if (selectedParam !== undefined) {
+    const id = UUID_RE.test(selectedParam) ? selectedParam.toLowerCase() : null
+    const open = !parseDetail(searchParams.detail) && id
+    redirect(link({ zakaznik: null, ...(open ? { detail: `zakaznik:${id}` } : {}) }))
+  }
 
-  const [data, modules] = await Promise.all([
-    getTodayData(ctx, business, { weekStart, now }),
-    getEnabledModules(ctx, business),
-  ])
+  const modules = await getEnabledModules(ctx, business)
+  const data = await getTodayData(ctx, business, {
+    weekStart,
+    now,
+    invoices: modules.has('invoices'),
+  })
   const welcome = first(searchParams.vitejte) === '1'
   const detail = (
     <DetailSlot
@@ -79,24 +80,20 @@ export default async function TodayPage(props: {
 
   if (data.isEmpty) {
     return (
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <PageShell width="wide">
         <Heading today={today} />
         <TodayWelcome
           welcome={welcome}
           orderUrl={await orderPageUrl(business.slug)}
         />
         {detail}
-      </div>
+      </PageShell>
     )
   }
-
-  const customerId = selected ?? data.suggestedCustomerId
 
   const todayVisits = data.calendar.filter(
     (e) => e.kind === 'visit' && pragueParts(e.start).date === today,
   ).length
-  const link = (patch: Record<string, string | null>) =>
-    hrefWith(pathname, searchParams, patch)
   const openRef = parseDetail(searchParams.detail)
   const selectedId =
     openRef?.kind === 'poptavka' || openRef?.kind === 'termin' ? openRef.id : null
@@ -105,9 +102,19 @@ export default async function TodayPage(props: {
       ? link({ detail: `poptavka:${e.id}` })
       : link({ detail: `termin:${e.id}` })
 
+  // První poptávka je nahoře jako hlavní věc, v seznamu vedle by byla podruhé.
+  const focusRequestId = data.focus.kind === 'request' ? data.focus.request.id : null
+  const restItems = data.incoming.filter((r) => r.id !== focusRequestId)
+  const restTotal = data.incomingTotal - (focusRequestId ? 1 : 0)
+  const actions = {
+    slug: business.slug,
+    calendar: modules.has('calendar'),
+    jobs: modules.has('jobs'),
+  }
+
   return (
     <PullToRefresh>
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <PageShell width="wide">
         <Heading today={today}>
           {plural(data.incomingTotal, [
             'nová poptávka',
@@ -119,20 +126,37 @@ export default async function TodayPage(props: {
         </Heading>
 
         <TodayBoard
-          incoming={
-            <IncomingList
-              items={data.incoming}
-              total={data.incomingTotal}
+          focus={
+            <TodayFocus
+              focus={data.focus}
               today={today}
               now={now}
-              hrefFor={(id) => link({ detail: `poptavka:${id}` })}
-              allHref={navHref(business.slug, 'poptavky')}
-              actions={{
-                slug: business.slug,
-                calendar: modules.has('calendar'),
-                jobs: modules.has('jobs'),
+              actions={actions}
+              hrefs={{
+                request: (id) => link({ detail: `poptavka:${id}` }),
+                visit: (id) => link({ detail: `termin:${id}` }),
+                invoices: navHref(business.slug, 'faktury'),
               }}
+              orderUrl={
+                data.focus.kind === 'none' && WS_FEATURES.orderLink
+                  ? await orderPageUrl(business.slug)
+                  : undefined
+              }
             />
+          }
+          incoming={
+            restTotal > 0 ? (
+              <IncomingList
+                label={focusRequestId ? 'Další poptávky' : 'Příchozí'}
+                items={restItems}
+                total={restTotal}
+                today={today}
+                now={now}
+                hrefFor={(id) => link({ detail: `poptavka:${id}` })}
+                allHref={navHref(business.slug, 'poptavky')}
+                actions={actions}
+              />
+            ) : null
           }
           calendar={
             <>
@@ -144,15 +168,8 @@ export default async function TodayPage(props: {
                 opening={data.opening}
                 selectedId={selectedId}
                 links={{
-                  // Termín vybere zákazníka do karty vpravo, poptávka otevře panel.
-                  entry: (e) =>
-                    e.kind === 'request'
-                      ? link({ detail: `poptavka:${e.id}` })
-                      : e.kind === 'block'
-                        ? link({ detail: `termin:${e.id}` })
-                        : e.customer_id
-                          ? link({ zakaznik: e.customer_id, detail: null })
-                          : link({ detail: `termin:${e.id}` }),
+                  // Termín i poptávka otevřou detail v pravém panelu, i s kartou zákazníka.
+                  entry: detailLink,
                   week: (start) => link({ tyden: start || null, detail: null }),
                 }}
               />
@@ -164,67 +181,11 @@ export default async function TodayPage(props: {
               />
             </>
           }
-          customer={
-            <section
-              aria-labelledby="zakaznik"
-              className="flex min-w-0 flex-col gap-3"
-            >
-              <h2 id="zakaznik">
-                <SectionLabel>Zákazník</SectionLabel>
-              </h2>
-              <div className="rounded-panel border bg-surface p-5">
-                <Suspense fallback={<Skeleton className="h-[260px]" />}>
-                  <CustomerCard
-                    ctx={ctx}
-                    business={business}
-                    customerId={customerId}
-                    now={now}
-                    today={today}
-                    detailHref={(id) => link({ detail: `zakaznik:${id}` })}
-                  />
-                </Suspense>
-              </div>
-            </section>
-          }
         />
 
         {detail}
-      </div>
+      </PageShell>
     </PullToRefresh>
-  )
-}
-
-/** Karta zákazníka se dočítá sama, týdenní kalendář na ni nečeká (RD02). */
-async function CustomerCard({
-  ctx,
-  business,
-  customerId,
-  now,
-  today,
-  detailHref,
-}: {
-  ctx: Awaited<ReturnType<typeof requireWorkspace>>
-  business: Awaited<ReturnType<typeof requireBusiness>>
-  customerId: string | null
-  now: Date
-  today: string
-  detailHref: (id: string) => string
-}) {
-  const card = customerId ? await getCustomerCard(ctx, business, customerId, now) : null
-  if (!card) {
-    return (
-      <p className="text-[15px] text-quiet">
-        Klikněte na termín v kalendáři a uvidíte tu kartu zákazníka.
-      </p>
-    )
-  }
-  return (
-    <CustomerSummary
-      card={card}
-      today={today}
-      businessName={business.name}
-      detailHref={detailHref(card.id)}
-    />
   )
 }
 
@@ -235,10 +196,5 @@ function Heading({
   today: string
   children?: React.ReactNode
 }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <AccentHeading accent={formatDayLong(today)}>Dnes,</AccentHeading>
-      {children && <p className="font-num text-sm text-quiet">{children}</p>}
-    </div>
-  )
+  return <PageHeader title="Dnes," accent={formatDayLong(today)} subtitle={children} />
 }

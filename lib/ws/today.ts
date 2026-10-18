@@ -1,7 +1,7 @@
 import 'server-only'
 import { q, wsDb, type WsQuery, type WsRow as DbRow } from './db'
 import { seededModules, type WsBusiness, type WsContext } from './context'
-import { addDays, pragueToUtc } from './time'
+import { addDays, pragueParts, pragueToUtc } from './time'
 
 // Data obrazovky Dnes (S09). Každý dotaz filtruje account_id z kontextu
 // a business_id ověřeného byznysu (requireBusiness) — RLS je jen pojistka.
@@ -31,6 +31,52 @@ export type CalendarEntry = {
   customer_id: string | null
 }
 
+/** Nejbližší dnešní termín, který ještě neskončil. */
+export type FocusVisit = {
+  id: string
+  customer_id: string | null
+  customer_name: string
+  service_name: string | null
+  start: Date
+  end: Date
+}
+
+/** Nejstarší nezaplacená vystavená faktura po splatnosti. */
+export type FocusInvoice = {
+  id: string
+  number: string
+  customer_name: string
+  amount: number
+  currency: string
+  /** Den splatnosti (YYYY-MM-DD). */
+  due_on: string
+  /** Kolik faktur je po splatnosti celkem. */
+  total: number
+}
+
+/** Jedna hlavní věc nahoře na Dnes (RD04). */
+export type FocusItem =
+  | { kind: 'request'; request: IncomingRequest }
+  | { kind: 'visit'; visit: FocusVisit }
+  | { kind: 'invoice'; invoice: FocusInvoice }
+  | { kind: 'none' }
+
+/**
+ * Co má majitel udělat jako první: nejdéle čekající nová poptávka → jinak
+ * nejbližší dnešní termín → jinak faktura po splatnosti → jinak nic.
+ * Čistá funkce; podklady vybírá `getTodayData` (faktura jen se zapnutou funkcí Faktury).
+ */
+export function pickFocus(c: {
+  request: IncomingRequest | null
+  visit: FocusVisit | null
+  invoice: FocusInvoice | null
+}): FocusItem {
+  if (c.request) return { kind: 'request', request: c.request }
+  if (c.visit) return { kind: 'visit', visit: c.visit }
+  if (c.invoice) return { kind: 'invoice', invoice: c.invoice }
+  return { kind: 'none' }
+}
+
 export type TodayData = {
   incoming: IncomingRequest[]
   incomingTotal: number
@@ -38,8 +84,8 @@ export type TodayData = {
   opening: { from: number; to: number } | null
   /** Byznys zatím nemá žádnou poptávku, termín ani zákazníka. */
   isEmpty: boolean
-  /** Zákazník pro kartu vpravo: vybraný, jinak z nejnovější poptávky, jinak z dalšího termínu. */
-  suggestedCustomerId: string | null
+  /** Hlavní věc nahoře; nezávisí na zobrazeném týdnu. */
+  focus: FocusItem
   services: string[]
 }
 
@@ -80,16 +126,20 @@ export async function getIncoming(
 export async function getTodayData(
   ctx: WsContext,
   business: Pick<WsBusiness, 'id'>,
-  opts: { weekStart: string; now?: Date },
+  opts: { weekStart: string; now?: Date; /** Byznys má zapnuté Faktury (hlavní věc smí být faktura po splatnosti). */ invoices?: boolean },
 ): Promise<TodayData> {
   const accountId = ctx.accountId
   const businessId = business.id
   const now = opts.now ?? new Date()
+  const today = pragueParts(now).date
   const from = pragueToUtc(opts.weekStart, 0)
   const to = pragueToUtc(addDays(opts.weekStart, 7), 0)
+  const endOfToday = pragueToUtc(addDays(today, 1), 0)
+  // Dolní mez, ať index (byznys, začátek) neprochází celou historii termínů.
+  const startOfYesterday = pragueToUtc(addDays(today, -1), 0)
   const db = wsDb(ctx)
 
-  const [incoming, total, visits, wanted, opening, flags, services] = await db.batch([
+  const [incoming, total, visits, wanted, opening, flags, services, oldest, nextVisit, overdue] = await db.batch([
     incomingQuery(accountId, businessId),
     incomingCountQuery(accountId, businessId),
     q`
@@ -127,17 +177,51 @@ export async function getTodayData(
       SELECT
         EXISTS (SELECT 1 FROM ws.requests WHERE account_id = ${accountId} AND business_id = ${businessId} AND NOT is_test) AS has_requests,
         EXISTS (SELECT 1 FROM ws.appointments WHERE account_id = ${accountId} AND business_id = ${businessId}) AS has_appointments,
-        EXISTS (SELECT 1 FROM ws.customers WHERE account_id = ${accountId}) AS has_customers,
-        (SELECT customer_id FROM ws.appointments
-          WHERE account_id = ${accountId} AND business_id = ${businessId} AND kind = 'visit'
-            AND status = 'confirmed' AND ends_at > ${now} AND customer_id IS NOT NULL
-          ORDER BY starts_at LIMIT 1) AS next_customer_id
+        EXISTS (SELECT 1 FROM ws.customers WHERE account_id = ${accountId}) AS has_customers
     `,
     q`
       SELECT name FROM ws.services
       WHERE account_id = ${accountId} AND business_id = ${businessId} AND active
       ORDER BY position, name
     `,
+    // Hlavní věc: nejdéle čekající poptávka, nejbližší dnešní termín, faktura po splatnosti.
+    q`
+      SELECT r.id, r.customer_id,
+             COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
+             s.name AS service_name, r.wanted_start, r.wanted_end, r.created_at, r.source
+      FROM ws.requests r
+      LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
+      LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
+      WHERE r.account_id = ${accountId} AND r.business_id = ${businessId} AND r.status = 'new' AND NOT r.is_test
+      ORDER BY r.created_at, r.id
+      LIMIT 1
+    `,
+    q`
+      SELECT a.id, a.customer_id, a.starts_at, a.ends_at, a.title,
+             c.name AS customer_name, s.name AS service_name
+      FROM ws.appointments a
+      LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
+      LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
+      WHERE a.account_id = ${accountId} AND a.business_id = ${businessId}
+        AND a.kind = 'visit' AND a.status = 'confirmed'
+        AND a.ends_at > ${now} AND a.starts_at >= ${startOfYesterday} AND a.starts_at < ${endOfToday}
+      ORDER BY a.starts_at, a.id
+      LIMIT 1
+    `,
+    opts.invoices
+      ? q`
+      SELECT i.id, i.number, i.amount::float8 AS amount, i.currency, i.due_on::text AS due_on,
+             COALESCE(c.name, NULLIF(i.counterparty->>'name', ''), 'Odběratel') AS customer_name,
+             count(*) OVER ()::int AS total
+      FROM ws.invoices i
+      LEFT JOIN ws.customers c ON c.account_id = i.account_id AND c.id = i.customer_id
+      WHERE i.account_id = ${accountId} AND i.business_id = ${businessId}
+        AND i.direction = 'issued' AND i.status = 'issued' AND i.paid_on IS NULL
+        AND i.due_on < ${today}::date
+      ORDER BY i.due_on, i.id
+      LIMIT 1
+    `
+      : q`SELECT 1 WHERE false`,
   ])
 
   const incomingRows = incoming as unknown as IncomingRequest[]
@@ -182,9 +266,37 @@ export async function getTodayData(
         ? { from: Number(open.opens), to: Number(open.closes) }
         : null,
     isEmpty: !flag.has_requests && !flag.has_appointments && !flag.has_customers,
-    suggestedCustomerId:
-      incomingRows.find((r) => r.customer_id)?.customer_id ?? ((flag.next_customer_id as string | null) ?? null),
+    focus: pickFocus({
+      request: ((oldest as unknown as IncomingRequest[])[0] as IncomingRequest | undefined) ?? null,
+      visit: visitFocus((nextVisit as Row[])[0]),
+      invoice: invoiceFocus((overdue as Row[])[0]),
+    }),
     services: (services as Row[]).map((r) => String(r.name)),
+  }
+}
+
+function visitFocus(r: Row | undefined): FocusVisit | null {
+  if (!r) return null
+  return {
+    id: String(r.id),
+    customer_id: (r.customer_id as string | null) ?? null,
+    customer_name: String(r.customer_name ?? r.title ?? 'Termín'),
+    service_name: (r.service_name as string | null) ?? null,
+    start: r.starts_at as Date,
+    end: r.ends_at as Date,
+  }
+}
+
+function invoiceFocus(r: Row | undefined): FocusInvoice | null {
+  if (!r) return null
+  return {
+    id: String(r.id),
+    number: String(r.number ?? ''),
+    customer_name: String(r.customer_name),
+    amount: Number(r.amount),
+    currency: String(r.currency),
+    due_on: String(r.due_on),
+    total: Number(r.total ?? 1),
   }
 }
 

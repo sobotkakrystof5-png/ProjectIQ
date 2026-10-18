@@ -16,6 +16,10 @@ import {
   Users,
 } from 'lucide-react'
 import { useWsTheme } from '@/components/ws/ws-root'
+import { PageHeader } from '@/components/ws/app/page-header'
+import { PillNav } from '@/components/ws/app/toolbar'
+import { TodayFocus } from '@/components/ws/app/today/focus'
+import type { FocusItem } from '@/lib/ws/today'
 import {
   AccentHeading,
   ConfirmedBlock,
@@ -120,6 +124,50 @@ const RADII = [
 ]
 
 const CHART = [42, 58, 35, 71, 64, 88, 52]
+
+// Ukázkové podklady pro blok „Teď na řadě“ (pevné datum, ať se server a prohlížeč shodnou).
+const FOCUS_TODAY = '2026-10-09'
+const FOCUS_NOW = new Date('2026-10-09T06:00:00Z')
+const FOCUS_CASES: { title: string; focus: FocusItem }[] = [
+  {
+    title: 'Nová poptávka',
+    focus: {
+      kind: 'request',
+      request: {
+        id: 'ukazka',
+        customer_id: null,
+        customer_name: 'Tereza Testová',
+        service_name: 'Střih a barva',
+        wanted_start: new Date('2026-10-10T07:00:00Z'),
+        wanted_end: new Date('2026-10-10T09:00:00Z'),
+        created_at: new Date('2026-10-09T04:25:00Z'),
+        source: 'web',
+      },
+    },
+  },
+  {
+    title: 'Dnešní termín',
+    focus: {
+      kind: 'visit',
+      visit: {
+        id: 'ukazka',
+        customer_id: null,
+        customer_name: 'Jana Ukázková',
+        service_name: 'Střih',
+        start: new Date('2026-10-09T08:00:00Z'),
+        end: new Date('2026-10-09T09:00:00Z'),
+      },
+    },
+  },
+  {
+    title: 'Faktura po splatnosti',
+    focus: {
+      kind: 'invoice',
+      invoice: { id: 'ukazka', number: '2026-000004', customer_name: 'Marta Dnešní', amount: 1850, currency: 'CZK', due_on: '2026-10-04', total: 2 },
+    },
+  },
+  { title: 'Nic k řešení', focus: { kind: 'none' } },
+]
 const DAYS = ['po', 'út', 'st', 'čt', 'pá', 'so', 'ne']
 
 function Section({
@@ -705,6 +753,68 @@ export function DesignShowcase() {
                 ))}
               </div>
             </Panel>
+          </div>
+        </Section>
+
+        <Section number="09" label="Obrazovky" title="Hlavička, přepínač a hlavní věc na Dnes">
+          <div className="grid gap-6">
+            <Panel title="PageHeader · jedna hlavní akce vpravo">
+              <PageHeader
+                title="Poptávky"
+                accent="na jednom místě."
+                subtitle="3 nové poptávky · 2 termíny dnes"
+                action={
+                  <Button>
+                    <Plus aria-hidden size={18} strokeWidth={1.5} />
+                    Nová rezervace
+                  </Button>
+                }
+              />
+            </Panel>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Panel title="PillNav · chips (stavy, skupiny)">
+                <PillNav
+                  label="Ukázka stavů"
+                  items={[
+                    { key: 'a', label: 'Nové', href: '#', active: true, count: 3 },
+                    { key: 'b', label: 'Potvrzené', href: '#', active: false, count: 12 },
+                    { key: 'c', label: 'Vyřízené', href: '#', active: false, count: 48 },
+                  ]}
+                />
+              </Panel>
+              <Panel title="PillNav · segmented (pohled)">
+                <PillNav
+                  variant="segmented"
+                  label="Ukázka pohledu"
+                  items={[
+                    { key: 'a', label: 'Den', href: '#', active: false },
+                    { key: 'b', label: 'Týden', href: '#', active: true },
+                    { key: 'c', label: 'Měsíc', href: '#', active: false },
+                  ]}
+                />
+              </Panel>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              {FOCUS_CASES.map((c) => (
+                <Panel key={c.title} title={c.title}>
+                  <TodayFocus
+                    focus={c.focus}
+                    today={FOCUS_TODAY}
+                    now={FOCUS_NOW}
+                    actions={{ slug: 'ukazka', calendar: true, jobs: false }}
+                    hrefs={{ request: () => '#', visit: () => '#', invoices: '#' }}
+                  />
+                </Panel>
+              ))}
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Panel title="EmptyState · výchozí">
+                <EmptyState title="Zatím nic vyřízeného" description="Tady budou odmítnuté poptávky a ty, jejichž termín už proběhl." />
+              </Panel>
+              <Panel title="EmptyState · compact">
+                <EmptyState size="compact" title="Žádná nová poptávka" description="Až přijde z webu, ukáže se tady a v kalendáři." />
+              </Panel>
+            </div>
           </div>
         </Section>
       </main>

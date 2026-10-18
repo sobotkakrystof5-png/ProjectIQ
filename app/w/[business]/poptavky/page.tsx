@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { PillNav } from '@/components/ws/app/toolbar'
 import { IncomingCard } from '@/components/ws/app/today/incoming-list'
-import { AccentHeading, EmptyState } from '@/components/ws/brand'
+import { EmptyState } from '@/components/ws/brand'
 import { buttonVariants } from '@/components/ui/button'
 import { getRequestsList, type RequestListItem, type RequestTab } from '@/lib/ws/calendar'
 import { requireBusiness, requireWorkspace } from '@/lib/ws/context'
@@ -60,30 +62,19 @@ export default async function RequestsPage(
   const canBook = WS_FEATURES.newBooking && calendar
 
   return (
-    <div className="mx-auto flex max-w-[960px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <AccentHeading accent="na jednom místě.">Poptávky</AccentHeading>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader title="Poptávky" accent="na jednom místě." />
 
-      <nav aria-label="Stav poptávek" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-        {TABS.map((t) => {
-          const active = t.key === tab
-          return (
-            <Link
-              key={t.key}
-              href={link({ stav: t.key === 'nove' ? null : t.key, detail: null })}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 text-[15px] font-semibold transition-colors',
-                active ? 'bg-navy-700 text-white' : 'bg-navy-50 text-navy-900 hover:bg-navy-100 dark:bg-navy-900 dark:text-navy-100',
-              )}
-            >
-              {t.label}
-              <span className={cn('font-num text-xs', active ? 'text-navy-200' : 'text-quiet')}>{counts[t.key]}</span>
-            </Link>
-          )
-        })}
-      </nav>
+      <PillNav
+        label="Stav poptávek"
+        items={TABS.map((t) => ({
+          key: t.key,
+          label: t.label,
+          href: link({ stav: t.key === 'nove' ? null : t.key, detail: null }),
+          active: t.key === tab,
+          count: counts[t.key],
+        }))}
+      />
 
       {items.length === 0 ? (
         <EmptyState
@@ -122,7 +113,7 @@ export default async function RequestsPage(
       )}
 
       <DetailSlot ctx={ctx} business={business} pathname={pathname} searchParams={searchParams} today={today} />
-    </div>
+    </PageShell>
   )
 }
 

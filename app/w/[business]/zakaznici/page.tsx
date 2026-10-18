@@ -2,10 +2,12 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Search } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { PillNav } from '@/components/ws/app/toolbar'
 import { formatPhone } from '@/components/ws/app/customer-summary'
 import { OutreachPanel } from '@/components/ws/customers/outreach-panel'
 import { SegmentBadge } from '@/components/ws/customers/segment-badge'
-import { AccentHeading, EmptyState, Money } from '@/components/ws/brand'
+import { EmptyState, Money } from '@/components/ws/brand'
 import { Input } from '@/components/ui/input'
 import { requireBusiness, requireWorkspace } from '@/lib/ws/context'
 import { getCustomersList, nextStepFor, SEGMENT_FILTERS, type CustomerListItem, type NextStep } from '@/lib/ws/customers'
@@ -62,23 +64,24 @@ export default async function CustomersPage(
   const filtered = Boolean(segment || query)
 
   return (
-    <div className="mx-auto flex max-w-[1280px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <AccentHeading accent="se vracejí.">Zákazníci</AccentHeading>
+    <PageShell>
+      <PageHeader title="Zákazníci" accent="se vracejí." />
 
       <div data-detail-grid className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <nav aria-label="Skupiny zákazníků" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            <FilterChip href={link({ skupina: null, detail: null })} active={!segment} label="Všichni" count={list.counts.all} />
-            {SEGMENT_FILTERS.map((key) => (
-              <FilterChip
-                key={key}
-                href={link({ skupina: SEGMENT_SLUGS[key], detail: null })}
-                active={segment === key}
-                label={SEGMENT_LABELS[key]}
-                count={list.counts[key]}
-              />
-            ))}
-          </nav>
+          <PillNav
+            label="Skupiny zákazníků"
+            items={[
+              { key: 'all', label: 'Všichni', href: link({ skupina: null, detail: null }), active: !segment, count: list.counts.all },
+              ...SEGMENT_FILTERS.map((key) => ({
+                key,
+                label: SEGMENT_LABELS[key],
+                href: link({ skupina: SEGMENT_SLUGS[key], detail: null }),
+                active: segment === key,
+                count: list.counts[key],
+              })),
+            ]}
+          />
 
           <form action={pathname} className="relative" role="search">
             {segment && <input type="hidden" name="skupina" value={SEGMENT_SLUGS[segment]} />}
@@ -136,23 +139,7 @@ export default async function CustomersPage(
       </div>
 
       <DetailSlot ctx={ctx} business={business} pathname={pathname} searchParams={searchParams} today={today} />
-    </div>
-  )
-}
-
-function FilterChip({ href, active, label, count }: { href: string; active: boolean; label: string; count: number }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? 'page' : undefined}
-      className={cn(
-        'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 text-[15px] font-semibold transition-colors',
-        active ? 'bg-navy-700 text-white' : 'bg-navy-50 text-navy-900 hover:bg-navy-100 dark:bg-navy-900 dark:text-navy-100',
-      )}
-    >
-      {label}
-      <span className={cn('font-num text-xs', active ? 'text-navy-200' : 'text-quiet')}>{count}</span>
-    </Link>
+    </PageShell>
   )
 }
 
