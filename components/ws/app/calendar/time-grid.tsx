@@ -8,6 +8,7 @@ import { Check } from 'lucide-react'
 import { confirmRequest, moveAppointment, resizeAppointment } from '@/app/w/[business]/poptavky/actions'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { toast } from '@/components/ui/toast'
+import { NowIndicator } from '@/components/ws/app/calendar/now-indicator'
 import { staffTint } from '@/lib/ws/staff-colors'
 import { cn } from '@/lib/ws/utils'
 import type { QuickBookingStart } from '../booking/quick-booking'
@@ -137,6 +138,10 @@ export function TimeGrid({
   const [selection, setSelection] = useState<Selection | null>(null)
   const [quick, setQuick] = useState<Quick | null>(null)
   const box = quick?.range ?? selection
+  const firstColumnByDay = new Map<string, string>()
+  for (const col of columns) {
+    if (!col.requests && !firstColumnByDay.has(col.day)) firstColumnByDay.set(col.day, col.key)
+  }
 
   const rawMinutes = (el: HTMLElement, clientY: number) => {
     const rect = el.getBoundingClientRect()
@@ -354,6 +359,9 @@ export function TimeGrid({
                 onDragLeave={() => setOver((o) => (o === col.key ? null : o))}
                 onDrop={(e) => drop(col, e)}
               >
+                {!col.requests && (
+                  <NowIndicator day={col.day} hours={hours} showLabel={firstColumnByDay.get(col.day) === col.key} />
+                )}
                 {col.closed?.map((seg, i) => (
                   <div
                     key={`z${i}`}
