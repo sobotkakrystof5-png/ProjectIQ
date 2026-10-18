@@ -297,3 +297,13 @@ Výsledek:
 - Text odměny se v e-mailové HTML šabloně escapuje; akcent se před vložením do CSS ověřuje jako šestimístný hex s kontrastem. Žádné nové HTML sinky, env, závislosti, API routy ani třetí strany; CSP se neměnila.
 Nálezy: 0 k opravě.
 Ověřeno: cílené testy pokrývají izolaci účtů, souběh a zastaralé „Zpět“; celé `npm test` (566 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`. Přihlášený lokální průchod nebyl možný, server přesměroval na přihlášení. `npm run build:check` selhal na sandboxovém omezení Turbopacku při vytváření procesu/vazbě na port; Webpack build prošel.
+
+## 2026-10-18 — review RD16 + RD13 (kontakt zákazníka a Nastavení)
+Spouštěč: dokončení RD16 a RD13 redesignu před commitem, skill `web-security-review`.
+Rozsah: nové akce `saveCustomerContact`, `getCustomerMessageTemplates`, `sendCustomerMessage`, `undoCustomerMessage`; `lib/ws/{customers,email/outbox,email/queue,email/mailto}.ts`, migrace 089; zákaznická kontaktní UI; server actions a formuláře pěti částí Nastavení, autosave, oborové funkce, barvy pracovníků a checklist Dnes.
+Výsledek: bez otevřených nálezů.
+- Akce vyžadují workspace kontext, validují Zod vstupy s limity, ověřují slug byznysu v účtu a u zápisu předplatné. SQL má vázané parametry a účet; zpráva i zrušení fronty ověřují účet, byznys, zákazníka a ID. Zrušení je povolené i v read-only režimu, aby šlo využít 60s „Zpět“.
+- Nabídka se kontroluje proti souhlasu, ukončení a odhlášení při vytvoření i znovu těsně před odesláním; osobní zprávy odhlášením blokované nejsou. Obsah zpráv skládá existující HTML kompozitor s escapováním. Bez připraveného Resend transportu se vrací jen `mailto:` a zpráva se neukládá jako odeslaná. Kontrola odhalila možnost vložit parametry do části adresy `mailto:`; opravena validací a samostatným bezpečným kódováním adresy, test pokrývá pokus o `bcc`.
+- Nastavení zůstává jen pro vlastníka; závislosti modulů se při obnově stavového snapshotu opraví do konzistentního stavu. Náhled šablon používá `iframe sandbox`; CSP ani skripty se neměnily. Bez nové závislosti, env proměnné nebo externího API.
+- Migrace 089 pouze rozšiřuje omezení typů v `message_settings`; je připravená a na Neonu se nespouštěla. GDPR export obsahuje nové zprávy a existující výmaz zákazníka je odstraní přes `customer_id`.
+Ověřeno: `npm test` (570 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`, `git diff --check`. `npm run build:check` Turbopack blokuje sandbox při vytváření procesu/vazbě na port; Webpack build prošel. Přihlášené UI, živý Resend a data po migraci ověřené nejsou.

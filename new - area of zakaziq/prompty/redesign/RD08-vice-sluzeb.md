@@ -11,7 +11,7 @@ Společná pravidla: `new - area of zakaziq/prompty/redesign/00-README.md`. Soub
 Potřebuje D-5 (opakované rezervace: ano/ne). Bez rozhodnutí opakování nedělej.
 
 ## Kroky
-1. **Návrh dat (nejdřív ukaž Kryštofovi).** Migrace 089 (088 používá RD10): `ws.appointments.group_id uuid` (společné potvrzení, zrušení a přesun skupiny), `ws.request_services (account_id, business_id, request_id, service_id, position)` se složenými cizími klíči, RLS (`ws.enable_account_rls`), touch trigger. Idempotentní, spustitelná dvakrát. Aktualizuj `seedAccount()`, zkontroluj dopad na `ws.erase_customer` (GDPR) a export. **Jen připrav, aplikuje Kryštof.**
+1. **Návrh dat (nejdřív ukaž Kryštofovi).** Migrace 090 (088 používá RD10, 089 RD16): `ws.appointments.group_id uuid` (společné potvrzení, zrušení a přesun skupiny), `ws.request_services (account_id, business_id, request_id, service_id, position)` se složenými cizími klíči, RLS (`ws.enable_account_rls`), touch trigger. Idempotentní, spustitelná dvakrát. Aktualizuj `seedAccount()`, zkontroluj dopad na `ws.erase_customer` (GDPR) a export. **Jen připrav, aplikuje Kryštof.**
 2. **Pravidlo.** V1: jeden pracovník na celý blok, služby jdou těsně za sebou, délka = součet. `EXCLUDE` na pracovníka zůstává a hlídá kolize (jedna kolize vrátí celou skupinu zpět v jedné transakci/CTE).
 3. **Příjem.** API v1 a objednávka: volitelné `serviceIds` (pole, nejvýš 5) vedle `serviceId`, schema se rozšiřuje jen přidáním. Volné časy se počítají z celkové délky. `order-flow.tsx`: výběr více služeb s mezisoučtem času a ceny.
 4. **Potvrzení.** Potvrzení poptávky vytvoří N navazujících termínů se stejným `group_id`. Kalendář je ukazuje jako **jeden blok** s podpoložkami; zrušení a přesun platí pro celou skupinu (se „Zpět“).

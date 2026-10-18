@@ -29,6 +29,10 @@ async function prepare(raw: unknown, write = true) {
 
 const log = (name: string, accountId: string, e: unknown) =>
   console.error(name, { accountId, error: e instanceof Error ? e.message : 'unknown' })
+const revalidateEmailSettings = (businessSlug: string) => {
+  revalidatePath(`/w/${businessSlug}/nastaveni/komunikace`)
+  revalidatePath(`/w/${businessSlug}/nastaveni/emaily`)
+}
 
 const settingSchema = z.object({
   type: z.enum(MESSAGE_TYPES),
@@ -44,7 +48,7 @@ export async function saveEmailSetting(raw: unknown): Promise<Result<null>> {
   if (!input.success) return fail(`Předmět může mít nejvýš ${SUBJECT_MAX} znaků a text ${BODY_MAX}.`)
   try {
     await saveMessageSetting(p.ctx, p.business, input.data)
-    revalidatePath(`/w/${p.business.slug}/nastaveni/emaily`)
+    revalidateEmailSettings(p.business.slug)
     return ok(null)
   } catch (e) {
     log('settings.email', p.ctx.accountId, e)
@@ -61,7 +65,7 @@ export async function saveEmailReplyTo(raw: unknown): Promise<Result<null>> {
   if (email && !z.string().email().safeParse(email).success) return fail('E-mail nevypadá správně. Zkontrolujte ho prosím.')
   try {
     await saveReplyTo(p.ctx, p.business, email)
-    revalidatePath(`/w/${p.business.slug}/nastaveni/emaily`)
+    revalidateEmailSettings(p.business.slug)
     return ok(null)
   } catch (e) {
     log('settings.replyTo', p.ctx.accountId, e)
@@ -76,7 +80,7 @@ export async function saveNewsSetting(raw: unknown): Promise<Result<null>> {
   if (!input.success) return fail('Něco v údajích nesedí.')
   try {
     await saveNewsEmails(p.ctx, input.data.enabled)
-    revalidatePath(`/w/${p.business.slug}/nastaveni/emaily`)
+    revalidateEmailSettings(p.business.slug)
     return ok(null)
   } catch (e) {
     log('settings.news', p.ctx.accountId, e)

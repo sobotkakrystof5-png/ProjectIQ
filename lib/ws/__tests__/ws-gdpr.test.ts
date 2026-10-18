@@ -71,15 +71,20 @@ describe('pomůcky', () => {
 
 describe('export účtu', () => {
   it('obsahuje CSV všech oblastí a jen data vlastního účtu', async () => {
+    await db.query(`INSERT INTO ws.outbound_messages (account_id, business_id, customer_id, type, to_address, subject)
+      VALUES ($1, $2, $3, 'customer_custom', 'jana@example.cz', 'Zpráva účtu A'), ($4, $5, $6, 'customer_custom', 'jiny@example.cz', 'Zpráva účtu B')`,
+      [A.account, A.business, A.customer, B.account, B.business, B.customer])
     const { zip, missingPdf } = await buildAccountExport(ctxA, { now: new Date('2026-10-17T10:00:00Z') })
     const text = new TextDecoder().decode(zip)
-    for (const f of ['CTI-MNE.txt', 'zakaznici.csv', 'poptavky.csv', 'terminy.csv', 'zakazky.csv', 'faktury.csv', 'prijmy-a-vydaje.csv', 'vernostni-karty.csv']) {
+    for (const f of ['CTI-MNE.txt', 'zakaznici.csv', 'zpravy-zakazniku.csv', 'poptavky.csv', 'terminy.csv', 'zakazky.csv', 'faktury.csv', 'prijmy-a-vydaje.csv', 'vernostni-karty.csv']) {
       expect(text).toContain(f)
     }
     expect(text).toContain('Jana Nováková')
+    expect(text).toContain('Zpráva účtu A')
     expect(text).toContain('Byznys a')
     expect(text).not.toContain('Byznys b')
     expect(text).not.toContain('Firma b')
+    expect(text).not.toContain('Zpráva účtu B')
     // vystavená faktura bez uloženého PDF a bez vykreslovače → v seznamu chybějících
     expect(missingPdf).toEqual(['2026001'])
   })

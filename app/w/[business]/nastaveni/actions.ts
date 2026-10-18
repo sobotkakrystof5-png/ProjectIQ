@@ -8,7 +8,7 @@ import { usableAccent } from '@/lib/ws/accent'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { createBlock } from '@/lib/ws/bookings'
 import { MAX_RANGES_PER_DAY, weekToRows } from '@/lib/ws/hours'
-import { moveAndDeleteStage, reorder, saveAppearance, saveField, savePortalRules, saveService, saveStaff, saveStage, saveWeekHours, setModule, setServiceActive, setStaffActive } from '@/lib/ws/settings'
+import { moveAndDeleteStage, reorder, restoreModules, saveAppearance, saveField, savePortalRules, saveService, saveStaff, saveStage, saveWeekHours, setModule, setServiceActive, setStaffActive } from '@/lib/ws/settings'
 import { hasWholeMinor } from '@/lib/ws/money'
 import { addDays, isIsoDate, pragueToUtc } from '@/lib/ws/time'
 import { ADDRESS_MAX, CHANGE_HOURS_OPTIONS } from '@/lib/ws/portal-rules'
@@ -47,6 +47,14 @@ export async function changeModule(raw: unknown): Promise<Result<null>> {
   if (!input.success) return fail('Vybraná funkce nesedí.')
   try { await setModule(p.ctx, p.business, input.data.module, input.data.enabled); return done(p.business) }
   catch (e) { log('settings.changeModule', p.ctx, e); return fail('Funkci se nepodařilo uložit. Zkuste to prosím znovu.') }
+}
+
+export async function restoreModuleSettings(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(raw); if (!p.ok) return p
+  const input = z.object({ modules: z.array(z.object({ module: z.enum(WS_MODULES), enabled: z.boolean() })).length(WS_MODULES.length) }).safeParse(p.input)
+  if (!input.success || new Set(input.data.modules.map((item) => item.module)).size !== WS_MODULES.length) return fail('Předchozí nastavení se nepodařilo obnovit. Obnovte prosím stránku.')
+  try { await restoreModules(p.ctx, p.business, input.data.modules); return done(p.business) }
+  catch (e) { log('settings.restoreModules', p.ctx, e); return fail('Předchozí nastavení se nepodařilo obnovit. Zkuste to prosím znovu.') }
 }
 
 const service = z.object({ id: id.optional(), name: z.string().trim().min(1).max(120), duration: z.number().int().min(5).max(1440), price: money, currency: z.string().regex(/^[A-Z]{3}$/), showOnWeb: z.boolean(), buffer: z.number().int().min(0).max(240), staffIds: z.array(id).max(100).optional() })
@@ -131,7 +139,7 @@ export async function saveHoursSettings(raw: unknown): Promise<Result<null>> {
 
 export async function saveStaffSettings(raw: unknown): Promise<Result<null>> {
   const p = await prepare(raw); if (!p.ok) return p
-  const input = z.object({ id: id.optional(), name: z.string().trim().min(1).max(80) }).safeParse(p.input)
+  const input = z.object({ id: id.optional(), name: z.string().trim().min(1).max(80), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional() }).safeParse(p.input)
   if (!input.success) return fail('Napište jméno pracovníka (nejvýš 80 znaků).')
   try { if (!(await saveStaff(p.ctx, p.business, input.data))) return fail('Pracovník už tu není. Obnovte prosím stránku.'); return done(p.business) }
   catch (e) { log('settings.saveStaff', p.ctx, e); return fail('Pracovníka se nepodařilo uložit. Zkuste to prosím znovu.') }

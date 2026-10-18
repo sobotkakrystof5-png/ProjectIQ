@@ -4,6 +4,9 @@
 
 export const STAFF_TONES = 5
 
+/** Výběr barev z palety termínů; stejné odstíny jako --staff-1…5 v Dílky. */
+export const STAFF_COLOR_OPTIONS = ['#23478b', '#0d7c75', '#6d4caa', '#a6535e', '#737828'] as const
+
 const HEX = /^#[0-9a-fA-F]{6}$/
 
 /** CSS barva pracovníka: uložená, nebo token podle pořadí (0 = první). */

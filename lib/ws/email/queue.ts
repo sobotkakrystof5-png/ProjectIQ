@@ -83,6 +83,18 @@ export async function cancelQueued(scope: Scope, dedupeKey: string): Promise<boo
   return rows.length > 0
 }
 
+/** Zruší jednu čekající ruční zprávu zákazníkovi, pokud ještě neodešla. */
+export async function cancelQueuedCustomerMessage(scope: Scope, businessId: string, customerId: string, id: string): Promise<boolean> {
+  const rows = await wsDb(scope)`
+    UPDATE ws.outbound_messages SET status = 'cancelled'
+    WHERE account_id = ${scope.accountId} AND business_id = ${businessId} AND customer_id = ${customerId}
+      AND id = ${id} AND type IN ('customer_thanks', 'customer_booking', 'customer_offer', 'customer_job', 'customer_custom')
+      AND status = 'queued'
+    RETURNING id
+  `
+  return rows.length > 0
+}
+
 /** Koncept (S12 „Komu napsat“, S14 faktura) → fronta. Jen koncepty, ostatní se nezmění. */
 export async function releaseDraft(
   scope: Scope,
@@ -165,15 +177,16 @@ async function invoiceAttachment(scope: Scope, businessId: string | null, invoic
   return { filename: `faktura-${invoice.number}.pdf`.replace(/[^\w.-]/g, '-'), content }
 }
 
-/** Hromadná zpráva („Komu napsat“): souhlas se ověří až těsně před odesláním. */
-export const isBulkType = (type: string): boolean => type.startsWith('outreach_')
+/** Nabídky a hromadné zprávy: souhlas se ověří těsně před odesláním. */
+export const isBulkType = (type: string): boolean => type.startsWith('outreach_') || type === 'customer_offer'
 
-async function stillContactable(scope: Scope, customerId: string | null): Promise<boolean> {
+async function stillContactable(scope: Scope, customerId: string | null, needsConsent = true): Promise<boolean> {
   if (!customerId) return false
   const [c] = await wsDb(scope)`
     SELECT 1 AS ok FROM ws.customers
     WHERE account_id = ${scope.accountId} AND id = ${customerId}
-      AND contact_consent_at IS NOT NULL AND unsubscribed_at IS NULL AND ended_at IS NULL AND email IS NOT NULL`
+      AND email IS NOT NULL
+      AND (NOT ${needsConsent}::boolean OR (unsubscribed_at IS NULL AND contact_consent_at IS NOT NULL AND ended_at IS NULL))`
   return Boolean(c)
 }
 
@@ -227,7 +240,8 @@ export async function flushAccount(scope: Scope, opts: { budgetMs?: number; limi
             out.expired++
             continue
           }
-          if (isBulkType(m.type) && !(await stillContactable(scope, m.customer_id))) {
+          const customerMessage = m.type.startsWith('customer_')
+          if ((customerMessage || isBulkType(m.type)) && !(await stillContactable(scope, m.customer_id, isBulkType(m.type)))) {
             await settle(scope, m, { cancelled: 'no_consent' })
             out.expired++
             continue

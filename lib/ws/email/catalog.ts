@@ -24,9 +24,17 @@ export const MESSAGE_TYPES = [
   'invoice_overdue',
   'vat_limit',
   'job_update',
+  'customer_thanks',
+  'customer_booking',
+  'customer_offer',
+  'customer_job',
+  'customer_custom',
 ] as const
 
 export type MessageType = (typeof MESSAGE_TYPES)[number]
+
+export const CUSTOMER_MESSAGE_TYPES = ['customer_thanks', 'customer_booking', 'customer_offer', 'customer_job', 'customer_custom'] as const
+export type CustomerMessageType = (typeof CUSTOMER_MESSAGE_TYPES)[number]
 
 export const isMessageType = (v: unknown): v is MessageType => (MESSAGE_TYPES as readonly unknown[]).includes(v)
 
@@ -56,6 +64,8 @@ export type MessageDef = {
   needs?: WsModule
   /** Text jde upravit (přehledy skládá aplikace z dat, ty mají jen přepínač). */
   editable: boolean
+  /** Ručně vybraná šablona, ne automatická událost. */
+  manualOnly?: boolean
   vars: TemplateVar[]
   subject: string
   body: string
@@ -149,6 +159,56 @@ export const MESSAGES: Record<MessageType, MessageDef> = {
     vars: ['jmeno', 'byznys', 'zakazka'],
     subject: 'Novinka k zakázce: {zakazka}',
     body: 'Dobrý den,\n\nk vaší zakázce máme novinku. Celý postup najdete na odkazu níže.\n\n{byznys}',
+  },
+  customer_thanks: {
+    label: 'Děkuji za objednávku',
+    when: 'Ruční zpráva zákazníkovi',
+    audience: 'customer',
+    editable: true,
+    manualOnly: true,
+    vars: ['jmeno', 'byznys', 'termin', 'sluzba'],
+    subject: 'Děkuji za objednávku',
+    body: 'Dobrý den,\n\nděkuji za objednávku {sluzba}. Těším se na vás {termin}.\n\n{byznys}',
+  },
+  customer_booking: {
+    label: 'Potvrzení nebo změna termínu',
+    when: 'Ruční zpráva zákazníkovi',
+    audience: 'customer',
+    editable: true,
+    manualOnly: true,
+    vars: ['jmeno', 'byznys', 'termin', 'sluzba'],
+    subject: 'Informace k termínu {termin}',
+    body: 'Dobrý den,\n\nposílám informace k vašemu termínu {termin}.\nSlužba: {sluzba}.\n\n{byznys}',
+  },
+  customer_offer: {
+    label: 'Nabízím volný termín',
+    when: 'Nabídka zákazníkovi se souhlasem',
+    audience: 'customer',
+    editable: true,
+    manualOnly: true,
+    vars: ['jmeno', 'byznys', 'termin', 'sluzba'],
+    subject: 'Mám pro vás volný termín',
+    body: 'Dobrý den,\n\nuvolnil se mi termín, který by se vám mohl hodit. Odpovězte prosím, pokud máte zájem.\n\n{byznys}',
+  },
+  customer_job: {
+    label: 'Informace k zakázce',
+    when: 'Ruční zpráva zákazníkovi',
+    audience: 'customer',
+    editable: true,
+    manualOnly: true,
+    vars: ['jmeno', 'byznys', 'zakazka'],
+    subject: 'Informace k zakázce {zakazka}',
+    body: 'Dobrý den,\n\nposílám vám informace k zakázce {zakazka}.\n\n{byznys}',
+  },
+  customer_custom: {
+    label: 'Vlastní zpráva',
+    when: 'Ruční zpráva zákazníkovi',
+    audience: 'customer',
+    editable: true,
+    vars: ['jmeno', 'byznys', 'termin', 'sluzba', 'zakazka'],
+    manualOnly: true,
+    subject: 'Zpráva od {byznys}',
+    body: 'Dobrý den,\n\n{byznys}',
   },
   new_request: {
     label: 'Nová poptávka',

@@ -10,9 +10,10 @@ import { renderEmail, safeUrl } from '../email/layout'
 import { setLinkSecretForTests, signLink, verifyLink } from '../email/links'
 import { applyActionLink, peekActionLink } from '../email/action-link'
 import { notifyBookingConfirmed, notifyNewRequest, notifyAppointmentMoved, notifyRequestDeclined, cancelPendingNotice, notifyVisitPaid, loadSender } from '../email/notify'
-import { enqueueEmail, flushAccount, MAX_ATTEMPTS } from '../email/queue'
+import { cancelQueuedCustomerMessage, enqueueEmail, flushAccount, MAX_ATTEMPTS } from '../email/queue'
 import { setEmailTransportForTests, type OutgoingEmail, type SendResult } from '../email/transport'
 import { sendOutreachDraft } from '../email/outbox'
+import { mailtoAddress } from '../email/mailto'
 import { unsubscribeCustomer } from '../email/public-links'
 import { queueReminders } from '../email/scheduled'
 import { verifySvix } from '../email/resend-webhook'
@@ -82,9 +83,15 @@ beforeEach(async () => {
   sent = []
   next = () => ({ ok: true, providerId: `re_${sent.length}` })
   await db.query(`DELETE FROM ws.outbound_messages`)
+  await db.query(`UPDATE ws.customers SET contact_consent_at = now(), unsubscribed_at = NULL, ended_at = NULL WHERE id = $1`, [A.customer])
 })
 
 describe('šablony a rozložení', () => {
+  it('zakóduje adresu pro mailto bez možnosti vložit další parametr', () => {
+    expect(mailtoAddress('user?bcc=attacker@example.cz')).toBe('user%3Fbcc%3Dattacker@example.cz')
+    expect(mailtoAddress('neplatny')).toBeNull()
+  })
+
   it('doplní proměnné a prázdnou vynechá i s mezerou', () => {
     expect(fillTemplate('Termín {termin} pro {jmeno}.', { termin: 'pátek v 9:00' })).toBe('Termín pátek v 9:00 pro.')
   })
@@ -197,6 +204,25 @@ describe('fronta', () => {
     await enqueueEmail(scopeA, { businessId: A.business, type: 'reminder', to: 'a@example.cz', fromName: 'B', email })
     expect((await flushAccount({ accountId: B.account })).sent).toBe(0)
     expect(sent).toHaveLength(0)
+  })
+
+  it('osobní zpráva může odejít i po odhlášení, nabídka se zastaví', async () => {
+    await db.query(`UPDATE ws.customers SET unsubscribed_at = now() WHERE id = $1`, [A.customer])
+    const personalId = await enqueueEmail(scopeA, { businessId: A.business, customerId: A.customer, type: 'customer_custom', to: 'zakaznik@example.cz', fromName: 'B', email })
+    const offerId = await enqueueEmail(scopeA, { businessId: A.business, customerId: A.customer, type: 'customer_offer', to: 'zakaznik@example.cz', fromName: 'B', email })
+    expect((await flushAccount(scopeA)).sent).toBe(1)
+    expect(sent.map((m) => m.id)).toEqual([personalId])
+    const status = await rows<{ id: string; status: string }>(`SELECT id, status FROM ws.outbound_messages WHERE id IN ($1, $2) ORDER BY id`, [personalId, offerId])
+    expect(status.map((row) => [row.id, row.status])).toEqual([[personalId, 'sent'], [offerId, 'cancelled']].sort(([a], [b]) => String(a).localeCompare(String(b))))
+  })
+
+  it('ruční e-mail jde vrátit jen během čekání ve frontě', async () => {
+    const id = await enqueueEmail(scopeA, { businessId: A.business, customerId: A.customer, type: 'customer_custom', to: 'zakaznik@example.cz', fromName: 'B', email, sendAt: new Date(Date.now() + 60_000) })
+    expect(id).not.toBeNull()
+    expect(await cancelQueuedCustomerMessage(scopeA, A.business, A.customer, id!)).toBe(true)
+    expect(await cancelQueuedCustomerMessage(scopeA, A.business, A.customer, id!)).toBe(false)
+    const [message] = await rows<{ status: string }>(`SELECT status FROM ws.outbound_messages WHERE id = $1`, [id])
+    expect(message.status).toBe('cancelled')
   })
 })
 

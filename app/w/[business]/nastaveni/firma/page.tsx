@@ -1,24 +1,29 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
-import { AccentHeading } from '@/components/ws/brand'
+import { AppearanceSettings } from '@/components/ws/settings/appearance-settings'
 import { IssuerProfileForm } from '@/components/ws/money/issuer-profile-form'
-import { canWrite,getBillingState } from '@/lib/ws/billing'
-import { requireBusiness,requireRole,requireWorkspace } from '@/lib/ws/context'
+import { SettingsPageShell } from '@/components/ws/settings/settings-page-shell'
+import { canWrite, getBillingState } from '@/lib/ws/billing'
+import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
 import { getIssuerProfile } from '@/lib/ws/money/data'
-import { navHref } from '@/lib/ws/nav'
 
-export const metadata:Metadata={title:'Firma a fakturace'}
+export default async function CompanySettingsPage(props: { params: Promise<{ business: string }> }) {
+  const { business: slug } = await props.params
+  const ctx = await requireWorkspace()
+  const business = await requireBusiness(ctx, slug)
+  if (!hasRole(ctx, 'owner')) return <SettingsPageShell businessSlug={slug} title="Firma"><p className="text-[15px] text-quiet">Nastavení firmy mění majitel účtu.</p></SettingsPageShell>
+  const [profile, billing] = await Promise.all([getIssuerProfile(ctx), getBillingState(ctx.accountId)])
+  const readOnly = !canWrite(billing)
 
-export default async function CompanySettingsPage(props:{params:Promise<{business:string}>}) {
-  const params=await props.params
-  const ctx=await requireWorkspace()
-  const business=await requireBusiness(ctx,params.business)
-  requireRole(ctx,'owner')
-  const [profile,billing]=await Promise.all([getIssuerProfile(ctx),getBillingState(ctx.accountId)])
-  return <main className="mx-auto flex max-w-[800px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-    <Link href={navHref(business.slug,'nastaveni')} className="-ml-2 inline-flex min-h-11 items-center gap-1 self-start rounded-full px-2 text-[15px] text-quiet hover:text-ink"><ChevronLeft size={18}/>Nastavení</Link>
-    <AccentHeading>Firma a fakturace</AccentHeading>
-    <IssuerProfileForm slug={business.slug} profile={profile} readOnly={!canWrite(billing)}/>
-  </main>
+  return <SettingsPageShell businessSlug={business.slug} title="Firma">
+    <nav aria-label="Části nastavení firmy" className="flex flex-wrap gap-2">
+      {[['udaje', 'Fakturační údaje'], ['vzhled', 'Vzhled']].map(([id, label]) => <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center rounded-full border border-navy-100 bg-surface px-4 text-sm font-medium text-ink hover:bg-navy-50">{label}</a>)}
+    </nav>
+    <section id="udaje" className="scroll-mt-6 flex flex-col gap-3">
+      <h2 className="text-[18px] font-semibold text-ink">Fakturační údaje</h2>
+      <IssuerProfileForm slug={business.slug} profile={profile} readOnly={readOnly} />
+    </section>
+    <section id="vzhled" className="scroll-mt-6 flex flex-col gap-3">
+      <h2 className="text-[18px] font-semibold text-ink">Vzhled</h2>
+      <AppearanceSettings slug={business.slug} color={business.color} readOnly={readOnly} />
+    </section>
+  </SettingsPageShell>
 }

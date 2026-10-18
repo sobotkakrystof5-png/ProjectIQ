@@ -95,6 +95,25 @@ export async function setModule(ctx: WsContext, business: WsBusiness, module: Ws
   await wsDb(ctx).batch(queries)
 }
 
+/** Obnoví úplnou sadu modulů jednou dávkou, včetně závislostí pro tlačítko Zpět. */
+export async function restoreModules(ctx: WsContext, business: WsBusiness, values: { module: WsModule; enabled: boolean }[]): Promise<void> {
+  const state = new Map<WsModule, boolean>(values.map((value) => [value.module, value.enabled]))
+  for (const module of ALWAYS_ON_MODULES) state.set(module, true)
+  for (const module of WS_MODULES) {
+    if (state.get(module) && MODULE_DETAILS[module].needs) state.set(MODULE_DETAILS[module].needs!, true)
+  }
+  for (const module of WS_MODULES) {
+    const dependency = MODULE_DETAILS[module].needs
+    if (dependency && !state.get(dependency)) state.set(module, false)
+  }
+  const queries = WS_MODULES.map((module) => q`
+    INSERT INTO ws.business_modules (account_id, business_id, module, enabled)
+    VALUES (${ctx.accountId}, ${business.id}, ${module}, ${state.get(module) === true})
+    ON CONFLICT (business_id, module) DO UPDATE SET enabled = EXCLUDED.enabled
+  `)
+  await wsDb(ctx).batch(queries)
+}
+
 /**
  * Uloží službu a (když přijde `staffIds`) i to, kdo ji dělá — v jedné dávce.
  * Prázdné `staffIds` = dělá ji kdokoli. Pracovník z jiného byznysu se tiše vynechá.
@@ -191,11 +210,13 @@ export async function saveWeekHours(ctx: WsContext, business: WsBusiness, staffI
   return (staff as WsRow[]).length > 0
 }
 
-export async function saveStaff(ctx: WsContext, business: WsBusiness, input: { id?: string; name: string }): Promise<boolean> {
+export async function saveStaff(ctx: WsContext, business: WsBusiness, input: { id?: string; name: string; color?: string | null }): Promise<boolean> {
   const acc = ctx.accountId
   const biz = business.id
   const rows = input.id
-    ? await wsDb(ctx)`UPDATE ws.staff SET name = ${input.name} WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.id} RETURNING id`
+    ? input.color === undefined
+      ? await wsDb(ctx)`UPDATE ws.staff SET name = ${input.name} WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.id} RETURNING id`
+      : await wsDb(ctx)`UPDATE ws.staff SET name = ${input.name}, color = ${input.color} WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.id} RETURNING id`
     : await wsDb(ctx)`INSERT INTO ws.staff (account_id, business_id, name, position) VALUES (${acc}, ${biz}, ${input.name}, (SELECT COALESCE(max(position), -1) + 1 FROM ws.staff WHERE account_id = ${acc} AND business_id = ${biz})) RETURNING id`
   return rows.length > 0
 }

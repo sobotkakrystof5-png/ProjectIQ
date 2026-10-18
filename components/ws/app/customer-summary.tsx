@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { Mail, Phone } from 'lucide-react'
 import { LoyaltyCard, TimeRange } from '@/components/ws/brand'
 import { SEGMENT_LABELS, type CustomerCard } from '@/lib/ws/today'
 import { formatRelativeDay, pragueParts } from '@/lib/ws/time'
 import { formatPhone } from '@/lib/ws/format-phone'
 import { plural } from '@/lib/ws/plural'
 import { cn } from '@/lib/ws/utils'
+import { CustomerContactActions } from '@/components/ws/customers/customer-contact-actions'
 
 export { formatPhone }
 
@@ -14,12 +14,14 @@ export { formatPhone }
  * Na Dnes vpravo (mockup C) i v pravém panelu.
  */
 export function CustomerSummary({
+  slug,
   card,
   today,
   businessName,
   businessColor,
   detailHref,
 }: {
+  slug: string
   card: CustomerCard
   today: string
   businessName: string
@@ -39,24 +41,18 @@ export function CustomerSummary({
             </span>
           )}
         </div>
-        <ul className="flex flex-col gap-0.5 text-[15px]">
-          {card.phone && (
-            <li>
-              <a href={`tel:${card.phone}`} className="inline-flex min-h-9 items-center gap-2 text-ink underline-offset-4 hover:underline">
-                <Phone aria-hidden size={16} strokeWidth={1.5} className="text-quiet" />
-                <span className="font-num text-sm">{formatPhone(card.phone)}</span>
-              </a>
-            </li>
-          )}
-          {card.email && (
-            <li>
-              <a href={`mailto:${card.email}`} className="inline-flex min-h-9 max-w-full items-center gap-2 text-ink underline-offset-4 hover:underline">
-                <Mail aria-hidden size={16} strokeWidth={1.5} className="shrink-0 text-quiet" />
-                <span className="truncate">{card.email}</span>
-              </a>
-            </li>
-          )}
-        </ul>
+        <CustomerContactActions
+          slug={slug}
+          customerId={card.id}
+          customerName={card.name}
+          businessName={businessName}
+          phone={card.phone}
+          email={card.email}
+          consent={card.consent}
+          unsubscribed={card.unsubscribed}
+          ended={card.ended}
+          context={{ nextVisit: card.nextVisit?.start.toISOString() ?? null, service: card.nextVisit?.service ?? null }}
+        />
       </div>
 
       <dl className="grid grid-cols-2 gap-3">

@@ -84,6 +84,8 @@ describe('getTodayData', () => {
     })
     const ctx: WsContext = { userId: 'user_p', accountId, role: 'owner' }
     const [biz] = await wsDb(ctx)<{ id: string }>`SELECT id FROM ws.businesses WHERE account_id = ${accountId}`
+    // Osamocený zákazník v účtu nepatří automaticky do každé jeho provozovny.
+    await wsDb(ctx)`INSERT INTO ws.customers (account_id, name) VALUES (${accountId}, 'Jiná provozovna')`
     const data = await getTodayData(ctx, biz, { weekStart: week, now })
     expect(data).toMatchObject({ isEmpty: true, incoming: [], calendar: [], focus: { kind: 'none' } })
     expect(data.services.length).toBeGreaterThan(0)

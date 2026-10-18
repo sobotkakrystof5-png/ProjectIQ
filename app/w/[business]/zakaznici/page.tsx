@@ -4,7 +4,7 @@ import { Search } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
-import { formatPhone } from '@/components/ws/app/customer-summary'
+import { CustomerContactActions } from '@/components/ws/customers/customer-contact-actions'
 import { OutreachPanel } from '@/components/ws/customers/outreach-panel'
 import { SegmentBadge } from '@/components/ws/customers/segment-badge'
 import { EmptyState, Money } from '@/components/ws/brand'
@@ -119,7 +119,7 @@ export default async function CustomersPage(
             )
           ) : (
             <>
-              <CustomerTable items={list.items} today={today} hrefFor={(id) => link({ detail: `zakaznik:${id}` })} />
+              <CustomerTable items={list.items} today={today} slug={business.slug} businessName={business.name} hrefFor={(id) => link({ detail: `zakaznik:${id}` })} />
               {list.truncated && (
                 <p className="text-sm text-quiet">Ukazujeme prvních 300 zákazníků. Další najdete hledáním nebo filtrem.</p>
               )}
@@ -165,7 +165,7 @@ function stepText(step: NextStep, today: string): string {
 
 const ROW_GRID = 'grid grid-cols-[minmax(0,1.5fr)_128px_72px_104px_96px_minmax(0,1.2fr)] gap-3'
 
-function CustomerTable({ items, today, hrefFor }: { items: CustomerListItem[]; today: string; hrefFor: (id: string) => string }) {
+function CustomerTable({ items, today, hrefFor, slug, businessName }: { items: CustomerListItem[]; today: string; hrefFor: (id: string) => string; slug: string; businessName: string }) {
   const lastText = (d: Date | null) => (d ? formatRelativeDay(pragueParts(d).date, today) : '—')
   return (
     <div className="overflow-hidden rounded-panel border bg-surface">
@@ -186,20 +186,10 @@ function CustomerTable({ items, today, hrefFor }: { items: CustomerListItem[]; t
           {items.map((c) => {
             const step = nextStepFor(c)
             return (
-              <li key={c.id}>
-                <Link
-                  href={hrefFor(c.id)}
-                  scroll={false}
-                  className={cn(
-                    ROW_GRID,
-                    'min-h-[60px] items-center px-5 py-3 transition-colors hover:bg-navy-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:hover:bg-navy-900/60',
-                  )}
-                >
+              <li key={c.id} className="border-b last:border-b-0">
+                <div className={cn(ROW_GRID, 'min-h-[60px] items-center px-5 py-3')}>
                   <span className="min-w-0">
-                    <span className="block truncate text-[15px] font-semibold text-ink">{c.name}</span>
-                    {(c.phone || c.email) && (
-                      <span className="block truncate font-num text-xs text-quiet">{c.phone ? formatPhone(c.phone) : c.email}</span>
-                    )}
+                    <Link href={hrefFor(c.id)} scroll={false} className="block truncate text-[15px] font-semibold text-ink underline-offset-4 hover:underline">{c.name}</Link>
                   </span>
                   <span>
                     <SegmentBadge segment={c.segment} />
@@ -215,10 +205,13 @@ function CustomerTable({ items, today, hrefFor }: { items: CustomerListItem[]; t
                   </span>
                   <span className="font-num text-sm text-ink">{lastText(c.lastVisit)}</span>
                   <span className="text-right text-sm">{c.spend > 0 ? <Money amount={c.spend} /> : <span className="text-quiet">—</span>}</span>
-                  <span className={cn('truncate text-sm', step?.kind === 'reward' ? 'font-semibold text-navy-700 dark:text-navy-200' : 'text-quiet')}>
-                    {stepText(step, today)}
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className={cn('truncate text-sm', step?.kind === 'reward' ? 'font-semibold text-navy-700 dark:text-navy-200' : 'text-quiet')}>
+                      {stepText(step, today)}
+                    </span>
+                    <CustomerContactActions slug={slug} customerId={c.id} customerName={c.name} businessName={businessName} phone={c.phone} email={c.email} consent={c.consent} unsubscribed={c.unsubscribed} ended={c.ended} compact />
                   </span>
-                </Link>
+                </div>
               </li>
             )
           })}
@@ -231,9 +224,9 @@ function CustomerTable({ items, today, hrefFor }: { items: CustomerListItem[]; t
           const step = nextStepFor(c)
           return (
             <li key={c.id}>
-              <Link href={hrefFor(c.id)} scroll={false} className="flex min-h-[64px] flex-col gap-1.5 px-4 py-3 hover:bg-navy-50/60">
+              <div className="flex min-h-[64px] flex-col gap-1.5 px-4 py-3">
                 <span className="flex items-center justify-between gap-3">
-                  <span className="truncate text-[15px] font-semibold text-ink">{c.name}</span>
+                  <Link href={hrefFor(c.id)} scroll={false} className="truncate text-[15px] font-semibold text-ink underline-offset-4 hover:underline">{c.name}</Link>
                   <SegmentBadge segment={c.segment} className="shrink-0" />
                 </span>
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-quiet">
@@ -246,7 +239,8 @@ function CustomerTable({ items, today, hrefFor }: { items: CustomerListItem[]; t
                   {c.spend > 0 && <Money amount={c.spend} />}
                   {step && <span className={cn(step.kind === 'reward' && 'font-semibold text-navy-700')}>{stepText(step, today)}</span>}
                 </span>
-              </Link>
+                <CustomerContactActions slug={slug} customerId={c.id} customerName={c.name} businessName={businessName} phone={c.phone} email={c.email} consent={c.consent} unsubscribed={c.unsubscribed} ended={c.ended} />
+              </div>
             </li>
           )
         })}

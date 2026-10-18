@@ -49,6 +49,18 @@ export function useWsAction() {
   return { run, pending: pending || busy }
 }
 
+/** Automatické uložení malé změny s jednotným toastem „Zpět“. */
+export function useWsUndoAction() {
+  const { run: runAction, pending } = useWsAction()
+  const router = useRouter()
+  const run = useCallback(
+    <T,>(call: () => Promise<Result<T>>, undo: () => Promise<Result<unknown>>, title: string, done?: string) =>
+      runAction(call, () => undoToast(title, undo, { done, refresh: () => router.refresh() })),
+    [runAction, router],
+  )
+  return { run, pending }
+}
+
 /** Akce s „Zpět“: provede se hned, toast nabídne vrácení. */
 export function undoToast(
   title: string,

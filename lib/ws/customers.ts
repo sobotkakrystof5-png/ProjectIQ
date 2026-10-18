@@ -19,6 +19,9 @@ export type CustomerListItem = {
   name: string
   phone: string | null
   email: string | null
+  consent: boolean
+  unsubscribed: boolean
+  ended: boolean
   segment: SegmentKey | null
   lastVisit: Date | null
   visits: number
@@ -96,7 +99,7 @@ export async function getCustomersList(
 
   const list = compose([
     q`
-      SELECT c.id, c.name, c.phone, c.email, cs.segment, cs.last_visit_at, cs.visits_12m,
+      SELECT c.id, c.name, c.phone, c.email, c.contact_consent_at, c.unsubscribed_at, c.ended_at, cs.segment, cs.last_visit_at, cs.visits_12m,
         lc.stamps, lc.status AS card_status, p.stamps_needed,
         (SELECT min(a.starts_at) FROM ws.appointments a
           WHERE a.account_id = c.account_id AND a.business_id = ${biz} AND a.customer_id = c.id
@@ -142,6 +145,9 @@ export async function getCustomersList(
       name: String(r.name),
       phone: (r.phone as string | null) ?? null,
       email: (r.email as string | null) ?? null,
+      consent: r.contact_consent_at !== null && r.contact_consent_at !== undefined,
+      unsubscribed: r.unsubscribed_at !== null && r.unsubscribed_at !== undefined,
+      ended: r.ended_at !== null && r.ended_at !== undefined,
       segment: (r.segment as SegmentKey | null) ?? null,
       lastVisit: (r.last_visit_at as Date | null) ?? null,
       visits: Number(r.visits_12m ?? 0),
@@ -190,6 +196,7 @@ export type CustomerDetail = {
   spend: { currency: string; amount: number }[]
   history: HistoryItem[]
   loyalty: { enabled: boolean; stamps: number; needed: number; status: 'active' | 'full' | 'redeemed' | 'empty'; full: boolean; reward: string } | null
+  messages: { id: string; type: string; subject: string | null; status: string; sentAt: Date | null; createdAt: Date }[]
   /** Zákazníci se stejným jménem — kandidáti na sloučení. */
   duplicates: { id: string; name: string; phone: string | null; email: string | null }[]
 }
@@ -197,7 +204,7 @@ export type CustomerDetail = {
 export async function getCustomerDetail(ctx: WsContext, business: Biz, customerId: string, now: Date = new Date()): Promise<CustomerDetail | null> {
   const acc = ctx.accountId
   const biz = business.id
-  const [customerRows, segRows, nextRows, spendRows, historyRows, loyaltyRows, dupRows] = await wsDb(ctx).batch([
+  const [customerRows, segRows, nextRows, spendRows, historyRows, loyaltyRows, dupRows, messageRows] = await wsDb(ctx).batch([
     q`
       SELECT id, name, phone, email, birthday::text AS birthday, note, contact_consent_at, unsubscribed_at, ended_at, ended_reason, created_at
       FROM ws.customers WHERE account_id = ${acc} AND id = ${customerId}
@@ -255,6 +262,12 @@ export async function getCustomerDetail(ctx: WsContext, business: Biz, customerI
       WHERE o.account_id = ${acc} AND o.id <> me.id AND lower(trim(o.name)) = lower(trim(me.name))
       ORDER BY o.created_at LIMIT 5
     `,
+    q`
+      SELECT id, type, subject, status, sent_at, created_at FROM ws.outbound_messages
+      WHERE account_id = ${acc} AND business_id = ${biz} AND customer_id = ${customerId}
+        AND type IN ('customer_thanks', 'customer_booking', 'customer_offer', 'customer_job', 'customer_custom')
+      ORDER BY created_at DESC LIMIT 5
+    `,
   ])
 
   const c = (customerRows as WsRow[])[0]
@@ -305,6 +318,14 @@ export async function getCustomerDetail(ctx: WsContext, business: Biz, customerI
             reward: String(l.reward_text ?? ''),
           }
         : null,
+    messages: (messageRows as WsRow[]).map((r) => ({
+      id: String(r.id),
+      type: String(r.type),
+      subject: (r.subject as string | null) ?? null,
+      status: String(r.status),
+      sentAt: dateOrNull(r.sent_at),
+      createdAt: r.created_at as Date,
+    })),
     duplicates: (dupRows as WsRow[]).map((r) => ({
       id: String(r.id),
       name: String(r.name),
@@ -373,6 +394,28 @@ export async function updateCustomer(ctx: WsContext, customerId: string, input: 
         AND ((${input.phone}::text IS NOT NULL AND phone = ${input.phone}::text) OR (${input.email}::text IS NOT NULL AND email = ${input.email}::text))
       LIMIT 1
     `
+    return { ok: false, reason: 'duplicate', other: other ? { id: String(other.id), name: String(other.name) } : null }
+  }
+}
+
+/** Doplnění telefonu nebo e-mailu přímo z karty zákazníka. */
+export async function updateCustomerContact(
+  ctx: WsContext,
+  customerId: string,
+  field: 'phone' | 'email',
+  value: string,
+): Promise<UpdateCustomerResult> {
+  const acc = ctx.accountId
+  try {
+    const rows = field === 'phone'
+      ? await wsDb(ctx)`UPDATE ws.customers SET phone = ${value} WHERE account_id = ${acc} AND id = ${customerId} RETURNING id`
+      : await wsDb(ctx)`UPDATE ws.customers SET email = ${value} WHERE account_id = ${acc} AND id = ${customerId} RETURNING id`
+    return rows[0] ? { ok: true } : { ok: false, reason: 'not_found' }
+  } catch (e) {
+    if (!isUniqueViolation(e)) throw e
+    const [other] = field === 'phone'
+      ? await wsDb(ctx)`SELECT id, name FROM ws.customers WHERE account_id = ${acc} AND id <> ${customerId} AND phone = ${value} LIMIT 1`
+      : await wsDb(ctx)`SELECT id, name FROM ws.customers WHERE account_id = ${acc} AND id <> ${customerId} AND email = ${value} LIMIT 1`
     return { ok: false, reason: 'duplicate', other: other ? { id: String(other.id), name: String(other.name) } : null }
   }
 }

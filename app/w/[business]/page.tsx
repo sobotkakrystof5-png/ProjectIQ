@@ -85,6 +85,9 @@ export default async function TodayPage(props: {
         <TodayWelcome
           welcome={welcome}
           orderUrl={await orderPageUrl(business.slug)}
+          businessSlug={business.slug}
+          hasService={data.services.length > 0}
+          hasHours={data.opening !== null}
         />
         {detail}
       </PageShell>

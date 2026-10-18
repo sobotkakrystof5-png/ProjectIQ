@@ -154,11 +154,12 @@ const bookingSchema = z
     note: z.string().trim().max(1000).optional(),
   })
   .refine((v) => v.customerId || v.name, { path: ['name'] })
+  .refine((v) => v.customerId || v.phone?.trim() || v.email?.trim(), { path: ['phone'], message: 'Zadejte prosím telefon nebo e-mail.' })
 
 /** Nová rezervace z panelu. Zákazník se najde podle telefonu/e-mailu, nebo založí. */
 export async function createManualBooking(raw: unknown): Promise<Result<{ message: string; appointmentId: string }>> {
   const p = await prepare(bookingSchema, raw)
-  if (!p.ok) return p.error === BAD_INPUT ? fail('Vyplňte prosím jméno, den a čas.') : p
+  if (!p.ok) return p.error === BAD_INPUT ? fail('Vyplňte prosím jméno, telefon nebo e-mail, den a čas.') : p
   const { input, c } = p
 
   const phone = input.phone ? bookings.normalizePhone(input.phone) : null

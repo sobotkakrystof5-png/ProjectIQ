@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setWsDriverForTests } from '../db'
 import type { WsBusiness, WsContext } from '../context'
 import { rowsToWeek, summarizeWeek, weekToRows, type Week } from '../hours'
-import { reorder, saveService, saveStaff, saveWeekHours, setStaffActive } from '../settings'
+import { reorder, restoreModules, saveService, saveStaff, saveWeekHours, setModule, setStaffActive } from '../settings'
+import { WS_MODULES } from '../templates/types'
 import { createBooking } from '../bookings'
 import { loadIntakeConfig, loadSlots } from '../intake/intake'
 import { hasWholeMinor } from '../money'
@@ -114,6 +115,8 @@ describe('pracovníci', () => {
     const [jana] = await all<{ id: string; position: number }>(`SELECT id, position FROM ws.staff WHERE business_id = $1 AND name = 'Jana'`, [A.business])
     expect(jana.position).toBeGreaterThan(0)
     expect(await saveStaff(ctxA, bizA, { id: jana.id, name: 'Jana N.' })).toBe(true)
+    expect(await saveStaff(ctxA, bizA, { id: jana.id, name: 'Jana N.', color: '#23478b' })).toBe(true)
+    expect((await all<{ color: string }>(`SELECT color FROM ws.staff WHERE id = $1`, [jana.id]))[0].color).toBe('#23478b')
     expect(await saveStaff(ctxA, bizA, { id: B.staff, name: 'Cizí' })).toBe(false)
     expect((await all<{ name: string }>(`SELECT name FROM ws.staff WHERE id = $1`, [B.staff]))[0].name).toBe('Pracovník')
   })
@@ -124,6 +127,21 @@ describe('pracovníci', () => {
     expect(await setStaffActive(ctxA, bizA, A.staff, false)).toBe('last')
     expect(await setStaffActive(ctxA, bizA, jana.id, true)).toBe('ok')
     expect(await setStaffActive(ctxA, bizA, B.staff, false)).toBe('not_found')
+  })
+
+  it('vrátí přepínače modulů včetně zapnutých závislostí', async () => {
+    const previous = WS_MODULES.map((module) => ({
+      module,
+      enabled: module === 'calendar' || module === 'requests' || module === 'customers',
+    }))
+    await setModule(ctxA, bizA, 'taxes', true)
+    const beforeUndo = await all<{ module: string; enabled: boolean }>(`SELECT module, enabled FROM ws.business_modules WHERE business_id = $1 ORDER BY module`, [A.business])
+    expect(beforeUndo.find((item) => item.module === 'finance')?.enabled).toBe(true)
+    await restoreModules(ctxA, bizA, previous)
+    const restored = await all<{ module: string; enabled: boolean }>(`SELECT module, enabled FROM ws.business_modules WHERE business_id = $1 ORDER BY module`, [A.business])
+    expect(restored.find((item) => item.module === 'finance')?.enabled).toBe(false)
+    expect(restored.find((item) => item.module === 'taxes')?.enabled).toBe(false)
+    expect(restored.find((item) => item.module === 'calendar')?.enabled).toBe(true)
   })
 })
 

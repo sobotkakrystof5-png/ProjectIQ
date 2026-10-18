@@ -4,7 +4,7 @@
 
 ## Co v databázi je
 
-- **Schéma `ws`** — tabulky Workspace a navazující funkce/indexy (migrace `064`–`088`). Admin tabulky v `public` se nemění.
+- **Schéma `ws`** — tabulky Workspace a navazující funkce/indexy (migrace `064`–`089`). Admin tabulky v `public` se nemění.
 - **Role `ws_app`** — jediná role, kterou se aplikace Workspace připojuje (`DATABASE_URL_WS`). Platí pro ni Row Level Security, do `public` nevidí.
 - **Vlastník tabulek** (`neondb_owner`, `DATABASE_URL`) — pouští migrace a čte `ws` pro admin stránku `/dashboard/klienti`. RLS pro něj neplatí.
 
@@ -24,7 +24,8 @@ node scripts/apply-migration.js \
   080_ws_penize_provoz.sql 081_ws_emaily_odkazy_novinky.sql \
   082_ws_klientsky_portal.sql 083_ws_admin_klienti_novinky.sql 084_ws_gdpr.sql \
   085_ws_kontext_jednim_dotazem.sql 086_ws_indexy_rychlost.sql \
-  087_ws_objednavka_pracovnik_a_portal.sql 088_ws_faktury_profil_a_zpet.sql
+  087_ws_objednavka_pracovnik_a_portal.sql 088_ws_faktury_profil_a_zpet.sql \
+  089_ws_rucni_zpravy_zakaznikum.sql
 ```
 
 Jde to i ručně v Neon SQL editoru (obsah souborů po jednom, v tomhle pořadí). Migrace jsou idempotentní, opakované spuštění nic nerozbije.
@@ -205,5 +206,5 @@ Po 083 aplikovat `migrations/084_ws_gdpr.sql` rolí vlastníka a znovu `scripts/
 
 Po 087, při již aplikované základní migraci peněz 080, aplikovat `migrations/088_ws_faktury_profil_a_zpet.sql` rolí vlastníka. Přidá profil dodavatele k účtu a původ platby k faktuře, nahradí `ws.money_pay` a přidá `ws.money_unpay`. Funkce jsou `SECURITY INVOKER`; migrace jim odebere `PUBLIC` a při existující roli `ws_app` přidá `EXECUTE`. Po založení role nebo při opakovaném nastavení práv spusťte `node scripts/ws-create-role.js` (znovu použije `scripts/ws-grants.sql`). Data nemaže. **Připravená, na Neonu dosud neaplikovaná.**
 
-RD08 potřebuje další číslo 089. Tuto migraci nespouštějte před 087 ani před základními funkcemi peněz z 080.
+RD16 přidává migraci 089 (rozšíření povolených typů zákaznických šablon); je připravená, na Neonu neaplikovaná. RD08 použije 090. Migrace nespouštějte před 087 ani před základními funkcemi peněz z 080.
 

@@ -298,7 +298,7 @@ async function panelContent(
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">
-                <CustomerSummary card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
+                <CustomerSummary slug={business.slug} card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
               </section>
             )}
           </div>
@@ -384,7 +384,7 @@ async function panelContent(
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">
-                <CustomerSummary card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
+                <CustomerSummary slug={business.slug} card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
               </section>
             )}
           </div>
@@ -461,7 +461,7 @@ async function panelContent(
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">
-                <CustomerSummary card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
+                <CustomerSummary slug={business.slug} card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
               </section>
             )}
           </div>

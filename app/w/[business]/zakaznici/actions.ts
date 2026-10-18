@@ -10,7 +10,10 @@ import { eraseCustomer as eraseCustomerData } from '@/lib/ws/gdpr'
 import * as loyalty from '@/lib/ws/loyalty'
 import type { StampOutcome } from '@/lib/ws/loyalty'
 import { deliver, notifyVisitPaid } from '@/lib/ws/email/notify'
-import { sendOutreachDraft, type SendOutcome } from '@/lib/ws/email/outbox'
+import { sendCustomerMessage as sendCustomerMessageData, sendOutreachDraft, type SendOutcome } from '@/lib/ws/email/outbox'
+import { cancelQueuedCustomerMessage } from '@/lib/ws/email/queue'
+import { getEmailSettings } from '@/lib/ws/email/settings'
+import { CUSTOMER_MESSAGE_TYPES, MESSAGES, type CustomerMessageType } from '@/lib/ws/email/catalog'
 import { createDraft, OUTREACH_KINDS, setDraftDiscarded } from '@/lib/ws/outreach'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { refreshSegmentsSafely } from '@/lib/ws/segments'
@@ -276,6 +279,92 @@ export async function updateCustomer(raw: unknown): Promise<Result<{ duplicateOf
     if (res.other) return { ok: false, error: `Tenhle telefon nebo e-mail už má ${res.other.name}. Zákazníky můžete sloučit níže.` }
     return fail('Tenhle telefon nebo e-mail už má jiný zákazník.')
   })
+}
+
+const contactInput = z.object({ slug, customerId: uuid, field: z.enum(['phone', 'email']), value: z.string().trim().min(1).max(254) })
+
+/** Doplnění jednoho kontaktu z detailu nebo souhrnné karty. */
+export async function saveCustomerContact(raw: unknown): Promise<Result<{ value: string; duplicateOf?: { id: string; name: string; contact: string | null } }>> {
+  const p = await prepare(contactInput, raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  const value = input.field === 'phone' ? normalizePhone(input.value) : input.value.toLowerCase()
+  if (input.field === 'phone' && !value) return fail('Telefon nevypadá správně. Zkontrolujte ho prosím.')
+  if (input.field === 'email' && !z.string().email().safeParse(value).success) return fail('E-mail nevypadá správně. Zkontrolujte ho prosím.')
+  return guard('saveCustomerContact', c, async () => {
+    const res = await customers.updateCustomerContact(c.ctx, input.customerId, input.field, value!)
+    if (res.ok) return ok({ value: value! })
+    if (res.reason === 'not_found') return fail(GONE)
+    if (!res.other) return fail('Tenhle telefon nebo e-mail už má jiný zákazník.')
+    return ok({ value: value!, duplicateOf: { ...res.other, contact: value! } })
+  })
+}
+
+/** Výchozí nebo upravené šablony ruční zprávy, načtené až při otevření okna. */
+export async function getCustomerMessageTemplates(raw: unknown): Promise<Result<{ type: CustomerMessageType; subject: string; body: string; enabled: boolean }[]>> {
+  const p = await prepare(z.object({ slug }), raw, { write: false })
+  if (!p.ok) return p
+  try {
+    const data = await getEmailSettings(p.c.ctx, p.c.business)
+    const rows = new Map(data.rows.map((r) => [r.type, r]))
+    return ok(CUSTOMER_MESSAGE_TYPES.map((type) => {
+      const row = rows.get(type)
+      return { type, subject: row?.subject ?? MESSAGES[type].subject, body: row?.body ?? MESSAGES[type].body, enabled: row?.enabled ?? true }
+    }))
+  } catch (e) {
+    console.error('getCustomerMessageTemplates', { accountId: p.c.ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
+    return fail('Šablony se nepodařilo načíst. Zkuste to prosím znovu.')
+  }
+}
+
+const sendCustomerMessageInput = z.object({
+  slug,
+  customerId: uuid,
+  type: z.enum(CUSTOMER_MESSAGE_TYPES),
+  subject: z.string().trim().min(1, '!Napište prosím předmět.').max(150, '!Předmět je moc dlouhý.'),
+  body: z.string().trim().min(1, '!Napište prosím text zprávy.').max(2000, '!Zpráva je moc dlouhá.'),
+})
+
+/** Připraví ruční e-mail; při vypnutém Resendu bezpečně vrátí odkaz mailto. */
+export async function sendCustomerMessage(raw: unknown): Promise<Result<{ mode: 'queued'; id: string; dedupeKey: string } | { mode: 'mailto'; href: string }>> {
+  const p = await prepare(sendCustomerMessageInput, raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  try {
+    const res = await sendCustomerMessageData(c.ctx, c.business, input)
+    if (res.status === 'mailto') return ok({ mode: 'mailto', href: res.href })
+    if (res.status === 'queued') {
+      await deliver(c.ctx)
+      return ok({ mode: 'queued', id: res.id, dedupeKey: res.dedupeKey })
+    }
+    const errors = {
+      no_consent: 'Tahle nabídka vyžaduje souhlas zákazníka.',
+      unsubscribed: 'Zákazník se odhlásil z e-mailů.',
+      gone: GONE,
+      off: 'Tuto šablonu máte vypnutou v Nastavení.',
+      read_only: 'Předplatné je pozastavené, e-maily zákazníkům teď neodcházejí.',
+      limited: 'Dnes už jste poslali hodně zpráv. Zkuste to prosím později.',
+    } satisfies Record<Exclude<typeof res.status, 'queued' | 'mailto'>, string>
+    return fail(errors[res.status])
+  } catch (e) {
+    console.error('sendCustomerMessage', { accountId: c.ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
+    return fail('E-mail se nepodařilo připravit. Zkuste to prosím znovu.')
+  }
+}
+
+/** „Zpět“ po ruční zprávě. Zruší se jen zpráva, která stále čeká ve frontě. */
+export async function undoCustomerMessage(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(z.object({ slug, customerId: uuid, id: uuid }), raw, { write: false })
+  if (!p.ok) return p
+  const { input, c } = p
+  try {
+    return await cancelQueuedCustomerMessage(c.ctx, c.business.id, input.customerId, input.id)
+      ? ok(null)
+      : fail('E-mail už odešel a vrátit ho nejde.')
+  } catch (e) {
+    console.error('undoCustomerMessage', { accountId: c.ctx.accountId, error: e instanceof Error ? e.message : 'unknown' })
+    return fail('E-mail se nepodařilo vrátit. Zkuste to prosím znovu.')
+  }
 }
 
 export async function setContactConsent(raw: unknown): Promise<Result<null>> {

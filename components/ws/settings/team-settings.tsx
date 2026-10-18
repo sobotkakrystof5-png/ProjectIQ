@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -12,6 +13,7 @@ import { summarizeWeek, type Week } from '@/lib/ws/hours'
 import { cn } from '@/lib/ws/utils'
 import { SortableList } from './sortable-list'
 import { WeekHoursEditor } from './week-hours-editor'
+import { STAFF_COLOR_OPTIONS } from '@/lib/ws/staff-colors'
 
 const copyWeek = (week: Week): Week => week.map((d) => d.map((r) => ({ ...r })))
 const same = (a: Week, b: Week) => JSON.stringify(a) === JSON.stringify(b)
@@ -36,7 +38,7 @@ export function BusinessHoursForm({ slug, week, readOnly }: { slug: string; week
 
 // --- Pracovníci a směny --------------------------------------------------------
 
-export type StaffItem = { id: string; name: string; active: boolean; shifts: Week | null }
+export type StaffItem = { id: string; name: string; color: string | null; active: boolean; shifts: Week | null }
 
 export function StaffSettings({ slug, staff, businessWeek, readOnly }: { slug: string; staff: StaffItem[]; businessWeek: Week; readOnly: boolean }) {
   const { run, pending } = useWsAction()
@@ -53,7 +55,7 @@ export function StaffSettings({ slug, staff, businessWeek, readOnly }: { slug: s
       <p className="mt-0.5 text-sm text-quiet">Kdo bere termíny. Se dvěma a více uvidíte v kalendáři sloupec pro každého. Pořadí změníte přetažením.</p>
     </div>
     {staff.length ? <SortableList slug={slug} kind="staff" items={staff} nameOf={(s) => s.name} disabled={readOnly} itemClassName="rounded-box border bg-surface">
-      {(s, handle) => <StaffRow slug={slug} staff={s} handle={handle} businessWeek={businessWeek} readOnly={readOnly} expanded={open === s.id} onToggle={() => setOpen(open === s.id ? null : s.id)} />}
+      {(s, handle) => <StaffRow slug={slug} staff={s} handle={handle} businessWeek={businessWeek} readOnly={readOnly} showColor={staff.filter((x) => x.active).length > 1} expanded={open === s.id} onToggle={() => setOpen(open === s.id ? null : s.id)} />}
     </SortableList> : <p className="text-sm text-quiet">Zatím tu nikdo není. Přidejte sebe nebo kolegyni, ať můžete termíny rozdělit.</p>}
     <fieldset disabled={readOnly || pending} className="flex flex-col gap-2 border-t border-navy-100 pt-4 sm:flex-row">
       <legend className="sr-only">Přidat pracovníka</legend>
@@ -63,9 +65,11 @@ export function StaffSettings({ slug, staff, businessWeek, readOnly }: { slug: s
   </section>
 }
 
-function StaffRow({ slug, staff, handle, businessWeek, readOnly, expanded, onToggle }: { slug: string; staff: StaffItem; handle: ReactNode; businessWeek: Week; readOnly: boolean; expanded: boolean; onToggle: () => void }) {
+function StaffRow({ slug, staff, handle, businessWeek, readOnly, showColor, expanded, onToggle }: { slug: string; staff: StaffItem; handle: ReactNode; businessWeek: Week; readOnly: boolean; showColor: boolean; expanded: boolean; onToggle: () => void }) {
   const { run, pending } = useWsAction()
+  const router = useRouter()
   const [name, setName] = useState(staff.name)
+  const [color, setColor] = useState(staff.color)
   const [own, setOwn] = useState(staff.shifts !== null)
   const [week, setWeek] = useState(() => copyWeek(staff.shifts ?? businessWeek))
   const summary = staff.shifts ? summarizeWeek(staff.shifts) ?? 'Bez směn' : 'Podle otevírací doby'
@@ -87,9 +91,37 @@ function StaffRow({ slug, staff, handle, businessWeek, readOnly, expanded, onTog
         <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} aria-label="Jméno" />
         <Button variant="outline" disabled={!name.trim() || name.trim() === staff.name} onClick={() => void run(() => saveStaffSettings({ slug, id: staff.id, name }), () => toast.success('Jméno je uložené.'))}>Uložit jméno</Button>
       </div>
+      {showColor && <fieldset className="flex flex-col gap-2">
+        <legend className="text-[15px] font-medium text-ink">Barva v kalendáři</legend>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={`Barva pracovníka ${staff.name}`}>
+          <Button type="button" variant="outline" className={`min-h-11 ${color === null ? 'border-navy-500 bg-navy-50' : ''}`} disabled={readOnly || pending} aria-pressed={color === null} onClick={() => {
+            if (color === null) return
+            const previous = color
+            void run(() => saveStaffSettings({ slug, id: staff.id, name: staff.name, color: null }), () => {
+              setColor(null)
+              undoToast('Barva je uložená.', () => saveStaffSettings({ slug, id: staff.id, name: staff.name, color: previous }), { done: 'Předchozí barva je zpátky.', refresh: () => router.refresh() })
+            })
+          }}>Automatická</Button>
+          {STAFF_COLOR_OPTIONS.map((tone) => <button key={tone} type="button" aria-label={`Nastavit barvu ${tone}`} aria-pressed={color?.toLowerCase() === tone} disabled={readOnly || pending} onClick={() => {
+            if (color?.toLowerCase() === tone) return
+            const previous = color
+            void run(() => saveStaffSettings({ slug, id: staff.id, name: staff.name, color: tone }), () => {
+              setColor(tone)
+              undoToast('Barva je uložená.', () => saveStaffSettings({ slug, id: staff.id, name: staff.name, color: previous }), { done: 'Předchozí barva je zpátky.', refresh: () => router.refresh() })
+            })
+          }} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-navy-200 disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: tone }}><span className="sr-only">{tone}</span>{color?.toLowerCase() === tone && <span className="h-3 w-3 rounded-full border-2 border-white" />}</button>)}
+        </div>
+        <p className="text-sm text-quiet">Odliší termíny v kalendáři. Automatická barva se mění podle pořadí pracovníka.</p>
+      </fieldset>}
       <div className="flex min-h-11 items-center justify-between gap-4">
         <label htmlFor={`aktivni-${staff.id}`} className="text-[15px]"><span className="font-medium text-ink">Bere nové termíny</span><span className="block text-sm text-quiet">Vypnutím ho schováte z nabídky. Dřívější termíny zůstanou.</span></label>
-        <Switch id={`aktivni-${staff.id}`} checked={staff.active} onCheckedChange={(active) => void run(() => changeStaffActive({ slug, id: staff.id, active }), () => toast.success(active ? `${staff.name} zase bere termíny.` : `${staff.name} je schovaný. Dřívější termíny zůstaly.`))} />
+        <Switch id={`aktivni-${staff.id}`} checked={staff.active} disabled={readOnly || pending} onCheckedChange={(active) => void run(
+          () => changeStaffActive({ slug, id: staff.id, active }),
+          () => undoToast(active ? `${staff.name} zase bere termíny.` : `${staff.name} je schovaný. Dřívější termíny zůstaly.`, () => changeStaffActive({ slug, id: staff.id, active: staff.active }), {
+            done: staff.active ? `${staff.name} zase bere termíny.` : `${staff.name} je schovaný.`,
+            refresh: () => router.refresh(),
+          }),
+        )} />
       </div>
       <div role="radiogroup" aria-label="Kdy pracuje" className="flex flex-col gap-1">
         <p className="text-[15px] font-medium text-ink">Kdy pracuje</p>

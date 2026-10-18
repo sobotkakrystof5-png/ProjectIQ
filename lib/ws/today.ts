@@ -177,7 +177,15 @@ export async function getTodayData(
       SELECT
         EXISTS (SELECT 1 FROM ws.requests WHERE account_id = ${accountId} AND business_id = ${businessId} AND NOT is_test) AS has_requests,
         EXISTS (SELECT 1 FROM ws.appointments WHERE account_id = ${accountId} AND business_id = ${businessId}) AS has_appointments,
-        EXISTS (SELECT 1 FROM ws.customers WHERE account_id = ${accountId}) AS has_customers
+        EXISTS (
+          SELECT 1 FROM ws.customers c
+          WHERE c.account_id = ${accountId} AND (
+            EXISTS (SELECT 1 FROM ws.requests r WHERE r.account_id = c.account_id AND r.business_id = ${businessId} AND r.customer_id = c.id AND NOT r.is_test)
+            OR EXISTS (SELECT 1 FROM ws.appointments a WHERE a.account_id = c.account_id AND a.business_id = ${businessId} AND a.customer_id = c.id)
+            OR EXISTS (SELECT 1 FROM ws.jobs j WHERE j.account_id = c.account_id AND j.business_id = ${businessId} AND j.customer_id = c.id)
+            OR EXISTS (SELECT 1 FROM ws.customer_segments s WHERE s.account_id = c.account_id AND s.business_id = ${businessId} AND s.customer_id = c.id)
+          )
+        ) AS has_customers
     `,
     q`
       SELECT name FROM ws.services
@@ -305,6 +313,9 @@ export type CustomerCard = {
   name: string
   phone: string | null
   email: string | null
+  consent: boolean
+  unsubscribed: boolean
+  ended: boolean
   note: string | null
   created_at: Date
   segment: SegmentKey | null
@@ -325,7 +336,7 @@ export async function getCustomerCard(
   const businessId = business.id
   const [customer, segment, visits, next, loyalty] = await wsDb(ctx).batch([
     q`
-      SELECT id, name, phone, email, note, created_at FROM ws.customers
+      SELECT id, name, phone, email, note, created_at, contact_consent_at, unsubscribed_at, ended_at FROM ws.customers
       WHERE account_id = ${accountId} AND id = ${customerId}
     `,
     q`
@@ -369,6 +380,9 @@ export async function getCustomerCard(
     name: String(c.name),
     phone: (c.phone as string | null) ?? null,
     email: (c.email as string | null) ?? null,
+    consent: c.contact_consent_at !== null && c.contact_consent_at !== undefined,
+    unsubscribed: c.unsubscribed_at !== null && c.unsubscribed_at !== undefined,
+    ended: c.ended_at !== null && c.ended_at !== undefined,
     note: (c.note as string | null) ?? null,
     created_at: c.created_at as Date,
     segment: ((segment as Row[])[0]?.segment as SegmentKey | undefined) ?? null,

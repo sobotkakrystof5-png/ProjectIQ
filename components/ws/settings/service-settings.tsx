@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
-import { useWsAction } from '@/components/ws/app/booking/use-ws-action'
+import { undoToast, useWsAction } from '@/components/ws/app/booking/use-ws-action'
 import { hideService, saveServiceSettings } from '@/app/w/[business]/nastaveni/actions'
 import { hasWholeMinor } from '@/lib/ws/money'
 import { cn } from '@/lib/ws/utils'
@@ -56,6 +57,7 @@ export function ServiceSettings({ slug, services, staff, serviceStaff, readOnly 
 
 function ServiceRow({ slug, service: s, handle, staff, assigned, readOnly, expanded, onToggle }: { slug: string; service: Service; handle: ReactNode; staff: Staff[]; assigned: string[]; readOnly: boolean; expanded: boolean; onToggle: () => void }) {
   const { run, pending } = useWsAction()
+  const router = useRouter()
   const [draft, setDraft] = useState<Draft>({ name: s.name, duration: String(s.duration_min), price: s.price === null ? '' : formatPrice(s.price).replace(/\s/g, ''), buffer: String(s.buffer_min), showOnWeb: s.show_on_web, staffIds: assigned })
   const who = staff.length > 1 && assigned.length ? staff.filter((x) => assigned.includes(x.id)).map((x) => x.name).join(', ') : null
   const save = () => {
@@ -71,7 +73,13 @@ function ServiceRow({ slug, service: s, handle, staff, assigned, readOnly, expan
         <p className="text-sm text-quiet"><span className="font-num">{s.duration_min} min{s.buffer_min ? ` + ${s.buffer_min} min rozestup` : ''}{s.price !== null ? ` · ${formatPrice(s.price)} ${s.currency === 'CZK' ? 'Kč' : s.currency}` : ''}</span>{!s.show_on_web ? ' · jen uvnitř aplikace' : ''}{who ? ` · dělá ${who}` : ''}</p>
       </div>
       <Button variant="ghost" aria-expanded={expanded} onClick={onToggle}>{expanded ? 'Zavřít' : 'Upravit'}</Button>
-      <Switch checked={s.active} disabled={readOnly || pending} aria-label={s.active ? `Skrýt službu ${s.name}` : `Znovu nabízet službu ${s.name}`} onCheckedChange={(active) => void run(() => hideService({ slug, id: s.id, active }), () => toast.success(active ? 'Služba je znovu vidět.' : 'Služba je skrytá. Dřívější termíny zůstaly uložené.'))} />
+      <Switch checked={s.active} disabled={readOnly || pending} aria-label={s.active ? `Skrýt službu ${s.name}` : `Znovu nabízet službu ${s.name}`} onCheckedChange={(active) => void run(
+        () => hideService({ slug, id: s.id, active }),
+        () => undoToast(active ? 'Služba je znovu vidět.' : 'Služba je skrytá. Dřívější termíny zůstaly uložené.', () => hideService({ slug, id: s.id, active: s.active }), {
+          done: s.active ? 'Služba je znovu vidět.' : 'Služba je skrytá.',
+          refresh: () => router.refresh(),
+        }),
+      )} />
     </div>
     {expanded && <fieldset disabled={readOnly || pending} className="flex flex-col gap-4 border-t border-navy-100 px-5 py-4">
       <legend className="sr-only">Upravit službu {s.name}</legend>

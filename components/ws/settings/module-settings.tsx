@@ -1,9 +1,8 @@
 'use client'
 
 import { Switch } from '@/components/ui/switch'
-import { toast } from '@/components/ui/toast'
-import { useWsAction } from '@/components/ws/app/booking/use-ws-action'
-import { changeModule } from '@/app/w/[business]/nastaveni/actions'
+import { useWsUndoAction } from '@/components/ws/app/booking/use-ws-action'
+import { changeModule, restoreModuleSettings } from '@/app/w/[business]/nastaveni/actions'
 import type { WsModule } from '@/lib/ws/templates/types'
 import type { PortalRules } from '@/lib/ws/portal-rules'
 import { PortalRulesForm } from './portal-rules-form'
@@ -13,14 +12,19 @@ const MODULE_DETAILS: Record<WsModule, { label: string; text: string; needs?: Ws
 }
 
 export function ModuleSettings({ slug, modules, readOnly, portalRules }: { slug: string; modules: { module: WsModule; enabled: boolean }[]; readOnly: boolean; portalRules: PortalRules }) {
-  const { run, pending } = useWsAction()
+  const { run, pending } = useWsUndoAction()
   return <ul className="flex flex-col gap-3">
     {modules.map(({ module, enabled }) => {
       const detail = MODULE_DETAILS[module]
       const always = module === 'requests' || module === 'customers'
       return <li key={module} className="flex flex-col gap-4 rounded-panel border bg-surface px-5 py-4"><div className="flex min-h-[44px] items-center justify-between gap-5">
         <div><h2 className="text-[16px] font-semibold text-ink">{detail.label}</h2><p className="mt-0.5 text-sm text-quiet">{detail.text}{detail.needs ? ` Potřebuje zapnuté: ${MODULE_DETAILS[detail.needs].label}.` : ''}</p></div>
-        <Switch checked={enabled} disabled={always || readOnly || pending} aria-label={detail.label} onCheckedChange={(next) => void run(() => changeModule({ slug, module, enabled: next }), () => toast.success(next ? 'Funkce je zapnutá.' : 'Funkce je skrytá. Data zůstala uložená.'))} />
+        <Switch checked={enabled} disabled={always || readOnly || pending} aria-label={detail.label} onCheckedChange={(next) => void run(
+          () => changeModule({ slug, module, enabled: next }),
+          () => restoreModuleSettings({ slug, modules }),
+          next ? 'Funkce je zapnutá.' : 'Funkce je skrytá. Data zůstala uložená.',
+          'Předchozí nastavení je zpátky.',
+        )} />
       </div>
       {module === 'portal' && enabled && <PortalRulesForm slug={slug} rules={portalRules} readOnly={readOnly} />}
       </li>

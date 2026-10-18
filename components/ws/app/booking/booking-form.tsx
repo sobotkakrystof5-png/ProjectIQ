@@ -63,6 +63,10 @@ export function BookingForm({
       toast.error('Vyplňte prosím jméno, den a čas.')
       return
     }
+    if (!customer && !phone.trim() && !email.trim()) {
+      toast.error('Zadejte prosím telefon nebo e-mail.')
+      return
+    }
     void run(
       () =>
         createManualBooking({
@@ -110,11 +114,11 @@ export function BookingForm({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="rez-telefon">Telefon (nepovinné)</Label>
+              <Label htmlFor="rez-telefon">Telefon</Label>
               <Input id="rez-telefon" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} className="font-num" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="rez-email">E-mail (nepovinné)</Label>
+              <Label htmlFor="rez-email">E-mail</Label>
               <Input id="rez-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} />
             </div>
           </div>
@@ -146,7 +150,7 @@ export function BookingForm({
           className="w-full rounded-chip border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink transition-colors focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         />
       </div>
-      {!customer && <p className="text-sm text-quiet">Podle telefonu nebo e-mailu poznáme stálého zákazníka. Jinak ho založíme.</p>}
+      {!customer && <p className="text-sm text-quiet">Vyplňte alespoň telefon nebo e-mail. Podle kontaktu poznáme stálého zákazníka, jinak ho založíme.</p>}
       <div>
         <Button type="submit" disabled={pending}>
           Uložit rezervaci

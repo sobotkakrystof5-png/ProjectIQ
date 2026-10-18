@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Mail, Phone } from 'lucide-react'
 import { LoyaltyCard, Money, SectionLabel, TimeRange } from '@/components/ws/brand'
 import { formatPhone } from '@/components/ws/app/customer-summary'
 import type { CustomerDetail as Detail } from '@/lib/ws/customers'
@@ -8,6 +7,7 @@ import type { WsCurrency } from '@/lib/ws/money'
 import { plural } from '@/lib/ws/plural'
 import { formatDayShort, formatRelativeDay, pragueParts } from '@/lib/ws/time'
 import { ConsentSwitch, CustomerEditForm, EndCustomer, EraseCustomer, LoyaltyControls, MergeBox } from './customer-controls'
+import { CustomerContactActions } from './customer-contact-actions'
 import { SegmentBadge } from './segment-badge'
 
 const STATUS: Record<string, string> = {
@@ -71,25 +71,37 @@ export function CustomerDetail({
           <h3 className="min-w-0 text-xl font-semibold tracking-[-0.02em]">{c.name}</h3>
           <SegmentBadge segment={c.segment} />
         </div>
-        <ul className="flex flex-col gap-0.5 text-[15px]">
-          {c.phone && (
-            <li>
-              <a href={`tel:${c.phone}`} className="inline-flex min-h-9 items-center gap-2 text-ink underline-offset-4 hover:underline">
-                <Phone aria-hidden size={16} strokeWidth={1.5} className="text-quiet" />
-                <span className="font-num text-sm">{formatPhone(c.phone)}</span>
-              </a>
-            </li>
-          )}
-          {c.email && (
-            <li>
-              <a href={`mailto:${c.email}`} className="inline-flex min-h-9 max-w-full items-center gap-2 text-ink underline-offset-4 hover:underline">
-                <Mail aria-hidden size={16} strokeWidth={1.5} className="shrink-0 text-quiet" />
-                <span className="truncate">{c.email}</span>
-              </a>
-            </li>
-          )}
-        </ul>
+        <CustomerContactActions
+          slug={slug}
+          customerId={c.id}
+          customerName={c.name}
+          businessName={businessName}
+          phone={c.phone}
+          email={c.email}
+          consent={c.consent}
+          unsubscribed={c.unsubscribed}
+          ended={c.ended}
+          context={{ nextVisit: c.nextVisit?.start.toISOString() ?? null, service: c.nextVisit?.service ?? null, job: c.history.find((item) => item.kind === 'job')?.title ?? null }}
+        />
       </div>
+
+      {c.messages.length > 0 && <section aria-labelledby={`zpravy-${c.id}`} className="flex flex-col gap-2">
+        <h4 id={`zpravy-${c.id}`}><SectionLabel>Poslední e-maily</SectionLabel></h4>
+        <ul className="flex flex-col divide-y rounded-chip border px-3">
+          {c.messages.map((message) => <li key={message.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+            <span className="min-w-0 truncate text-ink">{message.subject ?? 'E-mail zákazníkovi'}</span>
+            <span className="shrink-0 font-num text-xs text-quiet">
+              {message.status === 'sent'
+                ? `Odesláno ${message.sentAt ? formatDayShort(pragueParts(message.sentAt).date) : ''}`
+                : message.status === 'queued' || message.status === 'sending'
+                  ? 'Čeká na odeslání'
+                  : message.status === 'cancelled'
+                    ? 'Vráceno'
+                    : 'Nepodařilo se odeslat'}
+            </span>
+          </li>)}
+        </ul>
+      </section>}
 
       {invoiceHref&&<Link href={invoiceHref} scroll={false} className="inline-flex min-h-11 items-center justify-center self-start rounded-full border px-5 text-sm font-semibold text-ink hover:bg-accent">Vystavit fakturu</Link>}
 

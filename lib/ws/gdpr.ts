@@ -129,6 +129,15 @@ function sheets(a: string): Sheet[] {
       row: (r) => ['id', 'name', 'phone', 'email', 'birthday', 'note', 'contact_consent_at', 'unsubscribed_at', 'ended_at', 'ended_reason', 'created_at'].map((k) => v(r, k)),
     },
     {
+      file: 'zpravy-zakazniku.csv',
+      header: ['id', 'byznys', 'zakaznik_id', 'typ', 'email', 'predmet', 'stav', 'odeslano', 'vytvoreno'],
+      query: q`SELECT m.id, ${biz('m')} AS biz, m.customer_id, m.type, m.to_address, m.subject, m.status, m.sent_at, m.created_at
+        FROM ws.outbound_messages m
+        WHERE m.account_id = ${a} AND m.type IN ('customer_thanks', 'customer_booking', 'customer_offer', 'customer_job', 'customer_custom')
+        ORDER BY m.created_at`,
+      row: (r) => ['id', 'biz', 'customer_id', 'type', 'to_address', 'subject', 'status', 'sent_at', 'created_at'].map((k) => v(r, k)),
+    },
+    {
       file: 'poptavky.csv',
       header: ['id', 'byznys', 'prijato', 'stav', 'zdroj', 'zakaznik_id', 'jmeno', 'telefon', 'email', 'sluzba', 'chteny_zacatek', 'chteny_konec', 'zprava', 'kolonky', 'zkusebni'],
       query: {
