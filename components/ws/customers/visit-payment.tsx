@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from '@/components/ui/toast'
-import { completeVisit, stampVisit } from '@/app/w/[business]/zakaznici/actions'
-import { useWsAction } from '@/components/ws/app/booking/use-ws-action'
+import { completeVisit, stampVisit, undoCustomerStamp } from '@/app/w/[business]/zakaznici/actions'
+import { undoToast, useWsAction } from '@/components/ws/app/booking/use-ws-action'
 import { formatMoney, type WsCurrency } from '@/lib/ws/money'
 import { cn } from '@/lib/ws/utils'
 
@@ -49,6 +50,7 @@ export function VisitPayment({
   }
 }) {
   const { run, pending } = useWsAction()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState(state.servicePrice !== null ? String(state.servicePrice).replace('.', ',') : '')
   const [method, setMethod] = useState<Method>('cash')
@@ -73,7 +75,17 @@ export function VisitPayment({
           <Button
             variant="outline"
             disabled={pending}
-            onClick={() => void run(() => stampVisit({ slug, appointmentId }), (r) => toast.success(r.message))}
+            onClick={() =>
+              void run(
+                () => stampVisit({ slug, appointmentId }),
+                (r) =>
+                  undoToast(
+                    r.message,
+                    () => undoCustomerStamp({ slug, eventId: r.undoEventId, expectedStamps: r.expectedStamps, appointmentId: r.appointmentId }),
+                    { done: 'Razítko vráceno.', refresh: () => router.refresh() },
+                  ),
+              )
+            }
           >
             Dát razítko
           </Button>

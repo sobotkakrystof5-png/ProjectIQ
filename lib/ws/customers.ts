@@ -189,7 +189,7 @@ export type CustomerDetail = {
   nextVisit: { id: string; start: Date; end: Date; service: string | null } | null
   spend: { currency: string; amount: number }[]
   history: HistoryItem[]
-  loyalty: { enabled: boolean; stamps: number; needed: number; full: boolean; reward: string } | null
+  loyalty: { enabled: boolean; stamps: number; needed: number; status: 'active' | 'full' | 'redeemed' | 'empty'; full: boolean; reward: string } | null
   /** Zákazníci se stejným jménem — kandidáti na sloučení. */
   duplicates: { id: string; name: string; phone: string | null; email: string | null }[]
 }
@@ -240,8 +240,13 @@ export async function getCustomerDetail(ctx: WsContext, business: Biz, customerI
     q`
       SELECT p.enabled, p.stamps_needed, p.reward_text, c.stamps, c.status
       FROM ws.loyalty_programs p
-      LEFT JOIN ws.loyalty_cards c ON c.account_id = p.account_id AND c.program_id = p.id AND c.customer_id = ${customerId}
-        AND c.status IN ('active', 'full')
+      LEFT JOIN LATERAL (
+        SELECT lc.stamps, lc.status FROM ws.loyalty_cards lc
+        WHERE lc.account_id = p.account_id AND lc.program_id = p.id AND lc.customer_id = ${customerId}
+          AND lc.status IN ('active', 'full', 'redeemed')
+        ORDER BY CASE WHEN lc.status IN ('active', 'full') THEN 0 ELSE 1 END, lc.created_at DESC
+        LIMIT 1
+      ) c ON true
       WHERE p.account_id = ${acc} AND p.business_id = ${biz}
     `,
     q`
@@ -295,6 +300,7 @@ export async function getCustomerDetail(ctx: WsContext, business: Biz, customerI
             enabled: true,
             stamps: Number(l.stamps ?? 0),
             needed: Number(l.stamps_needed),
+            status: (l.status as 'active' | 'full' | 'redeemed' | null) ?? 'empty',
             full: l.status === 'full',
             reward: String(l.reward_text ?? ''),
           }

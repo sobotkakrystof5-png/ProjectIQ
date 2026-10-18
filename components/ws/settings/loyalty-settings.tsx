@@ -15,9 +15,9 @@ import type { LoyaltyCounts, LoyaltyProgram } from '@/lib/ws/loyalty'
 import { cn } from '@/lib/ws/utils'
 
 const COUNTS: { key: LoyaltyCounts; label: string; help: string }[] = [
-  { key: 'visit_paid', label: 'Zaplacená návštěva', help: 'Razítko, když u termínu dáte Hotovo, zaplaceno.' },
-  { key: 'job_done', label: 'Dokončená zakázka', help: 'Razítko, když zakázku přesunete mezi hotové.' },
-  { key: 'amount', label: 'Útrata', help: 'Jedno razítko za každou celou částku, kterou zákazník zaplatí.' },
+  { key: 'visit_paid', label: 'Zaplacená návštěva', help: 'Razítko se přidá po zaplacení návštěvy.' },
+  { key: 'job_done', label: 'Dokončená zakázka', help: 'Razítko se přidá po dokončení zakázky.' },
+  { key: 'amount', label: 'Útrata', help: 'Razítka se přidávají podle zaplacené částky.' },
 ]
 
 const num = (v: number | null) => (v === null ? '' : String(v).replace('.', ','))
@@ -26,12 +26,14 @@ const num = (v: number | null) => (v === null ? '' : String(v).replace('.', ',')
 export function LoyaltySettings({
   slug,
   businessName,
+  businessColor,
   program,
   services,
   readOnly,
 }: {
   slug: string
   businessName: string
+  businessColor: string | null
   program: LoyaltyProgram
   services: { id: string; name: string }[]
   readOnly: boolean
@@ -101,102 +103,106 @@ export function LoyaltySettings({
         <div className={cn('flex flex-col gap-6 rounded-panel border bg-surface p-5', !enabled && 'opacity-60')}>
           <div className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="vernost-pocet">Razítek do odměny</Label>
+              <Label htmlFor="vernost-pocet">Kolik razítek do odměny?</Label>
               <Input id="vernost-pocet" inputMode="numeric" value={needed} onChange={(e) => setNeeded(e.target.value)} maxLength={2} className="font-num" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="vernost-odmena">Odměna</Label>
+              <Label htmlFor="vernost-odmena">Jaká je odměna?</Label>
               <Input id="vernost-odmena" value={reward} onChange={(e) => setReward(e.target.value)} maxLength={120} placeholder="Například střih zdarma" />
             </div>
           </div>
 
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-medium text-ink">Za co je razítko</legend>
-            <div className="flex flex-wrap gap-2">
-              {COUNTS.map((c) => (
-                <button
-                  key={c.key}
-                  type="button"
-                  aria-pressed={counts === c.key}
-                  onClick={() => setCounts(c.key)}
-                  className={cn(
-                    'inline-flex min-h-11 items-center rounded-full px-4 text-[15px] font-semibold transition-colors',
-                    counts === c.key ? 'bg-navy-700 text-white' : 'bg-navy-50 text-navy-900 hover:bg-navy-100 dark:bg-navy-900 dark:text-navy-100',
-                  )}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-sm text-quiet">{COUNTS.find((c) => c.key === counts)?.help}</p>
-          </fieldset>
+          <p className="text-sm text-quiet">{COUNTS.find((c) => c.key === counts)?.help}</p>
 
-          {counts === 'amount' && (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="vernost-castka">Jedno razítko za každých (Kč)</Label>
-              <Input id="vernost-castka" inputMode="decimal" value={perStamp} onChange={(e) => setPerStamp(e.target.value)} maxLength={10} className="font-num sm:max-w-[200px]" />
-            </div>
-          )}
+          <details className="rounded-box border px-4 py-2">
+            <summary className="flex min-h-11 cursor-pointer items-center font-medium text-ink">Pokročilé</summary>
+            <div className="flex flex-col gap-6 pb-3 pt-2">
+              <fieldset className="flex flex-col gap-2">
+                <legend className="mb-1 text-sm font-medium text-ink">Za co je razítko</legend>
+                <div className="flex flex-wrap gap-2">
+                  {COUNTS.map((c) => (
+                    <button
+                      key={c.key}
+                      type="button"
+                      aria-pressed={counts === c.key}
+                      onClick={() => setCounts(c.key)}
+                      className={cn(
+                        'inline-flex min-h-11 items-center rounded-full px-4 text-[15px] font-semibold transition-colors',
+                        counts === c.key ? 'bg-navy-700 text-white' : 'bg-navy-50 text-navy-900 hover:bg-navy-100 dark:bg-navy-900 dark:text-navy-100',
+                      )}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-sm text-quiet">{COUNTS.find((c) => c.key === counts)?.help}</p>
+              </fieldset>
 
-          {counts !== 'job_done' && services.length > 0 && (
-            <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 text-sm font-medium text-ink">Jen za tyhle služby</legend>
-              <p className="-mt-1 text-sm text-quiet">Když nevyberete nic, počítá se každá služba.</p>
-              <ul className="grid gap-1 sm:grid-cols-2">
-                {services.map((s) => (
-                  <li key={s.id} className="flex min-h-11 items-center gap-3">
-                    <Checkbox id={`sluzba-${s.id}`} checked={onlyServices.includes(s.id)} onCheckedChange={(v) => toggleService(s.id, v === true)} />
-                    <Label htmlFor={`sluzba-${s.id}`} className="font-normal">
-                      {s.name}
-                    </Label>
-                  </li>
-                ))}
-              </ul>
-            </fieldset>
-          )}
+              {counts === 'amount' && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="vernost-castka">Jedno razítko za každých (Kč)</Label>
+                  <Input id="vernost-castka" inputMode="decimal" value={perStamp} onChange={(e) => setPerStamp(e.target.value)} maxLength={10} className="font-num sm:max-w-[200px]" />
+                </div>
+              )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="vernost-minimum">Minimální útrata (Kč, nepovinné)</Label>
-              <Input id="vernost-minimum" inputMode="decimal" value={minSpend} onChange={(e) => setMinSpend(e.target.value)} maxLength={10} className="font-num" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="vernost-platnost">Platnost karty v měsících (nepovinné)</Label>
-              <Input
-                id="vernost-platnost"
-                inputMode="numeric"
-                value={validity}
-                onChange={(e) => setValidity(e.target.value)}
-                maxLength={3}
-                placeholder="Bez omezení"
-                className="font-num"
-              />
-            </div>
-          </div>
+              {counts !== 'job_done' && services.length > 0 && (
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="mb-1 text-sm font-medium text-ink">Jen za tyhle služby</legend>
+                  <p className="-mt-1 text-sm text-quiet">Když nevyberete nic, počítá se každá služba.</p>
+                  <ul className="grid gap-1 sm:grid-cols-2">
+                    {services.map((s) => (
+                      <li key={s.id} className="flex min-h-11 items-center gap-3">
+                        <Checkbox id={`sluzba-${s.id}`} checked={onlyServices.includes(s.id)} onCheckedChange={(v) => toggleService(s.id, v === true)} />
+                        <Label htmlFor={`sluzba-${s.id}`} className="font-normal">
+                          {s.name}
+                        </Label>
+                      </li>
+                    ))}
+                  </ul>
+                </fieldset>
+              )}
 
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="vernost-den">Nejvýš 1 razítko za den</Label>
-              <p className="text-sm text-quiet">Dvě návštěvy v jeden den dají jedno razítko.</p>
-            </div>
-            <Switch id="vernost-den" checked={onePerDay} onCheckedChange={setOnePerDay} />
-          </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="vernost-minimum">Minimální útrata (Kč, nepovinné)</Label>
+                  <Input id="vernost-minimum" inputMode="decimal" value={minSpend} onChange={(e) => setMinSpend(e.target.value)} maxLength={10} className="font-num" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="vernost-platnost">Platnost karty v měsících (nepovinné)</Label>
+                  <Input
+                    id="vernost-platnost"
+                    inputMode="numeric"
+                    value={validity}
+                    onChange={(e) => setValidity(e.target.value)}
+                    maxLength={3}
+                    placeholder="Bez omezení"
+                    className="font-num"
+                  />
+                </div>
+              </div>
 
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="vernost-auto">Razítko automaticky</Label>
-              <p className="text-sm text-quiet">
-                {auto ? 'Razítko přibude samo po zaplacení.' : 'Razítko dáte ručně tlačítkem u zaplaceného termínu.'}
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="vernost-den">Nejvýš 1 razítko za den</Label>
+                  <p className="text-sm text-quiet">Dvě návštěvy v jeden den dají jedno razítko.</p>
+                </div>
+                <Switch id="vernost-den" checked={onePerDay} onCheckedChange={setOnePerDay} />
+              </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="vernost-auto">Razítko automaticky</Label>
+                  <p className="text-sm text-quiet">
+                    {auto ? 'Razítko přibude samo po zaplacení.' : 'Razítko dáte ručně tlačítkem u zaplaceného termínu.'}
+                  </p>
+                </div>
+                <Switch id="vernost-auto" checked={auto} onCheckedChange={setAuto} />
+              </div>
             </div>
-            <Switch id="vernost-auto" checked={auto} onCheckedChange={setAuto} />
-          </div>
+          </details>
         </div>
 
-        <p className="text-sm text-quiet">
-          Odměna se nabídne při placení další návštěvy. Po uplatnění začne nová karta. Razítko jde přidat nebo odebrat i ručně v kartě
-          zákazníka, vždy s důvodem.
-        </p>
+        <p className="text-sm text-quiet">Po uplatnění odměny začne nová karta. Ruční razítko můžete hned vrátit tlačítkem Zpět.</p>
 
         {!readOnly && (
           <div>
@@ -209,7 +215,14 @@ export function LoyaltySettings({
 
       <div className="flex flex-col gap-2 lg:sticky lg:top-6 lg:self-start">
         <p className="font-num text-[11px] uppercase tracking-[0.08em] text-quiet">Náhled</p>
-        <LoyaltyCard customer="Tereza" business={businessName} stamps={Math.max(0, neededNum - 1)} total={neededNum} reward={reward || 'odměna'} />
+        <LoyaltyCard
+          customer="Váš zákazník"
+          business={businessName}
+          stamps={0}
+          total={neededNum}
+          reward={reward || 'odměna'}
+          accentColor={businessColor}
+        />
       </div>
     </form>
   )

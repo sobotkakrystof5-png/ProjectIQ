@@ -4,14 +4,20 @@ import { setWsDriverForTests } from '../db'
 import type { WsContext } from '../context'
 import {
   adjustStamps,
+  addManualStamp,
   completeVisit,
   DEFAULT_PROGRAM,
   expireCards,
   getVisitPayment,
+  getLoyaltyProgram,
   redeemReward,
+  redeemRewardWithEvent,
+  saveLoyaltyProgram,
   stampJob,
   stampsForPayment,
   stampVisitManually,
+  undoReward,
+  undoStamp,
   type LoyaltyProgram,
 } from '../loyalty'
 import { createWsTestDb, ids, pgliteDriver } from './helpers/ws-pglite'
@@ -377,6 +383,41 @@ describe('pravidla razítek', () => {
 })
 
 describe('ruční úprava a odměna', () => {
+  it('jedno ruční razítko uloží datum a poznámku a jde vrátit', async () => {
+    const who = await fresh()
+    const added = await addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-17', reason: 'Zapomenuté razítko' })
+    expect(added).toMatchObject({ stamp: { result: 'added', stamps: 1 }, eventId: expect.any(String) })
+    const event = await one<{ for_day: string; reason: string }>(
+      `SELECT for_day::text, reason FROM ws.loyalty_events WHERE id = $1`,
+      [added?.eventId],
+    )
+    expect(event).toEqual({ for_day: '2026-10-17', reason: 'Zapomenuté razítko' })
+    expect(await undoStamp(ctxA, bizA, { eventId: added!.eventId!, expectedStamps: 1 })).toBe(true)
+    expect(await undoStamp(ctxA, bizA, { eventId: added!.eventId!, expectedStamps: 1 })).toBe(false)
+    expect(await card(who.customer)).toMatchObject({ stamps: 0, status: 'active' })
+  })
+
+  it('souběžná ruční razítka se sečtou bez ztráty', async () => {
+    const who = await fresh()
+    const [first, second] = await Promise.all([
+      addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-18' }),
+      addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-18' }),
+    ])
+    expect(first?.stamp?.result).toBe('added')
+    expect(second?.stamp?.result).toBe('added')
+    expect(first?.eventId).not.toBe(second?.eventId)
+    expect(await card(who.customer)).toMatchObject({ stamps: 2, status: 'active' })
+  })
+
+  it('Zpět odmítne starší razítko, když se karta mezitím změnila', async () => {
+    const who = await fresh()
+    const first = await addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-18' })
+    const second = await addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-18' })
+    expect(await undoStamp(ctxA, bizA, { eventId: first!.eventId!, expectedStamps: 1 })).toBe(false)
+    expect(await undoStamp(ctxA, bizA, { eventId: second!.eventId!, expectedStamps: 2 })).toBe(true)
+    expect(await card(who.customer)).toMatchObject({ stamps: 1, status: 'active' })
+  })
+
   it('přidat a odebrat razítko s důvodem, záznam v historii', async () => {
     const who = await fresh()
     expect(await adjustStamps(ctxA, bizA, { customerId: who.customer, delta: 1, reason: 'Zapomněli jsme razítko' })).toMatchObject({
@@ -410,6 +451,40 @@ describe('ruční úprava a odměna', () => {
     await adjustStamps(ctxA, bizA, { customerId: who.customer, delta: 1, reason: 'Start' })
     expect(await redeemReward(ctxA, bizA, who.customer)).toBe(true)
     expect(await redeemReward(ctxA, bizA, who.customer)).toBe(false)
+  })
+
+  it('uplatněnou odměnu lze vrátit, dokud nezačne nová karta', async () => {
+    await setProgram({ stamps_needed: 1 })
+    const who = await fresh()
+    await addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-18' })
+    const reward = await redeemRewardWithEvent(ctxA, bizA, who.customer)
+    expect(reward).toMatchObject({ redeemed: true, eventId: expect.any(String), stamps: 1 })
+    expect(await undoReward(ctxA, bizA, reward.eventId!)).toBe(true)
+    expect(await undoReward(ctxA, bizA, reward.eventId!)).toBe(false)
+    expect(await card(who.customer)).toMatchObject({ stamps: 1, status: 'full' })
+  })
+
+  it('odměnu nelze vrátit, když už zákazník začal novou kartu', async () => {
+    await setProgram({ stamps_needed: 1 })
+    const who = await fresh()
+    await addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-18' })
+    const reward = await redeemRewardWithEvent(ctxA, bizA, who.customer)
+    await addManualStamp(ctxA, bizA, { customerId: who.customer, day: '2026-10-18' })
+    expect(await undoReward(ctxA, bizA, reward.eventId!)).toBe(false)
+    expect(await card(who.customer)).toMatchObject({ stamps: 1, status: 'full' })
+  })
+})
+
+describe('uložení jednoduchého nastavení', () => {
+  it('zachová stejné hodnoty programu jako původní datový model', async () => {
+    const program: LoyaltyProgram = {
+      ...DEFAULT_PROGRAM,
+      enabled: true,
+      stampsNeeded: 7,
+      rewardText: 'Zvolená odměna',
+    }
+    await saveLoyaltyProgram(ctxA, bizA, program)
+    expect(await getLoyaltyProgram(ctxA, bizA)).toEqual(program)
   })
 })
 

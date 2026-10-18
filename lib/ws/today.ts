@@ -311,7 +311,7 @@ export type CustomerCard = {
   visits: number
   lastVisit: Date | null
   nextVisit: { start: Date; end: Date; service: string | null } | null
-  loyalty: { stamps: number; needed: number; reward: string; status: string } | null
+  loyalty: { stamps: number; needed: number; reward: string; status: 'active' | 'full' | 'redeemed' | 'empty' } | null
 }
 
 /** Karta zákazníka pro Dnes a pravý panel. Cizí nebo neexistující = null. */
@@ -347,9 +347,13 @@ export async function getCustomerCard(
     q`
       SELECT p.enabled, p.stamps_needed, p.reward_text, c.stamps, c.status
       FROM ws.loyalty_programs p
-      LEFT JOIN ws.loyalty_cards c
-        ON c.account_id = p.account_id AND c.program_id = p.id AND c.customer_id = ${customerId}
-        AND c.status IN ('active', 'full')
+      LEFT JOIN LATERAL (
+        SELECT lc.stamps, lc.status FROM ws.loyalty_cards lc
+        WHERE lc.account_id = p.account_id AND lc.program_id = p.id AND lc.customer_id = ${customerId}
+          AND lc.status IN ('active', 'full', 'redeemed')
+        ORDER BY CASE WHEN lc.status IN ('active', 'full') THEN 0 ELSE 1 END, lc.created_at DESC
+        LIMIT 1
+      ) c ON true
       WHERE p.account_id = ${accountId} AND p.business_id = ${businessId}
     `,
   ])
@@ -379,7 +383,7 @@ export async function getCustomerCard(
             stamps: Number(l.stamps ?? 0),
             needed: Number(l.stamps_needed),
             reward: String(l.reward_text ?? ''),
-            status: String(l.status ?? 'active'),
+            status: (l.status as 'active' | 'full' | 'redeemed' | null) ?? 'empty',
           }
         : null,
   }

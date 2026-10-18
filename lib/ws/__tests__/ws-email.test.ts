@@ -104,6 +104,19 @@ describe('šablony a rozložení', () => {
     expect(safeUrl('data:text/html,x')).toBeNull()
   })
 
+  it('vykreslí uplatněnou kartu jako tabulku se stejným stavem a bez obrázku', () => {
+    const email = renderEmail({
+      brand: { name: 'Kadeřnictví', color: '#23478b' },
+      subject: 'Děkujeme',
+      body: 'Děkujeme za návštěvu.',
+      blocks: [{ kind: 'card', stamps: 5, needed: 5, reward: 'Zvolená odměna', status: 'redeemed' }],
+    })
+    expect(email.html).toContain('Věrnostní karta · 5 z 5 razítek')
+    expect(email.html).toContain('Odměna uplatněna. Začíná nová karta.')
+    expect(email.html).not.toContain('<img')
+    expect(email.text).toContain('Odměna uplatněna. Začíná nová karta.')
+  })
+
   it('náhled v Nastavení skládá stejný e-mail jako odeslaný (jiné jsou jen údaje)', () => {
     const brand = { name: 'Kadeřnictví Lenka', color: null }
     const preview = previewCustomerEmail({ type: 'booking_confirmed', brand, subject: 'Vlastní {termin}', body: 'Dobrý den, {termin}.' })

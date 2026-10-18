@@ -4,6 +4,7 @@
 
 import { fillTemplate, MESSAGES, SAMPLE_VALUES, type MessageType, type TemplateValues } from './catalog'
 import { renderEmail, type EmailBlock, type RenderedEmail } from './layout'
+import type { LoyaltyCardStatus } from '@/lib/ws/loyalty-card-view'
 
 export type CustomerExtras = {
   /** Odkaz „Přidat do kalendáře“ (.ics). */
@@ -11,7 +12,7 @@ export type CustomerExtras = {
   /** Klientský portál (S16): termín nebo zakázka, label podle pravidel byznysu. */
   portal?: { url: string; label: string } | null
   /** Stav věrnostní karty (poděkování, odměna). */
-  card?: { stamps: number; needed: number; reward: string | null } | null
+  card?: { stamps: number; needed: number; reward: string | null; status?: LoyaltyCardStatus } | null
   unsubscribeUrl?: string | null
 }
 
@@ -105,8 +106,8 @@ export function previewCustomerEmail(input: Omit<ComposeInput, 'values' | 'extra
             : null,
       card:
         input.type === 'reward_ready'
-          ? { stamps: 10, needed: 10, reward: SAMPLE_VALUES.odmena ?? null }
-          : { stamps: 4, needed: 10, reward: SAMPLE_VALUES.odmena ?? null },
+          ? { stamps: 10, needed: 10, reward: SAMPLE_VALUES.odmena ?? null, status: 'full' }
+          : { stamps: 4, needed: 10, reward: SAMPLE_VALUES.odmena ?? null, status: 'active' },
     },
   })
 }

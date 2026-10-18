@@ -130,16 +130,64 @@ export async function completeVisit(raw: unknown): Promise<Result<{ message: str
 }
 
 /** „Dát razítko“ k hotové návštěvě, když se razítkuje ručně. */
-export async function stampVisit(raw: unknown): Promise<Result<{ message: string }>> {
+export async function stampVisit(raw: unknown): Promise<Result<{ message: string; undoEventId: string; expectedStamps: number; appointmentId: string }>> {
   const p = await prepare(z.object({ slug, appointmentId: uuid }), raw)
   if (!p.ok) return p
   const { input, c } = p
   return guard('stampVisit', c, async () => {
-    const stamp = await loyalty.stampVisitManually(c.ctx, c.business, input.appointmentId)
+    const { stamp, eventId } = await loyalty.stampVisitManuallyWithEvent(c.ctx, c.business, input.appointmentId)
     if (!stamp) return fail(GONE)
     if (stamp.result === 'duplicate') return fail('Za tuhle návštěvu už razítko je.')
     if (stamp.result === 'none' || stamp.result === 'off') return fail('Tahle návštěva podle pravidel věrnosti razítko nedostane.')
-    return ok({ message: stampMessage(stamp, 'Hotovo.') })
+    return stamp.result === 'added' && eventId
+      ? ok({ message: stampMessage(stamp, 'Razítko přidáno.'), undoEventId: eventId, expectedStamps: stamp.stamps, appointmentId: input.appointmentId })
+      : fail('Razítko se nepodařilo přidat. Obnovte prosím stránku.')
+  })
+}
+
+const addStampSchema = z.object({
+  slug,
+  customerId: uuid,
+  day: z.string().refine(isIsoDate, '!Vyberte platné datum.'),
+  note: z.string().trim().max(200, '!Poznámka je moc dlouhá.').optional(),
+})
+
+/** Jedno ruční razítko na kartě zákazníka, volitelně s datem a poznámkou. */
+export async function addCustomerStamp(raw: unknown): Promise<Result<{ message: string; undoEventId: string; expectedStamps: number }>> {
+  const p = await prepare(addStampSchema, raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  if (input.day > pragueToday()) return fail('Datum razítka nemůže být v budoucnosti.')
+  return guard('addCustomerStamp', c, async () => {
+    const result = await loyalty.addManualStamp(c.ctx, c.business, {
+      customerId: input.customerId,
+      day: input.day,
+      reason: input.note || null,
+    })
+    const stamp = result?.stamp
+    if (!stamp) return fail(GONE)
+    if (stamp.result === 'off') return fail('Věrnostní karty jsou vypnuté. Zapnete je v Nastavení › Věrnost.')
+    if (stamp.result === 'full') return fail('Karta je plná. Nejdřív uplatněte odměnu.')
+    if (stamp.result !== 'added' || !result.eventId) return fail('Razítko se nepodařilo přidat. Obnovte prosím stránku.')
+    return ok({
+      message: stampMessage(stamp, 'Razítko přidáno.'),
+      undoEventId: result.eventId,
+      expectedStamps: stamp.stamps,
+    })
+  })
+}
+
+/** Vrátí právě přidané razítko, pokud kartu mezitím nikdo nezměnil. */
+export async function undoCustomerStamp(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(
+    z.object({ slug, eventId: uuid, expectedStamps: z.number().int().min(1).max(50), appointmentId: uuid.optional() }),
+    raw,
+  )
+  if (!p.ok) return p
+  const { input, c } = p
+  return guard('undoCustomerStamp', c, async () => {
+    const undone = await loyalty.undoStamp(c.ctx, c.business, input)
+    return undone ? ok(null) : fail('Kartu už mezitím někdo změnil. Zpět teď nejde použít.')
   })
 }
 
@@ -166,13 +214,25 @@ export async function adjustStamps(raw: unknown): Promise<Result<{ message: stri
   })
 }
 
-export async function redeemReward(raw: unknown): Promise<Result<{ message: string }>> {
+export async function redeemReward(raw: unknown): Promise<Result<{ message: string; undoEventId: string }>> {
   const p = await prepare(z.object({ slug, customerId: uuid }), raw)
   if (!p.ok) return p
   const { input, c } = p
   return guard('redeemReward', c, async () => {
-    const done = await loyalty.redeemReward(c.ctx, c.business, input.customerId)
-    return done ? ok({ message: 'Odměna je uplatněná. Další razítko začne novou kartu.' }) : fail('Karta zatím není plná.')
+    const done = await loyalty.redeemRewardWithEvent(c.ctx, c.business, input.customerId)
+    return done.redeemed && done.eventId
+      ? ok({ message: 'Odměna je uplatněná. Další razítko začne novou kartu.', undoEventId: done.eventId })
+      : fail('Karta zatím není plná.')
+  })
+}
+
+export async function undoRedeemReward(raw: unknown): Promise<Result<null>> {
+  const p = await prepare(z.object({ slug, eventId: uuid }), raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  return guard('undoRedeemReward', c, async () => {
+    const undone = await loyalty.undoReward(c.ctx, c.business, input.eventId)
+    return undone ? ok(null) : fail('Kartu už mezitím někdo změnil. Zpět teď nejde použít.')
   })
 }
 

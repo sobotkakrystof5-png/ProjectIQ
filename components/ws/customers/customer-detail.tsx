@@ -50,6 +50,7 @@ export function CustomerDetail({
   events,
   today,
   businessName,
+  businessColor,
   invoiceHref,
   termHref,
 }: {
@@ -58,6 +59,7 @@ export function CustomerDetail({
   events: LoyaltyEvent[]
   today: string
   businessName: string
+  businessColor: string | null
   invoiceHref?: string | null
   termHref: (appointmentId: string) => string
 }) {
@@ -133,8 +135,10 @@ export function CustomerDetail({
             stamps={c.loyalty.stamps}
             total={c.loyalty.needed}
             reward={c.loyalty.reward || 'odměna podle nastavení'}
+            status={c.loyalty.status}
+            accentColor={businessColor}
           />
-          <LoyaltyControls slug={slug} customerId={c.id} full={c.loyalty.full} />
+          <LoyaltyControls slug={slug} customerId={c.id} full={c.loyalty.full} today={today} />
           {events.length > 0 && (
             <ul className="flex flex-col gap-1 text-sm">
               {events.slice(0, 6).map((e) => (

@@ -287,3 +287,13 @@ Výsledek:
 Nálezy: 0 k opravě.
 Ověřeno: `npx tsc --noEmit`, cílené `ws-money.test.ts` (33 prošlo, 1 přeskočený), celé `npm test` (558 prošlo, 1 přeskočený), `npx next build --webpack`. `npm run build:check` narazil na sandboxové omezení vytváření procesu/portu; Webpack sestavení prošlo.
 Zůstává: vizuální a přihlášený Preview, PDF v prohlížeči, skutečné nastavení ověřené domény Resendu a migrací 080/087/088 na určené DB.
+
+## 2026-10-18 — review RD12 (věrnost)
+Spouštěč: dokončení RD12 před commitem, skill `web-security-review`.
+Rozsah: nové a změněné vstupy v `app/w/[business]/zakaznici/actions.ts` (ruční razítko, oprava, uplatnění a jejich vrácení), DB logika v `lib/ws/loyalty.ts`, výběr karty v zákaznickém detailu/Dnes/portálu/e-mailu a HTML karta v `lib/ws/email/layout.ts`.
+Výsledek:
+- Všechny server actions začínají `requireWorkspace()`, Zod validací s limity a `requireBusiness()`; zápis vyžaduje `assertWritable`. Zákazníci a události se hledají pod `account_id`, byznysem a RLS; žádné ID účtu nepřichází z formuláře.
+- SQL používá vázané parametry. Přidání razítka a uplatnění odměny sdílí advisory lock pro zákazníka/program. „Zpět“ ověřuje účet, byznys, autora, druh události, časový limit a že na kartě nepřibyla pozdější událost.
+- Text odměny se v e-mailové HTML šabloně escapuje; akcent se před vložením do CSS ověřuje jako šestimístný hex s kontrastem. Žádné nové HTML sinky, env, závislosti, API routy ani třetí strany; CSP se neměnila.
+Nálezy: 0 k opravě.
+Ověřeno: cílené testy pokrývají izolaci účtů, souběh a zastaralé „Zpět“; celé `npm test` (566 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`. Přihlášený lokální průchod nebyl možný, server přesměroval na přihlášení. `npm run build:check` selhal na sandboxovém omezení Turbopacku při vytváření procesu/vazbě na port; Webpack build prošel.

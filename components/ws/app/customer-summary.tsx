@@ -17,11 +17,13 @@ export function CustomerSummary({
   card,
   today,
   businessName,
+  businessColor,
   detailHref,
 }: {
   card: CustomerCard
   today: string
   businessName: string
+  businessColor: string | null
   /** Odkaz na celou kartu v panelu — na Dnes ano, v panelu samotném ne. */
   detailHref?: string
 }) {
@@ -83,6 +85,8 @@ export function CustomerSummary({
           stamps={card.loyalty.stamps}
           total={card.loyalty.needed}
           reward={reward}
+          status={card.loyalty.status}
+          accentColor={businessColor}
         />
       )}
 

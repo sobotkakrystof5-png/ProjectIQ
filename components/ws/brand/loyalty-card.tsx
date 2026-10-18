@@ -3,12 +3,8 @@
 import { AnimatePresence, m } from 'framer-motion'
 import { cn } from '@/lib/ws/utils'
 import { zqStamp } from '@/lib/ws/motion'
-
-function remainingText(remaining: number): string {
-  if (remaining === 1) return 'Do odměny zbývá 1 návštěva'
-  if (remaining >= 2 && remaining <= 4) return `Do odměny zbývají ${remaining} návštěvy`
-  return `Do odměny zbývá ${remaining} návštěv`
-}
+import { accentGradient, accentVars } from '@/lib/ws/accent'
+import { loyaltyCardView, type LoyaltyCardStatus } from '@/lib/ws/loyalty-card-view'
 
 /**
  * Věrnostní karta: gradient navy-600 → navy-800, bílá razítka jako dílky, prázdné čárkovaně.
@@ -20,6 +16,8 @@ export function LoyaltyCard({
   total = 10,
   reward,
   business,
+  status,
+  accentColor,
   className,
 }: {
   customer: string
@@ -28,14 +26,19 @@ export function LoyaltyCard({
   /** Co zákazník dostane, např. „Střih zdarma". */
   reward: string
   business?: string
+  status?: LoyaltyCardStatus | null
+  accentColor?: string | null
   className?: string
 }) {
-  const filled = Math.min(Math.max(stamps, 0), total)
-  const full = filled >= total
+  const card = loyaltyCardView({ stamps, needed: total, reward, status })
+  const full = card.status === 'full'
+  const redeemed = card.status === 'redeemed'
+  const gradient = accentGradient(accentColor)
   return (
     <div
+      style={{ ...accentVars(accentColor), ...(gradient ? { backgroundImage: gradient } : {}) }}
       className={cn(
-        'relative w-full max-w-sm overflow-hidden rounded-panel bg-gradient-to-br from-navy-600 to-navy-800 p-5 text-white shadow-xl shadow-navy-950/25',
+        'relative w-full max-w-sm overflow-hidden rounded-panel bg-gradient-to-br from-navy-700 to-navy-800 p-5 text-white shadow-xl shadow-navy-950/25',
         className,
       )}
     >
@@ -44,22 +47,22 @@ export function LoyaltyCard({
           {business && <p className="truncate text-sm text-navy-200">{business}</p>}
           <p className="truncate text-lg font-semibold tracking-[-0.02em]">{customer}</p>
         </div>
-        <p className="shrink-0 font-num text-sm text-navy-200">
-          <span className="text-white">{filled}</span> / {total}
+        <p className="shrink-0 font-num text-sm text-navy-200" aria-label={card.progress}>
+          <span className="text-white">{card.stamps}</span> / {card.needed}
         </p>
       </div>
 
-      <ul className="mt-5 grid grid-cols-5 gap-2" aria-label={`${filled} z ${total} razítek`}>
-        {Array.from({ length: total }, (_, i) => (
+      <ul className="mt-5 grid grid-cols-5 gap-2" aria-label={card.progress}>
+        {Array.from({ length: card.needed }, (_, i) => (
           <li key={i} className="relative aspect-square">
             <span className="absolute inset-0 rounded-tiny border border-dashed border-white/35" aria-hidden />
             <AnimatePresence initial={false}>
-              {i < filled && (
+              {i < card.stamps && (
                 <m.span
                   key="stamp"
                   {...zqStamp}
                   exit={{ opacity: 0, transition: { duration: 0.2 } }}
-                  className="absolute inset-0 rounded-tiny bg-white shadow-sm"
+                  className={cn('absolute inset-0 rounded-tiny bg-white shadow-sm', redeemed && 'opacity-50')}
                   aria-hidden
                 />
               )}
@@ -68,8 +71,11 @@ export function LoyaltyCard({
         ))}
       </ul>
 
-      <p className={cn('mt-4 text-sm', full ? 'font-semibold text-reward' : 'text-navy-200')} aria-live="polite">
-        {full ? `Odměna připravena: ${reward}` : `${remainingText(total - filled)}: ${reward}`}
+      <p
+        className={cn('mt-4 text-sm', full ? 'font-semibold text-reward' : redeemed ? 'font-semibold text-navy-50' : 'text-navy-200')}
+        aria-live="polite"
+      >
+        {card.message}
       </p>
     </div>
   )

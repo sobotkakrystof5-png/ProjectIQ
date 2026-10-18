@@ -8,6 +8,8 @@
 // Každý vstup (jméno firmy, texty klienta, údaje zákazníka) se escapuje.
 
 import { usableAccent } from '../accent'
+import { accentGradient } from '../accent'
+import { loyaltyCardView, type LoyaltyCardStatus } from '../loyalty-card-view'
 
 const C = {
   ground: '#f4f6fb',
@@ -18,6 +20,7 @@ const C = {
   navy700: '#23478b',
   navy600: '#2b57a8',
   navy800: '#1b3868',
+  navy200: '#b8ceef',
   navy50: '#eef2fb',
   signalBg: '#fff7e8',
   signalLine: '#e19a2c',
@@ -37,7 +40,7 @@ export type EmailBlock =
   /** Seznam (přehledy): hlavní text + vedlejší údaj vpravo. */
   | { kind: 'list'; title: string; items: { main: string; side?: string }[]; empty?: string }
   /** Věrnostní karta. */
-  | { kind: 'card'; stamps: number; needed: number; reward: string | null }
+  | { kind: 'card'; stamps: number; needed: number; reward: string | null; status?: LoyaltyCardStatus }
   | { kind: 'note'; text: string }
   /** Nadpis s malým štítkem nad ním (novinky ZakazIQ). */
   | { kind: 'headline'; eyebrow?: string; text: string }
@@ -138,16 +141,21 @@ function block(b: EmailBlock, accent: string): string {
       return `<p style="margin:8px 0 4px;font:500 11px/16px ${MONO};letter-spacing:.08em;text-transform:uppercase;color:${C.quiet}">${escapeHtml(b.title)}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px">${items}</table>`
     }
     case 'card': {
-      const needed = Math.max(1, Math.min(b.needed, 20))
-      const stamps = Math.max(0, Math.min(b.stamps, needed))
-      const cells = Array.from({ length: needed }, (_, i) =>
-        i < stamps
-          ? `<td style="width:18px;height:18px;background:#ffffff;border-radius:5px"></td><td style="width:6px"></td>`
-          : `<td style="width:16px;height:16px;border:1px dashed ${C.navy50};border-radius:5px"></td><td style="width:6px"></td>`,
-      ).join('')
-      const full = stamps >= needed
-      const label = full ? `Odměna připravena${b.reward ? `: ${b.reward}` : ''}` : `${stamps} z ${needed} razítek`
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:${C.navy700};background-image:linear-gradient(135deg,${C.navy600},${C.navy800});border-radius:16px"><tr><td style="padding:16px 18px"><p style="margin:0 0 10px;font:500 11px/16px ${MONO};letter-spacing:.08em;text-transform:uppercase;color:#b8ceef">Věrnostní karta</p><table role="presentation" cellpadding="0" cellspacing="0"><tr>${cells}</tr></table><p style="margin:10px 0 0;font:600 15px/20px ${SANS};color:${full ? C.reward : '#ffffff'}">${escapeHtml(label)}</p></td></tr></table>`
+      const card = loyaltyCardView({ stamps: b.stamps, needed: b.needed, reward: b.reward, status: b.status })
+      const rows = Array.from({ length: Math.ceil(card.needed / 5) }, (_, row) => {
+        const cells = Array.from({ length: Math.min(5, card.needed - row * 5) }, (_, col) => {
+          const filled = row * 5 + col < card.stamps
+          const fill = card.status === 'redeemed' ? C.navy200 : '#ffffff'
+          const cell = filled
+            ? `<td style="width:18px;height:18px;background:${fill};border-radius:5px"></td>`
+            : `<td style="width:16px;height:16px;border:1px dashed ${C.navy50};border-radius:5px"></td>`
+          return `${cell}<td style="width:6px"></td>`
+        }).join('')
+        return `<tr>${cells}</tr>`
+      }).join('')
+      const gradient = accentGradient(accent) ?? `linear-gradient(135deg,${C.navy600},${C.navy800})`
+      const statusColor = card.status === 'full' ? C.reward : '#ffffff'
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:${accent};background-image:${gradient};border-radius:16px"><tr><td style="padding:16px 18px"><p style="margin:0 0 10px;font:500 11px/16px ${MONO};letter-spacing:.08em;text-transform:uppercase;color:#b8ceef">Věrnostní karta · ${card.progress}</p><table role="presentation" cellpadding="0" cellspacing="0">${rows}</table><p style="margin:10px 0 0;font:600 15px/20px ${SANS};color:${statusColor}">${escapeHtml(card.message)}</p></td></tr></table>`
     }
     case 'note':
       return `<p style="margin:0 0 16px;font:400 14px/1.5 ${SANS};color:${C.quiet}">${escapeHtml(b.text)}</p>`
@@ -173,7 +181,7 @@ function blockText(b: EmailBlock): string {
     case 'list':
       return [b.title.toUpperCase(), ...(b.items.length ? b.items.map((i) => `- ${i.main}${i.side ? ` (${i.side})` : ''}`) : [b.empty ?? 'Nic.'])].join('\n')
     case 'card':
-      return b.stamps >= b.needed ? `Věrnostní karta: odměna připravena${b.reward ? ` (${b.reward})` : ''}` : `Věrnostní karta: ${b.stamps} z ${b.needed} razítek`
+      return `Věrnostní karta: ${loyaltyCardView({ stamps: b.stamps, needed: b.needed, reward: b.reward, status: b.status }).message}`
     case 'note':
       return b.text
     case 'headline':

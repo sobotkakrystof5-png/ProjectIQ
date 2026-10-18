@@ -36,6 +36,7 @@ export default async function LoyaltySettingsPage(props: { params: Promise<{ bus
       <LoyaltySettings
         slug={business.slug}
         businessName={business.name}
+        businessColor={business.color}
         program={program}
         services={options.services.map((s) => ({ id: s.id, name: s.name }))}
         readOnly={!canWrite(billing)}

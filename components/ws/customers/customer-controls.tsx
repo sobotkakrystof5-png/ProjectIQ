@@ -9,11 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
 import {
+  addCustomerStamp,
   adjustStamps,
   eraseCustomer,
   findMergeCandidates,
   mergeCustomers,
   redeemReward,
+  undoCustomerStamp,
+  undoRedeemReward,
   setContactConsent,
   setCustomerEnded,
   updateCustomer,
@@ -27,11 +30,27 @@ const TEXTAREA =
 
 // --- Věrnostní karta ------------------------------------------------------------
 
-/** Ruční razítko (+/−) s důvodem a uplatnění odměny. */
-export function LoyaltyControls({ slug, customerId, full }: { slug: string; customerId: string; full: boolean }) {
+/** Jedním kliknutím přidá razítko nebo uplatní odměnu; ruční oprava zůstává vedlejší. */
+export function LoyaltyControls({ slug, customerId, full, today }: { slug: string; customerId: string; full: boolean; today: string }) {
   const { run, pending } = useWsAction()
+  const router = useRouter()
   const [delta, setDelta] = useState<1 | -1 | null>(null)
   const [reason, setReason] = useState('')
+  const [day, setDay] = useState(today)
+  const [note, setNote] = useState('')
+
+  const stamp = () =>
+    void run(
+      () => addCustomerStamp({ slug, customerId, day, note }),
+      (r) => {
+        setNote('')
+        undoToast(
+          r.message,
+          () => undoCustomerStamp({ slug, eventId: r.undoEventId, expectedStamps: r.expectedStamps }),
+          { done: 'Razítko vráceno.', refresh: () => router.refresh() },
+        )
+      },
+    )
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,36 +75,69 @@ export function LoyaltyControls({ slug, customerId, full }: { slug: string; cust
         {full && (
           <Button
             disabled={pending}
-            onClick={() => void run(() => redeemReward({ slug, customerId }), (r) => toast.success(r.message))}
+            onClick={() =>
+              void run(
+                () => redeemReward({ slug, customerId }),
+                (r) =>
+                  undoToast(
+                    r.message,
+                    () => undoRedeemReward({ slug, eventId: r.undoEventId }),
+                    { done: 'Uplatnění odměny vráceno.', refresh: () => router.refresh() },
+                  ),
+              )
+            }
           >
             Uplatnit odměnu
           </Button>
         )}
-        <Button variant="outline" disabled={pending} aria-pressed={delta === 1} onClick={() => setDelta(delta === 1 ? null : 1)}>
-          <Plus aria-hidden size={16} strokeWidth={1.5} />
-          Razítko
-        </Button>
-        <Button variant="ghost" disabled={pending} aria-pressed={delta === -1} onClick={() => setDelta(delta === -1 ? null : -1)}>
+        {!full && (
+          <Button disabled={pending} onClick={stamp}>
+            <Plus aria-hidden size={16} strokeWidth={1.5} />
+            Razítko
+          </Button>
+        )}
+        <Button variant="ghost" disabled={pending} aria-expanded={delta === -1} onClick={() => setDelta(delta === -1 ? null : -1)}>
           <Minus aria-hidden size={16} strokeWidth={1.5} />
-          Odebrat
+          Upravit razítka
         </Button>
       </div>
-      {delta && (
+      {!full && (
+        <details className="rounded-chip border px-3 py-2">
+          <summary className="flex min-h-7 cursor-pointer items-center text-sm font-medium text-ink">Datum nebo poznámka</summary>
+          <div className="grid gap-3 pt-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`datum-razitka-${customerId}`}>Datum razítka</Label>
+              <Input id={`datum-razitka-${customerId}`} type="date" value={day} max={today} onChange={(e) => setDay(e.target.value)} className="font-num" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`poznamka-razitka-${customerId}`}>Poznámka (nepovinná)</Label>
+              <Input
+                id={`poznamka-razitka-${customerId}`}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                maxLength={200}
+                placeholder="Například zapomenuté razítko"
+              />
+            </div>
+          </div>
+        </details>
+      )}
+      {delta === -1 && (
         <form onSubmit={submit} className="flex flex-col gap-3 rounded-box border bg-ground p-4 dark:bg-navy-950">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`duvod-${customerId}`}>{delta > 0 ? 'Proč razítko přidáváte' : 'Proč razítko odebíráte'}</Label>
+            <Label htmlFor={`duvod-${customerId}`}>Proč razítko odebíráte</Label>
             <Input
               id={`duvod-${customerId}`}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               maxLength={200}
-              placeholder={delta > 0 ? 'Například zapomenuté razítko' : 'Například přidané omylem'}
+              placeholder="Například přidané omylem"
               autoFocus
             />
           </div>
           <div>
             <Button type="submit" disabled={pending}>
-              {delta > 0 ? 'Přidat razítko' : 'Odebrat razítko'}
+              Odebrat razítko
             </Button>
           </div>
         </form>

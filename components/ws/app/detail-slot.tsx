@@ -133,6 +133,7 @@ async function panelContent(
             events={events}
             today={env.today}
             businessName={business.name}
+            businessColor={business.color}
             invoiceHref={env.modules.has('invoices')?navHref(business.slug,'faktury')+'?detail=nova-faktura&zakaznik='+customer.id:null}
             termHref={(id) => hrefWith(env.pathname, env.searchParams, { detail: `termin:${id}`, ...FORM_PARAMS })}
           />
@@ -297,7 +298,7 @@ async function panelContent(
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">
-                <CustomerSummary card={card} today={env.today} businessName={business.name} detailHref={customerLink(card.id)} />
+                <CustomerSummary card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
               </section>
             )}
           </div>
@@ -383,7 +384,7 @@ async function panelContent(
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">
-                <CustomerSummary card={card} today={env.today} businessName={business.name} detailHref={customerLink(card.id)} />
+                <CustomerSummary card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
               </section>
             )}
           </div>
@@ -460,7 +461,7 @@ async function panelContent(
 
             {card && (
               <section aria-label="Zákazník" className="border-t pt-5">
-                <CustomerSummary card={card} today={env.today} businessName={business.name} detailHref={customerLink(card.id)} />
+                <CustomerSummary card={card} today={env.today} businessName={business.name} businessColor={business.color} detailHref={customerLink(card.id)} />
               </section>
             )}
           </div>

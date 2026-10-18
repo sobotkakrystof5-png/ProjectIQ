@@ -141,6 +141,8 @@ export type StampOutcome =
   | { result: 'added'; added: number; stamps: number; needed: number; full: boolean }
   | { result: 'duplicate' | 'same_day' | 'full' | 'off' | 'none' }
 
+export type ReversibleStamp = { stamp: StampOutcome | null; eventId: string | null }
+
 function toOutcome(raw: unknown): StampOutcome | null {
   if (!raw) return null
   const o = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Record<string, unknown>
@@ -292,6 +294,10 @@ export async function stampJob(ctx: WsContext, business: Biz, jobId: string, now
 
 /** Ruční razítko k hotové návštěvě, když program razítkuje „ručně“ (auto_stamp vypnuté). */
 export async function stampVisitManually(ctx: WsContext, business: Biz, appointmentId: string): Promise<StampOutcome | null> {
+  return (await stampVisitManuallyWithEvent(ctx, business, appointmentId)).stamp
+}
+
+export async function stampVisitManuallyWithEvent(ctx: WsContext, business: Biz, appointmentId: string): Promise<ReversibleStamp> {
   const acc = ctx.accountId
   const biz = business.id
   const [apptRows, progRows] = await wsDb(ctx).batch([
@@ -308,7 +314,7 @@ export async function stampVisitManually(ctx: WsContext, business: Biz, appointm
     `,
   ])
   const a = (apptRows as WsRow[])[0]
-  if (!a?.customer_id) return null
+  if (!a?.customer_id) return { stamp: null, eventId: null }
   const program = rowToProgram((progRows as WsRow[])[0])
   const delta = stampsForPayment(program, {
     source: 'visit',
@@ -316,17 +322,17 @@ export async function stampVisitManually(ctx: WsContext, business: Biz, appointm
     serviceId: (a.service_id as string | null) ?? null,
     currency: String(a.currency),
   })
-  if (delta <= 0) return { result: 'none' }
-  return addStamps(ctx, business, {
+  if (delta <= 0) return { stamp: { result: 'none' }, eventId: null }
+  return (await addStampsWithEvent(ctx, business, {
     customerId: String(a.customer_id),
     delta,
     day: pragueParts(a.starts_at as Date).date,
     appointmentId,
     kind: 'stamp',
-  })
+  })) ?? { stamp: null, eventId: null }
 }
 
-/** Ruční přidání (+) nebo odebrání (−) razítka s důvodem (Nastavení › Věrnost, plán). */
+/** Ruční přidání (+) nebo odebrání (−) razítka s důvodem. */
 export async function adjustStamps(
   ctx: WsContext,
   business: Biz,
@@ -341,6 +347,21 @@ export async function adjustStamps(
   })
 }
 
+/** Jedno ruční razítko s volitelným datem a poznámkou; vrací událost pro „Zpět“. */
+export async function addManualStamp(
+  ctx: WsContext,
+  business: Biz,
+  input: { customerId: string; day: string; reason?: string | null },
+): Promise<ReversibleStamp | null> {
+  return addStampsWithEvent(ctx, business, {
+    customerId: input.customerId,
+    delta: 1,
+    day: input.day,
+    kind: 'manual',
+    reason: input.reason?.trim() || 'Ruční razítko',
+  })
+}
+
 async function addStamps(
   ctx: WsContext,
   business: Biz,
@@ -351,43 +372,222 @@ async function addStamps(
     appointmentId?: string
     jobId?: string
     kind: 'stamp' | 'manual'
-    reason?: string
+    reason?: string | null
   },
 ): Promise<StampOutcome | null> {
+  return (await addStampsWithEvent(ctx, business, input))?.stamp ?? null
+}
+
+async function addStampsWithEvent(
+  ctx: WsContext,
+  business: Biz,
+  input: {
+    customerId: string
+    delta: number
+    day: string
+    appointmentId?: string
+    jobId?: string
+    kind: 'stamp' | 'manual'
+    reason?: string | null
+  },
+): Promise<ReversibleStamp | null> {
   const acc = ctx.accountId
   try {
-    // Zákazník musí být z tohoto účtu — jinak funkce nic neudělá (NULL).
-    const [row] = await wsDb(ctx)`
-      SELECT ws.loyalty_add_stamps(${acc}, ${business.id}, c.id, ${input.delta}::int, ${input.day}::date,
-        ${input.appointmentId ?? null}::uuid, ${input.jobId ?? null}::uuid, ${input.kind}, ${input.reason ?? null}, ${ctx.userId}) AS stamp
-      FROM ws.customers c WHERE c.account_id = ${acc} AND c.id = ${input.customerId}
-    `
-    return row ? toOutcome(row.stamp) : null
+    // Obě věty jsou v jedné transakci. Funkce drží advisory lock do konce
+    // transakce, druhý SELECT proto najde právě vloženou událost i při souběhu.
+    const [stampRows, eventRows] = await wsDb(ctx).batch([
+      q`
+        SELECT ws.loyalty_add_stamps(${acc}, ${business.id}, c.id, ${input.delta}::int, ${input.day}::date,
+          ${input.appointmentId ?? null}::uuid, ${input.jobId ?? null}::uuid, ${input.kind}, ${input.reason ?? null}, ${ctx.userId}) AS stamp
+        FROM ws.customers c WHERE c.account_id = ${acc} AND c.id = ${input.customerId}
+      `,
+      q`
+        WITH event AS MATERIALIZED (
+          SELECT e.id
+          FROM ws.loyalty_events e
+          JOIN ws.loyalty_cards c ON c.account_id = e.account_id AND c.id = e.card_id AND c.customer_id = ${input.customerId}
+          WHERE e.account_id = ${acc} AND e.business_id = ${business.id}
+            AND e.kind = ${input.kind} AND e.actor = ${ctx.userId} AND e.for_day = ${input.day}::date
+            AND e.appointment_id IS NOT DISTINCT FROM ${input.appointmentId ?? null}::uuid
+            AND e.job_id IS NOT DISTINCT FROM ${input.jobId ?? null}::uuid
+            AND e.reason IS NOT DISTINCT FROM ${input.reason ?? null}
+            AND ((e.kind = 'stamp' AND e.delta > 0) OR (e.kind = 'manual' AND e.delta <> 0))
+          ORDER BY e.created_at DESC, e.xmin::text::bigint DESC
+          LIMIT 1
+        )
+        SELECT (SELECT id FROM event) AS event_id
+      `,
+    ])
+    const stampRow = (stampRows as WsRow[])[0]
+    if (!stampRow) return null
+    const stamp = toOutcome(stampRow.stamp)
+    const eventId = (eventRows as WsRow[])[0]?.event_id as string | undefined
+    return { stamp, eventId: eventId ?? null }
   } catch (e) {
     // Souběžné razítko k téže návštěvě / zakázce: druhé skončí na unikátním indexu.
-    if (pgErrorCode(e) === '23505') return { result: 'duplicate' }
+    if (pgErrorCode(e) === '23505') return { stamp: { result: 'duplicate' }, eventId: null }
     throw e
   }
 }
 
-/** Uplatní plnou kartu bez platby (např. odměna předaná mimo termín). Další razítko začne novou kartu. */
-export async function redeemReward(ctx: WsContext, business: Biz, customerId: string, now: Date = new Date()): Promise<boolean> {
+/** Vrátí poslední ruční razítko, jen pokud na kartě mezitím nic nezměnilo. */
+export async function undoStamp(
+  ctx: WsContext,
+  business: Biz,
+  input: { eventId: string; expectedStamps: number; appointmentId?: string },
+): Promise<boolean> {
   const acc = ctx.accountId
   const biz = business.id
-  const [row] = await wsDb(ctx)`
-    WITH card AS (
-      UPDATE ws.loyalty_cards SET status = 'redeemed', redeemed_at = ${now}
-      WHERE account_id = ${acc} AND business_id = ${biz} AND customer_id = ${customerId} AND status = 'full'
-      RETURNING id, stamps
-    ),
-    ev AS (
-      INSERT INTO ws.loyalty_events (account_id, business_id, card_id, kind, delta, actor, for_day)
-      SELECT ${acc}, ${biz}, card.id, 'redeem', -card.stamps, ${ctx.userId}, ${pragueParts(now).date}::date FROM card
-      RETURNING 1
-    )
-    SELECT count(*)::int AS n FROM ev
-  `
-  return Number(row?.n ?? 0) > 0
+  const manual = input.appointmentId === undefined
+  const eventKind = manual ? 'manual' : 'stamp'
+  const appointmentId = input.appointmentId ?? null
+  const [lock, result] = await wsDb(ctx).batch([
+    q`
+      SELECT pg_advisory_xact_lock(hashtext('ws.loyalty:' || p.id::text || ':' || c.customer_id::text))
+      FROM ws.loyalty_events e
+      JOIN ws.loyalty_cards c ON c.account_id = e.account_id AND c.id = e.card_id
+      JOIN ws.loyalty_programs p ON p.account_id = c.account_id AND p.id = c.program_id
+      WHERE e.account_id = ${acc} AND e.business_id = ${biz} AND e.id = ${input.eventId}
+        AND e.kind = ${eventKind} AND e.actor = ${ctx.userId} AND e.delta > 0
+        AND e.appointment_id IS NOT DISTINCT FROM ${appointmentId}::uuid
+        AND e.job_id IS NULL
+    `,
+    q`
+      WITH source AS MATERIALIZED (
+        SELECT e.id, e.card_id, e.delta, e.created_at, c.customer_id, c.program_id, p.stamps_needed
+        FROM ws.loyalty_events e
+        JOIN ws.loyalty_cards c ON c.account_id = e.account_id AND c.id = e.card_id
+        JOIN ws.loyalty_programs p ON p.account_id = c.account_id AND p.id = c.program_id
+        WHERE e.account_id = ${acc} AND e.business_id = ${biz} AND e.id = ${input.eventId}
+          AND e.kind = ${eventKind} AND e.actor = ${ctx.userId} AND e.delta > 0
+          AND e.appointment_id IS NOT DISTINCT FROM ${appointmentId}::uuid
+          AND e.job_id IS NULL AND e.created_at >= now() - interval '1 minute'
+      ), current_card AS MATERIALIZED (
+        SELECT c.id, c.stamps, c.status, c.program_id
+        FROM ws.loyalty_cards c JOIN source s ON s.card_id = c.id AND s.program_id = c.program_id
+        WHERE c.account_id = ${acc} AND c.business_id = ${biz}
+        FOR UPDATE
+      ), removed AS (
+        DELETE FROM ws.loyalty_events e USING source s, current_card c
+        WHERE e.account_id = ${acc} AND e.id = s.id AND e.card_id = c.id
+          AND c.status IN ('active', 'full') AND c.stamps = ${input.expectedStamps}
+          AND c.stamps >= s.delta
+          AND NOT EXISTS (
+            SELECT 1 FROM ws.loyalty_events later
+            WHERE later.account_id = e.account_id AND later.card_id = e.card_id AND later.id <> e.id
+              AND (later.created_at > e.created_at OR (later.created_at = e.created_at AND later.xmin::text::bigint > e.xmin::text::bigint))
+          )
+        RETURNING e.card_id, e.delta
+      ), updated AS (
+        UPDATE ws.loyalty_cards c SET
+          stamps = c.stamps - r.delta,
+          status = 'active',
+          full_at = NULL
+        FROM removed r
+        WHERE c.account_id = ${acc} AND c.business_id = ${biz} AND c.id = r.card_id
+        RETURNING c.id
+      )
+      SELECT EXISTS (SELECT 1 FROM updated) AS undone
+    `,
+  ])
+  void lock
+  return Boolean((result as WsRow[])[0]?.undone)
+}
+
+/** Uplatní plnou kartu bez platby (např. odměna předaná mimo termín). Další razítko začne novou kartu. */
+export async function redeemReward(ctx: WsContext, business: Biz, customerId: string, now: Date = new Date()): Promise<boolean> {
+  return (await redeemRewardWithEvent(ctx, business, customerId, now)).redeemed
+}
+
+export async function redeemRewardWithEvent(
+  ctx: WsContext,
+  business: Biz,
+  customerId: string,
+  now: Date = new Date(),
+): Promise<{ redeemed: boolean; eventId: string | null; stamps: number }> {
+  const acc = ctx.accountId
+  const biz = business.id
+  const [, rows] = await wsDb(ctx).batch([
+    q`
+      SELECT pg_advisory_xact_lock(hashtext('ws.loyalty:' || p.id::text || ':' || ${customerId}::text))
+      FROM ws.loyalty_programs p WHERE p.account_id = ${acc} AND p.business_id = ${biz}
+    `,
+    q`
+      WITH card AS (
+        UPDATE ws.loyalty_cards SET status = 'redeemed', redeemed_at = ${now}
+        WHERE account_id = ${acc} AND business_id = ${biz} AND customer_id = ${customerId} AND status = 'full'
+        RETURNING id, stamps
+      ),
+      ev AS (
+        INSERT INTO ws.loyalty_events (account_id, business_id, card_id, kind, delta, actor, for_day)
+        SELECT ${acc}, ${biz}, card.id, 'redeem', -card.stamps, ${ctx.userId}, ${pragueParts(now).date}::date FROM card
+        RETURNING id, delta
+      )
+      SELECT count(*)::int AS n, (SELECT id FROM ev LIMIT 1) AS event_id,
+        (SELECT abs(delta) FROM ev LIMIT 1)::int AS stamps
+      FROM ev
+    `,
+  ])
+  const row = (rows as WsRow[])[0]
+  return {
+    redeemed: Number(row?.n ?? 0) > 0,
+    eventId: (row?.event_id as string | null) ?? null,
+    stamps: Number(row?.stamps ?? 0),
+  }
+}
+
+/** Vrátí uplatnění jen dokud se neobjevila další aktivní karta zákazníka. */
+export async function undoReward(ctx: WsContext, business: Biz, eventId: string): Promise<boolean> {
+  const acc = ctx.accountId
+  const biz = business.id
+  const [lock, result] = await wsDb(ctx).batch([
+    q`
+      SELECT pg_advisory_xact_lock(hashtext('ws.loyalty:' || p.id::text || ':' || c.customer_id::text))
+      FROM ws.loyalty_events e
+      JOIN ws.loyalty_cards c ON c.account_id = e.account_id AND c.id = e.card_id
+      JOIN ws.loyalty_programs p ON p.account_id = c.account_id AND p.id = c.program_id
+      WHERE e.account_id = ${acc} AND e.business_id = ${biz} AND e.id = ${eventId}
+        AND e.kind = 'redeem' AND e.actor = ${ctx.userId} AND e.delta < 0
+    `,
+    q`
+      WITH source AS MATERIALIZED (
+        SELECT e.id, e.card_id, e.created_at, c.customer_id, c.program_id
+        FROM ws.loyalty_events e
+        JOIN ws.loyalty_cards c ON c.account_id = e.account_id AND c.id = e.card_id
+        WHERE e.account_id = ${acc} AND e.business_id = ${biz} AND e.id = ${eventId}
+          AND e.kind = 'redeem' AND e.actor = ${ctx.userId} AND e.delta < 0
+          AND e.created_at >= now() - interval '1 minute' AND c.status = 'redeemed'
+      ), current_card AS MATERIALIZED (
+        SELECT c.id, c.program_id, c.customer_id
+        FROM ws.loyalty_cards c JOIN source s ON s.card_id = c.id AND s.program_id = c.program_id
+        WHERE c.account_id = ${acc} AND c.business_id = ${biz}
+        FOR UPDATE
+      ), removed AS (
+        DELETE FROM ws.loyalty_events e USING source s, current_card c
+        WHERE e.account_id = ${acc} AND e.id = s.id AND e.card_id = c.id
+          AND NOT EXISTS (
+            SELECT 1 FROM ws.loyalty_events later
+            WHERE later.account_id = e.account_id AND later.card_id = e.card_id AND later.id <> e.id
+              AND (later.created_at > e.created_at OR (later.created_at = e.created_at AND later.xmin::text::bigint > e.xmin::text::bigint))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM ws.loyalty_cards active
+            WHERE active.account_id = ${acc} AND active.business_id = ${biz}
+              AND active.program_id = c.program_id AND active.customer_id = c.customer_id
+              AND active.id <> c.id AND active.status IN ('active', 'full')
+          )
+        RETURNING e.card_id
+      ), restored AS (
+        UPDATE ws.loyalty_cards c SET status = 'full', redeemed_at = NULL
+        FROM removed r
+        WHERE c.account_id = ${acc} AND c.business_id = ${biz} AND c.id = r.card_id AND c.status = 'redeemed'
+        RETURNING c.id
+      )
+      SELECT EXISTS (SELECT 1 FROM restored) AS undone
+    `,
+  ])
+  void lock
+  return Boolean((result as WsRow[])[0]?.undone)
 }
 
 /**

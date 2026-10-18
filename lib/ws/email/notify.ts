@@ -404,12 +404,24 @@ export async function cancelPendingNotice(scope: Scope, key: `declined:${string}
 
 async function loadCard(scope: Scope, businessId: string, customerId: string): Promise<CustomerExtras['card']> {
   const [c] = await wsDb(scope)`
-    SELECT lc.stamps, lp.stamps_needed, lp.reward_text
-    FROM ws.loyalty_cards lc JOIN ws.loyalty_programs lp ON lp.account_id = lc.account_id AND lp.id = lc.program_id
-    WHERE lc.account_id = ${scope.accountId} AND lc.business_id = ${businessId} AND lc.customer_id = ${customerId}
-      AND lp.enabled AND lc.status IN ('active', 'full')
-    ORDER BY lc.created_at DESC LIMIT 1`
-  return c ? { stamps: Number(c.stamps), needed: Number(c.stamps_needed), reward: (c.reward_text as string | null) || null } : null
+    SELECT lp.stamps_needed, lp.reward_text, lc.stamps, lc.status
+    FROM ws.loyalty_programs lp
+    LEFT JOIN LATERAL (
+      SELECT card.stamps, card.status FROM ws.loyalty_cards card
+      WHERE card.account_id = lp.account_id AND card.program_id = lp.id AND card.customer_id = ${customerId}
+        AND card.status IN ('active', 'full', 'redeemed')
+      ORDER BY CASE WHEN card.status IN ('active', 'full') THEN 0 ELSE 1 END, card.created_at DESC
+      LIMIT 1
+    ) lc ON true
+    WHERE lp.account_id = ${scope.accountId} AND lp.business_id = ${businessId} AND lp.enabled`
+  return c
+    ? {
+        stamps: Number(c.stamps ?? 0),
+        needed: Number(c.stamps_needed),
+        reward: (c.reward_text as string | null) || null,
+        status: (c.status as 'active' | 'full' | 'redeemed' | null) ?? 'empty',
+      }
+    : null
 }
 
 /** Zaplacená návštěva: poděkování se stavem karty; plná karta = navíc „Odměna je připravená“. */

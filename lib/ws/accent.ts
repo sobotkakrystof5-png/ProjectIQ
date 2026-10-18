@@ -31,9 +31,20 @@ const darken = ([r, g, b]: [number, number, number], f: number): [number, number
   Math.round(b * f),
 ]
 
+function hexColor([r, g, b]: [number, number, number]): string {
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
 /** Barva tlačítka jako hex, nebo null (výchozí navy). */
 export function usableAccent(hex: string | null | undefined): string | null {
   return hex && contrastWithWhite(hex) >= 4.5 ? hex.toLowerCase() : null
+}
+
+/** Gradient věrnostní karty podle barvy byznysu, jen pokud má text dostatečný kontrast. */
+export function accentGradient(hex: string | null | undefined): string | null {
+  const usable = usableAccent(hex)
+  const c = usable ? rgb(usable) : null
+  return usable && c ? `linear-gradient(135deg, ${usable}, ${hexColor(darken(c, 0.82))})` : null
 }
 
 /** CSS proměnné, které přebijí navy-700/800/900 uvnitř kořene stránky. */

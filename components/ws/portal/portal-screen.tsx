@@ -54,6 +54,8 @@ export function PortalScreen({ token, view }: { token: string; view: PortalView 
               stamps={view.loyalty.stamps}
               total={view.loyalty.needed}
               reward={view.loyalty.reward}
+              status={view.loyalty.status}
+              accentColor={brand.color}
             />
           </section>
         )}
