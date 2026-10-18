@@ -25,4 +25,5 @@ export const RESERVED_BUSINESS_SLUGS: ReadonlySet<string> = new Set([
   '_design',
   'api',
   'nastaveni',
+  'navody',
 ])

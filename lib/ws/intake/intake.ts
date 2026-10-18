@@ -40,6 +40,7 @@ export type ApiCode =
   | 'INVALID_BODY'
   | 'VALIDATION_ERROR'
   | 'SLOT_TAKEN'
+  | 'SESSION_FULL'
   | 'IDEMPOTENCY_MISMATCH'
   | 'IN_PROGRESS'
   | 'NOT_CONFIGURED'
@@ -148,19 +149,24 @@ export async function loadIntakeConfig(accountId: string, businessId: string): P
 export type SlotData = Omit<Parameters<typeof computeSlots>[0], 'fromDay' | 'days' | 'stepMin'>
 
 /** Přesun z portálu (S16): přesouvaný termín neblokuje sám sebe a délka je jeho vlastní. */
-export type SlotOptions = { excludeAppointmentId?: string | null; durationMin?: number }
+export type SlotOptions = { excludeAppointmentId?: string | null; excludeGroupId?: string | null; durationMin?: number }
 
-export async function loadSlotData(accountId: string, config: IntakeConfig, serviceId: string | null, now: Date, opts: SlotOptions = {}): Promise<SlotData> {
+export async function loadSlotData(accountId: string, config: IntakeConfig, serviceSelection: string | readonly string[] | null, now: Date, opts: SlotOptions = {}): Promise<SlotData> {
   const exclude = opts.excludeAppointmentId ?? null
+  const excludeGroup = opts.excludeGroupId ?? null
   const biz = config.business.id
+  const serviceIds = (Array.isArray(serviceSelection) ? serviceSelection : serviceSelection ? [serviceSelection] : []) as readonly string[]
   const from = now
   const to = new Date(now.getTime() + (BOOKING.slotDays + 2) * 86_400_000)
   const [staffRows, shiftRows, busyRows] = await wsDb({ accountId }).batch([
     q`SELECT st.id, st.name FROM ws.staff st
       WHERE st.account_id = ${accountId} AND st.business_id = ${biz} AND st.active
-        AND (${serviceId}::uuid IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
-          OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))`,
+        AND NOT EXISTS (
+          SELECT 1 FROM unnest(${serviceIds}::uuid[]) wanted(service_id)
+          WHERE EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active
+            WHERE x.account_id = st.account_id AND x.service_id = wanted.service_id)
+            AND NOT EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = wanted.service_id AND x.staff_id = st.id)
+        )`,
     q`SELECT staff_id, weekday, opens::text AS opens, closes::text AS closes FROM ws.opening_hours
       WHERE account_id = ${accountId} AND business_id = ${biz} AND staff_id IS NOT NULL`,
     q`SELECT a.staff_id, a.starts_at,
@@ -170,6 +176,7 @@ export async function loadSlotData(accountId: string, config: IntakeConfig, serv
       WHERE a.account_id = ${accountId} AND a.business_id = ${biz} AND a.status <> 'cancelled'
         AND a.starts_at < ${to} AND a.ends_at > ${from}
         AND a.id IS DISTINCT FROM ${exclude}::uuid
+        AND (${excludeGroup}::uuid IS NULL OR a.group_id IS DISTINCT FROM ${excludeGroup}::uuid)
       LIMIT 5000`,
   ])
   const shifts = new Map<string, Map<number, Range[]>>()
@@ -189,11 +196,11 @@ export async function loadSlotData(accountId: string, config: IntakeConfig, serv
       .filter((a) => a.staff_id === s.id)
       .map((a) => ({ start: a.starts_at as Date, end: a.ends_at as Date })),
   }))
-  const service = config.services.find((s) => s.id === serviceId)
+  const selectedServices = serviceIds.map((id) => config.services.find((service) => service.id === id)).filter((service): service is IntakeService => Boolean(service))
   return {
     now,
     // Rozestup blokuje další termín, ale neprodlužuje zobrazenou návštěvu.
-    durationMin: opts.durationMin ?? (service?.duration_min ?? 60) + (service?.buffer_min ?? 0),
+    durationMin: opts.durationMin ?? (selectedServices.length ? selectedServices.reduce((sum, service) => sum + service.duration_min, 0) : 60),
     leadMin: BOOKING.leadMin,
     hours: config.hours,
     staff,
@@ -207,7 +214,7 @@ export async function loadSlotData(accountId: string, config: IntakeConfig, serv
 export async function loadSlots(
   accountId: string,
   config: IntakeConfig,
-  serviceId: string | null,
+  serviceId: string | readonly string[] | null,
   now: Date = new Date(),
   opts: SlotOptions = {},
 ): Promise<DaySlots[]> {
@@ -223,12 +230,16 @@ export type OrderAvailability = { slots: DaySlots[]; staff: PublicStaffOption[] 
 export async function loadOrderAvailability(
   accountId: string,
   config: IntakeConfig,
-  serviceId: string | null,
+  serviceSelection: string | readonly string[] | null,
   staffId: string | null = null,
   now: Date = new Date(),
 ): Promise<OrderAvailability> {
   if (config.booking !== 'slots') return { slots: [], staff: [] }
-  const data = await loadSlotData(accountId, config, serviceId, now)
+  const serviceIds = (Array.isArray(serviceSelection) ? serviceSelection : serviceSelection ? [serviceSelection] : []) as readonly string[]
+  const selectedServices = serviceIds.map((id) => config.services.find((service) => service.id === id))
+  if (selectedServices.some((service) => !service)) return { slots: [], staff: [] }
+  const durationMin = selectedServices.length ? selectedServices.reduce((sum, service) => sum + service!.duration_min, 0) : 60
+  const data = await loadSlotData(accountId, config, serviceIds, now, { durationMin })
   const staff = data.staff.map((s) => ({ id: s.id, name: s.name ?? '' }))
   const selected = staffId ? data.staff.filter((s) => s.id === staffId) : data.staff
   return {
@@ -237,6 +248,49 @@ export async function loadOrderAvailability(
       : computeSlots({ ...data, staff: selected, fromDay: pragueToday(now), days: BOOKING.slotDays, stepMin: BOOKING.stepMin }),
     staff,
   }
+}
+
+export type PublicSession = {
+  id: string
+  serviceId: string
+  serviceName: string
+  start: Date
+  end: Date
+  staffName: string | null
+  capacity: number
+  reserved: number
+  places: number
+}
+
+/** Lekce, které může zákazník ještě rezervovat. Poptávající místa jsou už započtena. */
+export async function getOpenSessions(
+  accountId: string,
+  businessId: string,
+  serviceIds: readonly string[] = [],
+  now = new Date(),
+): Promise<PublicSession[]> {
+  const [rows] = await wsDb(scope(accountId)).batch([
+    q`
+      SELECT se.id, se.service_id, s.name AS service_name, a.starts_at, a.ends_at, st.name AS staff_name,
+        se.capacity, se.reserved, (se.capacity - se.reserved)::int AS places
+      FROM ws.sessions se
+      JOIN ws.appointments a ON a.account_id = se.account_id AND a.business_id = se.business_id AND a.id = se.appointment_id
+      JOIN ws.services s ON s.account_id = se.account_id AND s.business_id = se.business_id AND s.id = se.service_id
+      LEFT JOIN ws.staff st ON st.account_id = a.account_id AND st.id = a.staff_id
+      WHERE se.account_id = ${accountId} AND se.business_id = ${businessId}
+        AND se.status = 'open' AND se.reserved < se.capacity
+        AND a.status = 'confirmed' AND a.kind = 'visit' AND a.starts_at >= ${now}::timestamptz
+        AND (cardinality(${[...serviceIds]}::uuid[]) = 0 OR se.service_id = ANY(${[...serviceIds]}::uuid[]))
+        AND s.active
+      ORDER BY a.starts_at, s.position
+      LIMIT 100
+    `,
+  ])
+  return (rows as WsRow[]).map((r) => ({
+    id: String(r.id), serviceId: String(r.service_id), serviceName: String(r.service_name),
+    start: r.starts_at as Date, end: r.ends_at as Date, staffName: (r.staff_name as string | null) ?? null,
+    capacity: Number(r.capacity), reserved: Number(r.reserved), places: Number(r.places),
+  }))
 }
 
 // --- Vstup ------------------------------------------------------------------
@@ -257,6 +311,8 @@ export const requestInputSchema = z
     phone: optionalText(40),
     email: optionalText(200).transform((v) => (v ? v.toLowerCase() : null)),
     serviceId: z.string().uuid('Služba: vyberte prosím službu ze seznamu.').nullish(),
+    serviceIds: z.array(z.string().uuid('Služba: vyberte prosím službu ze seznamu.')).max(5).optional(),
+    sessionId: z.string().uuid().nullish(),
     // Volitelné a zpětně kompatibilní: pouze veřejný požadavek na konkrétního pracovníka.
     staffId: z.string().uuid('Pracovník: vyberte prosím ze seznamu.').nullish(),
     start: z
@@ -289,6 +345,12 @@ export const requestInputSchema = z
     }
     if (!v.phone && !v.email) {
       ctx.addIssue({ code: 'custom', path: ['phone'], message: 'Kontakt: vyplňte prosím telefon nebo e-mail.' })
+    }
+    if (v.serviceIds && new Set(v.serviceIds).size !== v.serviceIds.length) {
+      ctx.addIssue({ code: 'custom', path: ['serviceIds'], message: 'Stejnou službu vyberte jen jednou.' })
+    }
+    if (v.serviceIds?.length && v.serviceId && v.serviceIds[0] !== v.serviceId) {
+      ctx.addIssue({ code: 'custom', path: ['serviceIds'], message: 'První služba musí odpovídat poli serviceId.' })
     }
   })
 
@@ -445,18 +507,32 @@ export async function ingestRequest(
     return finish({ status: 202, body: { success: true, id: '00000000-0000-4000-8000-000000000000' } }, null, true)
   }
 
-  let service: IntakeService | null = null
-  if (input.serviceId) {
-    service = config.services.find((s) => s.id === input.serviceId) ?? null
-    if (!service) {
+  const serviceIds = input.serviceIds?.length ? input.serviceIds : input.serviceId ? [input.serviceId] : []
+  const services = serviceIds.map((id) => config.services.find((service) => service.id === id))
+  if (services.some((service) => !service)) {
       return finish(
         apiError(400, 'VALIDATION_ERROR', 'Služba: vyberte prosím službu ze seznamu.', [
-          { field: 'serviceId', message: 'Služba: vyberte prosím službu ze seznamu.' },
+          { field: serviceIds.length > 1 ? 'serviceIds' : 'serviceId', message: 'Služba: vyberte prosím službu ze seznamu.' },
         ]),
         null,
         false,
       )
-    }
+  }
+  const selectedServices = services as IntakeService[]
+  const service = selectedServices[0] ?? null
+  const durationMin = selectedServices.length ? selectedServices.reduce((sum, item) => sum + item.duration_min, 0) : 60
+  const sessionId = input.sessionId ?? null
+  if (durationMin > 12 * 60) {
+    const msg = 'Vybrané služby jsou dohromady příliš dlouhé. Vyberte prosím kratší kombinaci.'
+    return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'serviceIds', message: msg }]), null, false)
+  }
+  if (sessionId && (selectedServices.length !== 1 || input.staffId)) {
+    const msg = 'U skupinové lekce vyberte jednu službu a nepřiřazujte dalšího pracovníka.'
+    return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'sessionId', message: msg }]), null, false)
+  }
+  if (sessionId && !input.start && !(input.date && input.time)) {
+    const msg = 'Vybranou skupinovou lekci odešlete i s jejím termínem.'
+    return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'sessionId', message: msg }]), null, false)
   }
 
   if (input.staffId && (config.booking !== 'slots' || !input.start && !(input.date && input.time))) {
@@ -476,8 +552,19 @@ export async function ingestRequest(
       const msg = 'Čas: vyberte prosím termín v budoucnu.'
       return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'start', message: msg }]), null, false)
     }
-    if (config.booking === 'slots' && (!isTest || input.staffId)) {
-      const data = await loadSlotData(acc, config, service?.id ?? null, now)
+    if (sessionId && !isTest) {
+      const [sessionRows] = await wsDb(scope(acc)).batch([q`
+        SELECT se.id FROM ws.sessions se
+        JOIN ws.appointments a ON a.account_id = se.account_id AND a.business_id = se.business_id AND a.id = se.appointment_id
+        WHERE se.account_id = ${acc} AND se.business_id = ${src.businessId} AND se.id = ${sessionId}
+          AND se.status = 'open' AND se.reserved < se.capacity AND a.status = 'confirmed'
+          AND se.service_id = ${service?.id ?? null}::uuid AND a.starts_at = ${start}::timestamptz
+      `])
+      if (!(sessionRows as WsRow[])[0]) {
+        return finish(apiError(409, 'SESSION_FULL', 'Lekce už nemá volné místo. Vyberte prosím jinou.'), null, false)
+      }
+    } else if (!sessionId && config.booking === 'slots' && (!isTest || input.staffId)) {
+      const data = await loadSlotData(acc, config, serviceIds, now, { durationMin })
       if (input.staffId && !data.staff.some((s) => s.id === input.staffId)) {
         const msg = 'Tento pracovník danou službu nenabízí. Vyberte prosím jiného.'
         return finish(apiError(400, 'VALIDATION_ERROR', msg, [{ field: 'staffId', message: msg }]), null, false)
@@ -503,22 +590,54 @@ export async function ingestRequest(
       await wsDb({ accountId: acc })`UPDATE ws.customers SET contact_consent_at = COALESCE(contact_consent_at, now()), unsubscribed_at = NULL
         WHERE account_id = ${acc} AND id = ${customerId}`
     }
-    const end = start ? new Date(start.getTime() + (service?.duration_min ?? 60) * 60_000) : null
+    const end = start ? new Date(start.getTime() + durationMin * 60_000) : null
     const contact = JSON.stringify({ name: input.name, phone: phone ?? undefined, email: input.email ?? undefined })
     const source = src.channel === 'secret' ? (input.source ?? 'web') : SOURCE[src.channel]
 
     const [insertedRows, existingRows] = await wsDb({ accountId: acc }).batch([
-      q`INSERT INTO ws.requests (account_id, business_id, customer_id, service_id, requested_staff_id, integration_id, wanted_start, wanted_end,
-                                 contact, field_values, message, source, external_id, is_test)
-        VALUES (${acc}, ${src.businessId}, ${customerId}::uuid, ${service?.id ?? null}::uuid, ${input.staffId ?? null}::uuid, ${src.integrationId}::uuid,
+      q`WITH available_session AS (
+        SELECT se.id
+        FROM ws.sessions se
+        JOIN ws.appointments a ON a.account_id = se.account_id AND a.business_id = se.business_id AND a.id = se.appointment_id
+        WHERE ${sessionId && !isTest ? sessionId : null}::uuid IS NOT NULL
+          AND se.account_id = ${acc} AND se.business_id = ${src.businessId} AND se.id = ${sessionId && !isTest ? sessionId : null}::uuid
+          AND se.status = 'open' AND se.reserved < se.capacity AND se.service_id = ${service?.id ?? null}::uuid
+          AND a.status = 'confirmed' AND a.starts_at = ${start}::timestamptz
+        FOR UPDATE OF se
+      ), inserted AS (
+        INSERT INTO ws.requests (account_id, business_id, customer_id, service_id, requested_staff_id, integration_id, wanted_start, wanted_end,
+                                 contact, field_values, message, source, external_id, is_test, session_id)
+        SELECT ${acc}, ${src.businessId}, ${customerId}::uuid, ${service?.id ?? null}::uuid, ${input.staffId ?? null}::uuid, ${src.integrationId}::uuid,
                 ${start}::timestamptz, ${end}::timestamptz, ${contact}::jsonb, ${JSON.stringify(fieldsParsed.data)}::jsonb,
-                ${input.message}, ${source}, ${input.externalId}, ${isTest})
+                ${input.message}, ${source}, ${input.externalId}, ${isTest}, ${sessionId && !isTest ? sessionId : null}::uuid
+        WHERE ${!sessionId || isTest}::boolean OR EXISTS (SELECT 1 FROM available_session)
         ON CONFLICT (business_id, external_id) WHERE external_id IS NOT NULL DO NOTHING
-        RETURNING id`,
+        RETURNING id
+      ), services AS (
+        INSERT INTO ws.request_services (account_id, business_id, request_id, service_id, position)
+        SELECT ${acc}, ${src.businessId}, inserted.id, selected.service_id, selected.position::smallint
+        FROM inserted CROSS JOIN unnest(${serviceIds}::uuid[]) WITH ORDINALITY AS selected(service_id, position)
+      ), attendees AS (
+        INSERT INTO ws.session_attendees (account_id, business_id, session_id, request_id, customer_id)
+        SELECT ${acc}, ${src.businessId}, ${sessionId && !isTest ? sessionId : null}::uuid, inserted.id, ${customerId}::uuid
+        FROM inserted WHERE ${Boolean(sessionId && !isTest)}::boolean
+        RETURNING session_id
+      ), reserved_session AS (
+        UPDATE ws.sessions se SET reserved = se.reserved + 1
+        FROM attendees
+        WHERE se.account_id = ${acc} AND se.business_id = ${src.businessId} AND se.id = attendees.session_id
+        RETURNING se.id
+      )
+      SELECT id FROM inserted`,
       q`SELECT id FROM ws.requests WHERE account_id = ${acc} AND business_id = ${src.businessId}
           AND ${input.externalId}::text IS NOT NULL AND external_id = ${input.externalId}::text`,
     ])
     const inserted = (insertedRows as WsRow[])[0]
+    if (sessionId && !isTest && !inserted && !(existingRows as WsRow[])[0]) {
+      const result = apiError(409, 'SESSION_FULL', 'Lekce už nemá volné místo. Vyberte prosím jinou.')
+      if (idem) await settleIdempotency(acc, idem, result).catch(() => undefined)
+      return finish(result, null, false)
+    }
     const id = String((inserted ?? (existingRows as WsRow[])[0])?.id ?? '')
     if (!id) throw new Error('poptávka se neuložila')
     const duplicate = !inserted
@@ -531,7 +650,7 @@ export async function ingestRequest(
     const result: IntakeResult = { status: duplicate ? 200 : 202, body }
 
     if (idem) await settleIdempotency(acc, idem, result).catch(() => undefined)
-    if (!duplicate) await afterSave(src, config, { id, name: input.name, service: service?.name ?? null, start, test: isTest, customerId })
+    if (!duplicate) await afterSave(src, config, { id, name: input.name, service: selectedServices.map((item) => item.name).join(' · ') || null, start, test: isTest, customerId })
     return finish(result, id, isTest)
   } catch (e) {
     if (idem) await settleIdempotency(acc, idem, null).catch(() => undefined)

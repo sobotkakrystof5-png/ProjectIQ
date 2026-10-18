@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { assertWritable } from '@/lib/ws/billing'
 import * as bookings from '@/lib/ws/bookings'
 import type { BookingError, BookingResult } from '@/lib/ws/bookings'
-import { requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
+import { hasRole, requireBusiness, requireWorkspace, type WsBusiness, type WsContext } from '@/lib/ws/context'
 import * as mail from '@/lib/ws/email/notify'
 import { findCustomersForBooking, type CustomerOption } from '@/lib/ws/calendar'
 import { stampJob } from '@/lib/ws/loyalty'
@@ -28,6 +28,11 @@ const MESSAGES: Record<BookingError, string> = {
   needs_time: 'Vyberte prosím den a čas termínu.',
   invalid_staff: 'Vybraný pracovník tu není. Vyberte prosím jiného.',
   invalid_customer: 'Zákazník se nenašel. Vyberte ho prosím znovu.',
+  invalid_service: 'Vybraná služba už není dostupná. Obnovte prosím stránku.',
+  session_full: 'Lekce už nemá volné místo. Vyberte prosím jinou.',
+  session_closed: 'Přihlašování na lekci je zastavené.',
+  session_cancelled: 'Lekce už se nekoná. Obnovte prosím stránku.',
+  session_time_fixed: 'Skupinovou lekci nelze přesunout pro jednoho účastníka. Vyberte prosím původní čas.',
   bad_length: 'Termín může trvat nejméně 15 minut a nejvýš 12 hodin.',
 }
 
@@ -110,7 +115,7 @@ export async function confirmRequest(raw: unknown): Promise<Result<{ message: st
     await refreshSegmentsFor(c.ctx, c.business, { requestId: input.requestId })
     if (appointmentId) {
       const changed = Boolean(input.at) && (await bookings.requestStatus(c.ctx, c.business, input.requestId)) === 'rescheduled'
-      await mail.notifyBookingConfirmed(c.ctx, c.business.id, appointmentId, { changed })
+      await mail.notifyBookingConfirmed(c.ctx, c.business.id, appointmentId, { changed, requestId: input.requestId })
       await mail.deliver(c.ctx)
     }
   }
@@ -147,12 +152,15 @@ const bookingSchema = z
     phone: z.string().trim().max(30).optional(),
     email: z.string().trim().toLowerCase().max(200).optional(),
     serviceId: optionalUuid,
+    serviceIds: z.array(uuid).max(5).optional(),
     staffId: optionalUuid,
     at: when,
     /** Délka z rychlého zadání (tažením v mřížce); bez ní platí délka služby. */
     durationMin: z.number().int().min(15).max(720).nullable().optional(),
     note: z.string().trim().max(1000).optional(),
   })
+  .refine((v) => !v.serviceIds || new Set(v.serviceIds).size === v.serviceIds.length, { path: ['serviceIds'] })
+  .refine((v) => !v.serviceIds?.length || v.serviceIds[0] === v.serviceId, { path: ['serviceIds'] })
   .refine((v) => v.customerId || v.name, { path: ['name'] })
   .refine((v) => v.customerId || v.phone?.trim() || v.email?.trim(), { path: ['phone'], message: 'Zadejte prosím telefon nebo e-mail.' })
 
@@ -175,6 +183,7 @@ export async function createManualBooking(raw: unknown): Promise<Result<{ messag
         customerId: input.customerId ?? null,
         customer: input.customerId ? null : { name: input.name!, phone, email },
         serviceId: input.serviceId ?? null,
+        serviceIds: input.serviceIds,
         staffId: input.staffId ?? null,
         start: toUtc(input.at),
         durationMin: input.durationMin ?? null,
@@ -187,6 +196,47 @@ export async function createManualBooking(raw: unknown): Promise<Result<{ messag
     await mail.notifyBookingConfirmed(c.ctx, c.business.id, res.data.appointmentId)
     await mail.deliver(c.ctx)
   }
+  return res
+}
+
+const groupSessionSchema = z.object({ slug, serviceId: uuid, staffId: optionalUuid, at: when, title: z.string().trim().min(1).max(120), capacity: z.number().int().min(2).max(30) })
+
+/** Vypíše skupinovou lekci v kalendáři. */
+export async function createGroupSession(raw: unknown): Promise<Result<{ message: string; appointmentId: string; sessionId: string }>> {
+  const p = await prepare(groupSessionSchema, raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  if (!hasRole(c.ctx, 'owner')) return fail('Skupinové lekce může vypisovat jen majitel.')
+  const start = toUtc(input.at)
+  if (start.getTime() < Date.now()) return fail('Skupinovou lekci můžete vypsat jen do budoucna.')
+  const res = await run(
+    'createGroupSession', c,
+    () => bookings.createGroupSession(c.ctx, c.business, {
+      serviceId: input.serviceId, staffId: input.staffId ?? null, start, title: input.title, capacity: input.capacity,
+    }),
+    (created) => ({
+      message: `Lekce „${input.title}“ je vypsaná na ${label(start)}.`,
+      appointmentId: created.appointmentId,
+      sessionId: created.sessionId,
+    }),
+  )
+  if (res.ok) await refreshSegmentsFor(c.ctx, c.business, { appointmentId: res.data.appointmentId })
+  return res
+}
+
+const sessionStatusSchema = z.object({ slug, sessionId: uuid, open: z.boolean() })
+
+/** Zastaví přihlašování nebo ho znovu povolí, dokud lekce nezačala. */
+export async function setGroupSessionOpen(raw: unknown): Promise<Result<{ message: string }>> {
+  const p = await prepare(sessionStatusSchema, raw)
+  if (!p.ok) return p
+  const { input, c } = p
+  if (!hasRole(c.ctx, 'owner')) return fail('Přihlašování na skupinovou lekci může měnit jen majitel.')
+  const res = await run(
+    'setGroupSessionOpen', c,
+    () => bookings.setGroupSessionOpen(c.ctx, c.business, input.sessionId, input.open),
+    () => ({ message: input.open ? 'Přihlašování je znovu otevřené.' : 'Přihlašování na lekci je zastavené.' }),
+  )
   return res
 }
 

@@ -35,7 +35,10 @@ export async function peekActionLink(token: string): Promise<LinkState> {
   const scope = { accountId: link.accountId }
   const [row] = await wsDb(scope)`
     SELECT t.business_id, t.request_id, t.used_at, t.expires_at < now() AS expired,
-           r.status, r.wanted_start, r.message, c.name, s.name AS service,
+           r.status, r.wanted_start, r.message, c.name,
+           COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+             FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+             WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service,
            b.name AS business_name, b.color, b.slug,
            EXISTS (SELECT 1 FROM ws.business_modules m WHERE m.account_id = t.account_id AND m.business_id = t.business_id AND m.module = 'calendar' AND m.enabled) AS calendar,
            EXISTS (SELECT 1 FROM ws.business_modules m WHERE m.account_id = t.account_id AND m.business_id = t.business_id AND m.module = 'jobs' AND m.enabled) AS jobs

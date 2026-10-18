@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { setWsDriverForTests, type WsDriver, type WsRow } from '../db'
 import { setAdminAuthForTests } from '../admin/auth'
 import { setAdminDriverForTests } from '../admin/db'
-import { getClientDetail, listClients, saveClientNote } from '../admin/clients'
+import { getClientDetail, listClients } from '../admin/clients'
 import { InviteSetupError, inviteClient, setInviteClerkForTests, type InviteClerk } from '../admin/invite'
 import { generateWebKeys } from '../admin/web-keys'
 import { deleteNewsDraft, newsRecipients, parseNewsImage, publishNews, saveNews, sendNewsEmail, unpublishNews } from '../admin/news'
@@ -17,7 +17,7 @@ import { setEmailTransportForTests } from '../email/transport'
 import { newsTextHints, sniffImageType } from '../news-format'
 import { asApp, createWsTestDb, ids, pgCode, pgliteDriver } from './helpers/ws-pglite'
 import { GET as newsImage } from '../../../app/z/novinky/[id]/obrazek/route'
-import { inviteClientAction, saveNoteAction, generateWebKeysAction, resendInviteAction } from '../../../app/dashboard/klienti/actions'
+import { inviteClientAction, generateWebKeysAction, resendInviteAction } from '../../../app/dashboard/klienti/actions'
 import { saveNewsAction, publishNewsAction, sendNewsEmailAction, deleteNewsAction, newsRecipientsAction } from '../../../app/dashboard/novinky/actions'
 
 vi.mock('server-only', () => ({}))
@@ -98,7 +98,6 @@ describe('bez admina nic', () => {
       inviteClientAction({ email: 'novy@example.cz', businessName: 'Nový klient', industry: 'zamecnictvi' }),
       resendInviteAction({ accountId: A.account, email: 'x@example.cz' }),
       generateWebKeysAction({ accountId: A.account, businessId: A.business }),
-      saveNoteAction({ accountId: A.account, note: 'tajné' }),
       saveNewsAction({ id: null, title: 'X', body: 'Y', link: '', tag: 'new', image: { action: 'keep' } }),
       publishNewsAction({ id: A.account }),
       deleteNewsAction({ id: A.account }),
@@ -214,14 +213,11 @@ describe('klíče a prompt pro web', () => {
   })
 })
 
-describe('poznámka k účtu', () => {
-  it('admin ji uloží a smaže, klient (ws_app) ji nepřečte', async () => {
-    await saveClientNote(admin, A.account, '  Web staví Kryštof, fakturace ročně.  ')
-    expect((await getClientDetail(A.account))?.note?.text).toBe('Web staví Kryštof, fakturace ročně.')
+describe('soukromí účtu v administraci', () => {
+  it('detail klienta nezobrazuje interní poznámky; klient (ws_app) je nepřečte', async () => {
+    await db.query(`INSERT INTO ws.account_admin_notes (account_id, note, updated_by) VALUES ($1, $2, $3)`, [A.account, 'Soukromá poznámka', admin.email])
+    expect(await getClientDetail(A.account)).not.toHaveProperty('note')
     expect(await pgCode(asApp(db, A.account, (tx) => tx.query(`SELECT * FROM ws.account_admin_notes`)))).toBe('42501')
-    await saveClientNote(admin, A.account, '')
-    expect((await getClientDetail(A.account))?.note).toBeNull()
-    expect((await saveNoteAction({ accountId: A.account, note: 'x'.repeat(4001) })).ok).toBe(false)
   })
 })
 

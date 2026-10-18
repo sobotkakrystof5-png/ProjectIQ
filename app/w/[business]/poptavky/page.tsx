@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { HelpLink } from '@/components/ws/app/help-link'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
 import { IncomingCard } from '@/components/ws/app/today/incoming-list'
@@ -63,7 +64,7 @@ export default async function RequestsPage(
 
   return (
     <PageShell width="narrow">
-      <PageHeader title="Poptávky" accent="na jednom místě." />
+      <PageHeader title="Poptávky" accent="na jednom místě." help={<HelpLink slug={business.slug} topic="poptavky-a-kalendar" guide="potvrdit-poptavku" />} />
 
       <PillNav
         label="Stav poptávek"

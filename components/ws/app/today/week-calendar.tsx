@@ -133,7 +133,7 @@ export function WeekCalendar({
                   const body = (
                     <>
                       <span className="block truncate font-num text-[10px] leading-tight opacity-80">{formatClock(e.start)}</span>
-                      {!short && <span className="block truncate text-[12px] font-semibold leading-tight">{e.title}</span>}
+                      {!short && <span data-ws-private-value={e.kind === 'block' ? undefined : true} className="block truncate text-[12px] font-semibold leading-tight">{e.title}</span>}
                     </>
                   )
                   const cls = cn(

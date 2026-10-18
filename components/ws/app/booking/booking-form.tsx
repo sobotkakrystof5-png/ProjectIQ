@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from '@/components/ui/toast'
 import { cancelAppointment, createManualBooking } from '@/app/w/[business]/poptavky/actions'
 import { undoToast, useWsAction } from './use-ws-action'
-import { clockValue, NativeSelect, parseClock, StaffSelect, WhenFields } from './when-fields'
+import { clockValue, parseClock, StaffSelect, WhenFields } from './when-fields'
 
 type Option = { id: string; name: string }
 
@@ -38,6 +38,7 @@ export function BookingForm({
     day: string | null
     minutes: number | null
     service: string
+    serviceIds: string[]
     staffId: string | null
   }
 }) {
@@ -50,7 +51,8 @@ export function BookingForm({
   const [name, setName] = useState(prefill.name)
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [serviceId, setServiceId] = useState(matched?.id ?? (services.length === 1 ? services[0].id : ''))
+  const requestedServices = prefill.serviceIds.filter((id) => services.some((service) => service.id === id)).slice(0, 5)
+  const [serviceIds, setServiceIds] = useState<string[]>(requestedServices.length ? requestedServices : matched ? [matched.id] : services.length === 1 ? [services[0].id] : [])
   const [staffId, setStaffId] = useState(prefill.staffId ?? '')
   const [day, setDay] = useState(prefill.day ?? today)
   const [time, setTime] = useState(prefill.minutes !== null ? clockValue(prefill.minutes) : '')
@@ -75,7 +77,8 @@ export function BookingForm({
           name: customer ? undefined : name,
           phone: customer ? undefined : phone || undefined,
           email: customer ? undefined : email || undefined,
-          serviceId: serviceId || null,
+          serviceId: serviceIds[0] ?? null,
+          serviceIds,
           staffId: staffId || null,
           at: { day, minutes },
           note: note || undefined,
@@ -126,15 +129,28 @@ export function BookingForm({
       )}
       {services.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rez-sluzba">Služba</Label>
-          <NativeSelect id="rez-sluzba" value={serviceId} onChange={setServiceId}>
-            <option value="">Bez služby (1 hodina)</option>
+          <Label>Služby</Label>
+          <fieldset className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-box border border-line p-2">
+            <legend className="sr-only">Služby rezervace</legend>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-chip px-2 text-sm hover:bg-accent">
+              <input type="checkbox" checked={serviceIds.length === 0} onChange={() => setServiceIds([])} className="h-4 w-4 accent-navy-700" />
+              Bez služby (1 hodina)
+            </label>
             {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} · {s.duration_min} min
-              </option>
+              <label key={s.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-chip px-2 text-sm hover:bg-accent">
+                <input
+                  type="checkbox"
+                  checked={serviceIds.includes(s.id)}
+                  disabled={!serviceIds.includes(s.id) && (serviceIds.length >= 5 || serviceIds.reduce((sum, id) => sum + (services.find((item) => item.id === id)?.duration_min ?? 0), 0) + s.duration_min > 720)}
+                  onChange={() => setServiceIds(serviceIds.includes(s.id) ? serviceIds.filter((id) => id !== s.id) : [...serviceIds, s.id])}
+                  className="h-4 w-4 accent-navy-700"
+                />
+                <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                <span className="font-num text-quiet">{s.duration_min} min</span>
+              </label>
             ))}
-          </NativeSelect>
+          </fieldset>
+          {serviceIds.length > 1 && <p className="text-sm text-quiet">Služby se naplánují za sebou ({serviceIds.reduce((sum, id) => sum + (services.find((item) => item.id === id)?.duration_min ?? 0), 0)} min).</p>}
         </div>
       )}
       <WhenFields idPrefix="rez" day={day} time={time} onDay={setDay} onTime={setTime} />

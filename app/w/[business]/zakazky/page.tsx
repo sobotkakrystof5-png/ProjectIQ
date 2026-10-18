@@ -6,6 +6,7 @@ import { DetailSlot } from '@/components/ws/app/detail-slot'
 import { JobBoard } from '@/components/ws/app/jobs/job-board'
 import { JobList } from '@/components/ws/app/jobs/job-list'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { HelpLink } from '@/components/ws/app/help-link'
 import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
 import { EmptyState } from '@/components/ws/brand'
 import { buttonVariants } from '@/components/ui/button'
@@ -87,6 +88,7 @@ export default async function JobsPage(
         title="Zakázky"
         accent="krok za krokem."
         subtitle={jobs.length > 0 ? `${plural(open, ['otevřená', 'otevřené', 'otevřených'])} · ${plural(jobs.length - open, ['uzavřená', 'uzavřené', 'uzavřených'])} za 30 dní` : undefined}
+        help={<HelpLink slug={business.slug} topic="poptavky-a-kalendar" guide="sledovat-zakazku" />}
       />
 
       {jobs.length === 0 ? (

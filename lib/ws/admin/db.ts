@@ -6,7 +6,8 @@ import { q, type WsDriver, type WsQuery, type WsRow } from '../db'
 // vlastník tabulek, RLS nepodléhá a vidí všechny účty. Proto jen tady, jen
 // z /dashboard/klienti a /dashboard/novinky a jen po requireAdmin().
 //
-// Zapisuje jen do: ws.product_news, ws.account_admin_notes, ws.audit_log.
+// Zapisuje jen do: ws.product_news, ws.audit_log. Historická tabulka
+// ws.account_admin_notes se kvůli ochraně soukromí už v konzoli nečte ani nepíše.
 // Všechno, co mění data účtu klienta (založení účtu, klíče webu), jde přes
 // lib/ws (role ws_app pod RLS) s accountId ověřeným tady.
 

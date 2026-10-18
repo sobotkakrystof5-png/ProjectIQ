@@ -176,7 +176,10 @@ type RequestRow = {
 
 async function loadRequest(scope: Scope, businessId: string, requestId: string): Promise<RequestRow | null> {
   const [r] = await wsDb(scope)`
-    SELECT r.status, r.wanted_start, r.message, r.customer_id, c.name, c.email, c.phone, s.name AS service
+    SELECT r.status, r.wanted_start, r.message, r.customer_id, c.name, c.email, c.phone,
+      COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+        FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+        WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service
     FROM ws.requests r
     LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
     LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
@@ -265,7 +268,11 @@ type AppointmentRow = {
 
 async function loadAppointment(scope: Scope, businessId: string, appointmentId: string): Promise<AppointmentRow | null> {
   const [a] = await wsDb(scope)`
-    SELECT a.id, a.public_token, a.starts_at, a.status, a.kind, a.customer_id, c.name, c.email, s.name AS service
+    SELECT a.id, a.public_token, a.starts_at, a.status, a.kind, a.customer_id, c.name, c.email,
+      COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY a2.starts_at)
+        FROM ws.appointments a2 LEFT JOIN ws.services s2 ON s2.account_id = a2.account_id AND s2.id = a2.service_id
+        WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+          AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))), s.name) AS service
     FROM ws.appointments a
     LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
     LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
@@ -289,20 +296,36 @@ export function visitPortalButton(sender: Pick<Sender, 'portal'>, publicToken: s
 }
 
 /** Potvrzený termín (z poptávky, z e-mailu majitele nebo ruční rezervace). `changed` = jiný čas, než zákazník chtěl. */
-export async function notifyBookingConfirmed(scope: Scope, businessId: string, appointmentId: string, opts: { changed?: boolean } = {}): Promise<void> {
+export async function notifyBookingConfirmed(scope: Scope, businessId: string, appointmentId: string, opts: { changed?: boolean; requestId?: string } = {}): Promise<void> {
   try {
     const sender = await loadSender(scope, businessId)
     const a = sender && (await loadAppointment(scope, businessId, appointmentId))
     if (!sender || !a || a.kind !== 'visit' || a.status !== 'confirmed') return
+    let customerId = a.customer_id
+    let name = a.name
+    let email = a.email
+    let sessionAttendee = false
+    if (opts.requestId && (!customerId || !email)) {
+      const [request] = await wsDb(scope)`
+        SELECT r.session_id, r.customer_id, COALESCE(c.name, NULLIF(r.contact->>'name', '')) AS name,
+          COALESCE(c.email, NULLIF(r.contact->>'email', '')) AS email
+        FROM ws.requests r LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
+        WHERE r.account_id = ${scope.accountId} AND r.business_id = ${businessId} AND r.id = ${opts.requestId}
+      `
+      sessionAttendee = Boolean(request?.session_id)
+      customerId = (customerId ?? (request?.customer_id as string | null)) ?? null
+      name = (name ?? (request?.name as string | null)) ?? null
+      email = (email ?? (request?.email as string | null)) ?? null
+    }
     await customerEmail(
       scope,
       sender,
       opts.changed ? 'booking_changed' : 'booking_confirmed',
-      { customerId: a.customer_id, email: a.email },
-      visitValues(a),
+      { customerId, email },
+      { ...visitValues(a), jmeno: name ?? '' },
       {
-        dedupeKey: `confirmed:${appointmentId}`,
-        extras: { calendarUrl: icsLink(scope, appointmentId), portal: visitPortalButton(sender, a.public_token) },
+        dedupeKey: `confirmed:${opts.requestId ?? appointmentId}`,
+        extras: { calendarUrl: icsLink(scope, appointmentId), portal: sessionAttendee ? null : visitPortalButton(sender, a.public_token) },
         validUntil: new Date(a.starts_at),
       },
     )

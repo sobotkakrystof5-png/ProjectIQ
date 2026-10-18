@@ -28,7 +28,7 @@ export function DraftList({ slug, drafts }: { slug: string; drafts: { id: string
         {drafts.map((d) => (
           <li key={d.id} className="flex min-h-11 items-center gap-2">
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-ink">{d.name}</span>
+              <span data-ws-private-value className="block truncate text-sm font-medium text-ink">{d.name}</span>
               <span className="block truncate text-xs text-quiet">{d.subject}</span>
             </span>
             <button

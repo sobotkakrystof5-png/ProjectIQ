@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Search } from 'lucide-react'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { HelpLink } from '@/components/ws/app/help-link'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
 import { CustomerContactActions } from '@/components/ws/customers/customer-contact-actions'
@@ -65,7 +66,7 @@ export default async function CustomersPage(
 
   return (
     <PageShell>
-      <PageHeader title="Zákazníci" accent="se vracejí." />
+      <PageHeader title="Zákazníci" accent="se vracejí." help={<HelpLink slug={business.slug} topic="zakaznici-a-vernost" guide="kontakt-zakaznika" />} />
 
       <div data-detail-grid className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -189,7 +190,7 @@ function CustomerTable({ items, today, hrefFor, slug, businessName }: { items: C
               <li key={c.id} className="border-b last:border-b-0">
                 <div className={cn(ROW_GRID, 'min-h-[60px] items-center px-5 py-3')}>
                   <span className="min-w-0">
-                    <Link href={hrefFor(c.id)} scroll={false} className="block truncate text-[15px] font-semibold text-ink underline-offset-4 hover:underline">{c.name}</Link>
+                    <Link href={hrefFor(c.id)} scroll={false} className="block truncate text-[15px] font-semibold text-ink underline-offset-4 hover:underline"><span data-ws-private-value>{c.name}</span></Link>
                   </span>
                   <span>
                     <SegmentBadge segment={c.segment} />
@@ -226,7 +227,7 @@ function CustomerTable({ items, today, hrefFor, slug, businessName }: { items: C
             <li key={c.id}>
               <div className="flex min-h-[64px] flex-col gap-1.5 px-4 py-3">
                 <span className="flex items-center justify-between gap-3">
-                  <Link href={hrefFor(c.id)} scroll={false} className="truncate text-[15px] font-semibold text-ink underline-offset-4 hover:underline">{c.name}</Link>
+                  <Link href={hrefFor(c.id)} scroll={false} className="truncate text-[15px] font-semibold text-ink underline-offset-4 hover:underline"><span data-ws-private-value>{c.name}</span></Link>
                   <SegmentBadge segment={c.segment} className="shrink-0" />
                 </span>
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-quiet">

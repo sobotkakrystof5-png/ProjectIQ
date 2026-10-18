@@ -4,6 +4,7 @@ import type { WsBusiness, WsContext } from './context'
 import type { CalendarEntry } from './today'
 import type { OpeningRow } from './calendar-layout'
 import { likePattern } from './search'
+import { groupAppointmentSegments, type AppointmentSegment } from './calendar-groups'
 
 // Data obrazovek Poptávky, Kalendář a Zakázky (S10). Stejná pravidla jako
 // lib/ws/today.ts: account_id z kontextu, business_id ověřeného byznysu.
@@ -16,7 +17,7 @@ export type CalStaff = StaffItem & { color: string | null }
 export type ServiceItem = { id: string; name: string; duration_min: number }
 
 /** Položka kalendáře s pracovníkem (sloupce v pohledu Den). */
-export type CalEntry = CalendarEntry & { staff_id: string | null; staff_name: string | null }
+export type CalEntry = CalendarEntry & { staff_id: string | null; staff_name: string | null; group_id?: string | null; session_id?: string | null; session_capacity?: number | null; session_reserved?: number | null }
 
 export type CalendarData = {
   entries: CalEntry[]
@@ -34,12 +35,14 @@ export async function getCalendarData(ctx: WsContext, business: Biz, range: { fr
   const { from, to } = range
   const [visits, wanted, staff, services, opening] = await wsDb(ctx).batch([
     q`
-      SELECT a.id, a.kind, a.starts_at, a.ends_at, a.customer_id, a.title, a.staff_id,
-             c.name AS customer_name, s.name AS service_name, st.name AS staff_name
+      SELECT a.id, a.group_id, a.kind, a.starts_at, a.ends_at, a.customer_id, a.title, a.staff_id,
+             c.name AS customer_name, s.name AS service_name, st.name AS staff_name,
+             se.id AS session_id, se.capacity AS session_capacity, se.reserved AS session_reserved
       FROM ws.appointments a
       LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
       LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
       LEFT JOIN ws.staff st ON st.account_id = a.account_id AND st.id = a.staff_id
+      LEFT JOIN ws.sessions se ON se.account_id = a.account_id AND se.business_id = a.business_id AND se.appointment_id = a.id
       WHERE a.account_id = ${acc} AND a.business_id = ${biz}
         AND a.status <> 'cancelled' AND a.starts_at < ${to} AND a.ends_at > ${from}
       ORDER BY a.starts_at
@@ -48,7 +51,12 @@ export async function getCalendarData(ctx: WsContext, business: Biz, range: { fr
     q`
       SELECT r.id, r.customer_id, r.wanted_start, r.wanted_end,
              COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
-             s.name AS service_name, s.duration_min
+             COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+               FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service_name,
+             COALESCE((SELECT sum(s2.duration_min)::int FROM ws.request_services rs
+               JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.duration_min) AS duration_min
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
@@ -77,19 +85,35 @@ export async function getCalendarData(ctx: WsContext, business: Biz, range: { fr
     `,
   ])
 
+  const groupedVisits = groupAppointmentSegments((visits as WsRow[]).map((r) => ({
+    id: String(r.id), group_id: (r.group_id as string | null) ?? null,
+    kind: String(r.kind), start: r.starts_at as Date, end: r.ends_at as Date,
+    title: (r.title as string | null) ?? null, customer_id: (r.customer_id as string | null) ?? null,
+    customer_name: (r.customer_name as string | null) ?? null, staff_id: (r.staff_id as string | null) ?? null,
+    staff_name: (r.staff_name as string | null) ?? null, service_name: (r.service_name as string | null) ?? null,
+    session_id: (r.session_id as string | null) ?? null,
+    session_capacity: r.session_capacity === null || r.session_capacity === undefined ? null : Number(r.session_capacity),
+    session_reserved: r.session_reserved === null || r.session_reserved === undefined ? null : Number(r.session_reserved),
+  } satisfies AppointmentSegment)))
   const entries: CalEntry[] = [
-    ...(visits as WsRow[]).map((r): CalEntry => {
+    ...groupedVisits.map((r): CalEntry => {
       const block = r.kind === 'block'
       return {
-        id: String(r.id),
+        id: r.id,
         kind: block ? 'block' : 'visit',
-        start: r.starts_at as Date,
-        end: r.ends_at as Date,
-        title: block ? String(r.title ?? 'Blokace') : String(r.customer_name ?? r.title ?? 'Termín'),
-        subtitle: block ? null : ((r.service_name as string | null) ?? null),
-        customer_id: (r.customer_id as string | null) ?? null,
-        staff_id: (r.staff_id as string | null) ?? null,
-        staff_name: (r.staff_name as string | null) ?? null,
+        start: r.start,
+        end: r.end,
+        title: block ? String(r.title ?? 'Blokace') : r.session_id
+          ? `${String(r.title ?? 'Skupinová lekce')} · ${Number(r.session_reserved ?? 0)}/${Number(r.session_capacity ?? 0)}`
+          : String(r.customer_name ?? r.title ?? 'Termín'),
+        subtitle: block ? null : r.service_name,
+        customer_id: r.customer_id,
+        staff_id: r.staff_id,
+        staff_name: r.staff_name,
+        ...(r.group_id ? { group_id: r.group_id } : {}),
+        ...(r.session_id ? { session_id: r.session_id } : {}),
+        ...(r.session_capacity !== null && r.session_capacity !== undefined ? { session_capacity: Number(r.session_capacity) } : {}),
+        ...(r.session_reserved !== null && r.session_reserved !== undefined ? { session_reserved: Number(r.session_reserved) } : {}),
       }
     }),
     ...(wanted as WsRow[]).map((r): CalEntry => {
@@ -215,7 +239,9 @@ export async function getRequestsList(
     text: `
       SELECT r.id, r.status, r.source, r.created_at, r.handled_at, r.wanted_start, r.wanted_end,
              COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
-             s.name AS service_name,
+             COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+               FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service_name,
              (SELECT a.starts_at FROM ws.appointments a WHERE a.account_id = r.account_id AND a.request_id = r.id
                 AND a.status <> 'cancelled' ORDER BY a.created_at DESC LIMIT 1) AS appointment_start
       FROM ws.requests r
@@ -258,17 +284,45 @@ export type AppointmentDetail = {
   staff_id: string | null
   staff_name: string | null
   request_id: string | null
+  group_id: string | null
+  session_id: string | null
+  session_capacity: number | null
+  session_reserved: number | null
+  session_status: string | null
+}
+
+export type SessionAttendee = { request_id: string; customer_id: string | null; name: string; status: string; created_at: Date }
+
+export async function getSessionAttendees(ctx: WsContext, business: Biz, sessionId: string): Promise<SessionAttendee[]> {
+  const rows = await wsDb(ctx)`
+    SELECT sa.request_id, sa.customer_id, COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS name,
+      sa.status, sa.created_at
+    FROM ws.session_attendees sa
+    JOIN ws.requests r ON r.account_id = sa.account_id AND r.business_id = sa.business_id AND r.id = sa.request_id
+    LEFT JOIN ws.customers c ON c.account_id = sa.account_id AND c.id = sa.customer_id
+    WHERE sa.account_id = ${ctx.accountId} AND sa.business_id = ${business.id} AND sa.session_id = ${sessionId}
+    ORDER BY sa.created_at, sa.id
+  `
+  return rows.map((r) => ({
+    request_id: String(r.request_id), customer_id: (r.customer_id as string | null) ?? null,
+    name: String(r.name), status: String(r.status), created_at: r.created_at as Date,
+  }))
 }
 
 export async function getAppointmentDetail(ctx: WsContext, business: Biz, id: string): Promise<AppointmentDetail | null> {
   const [rows] = await wsDb(ctx).batch([
     q`
-      SELECT a.id, a.kind, a.status, a.starts_at, a.ends_at, a.title, a.note, a.customer_id, a.staff_id, a.request_id,
-             c.name AS customer_name, s.name AS service_name, st.name AS staff_name
+      SELECT a.id, a.group_id, a.kind, a.status, a.starts_at, a.ends_at, a.title, a.note, a.customer_id, a.staff_id, a.request_id,
+             c.name AS customer_name, st.name AS staff_name, se.id AS session_id, se.capacity AS session_capacity,
+             se.reserved AS session_reserved, se.status AS session_status,
+             COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY a2.starts_at)
+               FROM ws.appointments a2 LEFT JOIN ws.services s2 ON s2.account_id = a2.account_id AND s2.id = a2.service_id
+               WHERE a2.account_id = a.account_id AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR a2.id = a.id)), s.name) AS service_name
       FROM ws.appointments a
       LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
       LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
       LEFT JOIN ws.staff st ON st.account_id = a.account_id AND st.id = a.staff_id
+      LEFT JOIN ws.sessions se ON se.account_id = a.account_id AND se.business_id = a.business_id AND se.appointment_id = a.id
       WHERE a.account_id = ${ctx.accountId} AND a.business_id = ${business.id} AND a.id = ${id}
     `,
   ])
@@ -288,6 +342,11 @@ export async function getAppointmentDetail(ctx: WsContext, business: Biz, id: st
     staff_id: (r.staff_id as string | null) ?? null,
     staff_name: (r.staff_name as string | null) ?? null,
     request_id: (r.request_id as string | null) ?? null,
+    group_id: (r.group_id as string | null) ?? null,
+    session_id: (r.session_id as string | null) ?? null,
+    session_capacity: r.session_capacity === null || r.session_capacity === undefined ? null : Number(r.session_capacity),
+    session_reserved: r.session_reserved === null || r.session_reserved === undefined ? null : Number(r.session_reserved),
+    session_status: (r.session_status as string | null) ?? null,
   }
 }
 

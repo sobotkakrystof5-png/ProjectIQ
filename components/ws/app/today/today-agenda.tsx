@@ -58,7 +58,7 @@ export function TodayAgenda({
                   const body = (
                     <>
                       <span className="font-num text-xs">{formatTimeRange(e.start, e.end)}</span>
-                      <span className="block truncate text-[15px] font-semibold">{e.title}</span>
+                      <span data-ws-private-value={e.kind === 'block' ? undefined : true} className="block truncate text-[15px] font-semibold">{e.title}</span>
                       {e.subtitle && <span className="block truncate text-sm opacity-80">{e.subtitle}</span>}
                     </>
                   )

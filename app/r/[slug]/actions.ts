@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { z } from 'zod'
 import { wsDb } from '@/lib/ws/db'
 import { businessBySlug } from '@/lib/ws/intake/http'
-import { ingestRequest, loadIntakeConfig, loadOrderAvailability } from '@/lib/ws/intake/intake'
+import { getOpenSessions, ingestRequest, loadIntakeConfig, loadOrderAvailability, type PublicSession } from '@/lib/ws/intake/intake'
 import { clientIp, hitLimit, LIMITS } from '@/lib/ws/intake/rate-limit'
 import { orderSlots } from '@/lib/ws/intake/schema'
 import { isIsoDate, pragueToUtc } from '@/lib/ws/time'
@@ -21,11 +21,11 @@ const FAILED = 'Poptávku se nepodařilo odeslat. Zkuste to prosím znovu.'
 
 export type OrderSlots = ReturnType<typeof orderSlots>
 export type OrderStaff = { id: string; name: string }
-export type OrderAvailability = { slots: OrderSlots; staff: OrderStaff[] }
+export type OrderAvailability = { slots: OrderSlots; staff: OrderStaff[]; sessions: PublicSession[] }
 
 /** Volné časy a pracovníci pro vybranou službu. */
-export async function getOrderSlots(raw: unknown): Promise<{ ok: true } & OrderAvailability | { ok: false; error: string }> {
-  const parsed = z.object({ slug, serviceId: uuid.nullable(), staffId: uuid.nullable().optional() }).safeParse(raw)
+export async function getOrderSlots(raw: unknown): Promise<{ ok: true } & OrderAvailability | { ok: false; error: string; sessions?: PublicSession[] }> {
+  const parsed = z.object({ slug, serviceId: uuid.nullable(), serviceIds: z.array(uuid).max(5).optional(), staffId: uuid.nullable().optional() }).safeParse(raw)
   if (!parsed.success) return { ok: false, error: FAILED }
   try {
     if (await hitLimit(LIMITS.schemaPerIp, clientIp(await headers()))) return { ok: false, error: BUSY }
@@ -33,11 +33,18 @@ export async function getOrderSlots(raw: unknown): Promise<{ ok: true } & OrderA
     if (!biz) return { ok: false, error: FAILED }
     const config = await loadIntakeConfig(biz.accountId, biz.businessId)
     if (!config) return { ok: false, error: FAILED }
-    const availability = await loadOrderAvailability(biz.accountId, config, parsed.data.serviceId, parsed.data.staffId ?? null)
+    const serviceIds = parsed.data.serviceIds?.length ? parsed.data.serviceIds : parsed.data.serviceId ? [parsed.data.serviceId] : []
+    if (serviceIds.some((id) => !config.services.some((service) => service.id === id)) || new Set(serviceIds).size !== serviceIds.length) {
+      return { ok: false, error: 'Vybraná služba už není dostupná. Obnovte prosím stránku.' }
+    }
+    const [availability, sessions] = await Promise.all([
+      loadOrderAvailability(biz.accountId, config, serviceIds, parsed.data.staffId ?? null),
+      getOpenSessions(biz.accountId, biz.businessId, serviceIds),
+    ])
     if (parsed.data.staffId && !availability.staff.some((s) => s.id === parsed.data.staffId)) {
       return { ok: false, error: 'Tento pracovník danou službu nenabízí. Vyberte prosím jiného.' }
     }
-    return { ok: true, slots: orderSlots(availability.slots), staff: availability.staff }
+    return { ok: true, slots: orderSlots(availability.slots), staff: availability.staff, sessions }
   } catch (e) {
     console.error('order.slots', { error: e instanceof Error ? e.message : 'unknown' })
     return { ok: false, error: FAILED }
@@ -48,6 +55,8 @@ const orderSchema = z.object({
   slug,
   embedded: z.boolean().optional(),
   serviceId: uuid.nullable(),
+  serviceIds: z.array(uuid).max(5).optional(),
+  sessionId: uuid.nullable().optional(),
   staffId: uuid.nullable().optional(),
   when: z
     .object({ day: z.string().refine(isIsoDate), minutes: z.number().int().min(0).max(1439) })
@@ -63,12 +72,16 @@ const orderSchema = z.object({
 
 export type OrderResult =
   | { ok: true; portalUrl?: string }
-  | ({ ok: false; error: string; field?: string; slotTaken?: boolean } & Partial<OrderAvailability>)
+  | ({ ok: false; error: string; field?: string; slotTaken?: boolean; sessionFull?: boolean } & Partial<OrderAvailability>)
 
 export async function submitOrder(raw: unknown): Promise<OrderResult> {
   const parsed = orderSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: 'Něco ve formuláři nesedí. Zkontrolujte ho prosím.' }
   const input = parsed.data
+  const serviceIds = input.serviceIds?.length ? input.serviceIds : input.serviceId ? [input.serviceId] : []
+  if (new Set(serviceIds).size !== serviceIds.length || (input.serviceIds?.length && input.serviceIds[0] !== input.serviceId)) {
+    return { ok: false, error: 'Zkontrolujte prosím vybrané služby.' }
+  }
   try {
     if (await hitLimit(LIMITS.pagePerIp, clientIp(await headers()))) return { ok: false, error: BUSY }
     const biz = await businessBySlug(input.slug)
@@ -83,6 +96,8 @@ export async function submitOrder(raw: unknown): Promise<OrderResult> {
         phone: input.phone,
         email: input.email,
         serviceId: input.serviceId,
+        serviceIds,
+          sessionId: input.sessionId ?? null,
         staffId: input.staffId ?? null,
         start: input.when ? pragueToUtc(input.when.day, input.when.minutes).toISOString() : null,
         message: input.message,
@@ -111,17 +126,25 @@ export async function submitOrder(raw: unknown): Promise<OrderResult> {
       try {
         const config = await loadIntakeConfig(biz.accountId, biz.businessId)
         if (!config) throw new Error('order config unavailable')
-        const availability = await loadOrderAvailability(biz.accountId, config, input.serviceId, input.staffId ?? null)
+        const [availability, sessions] = await Promise.all([
+          loadOrderAvailability(biz.accountId, config, serviceIds, input.staffId ?? null),
+          getOpenSessions(biz.accountId, biz.businessId, serviceIds),
+        ])
         return {
           ok: false,
           error: 'Termín mezitím obsadil někdo jiný. Vyberte prosím nový čas níže.',
           slotTaken: true,
           slots: orderSlots(availability.slots),
           staff: availability.staff,
+          sessions,
         }
       } catch {
         return { ok: false, error: 'Termín mezitím obsadil někdo jiný. Vyberte prosím nový čas.', slotTaken: true }
       }
+    }
+    if (result.body.code === 'SESSION_FULL') {
+      const sessions = await getOpenSessions(biz.accountId, biz.businessId, serviceIds).catch(() => [])
+      return { ok: false, error: result.body.error, sessionFull: true, sessions }
     }
     const issue = result.body.issues?.[0]
     return {

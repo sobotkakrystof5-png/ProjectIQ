@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Building2, ChevronRight, ClipboardList, Package, Users, Mail } from 'lucide-react'
 import { ModuleSettings } from '@/components/ws/settings/module-settings'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { HelpLink } from '@/components/ws/app/help-link'
 import { AccentHeading } from '@/components/ws/brand'
 import { canWrite, getBillingState } from '@/lib/ws/billing'
 import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
@@ -40,7 +41,7 @@ export default async function SettingsPage(props: {
   const template = getIndustryTemplate(business.industry)
 
   return <div className="mx-auto flex max-w-[880px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-    <AccentHeading>Nastavení</AccentHeading>
+    <div className="flex items-center justify-between gap-3"><AccentHeading>Nastavení</AccentHeading><HelpLink slug={business.slug} topic="zacinate" guide="prvni-nastaveni" /></div>
     {owner && data && billing ? <>
       <section id="funkce" className="scroll-mt-6 rounded-panel border border-navy-100 bg-surface p-5">
         <div className="flex flex-col gap-1">

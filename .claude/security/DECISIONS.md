@@ -146,3 +146,11 @@ Důvod: navigace dělala za sebou tři dotazy do Neonu ještě před daty strán
 Zvažované alternativy: víc oddělených `SECURITY DEFINER` funkcí (víc kol), cache dat účtu napříč požadavky (riziko úniku mezi účty, odmítnuto), vypnutí RLS pro čtení (nepřijatelné).
 Přijaté riziko: funkce vrací víc než jen `id` (název, barvu, nastavení byznysu a stav předplatného) komukoli, kdo zná Clerk ID organizace a smí volat jako `ws_app`. Clerk ID organizace přichází jen z ověřeného přihlášení, `ws_app` jiný vstup než aplikace nemá; bezpečnostní hranice se tím nemění. Sloupce jsou vyjmenované (žádné `SELECT *`), takže přidaný sloupec v `businesses` se sám neprozradí.
 Revize: S19 (audit před spuštěním).
+
+## 017 — Minimalizace údajů v administraci Workspace
+Datum: 2026-10-19
+Rozhodnutí: Admin přehled účtů může používat jen souhrnné počty/stavy, údaje účtu, byznysů a týmu. Nečte osobní ani finanční obsah zákazníků, poptávek, termínů a faktur, interní poznámky ani volná pole auditu. Účelová práce s účtem (pozvánka, nastavení integrace a audit akce) zůstává za `requireAdmin()`.
+Důvod: Kryštof schválil v RD11 omezení osobních údajů; soukromí klientů nemá záviset pouze na tom, kdo smí otevřít admin konzoli.
+Zvažované alternativy: odebrat admin databázové připojení úplně (zrušilo by existující operace nad účty); vytvořit oddělenou read-only roli (vyžaduje samostatnou změnu databázových oprávnění a nasazení).
+Přijaté riziko: databázové připojení administrace stále používá vlastníka tabulek a technicky může číst všechny řádky. Omezení je v kódu a testech, ne v DB-grantu; revize při S19, před veřejným spuštěním.
+Revize: S19 nebo dříve při změně admin dotazů či databázové role.

@@ -193,6 +193,7 @@ export type CustomerDetail = {
   lastVisit: Date | null
   intervalDays: number | null
   nextVisit: { id: string; start: Date; end: Date; service: string | null } | null
+  lastServiceIds: string[]
   spend: { currency: string; amount: number }[]
   history: HistoryItem[]
   loyalty: { enabled: boolean; stamps: number; needed: number; status: 'active' | 'full' | 'redeemed' | 'empty'; full: boolean; reward: string } | null
@@ -204,7 +205,7 @@ export type CustomerDetail = {
 export async function getCustomerDetail(ctx: WsContext, business: Biz, customerId: string, now: Date = new Date()): Promise<CustomerDetail | null> {
   const acc = ctx.accountId
   const biz = business.id
-  const [customerRows, segRows, nextRows, spendRows, historyRows, loyaltyRows, dupRows, messageRows] = await wsDb(ctx).batch([
+  const [customerRows, segRows, nextRows, lastBookingRows, spendRows, historyRows, loyaltyRows, dupRows, messageRows] = await wsDb(ctx).batch([
     q`
       SELECT id, name, phone, email, birthday::text AS birthday, note, contact_consent_at, unsubscribed_at, ended_at, ended_reason, created_at
       FROM ws.customers WHERE account_id = ${acc} AND id = ${customerId}
@@ -219,6 +220,16 @@ export async function getCustomerDetail(ctx: WsContext, business: Biz, customerI
       WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.customer_id = ${customerId}
         AND a.kind = 'visit' AND a.status = 'confirmed' AND a.starts_at > ${now}
       ORDER BY a.starts_at LIMIT 1
+    `,
+    q`
+      SELECT COALESCE((SELECT array_agg(a2.service_id ORDER BY a2.starts_at)
+        FROM ws.appointments a2 WHERE a2.account_id = a.account_id
+          AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR a2.id = a.id)
+          AND a2.service_id IS NOT NULL), ARRAY[]::uuid[]) AS service_ids
+      FROM ws.appointments a
+      WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.customer_id = ${customerId}
+        AND a.kind = 'visit' AND a.status IN ('confirmed', 'completed') AND a.starts_at <= ${now}
+      ORDER BY a.starts_at DESC, a.id DESC LIMIT 1
     `,
     q`
       SELECT currency, sum(amount) AS amount FROM ws.transactions
@@ -274,6 +285,7 @@ export async function getCustomerDetail(ctx: WsContext, business: Biz, customerI
   if (!c) return null
   const seg = (segRows as WsRow[])[0]
   const next = (nextRows as WsRow[])[0]
+  const lastBooking = (lastBookingRows as WsRow[])[0]
   const l = (loyaltyRows as WsRow[])[0]
   const dateOrNull = (v: unknown) => (v as Date | null | undefined) ?? null
 
@@ -297,6 +309,7 @@ export async function getCustomerDetail(ctx: WsContext, business: Biz, customerI
     nextVisit: next
       ? { id: String(next.id), start: next.starts_at as Date, end: next.ends_at as Date, service: (next.service_name as string | null) ?? null }
       : null,
+    lastServiceIds: Array.isArray(lastBooking?.service_ids) ? lastBooking.service_ids.map(String) : [],
     spend: (spendRows as WsRow[]).map((r) => ({ currency: String(r.currency), amount: Number(r.amount) })),
     history: (historyRows as WsRow[]).map((r) => ({
       id: String(r.id),

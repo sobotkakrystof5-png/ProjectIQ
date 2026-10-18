@@ -32,6 +32,8 @@ export type RequestActionsProps = {
   durationMin?: number | null
   /** Pracovník, kterého zákazník preferuje; ve výběru se předvolí. */
   preferredStaffId?: string | null
+  /** Účastník skupinové lekce potvrzuje předem vypsaný pevný termín. */
+  fixedTime?: boolean
   /** Kam vede „nastavte otevírací dobu“. */
   settingsHref?: string
   className?: string
@@ -42,7 +44,7 @@ export type RequestActionsProps = {
  * čas; odmítnutí se provede hned a toast nabídne „Zpět“ (B9).
  */
 export function RequestActions(props: RequestActionsProps) {
-  const { slug, requestId, wanted, calendar, jobs, staff, today, variant = 'full', advice = null, serviceId = null, durationMin = null, preferredStaffId = null, settingsHref, className } = props
+  const { slug, requestId, wanted, calendar, jobs, staff, today, variant = 'full', advice = null, serviceId = null, durationMin = null, preferredStaffId = null, fixedTime = false, settingsHref, className } = props
   const { run, pending } = useWsAction()
   const [other, setOther] = useState(false)
   const [day, setDay] = useState(wanted?.day ?? today)
@@ -58,7 +60,7 @@ export function RequestActions(props: RequestActionsProps) {
 
   // S časem potvrzuje termín; bez času jen přijme (zakázka), nebo musí vybrat čas.
   const oneClick = wanted !== null || !calendar || jobs
-  const primaryLabel = wanted && calendar ? 'Potvrdit termín' : calendar && !jobs ? 'Vybrat termín' : 'Přijmout'
+  const primaryLabel = fixedTime ? 'Potvrdit místo' : wanted && calendar ? 'Potvrdit termín' : calendar && !jobs ? 'Vybrat termín' : 'Přijmout'
 
   const confirm = (at?: { day: string; minutes: number }) =>
     run(
@@ -101,7 +103,7 @@ export function RequestActions(props: RequestActionsProps) {
             {primaryLabel}
           </Button>
         ) : null}
-        {calendar && oneClick && (
+        {calendar && oneClick && !fixedTime && (
           <Button variant="outline" disabled={pending} aria-expanded={other} onClick={() => setOther((v) => !v)}>
             Jiný čas
           </Button>
@@ -123,7 +125,7 @@ export function RequestActions(props: RequestActionsProps) {
         </div>
       )}
 
-      {calendar && advice && !other && oneClick && (
+      {calendar && advice && !other && oneClick && !fixedTime && (
         <SuggestionChips
           advice={advice}
           settingsHref={settingsHref}
@@ -133,7 +135,7 @@ export function RequestActions(props: RequestActionsProps) {
         />
       )}
 
-      {calendar && (other || !oneClick) && (
+      {calendar && (other || !oneClick) && !fixedTime && (
         <form onSubmit={submitOther} className="flex flex-col gap-3 rounded-box border bg-ground p-4 dark:bg-navy-950">
           <p className="text-sm text-quiet">
             {wanted ? 'Domluvili jste se se zákazníkem na jiném čase? Zadejte ho a potvrďte.' : 'Kdy zákazníka vezmete?'}

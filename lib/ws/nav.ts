@@ -14,6 +14,7 @@ export type NavKey =
   | 'faktury'
   | 'prijmy'
   | 'dane'
+  | 'navody'
   | 'nastaveni'
 
 export type NavItem = {
@@ -36,6 +37,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'faktury', label: 'Faktury', segment: 'faktury', module: 'invoices' },
   { key: 'prijmy', label: 'Příjmy', segment: 'prijmy', module: 'finance' },
   { key: 'dane', label: 'Daně', segment: 'dane', module: 'taxes' },
+  { key: 'navody', label: 'Návody', segment: 'navody', module: null },
   { key: 'nastaveni', label: 'Nastavení', segment: 'nastaveni', module: null },
 ]
 
@@ -62,11 +64,11 @@ export function moneyItem(enabled: ReadonlySet<string>): NavItem | null {
   return first ? { key: 'penize', label: 'Peníze', segment: first.segment, module: first.module } : null
 }
 
-/** Hlavní menu: Dnes, Poptávky, Kalendář, Zákazníci, Zakázky, Peníze (podle zapnutých funkcí). */
+/** Hlavní menu: práce, peníze a Návody (podle zapnutých funkcí). */
 export function navItems(enabled: ReadonlySet<string>): NavItem[] {
   const work = WORK_KEYS.map(byKey).filter((i) => isModuleOn(enabled, i.module))
   const money = moneyItem(enabled)
-  return money ? [...work, money] : work
+  return money ? [...work, money, byKey('navody')] : [...work, byKey('navody')]
 }
 
 /** Cíle pro ⌘K „Přejít na“: hlavní menu a navíc záložky Peněz, které v menu samostatně nejsou. */

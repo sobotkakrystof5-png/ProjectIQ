@@ -8,6 +8,7 @@ import { clerkAppearance } from '@/components/ws/auth/clerk-appearance'
 import { wsFontVariables } from '@/lib/ws/fonts'
 import { WS_HOME_PATH, WS_ONBOARDING_PATH, WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
 import { parseThemePref, THEME_COOKIE } from '@/lib/ws/theme'
+import { parsePrivacyMode, PRIVACY_COOKIE } from '@/lib/ws/privacy'
 import '../ws-tokens.css'
 
 export const metadata: Metadata = {
@@ -37,7 +38,9 @@ export const dynamic = 'force-dynamic'
 // clerk-js. Telemetrie vypnutá — jinak by potřebovala další host v CSP.
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   // Vzhled z Účtu (S18); nonce kvůli skriptu „Podle systému“ ve WsRoot.
-  const themePref = parseThemePref((await cookies()).get(THEME_COOKIE)?.value)
+  const cookieJar = await cookies()
+  const themePref = parseThemePref(cookieJar.get(THEME_COOKIE)?.value)
+  const privacyMode = parsePrivacyMode(cookieJar.get(PRIVACY_COOKIE)?.value)
   const nonce = (await headers()).get('x-nonce') ?? undefined
   return (
     <ClerkProvider
@@ -51,7 +54,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
       signUpFallbackRedirectUrl={WS_ONBOARDING_PATH}
       afterSignOutUrl="/"
     >
-      <WsRoot fontClassName={wsFontVariables} themePref={themePref} nonce={nonce}>
+      <WsRoot fontClassName={wsFontVariables} themePref={themePref} privacyMode={privacyMode} nonce={nonce}>
         <PwaRegister />
         {children}
       </WsRoot>

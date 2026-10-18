@@ -24,6 +24,7 @@ const ROWS: { label: string; value: string }[] = [
   },
   { label: 'Jak dlouho', value: 'Po dobu účtu. Po zrušení účtu 30 dní, potom výmaz. Vystavené faktury vymazaného zákazníka 10 let od konce roku vystavení.' },
   { label: 'Zabezpečení', value: 'Šifrované spojení (HTTPS), oddělená data každého účtu v databázi, přihlášení přes ověřený e-mail nebo Google, záznam změn.' },
+  { label: 'Přístup k údajům', value: 'Konzole podpory ZakazIQ zobrazuje jen souhrny o účtu, ne záznamy vašich zákazníků. Provozovatel databáze k nim má technicky přístup. Režim soukromí pouze rozmazává jména a částky na tomto zařízení.' },
 ]
 
 const PROCESSORS: { name: string; role: string; where: string }[] = [

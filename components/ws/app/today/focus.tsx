@@ -87,10 +87,10 @@ export function TodayFocus({
             <div>
               <p className="font-num text-[11px] font-medium uppercase tracking-[0.08em] text-danger">Po splatnosti</p>
               <p className="mt-1.5 text-[15px] font-semibold leading-snug text-ink">
-                Faktura <span className="font-num">{i.number}</span> · {i.customer_name}
+                Faktura <span className="font-num">{i.number}</span> · <span data-ws-private-value>{i.customer_name}</span>
               </p>
               <p className="text-sm text-quiet">
-                <span className="font-num">{formatMoney(i.amount, { currency })}</span>, splatnost {dueDay}. {dueMonth}., {plural(late, ['den', 'dny', 'dní'])} po termínu.
+                <span data-ws-private-value className="font-num">{formatMoney(i.amount, { currency })}</span>, splatnost {dueDay}. {dueMonth}., {plural(late, ['den', 'dny', 'dní'])} po termínu.
                 {i.total > 1 && ` Dalších po splatnosti: ${i.total - 1}.`}
               </p>
             </div>

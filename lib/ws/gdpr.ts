@@ -139,9 +139,12 @@ function sheets(a: string): Sheet[] {
     },
     {
       file: 'poptavky.csv',
-      header: ['id', 'byznys', 'prijato', 'stav', 'zdroj', 'zakaznik_id', 'jmeno', 'telefon', 'email', 'sluzba', 'chteny_zacatek', 'chteny_konec', 'zprava', 'kolonky', 'zkusebni'],
+      header: ['id', 'byznys', 'prijato', 'stav', 'zdroj', 'zakaznik_id', 'lekce_id', 'jmeno', 'telefon', 'email', 'sluzba', 'chteny_zacatek', 'chteny_konec', 'zprava', 'kolonky', 'zkusebni'],
       query: {
-        text: `SELECT r.id, ${biz('r')} AS biz, r.created_at, r.status, r.source, r.customer_id, r.contact, s.name AS service,
+        text: `SELECT r.id, ${biz('r')} AS biz, r.created_at, r.status, r.source, r.customer_id, r.session_id, r.contact,
+          COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+            FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+            WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service,
           r.wanted_start, r.wanted_end, r.message, r.field_values, r.is_test
           FROM ws.requests r LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
           WHERE r.account_id = $1 ORDER BY r.created_at`,
@@ -149,10 +152,24 @@ function sheets(a: string): Sheet[] {
       },
       row: (r) => {
         const c = (r.contact ?? {}) as Record<string, unknown>
-        return [v(r, 'id'), v(r, 'biz'), v(r, 'created_at'), v(r, 'status'), v(r, 'source'), v(r, 'customer_id'),
+        return [v(r, 'id'), v(r, 'biz'), v(r, 'created_at'), v(r, 'status'), v(r, 'source'), v(r, 'customer_id'), v(r, 'session_id'),
           c.name as CsvValue, c.phone as CsvValue, c.email as CsvValue, v(r, 'service'), v(r, 'wanted_start'), v(r, 'wanted_end'),
           v(r, 'message'), v(r, 'field_values'), v(r, 'is_test')]
       },
+    },
+    {
+      file: 'lekce.csv',
+      header: ['id', 'byznys', 'termin_id', 'sluzba_id', 'kapacita', 'obsazeno', 'stav', 'vytvoreno'],
+      query: { text: `SELECT se.id, ${biz('se')} AS biz, se.appointment_id, se.service_id, se.capacity, se.reserved, se.status, se.created_at
+        FROM ws.sessions se WHERE se.account_id = $1 ORDER BY se.created_at`, params: [a] },
+      row: (r) => ['id', 'biz', 'appointment_id', 'service_id', 'capacity', 'reserved', 'status', 'created_at'].map((k) => v(r, k)),
+    },
+    {
+      file: 'ucastnici-lekci.csv',
+      header: ['id', 'byznys', 'lekce_id', 'poptavka_id', 'zakaznik_id', 'stav', 'prihlasen'],
+      query: { text: `SELECT sa.id, ${biz('sa')} AS biz, sa.session_id, sa.request_id, sa.customer_id, sa.status, sa.created_at
+        FROM ws.session_attendees sa WHERE sa.account_id = $1 ORDER BY sa.created_at`, params: [a] },
+      row: (r) => ['id', 'biz', 'session_id', 'request_id', 'customer_id', 'status', 'created_at'].map((k) => v(r, k)),
     },
     {
       file: 'terminy.csv',

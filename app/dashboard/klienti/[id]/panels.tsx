@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Copy, KeyRound, Mail } from 'lucide-react'
-import { generateWebKeysAction, resendInviteAction, saveNoteAction } from '../actions'
+import { generateWebKeysAction, resendInviteAction } from '../actions'
 import type { WebKeysResult } from '@/lib/ws/admin/web-keys'
 
 const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
@@ -125,39 +125,5 @@ export function ResendInviteForm({ accountId }: { accountId: string }) {
         {pending ? 'Posílám…' : 'Poslat pozvánku'}
       </button>
     </form>
-  )
-}
-
-export function NoteEditor({ accountId, initial }: { accountId: string; initial: string }) {
-  const [pending, start] = useTransition()
-  const [note, setNote] = useState(initial)
-  const dirty = note !== initial
-
-  const save = () => {
-    start(async () => {
-      const res = await saveNoteAction({ accountId, note })
-      if (!res.ok) toast.error(res.error)
-      else toast.success('Poznámka uložená.')
-    })
-  }
-
-  return (
-    <div className="space-y-2">
-      <textarea
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        maxLength={4000}
-        rows={4}
-        placeholder="Co je potřeba vědět — domluva, web, fakturace… Klient poznámku nevidí."
-        aria-label="Poznámka k účtu"
-        className={INPUT}
-      />
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-muted-foreground tabular-nums">{note.length} / 4000</span>
-        <button type="button" onClick={save} disabled={pending || !dirty} className={BUTTON}>
-          {pending ? 'Ukládám…' : 'Uložit poznámku'}
-        </button>
-      </div>
-    </div>
   )
 }

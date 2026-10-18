@@ -55,7 +55,7 @@ export function OutreachPanel({
                     <Icon aria-hidden size={18} strokeWidth={1.5} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold text-ink">{s.name}</span>
+                    <span data-ws-private-value className="block truncate text-[15px] font-semibold text-ink">{s.name}</span>
                     <span className="block truncate text-sm text-quiet">{s.reason}</span>
                   </span>
                   <span className="shrink-0 text-sm font-semibold text-navy-700 dark:text-navy-200">Připravit zprávu</span>

@@ -59,11 +59,16 @@ export async function appointmentIcs(token: string, now: Date = new Date()): Pro
   const link = verifyLink(token, 'c')
   if (!link?.id) return null
   const [a] = await wsDb({ accountId: link.accountId })`
-    SELECT a.id, a.starts_at, a.ends_at, b.name AS business, s.name AS service
+    SELECT a.id, min(a2.starts_at) AS starts_at, max(a2.ends_at) AS ends_at, b.name AS business,
+      COALESCE(string_agg(s2.name, ' + ' ORDER BY a2.starts_at), s.name) AS service
     FROM ws.appointments a
     JOIN ws.businesses b ON b.account_id = a.account_id AND b.id = a.business_id
     LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
-    WHERE a.account_id = ${link.accountId} AND a.id = ${link.id} AND a.kind = 'visit' AND a.status = 'confirmed'`
+    LEFT JOIN ws.appointments a2 ON a2.account_id = a.account_id AND a2.business_id = a.business_id
+      AND a2.status = 'confirmed' AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))
+    LEFT JOIN ws.services s2 ON s2.account_id = a2.account_id AND s2.id = a2.service_id
+    WHERE a.account_id = ${link.accountId} AND a.id = ${link.id} AND a.kind = 'visit' AND a.status = 'confirmed'
+    GROUP BY a.id, a.starts_at, a.ends_at, b.name, s.name`
   if (!a) return null
   const title = [a.service, a.business].filter(Boolean).join(' · ')
   return [

@@ -150,7 +150,7 @@ describe('navigace podle zapnutých funkcí', () => {
 
   it('vypnutá funkce v menu není, Poptávky a Zákazníci vždy', () => {
     const keys = navItems(new Set(['calendar'])).map((i) => i.key)
-    expect(keys).toEqual(['dnes', 'poptavky', 'kalendar', 'zakaznici'])
+    expect(keys).toEqual(['dnes', 'poptavky', 'kalendar', 'zakaznici', 'navody'])
     expect(navItemForSegment('faktury', new Set(['calendar']))).toBeNull()
     expect(navItemForSegment('faktury', new Set(['invoices']))?.label).toBe('Faktury')
     expect(navItemForSegment('', new Set())).toBeNull()
@@ -158,14 +158,14 @@ describe('navigace podle zapnutých funkcí', () => {
 
   it('hlavní menu má při všech funkcích šest položek a Nastavení v něm není (RD01)', () => {
     const all = new Set<string>(WS_MODULES)
-    expect(labels(navItems(all))).toEqual(['Dnes', 'Poptávky', 'Kalendář', 'Zákazníci', 'Zakázky', 'Peníze'])
+    expect(labels(navItems(all))).toEqual(['Dnes', 'Poptávky', 'Kalendář', 'Zákazníci', 'Zakázky', 'Peníze', 'Návody'])
     expect(navItems(all).some((i) => i.key === 'nastaveni')).toBe(false)
     // Faktury, Příjmy a Daně jsou jen záložky uvnitř Peněz.
     expect(navItems(all).some((i) => ['faktury', 'prijmy', 'dane'].includes(i.key))).toBe(false)
   })
 
   it('Peníze mizí, když není zapnutá žádná peněžní funkce', () => {
-    expect(labels(navItems(new Set(['calendar', 'jobs'])))).toEqual(['Dnes', 'Poptávky', 'Kalendář', 'Zákazníci', 'Zakázky'])
+    expect(labels(navItems(new Set(['calendar', 'jobs'])))).toEqual(['Dnes', 'Poptávky', 'Kalendář', 'Zákazníci', 'Zakázky', 'Návody'])
     expect(moneyItem(new Set(['calendar']))).toBeNull()
     expect(bottomBarSlots(new Set(['calendar'])).some((s) => s.kind === 'link' && s.label === 'Peníze')).toBe(false)
   })
@@ -197,9 +197,9 @@ describe('navigace podle zapnutých funkcí', () => {
 
   it('⌘K najde i záložky Peněz, které v menu samostatně nejsou', () => {
     expect(labels(paletteItems(new Set(['finance', 'invoices', 'taxes'])))).toEqual([
-      'Dnes', 'Poptávky', 'Zákazníci', 'Peníze', 'Faktury', 'Příjmy', 'Daně',
+      'Dnes', 'Poptávky', 'Zákazníci', 'Peníze', 'Návody', 'Faktury', 'Příjmy', 'Daně',
     ])
-    expect(labels(paletteItems(new Set()))).toEqual(['Dnes', 'Poptávky', 'Zákazníci'])
+    expect(labels(paletteItems(new Set()))).toEqual(['Dnes', 'Poptávky', 'Zákazníci', 'Návody'])
   })
 
   it('Účet: majitel má Nastavení, Předplatné a Zpracování údajů, pracovník žádný odkaz', () => {

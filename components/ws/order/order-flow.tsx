@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getOrderSlots, submitOrder, type OrderAvailability, type OrderSlots, type OrderStaff } from '@/app/r/[slug]/actions'
 import { formatMoney, type WsCurrency } from '@/lib/ws/money'
-import { addDays, formatDayShort, formatMinutes } from '@/lib/ws/time'
+import { addDays, formatDayShort, formatMinutes, pragueParts } from '@/lib/ws/time'
 import { cn } from '@/lib/ws/utils'
 
 // Objednávací stránka (S11): služba → termín → kontakt → hotovo. Mobil napřed,
@@ -23,6 +23,7 @@ export type OrderField = {
 }
 
 export type OrderService = { id: string; name: string; durationMin: number; price: number | null; currency: string }
+type OrderSession = OrderAvailability['sessions'][number]
 
 type Step = 'service' | 'time' | 'contact' | 'done'
 
@@ -56,6 +57,7 @@ export function OrderFlow({
   services,
   fields,
   booking,
+  hasSessions,
   initialAvailability,
   today,
 }: {
@@ -65,20 +67,23 @@ export function OrderFlow({
   services: OrderService[]
   fields: OrderField[]
   booking: 'slots' | 'free' | 'none'
+  hasSessions: boolean
   initialAvailability: OrderAvailability | null
   today: string
 }) {
   const steps = useMemo<Step[]>(
-    () => [...(services.length > 1 ? (['service'] as Step[]) : []), ...(booking !== 'none' ? (['time'] as Step[]) : []), 'contact'],
-    [services.length, booking],
+    () => [...(services.length > 1 ? (['service'] as Step[]) : []), ...(booking !== 'none' || hasSessions ? (['time'] as Step[]) : []), 'contact'],
+    [services.length, booking, hasSessions],
   )
-  const initialServiceId = services.length === 1 ? services[0].id : null
-  const initialKey = initialAvailability ? availabilityKey(initialServiceId, null) : null
+  const initialServiceIds = services.length === 1 ? [services[0].id] : []
+  const initialKey = initialAvailability ? availabilityKey(initialServiceIds, null) : null
   const [step, setStep] = useState<Step>(steps[0])
-  const [serviceId, setServiceId] = useState<string | null>(initialServiceId)
+  const [serviceIds, setServiceIds] = useState<string[]>(initialServiceIds)
   const [staffId, setStaffId] = useState<string | null>(null)
   const [staffOptions, setStaffOptions] = useState<OrderStaff[]>(initialAvailability?.staff ?? [])
   const [slots, setSlots] = useState<OrderSlots | null>(initialAvailability?.slots ?? null)
+  const [sessions, setSessions] = useState<OrderSession[]>(initialAvailability?.sessions ?? [])
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [slotsFor, setSlotsFor] = useState<string | null>(initialKey)
   const [day, setDay] = useState<string | null>(null)
   const [when, setWhen] = useState<When | null>(null)
@@ -91,7 +96,12 @@ export function OrderFlow({
   const stepHeading = useRef<HTMLHeadingElement>(null)
   const mounted = useRef(false)
 
-  const service = services.find((s) => s.id === serviceId) ?? null
+  const selectedServices = serviceIds.map((id) => services.find((service) => service.id === id)).filter((service): service is OrderService => Boolean(service))
+  const durationMin = selectedServices.reduce((sum, selected) => sum + selected.durationMin, 0) || 60
+  const priceByCurrency = selectedServices.reduce<Record<string, number>>((totals, selected) => {
+    if (selected.price !== null) totals[selected.currency] = (totals[selected.currency] ?? 0) + selected.price
+    return totals
+  }, {})
   const stepIndex = step === 'done' ? steps.length : steps.indexOf(step)
 
   useEffect(() => {
@@ -99,29 +109,31 @@ export function OrderFlow({
     else mounted.current = true
   }, [step])
 
-  const loadSlotsFor = (id: string | null, forStaff: string | null, force = false) => {
-    const key = availabilityKey(id, forStaff)
-    if (booking !== 'slots' || (!force && slotsFor === key)) return
+  const loadSlotsFor = (ids: readonly string[], forStaff: string | null, force = false) => {
+    const key = availabilityKey(ids, forStaff)
+    if ((booking !== 'slots' && !hasSessions) || (!force && slotsFor === key)) return
     const requestId = ++slotRequest.current
     setSlots(null)
     setSlotsFor(key)
     start(async () => {
-      const res = await getOrderSlots({ slug, serviceId: id, staffId: forStaff })
+      const res = await getOrderSlots({ slug, serviceId: ids[0] ?? null, serviceIds: [...ids], staffId: forStaff })
       if (requestId !== slotRequest.current) return
       if (res.ok) {
         setSlots(res.slots)
         setStaffOptions(res.staff)
+        setSessions(res.sessions)
       } else {
         setSlots(null)
+        setSessions(res.sessions ?? [])
         setSlotsFor(null)
         setError({ text: res.error })
       }
     })
   }
 
-  const go = (next: Step, forService: string | null = serviceId, forStaff: string | null = staffId) => {
+  const go = (next: Step, forServices: readonly string[] = serviceIds, forStaff: string | null = staffId) => {
     setError(null)
-    if (next === 'time') loadSlotsFor(forService, forStaff)
+    if (next === 'time') loadSlotsFor(forServices, forStaff)
     setStep(next)
   }
   const nextAfter = (s: Step): Step => steps[steps.indexOf(s) + 1] ?? 'contact'
@@ -136,11 +148,13 @@ export function OrderFlow({
     setDay(null)
     setWhen(null)
     setError(null)
-    loadSlotsFor(serviceId, id, true)
+    loadSlotsFor(serviceIds, id, true)
   }
 
-  const chosenWhen: When | null =
-    booking === 'free' && freeDay && freeTime ? { day: freeDay, minutes: Number(freeTime) } : booking === 'slots' ? when : null
+  const selectedSession = sessions.find((session) => session.id === sessionId) ?? null
+  const chosenWhen: When | null = selectedSession
+    ? (() => { const p = pragueParts(selectedSession.start); return { day: p.date, minutes: p.minutes } })()
+    : booking === 'free' && freeDay && freeTime ? { day: freeDay, minutes: Number(freeTime) } : booking === 'slots' ? when : null
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -154,7 +168,9 @@ export function OrderFlow({
         const res = await submitOrder({
           slug,
           embedded,
-          serviceId,
+          serviceId: serviceIds[0] ?? null,
+          serviceIds,
+          sessionId,
           staffId,
           when: chosenWhen,
           name: text('name'),
@@ -175,13 +191,22 @@ export function OrderFlow({
           setWhen(null)
           if (res.slots) {
             setSlots(res.slots)
-            setSlotsFor(availabilityKey(serviceId, staffId))
+            setSlotsFor(availabilityKey(serviceIds, staffId))
             setDay(res.slots.find((d) => d.times.length)?.date ?? null)
             if (res.staff) setStaffOptions(res.staff)
+            if (res.sessions) setSessions(res.sessions)
           } else {
             setSlotsFor(null)
-            loadSlotsFor(serviceId, staffId, true)
+            loadSlotsFor(serviceIds, staffId, true)
           }
+          setError({ text: res.error })
+          setStep('time')
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+          return
+        }
+        if (res.sessionFull) {
+          setSessionId(null)
+          setSessions(res.sessions ?? [])
           setError({ text: res.error })
           setStep('time')
           window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -207,6 +232,7 @@ export function OrderFlow({
   const nearestTime = nearestDay?.times[0] ?? null
   const selectedStaffName = staffOptions.find((s) => s.id === staffId)?.name ?? null
   const pickTime = (date: string, minutes: number) => {
+    setSessionId(null)
     setWhen({ day: date, minutes })
     setDay(date)
     go('contact')
@@ -245,12 +271,12 @@ export function OrderFlow({
         </p>
       )}
 
-      {step !== 'done' && (service || chosenWhen || selectedStaffName) && (
+      {step !== 'done' && (selectedServices.length > 0 || chosenWhen || selectedStaffName) && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-box bg-navy-50 px-4 py-3 text-[14px] text-navy-900" aria-label="Shrnutí objednávky">
-          {service && <span className="font-semibold">{service.name}</span>}
-          {service?.price !== null && service?.price !== undefined && (
-            <span className="font-num">{formatMoney(service.price, { currency: (service.currency as WsCurrency) ?? 'CZK' })}</span>
-          )}
+          {selectedServices.length > 0 && <span className="font-semibold">{selectedServices.map((s) => s.name).join(' + ')}</span>}
+          {Object.entries(priceByCurrency).map(([currency, amount]) => (
+            <span key={currency} className="font-num">{formatMoney(amount, { currency: currency as WsCurrency })}</span>
+          ))}
           {chosenWhen && <span className="font-num">{formatDayShort(chosenWhen.day)} v {formatMinutes(chosenWhen.minutes)}</span>}
           {selectedStaffName && <span>{selectedStaffName}</span>}
         </div>
@@ -262,18 +288,23 @@ export function OrderFlow({
               <h2 ref={stepHeading} tabIndex={-1} className="text-[24px] font-semibold leading-[1.1] tracking-[-0.02em] focus:outline-none">Co pro vás můžeme udělat?</h2>
               <ul className="flex flex-col gap-2.5">
                 {services.map((s) => {
-                  const active = s.id === serviceId
+                  const active = serviceIds.includes(s.id)
                   return (
                     <li key={s.id}>
                       <button
                         type="button"
+                        disabled={!active && (serviceIds.length >= 5 || selectedServices.reduce((sum, item) => sum + item.durationMin, 0) + s.durationMin > 720)}
                         aria-pressed={active}
                         onClick={() => {
-                          setServiceId(s.id)
+                          const next = active ? serviceIds.filter((id) => id !== s.id) : [...serviceIds, s.id]
+                          setServiceIds(next)
                           setStaffId(null)
                           setDay(null)
                           setWhen(null)
-                          go(nextAfter('service'), s.id, null)
+                          setSessionId(null)
+                          setSlotsFor(null)
+                          setSlots(null)
+                          setError(null)
                         }}
                         className={cn(
                           'flex min-h-[64px] w-full items-center justify-between gap-4 rounded-box border px-5 py-3 text-left transition-colors',
@@ -294,19 +325,15 @@ export function OrderFlow({
                   )
                 })}
               </ul>
-              <button
-                type="button"
-                onClick={() => {
-                  setServiceId(null)
-                  setStaffId(null)
-                  setDay(null)
-                  setWhen(null)
-                  go(nextAfter('service'), null, null)
-                }}
-                className="self-start text-[15px] font-medium text-navy-500 underline-offset-4 hover:underline"
-              >
-                Nevím, poradíte mi
-              </button>
+              <p className="text-[14px] text-quiet">Vyberte až pět služeb. Jejich délky se spojí do jednoho navazujícího termínu, nejvýše na 12 hodin.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" onClick={() => { setServiceIds([]); setStaffId(null); setDay(null); setWhen(null); setSlotsFor(null); setSlots(null); setError(null); go(nextAfter('service'), [], null) }}>
+                  Nevím, poradíte mi
+                </Button>
+                <Button type="button" disabled={serviceIds.length === 0} onClick={() => go(nextAfter('service'))}>
+                  Pokračovat{selectedServices.length ? ` · ${durationMin} min` : ''}
+                </Button>
+              </div>
             </>
           )}
 
@@ -393,6 +420,41 @@ export function OrderFlow({
                 </div>
               )}
             </>
+          )}
+
+          {step === 'time' && sessions.length > 0 && (
+            <section className="flex flex-col gap-3" aria-labelledby="skupinove-lekce">
+              <h2 id="skupinove-lekce" className="text-[19px] font-semibold text-ink">Skupinové lekce</h2>
+              <p className="text-[14px] text-quiet">Vyberte vypsaný termín. Místo se rezervuje hned po odeslání poptávky.</p>
+              <ul className="flex flex-col gap-2">
+                {sessions.map((session) => {
+                  const start = pragueParts(session.start)
+                  const active = session.id === sessionId
+                  return (
+                    <li key={session.id}>
+                      <button
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          setServiceIds([session.serviceId])
+                          setSessionId(session.id)
+                          setWhen(null)
+                          setDay(start.date)
+                          go('contact', [session.serviceId], null)
+                        }}
+                        className={cn('flex min-h-[68px] w-full items-center justify-between gap-3 rounded-box border px-4 py-3 text-left', active ? 'border-navy-700 bg-navy-50' : 'border-line bg-surface hover:border-navy-300')}
+                      >
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate font-semibold text-ink">{session.serviceName}</span>
+                          <span className="font-num text-sm text-quiet">{formatDayShort(start.date)} v {formatMinutes(start.minutes)} · {session.staffName ?? 'Skupinová lekce'}</span>
+                        </span>
+                        <span className="shrink-0 font-num text-sm text-navy-700">{session.places} {session.places === 1 ? 'místo' : session.places >= 2 && session.places <= 4 ? 'místa' : 'míst'}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
           )}
 
           {step === 'time' && booking === 'free' && (
@@ -514,9 +576,9 @@ export function OrderFlow({
                 <Button variant="outline" onClick={() => downloadTentativeCalendar({
                   day: chosenWhen.day,
                   minutes: chosenWhen.minutes,
-                  durationMin: service?.durationMin ?? 60,
+                  durationMin,
                   businessName,
-                  serviceName: service?.name ?? null,
+                  serviceName: selectedServices.map((selected) => selected.name).join(' + ') || null,
                   uid: confirmation?.calendarUid ?? crypto.randomUUID(),
                 })}>
                   <CalendarPlus aria-hidden size={18} strokeWidth={1.5} />
@@ -536,8 +598,8 @@ export function OrderFlow({
   )
 }
 
-function availabilityKey(serviceId: string | null, staffId: string | null): string {
-  return `${serviceId ?? 'bez-sluzby'}:${staffId ?? 'kdokoli'}`
+function availabilityKey(serviceIds: readonly string[], staffId: string | null): string {
+  return `${serviceIds.join(',') || 'bez-sluzby'}:${staffId ?? 'kdokoli'}`
 }
 
 function icsLocalDate(day: string, minutes: number): string {

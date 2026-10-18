@@ -3,7 +3,7 @@ import { ChevronLeft, ExternalLink, Globe } from 'lucide-react'
 import type { ClientDetail } from '@/lib/ws/admin/clients'
 import { cn } from '@/lib/utils'
 import { ACCESS_CLASS, ACCESS_LABEL, AUDIT_LABEL, ago, formatDate, formatDateTime } from '../labels'
-import { NoteEditor, ResendInviteForm, WebKeysPanel } from './panels'
+import { ResendInviteForm, WebKeysPanel } from './panels'
 
 // Vykreslení detailu účtu Workspace (S17) — bez načítání dat.
 
@@ -99,28 +99,22 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
         </ul>
       </Section>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Section title="Členové" hint={client.members === 0 ? 'Nikdo se zatím nepřihlásil. Pozvánku jde poslat znovu.' : undefined}>
-          {client.membersList.length > 0 && (
-            <ul className="space-y-1.5">
-              {client.membersList.map((m, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="min-w-0 truncate">
-                    {m.name ?? m.email ?? 'bez jména'}
-                    {m.name && m.email && <span className="text-muted-foreground"> · {m.email}</span>}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground shrink-0">{m.role === 'owner' ? 'vlastník' : 'pracovník'}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <ResendInviteForm accountId={client.id} />
-        </Section>
-
-        <Section title="Poznámka" hint={client.note ? `Naposledy ${formatDateTime(client.note.updatedAt)}` : 'Interní, klient ji nevidí.'}>
-          <NoteEditor accountId={client.id} initial={client.note?.text ?? ''} />
-        </Section>
-      </div>
+      <Section title="Členové" hint={client.members === 0 ? 'Nikdo se zatím nepřihlásil. Pozvánku jde poslat znovu.' : undefined}>
+        {client.membersList.length > 0 && (
+          <ul className="space-y-1.5">
+            {client.membersList.map((m, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate">
+                  {m.name ?? m.email ?? 'bez jména'}
+                  {m.name && m.email && <span className="text-muted-foreground"> · {m.email}</span>}
+                </span>
+                <span className="text-[11px] text-muted-foreground shrink-0">{m.role === 'owner' ? 'vlastník' : 'pracovník'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <ResendInviteForm accountId={client.id} />
+      </Section>
 
       <Section title="Historie" hint="Posledních 30 záznamů z auditu účtu.">
         {client.audit.length === 0 ? (

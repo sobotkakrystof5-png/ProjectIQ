@@ -110,14 +110,32 @@ async function loadBase(ref: PortalRef): Promise<Base | null> {
   const record =
     ref.kind === 'appointment'
       ? q`SELECT a.status, a.starts_at, a.ends_at, a.staff_id, a.service_id, a.customer_id, c.name AS customer_name,
-                 s.name AS service, COALESCE(s.buffer_min, 0) AS buffer_min
+                 a.group_id,
+                 (SELECT min(a2.starts_at) FROM ws.appointments a2 WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+                   AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))) AS group_starts_at,
+                 (SELECT max(a2.ends_at) FROM ws.appointments a2 WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+                   AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))) AS group_ends_at,
+                 ARRAY(SELECT a2.service_id FROM ws.appointments a2 WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+                   AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))
+                   ORDER BY a2.starts_at) AS service_ids,
+                 (SELECT sum(COALESCE(s2.buffer_min, 0)) FROM ws.appointments a2
+                   LEFT JOIN ws.services s2 ON s2.account_id = a2.account_id AND s2.id = a2.service_id
+                   WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+                     AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))) AS buffer_min,
+                 COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY a2.starts_at) FROM ws.appointments a2
+                   LEFT JOIN ws.services s2 ON s2.account_id = a2.account_id AND s2.id = a2.service_id
+                   WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+                     AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))), s.name) AS service
           FROM ws.appointments a
           LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
           LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
           WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.id = ${ref.id} AND a.kind = 'visit'`
       : ref.kind === 'request'
         ? q`SELECT r.status, r.wanted_start AS starts_at, r.wanted_end AS ends_at,
-                   r.customer_id, c.name AS customer_name, s.name AS service
+                   r.customer_id, c.name AS customer_name,
+                   COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+                     FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+                     WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service
             FROM ws.requests r
             LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
             LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
@@ -151,8 +169,8 @@ async function loadBase(ref: PortalRef): Promise<Base | null> {
 
 function visitView(ref: PortalRef, base: Base, now: Date): PortalVisit {
   const r = base.row
-  const start = new Date(r.starts_at as string)
-  const end = new Date(r.ends_at as string)
+  const start = new Date((r.group_starts_at as string | null) ?? (r.starts_at as string))
+  const end = new Date((r.group_ends_at as string | null) ?? (r.ends_at as string))
   const status = String(r.status)
   const upcoming = status === 'confirmed' && start > now
   const deadline = changeDeadline(start, base.rules.changeHours)
@@ -176,7 +194,8 @@ const isFinishedType = (t: unknown) => t === 'done' || t === 'paid'
 
 function visitReviewable(base: Base, now: Date): boolean {
   const s = String(base.row.status)
-  return s === 'completed' || (s === 'confirmed' && new Date(base.row.ends_at as string) <= now)
+  const end = (base.row.group_ends_at as string | null) ?? (base.row.ends_at as string)
+  return s === 'completed' || (s === 'confirmed' && new Date(end) <= now)
 }
 
 function jobFinished(base: Base): { finished: boolean; cancelled: boolean } {
@@ -242,11 +261,15 @@ export async function loadPortal(ref: PortalRef, now: Date = new Date()): Promis
           ORDER BY issued_on DESC NULLS LAST LIMIT 20`
       : none,
     isJob && base.modules.has('calendar')
-      ? q`SELECT a.starts_at, a.ends_at, a.public_token, s.name AS service FROM ws.appointments a
-          LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
+      ? q`SELECT min(a.starts_at) AS starts_at, max(a.ends_at) AS ends_at,
+            (array_agg(a.public_token ORDER BY a.starts_at))[1] AS public_token,
+            string_agg(s.name, ' + ' ORDER BY a.starts_at) AS service
+          FROM ws.appointments a LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
           WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.job_id = ${ref.id}
-            AND a.kind = 'visit' AND a.status = 'confirmed' AND a.ends_at > ${now}::timestamptz
-          ORDER BY a.starts_at LIMIT 10`
+            AND a.kind = 'visit' AND a.status = 'confirmed'
+          GROUP BY COALESCE(a.group_id, a.id)
+          HAVING max(a.ends_at) > ${now}::timestamptz
+          ORDER BY min(a.starts_at) LIMIT 10`
       : none,
   ])
 
@@ -322,9 +345,19 @@ async function visitForChange(ref: PortalRef, now: Date) {
 }
 
 function slotOptions(ref: PortalRef, base: Base) {
-  const start = new Date(base.row.starts_at as string).getTime()
-  const end = new Date(base.row.ends_at as string).getTime()
-  return { excludeAppointmentId: ref.id, durationMin: Math.round((end - start) / 60_000) + Number(base.row.buffer_min ?? 0) }
+  const start = new Date(((base.row.group_starts_at as string | null) ?? (base.row.starts_at as string))).getTime()
+  const end = new Date(((base.row.group_ends_at as string | null) ?? (base.row.ends_at as string))).getTime()
+  return {
+    excludeAppointmentId: ref.id,
+    excludeGroupId: (base.row.group_id as string | null) ?? null,
+    durationMin: Math.round((end - start) / 60_000) + Number(base.row.buffer_min ?? 0),
+  }
+}
+
+function appointmentServices(base: Base): string[] {
+  return Array.isArray(base.row.service_ids)
+    ? (base.row.service_ids as unknown[]).filter((id): id is string => typeof id === 'string')
+    : typeof base.row.service_id === 'string' ? [base.row.service_id] : []
 }
 
 /** Volné časy pro přesun. null = přesunout nejde. */
@@ -333,8 +366,7 @@ export async function portalSlots(ref: PortalRef, now: Date = new Date()): Promi
   if (!v || !v.view.canMove) return null
   const config = await loadIntakeConfig(ref.accountId, ref.businessId)
   if (!config || config.booking !== 'slots') return null
-  const serviceId = (v.base.row.service_id as string | null) ?? null
-  const slots = await loadSlots(ref.accountId, config, serviceId, now, slotOptions(ref, v.base))
+  const slots = await loadSlots(ref.accountId, config, appointmentServices(v.base), now, slotOptions(ref, v.base))
   const current = v.view.start.getTime()
   return slots
     .map((d) => ({ date: d.date, times: d.times.filter((m) => pragueToUtc(d.date, m).getTime() !== current) }))
@@ -351,8 +383,7 @@ export async function portalMove(ref: PortalRef, day: string, minutes: number, n
   const prevStart = v.view.start
   if (start.getTime() === prevStart.getTime()) return { ok: true }
 
-  const serviceId = (v.base.row.service_id as string | null) ?? null
-  const data = await loadSlotData(ref.accountId, config, serviceId, now, slotOptions(ref, v.base))
+  const data = await loadSlotData(ref.accountId, config, appointmentServices(v.base), now, slotOptions(ref, v.base))
   const staff = freeStaffAt(data, start, (v.base.row.staff_id as string | null) ?? null)
   if (staff === null) return failed('taken')
 

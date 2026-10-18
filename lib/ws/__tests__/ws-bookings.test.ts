@@ -8,6 +8,7 @@ import {
   confirmRequest,
   createBlock,
   createBooking,
+  createGroupSession,
   declineRequest,
   ensureStaff,
   findOrCreateCustomer,
@@ -15,6 +16,7 @@ import {
   normalizePhone,
   reopenRequest,
   restoreAppointment,
+  setGroupSessionOpen,
   setJobStage,
 } from '../bookings'
 import { getRequestsList } from '../calendar'
@@ -165,6 +167,111 @@ describe('potvrzení poptávky', () => {
     const id = await newRequest('2026-11-04T09:00:00Z')
     expect((await confirmRequest(ctxA, bizA, { requestId: id })).ok).toBe(true)
     expect(await confirmRequest(ctxA, bizA, { requestId: id })).toEqual({ ok: false, reason: 'already_handled' })
+  })
+
+  it('potvrdí místo ve skupinové lekci bez druhého termínu a jde zastavit přihlašování', async () => {
+    const start = at('2027-01-14T12:00:00Z')
+    const session = await createGroupSession(ctxA, bizA, {
+      serviceId: A.service, staffId: A.staff, start, title: 'Skupinová lekce', capacity: 2,
+    })
+    expect(session.ok).toBe(true)
+    if (!session.ok) return
+    const requestId = await newRequest(start.toISOString())
+    await db.query(`UPDATE ws.requests SET session_id = $2 WHERE account_id = $1 AND id = $3`, [A.account, session.data.sessionId, requestId])
+    await db.query(
+      `INSERT INTO ws.session_attendees (account_id, business_id, session_id, request_id, customer_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [A.account, A.business, session.data.sessionId, requestId, A.customer],
+    )
+    await db.query(`UPDATE ws.sessions SET reserved = 1 WHERE account_id = $1 AND id = $2`, [A.account, session.data.sessionId])
+
+    expect((await setGroupSessionOpen(ctxA, bizA, session.data.sessionId, false)).ok).toBe(true)
+    expect((await row<{ status: string }>(`SELECT status FROM ws.sessions WHERE id = $1`, [session.data.sessionId])).status).toBe('closed')
+    expect((await setGroupSessionOpen(ctxA, bizA, session.data.sessionId, true)).ok).toBe(true)
+
+    const confirmed = await confirmRequest(ctxA, bizA, { requestId })
+    expect(confirmed).toMatchObject({ ok: true, data: { appointmentId: session.data.appointmentId } })
+    expect((await row<{ status: string }>(`SELECT status FROM ws.requests WHERE id = $1`, [requestId])).status).toBe('confirmed')
+    expect((await row<{ status: string }>(`SELECT status FROM ws.session_attendees WHERE request_id = $1`, [requestId])).status).toBe('confirmed')
+    expect(await row<{ n: number }>(`SELECT count(*)::int AS n FROM ws.appointments WHERE account_id = $1 AND request_id = $2`, [A.account, requestId])).toMatchObject({ n: 0 })
+    expect(await row<{ n: number }>(`SELECT count(*)::int AS n FROM ws.appointments WHERE account_id = $1 AND id = $2`, [A.account, session.data.appointmentId])).toMatchObject({ n: 1 })
+  })
+
+  it('nepotvrdí ani neobnoví účastníka zrušené skupinové lekce', async () => {
+    const start = at('2027-02-11T12:00:00Z')
+    const session = await createGroupSession(ctxA, bizA, {
+      serviceId: A.service, staffId: A.staff, start, title: 'Zrušená lekce', capacity: 2,
+    })
+    expect(session.ok).toBe(true)
+    if (!session.ok) return
+    const requestId = await newRequest(start.toISOString())
+    await db.query(`UPDATE ws.requests SET session_id = $2 WHERE account_id = $1 AND id = $3`, [A.account, session.data.sessionId, requestId])
+    await db.query(
+      `INSERT INTO ws.session_attendees (account_id, business_id, session_id, request_id, customer_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [A.account, A.business, session.data.sessionId, requestId, A.customer],
+    )
+    await db.query(`UPDATE ws.sessions SET reserved = 1 WHERE account_id = $1 AND id = $2`, [A.account, session.data.sessionId])
+    expect((await cancelAppointment(ctxA, bizA, session.data.appointmentId)).ok).toBe(true)
+    expect(await confirmRequest(ctxA, bizA, { requestId })).toEqual({ ok: false, reason: 'session_cancelled' })
+
+    const declinedStart = at('2027-02-12T12:00:00Z')
+    const declinedSession = await createGroupSession(ctxA, bizA, {
+      serviceId: A.service, staffId: A.staff, start: declinedStart, title: 'Další zrušená lekce', capacity: 2,
+    })
+    expect(declinedSession.ok).toBe(true)
+    if (!declinedSession.ok) return
+    const declinedRequest = await newRequest(declinedStart.toISOString())
+    await db.query(`UPDATE ws.requests SET session_id = $2 WHERE account_id = $1 AND id = $3`, [A.account, declinedSession.data.sessionId, declinedRequest])
+    await db.query(
+      `INSERT INTO ws.session_attendees (account_id, business_id, session_id, request_id, customer_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [A.account, A.business, declinedSession.data.sessionId, declinedRequest, A.customer],
+    )
+    await db.query(`UPDATE ws.sessions SET reserved = 1 WHERE account_id = $1 AND id = $2`, [A.account, declinedSession.data.sessionId])
+    expect((await declineRequest(ctxA, bizA, declinedRequest)).ok).toBe(true)
+    expect((await cancelAppointment(ctxA, bizA, declinedSession.data.appointmentId)).ok).toBe(true)
+    expect(await reopenRequest(ctxA, bizA, declinedRequest)).toEqual({ ok: false, reason: 'session_cancelled' })
+  })
+
+  it('více služeb vytvoří jeden přesouvatelný blok a zruší se společně', async () => {
+    const [extra] = await db.query<{ id: string }>(
+      `INSERT INTO ws.services (account_id, business_id, name, duration_min) VALUES ($1, $2, 'Druhá služba', 30) RETURNING id`,
+      [A.account, A.business],
+    ).then((r) => r.rows)
+    const requestId = await newRequest('2026-12-10T09:00:00Z')
+    await db.query(
+      `INSERT INTO ws.request_services (account_id, business_id, request_id, service_id, position) VALUES ($1, $2, $3, $4, 1), ($1, $2, $3, $5, 2)`,
+      [A.account, A.business, requestId, A.service, extra.id],
+    )
+    const confirmed = await confirmRequest(ctxA, bizA, { requestId })
+    expect(confirmed.ok).toBe(true)
+    if (!confirmed.ok || !confirmed.data.appointmentId) return
+    const linked = await row<{ n: number; group_id: string; first_end: Date; second_start: Date; final_end: Date }>(
+      `SELECT count(*)::int AS n, (array_agg(group_id))[1]::text AS group_id,
+        min(starts_at) FILTER (WHERE service_id = $2) AS first_start,
+        max(ends_at) FILTER (WHERE service_id = $2) AS first_end,
+        min(starts_at) FILTER (WHERE service_id = $3) AS second_start,
+        max(ends_at) AS final_end
+       FROM ws.appointments WHERE account_id = $1 AND request_id = $4`,
+      [A.account, A.service, extra.id, requestId],
+    )
+    expect(linked.n).toBe(2)
+    expect(linked.first_end.toISOString()).toBe('2026-12-10T10:00:00.000Z')
+    expect(linked.second_start.toISOString()).toBe('2026-12-10T10:00:00.000Z')
+    expect(linked.final_end.toISOString()).toBe('2026-12-10T10:30:00.000Z')
+
+    const moved = await moveAppointment(ctxA, bizA, { appointmentId: confirmed.data.appointmentId, start: at('2026-12-11T09:00:00Z') })
+    expect(moved.ok).toBe(true)
+    const times = await db.query<{ starts_at: Date; ends_at: Date }>(
+      `SELECT starts_at, ends_at FROM ws.appointments WHERE account_id = $1 AND request_id = $2 ORDER BY starts_at`,
+      [A.account, requestId],
+    )
+    expect(times.rows[0].starts_at.toISOString()).toBe('2026-12-11T09:00:00.000Z')
+    expect(times.rows[1].starts_at.toISOString()).toBe('2026-12-11T10:00:00.000Z')
+    expect((await cancelAppointment(ctxA, bizA, confirmed.data.appointmentId)).ok).toBe(true)
+    expect(await row<{ n: number }>(`SELECT count(*)::int AS n FROM ws.appointments WHERE request_id = $1 AND status = 'cancelled'`, [requestId])).toMatchObject({ n: 2 })
+    expect((await restoreAppointment(ctxA, bizA, confirmed.data.appointmentId)).ok).toBe(true)
   })
 })
 

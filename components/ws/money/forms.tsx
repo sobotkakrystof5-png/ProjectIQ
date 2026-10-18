@@ -122,15 +122,16 @@ export function ReceivedForm({slug,today,closeHref,ai}:{slug:string;today:string
 
 export function TaxForm({slug,settings=DEFAULT_TAX}:{slug:string;settings?:TaxSettings}) {
   const {run,pending}=useWsAction()
+  const [flatTax,setFlatTax]=useState(settings.mode==='flat_tax')
   return <form className="flex flex-col gap-4" onSubmit={event=>{
     event.preventDefault()
     const data=new FormData(event.currentTarget)
     void run(()=>saveTaxAction({
       slug,
-      mode:data.get('mode'),
+      mode:flatTax?'flat_tax':data.get('mode'),
       flatRate:Number(data.get('flatRate')),
-      vatPayer:data.has('vatPayer'),
-      sideActivity:data.has('sideActivity'),
+      vatPayer:data.get('vatPayer')==='yes',
+      sideActivity:data.get('sideActivity')==='side',
       months:Number(data.get('months')),
       healthMinimum:data.has('healthMinimum'),
       taxpayerCredit:data.has('taxpayerCredit'),
@@ -140,29 +141,46 @@ export function TaxForm({slug,settings=DEFAULT_TAX}:{slug:string;settings?:TaxSe
     }),()=>toast.success('Nastavení je uložené.'))
   }}>
     <p className="text-sm text-quiet">Nastavení platí pro celý účet, tedy jedno IČO. Odhad není daňové poradenství.</p>
-    <Field label="Režim">
-      <select className={selectClass} name="mode" defaultValue={settings.mode}>
-        <option value="flat_expenses">Výdaje procentem</option><option value="real">Skutečné výdaje</option><option value="flat_tax">Paušální daň</option>
+    <Field label="Jak podnikáte?">
+      <select className={selectClass} name="sideActivity" defaultValue={settings.sideActivity?'side':'main'}>
+        <option value="main">OSVČ na hlavní činnost</option><option value="side">OSVČ na vedlejší činnost</option>
       </select>
     </Field>
-    <Field label="Výdajový paušál">
-      <select className={selectClass} name="flatRate" defaultValue={settings.flatRate}>{[30,40,60,80].map(value=><option key={value} value={value}>{value} %</option>)}</select>
-    </Field>
-    <Field label="Pásmo paušální daně">
-      <select className={selectClass} name="flatBand" defaultValue={settings.flatBand}>{[1,2,3].map(value=><option key={value}>{value}</option>)}</select>
-    </Field>
-    <Field label="Měsíců činnosti za rok"><Input name="months" type="number" min="1" max="12" defaultValue={settings.months} required/></Field>
-    {(['vatPayer','sideActivity','healthMinimum','taxpayerCredit'] as const).map(key=>{
-      const labels={vatPayer:'Jsem plátce DPH',sideActivity:'Podnikám na vedlejší činnost',healthMinimum:'Platí pro mě minimum zdravotního pojištění',taxpayerCredit:'Uplatním celou slevu na poplatníka'}
-      return <label key={key} className="flex min-h-11 items-center gap-3 text-sm"><input name={key} type="checkbox" defaultChecked={settings[key]}/>{labels[key]}</label>
-    })}
-    <p className="text-sm text-quiet">Pokud slevu využíváte v zaměstnání, vypněte ji. Výpočet nezahrnuje mzdu, děti, odpočty ani začínající OSVČ se sníženým minimem.</p>
-    <Field label="Uhrazené daně a pojistné"><Input name="advances" type="number" min="0" step=".01" defaultValue={settings.advances} required/></Field>
-    <Field label="Podání přiznání">
-      <select className={selectClass} name="filing" defaultValue={settings.filing}>
-        <option value="electronic">Elektronicky</option><option value="paper">Papírově</option><option value="advisor">S poradcem</option>
+    <Field label="Jak uplatňujete výdaje?">
+      <select className={selectClass} name="mode" defaultValue={settings.mode==='real'?'real':'flat_expenses'}>
+        <option value="flat_expenses">Paušálem</option><option value="real">Ve skutečné výši</option>
       </select>
     </Field>
+    <Field label="Jste plátce DPH?">
+      <select className={selectClass} name="vatPayer" defaultValue={settings.vatPayer?'yes':'no'}>
+        <option value="no">Ne</option><option value="yes">Ano</option>
+      </select>
+    </Field>
+    <details className="rounded-box border px-4 py-3">
+      <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">Pokročilé nastavení</summary>
+      <div className="flex flex-col gap-4 pb-2">
+        <label className="flex min-h-11 items-center gap-3 text-sm">
+          <input name="flatTax" type="checkbox" checked={flatTax} onChange={event=>setFlatTax(event.target.checked)}/>
+          Používám paušální daň
+        </label>
+        <Field label="Výdajový paušál">
+          <select className={selectClass} name="flatRate" defaultValue={settings.flatRate}>{[30,40,60,80].map(value=><option key={value} value={value}>{value} %</option>)}</select>
+        </Field>
+        <Field label="Pásmo paušální daně">
+          <select className={selectClass} name="flatBand" defaultValue={settings.flatBand}>{[1,2,3].map(value=><option key={value}>{value}</option>)}</select>
+        </Field>
+        <Field label="Měsíců činnosti za rok"><Input name="months" type="number" min="1" max="12" defaultValue={settings.months} required/></Field>
+        <label className="flex min-h-11 items-center gap-3 text-sm"><input name="healthMinimum" type="checkbox" defaultChecked={settings.healthMinimum}/>Platí pro mě minimum zdravotního pojištění</label>
+        <label className="flex min-h-11 items-center gap-3 text-sm"><input name="taxpayerCredit" type="checkbox" defaultChecked={settings.taxpayerCredit}/>Uplatním celou slevu na poplatníka</label>
+        <p className="text-sm text-quiet">Pokud slevu využíváte v zaměstnání, vypněte ji. Výpočet nezahrnuje mzdu, děti, odpočty ani začínající OSVČ se sníženým minimem.</p>
+        <Field label="Uhrazené daně a pojistné"><Input name="advances" type="number" min="0" step=".01" defaultValue={settings.advances} required/></Field>
+        <Field label="Podání přiznání">
+          <select className={selectClass} name="filing" defaultValue={settings.filing}>
+            <option value="electronic">Elektronicky</option><option value="paper">Papírově</option><option value="advisor">S poradcem</option>
+          </select>
+        </Field>
+      </div>
+    </details>
     <Button type="submit" disabled={pending}>Uložit nastavení</Button>
   </form>
 }

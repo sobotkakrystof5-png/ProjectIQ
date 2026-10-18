@@ -16,6 +16,7 @@ import { searchAction } from '@/app/w/[business]/actions'
 import { normalize, parseCommand } from '@/lib/ws/command-parser'
 import { hrefWith } from '@/lib/ws/detail-param'
 import type { NewAction } from '@/lib/ws/features'
+import { searchGuides, type Guide } from '@/lib/ws/guides'
 import { navHref, type AccountLink, type NavItem } from '@/lib/ws/nav'
 import type { SearchHit } from '@/lib/ws/search'
 import { formatDayShort, formatMinutes } from '@/lib/ws/time'
@@ -34,6 +35,7 @@ export type PaletteProps = {
   actions: NewAction[]
   orderUrl: string
   services: string[]
+  guides: Guide[]
   today: string
 }
 
@@ -45,7 +47,7 @@ const HIT_GROUP = { zakaznik: 'Zákazníci', poptavka: 'Poptávky', faktura: 'Fa
  * akce. „rezervace Tereza pátek 9:00" rozpozná parser a nabídne rezervaci
  * s předvyplněnými údaji (lib/ws/command-parser.ts).
  */
-export function CommandPalette({ open, onOpenChange, slug, nav, accountLinks, actions: available, orderUrl, services, today }: PaletteProps) {
+export function CommandPalette({ open, onOpenChange, slug, nav, accountLinks, actions: available, orderUrl, services, guides, today }: PaletteProps) {
   const canBook = available.includes('booking')
   const router = useRouter()
   const pathname = usePathname()
@@ -103,6 +105,7 @@ export function CommandPalette({ open, onOpenChange, slug, nav, accountLinks, ac
   const matches = (label: string) => !q || normalize(label).includes(q)
   const navMatches = nav.filter((i) => matches(i.label))
   const accountMatches = accountLinks.filter((l) => matches(l.paletteLabel))
+  const guideMatches = searchGuides(query, guides)
 
   const actions: { key: string; label: string; icon: LucideIcon; run: () => void }[] = []
   if (available.includes('booking')) actions.push({ key: 'booking', label: 'Nová rezervace', icon: CalendarPlus, run: () => openDetail('nova-rezervace') })
@@ -203,6 +206,18 @@ export function CommandPalette({ open, onOpenChange, slug, nav, accountLinks, ac
               <CommandItem key={a.key} value={`akce-${a.key}`} onSelect={a.run}>
                 <a.icon size={18} strokeWidth={1.5} />
                 {a.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {guideMatches.length > 0 && (
+          <CommandGroup heading="Návody">
+            {guideMatches.map((guide) => (
+              <CommandItem key={guide.id} value={`navod-${guide.id}`} onSelect={() => go(`/w/${slug}/navody/${guide.topic}#${guide.id}`)}>
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-50 font-num text-[10px] text-navy-700 dark:bg-navy-800 dark:text-navy-200">?</span>
+                <span className="min-w-0 truncate">{guide.title}</span>
+                <CommandShortcut>{guide.minutes} min</CommandShortcut>
               </CommandItem>
             ))}
           </CommandGroup>

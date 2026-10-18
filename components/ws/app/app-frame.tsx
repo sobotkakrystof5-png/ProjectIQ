@@ -11,6 +11,7 @@ import { Logo } from '@/components/ws/brand'
 import { rememberBusinessAction } from '@/app/w/[business]/actions'
 import { EMPTY_CHROME, type FrameChrome } from '@/lib/ws/frame-chrome'
 import { newActions } from '@/lib/ws/features'
+import { visibleGuides } from '@/lib/ws/guides'
 import {
   accountLinks,
   bottomBarSlots,
@@ -24,6 +25,7 @@ import {
 import { cn } from '@/lib/ws/utils'
 import { AccountMenu, AccountSheetSection } from './account-menu'
 import { LiveRefresh } from './booking/live-refresh'
+import { PrivacyToggle } from './privacy-toggle'
 import { NavIcon } from './nav-icon'
 import { NewMenu } from './new-menu'
 import { NotificationsBell } from './notifications-bell'
@@ -54,7 +56,7 @@ const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible
  * Kostra aplikace Workspace (S09, mockup C a D): postranní panel navy-950
  * jen se zapnutými funkcemi, hlavička s přepínačem byznysů, hledáním (⌘K),
  * zvonkem a „+ Nová"; na telefonu spodní lišta a menu v panelu.
- * Hlavní menu má nejvýš šest položek; Nastavení a předplatné jsou v Účtu (RD01).
+ * Hlavní menu má šest pracovních položek; Návody jsou samostatně (RD14).
  */
 export function AppFrame(props: AppFrameProps) {
   const { business, businesses, isOwner, orderUrl, chrome, rememberedSlug, children } = props
@@ -88,6 +90,7 @@ export function AppFrame(props: AppFrameProps) {
   const enabled = useMemo(() => new Set(props.enabledModules), [props.enabledModules])
   const nav = useMemo(() => navItems(enabled), [enabled])
   const palette = useMemo(() => paletteItems(enabled), [enabled])
+  const guides = useMemo(() => visibleGuides(enabled), [enabled])
   const account = useMemo(() => accountLinks(business.slug, isOwner), [business.slug, isOwner])
   const actions = useMemo(() => newActions(enabled), [enabled])
   // Bez hotové akce není „+“ ani ve spodní liště (R-043).
@@ -184,6 +187,7 @@ export function AppFrame(props: AppFrameProps) {
             >
               <Search aria-hidden size={20} strokeWidth={1.5} />
             </button>
+            <PrivacyToggle />
             <Suspense fallback={<NotificationsBell slug={business.slug} {...EMPTY_CHROME.bell} />}>
               <FrameBell slug={business.slug} chrome={chrome} />
             </Suspense>
@@ -291,6 +295,7 @@ export function AppFrame(props: AppFrameProps) {
           actions={actions}
           orderUrl={orderUrl}
           services={services}
+          guides={guides}
           today={props.today}
         />
       )}

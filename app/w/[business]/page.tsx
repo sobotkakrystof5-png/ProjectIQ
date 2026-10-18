@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { HelpLink } from '@/components/ws/app/help-link'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { TodayFocus } from '@/components/ws/app/today/focus'
 import { IncomingList } from '@/components/ws/app/today/incoming-list'
@@ -81,7 +82,7 @@ export default async function TodayPage(props: {
   if (data.isEmpty) {
     return (
       <PageShell width="wide">
-        <Heading today={today} />
+        <Heading slug={business.slug} today={today} />
         <TodayWelcome
           welcome={welcome}
           orderUrl={await orderPageUrl(business.slug)}
@@ -118,7 +119,7 @@ export default async function TodayPage(props: {
   return (
     <PullToRefresh>
       <PageShell width="wide">
-        <Heading today={today}>
+        <Heading slug={business.slug} today={today}>
           {plural(data.incomingTotal, [
             'nová poptávka',
             'nové poptávky',
@@ -193,11 +194,13 @@ export default async function TodayPage(props: {
 }
 
 function Heading({
+  slug,
   today,
   children,
 }: {
+  slug: string
   today: string
   children?: React.ReactNode
 }) {
-  return <PageHeader title="Dnes," accent={formatDayLong(today)} subtitle={children} />
+  return <PageHeader title="Dnes," accent={formatDayLong(today)} subtitle={children} help={<HelpLink slug={slug} topic="zacinate" guide="prvni-nastaveni" />} />
 }

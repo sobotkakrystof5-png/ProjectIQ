@@ -14,7 +14,7 @@ export function Money({
   className?: string
 }) {
   return (
-    <span className={cn('whitespace-nowrap font-num tabular-nums', className)}>
+    <span data-ws-private-value className={cn('whitespace-nowrap font-num tabular-nums', className)}>
       {formatMoney(amount, { currency, minor })}
     </span>
   )

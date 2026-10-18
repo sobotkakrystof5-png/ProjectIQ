@@ -53,6 +53,7 @@ export function CustomerDetail({
   businessColor,
   invoiceHref,
   termHref,
+  bookingHref,
 }: {
   slug: string
   customer: Detail
@@ -62,13 +63,14 @@ export function CustomerDetail({
   businessColor: string | null
   invoiceHref?: string | null
   termHref: (appointmentId: string) => string
+  bookingHref?: (serviceIds: string[]) => string
 }) {
   const day = (d: Date) => formatRelativeDay(pragueParts(d).date, today)
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="min-w-0 text-xl font-semibold tracking-[-0.02em]">{c.name}</h3>
+          <h3 data-ws-private-value className="min-w-0 text-xl font-semibold tracking-[-0.02em]">{c.name}</h3>
           <SegmentBadge segment={c.segment} />
         </div>
         <CustomerContactActions
@@ -104,6 +106,7 @@ export function CustomerDetail({
       </section>}
 
       {invoiceHref&&<Link href={invoiceHref} scroll={false} className="inline-flex min-h-11 items-center justify-center self-start rounded-full border px-5 text-sm font-semibold text-ink hover:bg-accent">Vystavit fakturu</Link>}
+      {bookingHref && c.lastServiceIds.length > 0 && <Link href={bookingHref(c.lastServiceIds)} scroll={false} className="inline-flex min-h-11 items-center justify-center self-start rounded-full bg-navy-700 px-5 text-sm font-semibold text-white hover:bg-navy-800">Objednat znovu</Link>}
 
       <dl className="grid grid-cols-2 gap-3">
         <Stat label="Návštěvy za rok">{plural(c.visits, ['návštěva', 'návštěvy', 'návštěv'])}</Stat>

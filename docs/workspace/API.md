@@ -18,7 +18,7 @@ Tajný klíč patří **jen na server**. Požadavek s tajným klíčem a hlavič
 
 Služby, vlastní kolonky a nabídka času byznysu. Odpověď se smí cachovat 60 s.
 
-Parametry: `serviceId` (nepovinné) — volné časy pro tuhle službu (jinak pro první); `staffId` (nepovinné) — časy konkrétního pracovníka. V `booking.staff` dostanete seznam pracovníků, kteří službu nabízejí.
+Parametry: `serviceId` (nepovinné) — volné časy pro jednu službu (jinak pro první); `serviceIds` (nepovinné) — ID až pěti služeb oddělená čárkou, ve zvoleném pořadí; `staffId` (nepovinné) — časy konkrétního pracovníka. V `booking.staff` dostanete pracovníky způsobilé pro všechny vybrané služby. Odpověď obsahuje také `sessions`: budoucí skupinové lekce s volnými místy.
 
 ```bash
 curl https://zakaziq.cz/api/public/v1/schema \
@@ -31,6 +31,7 @@ curl https://zakaziq.cz/api/public/v1/schema \
   "version": 1,
   "business": { "name": "Kadeřnictví Lenka", "slug": "kadernictvi-lenka", "color": "#23478b" },
   "services": [{ "id": "7e2d…", "name": "Dámský střih", "durationMin": 60, "price": 650, "currency": "CZK" }],
+  "sessions": [{ "id": "a142…", "serviceId": "7e2d…", "serviceName": "Dámský střih", "start": "2026-10-20T07:00:00.000Z", "end": "2026-10-20T08:00:00.000Z", "staffName": "Jana", "capacity": 8, "places": 3 }],
   "fields": [{ "key": "delka_vlasu", "label": "Délka vlasů", "type": "choice", "required": false, "options": ["Krátké", "Střední", "Dlouhé"] }],
   "booking": { "mode": "slots", "stepMin": 30, "slots": [{ "date": "2026-10-12", "label": "po 12. 10.", "times": [{ "time": "9:00", "start": "2026-10-12T07:00:00.000Z" }] }], "staff": [{ "id": "6a32…", "name": "Jana" }, { "id": "7e2d…", "name": "Lenka" }] },
   "contact": { "name": "required", "phoneOrEmail": "required" }
@@ -55,6 +56,7 @@ Typy kolonek: `text`, `address` (řádek textu), `number`, `date` (RRRR-MM-DD), 
   "phone": "+420 777 123 456",
   "email": "tereza@example.cz",
   "serviceId": "7e2d…",
+  "serviceIds": ["7e2d…", "6b92…"],
   "start": "2026-10-12T09:00:00+02:00",
   "message": "Dobrý den, …",
   "fields": { "delka_vlasu": "Dlouhé" },
@@ -68,6 +70,8 @@ Typy kolonek: `text`, `address` (řádek textu), `number`, `date` (RRRR-MM-DD), 
 | `name` | povinné | 2–120 znaků |
 | `phone`, `email` | aspoň jedno | telefon se uloží jako +420…, e-mail malými písmeny; podle nich se najde existující zákazník |
 | `serviceId` | nepovinné | jen služba z `schema` |
+| `serviceIds` | nepovinné | až pět různých ID služeb v pořadí; při současném `serviceId` musí být první ID stejné. Časy i konec rezervace se počítají ze součtu délek. |
+| `sessionId` | nepovinné | ID otevřené skupinové lekce z `schema.sessions`; jde poslat jen s jednou odpovídající službou a přesným časem lekce. Kapacita se ověří znovu při uložení. |
 | `staffId` | nepovinné | ID pracovníka z `booking.staff`; jen v režimu `slots`, dostupnost se znovu zkontroluje při uložení. Bez něj se čas nabídne podle všech pracovníků služby. |
 | `start` nebo `date` + `time` | podle `booking.mode` | ISO 8601 s časovým pásmem, nebo pražský den a čas; jen budoucnost |
 | `message` | nepovinné | do 2000 znaků |
@@ -109,6 +113,7 @@ Chyba — `error` a `issues[].message` jsou česky a dají se ukázat přímo u 
 | `UNAUTHORIZED` | 401 | špatný nebo chybějící klíč, tajný klíč z prohlížeče — zalogovat, zákazníkovi obecná hláška |
 | `FORBIDDEN_ORIGIN` | 403 | widget z domény, která není povolená |
 | `SLOT_TAKEN` | 409 | čas mezitím někdo vzal — načíst `GET /schema` znovu se stejnými `serviceId` a případně `staffId` |
+| `SESSION_FULL` | 409 | skupinová lekce mezitím obsadila všechna místa — načíst znovu `GET /schema` a nabídnout jinou lekci nebo termín |
 | `IN_PROGRESS` | 409 | stejný `Idempotency-Key` se právě zpracovává — zkusit za chvíli |
 | `IDEMPOTENCY_MISMATCH` | 422 | stejný klíč, jiné tělo — poslat nový klíč |
 | `RATE_LIMITED` | 429 | moc požadavků (20/min z jedné IP, 300/h na firmu), hlavička `Retry-After` |

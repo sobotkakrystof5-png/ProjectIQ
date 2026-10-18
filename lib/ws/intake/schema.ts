@@ -1,7 +1,7 @@
 import 'server-only'
 import { webFields } from '../fields'
 import { formatDayShort, formatMinutes, pragueToUtc } from '../time'
-import { BOOKING, type IntakeConfig, type PublicStaffOption } from './intake'
+import { BOOKING, type IntakeConfig, type PublicSession, type PublicStaffOption } from './intake'
 import type { DaySlots } from './slots'
 
 // Tvar odpovědi GET /api/public/v1/schema (S11). Z těchto dat se skládá i
@@ -13,6 +13,7 @@ export type PublicSchema = {
   version: 1
   business: { name: string; slug: string; color: string | null }
   services: { id: string; name: string; durationMin: number; price: number | null; currency: string }[]
+  sessions: { id: string; serviceId: string; serviceName: string; start: string; end: string; staffName: string | null; capacity: number; places: number }[]
   fields: { key: string; label: string; type: string; required: boolean; options?: string[]; help?: string }[]
   booking:
     | { mode: 'slots'; stepMin: number; slots: { date: string; label: string; times: { time: string; start: string }[] }[]; staff?: PublicStaffOption[] }
@@ -38,7 +39,7 @@ export function orderSlots(slots: DaySlots[]) {
   }))
 }
 
-export function buildPublicSchema(config: IntakeConfig, slots: DaySlots[], staff: PublicStaffOption[] = []): PublicSchema {
+export function buildPublicSchema(config: IntakeConfig, slots: DaySlots[], staff: PublicStaffOption[] = [], sessions: PublicSession[] = []): PublicSchema {
   const booking: PublicSchema['booking'] =
     config.booking === 'slots'
       ? {
@@ -66,6 +67,16 @@ export function buildPublicSchema(config: IntakeConfig, slots: DaySlots[], staff
       durationMin: s.duration_min,
       price: s.price,
       currency: s.currency,
+    })),
+    sessions: sessions.map((session) => ({
+      id: session.id,
+      serviceId: session.serviceId,
+      serviceName: session.serviceName,
+      start: session.start.toISOString(),
+      end: session.end.toISOString(),
+      staffName: session.staffName,
+      capacity: session.capacity,
+      places: session.places,
     })),
     fields: webFields(config.fields).map((f) => ({
       key: f.key,

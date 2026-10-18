@@ -90,7 +90,7 @@ export async function listClients(): Promise<ClientRow[]> {
 
 export type ClientBusiness = { id: string; name: string; slug: string; industry: string; archived: boolean; webUsedAt: Date | null; webReady: boolean; hasSecret: boolean }
 export type ClientMember = { role: 'owner' | 'staff'; name: string | null; email: string | null; createdAt: Date }
-export type ClientAudit = { at: Date; actor: string; action: string; details: Record<string, unknown> }
+export type ClientAudit = { at: Date; actor: string; action: string }
 
 export type ClientDetail = ClientRow & {
   clerkOrgId: string
@@ -100,7 +100,6 @@ export type ClientDetail = ClientRow & {
   businessesList: ClientBusiness[]
   membersList: ClientMember[]
   audit: ClientAudit[]
-  note: { text: string; updatedAt: Date; updatedBy: string } | null
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -108,7 +107,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** Detail účtu, nebo null. `accountId` z URL adminu — ověřený jen tvarem, data čte admin. */
 export async function getClientDetail(accountId: string): Promise<ClientDetail | null> {
   if (!UUID_RE.test(accountId)) return null
-  const [base, extra, businesses, members, audit, note] = await adminDb.batch([
+  const [base, extra, businesses, members, audit] = await adminDb.batch([
     { text: `${LIST_SQL} WHERE a.id = $1`, params: [accountId] },
     q`SELECT a.clerk_org_id, a.ico, a.news_emails FROM ws.accounts a WHERE a.id = ${accountId}`,
     q`SELECT b.id, b.name, b.slug, b.industry, b.archived_at IS NOT NULL AS archived,
@@ -117,8 +116,7 @@ export async function getClientDetail(accountId: string): Promise<ClientDetail |
         EXISTS (SELECT 1 FROM ws.web_integrations w WHERE w.account_id = b.account_id AND w.business_id = b.id AND w.active AND w.revoked_at IS NULL AND w.secret_prefix IS NOT NULL) AS has_secret
       FROM ws.businesses b WHERE b.account_id = ${accountId} ORDER BY b.created_at`,
     q`SELECT role, name, email, created_at FROM ws.members WHERE account_id = ${accountId} ORDER BY role DESC, created_at`,
-    q`SELECT created_at, actor, action, details FROM ws.audit_log WHERE account_id = ${accountId} ORDER BY created_at DESC LIMIT 30`,
-    q`SELECT note, updated_at, updated_by FROM ws.account_admin_notes WHERE account_id = ${accountId}`,
+    q`SELECT created_at, actor, action FROM ws.audit_log WHERE account_id = ${accountId} ORDER BY created_at DESC LIMIT 30`,
   ])
   if (!base[0] || !extra[0]) return null
   const row = mapClient(base[0])
@@ -149,11 +147,7 @@ export async function getClientDetail(accountId: string): Promise<ClientDetail |
       at: new Date(a.created_at as string),
       actor: String(a.actor),
       action: String(a.action),
-      details: (a.details as Record<string, unknown>) ?? {},
     })),
-    note: note[0]
-      ? { text: String(note[0].note), updatedAt: new Date(note[0].updated_at as string), updatedBy: String(note[0].updated_by) }
-      : null,
   }
 }
 
@@ -174,21 +168,4 @@ export async function auditAdmin(
     INSERT INTO ws.audit_log (account_id, business_id, actor, action, entity, entity_id, details)
     VALUES (${entry.accountId}, ${entry.businessId ?? null}, ${adminActor(admin)}, ${entry.action}, ${entry.entity ?? null},
       ${entry.entityId ?? null}, ${JSON.stringify(entry.details ?? {})}::jsonb)`
-}
-
-/** Poznámka admina k účtu (prázdná = smazat). Interní, klient ji nevidí (migrace 083). */
-export async function saveClientNote(admin: AdminIdentity, accountId: string, text: string): Promise<void> {
-  const note = text.trim()
-  await adminDb.batch(
-    note
-      ? [
-          q`INSERT INTO ws.account_admin_notes (account_id, note, updated_by) VALUES (${accountId}, ${note}, ${adminActor(admin)})
-            ON CONFLICT (account_id) DO UPDATE SET note = EXCLUDED.note, updated_by = EXCLUDED.updated_by`,
-          q`INSERT INTO ws.audit_log (account_id, actor, action, entity) VALUES (${accountId}, ${adminActor(admin)}, 'admin.note_saved', 'account')`,
-        ]
-      : [
-          q`DELETE FROM ws.account_admin_notes WHERE account_id = ${accountId}`,
-          q`INSERT INTO ws.audit_log (account_id, actor, action, entity) VALUES (${accountId}, ${adminActor(admin)}, 'admin.note_deleted', 'account')`,
-        ],
-  )
 }

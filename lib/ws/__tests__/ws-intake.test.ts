@@ -17,7 +17,8 @@ import {
   secretPrefixOf,
   setAllowedOrigins,
 } from '../keys'
-import { ingestRequest, loadIntakeConfig, loadOrderAvailability, loadSlots, type IntakeSource } from '../intake/intake'
+import { getOpenSessions, ingestRequest, loadIntakeConfig, loadOrderAvailability, loadSlots, type IntakeSource } from '../intake/intake'
+import { createGroupSession, declineRequest } from '../bookings'
 import { businessBySlug } from '../intake/http'
 import { computeSlots, isSlotFree, isSlotFreeForStaff } from '../intake/slots'
 import { pragueToUtc } from '../time'
@@ -35,7 +36,7 @@ const A = ids('a')
 const B = ids('b')
 const ctxA: WsContext = { userId: 'user_a', accountId: A.account, role: 'owner' }
 const ctxB: WsContext = { userId: 'user_b', accountId: B.account, role: 'owner' }
-const bizA = { id: A.business }
+const bizA = { id: A.business, name: 'Byznys a' }
 const bizB = { id: B.business }
 const ORIGIN_A = 'https://a.example.cz'
 
@@ -303,6 +304,31 @@ describe('ingestRequest', () => {
     const slots = await loadSlots(A.account, config!, A.service, NOW)
     expect(slots[0]).toMatchObject({ date: '2026-10-12' })
     expect(slots[0].times).not.toContain(9 * 60)
+  })
+
+  it('skupinová lekce rezervuje poslední místa atomicky a po odmítnutí místo uvolní', async () => {
+    const sessionStart = pragueToUtc('2026-10-30', 10 * 60)
+    const created = await createGroupSession(ctxA, { ...bizA, name: 'Byznys a' }, {
+      serviceId: A.service, staffId: A.staff, start: sessionStart, title: 'Skupinová lekce', capacity: 2,
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    const [session] = await getOpenSessions(A.account, A.business, [A.service], NOW)
+    expect(session).toMatchObject({ places: 2, capacity: 2, serviceId: A.service })
+    const first = await ingestRequest(srcA('page'), valid({ serviceId: A.service, sessionId: session.id, start: sessionStart.toISOString(), externalId: 'lesson-signup-1' }), { now: NOW })
+    const duplicate = await ingestRequest(srcA('page'), valid({ serviceId: A.service, sessionId: session.id, start: sessionStart.toISOString(), externalId: 'lesson-signup-1' }), { now: NOW })
+    expect(duplicate.body).toMatchObject({ success: true, duplicate: true })
+    expect(await count(`SELECT reserved::int AS n FROM ws.sessions WHERE account_id = $1 AND id = $2`, [A.account, session.id])).toBe(1)
+    const second = await ingestRequest(srcA('page'), valid({ serviceId: A.service, sessionId: session.id, start: sessionStart.toISOString(), phone: '777 123 457' }), { now: NOW })
+    expect(first.body.success).toBe(true)
+    expect(second.body.success).toBe(true)
+    const full = await ingestRequest(srcA('page'), valid({ serviceId: A.service, sessionId: session.id, start: sessionStart.toISOString(), phone: '777 123 458' }), { now: NOW })
+    expect(full.status).toBe(409)
+    expect(full.body).toMatchObject({ success: false, code: 'SESSION_FULL' })
+    const requestId = first.body.success ? first.body.id : ''
+    expect((await declineRequest(ctxA, bizA, requestId)).ok).toBe(true)
+    expect(await getOpenSessions(A.account, A.business, [A.service], NOW)).toMatchObject([{ id: session.id, places: 1 }])
+    expect(await count(`SELECT count(*)::int AS n FROM ws.session_attendees WHERE account_id = $1 AND session_id = $2`, [A.account, session.id])).toBe(2)
   })
 
   it('nabídne pracovníky služby, omezí časy podle výběru a uloží preferenci', async () => {

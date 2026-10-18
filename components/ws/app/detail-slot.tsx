@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import type { WsBusiness, WsContext } from '@/lib/ws/context'
-import { getAppointmentDetail, getBookingOptions, getCustomerOption } from '@/lib/ws/calendar'
+import { getAppointmentDetail, getBookingOptions, getCustomerOption, getSessionAttendees } from '@/lib/ws/calendar'
 import { detailValue, hrefWith, parseDetail, type DetailRef } from '@/lib/ws/detail-param'
 import { WS_FEATURES } from '@/lib/ws/features'
 import { getCustomerCard, getEnabledModules, getRequestDetail } from '@/lib/ws/today'
@@ -9,6 +9,7 @@ import { formatDayShort, formatMinutes, formatRelativeDay, formatTimeRange, isIs
 import { navHref } from '@/lib/ws/nav'
 import { ConfirmedBlock, NewRequestBlock, TimeRange } from '@/components/ws/brand'
 import { AppointmentActions } from './booking/appointment-actions'
+import { SessionRegistrationControl } from './booking/session-registration-control'
 import { BlockForm } from './booking/block-form'
 import { BookingForm } from './booking/booking-form'
 import { FindSlotForm } from './booking/find-slot-form'
@@ -136,6 +137,7 @@ async function panelContent(
             businessColor={business.color}
             invoiceHref={env.modules.has('invoices')?navHref(business.slug,'faktury')+'?detail=nova-faktura&zakaznik='+customer.id:null}
             termHref={(id) => hrefWith(env.pathname, env.searchParams, { detail: `termin:${id}`, ...FORM_PARAMS })}
+            bookingHref={(serviceIds) => hrefWith(env.pathname, env.searchParams, { detail: 'nova-rezervace', zakaznik: customer.id, ...FORM_PARAMS, sluzby: serviceIds.join(',') })}
           />
         ),
       }
@@ -195,7 +197,7 @@ async function panelContent(
       const [card, options, advice] = await Promise.all([
         r.customer_id ? getCustomerCard(ctx, business, r.customer_id) : null,
         isNew ? getBookingOptions(ctx, business) : null,
-        isNew && calendar
+        isNew && calendar && !r.session_id
           ? getSlotAdvice(ctx, business, {
               start: r.wanted_start,
               durationMin: wantedMin ?? (r.duration_min ?? null),
@@ -252,6 +254,7 @@ async function panelContent(
                 serviceId={r.service_id}
                 durationMin={wantedMin ?? r.duration_min ?? null}
                 preferredStaffId={r.requested_staff_id}
+                fixedTime={Boolean(r.session_id)}
                 settingsHref={`${navHref(business.slug, 'nastaveni')}/oteviraci-doba`}
               />
             )}
@@ -309,11 +312,12 @@ async function panelContent(
     case 'termin': {
       const a = await getAppointmentDetail(ctx, business, ref.id)
       if (!a) return notHere('Termín', env.closeHref)
-      const [card, options, payment, portal] = await Promise.all([
+      const [card, options, payment, portal, attendees] = await Promise.all([
         a.customer_id ? getCustomerCard(ctx, business, a.customer_id) : null,
         a.status === 'confirmed' ? getBookingOptions(ctx, business) : null,
-        a.kind === 'visit' ? getVisitPayment(ctx, business, a.id) : null,
+        a.kind === 'visit' && !a.session_id ? getVisitPayment(ctx, business, a.id) : null,
         a.kind === 'visit' && env.modules.has('portal') ? getAppointmentPortal(ctx, business, a.id) : null,
+        a.session_id ? getSessionAttendees(ctx, business, a.session_id) : null,
       ])
       const start = pragueParts(a.start)
       const block = a.kind === 'block'
@@ -330,6 +334,32 @@ async function panelContent(
               </div>
             ) : (
               <ConfirmedBlock start={a.start} end={a.end} customer={a.customer_name ?? a.title ?? 'Termín'} service={a.service_name ?? undefined} />
+            )}
+
+            {a.session_id && attendees && (
+              <section className="flex flex-col gap-2 rounded-box border p-4" aria-labelledby={`lekce-${a.id}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 id={`lekce-${a.id}`} className="font-semibold text-ink">Účastníci</h3>
+                  <span className="font-num text-sm text-quiet">{a.session_reserved ?? attendees.length} / {a.session_capacity ?? '—'} míst</span>
+                </div>
+                {a.session_status === 'cancelled' && <p className="text-sm text-quiet">Lekce je zrušená.</p>}
+                {a.session_status === 'closed' && <p className="text-sm text-quiet">Přihlašování je zastavené.</p>}
+                {attendees.length ? (
+                  <ul className="divide-y rounded-chip border px-3">
+                    {attendees.map((person) => (
+                      <li key={person.request_id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+                        <Link href={hrefWith(env.pathname, env.searchParams, { detail: `poptavka:${person.request_id}`, ...FORM_PARAMS })} scroll={false} data-ws-private-value className="min-w-0 truncate font-medium text-ink underline-offset-4 hover:underline">
+                          {person.name}
+                        </Link>
+                        <span className="shrink-0 text-quiet">{person.status === 'confirmed' ? 'Potvrzeno' : person.status === 'requested' ? 'Čeká na potvrzení' : 'Zrušeno'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="text-sm text-quiet">Zatím se nikdo nepřihlásil.</p>}
+                {ctx.role === 'owner' && a.status === 'confirmed' && a.session_status !== 'cancelled' && a.session_id && (
+                  <SessionRegistrationControl slug={business.slug} sessionId={a.session_id} open={a.session_status === 'open'} />
+                )}
+              </section>
             )}
             {a.status === 'cancelled' && <p className="text-[15px] text-quiet">{block ? 'Zrušená blokace.' : 'Zrušený termín.'}</p>}
 
@@ -474,6 +504,7 @@ async function panelContent(
       const minutesRaw = Number(first(env.searchParams.cas))
       const staffParam = first(env.searchParams.pracovnik)
       const customerParam = first(env.searchParams.zakaznik)
+      const serviceIdsParam = first(env.searchParams.sluzby)
       const [options, customer] = await Promise.all([
         getBookingOptions(ctx, business),
         customerParam && UUID_RE.test(customerParam) ? getCustomerOption(ctx, customerParam.toLowerCase()) : null,
@@ -493,6 +524,7 @@ async function panelContent(
               day: isIsoDate(day) ? day : null,
               minutes: Number.isInteger(minutesRaw) && minutesRaw >= 0 && minutesRaw < 1440 ? minutesRaw : null,
               service: first(env.searchParams.sluzba)?.slice(0, 80) ?? '',
+              serviceIds: serviceIdsParam?.split(',').filter((id) => UUID_RE.test(id)).slice(0, 5) ?? [],
               staffId: staffParam && UUID_RE.test(staffParam) && options.staff.some((s) => s.id === staffParam) ? staffParam : null,
             }}
           />

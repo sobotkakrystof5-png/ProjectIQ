@@ -1,6 +1,6 @@
 import { preflightResponse } from '@/lib/security/embed'
 import { resolvePublicKey } from '@/lib/ws/keys'
-import { apiError, loadIntakeConfig, loadOrderAvailability } from '@/lib/ws/intake/intake'
+import { apiError, getOpenSessions, loadIntakeConfig, loadOrderAvailability } from '@/lib/ws/intake/intake'
 import { authenticate, isAuthenticated, publicKeyFrom, respond } from '@/lib/ws/intake/http'
 import { clientIp, hitLimit, LIMITS } from '@/lib/ws/intake/rate-limit'
 import { buildPublicSchema } from '@/lib/ws/intake/schema'
@@ -33,21 +33,33 @@ export async function GET(req: Request): Promise<Response> {
     if (!config) return respond(apiError(401, 'UNAUTHORIZED', 'Klíč nepatří žádné firmě.'), cors)
 
     const params = new URL(req.url).searchParams
+    const serviceIdsParam = params.get('serviceIds')
+    let serviceIds: string[] | null = null
+    if (serviceIdsParam) {
+      serviceIds = serviceIdsParam.split(',')
+      if (serviceIds.length > 5 || new Set(serviceIds).size !== serviceIds.length
+        || serviceIds.some((id) => !UUID_RE.test(id) || !config.services.some((service) => service.id === id))) {
+        return respond(apiError(400, 'VALIDATION_ERROR', 'Služby: vyberte prosím služby ze seznamu.'), cors)
+      }
+    }
     const serviceParam = params.get('serviceId')
-    const serviceId = serviceParam && UUID_RE.test(serviceParam) && config.services.some((s) => s.id === serviceParam)
+    const selection = serviceIds ?? [serviceParam && UUID_RE.test(serviceParam) && config.services.some((s) => s.id === serviceParam)
       ? serviceParam
-      : (config.services[0]?.id ?? null)
+      : (config.services[0]?.id ?? null)].filter((id): id is string => id !== null)
     const staffParam = params.get('staffId')
     if (staffParam && !UUID_RE.test(staffParam)) {
       return respond(apiError(400, 'VALIDATION_ERROR', 'Pracovník: vyberte prosím pracovníka ze seznamu.'), cors)
     }
-    const availability = await loadOrderAvailability(auth.key.accountId, config, serviceId, staffParam)
+    const [availability, sessions] = await Promise.all([
+      loadOrderAvailability(auth.key.accountId, config, selection, staffParam),
+      getOpenSessions(auth.key.accountId, auth.key.businessId, selection),
+    ])
     if (staffParam && !availability.staff.some((s) => s.id === staffParam)) {
       return respond(apiError(400, 'VALIDATION_ERROR', 'Tento pracovník danou službu nenabízí. Vyberte prosím jiného.'), cors)
     }
 
     return respond(
-      { status: 200, body: buildPublicSchema(config, availability.slots, availability.staff) },
+      { status: 200, body: buildPublicSchema(config, availability.slots, availability.staff, sessions) },
       { ...cors, cache: auth.channel === 'widget' ? 'public, max-age=60' : 'private, max-age=60' },
     )
   } catch (e) {

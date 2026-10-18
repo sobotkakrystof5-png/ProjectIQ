@@ -183,7 +183,7 @@ Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind C
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 39 tabulek | migrace `064_ws_zaklad` … `089_ws_rucni_zpravy_zakaznikum` (přehled níže; podle posledního stavu na Neonu 064–079, 081–083 a 085–086; 080, 084, 087, 088 a 089 nejsou nasazené, 080/087/088 potvrdil Kryštof 2026-10-18) |
+| Schéma `ws` — 42 tabulek | migrace `064_ws_zaklad` … `091_ws_skupinove_lekce` (přehled níže; poslední známý stav Neonu zůstává 064–079, 081–083 a 085–086; 080, 084, 087–091 nejsou nasazené; 080/087/088 potvrdil Kryštof 2026-10-18) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
@@ -232,6 +232,8 @@ Pravidla schématu:
 | 087 | RD07: `requests.requested_staff_id` (předvolba pracovníka při potvrzení), `requests.public_token` (portál čekající poptávky); `ws.portal_lookup` přepne stejný odkaz na vzniklý termín. **Připravená, ručně aplikovat na Neon** |
 | 088 | RD10: `accounts.invoice_profile`, `invoices.payment_origin`; nahrazuje `ws.money_pay` a přidává `ws.money_unpay` jako `SECURITY INVOKER` s `EXECUTE` jen pro `ws_app`. **Připravená, ručně aplikovat po předchozích migracích; na Neonu neaplikovaná** |
 | 089 | RD16: rozšiřuje `message_settings_type_check` o pět ručních šablon pro zákazníky. **Připravená, ručně aplikovat po 088; na Neonu neaplikovaná** |
+| 090 | RD08: `appointments.group_id`, `requests.request_services` pro pořadí služeb v jedné rezervaci a potřebné unikátní indexy. **Připravená, ručně aplikovat po 089; na Neonu neaplikovaná** |
+| 091 | RD09: `sessions`, `session_attendees` a `requests.session_id` pro skupinové lekce s kapacitou 2–30 míst. **Připravená, ručně aplikovat po 090; na Neonu neaplikovaná** |
 
 ### GDPR, vzhled a PWA (S18, R-054)
 
@@ -251,10 +253,10 @@ Pravidla schématu:
 
 | Co | Kde |
 |---|---|
-| Stránky (vzhled adminu, NextAuth) | `/dashboard/klienti` (přehled účtů: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, napojený web), `/dashboard/klienti/[id]` (detail, klíče a prompt, pozvánka znovu, poznámka, historie z auditu), `/dashboard/novinky` (editor s náhledem v aplikaci a e-mailu, seznam). Vykreslení v `clients-view.tsx`, `[id]/detail-view.tsx`, akce `actions.ts` |
+| Stránky (vzhled adminu, NextAuth) | `/dashboard/klienti` (přehled účtů: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, napojený web), `/dashboard/klienti/[id]` (detail účtu, klíče a prompt, pozvánka znovu, omezená historie auditu), `/dashboard/novinky` (editor s náhledem v aplikaci a e-mailu, seznam). Vykreslení v `clients-view.tsx`, `[id]/detail-view.tsx`, akce `actions.ts` |
 | Přístup do DB | `lib/ws/admin/db.ts`: `adminDb` přes `DATABASE_URL` (vlastník tabulek, mimo RLS), `server-only`, v testech `setAdminDriverForTests`. Jen z `lib/ws/admin/*` |
 | Kdo smí | `lib/ws/admin/auth.ts`: `getAdmin()` = NextAuth session; každá server action ho volá první (testy `setAdminAuthForTests`). Audit `actor = 'admin'` |
-| Přehled a detail | `lib/ws/admin/clients.ts`: `listClients`, `getClientDetail`, `getClientBusiness`, `auditAdmin`, `saveClientNote`. Poslední aktivita = nejnovější změna poptávek, termínů, zakázek, zákazníků, faktur. Žádné údaje zákazníků klientů |
+| Přehled a detail | `lib/ws/admin/clients.ts`: `listClients`, `getClientDetail`, `getClientBusiness`, `auditAdmin`. Poslední aktivita = nejnovější změna poptávek, termínů, zakázek, zákazníků a faktur; jejich osobní/finanční obsah ani poznámky a podrobnosti auditu admin nečte. Zůstávají souhrny účtu, byznysů, předplatného a členů týmu. |
 | Pozvat klienta | `lib/ws/admin/invite.ts`: Clerk organizace (bez vlastníka) → `createAccountWithBusiness({ owner: null })` → pozvánka `org:admin` s návratem na `/w/registrace`. Člen se zapíše až v průvodci `/w/novy` (`ensureMember` v `lib/ws/onboarding.ts`, bez webhooku Clerku). Klient pak projde Checkoutem (R-038) |
 | Klíče a prompt pro web | `lib/ws/admin/web-keys.ts`: `ensureIntegration` + `rotateSecretKey` + `buildClaudePrompt` jako Nastavení › Napojený web (S11), zápis rolí `ws_app` pod RLS účtu |
 | Novinky | `lib/ws/admin/news.ts` (koncept → `publishNews` → `sendNewsEmail` s potvrzeným počtem příjemců, jednou), `lib/ws/news-format.ts` (štítky, limity, kontrola obrázku podle bajtů, tipy „Učesat text“ bez AI), `lib/ws/email/news-email.ts` (jeden e-mail pro náhled, odeslání i cron), zvonek `components/ws/app/news-entry.tsx`, obrázek `/z/novinky/[id]/obrazek` (jen zveřejněná, CORP `cross-origin`) |
@@ -332,8 +334,8 @@ Popis API s příklady pro weby klientů: **`docs/workspace/API.md`** (zdroj pro
 | Čas | `lib/ws/intake/slots.ts` (čistá funkce): režim `slots` (otevírací doba / směny, časy konkrétního pracovníka nebo sjednocení všech způsobilých pracovníků, termíny a blokace, krok 30 min, nejdřív za 60 min, 21 dní), `free` (bez otevírací doby — zákazník navrhne, R-045), `none` (bez kalendáře). Konstanty `BOOKING` v `intake.ts` |
 | HTTP | `lib/ws/intake/http.ts`: `authenticate` (tajný klíč jen bez `Origin`, veřejný jen z `allowed_origins`; nepovolená doména jde do záznamu), `respond` (CORS jen ověřenému originu), `readJson` (64 kB), `businessBySlug` |
 | Rate limit | `lib/ws/intake/rate-limit.ts` nad `ws.rate_limits` (pevné okno, klíč = HMAC hodnoty, ne IP): 20/min na IP, 300/h na byznys, schema 120/min, objednávací stránka 8/10 min, ověření 10/10 min |
-| Routy | `app/api/public/v1/requests/route.ts` (POST, OPTIONS), `app/api/public/v1/schema/route.ts` (GET, OPTIONS; tvar `lib/ws/intake/schema.ts`, cache 60 s; `serviceId` a `staffId` zúží nabídku) |
-| Objednávací stránka | `app/r/layout.tsx` (Dílky, `force-dynamic`), `app/r/[slug]/page.tsx`, akce `app/r/[slug]/actions.ts` (`getOrderSlots`, `submitOrder` — byznys jen ze slugu), UI `components/ws/order/order-flow.tsx` (služba → termín → kontakt → hotovo). Widget používá stejný tok přes `/r/<slug>?embed=1`. Barva byznysu přes `lib/ws/accent.ts` (jen s kontrastem ≥ 4.5 k bílé) |
+| Routy | `app/api/public/v1/requests/route.ts` (POST, OPTIONS), `app/api/public/v1/schema/route.ts` (GET, OPTIONS; tvar `lib/ws/intake/schema.ts`, cache 60 s; `serviceId`/`serviceIds` a `staffId` zúží nabídku, odpověď obsahuje volné skupinové `sessions`) |
+| Objednávací stránka (RD07–RD09) | `app/r/layout.tsx` (Dílky, `force-dynamic`), `app/r/[slug]/page.tsx`, akce `app/r/[slug]/actions.ts` (`getOrderSlots`, `submitOrder` — byznys jen ze slugu), UI `components/ws/order/order-flow.tsx` dovolí vybrat až pět navazujících služeb nebo jednu skupinovou lekci s atomickou rezervací místa. Widget používá stejný tok přes `/r/<slug>?embed=1`. Barva byznysu přes `lib/ws/accent.ts` (jen s kontrastem ≥ 4.5 k bílé) |
 | Widget | `app/embed/[file]/route.ts` (`/embed/<slug>.js`, cache 5 min) + `app/embed/widget.css/route.ts`; zdrojáky `lib/ws/intake/widget-script.ts` a `widget-css.ts` (bez frameworku, shadow DOM, tlačítko nebo inline iframe se sandboxem, CSS jako externí zdroj; v prohlížeči není veřejný API klíč) |
 | Rámování `/r` | `proxy.ts` → `lib/ws/intake/embed-origins.ts` (povolené domény ze slugu, cache 60 s v instanci, chyba = jen `'self'`) |
 | Nastavení › Napojený web | `/w/[byznys]/nastaveni/web` (jen vlastník): prompt pro Claude Code (`lib/ws/intake/claude-prompt.ts`), tajný klíč, Ověřit napojení, odkaz + QR (PNG/SVG, `qrcode.react`), kód widgetu, povolené weby, Poslat návod webáři (`mailto:`), posledních 20 požadavků (`lib/ws/intake/log.ts`). Akce `app/w/[business]/nastaveni/web/actions.ts`, UI `components/ws/settings/web-integration.tsx`. Rozcestník `/w/[byznys]/nastaveni` |
@@ -454,6 +456,16 @@ Jak je systém v kódu (S01, R-027):
 | Historie stavů | `setJobStage` zapisuje do `ws.audit_log` (`job.stage_changed`, `entity = 'job'`, `details` s názvy stavů „z“ a „na“) v téže SQL větě jako změnu; stejný stav nic nezapisuje. `getJobDetail` čte posledních 15 záznamů. Bez migrace; platí od 2026-10-18 |
 | Testy | `lib/ws/__tests__/ws-calendar.test.ts` (návrhy, rady k času, mezery a stínování, barvy, délka a kolize, kontrola konkrétního pracovníka, hledání zákazníka, oddělení účtů) a `ws-jobs-board.test.ts` (filtry, pohled, data tabule, přesun, historie, cizí účet) |
 
+### Rezervace více služeb a skupinové lekce (RD08/RD09, R-063)
+
+- Více služeb: `components/ws/order/order-flow.tsx` a `lib/ws/intake/` přijímají nejvýše pět různých služeb; server znovu ověřuje jejich příslušnost k byznysu, pracovníka a celkovou délku. Termíny jsou sousedící řádky `ws.appointments` se stejným `group_id`; potvrzení, přesun, zrušení i obnovení zachovají skupinu jako jeden blok. Pořadí služeb poptávky drží `ws.request_services`.
+- Skupinové lekce: majitel vytvoří budoucí samostatnou lekci z Kalendáře s jednou službou, pracovníkem a kapacitou 2–30. `ws.sessions` odkazuje na jeden termín pracovníka; `ws.session_attendees` a `requests.session_id` propojují jednotlivé poptávky. Server atomicky rezervuje místo i při souběžných odesláních; potvrzení účastníka nevytváří nový termín. Majitel může jednotlivé přihlášky potvrdit/odmítnout a zastavit/obnovit registraci. Odmítnutí uvolní místo; čekací listina ani souběžná obsluha více zákazníků jedním pracovníkem není.
+- Migrace `090_ws_rezervace_vice_sluzeb.sql` a `091_ws_skupinove_lekce.sql` jsou připravené v pořadí po 089, na Neonu nenasazené. Nové tabulky jsou v `seedAccount()` a mají account RLS. Testy: `ws-bookings.test.ts`, `ws-intake.test.ts`, `ws-portal.test.ts`, `ws-gdpr.test.ts`, `ws-schema.test.ts`.
+
+### Návody (RD14)
+
+`app/w/[business]/navody/` má rozcestník a témata; obsah je typovaný v `lib/ws/guides/index.ts`, hledání ignoruje diakritiku a návody se filtrují podle zapnutých funkcí. `HelpLink` se zobrazuje v záhlaví obrazovek. Jde o statický obsah bez nové tabulky; test `ws-guides.test.ts` hlídá existenci odkazovaných cest, filtrování a hledání.
+
 ### Jak je to v kódu (S10, R-044)
 
 | Co | Kde |
@@ -491,6 +503,12 @@ Jak je systém v kódu (S01, R-027):
 - PDF API `/api/ws/[business]/faktury/[id]/pdf` kontroluje účet/byznys/modul, vrací attachment a `private, no-store`. Přijatý soubor max. 4 MB s magic bytes `%PDF-`. Puppeteer/Chromium je externalizované v `next.config.mjs`, binárky přibalené k routě; písma s OFL v `lib/ws/money/assets/`. PDF dostane SPAYD QR pouze na nezaplacené vystavené faktuře v CZK s platným IBANem.
 - AI přepis: existující serverový `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`, max. 10/h/účet; při chybě ruční zadání. Odeslání faktury využívá frontu S15; tlačítko se nabízí jen při `WS_EMAIL_FROM`, `RESEND_API_KEY` a zapnuté šabloně. Nastavení odesílatele a ověření domény: `docs/workspace/SETUP.md`.
 - Odhad jen ověřené sazby 2026, neplátce a CZK; paušální/skutečný/paušální-daň režim, měsíce činnosti, vedlejší činnost, minima, sleva a zálohy. DPH za kalendářní rok, příjmy jen vodítko obratu. /api/ws/[business]/dane/kalendar nabízí ICS s připomínkou 7 dní předem. Zdroje a omezení: [MONEY.md](workspace/MONEY.md).
+
+### Jak je to v kódu (RD11, R-063)
+
+- Přehled Peněz a průvodce Daněmi jsou v `components/ws/money/page.tsx`; odloženou částku na daně a počet faktur po splatnosti skládá stávající datová vrstva a nemění daňový výpočet.
+- Režim soukromí je lokální volba zařízení (`lib/ws/privacy.ts`, `components/ws/app/privacy-toggle.tsx`); `WsRoot` přidá na označených jménech a částkách rozostření přes tokeny Dílky. Data ani oprávnění v DB nemění.
+- Admin přehled Workspace v `lib/ws/admin/clients.ts` už nečte poznámky, volný obsah auditu ani obsah tabulek zákazníků, poptávek, termínů a peněz; zůstávají jen souhrny účtů, předplatného, byznysů a členů týmu. Připojení vlastníka tabulek má dál technickou možnost číst schéma `ws`; omezení se týká kódu admin konzole. Bez nové migrace; `ws-admin-privacy.test.ts`.
 
 ### Jak je to v kódu (S13, R-054)
 

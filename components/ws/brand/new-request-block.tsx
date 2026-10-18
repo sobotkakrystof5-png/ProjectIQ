@@ -52,7 +52,7 @@ export function NewRequestBlock({
           <span className="ml-auto text-xs normal-case tracking-normal">Bez termínu</span>
         )}
       </div>
-      <p className="mt-1.5 text-[15px] font-semibold leading-snug">{customer}</p>
+      <p data-ws-private-value className="mt-1.5 text-[15px] font-semibold leading-snug">{customer}</p>
       {service && <p className="text-sm leading-snug opacity-80">{service}</p>}
       {children && <div className="mt-3 flex flex-wrap gap-2">{children}</div>}
     </m.div>

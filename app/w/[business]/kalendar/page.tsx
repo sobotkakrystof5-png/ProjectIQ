@@ -13,6 +13,7 @@ import { StaffFilter } from '@/components/ws/app/calendar/staff-filter'
 import { SwipeDays } from '@/components/ws/app/calendar/swipe-days'
 import { TimeGrid, type GridColumn, type GridItem } from '@/components/ws/app/calendar/time-grid'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { HelpLink } from '@/components/ws/app/help-link'
 import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
 import { getCalendarData, type CalEntry } from '@/lib/ws/calendar'
 import { closedSegments, freeGaps, gapSegments, hourRange, layoutWeek, openRangesFor, type MinuteRange } from '@/lib/ws/calendar-layout'
@@ -229,6 +230,7 @@ export default async function CalendarPage(
         title="Každý termín"
         accent="na svém místě."
         action={<CalendarActions bookHref={newBookingBase} findHref={findHref} blockHref={canBook ? link({ detail: 'nova-blokace' }) : null} />}
+        help={<HelpLink slug={business.slug} topic="poptavky-a-kalendar" guide="rezervace-v-kalendari" />}
       />
 
       <div data-detail-grid className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -300,6 +302,7 @@ export default async function CalendarPage(
                   newBookingHref={newBookingBase}
                   services={data.services}
                   staff={data.staff.map((s) => ({ id: s.id, name: s.name }))}
+                  canCreateGroupSessions={ctx.role === 'owner'}
                   today={today}
                   settingsHref={settingsHref}
                 />

@@ -2,6 +2,7 @@ import 'server-only'
 import { q, wsDb, type WsQuery, type WsRow as DbRow } from './db'
 import { seededModules, type WsBusiness, type WsContext } from './context'
 import { addDays, pragueParts, pragueToUtc } from './time'
+import { groupAppointmentSegments } from './calendar-groups'
 
 // Data obrazovky Dnes (S09). Každý dotaz filtruje account_id z kontextu
 // a business_id ověřeného byznysu (requireBusiness) — RLS je jen pojistka.
@@ -97,7 +98,10 @@ type Row = Record<string, unknown>
 const incomingQuery = (accountId: string, businessId: string) => q`
   SELECT r.id, r.customer_id,
          COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
-         s.name AS service_name, r.wanted_start, r.wanted_end, r.created_at, r.source
+         COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+           FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+           WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service_name,
+         r.wanted_start, r.wanted_end, r.created_at, r.source
   FROM ws.requests r
   LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
   LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
@@ -143,7 +147,7 @@ export async function getTodayData(
     incomingQuery(accountId, businessId),
     incomingCountQuery(accountId, businessId),
     q`
-      SELECT a.id, a.kind, a.starts_at, a.ends_at, a.customer_id, a.title,
+      SELECT a.id, a.group_id, a.kind, a.starts_at, a.ends_at, a.customer_id, a.title,
              c.name AS customer_name, s.name AS service_name, st.name AS staff_name
       FROM ws.appointments a
       LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
@@ -157,7 +161,12 @@ export async function getTodayData(
     q`
       SELECT r.id, r.customer_id, r.wanted_start, r.wanted_end,
              COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
-             s.name AS service_name, s.duration_min
+             COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+               FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service_name,
+             COALESCE((SELECT sum(s2.duration_min)::int FROM ws.request_services rs
+               JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.duration_min) AS duration_min
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
@@ -196,7 +205,10 @@ export async function getTodayData(
     q`
       SELECT r.id, r.customer_id,
              COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name,
-             s.name AS service_name, r.wanted_start, r.wanted_end, r.created_at, r.source
+             COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+               FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service_name,
+             r.wanted_start, r.wanted_end, r.created_at, r.source
       FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
@@ -234,17 +246,23 @@ export async function getTodayData(
 
   const incomingRows = incoming as unknown as IncomingRequest[]
 
+  const groupedVisits = groupAppointmentSegments((visits as Row[]).map((r) => ({
+    id: String(r.id), group_id: (r.group_id as string | null) ?? null, kind: String(r.kind),
+    start: r.starts_at as Date, end: r.ends_at as Date, title: (r.title as string | null) ?? null,
+    customer_id: (r.customer_id as string | null) ?? null, customer_name: (r.customer_name as string | null) ?? null,
+    staff_id: null, staff_name: null, service_name: (r.service_name as string | null) ?? null,
+  })))
   const calendar: CalendarEntry[] = [
-    ...(visits as Row[]).map((r): CalendarEntry => {
+    ...groupedVisits.map((r): CalendarEntry => {
       const block = r.kind === 'block'
       return {
-        id: String(r.id),
+        id: r.id,
         kind: block ? 'block' : 'visit',
-        start: r.starts_at as Date,
-        end: r.ends_at as Date,
+        start: r.start,
+        end: r.end,
         title: block ? String(r.title ?? 'Blokace') : String(r.customer_name ?? r.title ?? 'Termín'),
-        subtitle: block ? null : ((r.service_name as string | null) ?? null),
-        customer_id: (r.customer_id as string | null) ?? null,
+        subtitle: block ? null : r.service_name,
+        customer_id: r.customer_id,
       }
     }),
     ...(wanted as Row[]).map((r): CalendarEntry => {
@@ -411,6 +429,7 @@ export type RequestDetail = {
   customer_name: string
   contact: { name?: string; phone?: string; email?: string }
   service_id: string | null
+  session_id: string | null
   service_name: string | null
   requested_staff_id: string | null
   requested_staff_name: string | null
@@ -440,8 +459,14 @@ export async function getRequestDetail(
   const businessId = business.id
   const [rows, defs] = await wsDb(ctx).batch([
     q`
-      SELECT r.id, r.status, r.source, r.customer_id, r.contact, r.field_values, r.message,
-             r.wanted_start, r.wanted_end, r.created_at, r.service_id, s.name AS service_name, s.duration_min,
+      SELECT r.id, r.status, r.source, r.customer_id, r.session_id, r.contact, r.field_values, r.message,
+             r.wanted_start, r.wanted_end, r.created_at, r.service_id,
+             COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+               FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service_name,
+             COALESCE((SELECT sum(s2.duration_min)::int FROM ws.request_services rs
+               JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+               WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.duration_min) AS duration_min,
              r.requested_staff_id, st.name AS requested_staff_name,
              COALESCE(c.name, NULLIF(r.contact->>'name', ''), 'Bez jména') AS customer_name
       FROM ws.requests r
@@ -474,6 +499,7 @@ export async function getRequestDetail(
     customer_name: String(r.customer_name),
     contact: { name: str(contact.name), phone: str(contact.phone), email: str(contact.email) },
     service_id: (r.service_id as string | null) ?? null,
+    session_id: (r.session_id as string | null) ?? null,
     service_name: (r.service_name as string | null) ?? null,
     requested_staff_id: (r.requested_staff_id as string | null) ?? null,
     requested_staff_name: (r.requested_staff_name as string | null) ?? null,

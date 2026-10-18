@@ -307,3 +307,14 @@ Výsledek: bez otevřených nálezů.
 - Nastavení zůstává jen pro vlastníka; závislosti modulů se při obnově stavového snapshotu opraví do konzistentního stavu. Náhled šablon používá `iframe sandbox`; CSP ani skripty se neměnily. Bez nové závislosti, env proměnné nebo externího API.
 - Migrace 089 pouze rozšiřuje omezení typů v `message_settings`; je připravená a na Neonu se nespouštěla. GDPR export obsahuje nové zprávy a existující výmaz zákazníka je odstraní přes `customer_id`.
 Ověřeno: `npm test` (570 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`, `git diff --check`. `npm run build:check` Turbopack blokuje sandbox při vytváření procesu/vazbě na port; Webpack build prošel. Přihlášené UI, živý Resend a data po migraci ověřené nejsou.
+
+## 2026-10-19 — review RD08, RD09, RD11, RD14 a kalendáře
+Spouštěč: dokončení skupinových rezervací, více služeb, omezení osobních dat v administraci a návodů; bezpečnostní kontrola před commitem.
+Rozsah: veřejné API `/api/public/v1/schema` a `/requests`, objednávka `/r` a widget, server actions poptávek/kalendáře, `lib/ws/{intake,bookings,portal,gdpr,calendar,admin}`, migrace 090/091, e-maily/ICS/portál/export a administrační čtení nad `ws`.
+Výsledek: bez otevřených nálezů.
+- Veřejné vstupy zůstávají za stávajícími klíči, CORS allowlistem, rate limity, honeypotem, idempotencí a Zod limity. Služby, pracovník, skupinová lekce i čas se ověřují v účtu/byznysu; zápisy mají vázané SQL parametry a account/business filtry. Při obsazení skupiny se její řádek zamyká; místo se přičte jen po vložení nové přihlášky, takže opakovaný external ID nespotřebuje kapacitu.
+- Akce pro vypsání lekce a změnu přihlašování ověřují roli majitele na serveru; ovládání je skryté pracovníkům. Zrušená lekce nepřijme nové potvrzení ani obnovení odmítnutého účastníka. Databázová kolize termínů zůstává autoritativní. GDPR export zahrnuje služby/účastníky; úklid účtů smaže lekce před účtem kvůli FK na službu.
+- Admin seznam používá zákaznické/finanční tabulky jen pro agregace a čas poslední aktivity. Detail vrací pouze údaje účtu, byznysů a členů; poznámky a volný obsah auditu se nenačítají. Zbytkové oprávnění vlastníka DB je zaznamenané v DECISIONS #017.
+- Návody jsou statický typovaný obsah bez nových routových datových vstupů. CSP, přihlašování, secrets, závislosti a env zůstaly beze změny.
+- Během kontroly opravené nálezy: chybějící serverové omezení skupinových akcí jen pro majitele; možná spotřeba dalšího místa při duplicitním external ID; ochrana před potvrzením/obnovením po zrušení lekce.
+Ověřeno: `npm test --maxWorkers=2` (582 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`, `git diff --check`. `npm run build:check` Turbopacku narazil na sandboxový zákaz vytvoření procesu/vazby na interní port. Přihlášený Preview, skutečná DB/migrace, odeslání e-mailu a fyzické zařízení s perem/dotykem nejsou ověřené.

@@ -45,12 +45,19 @@ export async function queueReminders(scope: Scope, sender: Sender, today: string
   if (!sender.customerMail || !isOn(sender, 'reminder')) return 0
   const tomorrow = addDays(today, 1)
   const rows = await wsDb(scope)`
-    SELECT a.id, a.public_token, a.starts_at, a.customer_id, c.name, c.email, s.name AS service
+    SELECT a.id, a.public_token, a.starts_at, a.customer_id, c.name, c.email,
+      COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY a2.starts_at)
+        FROM ws.appointments a2 LEFT JOIN ws.services s2 ON s2.account_id = a2.account_id AND s2.id = a2.service_id
+        WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+          AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))), s.name) AS service
     FROM ws.appointments a
     JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
     LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
     WHERE a.account_id = ${scope.accountId} AND a.business_id = ${sender.business.id}
       AND a.kind = 'visit' AND a.status = 'confirmed' AND c.email IS NOT NULL
+      AND a.id = (SELECT a0.id FROM ws.appointments a0 WHERE a0.account_id = a.account_id AND a0.business_id = a.business_id
+        AND a0.status = 'confirmed' AND ((a.group_id IS NOT NULL AND a0.group_id = a.group_id) OR (a.group_id IS NULL AND a0.id = a.id))
+        ORDER BY a0.starts_at LIMIT 1)
       AND a.starts_at >= ${pragueToUtc(tomorrow, 0)} AND a.starts_at < ${pragueToUtc(addDays(tomorrow, 1), 0)}`
   const s = sender.settings.get('reminder')
   let n = 0
@@ -163,13 +170,25 @@ async function queueDaily(scope: Scope, sender: Sender, today: string): Promise<
   const acc = scope.accountId
   const biz = sender.business.id
   const [visits, requests] = await wsDb(scope).batch([
-    q`SELECT a.starts_at, c.name, s.name AS service FROM ws.appointments a
+    q`SELECT a.starts_at, c.name,
+        COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY a2.starts_at)
+          FROM ws.appointments a2 LEFT JOIN ws.services s2 ON s2.account_id = a2.account_id AND s2.id = a2.service_id
+          WHERE a2.account_id = a.account_id AND a2.business_id = a.business_id
+            AND ((a.group_id IS NOT NULL AND a2.group_id = a.group_id) OR (a.group_id IS NULL AND a2.id = a.id))), s.name) AS service
+      FROM ws.appointments a
       LEFT JOIN ws.customers c ON c.account_id = a.account_id AND c.id = a.customer_id
       LEFT JOIN ws.services s ON s.account_id = a.account_id AND s.id = a.service_id
       WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.kind = 'visit' AND a.status = 'confirmed'
         AND a.starts_at >= ${pragueToUtc(today, 0)} AND a.starts_at < ${pragueToUtc(addDays(today, 1), 0)}
+        AND a.id = (SELECT a0.id FROM ws.appointments a0 WHERE a0.account_id = a.account_id AND a0.business_id = a.business_id
+          AND a0.status = 'confirmed' AND ((a.group_id IS NOT NULL AND a0.group_id = a.group_id) OR (a.group_id IS NULL AND a0.id = a.id))
+          ORDER BY a0.starts_at LIMIT 1)
       ORDER BY a.starts_at LIMIT 30`,
-    q`SELECT r.created_at, c.name, s.name AS service FROM ws.requests r
+    q`SELECT r.created_at, c.name,
+        COALESCE((SELECT string_agg(s2.name, ' + ' ORDER BY rs.position)
+          FROM ws.request_services rs JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+          WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.name) AS service
+      FROM ws.requests r
       LEFT JOIN ws.customers c ON c.account_id = r.account_id AND c.id = r.customer_id
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
       WHERE r.account_id = ${acc} AND r.business_id = ${biz} AND r.status = 'new' AND NOT r.is_test

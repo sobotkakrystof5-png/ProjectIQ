@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getAdmin } from '@/lib/ws/admin/auth'
-import { getClientBusiness, getClientDetail, saveClientNote } from '@/lib/ws/admin/clients'
+import { getClientBusiness, getClientDetail } from '@/lib/ws/admin/clients'
 import { InviteSetupError, inviteClient, sendInvite } from '@/lib/ws/admin/invite'
 import { generateWebKeys, WebKeysUnavailable, type WebKeysResult } from '@/lib/ws/admin/web-keys'
 import { fail, ok, type Result } from '@/lib/ws/result'
@@ -65,22 +65,5 @@ export async function generateWebKeysAction(raw: unknown): Promise<Result<WebKey
     if (e instanceof WebKeysUnavailable) return fail('Chybí WS_KEY_PEPPER — tajný klíč teď nejde vytvořit.')
     console.error('admin.generateWebKeys', { accountId: parsed.data.accountId, error: e instanceof Error ? e.message : 'unknown' })
     return fail('Klíče se nepodařilo vytvořit. Zkus to prosím znovu.')
-  }
-}
-
-export async function saveNoteAction(raw: unknown): Promise<Result<null>> {
-  const admin = await getAdmin()
-  if (!admin) return fail(NO_ADMIN)
-  const parsed = z.object({ accountId: uuid, note: z.string().max(4000) }).safeParse(raw)
-  if (!parsed.success) return fail('Poznámka může mít nejvýš 4000 znaků.')
-  const client = await getClientDetail(parsed.data.accountId)
-  if (!client) return fail('Tenhle účet neexistuje.')
-  try {
-    await saveClientNote(admin, client.id, parsed.data.note)
-    revalidatePath(`/dashboard/klienti/${client.id}`)
-    return ok(null)
-  } catch (e) {
-    console.error('admin.saveNote', { accountId: client.id, error: e instanceof Error ? e.message : 'unknown' })
-    return fail('Poznámku se nepodařilo uložit.')
   }
 }

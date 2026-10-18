@@ -85,9 +85,16 @@ export async function seedAccount(db: PGlite, L: 'a' | 'b'): Promise<void> {
     INSERT INTO ws.customers (id, account_id, name, phone, email) VALUES ('${i.customer}', '${i.account}', 'Zákazník', '+420600000001', 'zakaznik@example.cz');
     INSERT INTO ws.web_integrations (id, account_id, business_id, public_key, allowed_origins) VALUES ('${i.integration}', '${i.account}', '${i.business}', 'pk_${L.repeat(24)}', ARRAY['https://${L}.example.cz']);
     INSERT INTO ws.requests (id, account_id, business_id, customer_id, service_id, integration_id, source) VALUES ('${i.request}', '${i.account}', '${i.business}', '${i.customer}', '${i.service}', '${i.integration}', 'web');
+    INSERT INTO ws.request_services (account_id, business_id, request_id, service_id, position)
+      VALUES ('${i.account}', '${i.business}', '${i.request}', '${i.service}', 1);
     INSERT INTO ws.jobs (id, account_id, business_id, customer_id, request_id, stage_id, title) VALUES ('${i.job}', '${i.account}', '${i.business}', '${i.customer}', '${i.request}', '${i.stage}', 'Zakázka');
     INSERT INTO ws.appointments (id, account_id, business_id, staff_id, customer_id, job_id, request_id, service_id, starts_at, ends_at)
       VALUES ('${i.appointment}', '${i.account}', '${i.business}', '${i.staff}', '${i.customer}', '${i.job}', '${i.request}', '${i.service}', '2026-10-01 09:00+02', '2026-10-01 10:00+02');
+    INSERT INTO ws.sessions (account_id, business_id, appointment_id, service_id, capacity, reserved)
+      VALUES ('${i.account}', '${i.business}', '${i.appointment}', '${i.service}', 2, 1);
+    INSERT INTO ws.session_attendees (account_id, business_id, session_id, request_id, customer_id, status)
+      SELECT '${i.account}', '${i.business}', id, '${i.request}', '${i.customer}', 'requested'
+      FROM ws.sessions WHERE account_id = '${i.account}' AND appointment_id = '${i.appointment}';
     INSERT INTO ws.loyalty_programs (id, account_id, business_id, enabled) VALUES ('${i.program}', '${i.account}', '${i.business}', true);
     INSERT INTO ws.loyalty_cards (id, account_id, business_id, program_id, customer_id, stamps) VALUES ('${i.card}', '${i.account}', '${i.business}', '${i.program}', '${i.customer}', 1);
     INSERT INTO ws.loyalty_events (account_id, business_id, card_id, appointment_id, kind, delta) VALUES ('${i.account}', '${i.business}', '${i.card}', '${i.appointment}', 'stamp', 1);

@@ -21,6 +21,11 @@ export type BookingError =
   | 'invalid_staff'
   | 'invalid_customer'
   | 'bad_length'
+  | 'invalid_service'
+  | 'session_full'
+  | 'session_closed'
+  | 'session_cancelled'
+  | 'session_time_fixed'
 
 export type BookingResult<T> = { ok: true; data: T } | { ok: false; reason: BookingError }
 
@@ -63,19 +68,36 @@ export async function ensureStaff(ctx: WsContext, business: Biz): Promise<void> 
  * CHECK selže), nebo první aktivní, který službu dělá a v tu dobu je volný.
  * Když volný není nikdo, vybere prvního — a vložení skončí na kolizi.
  */
-function staffExpr(acc: string, biz: string, staffId: string | null, serviceId: string | null, start: Date, end: Date) {
+function staffExpr(acc: string, biz: string, staffId: string | null, serviceIds: readonly string[], start: Date, end: Date) {
+  const services = [...serviceIds]
   return q`(CASE WHEN ${staffId}::uuid IS NOT NULL THEN (
       SELECT st.id FROM ws.staff st WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.id = ${staffId}::uuid
         AND st.active
-        AND (${serviceId}::uuid IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
-          OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))
+        AND NOT EXISTS (
+          SELECT 1 FROM unnest(${services}::uuid[]) wanted(service_id)
+          WHERE EXISTS (
+            SELECT 1 FROM ws.service_staff x JOIN ws.staff active_staff
+              ON active_staff.account_id = x.account_id AND active_staff.id = x.staff_id AND active_staff.active
+            WHERE x.account_id = ${acc} AND x.service_id = wanted.service_id
+          ) AND NOT EXISTS (
+            SELECT 1 FROM ws.service_staff x WHERE x.account_id = ${acc}
+              AND x.service_id = wanted.service_id AND x.staff_id = st.id
+          )
+        )
     ) ELSE (
       SELECT st.id FROM ws.staff st
       WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.active
-        AND (${serviceId}::uuid IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
-          OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))
+        AND NOT EXISTS (
+          SELECT 1 FROM unnest(${services}::uuid[]) wanted(service_id)
+          WHERE EXISTS (
+            SELECT 1 FROM ws.service_staff x JOIN ws.staff active_staff
+              ON active_staff.account_id = x.account_id AND active_staff.id = x.staff_id AND active_staff.active
+            WHERE x.account_id = ${acc} AND x.service_id = wanted.service_id
+          ) AND NOT EXISTS (
+            SELECT 1 FROM ws.service_staff x WHERE x.account_id = ${acc}
+              AND x.service_id = wanted.service_id AND x.staff_id = st.id
+          )
+        )
       ORDER BY EXISTS (
           SELECT 1 FROM ws.appointments a
           WHERE a.account_id = st.account_id AND a.staff_id = st.id AND a.status <> 'cancelled'
@@ -122,6 +144,7 @@ export async function checkSlot(
     start: Date
     end: Date
     serviceId: string | null
+    serviceIds?: readonly string[]
     excludeAppointmentId?: string | null
     /** Ověřit jen tohoto pracovníka (sloupec kalendáře, výběr ve formuláři); jinak stačí kdokoli volný. */
     staffId?: string | null
@@ -130,6 +153,7 @@ export async function checkSlot(
   const acc = ctx.accountId
   const biz = business.id
   const { start, end, serviceId } = input
+  const serviceIds = input.serviceIds?.length ? [...input.serviceIds] : serviceId ? [serviceId] : []
   const exclude = input.excludeAppointmentId ?? null
   const onlyStaff = input.staffId ?? null
   const [staffRows, conflicts] = await wsDb(ctx).batch([
@@ -144,9 +168,14 @@ export async function checkSlot(
       FROM ws.staff st
       WHERE st.account_id = ${acc} AND st.business_id = ${biz} AND st.active
         AND (${onlyStaff}::uuid IS NULL OR st.id = ${onlyStaff}::uuid)
-        AND (${onlyStaff}::uuid IS NOT NULL OR ${serviceId}::uuid IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff y ON y.account_id = x.account_id AND y.id = x.staff_id AND y.active WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid)
-          OR EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = st.account_id AND x.service_id = ${serviceId}::uuid AND x.staff_id = st.id))
+        AND NOT EXISTS (
+          SELECT 1 FROM unnest(${serviceIds}::uuid[]) wanted(service_id)
+          WHERE EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff active_staff
+            ON active_staff.account_id = x.account_id AND active_staff.id = x.staff_id AND active_staff.active
+            WHERE x.account_id = ${acc} AND x.service_id = wanted.service_id)
+            AND NOT EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = ${acc}
+              AND x.service_id = wanted.service_id AND x.staff_id = st.id)
+        )
       ORDER BY st.position, st.created_at
     `,
     q`
@@ -188,6 +217,11 @@ type RequestState = {
   wanted_start: Date | null
   wanted_end: Date | null
   service_id: string | null
+  service_ids: string[]
+  session_id: string | null
+  session_appointment_id: string | null
+  session_status: string | null
+  session_appointment_status: string | null
   requested_staff_id: string | null
   duration_min: number | null
   calendar: boolean
@@ -197,13 +231,23 @@ type RequestState = {
 async function requestState(ctx: WsContext, business: Biz, requestId: string): Promise<RequestState | null> {
   const [rows] = await wsDb(ctx).batch([
     q`
-      SELECT r.status, r.wanted_start, r.wanted_end, r.service_id, r.requested_staff_id, s.duration_min,
+      SELECT r.status, r.wanted_start, r.wanted_end, r.service_id, r.requested_staff_id, r.session_id,
+        se.appointment_id AS session_appointment_id, se.status AS session_status, session_appointment.status AS session_appointment_status,
+        COALESCE((SELECT array_agg(rs.service_id ORDER BY rs.position) FILTER (WHERE rs.service_id IS NOT NULL)
+          FROM ws.request_services rs WHERE rs.account_id = r.account_id AND rs.request_id = r.id),
+          CASE WHEN r.service_id IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[r.service_id] END) AS service_ids,
+        COALESCE((SELECT sum(s2.duration_min)::int FROM ws.request_services rs
+          JOIN ws.services s2 ON s2.account_id = rs.account_id AND s2.id = rs.service_id
+          WHERE rs.account_id = r.account_id AND rs.request_id = r.id), s.duration_min) AS duration_min,
         EXISTS (SELECT 1 FROM ws.business_modules m WHERE m.account_id = r.account_id AND m.business_id = r.business_id
                 AND m.module = 'calendar' AND m.enabled) AS calendar,
         EXISTS (SELECT 1 FROM ws.business_modules m WHERE m.account_id = r.account_id AND m.business_id = r.business_id
                 AND m.module = 'jobs' AND m.enabled) AS jobs
       FROM ws.requests r
       LEFT JOIN ws.services s ON s.account_id = r.account_id AND s.id = r.service_id
+      LEFT JOIN ws.sessions se ON se.account_id = r.account_id AND se.business_id = r.business_id AND se.id = r.session_id
+      LEFT JOIN ws.appointments session_appointment ON session_appointment.account_id = se.account_id
+        AND session_appointment.business_id = se.business_id AND session_appointment.id = se.appointment_id
       WHERE r.account_id = ${ctx.accountId} AND r.business_id = ${business.id} AND r.id = ${requestId}
     `,
   ])
@@ -214,6 +258,11 @@ async function requestState(ctx: WsContext, business: Biz, requestId: string): P
     wanted_start: (r.wanted_start as Date | null) ?? null,
     wanted_end: (r.wanted_end as Date | null) ?? null,
     service_id: (r.service_id as string | null) ?? null,
+    service_ids: Array.isArray(r.service_ids) ? r.service_ids.map(String) : r.service_id ? [String(r.service_id)] : [],
+    session_id: (r.session_id as string | null) ?? null,
+    session_appointment_id: (r.session_appointment_id as string | null) ?? null,
+    session_status: (r.session_status as string | null) ?? null,
+    session_appointment_status: (r.session_appointment_status as string | null) ?? null,
     requested_staff_id: (r.requested_staff_id as string | null) ?? null,
     duration_min: r.duration_min === null || r.duration_min === undefined ? null : Number(r.duration_min),
     calendar: Boolean(r.calendar),
@@ -241,14 +290,17 @@ export async function confirmRequest(
   const st = await requestState(ctx, business, input.requestId)
   if (!st) return no('not_found')
   if (st.status !== 'new') return no('already_handled')
+  if (st.session_id && (st.session_status === 'cancelled' || st.session_appointment_status !== 'confirmed')) return no('session_cancelled')
 
   const other = input.start ? !st.wanted_start || input.start.getTime() !== st.wanted_start.getTime() : false
+  if (st.session_appointment_id && other) return no('session_time_fixed')
   const start = input.start ?? st.wanted_start
   const durationMs =
     !other && st.wanted_start && st.wanted_end
       ? st.wanted_end.getTime() - st.wanted_start.getTime()
       : (st.duration_min ?? 60) * MINUTE
-  const withAppointment = st.calendar && start !== null
+  const withAppointment = st.calendar && start !== null && !st.session_appointment_id
+  const hasScheduledAppointment = withAppointment || Boolean(st.session_appointment_id && start)
   // Kalendář bez zakázek: potvrdit jde jen s časem (jinak není co potvrdit).
   if (st.calendar && !st.jobs && !start) return no('needs_time')
   const end = start ? new Date(start.getTime() + durationMs) : null
@@ -257,42 +309,87 @@ export async function confirmRequest(
 
   const acc = ctx.accountId
   const biz = business.id
+  const serviceIds = st.service_ids
+  const segmentMinutes = st.duration_min ?? Math.max(15, Math.round(durationMs / MINUTE))
   const sql = new Sql().add(q`
     WITH req AS (
       UPDATE ws.requests SET status = ${other ? 'rescheduled' : 'confirmed'}, handled_at = now()
       WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.requestId} AND status = 'new'
+        AND (session_id IS NULL OR EXISTS (
+          SELECT 1 FROM ws.sessions se
+          JOIN ws.appointments sa ON sa.account_id = se.account_id AND sa.business_id = se.business_id AND sa.id = se.appointment_id
+          WHERE se.account_id = ${acc} AND se.business_id = ${biz} AND se.id = ws.requests.session_id
+            AND se.status <> 'cancelled' AND sa.status = 'confirmed'
+        ))
       RETURNING id, customer_id, service_id
+    ),
+    req_data AS (
+      SELECT req.*, CASE WHEN cardinality(${serviceIds}::uuid[]) > 1 THEN gen_random_uuid() ELSE NULL::uuid END AS group_id
+      FROM req
+    ),
+    attendee AS (
+      UPDATE ws.session_attendees sa SET status = 'confirmed'
+      FROM req_data req WHERE sa.account_id = ${acc} AND sa.business_id = ${biz} AND sa.request_id = req.id
+      RETURNING sa.id
     ),
     job AS (
       INSERT INTO ws.jobs (account_id, business_id, customer_id, request_id, stage_id, title)
       SELECT ${acc}, ${biz}, req.customer_id, req.id,
         (SELECT id FROM ws.stages WHERE account_id = ${acc} AND business_id = ${biz} AND type <> 'cancelled'
-          ORDER BY (type = ${withAppointment ? 'in_progress' : 'new'}) DESC, position LIMIT 1),
-        COALESCE((SELECT name FROM ws.services WHERE account_id = ${acc} AND id = req.service_id), 'Zakázka')
-      FROM req WHERE ${st.jobs}::boolean
+          ORDER BY (type = ${hasScheduledAppointment ? 'in_progress' : 'new'}) DESC, position LIMIT 1),
+        COALESCE((SELECT string_agg(s.name, ' + ' ORDER BY picked.ordinality)
+          FROM unnest(${serviceIds}::uuid[]) WITH ORDINALITY picked(service_id, ordinality)
+          JOIN ws.services s ON s.account_id = ${acc} AND s.id = picked.service_id),
+          (SELECT name FROM ws.services WHERE account_id = ${acc} AND id = req.service_id), 'Zakázka')
+      FROM req_data req WHERE ${st.jobs}::boolean
       RETURNING id
     ),
-    appt AS (
-      INSERT INTO ws.appointments (account_id, business_id, kind, staff_id, customer_id, job_id, request_id, service_id, starts_at, ends_at)
-      SELECT ${acc}, ${biz}, 'visit', `)
-  if (withAppointment) sql.add(staffExpr(acc, biz, input.staffId ?? st.requested_staff_id, st.service_id, start!, end!))
+    segments AS (
+      SELECT picked.service_id, picked.ordinality,
+        COALESCE(s.duration_min, ${Math.max(15, Math.round(segmentMinutes))})::int AS duration_min,
+        COALESCE(sum(COALESCE(s.duration_min, ${Math.max(15, Math.round(segmentMinutes))})) OVER (
+          ORDER BY picked.ordinality ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)::int AS offset_min
+      FROM unnest(CASE WHEN cardinality(${serviceIds}::uuid[]) = 0 THEN ARRAY[NULL::uuid] ELSE ${serviceIds}::uuid[] END)
+        WITH ORDINALITY picked(service_id, ordinality)
+      LEFT JOIN ws.services s ON s.account_id = ${acc} AND s.id = picked.service_id
+    ),
+    chosen_staff AS (
+      SELECT `)
+  if (withAppointment) sql.add(staffExpr(acc, biz, input.staffId ?? st.requested_staff_id, serviceIds, start!, end!))
   else sql.add(q`NULL::uuid`)
-  sql.add(q`, req.customer_id, (SELECT id FROM job), req.id, req.service_id, ${start}::timestamptz, ${end}::timestamptz
-      FROM req WHERE ${withAppointment}::boolean
-      RETURNING id
+  sql.add(q` AS id
+    ),
+    appt AS (
+      INSERT INTO ws.appointments (account_id, business_id, group_id, kind, staff_id, customer_id, job_id, request_id, service_id, starts_at, ends_at)
+      SELECT ${acc}, ${biz}, req.group_id, 'visit', chosen_staff.id, req.customer_id, (SELECT id FROM job), req.id,
+        segments.service_id, ${start}::timestamptz + make_interval(mins => segments.offset_min),
+        ${start}::timestamptz + make_interval(mins => segments.offset_min + segments.duration_min)
+      FROM req_data req CROSS JOIN segments CROSS JOIN chosen_staff
+      WHERE ${withAppointment}::boolean
+      RETURNING id, starts_at
     )
-    SELECT (SELECT id FROM req) AS request_id, (SELECT id FROM appt) AS appointment_id, (SELECT id FROM job) AS job_id
+    SELECT (SELECT id FROM req_data) AS request_id,
+      COALESCE((SELECT id FROM appt ORDER BY starts_at LIMIT 1), ${st.session_appointment_id}::uuid) AS appointment_id,
+      (SELECT id FROM job) AS job_id
   `)
 
   try {
     const [rows] = await wsDb(ctx).batch([sql.build()])
     const r = (rows as WsRow[])[0]
     // Mezi čtením a zápisem ji vyřídil někdo jiný.
-    if (!r?.request_id) return no('already_handled')
+    if (!r?.request_id) {
+      const latest = await requestState(ctx, business, input.requestId)
+      if (!latest) return no('not_found')
+      if (latest.status !== 'new') return no('already_handled')
+      if (latest.session_id && (latest.session_status === 'cancelled' || latest.session_appointment_status !== 'confirmed')) {
+        return no('session_cancelled')
+      }
+      return no('already_handled')
+    }
     return done({
       appointmentId: (r.appointment_id as string | null) ?? null,
       jobId: (r.job_id as string | null) ?? null,
-      start: withAppointment ? start : null,
+      start: hasScheduledAppointment ? start : null,
     })
   } catch (e) {
     return no(asReason(e))
@@ -308,7 +405,17 @@ export async function declineRequest(ctx: WsContext, business: Biz, requestId: s
     upd AS (
       UPDATE ws.requests SET status = 'declined', handled_at = now()
       WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${requestId} AND status = 'new'
-      RETURNING id
+      RETURNING id, session_id
+    )
+    , attendee AS (
+      UPDATE ws.session_attendees sa SET status = 'cancelled'
+      FROM upd WHERE sa.account_id = ${ctx.accountId} AND sa.business_id = ${business.id}
+        AND sa.request_id = upd.id AND sa.status <> 'cancelled'
+      RETURNING sa.session_id
+    ), release AS (
+      UPDATE ws.sessions se SET reserved = greatest(0, se.reserved - 1)
+      FROM attendee WHERE se.account_id = ${ctx.accountId} AND se.business_id = ${business.id} AND se.id = attendee.session_id
+      RETURNING se.id
     )
     SELECT (SELECT id FROM found) AS found, (SELECT id FROM upd) AS updated
   `
@@ -318,12 +425,42 @@ export async function declineRequest(ctx: WsContext, business: Biz, requestId: s
 
 /** „Zpět“ po odmítnutí: poptávka je zase nová. */
 export async function reopenRequest(ctx: WsContext, business: Biz, requestId: string): Promise<BookingResult<null>> {
-  const rows = await wsDb(ctx)`
-    UPDATE ws.requests SET status = 'new', handled_at = NULL
-    WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${requestId} AND status = 'declined'
-    RETURNING id
-  `
-  return rows.length ? done(null) : no('not_found')
+  const [rows] = await wsDb(ctx).batch([q`
+    WITH target AS (
+      SELECT r.id, r.session_id, se.status AS session_status, a.status AS appointment_status
+      FROM ws.requests r
+      LEFT JOIN ws.sessions se ON se.account_id = r.account_id AND se.business_id = r.business_id AND se.id = r.session_id
+      LEFT JOIN ws.appointments a ON a.account_id = se.account_id AND a.business_id = se.business_id AND a.id = se.appointment_id
+      WHERE r.account_id = ${ctx.accountId} AND r.business_id = ${business.id} AND r.id = ${requestId} AND r.status = 'declined'
+    ), reserve AS (
+      UPDATE ws.sessions se SET reserved = se.reserved + 1
+      FROM target WHERE target.session_id IS NOT NULL AND se.account_id = ${ctx.accountId}
+        AND se.business_id = ${business.id} AND se.id = target.session_id AND se.status = 'open' AND se.reserved < se.capacity
+      RETURNING se.id
+    ), updated AS (
+      UPDATE ws.requests r SET status = 'new', handled_at = NULL
+      FROM target WHERE r.account_id = ${ctx.accountId} AND r.business_id = ${business.id} AND r.id = target.id
+        AND (target.session_id IS NULL OR EXISTS (SELECT 1 FROM reserve))
+      RETURNING r.id
+    ), attendee AS (
+      UPDATE ws.session_attendees sa SET status = 'requested'
+      FROM updated WHERE sa.account_id = ${ctx.accountId} AND sa.business_id = ${business.id}
+        AND sa.request_id = updated.id
+      RETURNING sa.id
+    )
+    SELECT (SELECT id FROM target) AS found, (SELECT id FROM updated) AS updated,
+      (SELECT session_id FROM target) AS session_id,
+      (SELECT session_status FROM target) AS session_status,
+      (SELECT appointment_status FROM target) AS appointment_status
+  `])
+  const r = rows[0]
+  if (!r?.found) return no('not_found')
+  if (!r.updated && r.session_id) {
+    if (r.session_status === 'cancelled' || r.appointment_status !== 'confirmed') return no('session_cancelled')
+    if (r.session_status !== 'open') return no('session_closed')
+    return no('session_full')
+  }
+  return r.updated ? done(null) : no('not_found')
 }
 
 // --- Zákazník pro ruční rezervaci ------------------------------------------
@@ -381,6 +518,7 @@ export async function createBooking(
     customerId?: string | null
     customer?: { name: string; phone: string | null; email: string | null } | null
     serviceId: string | null
+    serviceIds?: readonly string[]
     staffId: string | null
     start: Date
     durationMin?: number | null
@@ -391,12 +529,18 @@ export async function createBooking(
   const biz = business.id
   const db = wsDb(ctx)
 
+  const serviceIds = input.serviceIds?.length ? [...input.serviceIds] : input.serviceId ? [input.serviceId] : []
+  if (new Set(serviceIds).size !== serviceIds.length || (serviceIds.length && input.serviceId && serviceIds[0] !== input.serviceId)) return no('invalid_service')
   const [svcRows] = await db.batch([
-    q`SELECT id, duration_min FROM ws.services WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.serviceId}::uuid`,
+    q`SELECT id, duration_min FROM ws.services WHERE account_id = ${acc} AND business_id = ${biz}
+      AND active AND id = ANY(${serviceIds}::uuid[]) ORDER BY array_position(${serviceIds}::uuid[], id)`,
   ])
-  const svc = (svcRows as WsRow[])[0]
-  const serviceId = svc ? String(svc.id) : null
-  const minutes = input.durationMin ?? (svc ? Number(svc.duration_min) : 60)
+  const services = svcRows as WsRow[]
+  if (services.length !== serviceIds.length) return no('invalid_service')
+  const minutes = serviceIds.length > 1 ? services.reduce((sum, svc) => sum + Number(svc.duration_min), 0)
+    : input.durationMin ?? (services[0] ? Number(services[0].duration_min) : 60)
+  if (!Number.isFinite(minutes) || minutes < MIN_DURATION_MIN || minutes > MAX_DURATION_MIN) return no('bad_length')
+  const serviceId = serviceIds[0] ?? null
   const end = new Date(input.start.getTime() + minutes * MINUTE)
 
   let customerId: string | null = null
@@ -409,17 +553,35 @@ export async function createBooking(
   }
 
   await ensureStaff(ctx, business)
-  const sql = new Sql()
-    .add(q`
-      INSERT INTO ws.appointments (account_id, business_id, kind, staff_id, customer_id, service_id, starts_at, ends_at, note)
-      VALUES (${acc}, ${biz}, 'visit', `)
-    .add(staffExpr(acc, biz, input.staffId, serviceId, input.start, end))
-    .add(q`, ${customerId}::uuid, ${serviceId}::uuid, ${input.start}::timestamptz, ${end}::timestamptz, ${input.note})
-      RETURNING id
-    `)
+  const sql = new Sql().add(q`
+    WITH segments AS (
+      SELECT picked.service_id, picked.ordinality,
+        COALESCE(s.duration_min, ${minutes})::int AS duration_min,
+        COALESCE(sum(COALESCE(s.duration_min, ${minutes})) OVER (
+          ORDER BY picked.ordinality ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)::int AS offset_min
+      FROM unnest(CASE WHEN cardinality(${serviceIds}::uuid[]) = 0 THEN ARRAY[NULL::uuid] ELSE ${serviceIds}::uuid[] END)
+        WITH ORDINALITY picked(service_id, ordinality)
+      LEFT JOIN ws.services s ON s.account_id = ${acc} AND s.id = picked.service_id
+    ),
+    chosen_staff AS (SELECT `)
+    .add(staffExpr(acc, biz, input.staffId, serviceIds, input.start, end))
+    .add(q` AS id),
+    booking_group AS (SELECT CASE WHEN cardinality(${serviceIds}::uuid[]) > 1 THEN gen_random_uuid() ELSE NULL::uuid END AS id),
+    inserted AS (
+      INSERT INTO ws.appointments (account_id, business_id, group_id, kind, staff_id, customer_id, service_id, starts_at, ends_at, note)
+      SELECT ${acc}, ${biz}, booking_group.id, 'visit', chosen_staff.id, ${customerId}::uuid, segments.service_id,
+        ${input.start}::timestamptz + make_interval(mins => segments.offset_min),
+        ${input.start}::timestamptz + make_interval(mins => segments.offset_min + segments.duration_min), ${input.note}
+      FROM segments CROSS JOIN chosen_staff CROSS JOIN booking_group
+      RETURNING id, starts_at
+    )
+    SELECT id, starts_at FROM inserted ORDER BY starts_at
+  `)
   try {
     const [rows] = await db.batch([sql.build()])
-    return done({ appointmentId: String((rows as WsRow[])[0].id), customerId })
+    const first = (rows as WsRow[]).sort((a, b) => new Date(a.starts_at as Date).getTime() - new Date(b.starts_at as Date).getTime())[0]
+    if (!first) return no('invalid_service')
+    return done({ appointmentId: String(first.id), customerId })
   } catch (e) {
     return no(asReason(e))
   }
@@ -437,24 +599,53 @@ export async function moveAppointment(
   const biz = business.id
   const staffId = input.staffId ?? null
   try {
-    const rows = await wsDb(ctx)`
-      WITH old AS (
-        SELECT id, starts_at, ends_at, staff_id FROM ws.appointments
+    const [, rows] = await wsDb(ctx).batch([q`SET CONSTRAINTS ws.appointments_no_overlap DEFERRED`, q`
+      WITH target AS (
+        SELECT id, group_id FROM ws.appointments
         WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.appointmentId} AND status = 'confirmed'
-        FOR UPDATE
       )
-      UPDATE ws.appointments a SET
-        starts_at = ${input.start}::timestamptz,
-        ends_at = ${input.start}::timestamptz + (old.ends_at - old.starts_at),
-        staff_id = CASE WHEN ${staffId}::uuid IS NULL THEN a.staff_id ELSE (
-          SELECT id FROM ws.staff WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${staffId}::uuid
-        ) END
-      FROM old
-      WHERE a.account_id = ${acc} AND a.id = old.id
-      RETURNING old.starts_at AS prev_start, old.staff_id AS prev_staff, a.starts_at, a.ends_at
-    `
+      , old AS (
+        SELECT a.id, a.starts_at, a.ends_at, a.staff_id, a.service_id,
+          min(a.starts_at) OVER () AS group_start,
+          array_remove(array_agg(a.service_id) OVER (), NULL::uuid) AS service_ids
+        FROM ws.appointments a JOIN target t ON a.account_id = ${acc}
+          AND ((t.group_id IS NOT NULL AND a.group_id = t.group_id) OR (t.group_id IS NULL AND a.id = t.id))
+        WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.status = 'confirmed'
+      ),
+      summary AS (
+        SELECT min(starts_at) AS prev_start, (array_agg(staff_id ORDER BY starts_at))[1] AS prev_staff,
+          array_agg(DISTINCT service_id) FILTER (WHERE service_id IS NOT NULL) AS service_ids
+        FROM old
+      ),
+      changed AS (
+        UPDATE ws.appointments a SET
+          starts_at = ${input.start}::timestamptz + (old.starts_at - old.group_start),
+          ends_at = ${input.start}::timestamptz + (old.ends_at - old.group_start),
+          staff_id = CASE WHEN ${staffId}::uuid IS NULL THEN a.staff_id ELSE (
+            SELECT id FROM ws.staff WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${staffId}::uuid AND active
+          ) END
+        FROM old, summary
+        WHERE a.account_id = ${acc} AND a.id = old.id
+          AND (${staffId}::uuid IS NULL OR NOT EXISTS (
+            SELECT 1 FROM unnest(summary.service_ids) wanted(service_id)
+            WHERE EXISTS (SELECT 1 FROM ws.service_staff x JOIN ws.staff active_staff
+              ON active_staff.account_id = x.account_id AND active_staff.id = x.staff_id AND active_staff.active
+              WHERE x.account_id = ${acc} AND x.service_id = wanted.service_id)
+              AND NOT EXISTS (SELECT 1 FROM ws.service_staff x WHERE x.account_id = ${acc}
+                AND x.service_id = wanted.service_id AND x.staff_id = ${staffId}::uuid)
+          ))
+        RETURNING a.id
+      )
+      SELECT summary.prev_start, summary.prev_staff,
+        ${input.start}::timestamptz AS starts_at,
+        ${input.start}::timestamptz + (SELECT max(old.ends_at - old.group_start) FROM old) AS ends_at,
+        (SELECT count(*) FROM changed)::int AS changed_count,
+        (SELECT count(*) FROM old)::int AS found_count
+      FROM summary
+    `])
     const r = rows[0]
-    if (!r) return no('not_found')
+    if (!r || !r.prev_start) return no('not_found')
+    if (Number(r.changed_count) === 0) return no('invalid_staff')
     return done({
       prevStart: r.prev_start as Date,
       prevStaffId: (r.prev_staff as string | null) ?? null,
@@ -467,6 +658,84 @@ export async function moveAppointment(
 }
 
 export type ResizedAppointment = { prevDurationMin: number; start: Date; end: Date }
+
+export type GroupSessionResult = { appointmentId: string; sessionId: string }
+
+/** Vypíše skupinovou lekci z kalendáře: jeden termín pracovníka a 2–30 míst. */
+export async function createGroupSession(
+  ctx: WsContext,
+  business: Biz,
+  input: { serviceId: string; staffId: string | null; start: Date; title: string; capacity: number },
+): Promise<BookingResult<GroupSessionResult>> {
+  const capacity = Math.round(input.capacity)
+  const title = input.title.trim().slice(0, 120)
+  if (capacity < 2 || capacity > 30 || !title) return no('bad_length')
+  const acc = ctx.accountId
+  const biz = business.id
+  const [services] = await wsDb(ctx).batch([
+    q`SELECT id, duration_min FROM ws.services WHERE account_id = ${acc} AND business_id = ${biz} AND active AND id = ${input.serviceId}::uuid`,
+  ])
+  const service = (services as WsRow[])[0]
+  if (!service) return no('invalid_service')
+  const end = new Date(input.start.getTime() + Number(service.duration_min) * MINUTE)
+  await ensureStaff(ctx, business)
+  const sql = new Sql().add(q`
+    WITH service AS (
+      SELECT id FROM ws.services WHERE account_id = ${acc} AND business_id = ${biz} AND active AND id = ${input.serviceId}::uuid
+    ), chosen_staff AS (SELECT `)
+    .add(staffExpr(acc, biz, input.staffId, [input.serviceId], input.start, end))
+    .add(q` AS id), appointment AS (
+      INSERT INTO ws.appointments (account_id, business_id, kind, staff_id, service_id, starts_at, ends_at, title)
+      SELECT ${acc}, ${biz}, 'visit', chosen_staff.id, service.id,
+        ${input.start}::timestamptz, ${end}::timestamptz, ${title}
+      FROM service CROSS JOIN chosen_staff
+      RETURNING id
+    ), session AS (
+      INSERT INTO ws.sessions (account_id, business_id, appointment_id, service_id, capacity)
+      SELECT ${acc}, ${biz}, appointment.id, service.id, ${capacity}::smallint
+      FROM appointment CROSS JOIN service
+      RETURNING id
+    )
+    SELECT appointment.id AS appointment_id, session.id AS session_id FROM appointment CROSS JOIN session
+  `)
+  try {
+    const [rows] = await wsDb(ctx).batch([sql.build()])
+    const row = (rows as WsRow[])[0]
+    if (!row) return no('invalid_staff')
+    return done({ appointmentId: String(row.appointment_id), sessionId: String(row.session_id) })
+  } catch (e) {
+    return no(asReason(e))
+  }
+}
+
+/** Zastaví nebo obnoví přihlašování na budoucí lekci; místo pro obsazenou lekci obnovit nejde. */
+export async function setGroupSessionOpen(
+  ctx: WsContext,
+  business: Biz,
+  sessionId: string,
+  open: boolean,
+): Promise<BookingResult<null>> {
+  const [rows] = await wsDb(ctx).batch([q`
+    WITH target AS (
+      SELECT se.id, se.reserved, se.capacity
+      FROM ws.sessions se JOIN ws.appointments a
+        ON a.account_id = se.account_id AND a.business_id = se.business_id AND a.id = se.appointment_id
+      WHERE se.account_id = ${ctx.accountId} AND se.business_id = ${business.id} AND se.id = ${sessionId}
+        AND se.status IN ('open', 'closed') AND a.status = 'confirmed' AND a.starts_at > now()
+    ), changed AS (
+      UPDATE ws.sessions se SET status = ${open ? 'open' : 'closed'}
+      FROM target WHERE se.account_id = ${ctx.accountId} AND se.business_id = ${business.id} AND se.id = target.id
+        AND (${!open}::boolean OR target.reserved < target.capacity)
+      RETURNING se.id
+    )
+    SELECT EXISTS (SELECT 1 FROM target) AS found, EXISTS (SELECT 1 FROM changed) AS changed,
+      EXISTS (SELECT 1 FROM target WHERE reserved >= capacity) AS full
+  `])
+  const row = (rows as WsRow[])[0]
+  if (!row?.found) return no('not_found')
+  if (!row.changed && row.full) return no('session_full')
+  return row.changed ? done(null) : no('not_found')
+}
 
 /** Nejkratší a nejdelší termín, který jde změnit tažením nebo výběrem délky. */
 export const MIN_DURATION_MIN = 15
@@ -488,18 +757,39 @@ export async function resizeAppointment(
   if (!Number.isFinite(minutes) || minutes < MIN_DURATION_MIN || minutes > MAX_DURATION_MIN) return no('bad_length')
   try {
     const rows = await wsDb(ctx)`
-      WITH old AS (
-        SELECT id, starts_at, ends_at FROM ws.appointments
+      WITH target AS (
+        SELECT id, group_id FROM ws.appointments
         WHERE account_id = ${acc} AND business_id = ${biz} AND id = ${input.appointmentId} AND status = 'confirmed'
-        FOR UPDATE
+      ), ranked AS (
+        SELECT a.id, a.starts_at, a.ends_at, min(a.starts_at) OVER () AS group_start,
+          row_number() OVER (ORDER BY a.starts_at DESC) AS reverse_position,
+          max(a.ends_at) OVER () AS group_end
+        FROM ws.appointments a JOIN target t ON a.account_id = ${acc}
+          AND ((t.group_id IS NOT NULL AND a.group_id = t.group_id) OR (t.group_id IS NULL AND a.id = t.id))
+        WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.status = 'confirmed'
+      ), old AS (
+        SELECT ranked.*, max(ends_at) FILTER (WHERE reverse_position > 1) OVER () AS leading_end
+        FROM ranked
+      ), summary AS (
+        SELECT min(group_start) AS starts_at, max(group_end) AS ends_at, max(leading_end) AS leading_end,
+          (array_agg(id ORDER BY reverse_position))[1] AS last_id, count(*)::int AS row_count FROM old
+      ), changed AS (
+        UPDATE ws.appointments a SET ends_at = summary.starts_at + make_interval(mins => ${minutes}::int)
+        FROM summary WHERE a.account_id = ${acc} AND a.business_id = ${biz} AND a.id = summary.last_id
+          AND ${minutes}::int >= COALESCE((extract(epoch FROM summary.leading_end - summary.starts_at) / 60)::int, 0) + ${MIN_DURATION_MIN}
+        RETURNING a.starts_at, a.ends_at
       )
-      UPDATE ws.appointments a SET ends_at = old.starts_at + make_interval(mins => ${minutes}::int)
-      FROM old
-      WHERE a.account_id = ${acc} AND a.id = old.id
-      RETURNING (extract(epoch FROM old.ends_at - old.starts_at) / 60)::int AS prev_min, a.starts_at, a.ends_at
+      SELECT summary.starts_at,
+        (extract(epoch FROM summary.ends_at - summary.starts_at) / 60)::int AS prev_min,
+        summary.starts_at AS starts_at, changed.ends_at AS ends_at,
+        summary.row_count > 0 AS found,
+        EXISTS (SELECT 1 FROM summary WHERE ${minutes}::int < COALESCE((extract(epoch FROM leading_end - starts_at) / 60)::int, 0) + ${MIN_DURATION_MIN}) AS too_short
+      FROM summary LEFT JOIN changed ON true
     `
     const r = rows[0]
     if (!r) return no('not_found')
+    if (r.too_short) return no('bad_length')
+    if (!r.ends_at) return no('not_found')
     return done({ prevDurationMin: Number(r.prev_min), start: r.starts_at as Date, end: r.ends_at as Date })
   } catch (e) {
     return no(asReason(e))
@@ -509,9 +799,19 @@ export async function resizeAppointment(
 /** Zruší termín nebo blokaci. Vrátit jde přes restoreAppointment. */
 export async function cancelAppointment(ctx: WsContext, business: Biz, appointmentId: string): Promise<BookingResult<null>> {
   const rows = await wsDb(ctx)`
-    UPDATE ws.appointments SET status = 'cancelled', cancelled_at = now()
-    WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${appointmentId} AND status = 'confirmed'
-    RETURNING id
+    WITH target AS (SELECT id, group_id FROM ws.appointments
+      WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${appointmentId} AND status = 'confirmed')
+    , changed AS (
+      UPDATE ws.appointments a SET status = 'cancelled', cancelled_at = now()
+      FROM target t WHERE a.account_id = ${ctx.accountId} AND a.business_id = ${business.id} AND a.status = 'confirmed'
+        AND ((t.group_id IS NOT NULL AND a.group_id = t.group_id) OR (t.group_id IS NULL AND a.id = t.id))
+      RETURNING a.id
+    ), closed AS (
+      UPDATE ws.sessions se SET status = 'cancelled'
+      FROM changed WHERE se.account_id = ${ctx.accountId} AND se.business_id = ${business.id} AND se.appointment_id = changed.id
+      RETURNING se.id
+    )
+    SELECT id FROM changed
   `
   return rows.length ? done(null) : no('not_found')
 }
@@ -520,9 +820,19 @@ export async function cancelAppointment(ctx: WsContext, business: Biz, appointme
 export async function restoreAppointment(ctx: WsContext, business: Biz, appointmentId: string): Promise<BookingResult<null>> {
   try {
     const rows = await wsDb(ctx)`
-      UPDATE ws.appointments SET status = 'confirmed', cancelled_at = NULL
-      WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${appointmentId} AND status = 'cancelled'
-      RETURNING id
+      WITH target AS (SELECT id, group_id FROM ws.appointments
+        WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND id = ${appointmentId} AND status = 'cancelled')
+      , changed AS (
+        UPDATE ws.appointments a SET status = 'confirmed', cancelled_at = NULL
+        FROM target t WHERE a.account_id = ${ctx.accountId} AND a.business_id = ${business.id} AND a.status = 'cancelled'
+          AND ((t.group_id IS NOT NULL AND a.group_id = t.group_id) OR (t.group_id IS NULL AND a.id = t.id))
+        RETURNING a.id
+      ), reopened AS (
+        UPDATE ws.sessions se SET status = 'open'
+        FROM changed WHERE se.account_id = ${ctx.accountId} AND se.business_id = ${business.id} AND se.appointment_id = changed.id
+        RETURNING se.id
+      )
+      SELECT id FROM changed
     `
     return rows.length ? done(null) : no('not_found')
   } catch (e) {

@@ -11,6 +11,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { toast } from '@/components/ui/toast'
 import { NowIndicator } from '@/components/ws/app/calendar/now-indicator'
 import { staffTint } from '@/lib/ws/staff-colors'
+import { pointerDragStarted } from '@/lib/ws/calendar-indicator'
 import { cn } from '@/lib/ws/utils'
 import type { QuickBookingStart } from '../booking/quick-booking'
 import { undoToast, useWsAction } from '../booking/use-ws-action'
@@ -19,7 +20,7 @@ import { undoToast, useWsAction } from '../booking/use-ws-action'
 // pracovníci (Den). Pozici položek spočítal server (lib/ws/calendar-layout.ts),
 // tady je jen interakce:
 //  - klik nebo tažení v prázdném místě otevře rychlé zadání rezervace,
-//  - přetažení termínu myší (se „Zpět“),
+//  - přetažení termínu myší, perem nebo dotykem (se „Zpět“),
 //  - tažení za spodní okraj změní délku (se „Zpět“),
 //  - potvrzení poptávky na bloku.
 // Přesun i změna délky se v mřížce ukážou hned (optimisticky) a bez druhého
@@ -93,6 +94,14 @@ const HATCH = 'repeating-linear-gradient(135deg, hsl(var(--border)) 0 1px, trans
 
 type Selection = { colKey: string; from: number; to: number }
 type Quick = { col: GridColumn; range: Selection; start: QuickBookingStart }
+type AppointmentDrag = {
+  item: GridItem
+  pointerId: number
+  startX: number
+  startY: number
+  offsetMin: number
+  started: boolean
+}
 
 export function TimeGrid({
   slug,
@@ -102,6 +111,7 @@ export function TimeGrid({
   newBookingHref,
   services,
   staff,
+  canCreateGroupSessions,
   today,
   settingsHref,
   className,
@@ -114,6 +124,7 @@ export function TimeGrid({
   newBookingHref: string | null
   services: { id: string; name: string; duration_min: number }[]
   staff: { id: string; name: string }[]
+  canCreateGroupSessions: boolean
   today: string
   /** Kam vede odkaz „nastavte otevírací dobu“ v rychlém zadání. */
   settingsHref: string
@@ -124,7 +135,8 @@ export function TimeGrid({
   const { run, pending } = useWsAction()
   const height = (hours.to - hours.from) * HOUR_PX
   const span = (hours.to - hours.from) * 60
-  const grab = useRef<{ id: string; offsetMin: number } | null>(null)
+  const appointmentDrag = useRef<AppointmentDrag | null>(null)
+  const suppressClick = useRef(false)
   const [over, setOver] = useState<string | null>(null)
   // Přetažený nebo natažený termín zůstane na novém místě, než dorazí čerstvá data.
   const [moved, setMoved] = useState<Record<string, { column: string; top: number }>>({})
@@ -139,6 +151,7 @@ export function TimeGrid({
   const [selection, setSelection] = useState<Selection | null>(null)
   const [quick, setQuick] = useState<Quick | null>(null)
   const [touchSelect, setTouchSelect] = useState(false)
+  const [touchMove, setTouchMove] = useState(false)
   const box = quick?.range ?? selection
   const firstColumnByDay = new Map<string, string>()
   for (const col of columns) {
@@ -152,14 +165,7 @@ export function TimeGrid({
   const minutesAt = (el: HTMLElement, clientY: number) => Math.round(rawMinutes(el, clientY) / SNAP_MIN) * SNAP_MIN
   const clampMin = (m: number) => Math.max(hours.from * 60, Math.min(hours.to * 60, m))
 
-  const drop = (col: GridColumn, e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setOver(null)
-    const g = grab.current
-    grab.current = null
-    const item = g && items.find((i) => i.id === g.id && i.movable)
-    if (!item || col.requests) return
-    const minutes = Math.max(0, Math.min(1439, minutesAt(e.currentTarget, e.clientY) - g.offsetMin))
+  const commitMove = (item: GridItem, col: GridColumn, minutes: number) => {
     const sameColumn = item.column === col.key
     if (sameColumn && minutes === item.startMinutes) return
     setMoved((m) => ({ ...m, [item.id]: { column: col.key, top: ((minutes - hours.from * 60) / span) * 100 } }))
@@ -177,6 +183,74 @@ export function TimeGrid({
         return next
       })
     })
+  }
+
+  const pointerColumn = (x: number, y: number) => {
+    const target = document.elementFromPoint(x, y)
+    const columnElement = target instanceof Element ? target.closest<HTMLElement>('[data-calendar-column]') : null
+    const key = columnElement?.dataset.calendarColumn
+    const col = key ? columns.find((candidate) => candidate.key === key) : undefined
+    return columnElement && col && !col.requests ? { col, element: columnElement } : null
+  }
+
+  const startAppointmentDrag = (item: GridItem, e: React.PointerEvent<HTMLAnchorElement>) => {
+    if (!item.movable || e.button !== 0 || (e.pointerType === 'touch' && !touchMove)) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const offsetMin = Math.max(0, Math.min(item.durationMin, Math.round((((e.clientY - rect.top) / Math.max(rect.height, 1)) * item.durationMin) / SNAP_MIN) * SNAP_MIN))
+    appointmentDrag.current = { item, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, offsetMin, started: false }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const moveAppointmentPointer = (e: React.PointerEvent<HTMLAnchorElement>) => {
+    const drag = appointmentDrag.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    if (!drag.started && !pointerDragStarted(drag.startX, drag.startY, e.clientX, e.clientY, DRAG_THRESHOLD_PX)) return
+    drag.started = true
+    const target = pointerColumn(e.clientX, e.clientY)
+    if (!target) {
+      setOver(null)
+      setMoved((current) => {
+        const next = { ...current }
+        delete next[drag.item.id]
+        return next
+      })
+      return
+    }
+    const minutes = Math.max(0, Math.min(1439, minutesAt(target.element, e.clientY) - drag.offsetMin))
+    setOver(target.col.key)
+    setMoved((current) => ({ ...current, [drag.item.id]: { column: target.col.key, top: ((minutes - hours.from * 60) / span) * 100 } }))
+  }
+
+  const finishAppointmentDrag = (e: React.PointerEvent<HTMLAnchorElement>, cancelled = false) => {
+    const drag = appointmentDrag.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    appointmentDrag.current = null
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    setOver(null)
+    if (!drag.started) return
+    suppressClick.current = true
+    window.setTimeout(() => { suppressClick.current = false }, 0)
+    if (cancelled) {
+      setMoved((current) => {
+        const next = { ...current }
+        delete next[drag.item.id]
+        return next
+      })
+      return
+    }
+    const target = pointerColumn(e.clientX, e.clientY)
+    const drop = target
+      ? { col: target.col, minutes: Math.max(0, Math.min(1439, minutesAt(target.element, e.clientY) - drag.offsetMin)) }
+      : null
+    if (!drop) {
+      setMoved((current) => {
+        const next = { ...current }
+        delete next[drag.item.id]
+        return next
+      })
+      return
+    }
+    commitMove(drag.item, drop.col, drop.minutes)
   }
 
   // --- Výběr v prázdné mřížce ---------------------------------------------------
@@ -306,21 +380,34 @@ export function TimeGrid({
   return (
     <Popover open={quick !== null} onOpenChange={(o) => !o && setQuick(null)}>
       <div className={cn('overflow-x-auto', className)}>
-        <div className="calendar-touch-select-control sticky left-0 z-30 mb-3 w-fit items-center gap-3 rounded-box bg-surface">
+        <div className="calendar-touch-select-control sticky left-0 z-30 mb-3 w-fit flex-wrap items-center gap-2 rounded-box bg-surface">
           <Button
             variant="outline"
             aria-pressed={touchSelect}
             onClick={() => {
               pick.current = null
               setSelection(null)
+              if (!touchSelect) setTouchMove(false)
               setTouchSelect((active) => !active)
             }}
           >
             {touchSelect ? 'Zrušit výběr' : 'Vybrat dobu'}
           </Button>
-          {touchSelect && (
+          <Button
+            variant="outline"
+            aria-pressed={touchMove}
+            onClick={() => {
+              if (!touchMove) setTouchSelect(false)
+              setTouchMove((active) => !active)
+            }}
+          >
+            {touchMove ? 'Zrušit přesun' : 'Přesouvat termíny'}
+          </Button>
+          {(touchSelect || touchMove) && (
             <p role="status" className="text-sm text-quiet">
-              Táhněte prstem od začátku do konce; krátký dotyk vybere začátek a délku určí služba.
+              {touchMove
+                ? 'Podržte termín a přetáhněte ho na nový čas. Když režim vypnete, stránku můžete běžně posouvat.'
+                : 'Táhněte prstem od začátku do konce; krátký dotyk vybere začátek a délku určí služba.'}
             </p>
           )}
         </div>
@@ -373,14 +460,8 @@ export function TimeGrid({
                 onPointerMove={pickMove}
                 onPointerUp={pickUp}
                 onPointerCancel={pickCancel}
-                onDragOver={(e) => {
-                  if (col.requests || !grab.current) return
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                  if (over !== col.key) setOver(col.key)
-                }}
-                onDragLeave={() => setOver((o) => (o === col.key ? null : o))}
-                onDrop={(e) => drop(col, e)}
+                data-calendar-column={col.key}
+                onPointerLeave={() => setOver((o) => (o === col.key ? null : o))}
               >
                 {!col.requests && (
                   <NowIndicator day={col.day} hours={hours} showLabel={firstColumnByDay.get(col.day) === col.key} />
@@ -426,6 +507,18 @@ export function TimeGrid({
                     const roomy = px >= 40
                     const selected = openDetail !== null && new URLSearchParams(it.href.split('?')[1] ?? '').get('detail') === openDetail
                     const tinted = it.kind === 'visit' && it.accent
+                    const dragHandlers = it.movable ? {
+                      onPointerDown: (event: React.PointerEvent<HTMLAnchorElement>) => startAppointmentDrag(it, event),
+                      onPointerMove: moveAppointmentPointer,
+                      onPointerUp: (event: React.PointerEvent<HTMLAnchorElement>) => finishAppointmentDrag(event),
+                      onPointerCancel: (event: React.PointerEvent<HTMLAnchorElement>) => finishAppointmentDrag(event, true),
+                      onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
+                        if (!suppressClick.current) return
+                        suppressClick.current = false
+                        event.preventDefault()
+                        event.stopPropagation()
+                      },
+                    } : {}
                     return (
                       <li
                         key={it.key}
@@ -443,24 +536,7 @@ export function TimeGrid({
                           aria-label={it.label}
                           aria-current={selected ? 'true' : undefined}
                           title={it.label}
-                          draggable={it.movable}
-                          onDragStart={(e) => {
-                            if (!it.movable) return
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            const offsetMin = Math.round((((e.clientY - rect.top) / height) * span) / SNAP_MIN) * SNAP_MIN
-                            grab.current = { id: it.id, offsetMin }
-                            e.dataTransfer.effectAllowed = 'move'
-                            e.dataTransfer.setData('text/plain', it.title)
-                          }}
-                          onDragEnd={() => {
-                            grab.current = null
-                            setOver(null)
-                          }}
-                          style={
-                            tinted
-                              ? { borderLeftColor: it.accent, backgroundColor: staffTint(it.accent!) }
-                              : undefined
-                          }
+                          {...dragHandlers}
                           className={cn(
                             'block h-full overflow-hidden rounded-tiny px-1.5 py-1 transition-[filter] duration-200 hover:brightness-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             KIND_CLASS[it.kind],
@@ -470,6 +546,10 @@ export function TimeGrid({
                             selected && 'ring-2 ring-navy-700 ring-offset-1 ring-offset-surface dark:ring-navy-200',
                             pending && moved[it.id] && 'opacity-70',
                           )}
+                          style={{
+                            ...(tinted ? { borderLeftColor: it.accent, backgroundColor: staffTint(it.accent!) } : {}),
+                            ...(touchMove && it.movable ? { touchAction: 'none' } : {}),
+                          }}
                         >
                           <span className="block truncate font-num text-[10px] leading-tight opacity-80">{it.time}</span>
                           {px >= 34 && <span className="block truncate text-[12px] font-semibold leading-tight">{it.title}</span>}
@@ -508,8 +588,8 @@ export function TimeGrid({
           })}
         </div>
         <p className="sr-only">
-          Termín přesunete v jeho detailu tlačítkem Přesunout, délku změníte tamtéž. Myší ho můžete přetáhnout a za spodní okraj natáhnout.
-          Na dotykové obrazovce můžete zapnout Vybrat dobu a tažením prstu zvolit její délku. Novou rezervaci založíte tlačítkem Nová rezervace.
+          Termín přesunete v jeho detailu tlačítkem Přesunout, délku změníte tamtéž. Myší nebo perem ho můžete přetáhnout a za spodní okraj natáhnout.
+          Na dotykové obrazovce zapněte Přesouvat termíny. Novou rezervaci založíte tlačítkem Nová rezervace.
         </p>
       </div>
 
@@ -529,6 +609,7 @@ export function TimeGrid({
             slug={slug}
             services={services}
             staff={staff}
+            canCreateGroupSessions={canCreateGroupSessions}
             today={today}
             start={quick.start}
             fullFormHref={fullFormHref}

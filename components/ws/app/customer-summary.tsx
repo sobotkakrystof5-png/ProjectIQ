@@ -34,7 +34,7 @@ export function CustomerSummary({
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="min-w-0 text-xl font-semibold tracking-[-0.02em]">{card.name}</h3>
+          <h3 data-ws-private-value className="min-w-0 text-xl font-semibold tracking-[-0.02em]">{card.name}</h3>
           {card.segment && (
             <span className="rounded-full bg-navy-50 px-2.5 py-1 font-num text-[11px] uppercase tracking-[0.08em] text-navy-700 dark:bg-navy-800 dark:text-navy-200">
               {SEGMENT_LABELS[card.segment]}

@@ -23,7 +23,7 @@ export function ConfirmedBlock({
       )}
     >
       <TimeRange start={start} end={end} className="text-xs" />
-      <p className="mt-1 text-[15px] font-semibold leading-snug">{customer}</p>
+      <p data-ws-private-value className="mt-1 text-[15px] font-semibold leading-snug">{customer}</p>
       {service && <p className="text-sm leading-snug text-navy-900/75 dark:text-navy-200">{service}</p>}
     </div>
   )

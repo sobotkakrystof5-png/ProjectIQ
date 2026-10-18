@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   ClipboardList,
+  CircleHelp,
   FileText,
   Inbox,
   Landmark,
@@ -21,6 +22,7 @@ const ICONS: Record<NavKey, LucideIcon> = {
   faktury: FileText,
   prijmy: Wallet,
   dane: Landmark,
+  navody: CircleHelp,
   nastaveni: Settings,
   penize: Wallet,
 }

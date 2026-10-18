@@ -28,6 +28,12 @@ export async function listInvoices(ctx:WsContext,business:Biz,all=false):Promise
  WHERE i.account_id=${ctx.accountId} AND (${all} OR i.business_id=${business.id}) ORDER BY i.issued_on DESC NULLS LAST,i.created_at DESC LIMIT 500`
  return rows.map(invoiceRow)
 }
+export async function getOverdueInvoiceCount(ctx:WsContext,business:Biz,today:string,all=false):Promise<number> {
+ const [row]=await wsDb(ctx)`SELECT count(*)::int AS count FROM ws.invoices
+ WHERE account_id=${ctx.accountId} AND (${all} OR business_id=${business.id})
+   AND direction='issued' AND status='issued' AND due_on<${today}::date`
+ return Number(row?.count??0)
+}
 export async function getInvoice(ctx:WsContext,business:Biz,id:string):Promise<Invoice|null> {
  const [r]=await wsDb(ctx)`SELECT i.id,i.business_id,b.slug AS business_slug,i.direction,i.number,i.customer_id,i.job_id,i.counterparty,i.issuer,i.issued_on::text,i.supplied_on::text,i.due_on::text,i.paid_on::text,i.amount,i.currency,i.items,i.status,i.note,i.pdf_data IS NOT NULL AS has_pdf
  FROM ws.invoices i JOIN ws.businesses b ON b.account_id=i.account_id AND b.id=i.business_id

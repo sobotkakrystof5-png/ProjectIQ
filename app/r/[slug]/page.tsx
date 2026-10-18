@@ -5,7 +5,7 @@ import { OrderFlow } from '@/components/ws/order/order-flow'
 import { Logo } from '@/components/ws/brand'
 import { accentVars } from '@/lib/ws/accent'
 import { businessBySlug } from '@/lib/ws/intake/http'
-import { loadIntakeConfig, loadOrderAvailability } from '@/lib/ws/intake/intake'
+import { getOpenSessions, loadIntakeConfig, loadOrderAvailability } from '@/lib/ws/intake/intake'
 import { orderSlots } from '@/lib/ws/intake/schema'
 import { webFields } from '@/lib/ws/fields'
 import { pragueToday } from '@/lib/ws/time'
@@ -49,9 +49,12 @@ export default async function OrderPage(props: { params: Promise<{ slug: string 
 
   // Jedna (nebo žádná) služba = volné časy hned; jinak až po výběru služby.
   let initialAvailability: OrderAvailability | null = null
+  const initialSessions = await getOpenSessions(biz.accountId, biz.businessId, config.services.length === 1 ? [config.services[0].id] : [])
   if (config.booking === 'slots' && config.services.length <= 1) {
     const availability = await loadOrderAvailability(biz.accountId, config, config.services[0]?.id ?? null)
-    initialAvailability = { slots: orderSlots(availability.slots), staff: availability.staff }
+    initialAvailability = { slots: orderSlots(availability.slots), staff: availability.staff, sessions: initialSessions }
+  } else if (initialSessions.length) {
+    initialAvailability = { slots: [], staff: [], sessions: initialSessions }
   }
 
   return (
@@ -90,6 +93,7 @@ export default async function OrderPage(props: { params: Promise<{ slug: string 
             help: f.help_text ?? null,
           }))}
           booking={config.booking}
+          hasSessions={initialSessions.length > 0}
           initialAvailability={initialAvailability}
           today={pragueToday()}
         />

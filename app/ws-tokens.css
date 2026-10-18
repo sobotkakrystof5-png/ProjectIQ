@@ -120,6 +120,22 @@
 [data-app="ws"][data-theme="dark"] :is(.hover\:text-navy-700, .hover\:text-navy-900):hover:not([class*="dark:hover:text-"]) { color: rgb(var(--navy-50)); }
 [data-app="ws"][data-theme="dark"] :is(.text-danger, .hover\:text-danger:hover):not([class*="dark:text-"]) { color: rgb(var(--danger-ink)); }
 
+/* RD11: lokální režim pro sdílení obrazovky. Cookie nastavuje pouze výchozí
+   pohled na zařízení; původní data se nemění ani nemažou. */
+[data-app="ws"][data-ws-private="on"] [data-ws-private-value] {
+  filter: blur(6px);
+  user-select: none;
+  transition: filter 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-app="ws"][data-ws-private="on"] [data-ws-private-value] { transition: none; }
+}
+
+.calendar-touch-select-control { display: none; }
+@media (any-pointer: coarse) {
+  .calendar-touch-select-control { display: flex; }
+}
+
 /* Zadokovaný detail (R-057): od 1280 px pravý panel nepřekrývá obsah. Stránka se
    vedle něj zúží a postranní pruh (Příchozí, karta zákazníka) se schová — jeho roli
    převezme detail. Pod 1280 px zůstává vysouvací panel přes obsah. */

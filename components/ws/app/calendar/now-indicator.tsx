@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { formatMinutes, pragueParts } from '@/lib/ws/time'
+import { nowLinePosition } from '@/lib/ws/calendar-indicator'
 
 type PragueNow = ReturnType<typeof pragueParts>
 
@@ -66,13 +67,8 @@ export function NowIndicator({
   showLabel: boolean
 }) {
   const now = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-  if (!now || now.date !== day) return null
-
-  const from = hours.from * 60
-  const to = hours.to * 60
-  if (now.minutes < from || now.minutes >= to || to <= from) return null
-
-  const top = ((now.minutes - from) / (to - from)) * 100
+  const top = nowLinePosition(now, day, hours)
+  if (top === null || !now) return null
   const time = formatMinutes(now.minutes)
 
   return (
