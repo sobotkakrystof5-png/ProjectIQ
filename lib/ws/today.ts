@@ -1,6 +1,6 @@
 import 'server-only'
-import { q, wsDb } from './db'
-import type { WsBusiness, WsContext } from './context'
+import { q, wsDb, type WsQuery, type WsRow as DbRow } from './db'
+import { seededModules, type WsBusiness, type WsContext } from './context'
 import { addDays, pragueToUtc } from './time'
 
 // Data obrazovky Dnes (S09). Každý dotaz filtruje account_id z kontextu
@@ -352,12 +352,9 @@ export async function getRequestDetail(
 
 export type NotificationItem = { id: string; title: string; body: string | null; link: string | null; created_at: Date; read: boolean }
 
-/** Upozornění v aplikaci (zvonek). Vznikají z událostí (S15), přečtená po otevření zvonku. */
-export async function getNotifications(
-  ctx: WsContext,
-  business: Pick<WsBusiness, 'id'>,
-): Promise<{ items: NotificationItem[]; unread: number }> {
-  const [items, unread] = await wsDb(ctx).batch([
+/** Dotazy na zvonek: posledních 8 upozornění a počet nepřečtených (pro jednu dávku s dalšími). */
+export function notificationQueries(ctx: WsContext, business: Pick<WsBusiness, 'id'>): [WsQuery, WsQuery] {
+  return [
     q`
       SELECT id, title, body, link, created_at, read_at IS NOT NULL AS read FROM ws.notifications
       WHERE account_id = ${ctx.accountId} AND (business_id = ${business.id} OR business_id IS NULL)
@@ -367,15 +364,29 @@ export async function getNotifications(
       SELECT count(*)::int AS n FROM ws.notifications
       WHERE account_id = ${ctx.accountId} AND (business_id = ${business.id} OR business_id IS NULL) AND read_at IS NULL
     `,
-  ])
+  ]
+}
+
+export function notificationsFrom([items, unread]: DbRow[][]): { items: NotificationItem[]; unread: number } {
   return {
     items: items as unknown as NotificationItem[],
     unread: Number((unread as Row[])[0]?.n ?? 0),
   }
 }
 
+/** Upozornění v aplikaci (zvonek). Vznikají z událostí (S15), přečtená po otevření zvonku. */
+export async function getNotifications(
+  ctx: WsContext,
+  business: Pick<WsBusiness, 'id'>,
+): Promise<{ items: NotificationItem[]; unread: number }> {
+  return notificationsFrom(await wsDb(ctx).batch(notificationQueries(ctx, business)))
+}
+
 /** Zapnuté funkce byznysu. */
 export async function getEnabledModules(ctx: WsContext, business: Pick<WsBusiness, 'id'>): Promise<Set<string>> {
+  // Layout je načetl s kontextem (lib/ws/scope.ts) — stránka se podruhé neptá.
+  const seeded = seededModules(ctx.accountId, business.id)
+  if (seeded) return seeded
   const rows = await wsDb(ctx)<{ module: string }>`
     SELECT module FROM ws.business_modules
     WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND enabled

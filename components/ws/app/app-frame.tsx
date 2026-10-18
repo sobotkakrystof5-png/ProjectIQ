@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, use, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, Search } from 'lucide-react'
@@ -8,6 +8,7 @@ import { useCommandShortcut } from '@/components/ui/command'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Logo } from '@/components/ws/brand'
 import { rememberBusinessAction } from '@/app/w/[business]/actions'
+import { EMPTY_CHROME, type FrameChrome } from '@/lib/ws/frame-chrome'
 import { newActions } from '@/lib/ws/features'
 import {
   accountLinks,
@@ -25,7 +26,7 @@ import { LiveRefresh } from './booking/live-refresh'
 import { CommandPalette } from './command-palette'
 import { NavIcon } from './nav-icon'
 import { NewMenu } from './new-menu'
-import { NotificationsBell, type BellItem, type BellNews } from './notifications-bell'
+import { NotificationsBell } from './notifications-bell'
 
 export type FrameBusiness = { name: string; slug: string }
 
@@ -35,9 +36,9 @@ export type AppFrameProps = {
   enabledModules: string[]
   isOwner: boolean
   orderUrl: string
-  services: string[]
   today: string
-  notifications: { items: BellItem[]; unread: number; news: BellNews[]; newsUnseen: boolean }
+  /** Zvonek a názvy služeb pro ⌘K přijdou, až budou — kostra a stránka na ně nečekají. Nikdy nevyhodí chybu. */
+  chrome: Promise<FrameChrome>
   /** Slug z cookie — když se liší od otevřeného byznysu, uloží se nový. */
   rememberedSlug: string | null
   children: React.ReactNode
@@ -52,11 +53,20 @@ const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible
  * Hlavní menu má nejvýš šest položek; Nastavení a předplatné jsou v Účtu (RD01).
  */
 export function AppFrame(props: AppFrameProps) {
-  const { business, businesses, isOwner, orderUrl, notifications, rememberedSlug, children } = props
+  const { business, businesses, isOwner, orderUrl, chrome, rememberedSlug, children } = props
   const pathname = usePathname()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [services, setServices] = useState<string[]>([])
   useCommandShortcut(setPaletteOpen)
+
+  useEffect(() => {
+    let current = true
+    void chrome.then((c) => current && setServices(c.services))
+    return () => {
+      current = false
+    }
+  }, [chrome])
 
   const enabled = useMemo(() => new Set(props.enabledModules), [props.enabledModules])
   const nav = useMemo(() => navItems(enabled), [enabled])
@@ -157,7 +167,9 @@ export function AppFrame(props: AppFrameProps) {
             >
               <Search aria-hidden size={20} strokeWidth={1.5} />
             </button>
-            <NotificationsBell slug={business.slug} items={notifications.items} unread={notifications.unread} news={notifications.news} newsUnseen={notifications.newsUnseen} />
+            <Suspense fallback={<NotificationsBell slug={business.slug} {...EMPTY_CHROME.bell} />}>
+              <FrameBell slug={business.slug} chrome={chrome} />
+            </Suspense>
             <div className="hidden md:block">
               <NewMenu variant="header" actions={actions} orderUrl={orderUrl} onSearch={openSearch} />
             </div>
@@ -260,11 +272,16 @@ export function AppFrame(props: AppFrameProps) {
         accountLinks={account}
         actions={actions}
         orderUrl={orderUrl}
-        services={props.services}
+        services={services}
         today={props.today}
       />
     </div>
   )
+}
+
+function FrameBell({ slug, chrome }: { slug: string; chrome: Promise<FrameChrome> }) {
+  const { bell } = use(chrome)
+  return <NotificationsBell slug={slug} items={bell.items} unread={bell.unread} news={bell.news} newsUnseen={bell.newsUnseen} />
 }
 
 function sideItemClass(active: boolean) {

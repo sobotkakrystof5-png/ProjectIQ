@@ -139,3 +139,10 @@ Zvažované alternativy: ponechat admin v Report-Only (nechrání před skripty)
 Přijaté riziko: statická 404 může být zobrazena bez klientské hydratace. Při přidání vlastní chybové stránky ověřit nonce a vynucenou CSP.
 Revize: po ručním průchodu adminu a Workspace v Chrome i Safari na Vercel Preview.
 
+## 016 — Kontext obrazovky jednou SECURITY DEFINER funkcí
+Datum: 2026-10-18
+Rozhodnutí: Migrace 085 přidává `ws.business_scope(org_id text, business_slug text)` (SQL, `STABLE SECURITY DEFINER`, `search_path = pg_catalog, pg_temp`, `REVOKE` od `PUBLIC`, `EXECUTE` jen `ws_app`). Pro Clerk organizaci z přihlášení vrátí jednorázově účet, byznys podle slugu (jen nearchivovaný), byznysy účtu pro přepínač, zapnuté funkce a řádky předplatného. Neznámá organizace → žádný řádek, cizí slug → `business` je null (aplikace dá 404). Výsledek `lib/ws/scope.ts` uloží do paměti jednoho požadavku (`React.cache`), takže layout i stránka na další dotazy kvůli účtu a byznysu nesahají. Chybí-li funkce v DB (kód `42883`), vrací se starý postup po částech.
+Důvod: navigace dělala za sebou tři dotazy do Neonu ještě před daty stránky (R-058, RD02). Stejný vzor jako `ws.account_by_clerk_org` (#008), jen vrací víc polí téhož účtu.
+Zvažované alternativy: víc oddělených `SECURITY DEFINER` funkcí (víc kol), cache dat účtu napříč požadavky (riziko úniku mezi účty, odmítnuto), vypnutí RLS pro čtení (nepřijatelné).
+Přijaté riziko: funkce vrací víc než jen `id` (název, barvu, nastavení byznysu a stav předplatného) komukoli, kdo zná Clerk ID organizace a smí volat jako `ws_app`. Clerk ID organizace přichází jen z ověřeného přihlášení, `ws_app` jiný vstup než aplikace nemá; bezpečnostní hranice se tím nemění. Sloupce jsou vyjmenované (žádné `SELECT *`), takže přidaný sloupec v `businesses` se sám neprozradí.
+Revize: S19 (audit před spuštěním).

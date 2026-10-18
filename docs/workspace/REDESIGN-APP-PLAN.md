@@ -147,7 +147,7 @@ Pořadí je doporučené. Po RD04 jsou RD05–RD06, RD10–RD13 na sobě nezávi
 |---|---|---|---|---|---|
 | RD00 | Příprava, větev, testovací DB, měření, R-058 | S | — | D-7, D-8, všechna ke schválení | rozpracováno 2026-10-18: rozhodnutí a R-058 hotové, větev a commity hotové; zbývá Neon branch, měření a průchod s přihlášením |
 | RD01 | Menu a Účet: Nastavení do Účtu, Peníze sloučeno | S–M | — | D-9 (rozhodnuto) | hotovo 2026-10-18 (kód, testy, náhled na 4 šířkách světle i tmavě; s přihlášením neověřeno) |
-| RD02 | Rychlost I: region, kola do DB, streaming | M | — | D-6 | nezačato |
+| RD02 | Rychlost I: region, kola do DB, streaming | M | 085 | D-6 | hotovo v kódu 2026-10-18 (region `fra1` v `vercel.json`, kontext jedním dotazem, doplňky kostry streamem, `loading.tsx`, Suspense; **migrace 085 neaplikována, nenasazeno, čas před/po neměřen** — viz oddíl 9) |
 | RD03 | Rychlost II: dotazy, indexy, klient, bundle | M | možná indexy | — | nezačato |
 | RD04 | Dnes + hlavička + společné komponenty | M | — | D-3 | nezačato |
 | RD05 | Kalendář | M–L | — | — | nezačato |
@@ -191,3 +191,16 @@ Stav se po každém sezení přepíše tady (`hotovo YYYY-MM-DD`, co zbylo) a v 
 ## 8. Zápis do paměti
 
 Po odsouhlasení plánu (RD00): R-058 (rozsah a pořadí) v `memory/memory.md`. Po každém sezení: changelog + stav v sekci 5.
+
+## 9. Naměřeno
+
+Měření času po kliknutí (RD00, krok 5) zatím neproběhlo: chybí testovací Neon branch a přihlášení v Chromu, a produkční Neon se k měření nepoužívá. Čísla času proto **nejsou**. Co je ověřené:
+
+| Co | Před RD02 | Po RD02 | Jak zjištěno |
+|---|---|---|---|
+| Region funkcí na Vercelu | `iad1` (USA) u posledního nasazení, DB ve Frankfurtu (`eu-central-1`) | `fra1` v `vercel.json`, **projeví se až po deployi** | Vercel MCP `get_deployment` (poslední Preview) + host v `DATABASE_URL_WS` (jen region) |
+| Dotazy do DB, než stránka začne číst svá data (po sobě) | 3 kola: účet → byznys ∥ předplatné → funkce, byznysy, zvonek, služby, novinky (8 požadavků celkem) | 1 kolo (`ws.business_scope`); doplňky kostry (1 požadavek) běží zároveň se stránkou | z kódu; po RD02 čítačem v testu `ws-request-scope.test.ts` (stejný test ověřuje 2 požadavky za kostru: kontext + doplňky) |
+| Co blokuje první vykreslení kostry | všechny 3 kola | jen kontext (1 kolo) | z kódu, streamování ověřeno na dočasné stránce: první bajt 60 ms s hotovou kostrou, zvonek dorazí v témže HTML po uměle zpožděném promise (1,5 s) |
+| Clerk `auth()` | neměřeno | neměřeno | — |
+
+Zbývá změřit s přihlášením na testovací větvi: čas do kostry a do obsahu pro Dnes, Kalendář, Zákazníci, Peníze, před (větev `ws/redesign-app` bez commitu RD02) a po. Dokud nejsou čísla, tvrzení „rychlejší“ platí jen o počtu kol, ne o milisekundách.

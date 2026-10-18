@@ -39,10 +39,46 @@ export { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH }
 type Cache = <F extends (...args: never[]) => unknown>(fn: F) => F
 const cache: Cache = (React as unknown as { cache?: Cache }).cache ?? ((fn) => fn)
 
-export const requireWorkspace = cache(async function requireWorkspace(): Promise<WsContext> {
+/** Přihlášený člověk s aktivní organizací; jinak přesměruje na přihlášení nebo průvodce. */
+export async function requireIdentity(): Promise<WsIdentity & { orgId: string }> {
   const identity = await authProvider()
   if (!identity) redirect(WS_SIGN_IN_PATH)
   if (!identity.orgId) redirect(WS_ONBOARDING_PATH)
+  return { ...identity, orgId: identity.orgId }
+}
+
+export const roleOf = (orgRole: string | null): WsRole => (orgRole === 'org:admin' ? 'owner' : 'staff')
+
+// Co o účtu a byznysu už víme z jednoho dotazu na začátku požadavku
+// (`loadBusinessScope` v scope.ts, RD02). Stejný React.cache jako výše, takže
+// platí jen pro jeden požadavek a jednoho člověka; mimo render (server action,
+// route handler, Vitest) je to pokaždé prázdné a vše se čte z DB jako dřív.
+type RequestScope = {
+  workspace: WsContext | null
+  businesses: Map<string, WsBusiness>
+  modules: Map<string, ReadonlySet<string>>
+}
+const requestScope = cache((): RequestScope => ({ workspace: null, businesses: new Map(), modules: new Map() }))
+
+/** Uloží výsledek `ws.business_scope()` pro zbytek požadavku. Volá jen `loadBusinessScope`. */
+export function seedRequestScope(ctx: WsContext, business: WsBusiness, modules: ReadonlySet<string>): void {
+  const scope = requestScope()
+  scope.workspace ??= ctx
+  scope.businesses.set(`${ctx.accountId}:${business.slug}`, business)
+  scope.modules.set(`${ctx.accountId}:${business.id}`, modules)
+}
+
+/** Zapnuté funkce, které už tento požadavek načetl; jinak `null` a čte se z DB. */
+export function seededModules(accountId: string, businessId: string): Set<string> | null {
+  const modules = requestScope().modules.get(`${accountId}:${businessId}`)
+  return modules ? new Set(modules) : null
+}
+
+export const requireWorkspace = cache(async function requireWorkspace(): Promise<WsContext> {
+  const seeded = requestScope().workspace
+  if (seeded) return seeded
+
+  const identity = await requireIdentity()
 
   // Účet ještě neznáme, proto SECURITY DEFINER funkce místo SELECT pod RLS.
   const [row] = await wsSystem<{ id: string | null }>`SELECT ws.account_by_clerk_org(${identity.orgId}) AS id`
@@ -51,7 +87,7 @@ export const requireWorkspace = cache(async function requireWorkspace(): Promise
   return {
     userId: identity.userId,
     accountId: row.id,
-    role: identity.orgRole === 'org:admin' ? 'owner' : 'staff',
+    role: roleOf(identity.orgRole),
   }
 })
 
@@ -69,10 +105,13 @@ export type WsBusiness = {
 }
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
+export const isBusinessSlug = (slug: string): boolean => SLUG_RE.test(slug) && slug.length <= 60
 
 /** Byznys z URL ověřený proti účtu. Cizí nebo neexistující slug = 404, nikdy 403. */
 export const requireBusiness = cache(async function requireBusiness(ctx: WsContext, slug: string): Promise<WsBusiness> {
-  if (!SLUG_RE.test(slug) || slug.length > 60) notFound()
+  if (!isBusinessSlug(slug)) notFound()
+  const seeded = requestScope().businesses.get(`${ctx.accountId}:${slug}`)
+  if (seeded) return seeded
   const db = wsDb(ctx)
   const [business] = await db<WsBusiness>`
     SELECT id, account_id, name, slug, industry, color, logo_url, timezone, settings, archived_at

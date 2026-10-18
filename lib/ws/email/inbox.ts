@@ -1,5 +1,5 @@
 import 'server-only'
-import { q, wsDb, type WsRow } from '../db'
+import { q, wsDb, type WsQuery, type WsRow } from '../db'
 import type { WsBusiness, WsContext } from '../context'
 import { isNewsTag, type NewsTag } from '../news-format'
 import { newsImagePath } from './news-email'
@@ -18,14 +18,17 @@ export type NewsItem = {
   publishedAt: Date
 }
 
-/** Posledních pár novinek a jestli je člen už viděl. */
-export async function getNews(ctx: WsContext): Promise<{ items: NewsItem[]; unseen: boolean }> {
-  const [news, me] = await wsDb(ctx).batch([
+/** Dotazy na novinky a čas, kdy je člen naposledy viděl (pro jednu dávku s dalšími). */
+export function newsQueries(ctx: WsContext): [WsQuery, WsQuery] {
+  return [
     q`SELECT id, title, body, link_url, tag, image_type IS NOT NULL AS has_image, published_at FROM ws.product_news
       WHERE published_at IS NOT NULL AND published_at <= now() AND published_at > now() - interval '120 days'
       ORDER BY published_at DESC LIMIT 3`,
     q`SELECT news_seen_at FROM ws.members WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`,
-  ])
+  ]
+}
+
+export function newsFrom([news, me]: WsRow[][]): { items: NewsItem[]; unseen: boolean } {
   const items = news.map((n: WsRow) => ({
     id: String(n.id),
     title: String(n.title),
@@ -37,6 +40,11 @@ export async function getNews(ctx: WsContext): Promise<{ items: NewsItem[]; unse
   }))
   const seen = me[0]?.news_seen_at ? new Date(me[0].news_seen_at as string) : null
   return { items, unseen: items.some((i) => !seen || i.publishedAt > seen) }
+}
+
+/** Posledních pár novinek a jestli je člen už viděl. */
+export async function getNews(ctx: WsContext): Promise<{ items: NewsItem[]; unseen: boolean }> {
+  return newsFrom(await wsDb(ctx).batch(newsQueries(ctx)))
 }
 
 /** Otevřený zvonek: upozornění byznysu přečtená, novinky viděné. */

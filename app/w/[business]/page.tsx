@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
+import { Skeleton } from '@/components/ui/skeleton'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
 import { CustomerSummary } from '@/components/ws/app/customer-summary'
 import { IncomingList } from '@/components/ws/app/today/incoming-list'
@@ -89,9 +91,6 @@ export default async function TodayPage(props: {
   }
 
   const customerId = selected ?? data.suggestedCustomerId
-  const card = customerId
-    ? await getCustomerCard(ctx, business, customerId, now)
-    : null
 
   const todayVisits = data.calendar.filter(
     (e) => e.kind === 'visit' && pragueParts(e.start).date === today,
@@ -174,18 +173,16 @@ export default async function TodayPage(props: {
                 <SectionLabel>Zákazník</SectionLabel>
               </h2>
               <div className="rounded-panel border bg-surface p-5">
-                {card ? (
-                  <CustomerSummary
-                    card={card}
+                <Suspense fallback={<Skeleton className="h-[260px]" />}>
+                  <CustomerCard
+                    ctx={ctx}
+                    business={business}
+                    customerId={customerId}
+                    now={now}
                     today={today}
-                    businessName={business.name}
-                    detailHref={link({ detail: `zakaznik:${card.id}` })}
+                    detailHref={(id) => link({ detail: `zakaznik:${id}` })}
                   />
-                ) : (
-                  <p className="text-[15px] text-quiet">
-                    Klikněte na termín v kalendáři a uvidíte tu kartu zákazníka.
-                  </p>
-                )}
+                </Suspense>
               </div>
             </section>
           }
@@ -194,6 +191,40 @@ export default async function TodayPage(props: {
         {detail}
       </div>
     </PullToRefresh>
+  )
+}
+
+/** Karta zákazníka se dočítá sama, týdenní kalendář na ni nečeká (RD02). */
+async function CustomerCard({
+  ctx,
+  business,
+  customerId,
+  now,
+  today,
+  detailHref,
+}: {
+  ctx: Awaited<ReturnType<typeof requireWorkspace>>
+  business: Awaited<ReturnType<typeof requireBusiness>>
+  customerId: string | null
+  now: Date
+  today: string
+  detailHref: (id: string) => string
+}) {
+  const card = customerId ? await getCustomerCard(ctx, business, customerId, now) : null
+  if (!card) {
+    return (
+      <p className="text-[15px] text-quiet">
+        Klikněte na termín v kalendáři a uvidíte tu kartu zákazníka.
+      </p>
+    )
+  }
+  return (
+    <CustomerSummary
+      card={card}
+      today={today}
+      businessName={business.name}
+      detailHref={detailHref(card.id)}
+    />
   )
 }
 

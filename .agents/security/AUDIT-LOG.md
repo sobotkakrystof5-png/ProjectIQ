@@ -240,3 +240,13 @@ Spouštěč: `web-security-review` před lokálním commitem redesignu.
 Rozsah: `components/marketing/{hero,live-demo,features,how-it-works}.tsx`, `components/ws/app/today/{today-board,week-calendar}.tsx`, `app/w/[business]/{page,loading}.tsx`, lokální CSS landing page.
 Výsledek: 0 nálezů. Ukázka používá pouze statická fiktivní data a místní stav Reactu; nepřijímá vstup z URL, nevolá API, neodesílá e-maily. Žádné nové HTML sinky, externí skripty, balíčky, env, autentizační či DB operace. Dnes předává stejná serverová data a odkazy do stávajících komponent; account_id ani mutace se nemění. CSP beze změny.
 Ověření: 475 testů + 1 přeskočený, typová kontrola; Chrome nad upravenými komponentami s fiktivními daty. Kompletní produkční build blokují podmínky worktree a DNS Google Fonts. Přihlášení ani externí služby nebyly použity.
+
+## 2026-10-18 — review RD02 (rychlost: kontext jedním dotazem, streamování kostry)
+Spouštěč: `web-security-review` před commitem (nová DB funkce).
+Rozsah: `migrations/085_ws_kontext_jednim_dotazem.sql`, `lib/ws/{scope,context,chrome,frame-chrome}.ts`, `app/w/[business]/layout.tsx`, `components/ws/app/{app-frame,detail-slot,skeletons}.tsx`, `vercel.json` (region `fra1`).
+Výsledek:
+- `ws.business_scope`: parametrizovaný dotaz (`${org}`, `${slug}` jdou jako parametry, slug navíc ověřený regulárním výrazem a délkou před voláním), pevný `search_path`, `REVOKE PUBLIC`, `EXECUTE` jen `ws_app`, vyjmenované sloupce. Testy `ws-request-scope.test.ts` (17): cizí slug i organizace nic nevrátí, nesmyslný slug neškodí, archivovaný byznys nevrátí nic, odpověď neobsahuje ID účtu B.
+- Paměť požadavku (`React.cache`) je klíčovaná `accountId:slug`, takže seed jednoho účtu nepustí byznys jiného účtu (test). Mimo render (server action, route handler) se nepoužívá.
+- Streamování: promise s doplňky (zvonek, služby) vzniká na serveru v layoutu s kontextem přihlášeného, nese jen jeho data; chyba se loguje a vrací prázdné hodnoty (nic nepadá, nic se neukáže cizímu). Žádné nové `dangerouslySetInnerHTML`, balíčky, env ani skripty třetích stran. CSP beze změny; ověřeno v Chromu bez chyb v konzoli (kromě varování Clerku o vývojových klíčích).
+- `vercel.json` `regions: ["fra1"]` jen přesouvá běh funkcí blíž Neonu; projeví se po deployi.
+Nálezy: 0 k opravě. Zůstává: migrace 085 není na Neonu (do té doby běží záložní postup), obrazovky s přihlášením neověřeny.

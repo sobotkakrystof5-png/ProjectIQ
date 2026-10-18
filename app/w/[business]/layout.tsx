@@ -2,17 +2,20 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { AppFrame } from '@/components/ws/app/app-frame'
 import { BillingBanner } from '@/components/ws/billing/billing-banner'
-import { getBillingState } from '@/lib/ws/billing'
-import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
+import { hasRole } from '@/lib/ws/context'
+import { getFrameChrome } from '@/lib/ws/chrome'
 import { LAST_BUSINESS_COOKIE, WS_ONBOARDING_PATH } from '@/lib/ws/paths'
 import { orderPageUrl } from '@/lib/ws/app-origin'
-import { formatDayShort, formatMinutes, pragueParts } from '@/lib/ws/time'
-import { getBusinesses, getEnabledModules, getNotifications } from '@/lib/ws/today'
-import { wsDb } from '@/lib/ws/db'
-import { getNews } from '@/lib/ws/email/inbox'
+import { loadBusinessScope } from '@/lib/ws/scope'
+import { pragueParts } from '@/lib/ws/time'
 
 // Kostra aplikace pro jeden byznys (S09): postranní panel, hlavička,
 // spodní lišta, ⌘K. Byznys z URL se ověří proti účtu — cizí slug = 404.
+//
+// RD02: účet, byznys, předplatné, funkce a byznysy přijdou jedním dotazem
+// (loadBusinessScope). Zvonek, novinky a služby pro ⌘K se do DB ptají zároveň
+// se stránkou a do hotové kostry se doplní (Promise v `chrome`), takže stránka
+// na ně nečeká.
 
 export default async function BusinessLayout(
   props: {
@@ -26,24 +29,12 @@ export default async function BusinessLayout(
     children
   } = props
 
-  const ctx = await requireWorkspace()
-  const [business, billing] = await Promise.all([requireBusiness(ctx, params.business), getBillingState(ctx.accountId)])
+  const { ctx, business, billing, modules, businesses } = await loadBusinessScope(params.business)
   // Účet, který nikdy neprošel Checkoutem, dokončí průvodce (S08, krok 2).
   if (billing.access === 'none') redirect(WS_ONBOARDING_PATH)
 
-  const [businesses, modules, notifications, services, news] = await Promise.all([
-    getBusinesses(ctx),
-    getEnabledModules(ctx, business),
-    getNotifications(ctx, business),
-    wsDb(ctx)<{ name: string }>`
-      SELECT name FROM ws.services
-      WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND active
-      ORDER BY position, name
-    `,
-    getNews(ctx).catch(() => ({ items: [], unseen: false })),
-  ])
   const isOwner = hasRole(ctx, 'owner')
-  const now = new Date()
+  const chrome = getFrameChrome(ctx, business)
 
   return (
     <AppFrame
@@ -52,24 +43,8 @@ export default async function BusinessLayout(
       enabledModules={Array.from(modules)}
       isOwner={isOwner}
       orderUrl={await orderPageUrl(business.slug)}
-      services={services.map((s) => s.name)}
-      today={pragueParts(now).date}
-      notifications={{
-        unread: notifications.unread,
-        items: notifications.items.map((n) => {
-          const at = pragueParts(n.created_at)
-          return {
-            id: n.id,
-            title: n.title,
-            body: n.body,
-            link: n.link,
-            read: n.read,
-            at: `${formatDayShort(at.date)} ${formatMinutes(at.minutes)}`,
-          }
-        }),
-        news: news.items.map((n) => ({ id: n.id, title: n.title, body: n.body, link: n.link, tag: n.tag, image: n.image, at: formatDayShort(pragueParts(n.publishedAt).date) })),
-        newsUnseen: news.unseen,
-      }}
+      today={pragueParts(new Date()).date}
+      chrome={chrome}
       rememberedSlug={(await cookies()).get(LAST_BUSINESS_COOKIE)?.value ?? null}
     >
       {(billing.access === 'grace' || billing.access === 'read_only') && (

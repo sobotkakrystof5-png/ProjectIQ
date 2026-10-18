@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, CircleCheck } from 'lucide-react'
 import type { WsBusiness, WsContext } from '@/lib/ws/context'
@@ -58,23 +59,36 @@ function isAvailable(ref: DetailRef, modules: Set<string>): boolean {
   return true
 }
 
-/**
- * Pravý panel podle `?detail=` na kterékoli obrazovce byznysu. Data se čtou
- * na serveru přes kontext účtu; cizí nebo smazaný záznam = „není tu".
- */
-export async function DetailSlot({
-  ctx,
-  business,
-  pathname,
-  searchParams,
-  today,
-}: {
+type DetailSlotProps = {
   ctx: WsContext
   business: WsBusiness
   pathname: string
   searchParams: Params
   today: string
-}) {
+}
+
+/**
+ * Pravý panel podle `?detail=` na kterékoli obrazovce byznysu. Data se čtou
+ * na serveru přes kontext účtu; cizí nebo smazaný záznam = „není tu".
+ * Vlastní `Suspense` (RD02): panel se dočítá sám a stránka pod ním na něj
+ * nikdy nečeká. Dokud nepřijde, nic se neukazuje — hotový panel se tak
+ * neotevírá dvakrát.
+ */
+export function DetailSlot(props: DetailSlotProps) {
+  return (
+    <Suspense fallback={null}>
+      <DetailContent {...props} />
+    </Suspense>
+  )
+}
+
+async function DetailContent({
+  ctx,
+  business,
+  pathname,
+  searchParams,
+  today,
+}: DetailSlotProps) {
   const ref = parseDetail(searchParams.detail)
   if (!ref) return null
   const modules = await getEnabledModules(ctx, business)

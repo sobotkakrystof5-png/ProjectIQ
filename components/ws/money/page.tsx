@@ -1,9 +1,11 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AccentHeading } from '@/components/ws/brand'
 import { DetailSheet } from '@/components/ws/app/detail-sheet'
 import { buttonVariants } from '@/components/ui/button'
 import { DetailSlot } from '@/components/ws/app/detail-slot'
+import { MetricsSkeleton,TaxSkeleton } from '@/components/ws/app/skeletons'
 import { requireBusiness,requireWorkspace } from '@/lib/ws/context'
 import { getEnabledModules } from '@/lib/ws/today'
 import { hrefWith } from '@/lib/ws/detail-param'
@@ -67,15 +69,15 @@ export async function MoneyPage({slug,section,searchParams}:{slug:string;section
  <span className="min-w-0 flex-1"><span className="font-num text-sm">{i.number||'Bez čísla'}</span><span className="block truncate text-sm text-quiet">{i.counterparty.name} · {i.direction==='received'?'Přijatá':'Vystavená'}{all&&b?' · '+b.name:''}</span></span>
  <span className="font-num text-sm">{formatMoney(i.amount,{currency:i.currency})}</span><span className={'rounded-full px-3 py-2 text-xs '+(overdue?'bg-danger/10 text-danger':'bg-navy-50 text-quiet dark:bg-navy-800')}>{i.paidOn?'Zaplacená':i.status==='cancelled'?'Stornovaná':overdue?'Po splatnosti':'Čeká na platbu'}</span>
  </Link></li>})}</ul>}{invoices.length===500&&<p className="mt-4 text-sm text-quiet">Zobrazeno posledních 500 faktur. Starší najdete hledáním podle čísla.</p>}</div>
- </>:section==='dane'?await TaxPanel({ctx,business,year,today,settings:tax}):<>
+ </>:section==='dane'?<Suspense fallback={<TaxSkeleton/>}><TaxPanel ctx={ctx} business={business} year={year} today={today} settings={tax}/></Suspense>:<>
  <Totals entries={current}/>
  {section==='penize'&&<><section className={panel}><h2 className="text-lg font-semibold">Oproti minulému měsíci</h2>{Object.entries(currencyTotals(current)).map(([currency,v])=>{const p=currencyTotals(previous)[currency]?.income??0;return <p key={currency} className="mt-2 font-num">{currency}: {formatMoney(v.income-p,{currency:currency as 'CZK'|'EUR'})}{p>0?' ('+Math.round((v.income-p)/p*100)+' %)':''}</p>})}</section>
- {await MonthMetrics({ctx,business,from,end,all})}</>}
+ <Suspense fallback={<MetricsSkeleton/>}><MonthMetrics ctx={ctx} business={business} from={from} end={end} all={all}/></Suspense></>}
  <section className={panel}><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">Příjmy a výdaje</h2><div className="flex gap-2">{[6,12].map(n=><Link key={n} href={link({obdobi:String(n)})} className={buttonVariants({variant:count===n?'outline':'ghost'})}>{n} měsíců</Link>)}</div></div><MoneyChart rows={monthSeries(entries,month,count)}/></section>
  <div className="grid gap-4 lg:grid-cols-3">{(['segment','service','source'] as const).map(key=><section key={key} className={panel}><h2 className="mb-3 text-lg font-semibold">{{segment:'Podle skupin',service:'Podle služeb',source:'Podle zdroje'}[key]}</h2>
  {group(current,key).length===0?<p className="text-sm text-quiet">Zatím bez příjmů.</p>:group(current,key).map(g=><div key={g.name} className="border-t py-3 text-sm"><p>{key==='source'?SOURCE[g.name]??g.name:key==='segment'?SEGMENT[g.name]??g.name:g.name}</p>{Object.entries(g.totals).map(([c,v])=><p key={c} className="font-num">{formatMoney(v.income,{currency:c as 'CZK'|'EUR'})}</p>)}</div>)}</section>)}</div>
  <section className={panel}><h2 className="mb-3 text-lg font-semibold">Platby za měsíc</h2>{current.length===0?<p className="text-quiet">Zapište první platbu. Faktura se tu objeví až po zaplacení.</p>:<ul className="divide-y">{current.map(t=><li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-3"><div><p className="text-sm">{t.description||t.category}</p><p className="font-num text-xs text-quiet">{formatDayShort(t.day)} · {t.kind==='income'?'Příjem':'Výdaj'} · {t.category}</p></div><span className="font-num text-sm">{t.kind==='expense'?'−':''}{formatMoney(t.amount,{currency:t.currency})}</span></li>)}</ul>}</section>
- {section==='penize'&&modules.has('taxes')&&await TaxPanel({ctx,business,year,today,settings:tax})}
+ {section==='penize'&&modules.has('taxes')&&<Suspense fallback={<TaxSkeleton/>}><TaxPanel ctx={ctx} business={business} year={year} today={today} settings={tax}/></Suspense>}
  </>}
  {invoice&&<DetailSheet title={'Faktura '+invoice.number} closeHref={closeHref}><p className="mb-2 text-quiet">{invoice.counterparty.name}</p><p className="mb-6 font-num text-2xl">{formatMoney(invoice.amount,{currency:invoice.currency})}</p><InvoicePayment slug={slug} invoice={invoice} today={today}/></DetailSheet>}
  {id&&!invoice&&<DetailSheet title="Faktura tu není" closeHref={closeHref}><p className="text-quiet">Zkontrolujte vybraný byznys a číslo faktury.</p></DetailSheet>}
