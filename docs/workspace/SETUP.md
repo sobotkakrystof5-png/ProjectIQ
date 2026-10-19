@@ -159,7 +159,7 @@ Před spuštěním (S19) totéž v live módu: produkt a cena, omezený klíč, 
 
 ## Peníze (S14): migrace 080
 
-Po 078/079 ručně aplikovat migrations/080_ws_penize_provoz.sql v Neon SQL editoru rolí vlastníka. Přidává sloupce, unikátní platbu za fakturu a SECURITY INVOKER funkce; EXECUTE pro ws_app uděluje sama. Nevkládá ukázková data. Při starších duplicitních platbách index bezpečně selže a data se nemažou. Na skutečnou DB v S14 neaplikovaná.
+Po 078/079 aplikována `migrations/080_ws_penize_provoz.sql` na produkčním Neonu 2026-10-19. Přidává sloupce, unikátní platbu za fakturu a SECURITY INVOKER funkce; EXECUTE pro ws_app uděluje sama. Nevkládá ukázková data. Při starších duplicitních platbách index bezpečně selže a data se nemažou.
 
 Postup a odhad daní: [MONEY.md](MONEY.md). Pro lokální PDF je potřeba Chrome/CHROME_PATH, pro Vercel kompletní @sparticuz/chromium včetně bin/chromium.br. Nová env není potřeba; AI používá existující serverový ANTHROPIC_API_KEY. Fakturu e-mailem s PDF posílá od S15 fronta (níže).
 
@@ -205,7 +205,7 @@ Po 083 aplikovat `migrations/084_ws_gdpr.sql` rolí vlastníka a znovu `scripts/
 
 ## Fakturace (RD10): migrace 088
 
-Po 087, při již aplikované základní migraci peněz 080, aplikovat `migrations/088_ws_faktury_profil_a_zpet.sql` rolí vlastníka. Přidá profil dodavatele k účtu a původ platby k faktuře, nahradí `ws.money_pay` a přidá `ws.money_unpay`. Funkce jsou `SECURITY INVOKER`; migrace jim odebere `PUBLIC` a při existující roli `ws_app` přidá `EXECUTE`. Po založení role nebo při opakovaném nastavení práv spusťte `node scripts/ws-create-role.js` (znovu použije `scripts/ws-grants.sql`). Data nemaže. **Připravená, na Neonu dosud neaplikovaná.**
+Po 087, při již aplikované základní migraci peněz 080, byla `migrations/088_ws_faktury_profil_a_zpet.sql` aplikována na produkčním Neonu 2026-10-19. Přidá profil dodavatele k účtu a původ platby k faktuře, nahradí `ws.money_pay` a přidá `ws.money_unpay`. Funkce jsou `SECURITY INVOKER`; migrace jim odebere `PUBLIC` a při existující roli `ws_app` přidá `EXECUTE`. Po založení role nebo při opakovaném nastavení práv spusťte `node scripts/ws-create-role.js` (znovu použije `scripts/ws-grants.sql`). Data nemaže.
 
-RD16 přidává migraci 089 (rozšíření povolených typů zákaznických šablon), RD08 migraci 090 (více služeb v jedné rezervaci) a RD09 migraci 091 (kapacita skupinových lekcí). Migrace 089–091 jsou připravené, na Neonu neaplikované; Kryštof 2026-10-18 potvrdil, že také 080, 087 a 088 zatím nejsou nasazené. Migrace nespouštějte mimo dohodnuté pořadí ani bez výslovného zadání.
+RD16 přidává migraci 089 (rozšíření povolených typů zákaznických šablon), RD08 migraci 090 (více služeb v jedné rezervaci) a RD09 migraci 091 (kapacita skupinových lekcí). Migrace 080 a 087–091 byly aplikovány na produkčním Neonu 2026-10-19 v pořadí `080 → 087 → 088 → 089 → 090 → 091`; přítomnost klíčových tabulek, sloupců a funkce `ws.money_unpay()` byla ověřena čtením katalogu 2026-10-19. Migraci 084 neaplikujte mimo její dohodnutý krok nebo bez výslovného zadání.
 

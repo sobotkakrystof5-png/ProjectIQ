@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-10-19 · redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 zbývá; migrace 085–086 aplikované, 080 a 087–091 připravené, ale nenasazené · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
+> **Poslední aktualizace:** 2026-10-19 · redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 rozpracováno; migrace 080, 085–086 a 087–091 aplikované, 084 stále čeká · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
 
 ---
 
@@ -40,7 +40,7 @@
 | S11 | Veřejné API, objednávací stránka, widget | hotovo (2026-10-10), migrace 076 na Neonu; Nastavení › Napojený web naostro s přihlášením neověřeno |
 | S12 | Zákazníci, věrnost, segmenty | hotovo v repu (2026-10-10); migrace 077–078 na Neonu |
 | S13 | Nastavení: funkce, služby, kolonky, stavy | hotovo v repu (2026-10-17, větev `chore/next-16`); migrace 079 na Neonu, s přihlášením neověřeno |
-| S14 | Peníze: faktury, příjmy, daně | hotovo v repu (2026-10-10, commit `35cba9f`); migrace 080 připravená, na Neonu neaplikovaná |
+| S14 | Peníze: faktury, příjmy, daně | hotovo v repu (2026-10-10, commit `35cba9f`); migrace 080 aplikovaná na produkčním Neonu 2026-10-19 |
 | S15 | E-maily, upozornění, novinky | hotovo v repu (2026-10-10); migrace 081 na Neonu, odesílání čeká na doménu v Resendu (`WS_EMAIL_FROM`) |
 | S16 | Klientský portál | hotovo v repu (2026-10-10); migrace 082 na Neonu, skutečná data neověřena |
 | S17 | Admin: klienti a novinky | hotovo v repu (2026-10-10); migrace 083 na Neonu, s přihlášením neověřeno |
@@ -415,9 +415,9 @@
 - [ ] **RD04 naostro:** Dnes s hlavní věcí, panel s kartou zákazníka po kliku na termín, přesměrování `?zakaznik=` a hlavička v Poptávkách a Zákaznících jsou ověřené jen na dočasné stránce s fiktivními daty a testy; s přihlášením na skutečných datech (včetně telefonu a zadokovaného panelu od 1280 px) ne · od 2026-10-18
 - [ ] **RD05 + RD06 naostro:** rychlé zadání z mřížky (klik i tažení), rady k času a kolize, tři nejbližší volné časy u poptávky, změna délky tažením i v detailu, barvy pracovníků, mezery a stínování mimo otevírací dobu, skok na datum, přejetí mezi dny, Najít volný čas (⌘K i menu), filtry a seznam zakázek, historie stavů a stav v panelu jsou ověřené jen na dočasné stránce s fiktivními daty (390/768/1280/1440 px, světle i tmavě; dočasná stránka smazána) a testy v PGlite; s přihlášením na skutečných datech ne (server actions `slotAdvice`, `searchCustomers`, `resizeAppointment`, `createManualBooking` s délkou) · od 2026-10-18
 - [ ] **RD07 naostro:** objednávkový tok, výběr služby/pracovníka/času i kontakt ověřeny lokálně s fiktivními daty v úzkém (614 px) a širokém (1228 px) zobrazení. Přesné šířky 390/768/1280/1440 px, widget na cizí doméně, živé odeslání na Preview a chování po migraci 087 ještě ověřit · od 2026-10-18
-- [ ] **RD10 naostro:** ověřit profil a formulář s přihlášením, včetně předvyplnění z karty/zakázky, stažení PDF a QR v PDF v Preview. Migrace 080, 087 a 088 nejsou na Neonu; 088 vyžaduje pořadí po 087. E-mail ověřit až s ověřenou doménou Resendu a nastaveným `WS_EMAIL_FROM` · od 2026-10-18
+- [ ] **RD10 naostro:** ověřit profil a formulář s přihlášením, včetně předvyplnění z karty/zakázky, stažení PDF a QR v PDF v Preview. Migrace 080, 087 a 088 byly na Neonu aplikovány 2026-10-19. E-mail ověřit až s ověřenou doménou Resendu a nastaveným `WS_EMAIL_FROM` · od 2026-10-18
 - [ ] **RD12 naostro:** projít věrnostní nastavení, přidání/vrácení razítka a uplatnění/vrácení odměny na přihlášeném Preview a šířkách 390/768/1280/1440 px; lokální prohlížeč skončil na přihlášení, testovací účet ani Neon branch nejsou připravené · od 2026-10-18
-- [ ] **RD13 + RD16 naostro:** přihlášený průchod pěti sekcí Nastavení, checklistu na Dnes, doplnění kontaktu, návrhu sloučení a zrušení zprávy v 60s okně; ověřit přímé odeslání po nastavení Resendu. Migrace 089 a její závislosti 080/087/088 na Neonu nejsou nasazené · od 2026-10-18
+- [ ] **RD13 + RD16 naostro:** přihlášený průchod pěti sekcí Nastavení, checklistu na Dnes, doplnění kontaktu, návrhu sloučení a zrušení zprávy v 60s okně; ověřit přímé odeslání po nastavení Resendu. Migrace 089 a její závislosti 080/087/088 byly na Neonu aplikovány 2026-10-19 · od 2026-10-18
 - [ ] **Kalendář — přímé tažení perem/dotykem a čára „teď“:** Kryštof 2026-10-18 označil oboje jako dosud zbývající. HTML5 přetažení bloku podporuje myš; na dotykovém displeji se termín přesouvá formulářem Přesunout v detailu. B9 a stav RD05 už ale popisují čáru „teď“ jako přítomnou; při navazujícím kalendářním kroku porovnat očekávaný výsledek se stávajícím kódem, nic nepřepisovat odhadem · `components/ws/app/calendar/time-grid.tsx`, `components/ws/app/calendar/now-indicator.tsx`, `components/ws/app/booking/appointment-actions.tsx` · od 2026-10-18
 - [ ] **Zakázky — historie jen od RD06:** změny stavu před 2026-10-18 nejsou v `ws.audit_log`; potvrzení poptávky ani portál záznam stavu nezapisují (jen přesun v aplikaci) · `lib/ws/bookings.ts` (`setJobStage`) · od 2026-10-18
 - [ ] **RD02 — region a měření:** `vercel.json` má `regions: ["fra1"]`, ale projeví se až po deployi (nasazení jen se souhlasem). Po deployi ověřit `regions` v nasazení (Vercel MCP `get_deployment`) a změřit čas po kliknutí před/po s přihlášením (plán oddíl 9). Clerk `auth()` v tom neměřený · od 2026-10-18
@@ -447,7 +447,7 @@
 - [ ] **Workspace — SMS poskytovatel** pro připomínky a „Komu napsat". Blokuje S12/S15 (lze odložit) · od 2026-10-08
 - [ ] **Workspace — zálohy online přes Stripe Connect** teď, nebo až po spuštění? Neblokuje · od 2026-10-08
 - [ ] **Workspace — admin přihlášení:** nechat NextAuth natrvalo, nebo později převést na Clerk? Neblokuje · od 2026-10-08
-- [ ] **S14 naostro:** obrazovky Peněz s přihlášením, PDF na Vercelu a externí AI přepis neověřené (migrace 080 na Neonu neaplikovaná) · od 2026-10-10
+- [ ] **S14 naostro:** obrazovky Peněz s přihlášením, PDF na Vercelu a externí AI přepis neověřené; migrace 080 aplikovaná 2026-10-19 · od 2026-10-10
 - [ ] **S16 naostro:** ověřit skutečný termín, zakázku, fakturu a hodnocení v `/z/[token]` (migrace 082 na Neonu) · od 2026-10-10
 - [ ] **S17 — pozvaní klienti a platba:** pozvaný klient prochází stejným Checkoutem (14 dní s kartou, R-038). Rozhodnout, jestli klienti, kterým Kryštof staví web, mají mít Workspace zdarma nebo se slevou (kupón ve Stripe) · od 2026-10-10
 - [ ] **S17 naostro:** pozvánka Clerku (e-mail, registrace s `__clerk_ticket` na `/w/registrace`, aktivace organizace, `ensureMember`) a obě admin stránky s přihlášením neověřené · od 2026-10-10
@@ -476,4 +476,5 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-19
+- **fix / ops** Na produkčním Neonu aplikovány migrace `080 → 087 → 088 → 089 → 090 → 091`, každá v samostatné transakci po sobě. Ověřeny tabulky `ws.request_services`, `ws.sessions`, `ws.session_attendees`, sloupce `invoice_sequences`, `issuer`, `requests.session_id`, `appointments.group_id` a funkce `ws.money_unpay()`. Lokální skript narazil na síťové omezení; stejné SQL bylo spuštěno připojeným Neon nástrojem. `084` zůstává neaplikovaná. RD15 audit opravil výchozí akcent v Nastavení z `#193A6A` na `#23478b` a náhodný test porovnání tajného klíče. Ověřeno: `npm test -- --maxWorkers=2` (582 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`. RD00/RD15 pokračují: Neon projekt má jen produkční větev s aplikačními daty, proto se čeká na volbu bezpečné testovací DB; aktuální Vercel Preview z `ws/s18` neobsahuje dosavadní RD kód. |
 - **feat** RD08, RD09, RD11 a RD14 dokončeny; kalendář doplněn o přímé tažení perem/dotykem a čáru „teď“. Více služeb drží pořadí a souvislý termín, skupinová lekce má 2–30 míst s atomickou kapacitou a akcemi jen pro majitele; zrušená lekce už nejde potvrdit ani obnovit. Admin konzole nečte osobní/finanční obsah klientů, interní poznámky ani volný audit; místní režim soukromí skrývá jména a částky. Návody mají 11 postupů v 7 tématech. Připravené migrace 090/091 zůstávají nenasazené; také 080 a 087–089 nejsou nasazené. Ověřeno: `npm test --maxWorkers=2` 582 + 1 přeskočený, `npx tsc --noEmit`, `npx next build --webpack`, `git diff --check`. `build:check` blokuje sandbox. Přihlášené Preview, skutečná DB/e-mail a zařízení s perem/dotykem čekají na ruční ověření.

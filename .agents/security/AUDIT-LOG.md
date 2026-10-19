@@ -318,3 +318,12 @@ Výsledek: bez otevřených nálezů.
 - Návody jsou statický typovaný obsah bez nových routových datových vstupů. CSP, přihlašování, secrets, závislosti a env zůstaly beze změny.
 - Během kontroly opravené nálezy: chybějící serverové omezení skupinových akcí jen pro majitele; možná spotřeba dalšího místa při duplicitním external ID; ochrana před potvrzením/obnovením po zrušení lekce.
 Ověřeno: `npm test --maxWorkers=2` (582 prošlo, 1 přeskočený), `npx tsc --noEmit`, `npx next build --webpack`, `git diff --check`. `npm run build:check` Turbopacku narazil na sandboxový zákaz vytvoření procesu/vazby na interní port. Přihlášený Preview, skutečná DB/migrace, odeslání e-mailu a fyzické zařízení s perem/dotykem nejsou ověřené.
+
+## 2026-10-19 — migrace 080, 087–091 na produkčním Neonu
+Spouštěč: Kryštof výslovně požádal o aplikaci připravených migrací v pořadí `080 → 087 → 088 → 089 → 090 → 091`.
+Rozsah: `migrations/080_ws_penize_provoz.sql`, `087_ws_objednavka_pracovnik_a_portal.sql`, `088_ws_faktury_profil_a_zpet.sql`, `089_ws_rucni_zpravy_zakaznikum.sql`, `090_ws_rezervace_vice_sluzeb.sql`, `091_ws_skupinove_lekce.sql`.
+Výsledek: bez otevřených nálezů.
+- Nové tabulky `request_services`, `sessions` a `session_attendees` procházejí přes `ws.enable_account_rls`; aplikační funkce pro peníze jsou `SECURITY INVOKER`, s pevným `search_path`, `PUBLIC` odňatým EXECUTE a oprávněním `ws_app`.
+- `portal_lookup` vrací pouze metadata potřebná portálu, má pevný `search_path` a EXECUTE je omezeno na `ws_app`. `purge_closed_accounts` je `SECURITY DEFINER` s pevným `search_path`, používá plně kvalifikované tabulky, maže jen účty s prošlým `delete_after` a nejprve uklidí navázané lekce; EXECUTE je odňato `PUBLIC` a uděleno `ws_app`.
+- Změna migrací 090/091 neuvolňuje RLS ani přístup k `public`; kolizní ochrana zůstává v databázi. Data nebyla mazána ani seedována.
+Ověřeno: každá migrace proběhla v samostatné transakci v požadovaném pořadí; z katalogu potvrzeny nové tabulky, sloupce a `ws.money_unpay()`. Lokální skript neměl síťový přístup, migrace byly spuštěny přes připojený Neon konektor. Přihlášené Preview není aktuální (poslední deployment je z `ws/s18`), testovací Neon větev zatím neexistuje.

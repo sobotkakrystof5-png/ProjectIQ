@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { useWsUndoAction } from '@/components/ws/app/booking/use-ws-action'
 import { saveAppearanceSettings } from '@/app/w/[business]/nastaveni/actions'
 
-const DEFAULT_COLOR = '#193A6A'
+const DEFAULT_COLOR = '#23478b'
 const HEX = /^#[0-9a-fA-F]{6}$/
 
 export function AppearanceSettings({ slug, color, readOnly }: { slug: string; color: string | null; readOnly: boolean }) {

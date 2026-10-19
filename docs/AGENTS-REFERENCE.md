@@ -183,7 +183,7 @@ Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind C
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 42 tabulek | migrace `064_ws_zaklad` … `091_ws_skupinove_lekce` (přehled níže; poslední známý stav Neonu zůstává 064–079, 081–083 a 085–086; 080, 084, 087–091 nejsou nasazené; 080/087/088 potvrdil Kryštof 2026-10-18) |
+| Schéma `ws` — 42 tabulek | migrace `064_ws_zaklad` … `091_ws_skupinove_lekce` (přehled níže; na produkčním Neonu jsou aplikované 064–083 a 085–091; migrace 084 stále čeká. Migrace 080 a 087–091 byly aplikovány 2026-10-19 v tomto pořadí: 080 → 087 → 088 → 089 → 090 → 091) |
 | Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
 | Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
 | Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |

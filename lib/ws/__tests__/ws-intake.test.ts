@@ -101,7 +101,8 @@ describe('klíče', () => {
     expect(hash).toMatch(/^[0-9a-f]{64}$/)
     expect(hash).not.toContain(key)
     expect(secretMatches(key, hash)).toBe(true)
-    expect(secretMatches(`${key.slice(0, -1)}x`, hash)).toBe(false)
+    const replacement = key.endsWith('x') ? 'y' : 'x'
+    expect(secretMatches(`${key.slice(0, -1)}${replacement}`, hash)).toBe(false)
     expect(maskSecret(prefix)).toBe(`sk_live_${prefix.slice(0, 4)}…`)
   })
 
