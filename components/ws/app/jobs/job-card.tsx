@@ -75,7 +75,7 @@ export function JobCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        'relative flex flex-col gap-2 rounded-chip border bg-surface p-3 shadow-sm shadow-navy-950/5',
+        'relative flex flex-col gap-2 rounded-chip border bg-surface p-3',
         draggable && 'cursor-grab active:cursor-grabbing',
         pending && 'opacity-90',
       )}

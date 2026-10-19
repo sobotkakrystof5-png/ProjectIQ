@@ -562,7 +562,7 @@ export function OrderFlow({
           )}
 
           {step === 'done' && (
-            <div className="ws-order-step-in flex flex-col items-start gap-4 rounded-panel bg-surface p-6 shadow-sm">
+            <div className="ws-order-step-in flex flex-col items-start gap-4 rounded-panel bg-surface p-6">
               <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-navy-700 text-white">
                 <Check aria-hidden size={24} strokeWidth={2} />
               </span>
