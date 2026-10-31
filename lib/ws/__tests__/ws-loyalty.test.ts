@@ -348,9 +348,10 @@ describe('pravidla razítek', () => {
     const who = await fresh()
     await pay(await visit(who, '2026-11-28T08:00:00Z'))
     const c = await card(who.customer)
-    await db.query(`UPDATE ws.loyalty_cards SET created_at = now() - interval '6 months' + interval '1 hour' WHERE id = $1`, [c!.id])
+    // 6 měsíců = 181–184 dní; „6 months ± 1 hour“ selhávalo na konci měsíce (31. 10. − 6 měsíců = 30. 4.).
+    await db.query(`UPDATE ws.loyalty_cards SET created_at = now() - interval '180 days' WHERE id = $1`, [c!.id])
     expect(await pay(await visit(who, '2026-11-29T08:00:00Z'))).toMatchObject({ ok: true, data: { stamp: { stamps: 2 } } })
-    await db.query(`UPDATE ws.loyalty_cards SET created_at = now() - interval '6 months' - interval '1 hour' WHERE id = $1`, [c!.id])
+    await db.query(`UPDATE ws.loyalty_cards SET created_at = now() - interval '185 days' WHERE id = $1`, [c!.id])
     expect(await expireCards(ctxA, bizA)).toBeGreaterThanOrEqual(1)
     expect(await card(who.customer)).toBeUndefined()
   })
