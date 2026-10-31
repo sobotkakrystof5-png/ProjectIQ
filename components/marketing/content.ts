@@ -2,13 +2,14 @@
 // Údaje označené [DOPLNIT] chybí záměrně — nevymýšlet (AGENTS.md → B10). Fakta o ceně
 // a zkušební době: R-018, R-026, R-038.
 
-/** E-mail podpory pro „Napište nám" (R-032). Firemní adresa se teprve řeší. */
-export const SUPPORT_EMAIL = '[DOPLNIT]'
+/** E-mail podpory pro „Napište nám". Potvrdil Kryštof 2026-10-31. */
+export const SUPPORT_EMAIL = 'info@vizeon.cz'
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`
-export const SUPPORT_LABEL = SUPPORT_EMAIL === '[DOPLNIT]' ? '[DOPLNIT e-mail podpory]' : SUPPORT_EMAIL
+export const SUPPORT_LABEL = SUPPORT_EMAIL
+export const SUPPORT_FORM_HREF = '/#kontakt'
 
 /** IČO provozovatele do footeru. */
-export const COMPANY_ID = '[DOPLNIT]'
+export const COMPANY_ID = '29977231'
 
 /** Cesty do aplikace — přesné cesty Clerku potvrdí S07. */
 export const ROUTES = {
@@ -22,7 +23,7 @@ export const ROUTES = {
 } as const
 
 export const PRICE_LABEL = '249 Kč'
-export const CTA_LABEL = 'Začít za 249 Kč měsíčně'
+export const CTA_LABEL = 'Vyzkoušet 14 dní zdarma'
 
 /** Kotvy v hlavičce (scrollspy). */
 export const NAV = [

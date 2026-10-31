@@ -38,8 +38,9 @@ export function Pricing() {
                 <span className="font-num text-white">Kč</span> / měsíc
               </span>
             </p>
-            <p className="max-w-[420px] font-num text-sm leading-relaxed text-navy-300">
-              konečná cena, nic se nepřipočítává · prvních 14 dní zdarma · zrušíte kdykoli · karta, Apple Pay, Google Pay
+            <p className="max-w-[420px] text-base leading-relaxed text-navy-200">
+              Konečná cena, nic se nepřipočítává. Kartu zadáte při registraci; první platba proběhne až po 14 dnech.
+              Zrušíte kdykoli.
             </p>
           </div>
         </div>

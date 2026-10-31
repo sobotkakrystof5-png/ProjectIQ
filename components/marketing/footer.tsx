@@ -47,8 +47,8 @@ export function Footer() {
           <div>
             <p className="font-num text-sm uppercase tracking-[0.12em] text-navy-400">Podpora</p>
             <ul className="mt-3">
-              <li><a href={SUPPORT_MAILTO} className={linkClass}>Napište nám</a></li>
-              <li className="break-all font-num text-[15px] text-navy-300">{SUPPORT_LABEL}</li>
+              <li><a href="/#kontakt" className={linkClass}>Kontaktní formulář</a></li>
+              <li><a href={SUPPORT_MAILTO} className="inline-flex min-h-[44px] items-center break-all font-num text-[15px] text-navy-300 hover:text-white">{SUPPORT_LABEL}</a></li>
             </ul>
           </div>
         </div>

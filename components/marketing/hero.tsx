@@ -1,17 +1,11 @@
-import { BadgeCheck, Gift, MailCheck, Undo2 } from 'lucide-react'
 import { AccentHeading } from '@/components/ws/brand'
-import { CTA_LABEL, ROUTES, SUPPORT_MAILTO } from './content'
+import { CTA_LABEL, ROUTES, SUPPORT_FORM_HREF } from './content'
 import { HeroBackdrop } from './hero-backdrop'
 import { Header } from './header'
 import { LiveDemo } from './live-demo'
 
-/** Důvěra pod CTA: ikona (SVG z lucide) a krátký text. */
-const TRUST = [
-  { icon: Gift, label: '14 dní zdarma' },
-  { icon: BadgeCheck, label: 'Vše v ceně' },
-  { icon: Undo2, label: 'Zrušíte kdykoli' },
-  { icon: MailCheck, label: 'Přihlášení bez hesla' },
-] as const
+/** Stručný řádek z briefu; stejná fakta zůstávají i v ceníku. */
+const TRUST = ['14 dní zdarma', 'Kartu zadáte při registraci', 'Poté 249 Kč měsíčně', 'Zrušíte kdykoli'] as const
 
 /** Úvod Dílků s kalendářem a příběhem jedné ukázkové poptávky. */
 export function Hero() {
@@ -30,7 +24,7 @@ export function Hero() {
               Každá poptávka
               <br />
             </AccentHeading>
-            <p className="max-w-[620px] text-[19px] font-medium leading-relaxed text-white sm:text-[23px]">
+            <p className="max-w-[620px] text-[15px] font-normal leading-relaxed text-white sm:text-[17px]">
               ZakazIQ je přehled podnikání pro malé firmy. Poptávky z webu,
               kalendář, zákazníci a věrnostní karty, zakázky, faktury a odhad
               daní v jedné aplikaci pro telefon i počítač.
@@ -43,31 +37,25 @@ export function Hero() {
                 {CTA_LABEL}
               </a>
               <a
-                href={SUPPORT_MAILTO}
+                href={SUPPORT_FORM_HREF}
                 className="inline-flex min-h-[44px] items-center text-lg text-navy-100 underline decoration-navy-400 underline-offset-[6px] transition-colors hover:text-white hover:decoration-white"
               >
                 Napište nám
               </a>
             </div>
             <ul
-              aria-label="Co je v ceně a jak to funguje"
-              className="flex flex-wrap gap-2.5 animate-zq-rise [animation-delay:300ms]"
+              aria-label="Podmínky zkušební doby"
+              className="flex flex-wrap gap-x-2.5 gap-y-1 text-[14px] leading-relaxed text-navy-200 animate-zq-rise [animation-delay:300ms]"
             >
-              {TRUST.map(({ icon: Icon, label }) => (
-                <li
-                  key={label}
-                  className="inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.06] py-1.5 pl-1.5 pr-4 text-[15px] font-medium text-white"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-navy-950">
-                    <Icon className="h-4 w-4" strokeWidth={2.25} aria-hidden />
-                  </span>
-                  {label}
+              {TRUST.map((label, i) => (
+                <li key={label} className="inline-flex items-center whitespace-nowrap">
+                  {label}{i < TRUST.length - 1 && <span className="ml-2 text-navy-500" aria-hidden>·</span>}
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="mt-10 pb-16 md:mt-12">
+          <div className="mt-8 pb-16 md:mt-12">
             <LiveDemo />
           </div>
         </div>

@@ -139,8 +139,8 @@ export function Header({ variant = 'hero' }: { variant?: 'hero' | 'page' }) {
           href={ROUTES.signUp}
           className="inline-flex min-h-[44px] items-center rounded-full bg-white px-5 text-base font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50"
         >
-          <span className="sm:hidden">Začít</span>
-          <span className="hidden sm:inline">Začít za 249 Kč</span>
+          <span className="sm:hidden">Zkusit zdarma</span>
+          <span className="hidden sm:inline">14 dní zdarma</span>
         </a>
         <button
           type="button"

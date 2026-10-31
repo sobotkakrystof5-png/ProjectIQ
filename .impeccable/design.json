@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-31T13:56:34Z",
+  "title": "Design System: ZakazIQ",
+  "extensions": {
+    "colorMeta": {
+      "navy-950": {
+        "role": "primary",
+        "displayName": "Dílky deep navy",
+        "canonical": "rgb(12 26 54)",
+        "tonalRamp": [
+          "rgb(12 26 54)",
+          "rgb(19 40 80)",
+          "rgb(27 56 104)",
+          "rgb(35 71 139)",
+          "rgb(43 87 168)",
+          "rgb(58 110 196)",
+          "rgb(92 141 211)",
+          "rgb(138 174 227)",
+          "rgb(184 206 239)",
+          "rgb(220 231 247)",
+          "rgb(238 242 251)"
+        ]
+      },
+      "navy-900": { "role": "primary", "displayName": "Deep navy", "canonical": "rgb(19 40 80)" },
+      "navy-800": { "role": "primary", "displayName": "Sidebar navy", "canonical": "rgb(27 56 104)" },
+      "navy-700": {
+        "role": "primary",
+        "displayName": "Dílky action navy",
+        "canonical": "rgb(35 71 139)"
+      },
+      "navy-600": { "role": "primary", "displayName": "Mid navy", "canonical": "rgb(43 87 168)" },
+      "navy-500": { "role": "primary", "displayName": "Accessible light-surface accent", "canonical": "rgb(58 110 196)" },
+      "navy-400": { "role": "primary", "displayName": "Light navy", "canonical": "rgb(92 141 211)" },
+      "navy-300": { "role": "primary", "displayName": "Navy accent on dark", "canonical": "rgb(138 174 227)" },
+      "navy-200": { "role": "primary", "displayName": "Navy text on dark", "canonical": "rgb(184 206 239)" },
+      "navy-100": { "role": "neutral", "displayName": "Navy border", "canonical": "rgb(220 231 247)" },
+      "navy-50": { "role": "neutral", "displayName": "Pale navy surface", "canonical": "rgb(238 242 251)" },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cool page ground",
+        "canonical": "rgb(244 246 251)"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "White working surface",
+        "canonical": "rgb(255 255 255)"
+      },
+      "ink": { "role": "neutral", "displayName": "Navy ink", "canonical": "rgb(12 26 54)" },
+      "quiet": { "role": "neutral", "displayName": "Readable secondary text", "canonical": "rgb(74 88 120)" },
+      "signal": {
+        "role": "secondary",
+        "displayName": "Request signal amber",
+        "canonical": "rgb(255 181 71)"
+      },
+      "signal-bg": {
+        "role": "secondary",
+        "displayName": "Request signal surface",
+        "canonical": "rgb(255 247 232)"
+      },
+      "signal-line": { "role": "secondary", "displayName": "Request signal edge", "canonical": "rgb(225 154 44)" },
+      "signal-ink": { "role": "secondary", "displayName": "Request signal text", "canonical": "rgb(107 67 0)" },
+      "reward": { "role": "secondary", "displayName": "Ready reward on navy", "canonical": "rgb(255 210 138)" },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Danger red",
+        "canonical": "rgb(179 38 30)"
+      },
+      "staff-1": { "role": "categorical", "displayName": "Staff calendar color 1", "canonical": "rgb(35 71 139)" },
+      "staff-2": { "role": "categorical", "displayName": "Staff calendar color 2", "canonical": "rgb(13 124 117)" },
+      "staff-3": { "role": "categorical", "displayName": "Staff calendar color 3", "canonical": "rgb(109 76 170)" },
+      "staff-4": { "role": "categorical", "displayName": "Staff calendar color 4", "canonical": "rgb(166 83 94)" },
+      "staff-5": { "role": "categorical", "displayName": "Staff calendar color 5", "canonical": "rgb(115 120 40)" }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Instrument Sans display",
+        "purpose": "Landing H1; responsive sizes are 40px, 64px and 88px."
+      },
+      "heading": {
+        "displayName": "Instrument Sans heading",
+        "purpose": "Landing H2; responsive sizes are 28px, 44px and 56px."
+      },
+      "page-title": {
+        "displayName": "Workspace page title",
+        "purpose": "Page heading in Instrument Sans, 28px on phones and 36px from 640px."
+      },
+      "body": {
+        "displayName": "Instrument Sans interface",
+        "purpose": "Interface and explanatory text; 15px compact and 17px wider."
+      },
+      "accent": {
+        "displayName": "Instrument Serif italic",
+        "purpose": "The occasional second half of a heading."
+      },
+      "data": {
+        "displayName": "JetBrains Mono data",
+        "purpose": "Times, dates, amounts, counts and section markers."
+      }
+    },
+    "shadows": [
+      {
+        "name": "floating-popover",
+        "value": "0 20px 25px -5px rgb(12 26 54 / 0.1), 0 8px 10px -6px rgb(12 26 54 / 0.1)",
+        "purpose": "Floating menus and popovers; never a resting work panel."
+      },
+      {
+        "name": "loyalty-card",
+        "value": "0 20px 25px -5px rgb(12 26 54 / 0.25), 0 8px 10px -6px rgb(12 26 54 / 0.25)",
+        "purpose": "The established, raised loyalty card only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "dilky-ease",
+        "value": "cubic-bezier(.2,.8,.2,1)",
+        "purpose": "Short state and panel transitions."
+      },
+      {
+        "name": "state-change",
+        "value": "180ms ease-out",
+        "purpose": "A compact response to a real state change."
+      },
+      {
+        "name": "request-arrival",
+        "value": "600ms cubic-bezier(.2,.8,.2,1)",
+        "purpose": "A newly arrived request enters from above and is announced by the signal dot."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Remove travel and loops; keep content and the changed state visible."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ],
+    "radii": [
+      { "name": "tiny", "value": "9px" },
+      { "name": "chip", "value": "12px" },
+      { "name": "box", "value": "20px" },
+      { "name": "panel", "value": "24px" },
+      { "name": "slab", "value": "32px" },
+      { "name": "hero", "value": "40px" },
+      { "name": "pill", "value": "9999px" }
+    ],
+    "spacing": [
+      { "name": "unit", "value": "4px" },
+      { "name": "compact", "value": "8px" },
+      { "name": "base", "value": "16px" },
+      { "name": "group", "value": "24px" },
+      { "name": "section", "value": "120px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "One main action with a 44px touch height.",
+      "html": "<button class=\"ds-button-primary\">Potvrdit termín</button>",
+      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 20px;border:0;border-radius:9999px;background:rgb(35 71 139);color:#fff;font:600 15px/1.2 'Instrument Sans',system-ui,sans-serif;transition:background-color 200ms cubic-bezier(.2,.8,.2,1)}.ds-button-primary:hover{background:rgb(27 56 104)}.ds-button-primary:active{background:rgb(19 40 80)}.ds-button-primary:focus-visible{outline:2px solid hsl(217 54% 50%);outline-offset:2px}"
+    },
+    {
+      "name": "Text input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Readable, token-bordered field with a clear focus state.",
+      "html": "<input class=\"ds-input\" aria-label=\"Jméno zákazníka\" placeholder=\"Jméno zákazníka\" />",
+      "css": ".ds-input{width:100%;height:44px;padding:0 14px;border:1px solid hsl(216 63% 92%);border-radius:12px;background:#fff;color:rgb(12 26 54);font:400 15px/1.5 'Instrument Sans',system-ui,sans-serif;transition:border-color 200ms,box-shadow 200ms}.ds-input::placeholder{color:rgb(74 88 120)}.ds-input:focus-visible{border-color:rgb(58 110 196);outline:none;box-shadow:0 0 0 2px hsl(217 54% 50% / .3)}"
+    },
+    {
+      "name": "Request signal chip",
+      "kind": "chip",
+      "refersTo": "request-signal",
+      "description": "Amber appears only when a new request needs attention.",
+      "html": "<span class=\"ds-request-chip\">Nová poptávka</span>",
+      "css": ".ds-request-chip{display:inline-flex;align-items:center;min-height:24px;padding:2px 10px;border:1px dashed rgb(225 154 44);border-radius:9999px;background:rgb(255 247 232);color:rgb(107 67 0);font:500 12px/1.4 'Instrument Sans',system-ui,sans-serif;white-space:nowrap}"
+    },
+    {
+      "name": "Mobile workspace navigation",
+      "kind": "nav",
+      "refersTo": "workspace-mobile-nav",
+      "description": "Four destinations and one central create action, above the phone safe area.",
+      "html": "<nav class=\"ds-mobile-nav\" aria-label=\"Rychlá navigace\"><a class=\"ds-mobile-item is-active\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 11 12 3l9 8M5 10v10h14V10M9 20v-6h6v6\"/></svg>Dnes</a><a class=\"ds-mobile-item\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M16 3v4M8 3v4M3 10h18\"/></svg>Kalendář</a><button class=\"ds-mobile-new\" aria-label=\"Nová\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg></button><a class=\"ds-mobile-item\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M20 8v6M23 11h-6\"/></svg>Zákazníci</a><a class=\"ds-mobile-item\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M2 10h20M6 15h3\"/></svg>Peníze</a></nav>",
+      "css": ".ds-mobile-nav{position:fixed;inset:auto 0 0;z-index:30;display:flex;align-items:stretch;justify-content:space-around;height:68px;padding:0 4px env(safe-area-inset-bottom);border-top:1px solid rgb(220 231 247);background:#fff}.ds-mobile-item{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:12px;color:rgb(74 88 120);font:500 11px/1.2 'Instrument Sans',system-ui,sans-serif;text-decoration:none}.ds-mobile-item svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.ds-mobile-item.is-active{color:rgb(35 71 139)}.ds-mobile-new{width:56px;height:56px;align-self:flex-start;transform:translateY(-12px);border:0;border-radius:9999px;background:rgb(35 71 139);color:#fff;box-shadow:0 10px 15px -3px rgb(12 26 54 / .25),0 4px 6px -4px rgb(12 26 54 / .25)}.ds-mobile-new svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round}.ds-mobile-new:focus-visible{outline:2px solid hsl(217 54% 50%);outline-offset:2px}"
+    },
+    {
+      "name": "Pending request block",
+      "kind": "custom",
+      "refersTo": "NewRequestBlock",
+      "description": "A requested time that is still waiting for the owner.",
+      "html": "<article class=\"ds-request-block\"><p class=\"ds-request-meta\">NOVÁ POPTÁVKA <span>Bez termínu</span></p><strong>Eva Demo</strong><p>Kosmetické ošetření</p></article>",
+      "css": ".ds-request-block{padding:12px;border:1.5px dashed rgb(225 154 44);border-radius:12px;background:rgb(255 247 232);color:rgb(107 67 0);font-family:'Instrument Sans',system-ui,sans-serif}.ds-request-meta{display:flex;justify-content:space-between;gap:8px;margin:0 0 6px;font:500 11px/1.4 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.08em}.ds-request-block strong{display:block;font-size:15px;line-height:1.35}.ds-request-block p:last-child{margin:2px 0 0;font-size:14px;line-height:1.4}"
+    },
+    {
+      "name": "Confirmed appointment block",
+      "kind": "custom",
+      "refersTo": "ConfirmedBlock",
+      "description": "A confirmed calendar event, visually distinct from a pending request.",
+      "html": "<article class=\"ds-confirmed-block\"><time>9:00–10:30</time><strong>Tereza Malá</strong><p>Barvení + střih</p></article>",
+      "css": ".ds-confirmed-block{padding:12px;border-left:3px solid rgb(35 71 139);border-radius:12px;background:rgb(220 231 247);color:rgb(19 40 80);font-family:'Instrument Sans',system-ui,sans-serif}.ds-confirmed-block time{font:400 12px/1.4 'JetBrains Mono',ui-monospace,monospace}.ds-confirmed-block strong{display:block;margin-top:4px;font-size:15px;line-height:1.35}.ds-confirmed-block p{margin:2px 0 0;font-size:14px;line-height:1.4}"
+    },
+    {
+      "name": "Dílky tile mark",
+      "kind": "custom",
+      "refersTo": "TileGlyph",
+      "description": "The 2×2 mark reused as a restrained product signature.",
+      "html": "<span class=\"ds-tile-mark\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i></span>",
+      "css": ".ds-tile-mark{display:inline-grid;grid-template-columns:repeat(2,5px);gap:2px}.ds-tile-mark i{width:5px;height:5px;border-radius:1.5px;background:rgb(138 174 227)}.ds-tile-mark i:first-child,.ds-tile-mark i:last-child{background:rgb(35 71 139)}"
+    },
+    {
+      "name": "Loyalty stamp card",
+      "kind": "card",
+      "refersTo": "LoyaltyCard",
+      "description": "The approved navy gradient and tile-shaped stamps; this is a signature card, not a generic panel.",
+      "html": "<article class=\"ds-loyalty-card\"><header><div><span>Testovací salon</span><strong>Tereza Malá</strong></div><span>4 / 5</span></header><ol aria-label=\"4 z 5 razítek\"><li class=\"is-stamped\"></li><li class=\"is-stamped\"></li><li class=\"is-stamped\"></li><li class=\"is-stamped\"></li><li></li></ol><p>Do odměny zbývá 1 razítko: střih zdarma</p></article>",
+      "css": ".ds-loyalty-card{max-width:384px;padding:20px;border-radius:24px;background:linear-gradient(to bottom right,rgb(35 71 139),rgb(27 56 104));color:#fff;font-family:'Instrument Sans',system-ui,sans-serif;box-shadow:0 20px 25px -5px rgb(12 26 54 / .25),0 8px 10px -6px rgb(12 26 54 / .25)}.ds-loyalty-card header{display:flex;justify-content:space-between;gap:12px}.ds-loyalty-card header span{display:block;color:rgb(184 206 239);font-size:14px}.ds-loyalty-card header strong{display:block;font-size:18px;letter-spacing:-.02em}.ds-loyalty-card ol{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:20px 0 0;padding:0;list-style:none}.ds-loyalty-card li{aspect-ratio:1;border:1px dashed rgb(255 255 255 / .35);border-radius:9px}.ds-loyalty-card li.is-stamped{border-style:solid;background:#fff}.ds-loyalty-card p{margin:16px 0 0;color:rgb(184 206 239);font-size:14px;line-height:1.4}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Každá poptávka na svém místě.",
+    "overview": "ZakazIQ’s visual world starts with the 2×2 tile mark. The tiles connect the wordmark, the calendar, the customer’s loyalty stamps and the small-business modules. They identify the product; they do not replace its real work. The calendar and the request moving from pending to confirmed remain the strongest product image.\n\nThe Dílky identity is the approved visual system. Keep its navy shell, its warm request signal, its own type and its dark sidebar in Workspace. Taste and Impeccable contribute checks for hierarchy, density and repeated patterns; their neutral default palettes do not replace the approved brand.",
+    "keyCharacteristics": [
+      "Navy surfaces and the 2×2 mark establish the ZakazIQ identity.",
+      "One request connects calendar, customer history and recorded income.",
+      "Color, borders and motion indicate a real state or action.",
+      "The landing page shows the product itself, with sample content marked ‘Ukázka’.",
+      "The calendar is the main workspace; the next action sits alongside it on wide screens and the phone agenda puts times first.",
+      "The calendar story sits on a quiet navy surface so the product and its narrative stay readable."
+    ],
+    "rules": [
+      {
+        "name": "The One Warm Signal Rule",
+        "body": "Warm amber belongs to a new request, an active arrival or a ready reward. It is not a decorative accent.",
+        "section": "colors"
+      },
+      {
+        "name": "The State Carries Meaning Rule",
+        "body": "A pending request has a dashed amber outline; a confirmed appointment has a navy tint and a solid leading edge. Preserve these signals across the app, booking page and product demonstrations.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Voice Rule",
+        "body": "Serif italic is an occasional heading accent, never a paragraph or a standalone decorative word. Mono is for data, code and the intentional chapter markers, not ordinary body copy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Resting Surface Rule",
+        "body": "Use a border or a tone change for a panel. Reserve shadows for elements that float and the established loyalty card.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Quiet Text Contrast Rule",
+        "body": "Keep the quiet token fully opaque for normal supporting text, placeholders, select prompts and outside-month dates. Reduce opacity only for truly disabled controls.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do keep the Dílky logo, navy palette, type roles and tile mark on ZakazIQ surfaces.",
+      "Do make the calendar and the pending-to-confirmed journey the product’s visual evidence.",
+      "Do use signal amber only for a new request, live arrival or ready reward.",
+      "Do keep sample data clearly marked ‘Ukázka’ and never invent proof or performance claims.",
+      "Do preserve numbered landing chapters: their sequence and section map are part of the approved brief.",
+      "Do use shared color and component tokens instead of raw UI colors."
+    ],
+    "donts": [
+      "Don't replace Dílky with a generic neutral SaaS theme or the Workspace dark sidebar with a pale default shell.",
+      "Don't add repeated icon-feature cards, generic dashboard tiles, stock photos, emoji, glass or decorative gradients.",
+      "Don't use warm amber as decoration or let staff colors imply a booking state.",
+      "Don't turn a pending request into a confirmed appointment or record income before payment is recorded.",
+      "Don't apply this design system to the separate VIZEON, ALTENO or Hub admin."
+    ]
+  }
+}

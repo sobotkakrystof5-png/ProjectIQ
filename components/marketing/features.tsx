@@ -23,7 +23,7 @@ export function Features() {
       <article
         id="ukazka-zakaznik"
         aria-labelledby="zakaznici-title"
-        className="grid scroll-mt-28 items-center gap-10 border-t border-navy-100 py-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 md:py-20"
+        className="grid scroll-mt-28 items-center gap-10 py-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 md:py-20"
       >
         <div>
           <SectionLabel>Zákazníci</SectionLabel>
@@ -48,24 +48,17 @@ export function Features() {
             A co po zaplacení?
           </a>
         </div>
-        <div className="min-w-0 rounded-slab bg-navy-50 p-4 sm:p-8">
-          <div className="flex items-center justify-between gap-3 border-b border-navy-200 pb-5">
+        <div className="min-w-0">
+          <div className="flex items-end justify-between gap-3">
             <div>
-              <span className="font-num text-[13px] text-quiet">
-                KARTA ZÁKAZNICE
-              </span>
-              <p className="mt-1 text-2xl font-semibold tracking-[-0.02em]">
-                Tereza Malá
-              </p>
+              <p className="text-sm text-quiet">Karta zákaznice · ukázka</p>
+              <p className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Tereza Malá</p>
             </div>
-            <span className="font-num text-[13px] text-quiet">UKÁZKA</span>
           </div>
-          <div className="grid items-start gap-6 pt-6 sm:grid-cols-[1fr_1.2fr]">
+          <div className="grid items-start gap-8 pt-6 sm:grid-cols-[1fr_1.2fr]">
             <div>
-              <p className="font-num text-[13px] text-quiet">
-                HISTORIE NÁVŠTĚV
-              </p>
-              <ol className="mt-5 space-y-6 border-l border-navy-200 pl-4 text-base">
+              <p className="text-sm font-semibold text-quiet">Historie návštěv</p>
+              <ol className="mt-5 space-y-6 text-base">
                 <li>
                   <span className="font-num text-[13px] text-quiet">
                     9. 10. 2026 · 9:00
@@ -89,10 +82,8 @@ export function Features() {
                 reward="střih zdarma"
                 business="Věrnostní karta"
               />
-              <div className="mt-5 border-t border-navy-200 pt-4">
-                <p className="font-num text-[13px] text-quiet">
-                  KDY PŘIBUDE RAZÍTKO
-                </p>
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-quiet">Kdy přibude razítko</p>
                 <p className="mt-2 text-lg font-semibold leading-snug text-navy-900">
                   Po návštěvě a zaznamenání platby.
                 </p>
@@ -129,7 +120,7 @@ export function Features() {
             e-mailem.
           </p>
         </div>
-        <div className="mt-10 overflow-hidden rounded-panel bg-surface text-ink">
+        <div className="mt-10 overflow-hidden bg-surface text-ink">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-100 p-5 sm:px-8">
             <span className="font-semibold">Příjmy · říjen 2026</span>
             <span className="font-num text-[13px] text-quiet">

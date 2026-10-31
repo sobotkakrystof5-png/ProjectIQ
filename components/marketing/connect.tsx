@@ -1,22 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Check } from 'lucide-react'
-import { AccentHeading, SectionLabel } from '@/components/ws/brand'
+import { AccentHeading, SectionLabel, TileField } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
 import { CONNECT_SLUG } from './content'
 import { useRevealState } from './use-in-view'
 
 // Cesty podle R-016 (objednávací stránka /r, widget /embed), doména R-030.
 const LINES = [
-  { label: '01 · odkaz pro objednání', code: `zakaziq.cz/r/${CONNECT_SLUG}` },
-  { label: '02 · jeden řádek na web', code: `<script src="https://zakaziq.cz/embed/${CONNECT_SLUG}.js"></script>` },
-  { label: '03 · web postavený v Claude Code', code: '„napoj formulář na ZakazIQ“' },
+  { label: 'Odkaz pro objednání', code: `zakaziq.cz/r/${CONNECT_SLUG}` },
+  { label: 'Kód do webu', code: `<script src="https://zakaziq.cz/embed/${CONNECT_SLUG}.js"></script>` },
+  { label: 'Pokyn pro web vytvořený v Claude Code', code: '„napoj formulář na ZakazIQ“' },
 ] as const
 
 /**
  * Terminálová karta: tři cesty napojení se vypíšou postupně (jednou, když karta přijede
- * na obrazovku), u poslední bliká kurzor, nakonec řádek „napojení ověřeno".
+ * na obrazovku). Text ukazuje tři cesty bez předstírání úspěšného napojení.
  */
 function Terminal() {
   const ref = useRef<HTMLDivElement>(null)
@@ -32,34 +31,28 @@ function Terminal() {
   }, [reveal, step])
 
   return (
-    <div ref={ref} className="rounded-slab bg-navy-950 p-5 font-num text-[15px] text-navy-100 shadow-xl shadow-navy-950/20 sm:p-7 sm:text-base">
-      <div aria-hidden className="mb-6 flex gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-navy-700" />
-        <span className="h-2.5 w-2.5 rounded-full bg-navy-700" />
-        <span className="h-2.5 w-2.5 rounded-full bg-navy-700" />
+    <div ref={ref} className="relative isolate overflow-hidden bg-navy-950 px-5 py-7 text-navy-100 sm:px-8 sm:py-9">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-32 overflow-hidden opacity-[0.16]">
+        <TileField cols={18} rows={4} className="-left-2 -top-2" />
       </div>
-      <ol className="flex flex-col gap-5">
+      <ol className="relative flex flex-col gap-7">
         {LINES.map((line, i) => (
           <li
             key={line.label}
             className={cn('flex flex-col gap-1.5 transition-opacity duration-500 ease-zq', i < shown ? 'opacity-100' : 'opacity-0')}
           >
-            <span className="text-[13px] uppercase tracking-[0.1em] text-navy-400">{line.label}</span>
-            <code className="break-all text-white">
-              {line.code}
-              {i === LINES.length - 1 && <span aria-hidden className="ml-0.5 inline-block h-[1.1em] w-[0.55em] translate-y-[3px] bg-navy-300 animate-zq-blink" />}
-            </code>
+            <span className="text-sm text-navy-200">{line.label}</span>
+            <code className="break-all font-num text-[16px] text-white">{line.code}</code>
           </li>
         ))}
       </ol>
       <p
         className={cn(
-          'mt-6 flex items-center gap-2 border-t border-navy-800 pt-5 text-navy-200 transition-opacity duration-500 ease-zq',
+          'relative mt-7 text-[15px] leading-relaxed text-navy-200 transition-opacity duration-500 ease-zq',
           shown > LINES.length ? 'opacity-100' : 'opacity-0',
         )}
       >
-        <Check size={16} strokeWidth={1.5} className="text-navy-300" aria-hidden />
-        napojení ověřeno · první poptávka přijata
+        Vyberete si cestu, která odpovídá vašemu webu.
       </p>
     </div>
   )

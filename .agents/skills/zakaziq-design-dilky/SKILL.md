@@ -61,12 +61,12 @@ jako dekorace.
 - Načítat přes `next/font/google` s `display: swap` a proměnnými `--font-instrument-sans`,
   `--font-instrument-serif`, `--font-jetbrains-mono`. Inter se ve Workspace nepoužívá.
 
-Škála (landing / aplikace): H1 88/40 · H2 56/28 · H3 26/20 · tělo 17/15 · drobné 13/12.
+Škála (landing / aplikace): H1 88/28–36 · H2 56/28 · H3 26/20 · tělo 17/15 · drobné 13/12. Nadpis obrazovky Workspace má 28 px na telefonu a 36 px od 640 px.
 
 ## 3. Tvary a prostor
 
-- Tlačítka, filtry, štítky stavů: **pilulka** (`rounded-full`). Hlavní tlačítko `navy-700`
-  (v aplikaci) nebo bílé na tmavém (landing). Výška min. 44 px.
+- Tlačítka, aktivní filtry a štítky stavů: **pilulka** (`rounded-full`); neaktivní filtry mohou zůstat tichým textem. Hlavní tlačítko `navy-700`
+  (v aplikaci) nebo bílé na tmavém (landing). Výška ovládací plochy min. 44 px.
 - Rádiusy: drobné prvky 9–12 px (`tiny`, `chip`) · karty 20–24 px (`box`, `panel`) ·
   velké panely 32 px (`slab`) · hero a footer landing page 40 px (`hero`).
 - Okraje 1 px `navy-100`. Stíny jen u plovoucích prvků (věrnostní karta, dialog, popover).
@@ -77,8 +77,7 @@ jako dekorace.
 - **Logo:** čtverec s gradientem `navy-600 → navy-800`, mřížka 2×2 bílých dílků 9 px s mezerou
   4 px; v hlavičce dva dílky (vpravo nahoře, vlevo dole) jemně dýchají (opacity 0.95 ↔ 0.4, 3 s).
 - **Pole dílků** v pozadí tmavých ploch: mřížka čtverců 44 px s rádiusem 10, skoro neviditelných;
-  ~9 % z nich pulzuje v `navy-500` (4–7 s, posunuté zpoždění). Jen hero, panel „Jak to funguje",
-  ceník, prázdné stavy ve velkém.
+  ~9 % z nich pulzuje v `navy-500` (4–7 s, posunuté zpoždění). Kalendářový příběh v hero má vlastní souvislou tmavou plochu pro čitelnost; další použití je panel „Jak to funguje", ceník a velké prázdné stavy.
 - **Dlaždice** (moduly, rychlé akce) ve střídajících se odstínech `navy-700`, `navy-100`, bílá,
   `navy-800`.
 - **Znak 2×2** (5 px dílky, `navy-700`/`navy-300` šachovnicově) jako odrážka u oborů a štítků.
@@ -105,8 +104,7 @@ Animuje se jen to, co něco vysvětluje. Podrobnosti a keyframes v `references/m
 
 ## 6. Převod do aplikace Workspace
 
-- Postranní panel `navy-950`, logo nahoře, ikony Lucide `strokeWidth={1.5}` + popisek pod ikonou,
-  aktivní položka `navy-700` pozadí s bílým textem.
+- Postranní panel `navy-950`, logo nahoře, ikony Lucide `strokeWidth={1.5}`. Na tabletu popisek pod ikonou, od 1280 px širší panel s popiskem vedle ikony; aktivní položka má `navy-700` pozadí s bílým textem.
 - Hlavička `surface` s přepínačem byznysů (pilulky v `navy-50`), vyhledáváním ⌘K a tlačítkem „+ Nová".
 - Obsah na `ground`, panely a tabulky v `surface`, okraje `navy-100`.
 - **Nová poptávka všude stejně:** `signal-bg` + čárkovaný okraj `signal-line` + `signal-ink` text.

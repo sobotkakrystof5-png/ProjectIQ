@@ -63,7 +63,7 @@ const MOMENTS: Moment[] = [
 
 const TONE: Record<Tone, { band: string; time: string; label: string; title: string; text: string }> = {
   dark: { band: 'bg-navy-950 text-white', time: 'text-navy-300', label: 'text-navy-300', title: 'text-white', text: 'text-navy-200' },
-  light: { band: 'border border-navy-100 bg-surface text-ink', time: 'text-navy-500', label: 'text-quiet', title: 'text-ink', text: 'text-quiet' },
+  light: { band: 'bg-surface text-ink', time: 'text-navy-500', label: 'text-quiet', title: 'text-ink', text: 'text-quiet' },
   soft: { band: 'bg-navy-50 text-ink', time: 'text-navy-500', label: 'text-quiet', title: 'text-ink', text: 'text-quiet' },
 }
 
@@ -93,7 +93,7 @@ function ArtifactView({ kind }: { kind: Artifact }) {
       )
     case 'move':
       return (
-        <div className="rounded-panel border border-navy-100 bg-ground p-4 text-ink">
+        <div className="bg-ground p-4 text-ink">
           <p className={cn(mono, 'text-quiet')}>Pátek · přesunuto</p>
           <div className="mt-4 flex flex-col gap-2">
             <div className="rounded-chip border border-dashed border-navy-300 px-4 py-3 text-quiet">
@@ -111,7 +111,7 @@ function ArtifactView({ kind }: { kind: Artifact }) {
       )
     case 'payment':
       return (
-        <div className="rounded-panel border border-navy-100 bg-surface p-4 text-ink">
+        <div className="bg-surface p-4 text-ink">
           <div className="flex items-center justify-between gap-3">
             <span className={cn(mono, 'text-quiet')}>Příjmy · říjen</span>
             <span className="rounded-full bg-navy-50 px-3 py-1 font-num text-[13px] text-navy-700">Zaplaceno</span>
@@ -125,7 +125,7 @@ function ArtifactView({ kind }: { kind: Artifact }) {
       )
     case 'sleeping':
       return (
-        <div className="rounded-panel bg-navy-50 p-4 text-ink">
+        <div className="bg-navy-50 p-4 text-ink">
           <div className="flex items-center justify-between gap-3">
             <span className="rounded-full bg-surface px-3 py-1 font-num text-[13px] uppercase text-navy-700">Spící</span>
             <span className="font-num text-[13px] text-quiet">naposledy 14. 4.</span>
@@ -153,7 +153,7 @@ export function WhyBother() {
         Firmu vedete z telefonu a diáře. Něco občas uteče, hlavně když máte plné ruce. ZakazIQ jsem postavil pro tyhle chvíle.
       </p>
 
-      <ol className="mt-10 flex flex-col gap-3 md:mt-12 md:gap-4">
+      <ol className="mt-10 flex flex-col gap-1 md:mt-12">
         {MOMENTS.map((m) => {
           const t = TONE[m.tone]
           return (
@@ -161,7 +161,7 @@ export function WhyBother() {
               as="li"
               key={m.when}
               className={cn(
-                'grid gap-6 rounded-panel p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-center lg:gap-12 lg:p-8',
+                'grid gap-8 px-5 py-9 sm:px-8 md:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-center lg:gap-12',
                 t.band,
               )}
             >

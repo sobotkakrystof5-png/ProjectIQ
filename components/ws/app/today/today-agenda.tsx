@@ -50,23 +50,25 @@ export function TodayAgenda({
         uniqueDays.map((day) => (
           <div key={day} className="flex flex-col gap-2">
             <p className="font-num text-xs uppercase tracking-[0.08em] text-quiet">{formatRelativeDay(day, today)}</p>
-            <ul className="flex flex-col gap-2">
+            <ul className="overflow-hidden rounded-box border border-navy-100 bg-surface">
               {upcoming
                 .filter((e) => dayOf(e) === day)
                 .map((e) => {
                   const href = hrefFor(e)
                   const body = (
                     <>
-                      <span className="font-num text-xs">{formatTimeRange(e.start, e.end)}</span>
-                      <span data-ws-private-value={e.kind === 'block' ? undefined : true} className="block truncate text-[15px] font-semibold">{e.title}</span>
-                      {e.subtitle && <span className="block truncate text-sm opacity-80">{e.subtitle}</span>}
+                      <span className="pt-0.5 font-num text-xs">{formatTimeRange(e.start, e.end)}</span>
+                      <span className="min-w-0">
+                        <span data-ws-private-value={e.kind === 'block' ? undefined : true} className="block truncate text-[15px] font-semibold">{e.title}</span>
+                        {e.subtitle && <span className="block truncate text-sm opacity-80">{e.subtitle}</span>}
+                      </span>
                     </>
                   )
-                  const cls = cn('block min-h-11 rounded-chip px-3 py-2.5', KIND_CLASS[e.kind])
+                  const cls = cn('grid min-h-[64px] grid-cols-[92px_minmax(0,1fr)] items-start gap-3 px-3 py-3', KIND_CLASS[e.kind])
                   return (
-                    <li key={`${e.kind}-${e.id}`}>
+                    <li key={`${e.kind}-${e.id}`} className="border-b border-navy-100 last:border-b-0">
                       {href ? (
-                        <Link href={href} scroll={false} className={cn(cls, 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}>
+                        <Link href={href} scroll={false} className={cn(cls, 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring')}>
                           {body}
                         </Link>
                       ) : (

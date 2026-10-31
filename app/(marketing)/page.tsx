@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Connect } from '@/components/marketing/connect'
+import { ContactSection } from '@/components/marketing/contact-section'
 import { Faq } from '@/components/marketing/faq'
 import { Features } from '@/components/marketing/features'
 import { Footer } from '@/components/marketing/footer'
@@ -45,6 +46,7 @@ export default function LandingPage() {
         <Connect />
         <Pricing />
         <Faq />
+        <ContactSection />
       </main>
       <Footer />
     </>

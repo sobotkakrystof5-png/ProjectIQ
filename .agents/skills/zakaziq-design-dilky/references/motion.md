@@ -38,11 +38,8 @@ stagger 80–120 ms mezi kartami. Bez knihovny navíc.
 **Pole dílků (landing hero)** — CSS grid čtverců 44 px, `rounded-[10px]`, výchozí
 `bg-navy-200/5 border border-navy-200/5`; deterministicky (index × 37 mod 100 < 9) vybrané
 dílky `bg-navy-500 animate-zq-pulse` s `animation-duration` 4–7 s a zpožděním 0–6 s.
-`aria-hidden`, `pointer-events-none`. Žádný JavaScript.
+`aria-hidden`, `pointer-events-none`. Aktuální `HeroBackdrop` doplňuje světlo a mírný náklon podle ukazatele; při omezeném pohybu je vypíná. Kalendářový příběh má souvislé tmavé pozadí pro čitelnost.
 
-**Živá ukázka aplikace (landing)** — klientská komponenta s `setInterval` 2800 ms, cyklus přes
-6 ukázkových poptávek; nová položka vjede (`zq-in`), blok v kalendáři se objeví na odpovídajícím
-místě, věrnostní karta přidá razítko. Interval se zastaví, když komponenta není vidět
-(`IntersectionObserver`) a při `prefers-reduced-motion`.
+**Živá ukázka aplikace (landing)** — tři stavy jedné fiktivní poptávky lze ovládat tlačítky i běžným posouváním příběhu. Bez automatické smyčky; po potvrzení se změní podoba bloku, při `prefers-reduced-motion` bez přechodu. Kalendář a detail zůstávají společně viditelné.
 
 **Grafy** — sloupce `origin-bottom animate-zq-grow`, `animation-delay: i * 120ms`.

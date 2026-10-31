@@ -48,12 +48,12 @@ export function PillNav({
           aria-current={item.active ? 'page' : undefined}
           className={cn(
             'inline-flex shrink-0 items-center gap-2 rounded-full font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            segmented ? 'min-h-10 px-4 text-sm' : 'min-h-11 px-4 text-[15px]',
+            segmented ? 'min-h-11 px-4 text-sm' : 'min-h-11 px-4 text-sm',
             item.active
               ? 'bg-navy-700 text-white'
               : segmented
                 ? 'text-navy-900 hover:bg-navy-100 dark:text-navy-100 dark:hover:bg-navy-800'
-                : 'bg-navy-50 text-navy-900 hover:bg-navy-100 dark:bg-navy-900 dark:text-navy-100',
+                : 'text-navy-900 hover:bg-navy-100 dark:text-navy-100 dark:hover:bg-navy-800',
           )}
         >
           {item.label}

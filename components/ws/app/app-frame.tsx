@@ -110,7 +110,7 @@ export function AppFrame(props: AppFrameProps) {
   const openSearch = () => setPaletteOpen(true)
 
   return (
-    <div data-ws-frame className="min-h-screen bg-ground text-ink md:pl-[92px]">
+    <div data-ws-frame className="min-h-screen bg-ground text-ink md:pl-[92px] xl:pl-[208px]">
       <a
         href="#obsah"
         className="sr-only z-50 rounded-full bg-surface px-4 py-2 text-sm font-semibold focus:not-sr-only focus:fixed focus:left-4 focus:top-3"
@@ -119,16 +119,17 @@ export function AppFrame(props: AppFrameProps) {
       </a>
 
       {/* Postranní panel (tablet a desktop) */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[92px] flex-col items-center gap-1 bg-navy-950 py-4 md:flex">
-        <Link href={root} aria-label={`${business.name}, Dnes`} className={cn('mb-4 rounded-chip p-1.5', focusRing)}>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[92px] flex-col items-center gap-1 bg-navy-950 py-4 md:flex xl:w-[208px] xl:items-stretch">
+        <Link href={root} aria-label={`${business.name}, Dnes`} className={cn('mb-4 flex items-center gap-3 rounded-chip p-1.5 xl:mx-4', focusRing)}>
           <Logo size={34} animated />
+          <span className="hidden text-lg font-semibold tracking-[-0.02em] text-white xl:inline">ZakazIQ</span>
         </Link>
-        <nav aria-label="Hlavní" className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
+        <nav aria-label="Hlavní" className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 xl:items-stretch xl:px-3">
           {nav.map((item) => (
             <SideLink key={item.key} item={item} href={navHref(business.slug, item.segment)} active={isNavActive(pathname, business.slug, item)} />
           ))}
         </nav>
-        <div className="flex w-full flex-col items-center gap-1 px-2">
+        <div className="flex w-full flex-col items-center gap-1 px-2 xl:items-stretch xl:px-3">
           <AccountMenu
             businessName={business.name}
             links={account}
@@ -154,7 +155,7 @@ export function AppFrame(props: AppFrameProps) {
                   href={navHref(b.slug, '')}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'inline-flex min-h-[36px] max-w-[240px] items-center truncate rounded-full px-4 text-sm font-semibold transition-colors duration-200 ease-zq',
+                    'inline-flex min-h-11 max-w-[240px] items-center truncate rounded-full px-4 text-sm font-semibold transition-colors duration-200 ease-zq',
                     active ? 'bg-navy-700 text-white' : 'bg-navy-50 text-ink hover:bg-navy-100 dark:bg-navy-800 dark:text-navy-50',
                     focusRing,
                   )}
@@ -163,11 +164,12 @@ export function AppFrame(props: AppFrameProps) {
                 </Link>
               )
             })}
-            {enabled.has('finance') && <Link href={navHref(business.slug, 'penize') + '?rozsah=ucet'} className={cn('inline-flex min-h-11 items-center rounded-full px-4 text-sm text-quiet hover:bg-navy-50', focusRing)}>Vše · jedno IČO</Link>}
+            {enabled.has('finance') && <Link data-detail-hide href={navHref(business.slug, 'penize') + '?rozsah=ucet'} className={cn('hidden min-h-11 items-center whitespace-nowrap rounded-full px-4 text-sm text-quiet hover:bg-navy-50 lg:inline-flex', focusRing)}>Vše · jedno IČO</Link>}
           </nav>
 
           <div className="ml-auto flex items-center gap-1 md:gap-2">
             <button
+              data-detail-hide
               type="button"
               onClick={openSearch}
               className={cn(
@@ -180,6 +182,7 @@ export function AppFrame(props: AppFrameProps) {
               <kbd className="font-num text-xs">⌘K</kbd>
             </button>
             <button
+              data-detail-search
               type="button"
               onClick={openSearch}
               aria-label="Hledat"
@@ -310,7 +313,7 @@ function FrameBell({ slug, chrome }: { slug: string; chrome: Promise<FrameChrome
 
 function sideItemClass(active: boolean) {
   return cn(
-    'flex w-[72px] flex-col items-center gap-1 rounded-chip px-1 py-2.5 text-[11px] font-medium leading-none transition-colors duration-200 ease-zq',
+    'flex min-h-11 w-[72px] flex-col items-center justify-center gap-1 rounded-chip px-1 py-2.5 text-[11px] font-medium leading-none transition-colors duration-200 ease-zq xl:w-full xl:flex-row xl:justify-start xl:gap-3 xl:px-3 xl:text-sm xl:leading-normal',
     active ? 'bg-navy-700 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white',
   )
 }

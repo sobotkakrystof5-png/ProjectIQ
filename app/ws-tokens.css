@@ -143,6 +143,7 @@
   [data-app="ws"]:has([data-detail-docked]) [data-ws-frame] { padding-right: 480px; }
   [data-app="ws"]:has([data-detail-docked]) [data-detail-grid] { grid-template-columns: minmax(0, 1fr); }
   [data-app="ws"]:has([data-detail-docked]) [data-detail-hide] { display: none; }
+  [data-app="ws"]:has([data-detail-docked]) [data-detail-search] { display: inline-flex; }
 }
 
 @keyframes ws-order-step-enter {

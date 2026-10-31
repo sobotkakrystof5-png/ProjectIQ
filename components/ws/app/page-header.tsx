@@ -11,7 +11,7 @@ const WIDTH = {
 } as const
 
 /**
- * Kořen obrazovky byznysu (RD04): šířka, okraje a svislý rytmus 24 px jsou
+ * Kořen obrazovky byznysu (RD04): šířka, okraje a svislý rytmus jsou
  * pro všechny obrazovky stejné, ať se při přepínání nic neposouvá.
  */
 export function PageShell({
@@ -24,7 +24,7 @@ export function PageShell({
   children: React.ReactNode
 }) {
   return (
-    <div className={cn('mx-auto flex flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8', WIDTH[width], className)}>
+    <div className={cn('mx-auto flex flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8 lg:py-7', WIDTH[width], className)}>
       {children}
     </div>
   )
@@ -52,7 +52,7 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <header className={cn('flex flex-wrap items-end justify-between gap-x-4 gap-y-3', className)}>
+    <header className={cn('flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-navy-100 pb-5', className)}>
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex items-center gap-3">
           <AccentHeading accent={accent}>{title}</AccentHeading>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ComponentType, type ReactNode } from 'react'
+import { useState, type ComponentType } from 'react'
 import { cn } from '@/lib/ws/utils'
 import { CTA_LABEL, MODULES, ROUTES } from './content'
 import {
@@ -56,10 +56,10 @@ function applyRules(state: Toggles, key: SwitchKey, value: boolean): Toggles {
 
 const TONE: Record<Tone, { surface: string; sub: string; muted: string }> = {
   dark: { surface: 'bg-navy-950 text-white', sub: 'text-navy-200', muted: 'text-navy-300' },
-  light: { surface: 'border border-navy-100 bg-surface text-ink', sub: 'text-quiet', muted: 'text-quiet' },
+  light: { surface: 'bg-surface text-ink', sub: 'text-quiet', muted: 'text-quiet' },
   soft: { surface: 'bg-navy-50 text-ink', sub: 'text-quiet', muted: 'text-quiet' },
 }
-const OFF_TONE = { surface: 'border border-dashed border-navy-300 bg-transparent text-ink', sub: 'text-quiet', muted: 'text-quiet' }
+const OFF_TONE = { surface: 'bg-navy-100 text-ink', sub: 'text-quiet', muted: 'text-quiet' }
 
 /** Dílek znaku: plný, když je funkce zapnutá; prázdný a čárkovaný, když je vypnutá. */
 function Dilek({ on, dark }: { on: boolean; dark: boolean }) {
@@ -125,24 +125,11 @@ function Switch({
   )
 }
 
-function Pill({ dark, children }: { dark: boolean; children: ReactNode }) {
-  return (
-    <span
-      className={cn(
-        'whitespace-nowrap rounded-full border px-3 py-1.5 font-num text-[12px] uppercase tracking-[0.06em]',
-        dark ? 'border-navy-600 text-navy-200' : 'border-navy-200 text-quiet',
-      )}
-    >
-      {children}
-    </span>
-  )
-}
-
 function OffSlot() {
   return (
-    <div className="flex min-h-[180px] flex-1 flex-col justify-center gap-2 rounded-chip border border-dashed border-navy-300 p-5">
-      <p className="font-semibold">Vypnuto</p>
-      <p className="text-[15px] leading-relaxed text-quiet">Z menu zmizí, data zůstanou. Kdykoli to můžete zapnout zpět.</p>
+    <div className="flex min-h-[180px] flex-1 flex-col justify-center gap-2 py-3">
+      <p className="font-semibold">Funkce je vypnutá</p>
+      <p className="text-[15px] leading-relaxed text-quiet">Z menu zmizí, data zůstanou. Kdykoli ji můžete zapnout zpět.</p>
     </div>
   )
 }
@@ -163,20 +150,20 @@ function ModuleCard({
   return (
     <div
       className={cn(
-        'flex h-full flex-col rounded-box p-5 transition-[background-color,border-color,transform] duration-300 ease-zq sm:p-6',
+        'flex h-full flex-col rounded-chip p-5 transition-colors duration-300 ease-zq sm:p-6',
         tone.surface,
-        on && 'hover:-translate-y-0.5',
       )}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className={cn('font-num text-[13px]', tone.muted)}>{tile.n}</span>
           <Dilek on={on} dark={dark} />
         </div>
         {tile.control.kind === 'switch' ? (
           <Switch id={titleId} checked={on} dark={dark} onChange={onToggle} />
         ) : (
-          <Pill dark={dark}>{tile.control.kind === 'locked' ? 'Vždy v menu' : tile.control.where}</Pill>
+          <span className={cn('text-[13px]', tone.muted)}>
+            {tile.control.kind === 'locked' ? 'Vždy v menu' : tile.control.where}
+          </span>
         )}
       </div>
       <div className="mt-6">
@@ -228,7 +215,7 @@ export function Modules() {
 
       <div className="mt-10 flex flex-col gap-5 border-t border-navy-100 pt-10 sm:flex-row sm:items-center sm:justify-between">
         <p className="max-w-[46ch] text-lg leading-relaxed text-ink">
-          Všechno, co tu vidíte, je v jednom tarifu. Prvních 14 dní je zdarma.
+          Všechno, co tu vidíte, je v ceně. 14 dní zdarma, potom 249 Kč měsíčně.
         </p>
         <a
           href={ROUTES.signUp}

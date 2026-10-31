@@ -193,7 +193,7 @@ function OrderScene({ fill }: { fill: number }) {
           Odeslat poptávku
         </span>
       </div>
-      <p className="rounded-chip border border-navy-100 bg-ground p-4 text-[15px] leading-snug text-quiet">
+      <p className="text-[15px] leading-snug text-quiet">
         Stejná stránka se otevře i z QR kódu na pultu. Zákazník si čas vybere sám.
       </p>
     </div>
@@ -241,7 +241,7 @@ function ConfirmScene() {
           ]}
         />
       </div>
-      <div className={cn('rounded-chip border border-navy-200 bg-ground p-4 sm:p-5 animate-zq-in', motion)}>
+      <div className={cn('bg-ground p-4 sm:p-5 animate-zq-in', motion)}>
         <p className="flex items-center gap-2 text-sm font-medium text-quiet">
           <Check size={16} aria-hidden />
           E-mail zákaznici · odesláno
@@ -258,7 +258,7 @@ function ConfirmScene() {
 function PaymentScene() {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className={cn('flex flex-col rounded-chip border border-navy-200 p-5 animate-zq-in', motion)}>
+      <div className={cn('flex flex-col bg-navy-50 p-5 animate-zq-in', motion)}>
         <span className="self-start rounded-full bg-navy-100 px-3 py-1 text-sm font-medium text-navy-800">
           Zaplaceno
         </span>
@@ -269,7 +269,7 @@ function PaymentScene() {
           Zapsáno do přehledu
         </p>
       </div>
-      <div className={cn('rounded-chip border border-navy-200 bg-ground p-5 animate-zq-in', motion)}>
+      <div className={cn('bg-ground p-5 animate-zq-in', motion)}>
         <p className="text-sm font-medium text-quiet">Věrnostní karta</p>
         <div className="mt-5 grid grid-cols-5 gap-2" aria-hidden>
           {[0, 1, 2, 3].map((i) => (
@@ -388,23 +388,21 @@ export function HowItWorks() {
           ))}
         </div>
 
-        <div className="story-scene sticky top-24 order-1 min-w-0 overflow-hidden rounded-panel border border-navy-200 bg-surface text-ink lg:order-2">
-          <div className="flex items-center justify-between gap-3 border-b border-navy-100 px-4 py-3 sm:px-6">
+        <div className="story-scene order-1 min-w-0 bg-surface text-ink lg:sticky lg:top-24 lg:order-2">
+          <div className="mb-6 flex items-center justify-between gap-3">
             <span aria-live="polite" className="font-semibold">
               {STEPS[step].title}
             </span>
             <span className="font-num text-[13px] uppercase tracking-[0.08em] text-quiet">Ukázka</span>
           </div>
-          <div id="jak-scena" className="min-h-[400px] p-4 sm:p-6">
+          <div id="jak-scena" className="min-h-[400px]">
             <div key={step} className={cn('animate-zq-rise', motion)}>
               {renderScene(step, fill)}
             </div>
           </div>
-          <div className="flex items-center justify-between gap-3 border-t border-navy-100 bg-ground px-4 py-3 sm:px-6">
-            <span className="font-num text-sm text-quiet">
-              Krok {step + 1} z {STEPS.length} · fiktivní data
-            </span>
-          </div>
+          <p className="mt-4 text-sm text-quiet">
+            Krok {step + 1} z {STEPS.length} · Fiktivní data
+          </p>
         </div>
       </div>
       {reduced && <span className="sr-only">Pohyb je vypnutý. Kroky můžete procházet tlačítky.</span>}

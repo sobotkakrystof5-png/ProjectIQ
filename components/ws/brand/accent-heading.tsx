@@ -2,11 +2,11 @@ import { cn } from '@/lib/ws/utils'
 
 const sizes = {
   // landing H1 88 px
-  hero: 'text-[44px] leading-[0.98] tracking-[-0.035em] sm:text-[64px] lg:text-[88px]',
+  hero: 'text-[40px] leading-[0.98] tracking-[-0.035em] sm:text-[64px] lg:text-[88px]',
   // landing H2 56 px
-  section: 'text-[34px] leading-[1.02] tracking-[-0.03em] sm:text-[44px] lg:text-[56px]',
-  // nadpis obrazovky v aplikaci 40 px
-  page: 'text-[32px] leading-[1.05] tracking-[-0.03em] sm:text-[40px]',
+  section: 'text-[28px] leading-[1.02] tracking-[-0.03em] sm:text-[44px] lg:text-[56px]',
+  // nadpis obrazovky v aplikaci 28–36 px
+  page: 'text-[28px] leading-[1.05] tracking-[-0.03em] sm:text-[36px]',
   // menší nadpis v aplikaci 28 px
   title: 'text-[24px] leading-[1.1] tracking-[-0.02em] sm:text-[28px]',
 }

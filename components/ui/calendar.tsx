@@ -40,7 +40,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: R
         today: '[&>button]:font-semibold [&>button]:text-navy-700 [&>button]:ring-1 [&>button]:ring-inset [&>button]:ring-navy-100 dark:[&>button]:text-navy-200 dark:[&>button]:ring-navy-700',
         selected:
           '[&>button]:bg-navy-700 [&>button]:text-white [&>button]:hover:bg-navy-800 [&>button]:ring-0',
-        outside: '[&>button]:text-quiet/50',
+        outside: '[&>button]:text-quiet',
         disabled: '[&>button]:pointer-events-none [&>button]:text-quiet/40',
         range_middle: '[&>button]:rounded-none [&>button]:bg-navy-100 [&>button]:text-navy-900',
         hidden: 'invisible',
