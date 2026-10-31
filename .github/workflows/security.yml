@@ -16,9 +16,6 @@ permissions:
 jobs:
   dependencies:
     runs-on: ubuntu-latest
-    # Dočasně jen upozornění: zbývá nodemailer 7, next-auth 4 a řetězec tailwindcss 3
-    # (Next je od R-053 na 16.4). Rozhodnout nejpozději v S19. .claude/security/DECISIONS.md #006.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

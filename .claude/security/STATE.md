@@ -3,7 +3,7 @@
 > Současný stav. Přepisuje se — historie je v ostatních souborech.
 > Čti na začátku každého sezení, které sahá na hlavičky, CSP, proxy, API nebo vstupy.
 
-**Poslední aktualizace:** 2026-10-17, S19 (Preview, živý audit a Nodemailer 10)
+**Poslední aktualizace:** 2026-10-31, launch audit (dependency audit bez nálezů; CI audit blokuje)
 
 ## Projekt
 
@@ -26,7 +26,7 @@ Co aplikace drží, a proto na čem záleží:
 - [x] **Přihlášení** — admin (NextAuth, jeden účet, brute-force lockout), firmy (Clerk od S07) → krádež session
 - [x] **Platby** — Stripe Checkout (přesměrování, karty nikdy u nás) → ověření podpisu webhooku, idempotence (`ws.stripe_events`)
 - [x] **Faktury** (IČO, DIČ, adresy, PDF v DB) → jen za přihlášením, PDF route kontroluje session sama
-- [x] **Veřejné vstupy** — poptávky z webů klientů (`/api/public/v1/*`, widget, objednávací stránka), booking API vizeon/alteno, portálové formuláře → spam, zahlcení, XSS přes uložená data
+- [x] **Veřejné vstupy** — poptávky z webů klientů (`/api/public/v1/*`, widget, objednávací stránka), booking API vizeon/alteno, portálové formuláře a kontaktní formulář landing (`app/(marketing)/actions.ts`) → spam, zahlcení, XSS přes uložená data; kontaktní formulář má Zod limity, honeypot, časovou kontrolu a rate limit
 - [x] **Vkládání na cizí weby** — `/r/[slug]` v iframe, `/embed/[slug].js` → clickjacking, únik přes špatné CORS
 - [x] **E-maily** z domény ZakazIQ přes Resend → podvržení odesílatele bez SPF/DKIM/DMARC
 - [x] **Secrets** — DB, NextAuth, Clerk, Stripe, Resend, Anthropic, Gmail app password → jen v env Vercelu
@@ -110,7 +110,6 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 | Stripe live mód (produkt, cena, Portal, e-maily, šablona faktury s IČO, webhook) | sandbox nesmí do produkce | Kryštof + Claude | S19 |
 | `WS_KEY_PEPPER` do Vercelu (Production + Preview, jiná hodnota než lokálně) | bez něj tajné klíče webů nejde vytvořit ani ověřit (API 503). Po nastavení už neměnit — změna zneplatní všechny tajné klíče | Kryštof | před nasazením `/w` |
 | Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; Workspace zatím Zod jen na serveru (S07) — `z.config({ jitless: true })` až s prvním formulářem validovaným v prohlížeči | — | S10+ |
-| `npm audit` — Nodemailer 10.1.2 odstranil svůj high nález; zbývá 5 high a 2 moderate v řetězci Tailwind 3. Oprava vyžaduje Tailwind 4 major migraci | CI audit zůstává upozorněním, viz DECISIONS #006 | Kryštof | před obnovením blokujícího CI |
 | `security.txt` | Audit neobdržel 200; soubor existuje v `public/.well-known/security.txt` a v Preview balíčku, produkce běží ze staršího commitu; kontakt a HTTP cestu ověřit | po přístupu k doméně |
 | DNS `zakaziq.cz` (DNSSEC, CAA, SPF, DKIM, DMARC) + doména v Resendu | bez nich lze posílat poštu jménem domény a e-maily padají do spamu; postup `docs/workspace/SETUP.md` → E-maily (S15) | Kryštof | před nastavením `WS_EMAIL_FROM` |
 | `WS_EMAIL_FROM` a `RESEND_WEBHOOK_SECRET` do Vercelu (+ endpoint webhooku v Resendu) | bez `WS_EMAIL_FROM` Workspace neodešle žádný e-mail; bez webhooku se nedozvíme o nedoručených | Kryštof | po ověření domény v Resendu |

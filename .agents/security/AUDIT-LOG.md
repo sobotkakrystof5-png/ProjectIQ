@@ -16,6 +16,35 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-31 — review V3: veřejné vstupy, webhooky, cron (launch plán)
+Spouštěč: launch plán, fáze 3 (V3), průchod nad vstupními body větve `ws/redesign-app`.
+Rozsah: kontaktní formulář landing, `app/api/{stripe,clerk,resend}/webhook`, `app/api/public/v1/requests`, `app/api/cron/ws-*`, `lib/ws/cron.ts`, `lib/ws/email/resend-webhook.ts`, `lib/ws/intake/rate-limit.ts`, XSS sinky, veřejné `NEXT_PUBLIC_*`, sledované `.env*`. Celý rozdíl (613 souborů) řádek po řádku nečten; `proxy.ts`, `next.config.mjs` a `lib/security/*` v tomto průchodu nově nezkoumány (pokryté dřívějšími review).
+Výsledek: bez nálezu „opravit hned“.
+- Webhooky Stripe, Clerk i Resend jsou fail-closed (bez tajemství 503), čtou tělo s limitem, ověřují podpis a čerstvost; Resend používá `timingSafeEqual`. Cron porovnává `CRON_SECRET` v konstantním čase a bez něj nepustí nikoho.
+- Veřejné API poptávek: rate limit na IP i byznys před autentizací, idempotence, CORS jen z povolených domén klíče.
+- XSS: `dangerouslySetInnerHTML` jen pro JSON-LD z vlastního objektu a pevný skript motivu s nonce; `innerHTML` jen v admin `TradingViewChart` (konstantní obsah, admin se nemění). V klientském kódu jsou jen `NEXT_PUBLIC_APP_URL` a publishable klíč Clerku. V gitu jsou jen `.env.example` a `.env.local.example`.
+- Opravit před spuštěním: Vercel Production má dnes dev/sandbox klíče Clerku a Stripe a chybí `CLERK_WEBHOOK_SECRET`, `RESEND_WEBHOOK_SECRET`, `WS_EMAIL_FROM`. Před mergem je nahradit live hodnotami.
+- Přijato (nízké): kontaktní formulář kontroluje a zapisuje limit ve dvou dotazech (ne atomicky) a ukládá IP v čitelné podobě do admin tabulky `api_requests` (mazání po 1 dni); bez captchy, jen honeypot, časová kontrola a limit 5/15 min na IP. Při distribuovaném spamu přibudou řádky v Hovorech; zvážit Turnstile po spuštění.
+Ověřeno: `npm test` (588 passed, 1 skipped), `npx tsc --noEmit`.
+Zůstává: V2 (admin s daty po Next 16), živý audit produkční domény po nasazení.
+
+## 2026-10-31 — audit závislostí a obnova blokujícího CI
+Spouštěč: launch plán, fáze 3 (V4); naplnění podmínky v rozhodnutí #006.
+Rozsah: produkční i vývojové závislosti podle npm advisories; lockfile po `npm audit fix`.
+Výsledek: první audit našel 5 zranitelností (3 high, 2 moderate), včetně Zod přes Puppeteer/Chromium, Nodemailer a postcss-selector-parser. `npm audit fix` bez `--force` aktualizoval lockfile v rámci existujících rozsahů. Následný `npm audit` i `npm audit --omit=dev --audit-level=high` hlásí 0 zranitelností.
+Ověřeno: `npm test` — 583 passed, 1 skipped; `npx tsc --noEmit`; `npm run build:check` prošly. `gitleaks git --log-opts='main..HEAD' --redact` — bez nálezu.
+Opraveno: `.github/workflows/security.yml` už nemá `continue-on-error`; high/critical audit nyní blokuje CI podle rozhodnutí #006. `package.json` beze změny; aktualizován `package-lock.json`.
+Zůstává: celý V3 bezpečnostní review proti `main`, živé Preview/provozní ověření a ruční kroky z `docs/workspace/LAUNCH-PLAN.md`.
+
+## 2026-10-31 — review kontaktního formuláře landing
+Spouštěč: launch plán; nový veřejný formulář podpory.
+Rozsah: `app/(marketing)/actions.ts`, formulář a sekce v `components/marketing/`, rate limit a zápis do existující tabulky `client_leads`.
+Výsledek: scoped review bez vysokého nálezu; nejširší kontrola V3 celého rozdílu proti `main` zůstává otevřená.
+- Jméno, e-mail a zpráva mají Zod limity; data se vkládají parametrizovaně bez HTML interpretace. Honeypot a časová kontrola omezují automatický spam; limit je 5 požadavků za 15 minut na IP. Chyba loguje pouze typ chyby, ne obsah ani kontaktní údaje.
+- Dotazy jsou v existujících Hovorech `/dashboard/calls`, s termínem odpovědi následující den a typem úkolu e-mail. Automatická notifikace se neposílá; odpovědná osoba a monitoring Hovorů zůstávají provozní blokátor. Právní účel a retenci osobních údajů doplnit před veřejným spuštěním.
+- Bez nové závislosti, env proměnné, externí služby, e-mailového odeslání nebo změny CSP.
+Ověřeno: kontaktní testy 5/5, celé `npm test` 588 passed + 1 skipped, `npx tsc --noEmit`, `npx next build --webpack` (47/47 stránek). Turbopack build v tomto prostředí selhal při vytvoření procesu/vazbě na interní port; Webpack build uspěl.
+
 ## 2026-10-17 — review S19 (částečné, před nasazením)
 Spouštěč: bezpečnostní audit a spuštění S19.
 Rozsah: dřívější detailní review S06–S18 v tomto logu; aktuální rozdíly veřejného příjmu poptávek, rate limitů, cen a CSP; webhooky Stripe/Clerk/Resend; čtení těla veřejného API; CSP pro všechny cesty.

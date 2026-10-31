@@ -66,6 +66,7 @@ Přijaté riziko: nová high/critical zranitelnost neshodí build, jen se objev�
 Revize: S19 — po upgradu nodemailer 10 (a rozhodnutí o next-auth 4 / tailwindcss 4) vrátit `continue-on-error: false`. Next 16.2.12 audit neprošel (opravy od 16.3.8), proto cíl 16.4.2.
 Revize S19 (2026-10-17): Nodemailer je 10.1.2 a odstranil vlastní high nález. Peer rozsah `next-auth@4` stále uvádí nepovinný Nodemailer 7; projekt používá pouze CredentialsProvider, proto instalace používá `.npmrc` `legacy-peer-deps=true` (R-056). Audit stále hlásí 5 high + 2 moderate v Tailwind 3 řetězci; `npm audit fix` vyžaduje Tailwind 4 major. CI zůstává neblokující do migračního rozhodnutí a opravy nálezů.
 Revize S19 (2026-10-17): Nodemailer je 10.1.2 a odstranil vlastní high nález. Peer rozsah `next-auth@4` stále uvádí volitelný Nodemailer 7; projekt používá pouze CredentialsProvider, proto instalace používá `.npmrc` `legacy-peer-deps=true` (R-056). Audit stále hlásí 5 high + 2 moderate v Tailwind 3 řetězci; `npm audit fix` vyžaduje Tailwind 4 major. CI zůstává non-blocking do migračního rozhodnutí a opravy nálezů.
+Revize (2026-10-31): `npm audit fix` bez `--force` aktualizoval zranitelné závislosti v rámci existujících rozsahů verzí. `npm audit` i `npm audit --omit=dev --audit-level=high` hlásí 0 zranitelností. Podle původní podmínky je `continue-on-error` odstraněno; job závislostí nyní blokuje CI při high/critical nálezu.
 
 ## 007 — Landing page dynamická s vynucenou CSP
 Datum: 2026-10-08
