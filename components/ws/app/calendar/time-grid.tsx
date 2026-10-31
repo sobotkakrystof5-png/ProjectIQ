@@ -153,10 +153,6 @@ export function TimeGrid({
   const [touchSelect, setTouchSelect] = useState(false)
   const [touchMove, setTouchMove] = useState(false)
   const box = quick?.range ?? selection
-  const firstColumnByDay = new Map<string, string>()
-  for (const col of columns) {
-    if (!col.requests && !firstColumnByDay.has(col.day)) firstColumnByDay.set(col.day, col.key)
-  }
 
   const rawMinutes = (el: HTMLElement, clientY: number) => {
     const rect = el.getBoundingClientRect()
@@ -464,7 +460,7 @@ export function TimeGrid({
                 onPointerLeave={() => setOver((o) => (o === col.key ? null : o))}
               >
                 {!col.requests && (
-                  <NowIndicator day={col.day} hours={hours} showLabel={firstColumnByDay.get(col.day) === col.key} />
+                  <NowIndicator day={col.day} hours={hours} showLabel={columns[0]?.key === col.key} />
                 )}
                 {col.closed?.map((seg, i) => (
                   <div

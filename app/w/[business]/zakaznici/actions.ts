@@ -13,6 +13,7 @@ import { deliver, notifyVisitPaid } from '@/lib/ws/email/notify'
 import { sendCustomerMessage as sendCustomerMessageData, sendOutreachDraft, type SendOutcome } from '@/lib/ws/email/outbox'
 import { cancelQueuedCustomerMessage } from '@/lib/ws/email/queue'
 import { getEmailSettings } from '@/lib/ws/email/settings'
+import { getEnabledModules } from '@/lib/ws/today'
 import { CUSTOMER_MESSAGE_TYPES, MESSAGES, type CustomerMessageType } from '@/lib/ws/email/catalog'
 import { createDraft, OUTREACH_KINDS, setDraftDiscarded } from '@/lib/ws/outreach'
 import { fail, ok, type Result } from '@/lib/ws/result'
@@ -305,9 +306,10 @@ export async function getCustomerMessageTemplates(raw: unknown): Promise<Result<
   const p = await prepare(z.object({ slug }), raw, { write: false })
   if (!p.ok) return p
   try {
-    const data = await getEmailSettings(p.c.ctx, p.c.business)
+    const [data, modules] = await Promise.all([getEmailSettings(p.c.ctx, p.c.business), getEnabledModules(p.c.ctx, p.c.business)])
     const rows = new Map(data.rows.map((r) => [r.type, r]))
-    return ok(CUSTOMER_MESSAGE_TYPES.map((type) => {
+    // „Informace k zakázce“ dává smysl jen byznysu se zapnutými Zakázkami.
+    return ok(CUSTOMER_MESSAGE_TYPES.filter((type) => type !== 'customer_job' || modules.has('jobs')).map((type) => {
       const row = rows.get(type)
       return { type, subject: row?.subject ?? MESSAGES[type].subject, body: row?.body ?? MESSAGES[type].body, enabled: row?.enabled ?? true }
     }))

@@ -236,8 +236,9 @@ export function CustomerContactActions({
                 <select value={type} onChange={(event) => selectTemplate(event.target.value as CustomerMessageType)} className="h-11 rounded-chip border border-input bg-surface px-3 text-[15px] text-ink">
                   {CUSTOMER_MESSAGE_TYPES.map((item) => {
                     const row = templates.find((template) => template.type === item)
+                    if (!row) return null
                     const blocked = item === 'customer_offer' && offerBlocked
-                    return <option key={item} value={item} disabled={!row?.enabled || blocked}>{MESSAGES[item].label}</option>
+                    return <option key={item} value={item} disabled={!row.enabled || blocked}>{MESSAGES[item].label}</option>
                   })}
                 </select>
               </label>

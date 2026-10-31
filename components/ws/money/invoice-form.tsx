@@ -136,6 +136,7 @@ export function InvoiceForm({slug,today,options,closeHref,jobId,customerId}:{slu
       <datalist id="invoice-customers">{customerOptions.map(item=><option key={item.customer.id} value={item.value}/>)}</datalist>
     </Field>
     <PartyFields title="Odběratel" value={buyer} onChange={party=>{setBuyer(party);if(party.name!==buyer.name)setCustomer(null)}}/>
+    {!customer&&buyer.name.trim()!==''&&<p role="status" className="-mt-2 text-sm text-quiet">Faktura nebude u žádného zákazníka. Vyberte ho ze seznamu výše, pokud ho máte v Zákaznících.</p>}
 
     <fieldset className="flex flex-col gap-3">
       <legend className="text-sm font-semibold text-ink">Položky faktury</legend>
@@ -158,6 +159,7 @@ export function InvoiceForm({slug,today,options,closeHref,jobId,customerId}:{slu
         </Field>}
         {items.length>1&&<Button type="button" variant="ghost" onClick={()=>setItems(current=>current.filter((_,n)=>n!==index))}>Odebrat položku</Button>}
       </div>)}
+      {items.some(row=>row.description.trim()!==''&&row.unitPrice===0)&&<p role="status" className="text-sm text-quiet">U některé položky je cena 0. Doplňte ji, než fakturu vystavíte.</p>}
       {items.length<50&&<Button type="button" variant="outline" onClick={()=>setItems(current=>[...current,{description:'',quantity:1,unitPrice:0,vatRate:0}])}>Přidat vlastní položku</Button>}
     </fieldset>
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-box bg-navy-50 p-4 dark:bg-navy-800">

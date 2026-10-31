@@ -82,9 +82,9 @@ export function NowIndicator({
         <>
           <span
             aria-hidden="true"
-            className="absolute left-1 -top-2.5 rounded-full border border-navy-100 bg-surface px-1.5 py-0.5 font-num text-[10px] leading-none text-navy-700 shadow-sm dark:border-navy-800 dark:bg-navy-950 dark:text-navy-200"
+            className="absolute right-full -top-2.5 mr-1 rounded-full border border-navy-100 bg-surface px-1.5 py-0.5 font-num text-[10px] leading-none text-navy-700 shadow-sm dark:border-navy-800 dark:bg-navy-950 dark:text-navy-200"
           >
-            Teď {time}
+            {time}
           </span>
           <span className="sr-only">Teď je {time}.</span>
         </>
