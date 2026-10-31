@@ -29,8 +29,8 @@ export async function GET(_req:Request, props:{params: Promise<{business:string;
    pdf=await renderInvoicePdf(invoice,{name:b.name,logo:b.logo_url})
   }
   return new NextResponse(new Uint8Array(pdf),{headers:{'Content-Type':'application/pdf','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent('faktura-'+invoice.number+'.pdf'),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})
- }catch{
-  console.error('[ws/money] PDF se nepodařilo připravit.',{accountId:ctx.accountId})
+ }catch(e){
+  console.error('[ws/money] PDF se nepodařilo připravit.',{accountId:ctx.accountId,error:e instanceof Error?e.name+': '+e.message:String(e)})
   return new NextResponse('PDF se nepovedlo připravit. Zkuste to znovu.',{status:503})
  }
 }
