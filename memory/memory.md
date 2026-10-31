@@ -476,6 +476,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-31
+- **fix** Preview `/w/testovaci-salon` padal (`permission denied for function business_scope`): na testovací DB chybělo `ws_app` právo na `ws.business_scope`, `ws.money_issue` a `ws.money_adopt_visit` (migrace je udělují jen při existující roli). Doplněno do `scripts/ws-grants.sql`, rozbitý blok `DO $$` nahrazen prostými GRANTy (`ws-create-role.js` dělí soubor podle `;`); puštěno na testovací DB. Produkční práva neověřena. Stripe Checkout testovacího účtu dokončen, předplatné `trialing` do 2026-11-14.
 - **fix** Test věrnosti „platnost těsně před koncem“ padal na konci měsíce (31. 10. − 6 měsíců = 30. 4.); posun data karty teď počítá ve dnech (180/185). Soubor `lib/ws/__tests__/ws-loyalty.test.ts`. Ověřeno: `npm test` 582 + 1 přeskočený, `npx tsc --noEmit`.
 - **db** Migrace 084 (GDPR) aplikována na testovací Neon `ZakazIQ RD test` dvakrát po sobě (idempotence), ověřeno 5 funkcí a `EXECUTE` pro `ws_app`. Na produkci ji 2026-10-31 aplikoval Kryštof sám (z odsud nebylo připojení vlastníka produkční DB; čtením katalogu neověřeno). Produkční Neon má tím všechny migrace 064–091.
 - **fix** Clerk (dev instance): `force_organization_selection` vypnuto přes `clerk config patch`. Po registraci Clerk vynucoval vlastní anglický krok „Setup your organization“ s názvem z domény e-mailu a obcházel průvodce `/w/novy` (R-037); nejspíš nový výchozí stav Clerku. Stejné nastavení musí mít produkční instance (LAUNCH.md).
