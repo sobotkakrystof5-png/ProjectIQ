@@ -402,6 +402,11 @@
 **Proč:** skupinová lekce dostává pevnou kapacitu bez dvojího blokování pracovníka; omezení adminu naplňuje D-1 bez změny databázové role a její správy.
 **Důsledek:** migrace 090/091 jsou aplikované na produkci i testovací DB; RD11 migraci nemá. Technické podrobnosti a omezení ověření jsou v redesign plánu a referenci B9; bezpečnostní rozhodnutí #017.
 
+### R-064 · QR platba v PDF přes balíček qrcode (2026-10-31)
+**Rozhodnutí:** SPAYD QR v PDF faktury kreslí `qrcode` 1.5.4 (`QRCode.toString(…, {type:'svg'})`), ne `qrcode.react`. `qrcode.react` zůstává jen pro QR v prohlížeči (Nastavení › Napojený web).
+**Proč:** route handlery a server actions běží s React serverovým buildem bez hooků; `QRCodeSVG` volá `useMemo` a PDF s QR na Vercelu padalo (`Cannot read properties of null (reading 'useMemo')`). Vitest to nezachytil, běží s běžným Reactem. Kryštof vybral balíček (MIT) před vložením generátoru do repa.
+**Důsledek:** `lib/ws/money/pdf.ts`; v kódu pro server nepoužívat React komponenty s hooky přes `renderToStaticMarkup`.
+
 ## 3. Otevřené problémy
 
 - [ ] **Landing — oborové podstránky (návrh R-055, nestavět bez rozhodnutí):** `/pro/kadernictvi`, `/pro/kosmetika`, `/pro/remeslnici` (zámečnictví, studnařství, stavba), `/pro/autoservis`, `/pro/uklid`; likvidace azbestu spíš jako sekce u řemeslníků. Každá jen s obsahem, který je opravdu jiný: služby a kolonky ze šablony oboru (`lib/ws/templates/`), ukázka objednávky pro obor, vlastní dotazy. Bez skutečných zákazníků z oboru hrozí tenké stránky, proto začít 1–2 obory, kde budou první reference. `/cenik` samostatně nedává smysl (jedna cena, kotva stačí) · od 2026-10-17
@@ -476,6 +481,8 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-10-31
+- **fix** PDF faktury na Vercelu (503): (1) písma `lib/ws/money/assets` a `app/ws-tokens.css` přibalena do funkcí (`outputFileTracingIncludes`), Chromium i k portálu, exportu, stránce faktur a cronu e-mailů; (2) QR platba přes `qrcode` místo `qrcode.react` (R-064); log PDF nese text chyby. Soubory `next.config.mjs`, `lib/ws/money/pdf.ts`, `app/api/ws/[business]/faktury/[id]/pdf/route.ts`.
+- **chore** Přihlášený průchod Preview s ukázkovými daty (`testovaci-salon`, seed pustil Kryštof): Dnes, Kalendář, Poptávky, Zákazníci, Nastavení › Firma a vystavení faktury 2026-000001 fungují, konzole bez chyb. Testovacímu salonu zapnuty Faktury a vyplněn fiktivní dodavatel.
 - **fix** Preview `/w/testovaci-salon` padal (`permission denied for function business_scope`): na testovací DB chybělo `ws_app` právo na `ws.business_scope`, `ws.money_issue` a `ws.money_adopt_visit` (migrace je udělují jen při existující roli). Doplněno do `scripts/ws-grants.sql`, rozbitý blok `DO $$` nahrazen prostými GRANTy (`ws-create-role.js` dělí soubor podle `;`); puštěno na testovací DB. Produkční práva neověřena. Stripe Checkout testovacího účtu dokončen, předplatné `trialing` do 2026-11-14.
 - **fix** Test věrnosti „platnost těsně před koncem“ padal na konci měsíce (31. 10. − 6 měsíců = 30. 4.); posun data karty teď počítá ve dnech (180/185). Soubor `lib/ws/__tests__/ws-loyalty.test.ts`. Ověřeno: `npm test` 582 + 1 přeskočený, `npx tsc --noEmit`.
 - **db** Migrace 084 (GDPR) aplikována na testovací Neon `ZakazIQ RD test` dvakrát po sobě (idempotence), ověřeno 5 funkcí a `EXECUTE` pro `ws_app`. Na produkci ji 2026-10-31 aplikoval Kryštof sám (z odsud nebylo připojení vlastníka produkční DB; čtením katalogu neověřeno). Produkční Neon má tím všechny migrace 064–091.

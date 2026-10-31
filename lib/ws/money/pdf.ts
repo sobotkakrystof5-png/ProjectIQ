@@ -81,10 +81,9 @@ export async function invoiceHtml(invoice:Invoice,brand:{name:string;logo:string
  const spayd=spaydPaymentString(invoice)
  let qr=''
  if(spayd){
-  const [{createElement},{renderToStaticMarkup},{QRCodeSVG}]=await Promise.all([
-   import('react'),import('react-dom/server'),import('qrcode.react'),
-  ])
-  qr=renderToStaticMarkup(createElement(QRCodeSVG,{value:spayd,size:148,level:'M',marginSize:2}))
+  // Ne qrcode.react: route handlery běží s React serverovým buildem bez hooků (R-064).
+  const QRCode=(await import('qrcode')).default
+  qr=await QRCode.toString(spayd,{type:'svg',errorCorrectionLevel:'M',margin:2,width:148})
  }
  // Uživatelské hodnoty se serializují pouze jako escapovaný text, nikdy HTML.
  return '<!doctype html><html lang="cs"><head><meta charset="utf-8">'+
