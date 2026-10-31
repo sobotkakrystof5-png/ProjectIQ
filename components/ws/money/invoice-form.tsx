@@ -85,6 +85,14 @@ export function InvoiceForm({slug,today,options,closeHref,jobId,customerId}:{slu
     setBuyer({...blankParty,name:selected?.name??value,email:selected?.email??''})
   }
 
+  // Celé napsané jméno bez výběru ze seznamu: bez vazby by fakturu nenašel výmaz zákazníka (R-054).
+  function matchTypedCustomer() {
+    if(customer)return
+    const name=buyer.name.trim().toLocaleLowerCase('cs')
+    const matches=name?options.customers.filter(item=>item.name.trim().toLocaleLowerCase('cs')===name):[]
+    if(matches.length===1)selectCustomer(customerOptions.find(option=>option.customer.id===matches[0].id)!.value)
+  }
+
   async function issue(intent:'send'|'download'|'only') {
     const form=formRef.current
     if(!form||!profileReady||!form.reportValidity())return
@@ -124,7 +132,7 @@ export function InvoiceForm({slug,today,options,closeHref,jobId,customerId}:{slu
     </Field>
     <Field label="Zákazník">
       <Input list="invoice-customers" value={customerOptions.find(item=>item.customer.id===customer)?.value??buyer.name}
-        disabled={Boolean(job)} placeholder="Začněte psát jméno" onChange={event=>selectCustomer(event.target.value)}/>
+        disabled={Boolean(job)} placeholder="Začněte psát jméno" onChange={event=>selectCustomer(event.target.value)} onBlur={matchTypedCustomer}/>
       <datalist id="invoice-customers">{customerOptions.map(item=><option key={item.customer.id} value={item.value}/>)}</datalist>
     </Field>
     <PartyFields title="Odběratel" value={buyer} onChange={party=>{setBuyer(party);if(party.name!==buyer.name)setCustomer(null)}}/>
