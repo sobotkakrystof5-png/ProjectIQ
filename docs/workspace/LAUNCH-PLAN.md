@@ -159,7 +159,7 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 **Hotovo, když:** V1–V4 zelené, V2 doloženo seznamem ověřených adres, V5 a V7 bez blokujících nálezů.
 
-**Stav V1 + V4 (2026-10-31): hotovo.** Testy 588/588 mimo 1 očekávaně přeskočený, TypeScript a produkční Webpack build prošly (47/47 stránek). Závislostní audit je čistý; `.github/workflows/security.yml` nyní blokuje high/critical nálezy. V2, V3 a ruční ověření zůstávají otevřené.
+**Stav V1 + V4 (2026-10-31): hotovo.** Testy 588/588 mimo 1 očekávaně přeskočený, TypeScript a produkční Webpack build prošly (47/47 stránek). Závislostní audit je čistý; `.github/workflows/security.yml` nyní blokuje high/critical nálezy. V3 (veřejné vstupy, webhooky, cron) proběhl 2026-10-31 bez nálezu „opravit hned“, viz `.claude/security/AUDIT-LOG.md`. V2 jen částečně: na lokálním serveru se testovací DB `/login` a `/` vrací 200, `/dashboard`, `/alteno`, `/hub` a `/dashboard/klienti` přesměrují na přihlášení stejně jako na `main` (`withAuth` beze změny), crony bez tajemství 401, webhook 405 na GET; `/p/[token]` dává 500, protože testovací DB nemá admin tabulky. Přihlášení a data adminu ověřit zbývá. Ruční ověření zůstává otevřené.
 
 ## 7. Fáze 4 — nasazení (jen s výslovným souhlasem Kryštofa)
 
