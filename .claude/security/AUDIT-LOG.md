@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-10-31 — statická analýza Semgrep (kód a CI)
+Spouštěč: žádost Kryštofa o test bezpečnosti kódu nástrojem Semgrep.
+Rozsah: celé repo (1015 souborů, bez `node_modules`, `.next`, `graphify-out`, `.agents`, `public`); pravidla `p/security-audit`, `typescript`, `nextjs`, `react`, `secrets`, `owasp-top-ten`, `jwt`, `sql-injection`, `xss`; telemetrie vypnutá, nic se nenahrává. Semgrep 1.183.0 v dočasném venv mimo repo.
+Výsledek: 12 nálezů, žádný v aplikačním kódu (SQL injection, XSS, secrets, JWT bez nálezu).
+Nálezy: 5× `github-actions-mutable-action-tag` (`security.yml`), 1× `npm-missing-minimum-release-age` (`.npmrc`), 6× `wildcard-postmessage-configuration` ve vendorovaném skriptu skillu Impeccable (`live-browser.js`, ne náš kód). Parser neprošel úplně `& Zdraví`/`& čas` v JSX (omezení Semgrepu).
+Opraveno: akce v `.github/workflows/security.yml` připnuté na commit SHA (`actions/checkout`, `actions/setup-node`, `gitleaks/gitleaks-action`, verze v komentáři); `.npmrc` má `min-release-age = 7` (npm 11.10+, starší npm klíč ignoruje). Opakovaný sken obou souborů: 0 nálezů.
+Zůstává: SHA akcí se neaktualizují samy (zvážit Dependabot pro `github-actions`); `postMessage` ve vendorovaném skriptu se neřeší; Semgrep nevidí oddělení účtů, logiku webhooků ani produkční konfiguraci (viz review V3).
+
 ## 2026-10-31 — review V3: veřejné vstupy, webhooky, cron (launch plán)
 Spouštěč: launch plán, fáze 3 (V3), průchod nad vstupními body větve `ws/redesign-app`.
 Rozsah: kontaktní formulář landing, `app/api/{stripe,clerk,resend}/webhook`, `app/api/public/v1/requests`, `app/api/cron/ws-*`, `lib/ws/cron.ts`, `lib/ws/email/resend-webhook.ts`, `lib/ws/intake/rate-limit.ts`, XSS sinky, veřejné `NEXT_PUBLIC_*`, sledované `.env*`. Celý rozdíl (613 souborů) řádek po řádku nečten; `proxy.ts`, `next.config.mjs` a `lib/security/*` v tomto průchodu nově nezkoumány (pokryté dřívějšími review).
