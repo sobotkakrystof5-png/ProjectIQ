@@ -161,18 +161,18 @@ export function CustomerContactActions({
   const encodedEmail = email ? mailtoAddress(email) : null
 
   return (
-    <div className={compact ? 'flex items-center gap-2' : 'flex flex-col gap-2'}>
-      <ul className="flex flex-col gap-0.5 text-[15px]">
+    <div className={compact ? 'flex min-w-0 flex-col items-start gap-1' : 'flex flex-col gap-2'}>
+      <ul className="flex min-w-0 max-w-full flex-col gap-0.5 text-[15px]">
         {phone && (
           <li>
-            <a href={`tel:${phone}`} className="inline-flex min-h-9 items-center gap-2 text-ink underline-offset-4 hover:underline">
-              <Phone aria-hidden size={16} strokeWidth={1.5} className="text-quiet" />
+            <a href={`tel:${phone}`} className="inline-flex min-h-9 items-center gap-2 whitespace-nowrap text-ink underline-offset-4 hover:underline">
+              <Phone aria-hidden size={16} strokeWidth={1.5} className="shrink-0 text-quiet" />
               <span className="font-num text-sm">{formatPhone(phone)}</span>
             </a>
           </li>
         )}
         {email && (
-          <li className="flex flex-wrap items-center gap-2">
+          <li className="flex min-w-0 flex-wrap items-center gap-2">
             {encodedEmail ? <a href={`mailto:${encodedEmail}`} className="inline-flex min-h-9 max-w-full items-center gap-2 text-ink underline-offset-4 hover:underline">
               <Mail aria-hidden size={16} strokeWidth={1.5} className="shrink-0 text-quiet" />
               <span className="truncate">{email}</span>

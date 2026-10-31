@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { FieldSettings } from '@/components/ws/settings/field-settings'
 import { StageSettings } from '@/components/ws/settings/stage-settings'
 import { WebIntegration } from '@/components/ws/settings/web-integration'
@@ -16,6 +17,8 @@ function guideMailto(input: { businessName: string; widgetCode: string; orderUrl
   const body = `Dobrý den,\n\nprosím o napojení formuláře na ZakazIQ.\n\nVložte tento kód na web:\n${input.widgetCode}\n\nObjednávková stránka: ${input.orderUrl}\n\nDěkuji\n${input.businessName}`
   return `mailto:?subject=${encodeURIComponent(`Napojení formuláře na ZakazIQ — ${input.businessName}`)}&body=${encodeURIComponent(body)}`
 }
+
+export const metadata: Metadata = { title: 'Objednávky · Nastavení' }
 
 export default async function BookingSettingsPage(props: { params: Promise<{ business: string }> }) {
   const { business: slug } = await props.params
@@ -36,19 +39,20 @@ export default async function BookingSettingsPage(props: { params: Promise<{ bus
   const widgetCode = `<script src="${apiOrigin}/embed/${business.slug}.js" async></script>`
   const schema = config ? buildPublicSchema(config, []) : null
   const integration = log.integration
+  const jobsOn = data.modules.some((m) => m.module === 'jobs' && m.enabled)
 
   return <SettingsPageShell businessSlug={business.slug} title="Objednávky">
     <nav aria-label="Části objednávek" className="flex flex-wrap gap-2">
-      {[['formular', 'Formulář'], ['stavy', 'Stavy zakázky'], ['web', 'Napojený web']].map(([id, label]) => <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center rounded-full border border-navy-100 bg-surface px-4 text-sm font-medium text-ink hover:bg-navy-50">{label}</a>)}
+      {[['formular', 'Formulář'], ...(jobsOn ? [['stavy', 'Stavy zakázky']] : []), ['web', 'Napojený web']].map(([id, label]) => <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center rounded-full border border-navy-100 bg-surface px-4 text-sm font-medium text-ink hover:bg-navy-50">{label}</a>)}
     </nav>
     <section id="formular" className="scroll-mt-6 flex flex-col gap-3">
       <div><h2 className="text-[18px] font-semibold text-ink">Formulář poptávky</h2><p className="text-sm text-quiet">Změny se hned projeví v objednávací stránce i na napojeném webu.</p></div>
       <FieldSettings slug={business.slug} fields={data.fields} readOnly={!canWrite(billing)} />
     </section>
-    <section id="stavy" className="scroll-mt-6 flex flex-col gap-3">
+    {jobsOn && <section id="stavy" className="scroll-mt-6 flex flex-col gap-3">
       <div><h2 className="text-[18px] font-semibold text-ink">Stavy zakázky</h2><p className="text-sm text-quiet">Typ stavu určuje statistiky a věrnost. Při odstranění vyberete, kam přesunout rozpracované zakázky.</p></div>
       <StageSettings slug={business.slug} stages={data.stages} readOnly={!canWrite(billing)} />
-    </section>
+    </section>}
     <section id="web" className="scroll-mt-6 flex flex-col gap-3">
       <div><h2 className="text-[18px] font-semibold text-ink">Napojený web</h2><p className="text-sm text-quiet">Odkaz na objednání, QR kód, widget a příchozí poptávky.</p></div>
       <WebIntegration

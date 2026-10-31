@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { AccentHeading } from '@/components/ws/brand'
 import { navHref } from '@/lib/ws/nav'
+import { ScrollToHash } from './scroll-to-hash'
 
 export function SettingsPageShell({ businessSlug, title, children, width = 'max-w-[1040px]' }: {
   businessSlug: string
@@ -16,5 +17,6 @@ export function SettingsPageShell({ businessSlug, title, children, width = 'max-
     </Link>
     <AccentHeading>{title}</AccentHeading>
     {children}
+    <ScrollToHash />
   </main>
 }

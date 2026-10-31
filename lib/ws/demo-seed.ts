@@ -53,6 +53,12 @@ export function demoCleanupQueries({ accountId, businessId }: Omit<DemoScope, 't
       DELETE FROM ws.staff s WHERE s.account_id = ${accountId} AND s.business_id = ${businessId} AND s.name = ${DEMO_STAFF}
         AND NOT EXISTS (SELECT 1 FROM ws.appointments a WHERE a.account_id = s.account_id AND a.staff_id = s.id)
     `,
+    // Funkce Věrnost se vypne spolu s ukázkovým programem (před ním, dokud nese ukázkovou odměnu).
+    q`
+      UPDATE ws.business_modules m SET enabled = false
+      WHERE m.account_id = ${accountId} AND m.business_id = ${businessId} AND m.module = 'loyalty'
+        AND EXISTS (SELECT 1 FROM ws.loyalty_programs p WHERE p.account_id = m.account_id AND p.business_id = m.business_id AND p.reward_text = ${DEMO_REWARD})
+    `,
     q`
       UPDATE ws.loyalty_programs SET enabled = false, reward_text = ''
       WHERE account_id = ${accountId} AND business_id = ${businessId} AND reward_text = ${DEMO_REWARD}
@@ -209,6 +215,13 @@ export function demoSeedQueries(scope: DemoScope): WsQuery[] {
   queries.push(q`
     UPDATE ws.loyalty_programs SET enabled = true, reward_text = ${DEMO_REWARD}
     WHERE account_id = ${accountId} AND business_id = ${businessId} AND NOT enabled AND reward_text = ''
+  `)
+  // Program i funkce musí říkat totéž (lib/ws/settings.ts → setModule).
+  queries.push(q`
+    INSERT INTO ws.business_modules (account_id, business_id, module, enabled)
+    SELECT p.account_id, p.business_id, 'loyalty', true FROM ws.loyalty_programs p
+    WHERE p.account_id = ${accountId} AND p.business_id = ${businessId} AND p.reward_text = ${DEMO_REWARD}
+    ON CONFLICT (business_id, module) DO UPDATE SET enabled = true
   `)
   const cards: [CustomerKey, 'some' | 'full'][] = [
     ['jana', 'some'],

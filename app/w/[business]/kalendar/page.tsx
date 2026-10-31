@@ -215,7 +215,8 @@ export default async function CalendarPage(
     for (const col of staffCols) items.push(...place(listFor(col.staffId ?? undefined), col.key))
   }
 
-  const agendaDays = view === 'den' ? [date] : Array.from({ length: 7 }, (_, i) => addDays(rangeStart, i))
+  // Telefon v aktuálním týdnu: od dneška do konce týdne (R-040), minulé dny vynechá.
+  const agendaDays = view === 'den' ? [date] : Array.from({ length: 7 }, (_, i) => addDays(rangeStart, i)).filter((d) => view !== 'tyden' || !showsToday || d >= today)
   const flatParams = Object.fromEntries(
     Object.entries(searchParams).flatMap(([k, v]) => {
       const one = first(v)

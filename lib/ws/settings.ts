@@ -92,8 +92,18 @@ export async function setModule(ctx: WsContext, business: WsBusiness, module: Ws
     UPDATE ws.business_modules SET enabled = false
     WHERE account_id = ${ctx.accountId} AND business_id = ${business.id} AND module = 'reminders'
   `)
+  if (module === 'loyalty') queries.push(loyaltyProgramSync(ctx, business, forced))
   await wsDb(ctx).batch(queries)
 }
+
+/**
+ * Věrnost má vedle modulu i vlastní přepínač programu (Nastavení › Zákazníci),
+ * podle kterého se ukazují karty a razítka. Funkce i program musí říkat totéž.
+ */
+const loyaltyProgramSync = (ctx: WsContext, business: WsBusiness, enabled: boolean) => q`
+  UPDATE ws.loyalty_programs SET enabled = ${enabled}
+  WHERE account_id = ${ctx.accountId} AND business_id = ${business.id}
+`
 
 /** Obnoví úplnou sadu modulů jednou dávkou, včetně závislostí pro tlačítko Zpět. */
 export async function restoreModules(ctx: WsContext, business: WsBusiness, values: { module: WsModule; enabled: boolean }[]): Promise<void> {
@@ -111,6 +121,7 @@ export async function restoreModules(ctx: WsContext, business: WsBusiness, value
     VALUES (${ctx.accountId}, ${business.id}, ${module}, ${state.get(module) === true})
     ON CONFLICT (business_id, module) DO UPDATE SET enabled = EXCLUDED.enabled
   `)
+  queries.push(loyaltyProgramSync(ctx, business, state.get('loyalty') === true))
   await wsDb(ctx).batch(queries)
 }
 

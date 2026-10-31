@@ -536,7 +536,7 @@ export function OrderFlow({
 
               <label className="flex min-h-11 items-start gap-3 text-[15px]">
                 <input type="checkbox" name="consent" className="mt-0.5 h-5 w-5 shrink-0 accent-navy-700" />
-                <span>Chci občas dostat nabídku nebo novinku od {businessName}.</span>
+                <span>Chci od firmy {businessName} občas dostat nabídku nebo novinku.</span>
               </label>
 
               {/* Past na roboty: lidé pole nevidí ani na něj neskočí tabulátorem. */}

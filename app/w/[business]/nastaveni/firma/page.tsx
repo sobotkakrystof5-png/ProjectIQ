@@ -1,9 +1,12 @@
+import type { Metadata } from 'next'
 import { AppearanceSettings } from '@/components/ws/settings/appearance-settings'
 import { IssuerProfileForm } from '@/components/ws/money/issuer-profile-form'
 import { SettingsPageShell } from '@/components/ws/settings/settings-page-shell'
 import { canWrite, getBillingState } from '@/lib/ws/billing'
 import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
 import { getIssuerProfile } from '@/lib/ws/money/data'
+
+export const metadata: Metadata = { title: 'Firma · Nastavení' }
 
 export default async function CompanySettingsPage(props: { params: Promise<{ business: string }> }) {
   const { business: slug } = await props.params

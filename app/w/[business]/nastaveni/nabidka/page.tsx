@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { BusinessHoursForm, StaffSettings, TimeOffSettings, type StaffItem, type TimeOffItem } from '@/components/ws/settings/team-settings'
 import { ServiceSettings } from '@/components/ws/settings/service-settings'
 import { SettingsPageShell } from '@/components/ws/settings/settings-page-shell'
@@ -17,6 +18,8 @@ function timeOffWhen(startsAt: string, endsAt: string): string {
   const from = `${formatDayShort(start.date)} ${formatMinutes(start.minutes)}`
   return end.date === start.date ? `${from}–${formatMinutes(end.minutes)}` : `${from} – ${formatDayShort(end.date)} ${formatMinutes(end.minutes)}`
 }
+
+export const metadata: Metadata = { title: 'Nabídka · Nastavení' }
 
 export default async function OfferSettingsPage(props: { params: Promise<{ business: string }> }) {
   const { business: slug } = await props.params

@@ -1,8 +1,11 @@
+import type { Metadata } from 'next'
 import { EmailSettings } from '@/components/ws/settings/email-settings'
 import { SettingsPageShell } from '@/components/ws/settings/settings-page-shell'
 import { canWrite, getBillingState } from '@/lib/ws/billing'
 import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
 import { getEmailSettings } from '@/lib/ws/email/settings'
+
+export const metadata: Metadata = { title: 'Komunikace · Nastavení' }
 
 export default async function CommunicationSettingsPage(props: { params: Promise<{ business: string }> }) {
   const { business: slug } = await props.params

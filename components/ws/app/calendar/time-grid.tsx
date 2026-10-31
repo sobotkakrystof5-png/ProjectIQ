@@ -551,8 +551,15 @@ export function TimeGrid({
                             ...(touchMove && it.movable ? { touchAction: 'none' } : {}),
                           }}
                         >
-                          <span className="block truncate font-num text-[10px] leading-tight opacity-80">{it.time}</span>
-                          {px >= 34 && <span className="block truncate text-[12px] font-semibold leading-tight">{it.title}</span>}
+                          {px >= 34 ? <>
+                            <span className="block truncate font-num text-[10px] leading-tight opacity-80">{it.time}</span>
+                            <span className="block truncate text-[12px] font-semibold leading-tight">{it.title}</span>
+                          </> : (
+                            // krátký termín (30 min): název přednostně, čas za ním na stejném řádku
+                            <span className="block truncate text-[11px] leading-tight">
+                              <span className="font-semibold">{it.title}</span> <span className="font-num text-[10px] opacity-80">{it.time}</span>
+                            </span>
+                          )}
                         </Link>
                         {it.confirm && roomy && (
                           <button

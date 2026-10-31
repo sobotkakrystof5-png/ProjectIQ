@@ -143,6 +143,17 @@ describe('pracovníci', () => {
     expect(restored.find((item) => item.module === 'taxes')?.enabled).toBe(false)
     expect(restored.find((item) => item.module === 'calendar')?.enabled).toBe(true)
   })
+
+  it('vypnutá Věrnost vypne i program, Zpět ho vrátí; cizí program nezmění', async () => {
+    await db.query(`INSERT INTO ws.loyalty_programs (account_id, business_id, enabled, reward_text) VALUES ($1, $2, true, 'Káva') ON CONFLICT (business_id) DO UPDATE SET enabled = true`, [A.account, A.business])
+    await db.query(`INSERT INTO ws.loyalty_programs (account_id, business_id, enabled) VALUES ($1, $2, true) ON CONFLICT (business_id) DO UPDATE SET enabled = true`, [B.account, B.business])
+    const program = async (business: string) => (await all<{ enabled: boolean }>(`SELECT enabled FROM ws.loyalty_programs WHERE business_id = $1`, [business]))[0].enabled
+    await setModule(ctxA, bizA, 'loyalty', false)
+    expect(await program(A.business)).toBe(false)
+    expect(await program(B.business)).toBe(true)
+    await restoreModules(ctxA, bizA, WS_MODULES.map((module) => ({ module, enabled: module === 'loyalty' })))
+    expect(await program(A.business)).toBe(true)
+  })
 })
 
 describe('služby a pořadí', () => {

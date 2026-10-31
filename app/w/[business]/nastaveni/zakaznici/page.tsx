@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { LoyaltySettings } from '@/components/ws/settings/loyalty-settings'
 import { SegmentSettings } from '@/components/ws/settings/segment-settings'
 import { SettingsPageShell } from '@/components/ws/settings/settings-page-shell'
@@ -6,6 +7,8 @@ import { getBookingOptions } from '@/lib/ws/calendar'
 import { hasRole, requireBusiness, requireWorkspace } from '@/lib/ws/context'
 import { getLoyaltyProgram } from '@/lib/ws/loyalty'
 import { getSegmentRules } from '@/lib/ws/segments'
+
+export const metadata: Metadata = { title: 'Zákazníci · Nastavení' }
 
 export default async function CustomerSettingsPage(props: { params: Promise<{ business: string }> }) {
   const { business: slug } = await props.params

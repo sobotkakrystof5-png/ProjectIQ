@@ -142,7 +142,8 @@ export function InvoiceForm({slug,today,options,closeHref,jobId,customerId}:{slu
       {options.services.length>0&&<div className="flex flex-wrap gap-2">
         {options.services.map(service=><Button key={service.id} type="button" variant="outline" onClick={()=>{
           setCurrency(service.currency==='EUR'?'EUR':'CZK')
-          setItems(current=>[...current,{description:service.name,quantity:1,unitPrice:service.price??0,vatRate:0}])
+          // Prázdný řádek (bez popisu i ceny) se nahradí, ne doplní vedle.
+          setItems(current=>[...current.filter(row=>row.description.trim()!==''||row.unitPrice!==0),{description:service.name,quantity:1,unitPrice:service.price??0,vatRate:0}])
         }}>{service.name}{service.price!==null?' · '+formatMoney(service.price,{currency:service.currency as 'CZK'|'EUR'}):''}</Button>)}
       </div>}
       {items.map((item,index)=><div key={index} className="grid grid-cols-2 gap-3 rounded-box border p-3">
