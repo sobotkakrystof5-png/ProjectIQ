@@ -15,23 +15,23 @@ Tohle je nejdůležitější část zadání a platí pro každé rozhodnutí n�
 
 - **Modrobílá SaaS šablona.** Bílé pozadí, modré tlačítko, šedý text a ilustrace vpravo. Dílky jsou námořnická modrá s jedinou teplou barvou, a ta patří jen nové poptávce a odměně (`signal`). Nikde jinde, ani jako dekorace.
 - **Ikonové trojice.** Tři karty s ikonou nahoře, nadpisem a dvěma řádky textu. Kalendář, zákaznice a peníze mají vlastní produktovou kompozici, nikoli tři stejné karty. Moduly jsou dlaždice v odstínech modré, ne mřížka ikon.
-- **Hero „nadpis uprostřed, dvě tlačítka, obrázek vpravo“.** Hero je tmavé pole dílků. Nadpis má serifovou kurzívu v druhé půlce a pod ním je ovladatelná scéna kalendáře. Hlavní tlačítko je jen jedno, vedlejší akce je tichý textový odkaz.
-- **Gradienty, glassmorphism, 3D ilustrace, stock fotky.** Povolené jsou jen gradient loga a věrnostní karty (`navy-600 → navy-800`) a jedno jemné radiální světlo v hero. Fotky žádné, místo nich ukázky skutečných obrazovek.
+- **Hero „nadpis uprostřed, dvě tlačítka, obrázek vpravo“.** Hero má tmavé pozadí s motivem dílků; příběh kalendáře leží na klidné souvislé ploše. Nadpis má serifovou kurzívu v druhé půlce a pod ním je ovladatelná scéna kalendáře. Hlavní tlačítko je jen jedno, vedlejší akce je tichý textový odkaz.
+- **Generické gradienty, glassmorphism, 3D ilustrace, stock fotky.** Vizuální jazyk zůstává v odstínech Dílků. Na Landing patří jemné radiální světlo, barevně reagující pole dílků v hero a malá perspektiva podle kurzoru; produktová karta a přechod poptávky smějí mít vlastní stavový pohyb. Žádné skleněné panely ani náhodně rozházené efekty. Fotky žádné, místo nich ukázky skutečných obrazovek.
 - **„Fade-in + slide-up“ na všem.** Nájezd sekcí smí být jen jeden (`zq-rise`, jednou). Ostatní pohyb vysvětluje produkt: poptávka přijede, zařadí se do kalendáře, razítko vyskočí. Co nic nevysvětluje, se nehýbe.
 - **Obecné marketingové fráze.** Žádné „revoluční“, „all-in-one“, „posuňte svůj byznys“, „jsme tým profesionálů“. Píše zakladatel v první osobě a jen to, co produkt skutečně umí.
-- **Stejný rytmus všech sekcí.** Sekce se liší kompozicí i hustotou: kalendář s příběhem, otevřená kapitola zákaznice, tmavá kapitola peněz, barevná mozaika modulů, terminálová karta, tmavý ceník s polem dílků, úzký sloupec dotazů.
+- **Stejný rytmus všech sekcí.** Sekce se liší kompozicí i hustotou: kalendář s příběhem, otevřená kapitola zákaznice, tmavá kapitola peněz, barevná mozaika modulů, kódová ukázka s motivem dílků, tmavý ceník s polem dílků, úzký sloupec dotazů. Dekorativní rámečky kolem příběhů a textu se nepřidávají; ohraničení zůstává tam, kde označuje ovládací prvek nebo skutečnou obrazovku.
 - **Výchozí písmo bez charakteru.** Instrument Sans 600 s těsným prokladem (`-0.02em` až `-0.035em`), serifová kurzíva jen na druhé půlce nadpisu a čísla, časy a částky v JetBrains Mono. Inter se tu nepoužívá.
 
 **Místo toho:**
 
 - **Podpisový motiv: dílky 2×2 z loga jako skládání byznysu „po dílcích“.** Logo je čtverec se čtyřmi dílky a stejný princip nese celá stránka:
-  - **pole pulzujících dílků** v tmavých plochách (hero, panel Jak to funguje, ceník): mřížka čtverců 44 px, ~9 % z nich pulzuje v `navy-500`, čisté CSS, deterministicky;
+  - **pole dílků** na vybraných tmavých plochách: v hero plná mřížka čtverců 44 px v původních barvách, kurzor rozsvěcí její část a klik vyšle krátkou vlnu; jemný náklon zůstává omezený na plochu. Kalendářový příběh má vlastní souvislou tmavou plochu;
   - **moduly** jsou dílky různých odstínů modré, které si člověk „skládá“;
   - **razítka** na věrnostní kartě jsou bílé dílky se zaoblením;
   - **znak 2×2** (5 px) slouží jako odrážka v pásu oborů a u štítků.
   Motiv je podpis, ne tapeta. Každá sekce ho použije nejvýš jednou.
 - **Živá ukázka aplikace místo screenshotu.** Poptávky přijíždějí, blok se zařadí do týdne, karta dostane razítko. Návštěvník pochopí produkt dřív, než dočte perex.
-- **Mikrointerakce podle obsahu.** Hover na dlaždici modulu ukáže jeho popis, kliknutí na krok ukáže odpovídající stav ukázky. Žádné obecné `scale-105`.
+- **Mikrointerakce podle obsahu.** Klik na poptávku ji potvrdí v místní ukázce; přepínač funkce ukáže její vypnutý stav; kliknutí na krok ukáže odpovídající stav. Jemný pohyb potvrzeného termínu a reakce mřížky vysvětlují právě probíhající akci. Žádné obecné `scale-105`.
 - Před dokončením každé sekce si polož otázku: *je tohle navržené pro ZakazIQ, nebo by to fungovalo na jakémkoli SaaS?* Když to druhé, předělat. Když si nejsi jistý, zeptej se.
 
 ---
@@ -42,9 +42,9 @@ Tohle je nejdůležitější část zadání a platí pro každé rozhodnutí n�
 |---|---|
 | **Produkt** | ZakazIQ Workspace, přehled podnikání pro malé firmy, které dostávají poptávky |
 | **Provozovatel** | Kryštof Sobotka (VIZEON, ALTENO), OSVČ, neplátce DPH |
-| **IČO** | `[DOPLNIT]` |
+| **IČO** | `29977231` (Kryštof potvrdil 2026-10-31; úplné právní jméno a adresa sídla stále chybí) |
 | **Doména** | `zakaziq.cz` (R-030), landing na `/`, aplikace na `/w` (R-017) |
-| **E-mail podpory** | `[DOPLNIT]` (firemní adresa se teprve řeší, R-032) |
+| **E-mail podpory** | `info@vizeon.cz` (Kryštof potvrdil 2026-10-31) |
 | **Telefon, adresa** | na landing page nejsou |
 
 **Co produkt umí** (zdroj: `docs/workspace/PLAN.md`, nic navíc): poptávka z webu se sama objeví v kalendáři jako čárkovaný blok a potvrdí se jedním klikem. Zákazník dostane e-mail a po návštěvě razítko na věrnostní kartu. Dál zákazníci se skupinami (Noví, Stálí, Jednorázoví, Spící, Ukončení) a panelem „Komu napsat“, zakázky s vlastními stavy a kolonkami, faktury, příjmy a výdaje, odhad daní a měsíční přehled e-mailem. Šablony podle oboru. Napojení webu třemi cestami.
@@ -53,11 +53,13 @@ Tohle je nejdůležitější část zadání a platí pro každé rozhodnutí n�
 
 **Obory** (pás oborů, šablony): Kadeřnictví, Kosmetika, Zámečnictví, Studnařství, Likvidace azbestu, Autoservis, Úklid, Stavba a řemesla.
 
-**Cíl stránky:** registrace (`/w/registrace`). Jedna hlavní akce na celé stránce: „Začít za 249 Kč měsíčně“. Vedlejší cesta je e-mail na podporu, pro lidi, kteří se chtějí nejdřív zeptat.
+**Cíl stránky:** registrace (`/w/registrace`). Jedna hlavní akce na celé stránce: „Vyzkoušet 14 dní zdarma“. Vedlejší cesta je kontakt na podporu, pro lidi, kteří se chtějí nejdřív zeptat. Podmínky u CTA vždy jasně uvádějí kartu při registraci, první platbu po 14 dnech, cenu 249 Kč měsíčně a možnost kdykoli zrušit.
 
 **Tón:** přímý, v první osobě zakladatele („Web vám postavím a rovnou napojím.“), bez superlativů, oslovení „vy“. Čtenář je kadeřnice nebo zámečník s telefonem v ruce, žádný IT člověk. Pravidla a slovník: skill `zakaziq-ux-texty-cs` (v textech „funkce“, ne „modul“; „skupina“, ne „segment“; „účet“, ne „workspace“). Žádné technické termíny mimo sekci Napojení, kde smí padnout „kód“.
 
 **Co nemáme a nevymýšlíme:** počty klientů, recenze, citace, loga zákazníků, procenta úspor, reference. Sekce „Kdo za tím stojí“ se nedělá (R-023). Pilotní klient zatím není, takže sociální důkaz na stránce nebude. Až bude, přidá se jako samostatný krok.
+
+**Prodejní princip:** návštěvník má snadno pochopit, co produkt udělá v jeho běžném dni a co dostane za 249 Kč. Ukazujeme skutečné produktové stavy, jasnou cestu do registrace a pravdivé podmínky zkušební doby vedle výzvy. Nepoužíváme falešnou naléhavost, vymyšlené výsledky ani skryté podmínky.
 
 ---
 
@@ -122,7 +124,7 @@ Pořadí: LP-D + sekce Proč to řešit (R-031). Čísla sekcí jsou proto posun
 
 ```
 Hlavička (v hero)
-Hero „Každá poptávka na svém místě.“ + pole dílků + ovladatelný příběh v kalendáři
+Hero „Každá poptávka na svém místě.“ + střídmý motiv dílků + ovladatelný příběh v kalendáři
 Pás oborů
 01 Proč to řešit            (nové oproti LP-D)
 02 Co to umí                (#funkce)
@@ -138,23 +140,23 @@ Texty níže jsou návrh (prošly `zakaziq-ux-texty-cs` a `humanize-text-cs`). S
 
 ### 4.0 Hlavička
 
-- Uvnitř tmavého hero, není to samostatný bílý pruh. Vlevo `Logo` + „ZakazIQ“. Uprostřed pilulková navigace (průhledná pilulka s okrajem `navy-200/15`): **Funkce · Jak to funguje · Napojení webu · Ceník**. Vpravo „Přihlásit“ (tichý odkaz) a „Začít za 249 Kč“ (bílá pilulka, `navy-950` text).
+- Uvnitř tmavého hero, není to samostatný bílý pruh. Vlevo `Logo` + „ZakazIQ“. Uprostřed pilulková navigace (průhledná pilulka s okrajem `navy-200/15`): **Funkce · Jak to funguje · Napojení webu · Ceník**. Vpravo „Přihlásit“ (tichý odkaz) a „14 dní zdarma“ (bílá pilulka, `navy-950` text).
 - Po odjetí z hero se hlavička přichytí nahoře jako kompaktní tmavá pilulka. Bez rozmazaného skla, plné `navy-950/95`.
-- Mobil: logo + „Začít“ + tlačítko menu (`aria-label="Otevřít menu"`), menu jako panel shora se stejnými kotvami a odkazem Přihlásit.
-- Odkazy: „Přihlásit“ → `/w/prihlaseni`, „Začít za 249 Kč“ → `/w/registrace`. Přesné cesty Clerku potvrdí S07. Do té doby vedou na 404 a to je v pořádku.
+- Mobil: logo + „Zkusit zdarma“ + tlačítko menu (`aria-label="Otevřít menu"`), menu jako panel shora se stejnými kotvami a odkazem Přihlásit.
+- Odkazy: „Přihlásit“ → `/w/prihlaseni`, „14 dní zdarma“ → `/w/registrace`. Přesné cesty Clerku potvrdí S07. Do té doby vedou na 404 a to je v pořádku.
 
 ### 4.1 Hero
 
-**Kompozice:** tmavá plocha Dílků s nadpisem vlevo. Pod úvodem je kalendářová scéna; na desktopu vedle ní tři kroky příběhu. Scéna zůstává při průchodu kroky přichycená, scroll se nepřebírá. Na telefonu ukazuje jediný den místo hustého týdne. Věrnostní karta patří až do kapitoly zákaznice.
+**Kompozice:** tmavá plocha Dílků s plnou interaktivní mřížkou v původních barvách, nadpisem vlevo a kalendářovým příběhem na souvislém pozadí. Ukazatel jemně rozsvítí dílky, plocha se nepatrně nakloní; kliknutí vyšle krátkou vlnu. Na telefonu zůstává motiv viditelný a neblokuje obsah. Pod úvodem je otevřená kalendářová scéna s detailem poptávky; od 1024 px a při výšce nad 700 px zůstává scéna při průchodu kroky přichycená, scroll se nepřebírá. Na menších šířkách a nízkých obrazovkách scéna zůstává v běžném toku, aby nezakryla příběh. Na telefonu ukazuje jediný den a kompaktní detail. Věrnostní karta patří až do kapitoly zákaznice.
 
 **Texty:**
 
 - Štítek: „Ukázka · jedna poptávka od začátku do konce“.
 - **H1:** „Každá poptávka *na svém místě.*“
-- **Perex:** „Poptávka z vašeho webu se sama zařadí do kalendáře. Potvrdíte ji jedním klikem a o e-mail, připomínku i razítko na věrnostní kartu se postará ZakazIQ.“
-- **Hlavní tlačítko:** „Začít za 249 Kč měsíčně“ → `/w/registrace` (bílá pilulka).
+- **Perex:** „ZakazIQ je přehled podnikání pro malé firmy. Poptávky z webu, kalendář, zákazníci a věrnostní karty, zakázky, faktury a odhad daní v jedné aplikaci pro telefon i počítač.“
+- **Hlavní tlačítko:** „Vyzkoušet 14 dní zdarma“ → `/w/registrace` (bílá pilulka).
 - **Vedlejší odkaz:** „Napište nám“ → `mailto:[DOPLNIT e-mail podpory]` (textový odkaz `navy-200` s podtržením při hoveru, žádné druhé tlačítko).
-- **Drobný řádek** (mono, `navy-300`): „14 dní zdarma · vše v ceně · zrušíte kdykoli · přihlášení bez hesla“
+- **Podmínky zkušební doby:** „14 dní zdarma · kartu zadáte při registraci · poté 249 Kč měsíčně · zrušíte kdykoli“. Karta se zadává při registraci a první platba proběhne až po 14 dnech.
 
 **Ovladatelná ukázka** (`components/marketing/live-demo.tsx`):
 
@@ -162,7 +164,7 @@ Texty níže jsou návrh (prošly `zakaziq-ux-texty-cs` a `humanize-text-cs`). S
 - Tři stavy: čárkovaná poptávka → detail vedle kalendáře → potvrzený termín. Kliknutí do bloku otevře detail, „Potvrdit termín“ změní podobu bloku. Jde o místní demonstraci, žádný zápis ani e-mail se neodesílá.
 - Tlačítka kroků, odkazy v příběhu a běžný scroll. Scroll přepíná krok podle kapitoly, která je ve výhledu, oběma směry (od 2026-10-17); klik na krok platí do přechodu na jinou kapitolu. Focus v ukázce scroll nepřeruší.
 - Bez intervalu a časové smyčky. Změna barev 300 ms, při omezeném pohybu bez přechodu.
-- Pod 640 px jeden páteční sloupec; od 640 px pětidenní přehled. Detail na menších šířkách nahradí mřížku ve stejné scéně.
+- Pod 640 px jeden páteční sloupec; od 640 px pětidenní přehled. Detail je na menších šířkách pod kalendářem, od 1024 px vedle něj.
 - Návazný odkaz vede do kapitoly zákaznice. Kapitola peněz rozlišuje potvrzený termín a zaznamenanou platbu.
 
 ### 4.2 Pás oborů
@@ -198,7 +200,7 @@ Plní roli sekce „Proč to řešit“ z `PLAN.md`: problém a jeho řešení. 
 
 ### 4.5 03 Jak to funguje (`#jak-to-funguje`)
 
-Statické čtyři kroky bez časovaného přehrávání:
+Čtyři ručně ovládané kroky bez časovaného přehrávání. Tlačítka přepínají odpovídající scénu, scroll vybírá krok podle jeho textu; po dokončení se nic nepřehrává znovu. Scéna je přichycená jen na široké, dostatečně vysoké obrazovce, na telefonu a tabletu zůstává v toku stránky.
 
 1. Zákazník se objedná na webu, přes odkaz nebo QR kód.
 2. Poptávka se ukáže v kalendáři jako čárkovaný blok.
@@ -209,7 +211,7 @@ Nadpis „Jedna poptávka. Nula přepisování.“ zůstává. Jedinou příběh
 
 ### 4.6 04 Skládejte si to po dílcích (`#funkce-seznam`)
 
-**Kompozice (R-057, 2026-10-17):** asymetrická mozaika dílků, ne mřížka 3 × 3. Velikost podle důležitosti: Poptávky 5/12 (tmavá karta, nová poptávka ve `signal`), Kalendář 7/12 (hlavní plocha). Zákazníci a Věrnostní karty jsou dvojice od 1024 px, Zakázky přes celou šířku; od 1280 px je to řada tří. Faktury, Příjmy, Daně (tmavá) a E-maily jsou dvojice od 1024 px a řada čtyř od 1280 px. Mobil jeden sloupec, tablet dva. Číslo vlevo nahoře (mono), název a popis pod ním. Každá karta obsahuje kus skutečného rozhraní označený „Ukázka“; fiktivní údaje (Tereza Malá, 1 850 Kč) jsou stejné jako v kapitolách Zákaznice a Peníze.
+**Kompozice (R-057, 2026-10-17):** asymetrická mozaika dílků, ne mřížka 3 × 3. Velikost podle důležitosti: Poptávky 5/12 (tmavá plocha, nová poptávka ve `signal`), Kalendář 7/12 (hlavní plocha). Zákazníci a Věrnostní karty jsou dvojice od 1024 px, Zakázky přes celou šířku; od 1280 px je to řada tří. Faktury, Příjmy, Daně (tmavá) a E-maily jsou dvojice od 1024 px a řada čtyř od 1280 px. Mobil jeden sloupec, tablet dva. Znak Dílků vlevo nahoře, název a popis pod ním; bez dekorativních čísel a vnějších čarovaných rámečků. Každá dlaždice obsahuje kus skutečného rozhraní označený „Ukázka“; fiktivní údaje (Tereza Malá, 1 850 Kč) jsou stejné jako v kapitolách Zákaznice a Peníze.
 
 - Štítek: `04 — FUNKCE · VŠECHNY V CENĚ` (v LP-D „MODULY“, v textech pro lidi „funkce“, viz slovník)
 - **H2:** „Skládejte si to *po dílcích.*“
@@ -227,23 +229,23 @@ Nadpis „Jedna poptávka. Nula přepisování.“ zůstává. Jedinou příběh
 | 08 | Daně | odhad a termíny |
 | 09 | E-maily zákazníkům | potvrzení, připomínky |
 
-**Přepínače:** jen u šesti modulů, které jdou v Nastavení › Funkce skutečně vypnout (Kalendář, Zakázky, Věrnostní karty, Faktury, Příjmy a výdaje, Daně). Poptávky a Zákazníci mají štítek „Vždy v menu“, E-maily nejsou modul a štítek odkazuje do Nastavení › E-maily. Pravidla jako v aplikaci (`lib/ws/settings.ts`): zapnutí Daní zapne Příjmy, vypnutí Příjmů vypne Daně. Vypnutá karta je čárkovaná a říká „Vypnuto. Z menu zmizí, data zůstanou.“ Dílek znaku je plný, když funkce běží, a prázdný, když ne. Přepínač je `role="switch"`, ovládá se klávesnicí (mezerník), změnu hlásí `role="status"`.
+**Přepínače:** jen u šesti modulů, které jdou v Nastavení › Funkce skutečně vypnout (Kalendář, Zakázky, Věrnostní karty, Faktury, Příjmy a výdaje, Daně). Poptávky a Zákazníci mají štítek „Vždy v menu“, E-maily nejsou modul a štítek odkazuje do Nastavení › E-maily. Pravidla jako v aplikaci (`lib/ws/settings.ts`): zapnutí Daní zapne Příjmy, vypnutí Příjmů vypne Daně. Vypnutý stav má klidnější tón, říká „Funkce je vypnutá“ a potvrzuje, že data zůstanou. Dílek znaku je plný, když funkce běží, a prázdný, když ne. Přepínač je `role="switch"`, ovládá se klávesnicí, změnu hlásí `role="status"`.
 
-**CTA pod mřížkou:** „Všechno, co tu vidíte, je v jednom tarifu. Prvních 14 dní je zdarma.“ + `CTA_LABEL` na `ROUTES.signUp`.
+**CTA pod mřížkou:** „Všechno, co tu vidíte, je v ceně. 14 dní zdarma, potom 249 Kč měsíčně.“ + `CTA_LABEL` „Vyzkoušet 14 dní zdarma“ na `ROUTES.signUp`.
 
-Hover: zapnutá karta se o 2 px nadzvedne. Pohyb je jen přechod barev a přepínače; `prefers-reduced-motion` vypíná pohyb a změna barvy zůstává (`tokens.css`).
+Vnější dlaždice zůstávají v klidu; mění se jen barva při přepnutí. `prefers-reduced-motion` vypíná dekorativní perspektivu a přechody bez vlivu na ovládání.
 
 Implementace: `components/marketing/modules.tsx` (sekce, přepínače, rozvržení), `components/marketing/module-previews.tsx` (ukázky), `content.ts` beze změny.
 
 ### 4.7 05 Napojení na váš web (`#napojeni`)
 
-**Kompozice:** dva sloupce, text vlevo, terminálová karta vpravo (`navy-950`, tři tečky okna nahoře, mono písmo). Karta „píše“ tři řádky postupně (jednou při zobrazení), u třetího bliká kurzor (`zq-blink`). Na konci řádek s Lucide `Check` v `navy-300`: „napojení ověřeno · první poptávka přijata“.
+**Kompozice:** dva sloupce, text vlevo a tři cesty napojení vpravo na tmavé ploše s nenápadným polem dílků. Text v ukázce se objeví postupně jednou při zobrazení; nehraje si na terminál a netvrdí, že testovací napojení nebo první poptávka skutečně proběhly.
 
 - Štítek: `05 — NAPOJENÍ NA VÁŠ WEB`
 - **H2:** „Web vám postavím *a rovnou napojím.*“
 - Text: „Nemáte web? Dostanete stránku pro objednání a QR kód na pult. Máte web? Stačí jeden řádek kódu. Napojení si ověříte jedním klikem.“
 
-Obsah terminálové karty (cesty podle R-016, **ne** `/w/lenka.js` z mockupu):
+Obsah ukázky (cesty podle R-016, **ne** `/w/lenka.js` z mockupu):
 
 ```
 01 · odkaz pro objednání
@@ -265,7 +267,7 @@ zakaziq.cz/r/kadernictvi-lenka
 - Štítek: `06 — CENÍK`
 - **H2:** „Jedna cena. *Žádné balíčky.*“
 - Cena: **249 Kč** (mono, velké) + „/ měsíc“
-- Pod cenou (mono, drobné): „konečná cena, nic se nepřipočítává · prvních 14 dní zdarma · zrušíte kdykoli · karta, Apple Pay, Google Pay“ (nahrazuje `[DPH: DOPLNIT]` z mockupu, R-018, R-038)
+- Pod cenou: „Konečná cena, nic se nepřipočítává. Kartu zadáte při registraci; první platba proběhne až po 14 dnech. Zrušíte kdykoli.“ (nahrazuje `[DPH: DOPLNIT]` z mockupu, R-018, R-038)
 - **V ceně** (odrážky s Lucide `Check`, ne s „✓“ znakem):
   - Neomezené poptávky a zákazníci
   - Kalendář a rezervace
@@ -275,7 +277,7 @@ zakaziq.cz/r/kadernictvi-lenka
   - Napojení na web
   - Měsíční přehled
   - Jeden byznys a neomezeně pracovníků
-- Tlačítko: „Začít za 249 Kč měsíčně“ → `/w/registrace` (bílá pilulka)
+- Tlačítko: „Vyzkoušet 14 dní zdarma“ → `/w/registrace` (bílá pilulka)
 
 Nikde „+ DPH“, žádná srovnávací tabulka balíčků, žádné přeškrtnuté ceny.
 
@@ -295,7 +297,7 @@ Nikde „+ DPH“, žádná srovnávací tabulka balíčků, žádné přeškrtn
 | Co se stane po 14 dnech? | Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho zrušíte, nic nezaplatíte a k datům se dostanete dál, jen je nepůjde měnit. |
 | Můžu předplatné kdykoli zrušit? | Ano, sami v nastavení účtu. Data se nemažou, zůstanou vám k nahlédnutí. |
 | Funguje to na telefonu? | Ano. Aplikace je dělaná tak, aby šla ovládat jednou rukou mezi dvěma zákazníky. |
-| Kde najdu pomoc, když se něco nedaří? | Napište mi na `[DOPLNIT e-mail podpory]`. |
+| Kde najdu pomoc, když se něco nedaří? | Napište na `info@vizeon.cz` nebo použijte kontaktní formulář. Odpovíme do 24 hodin. |
 
 Odpovědi o zkušební době a zrušení stojí na R-038 a `AGENTS.md` → B5 (bez předplatného jen čtení, data se nemažou). Před spuštěním (S19) je ověřit proti skutečnému chování aplikace.
 
@@ -304,18 +306,18 @@ Odpovědi o zkušební době a zrušení stojí na R-038 a `AGENTS.md` → B5 (b
 **Kompozice:** tmavá plocha `navy-950` s horními rohy 40 px. Nahoře velká výzva a tlačítko, pod tím sloupce odkazů, úplně dole řádek s copyrightem a nenápadným odkazem Admin.
 
 - Výzva: „Začněte ještě dnes. *Za tři minuty.*“ (cíl z `AGENTS.md` → B9. Když se v S07 ukáže, že registrace trvá déle, text se změní.)
-- Tlačítko: „Začít za 249 Kč měsíčně“ → `/w/registrace`
+- Tlačítko: „Vyzkoušet 14 dní zdarma“ → `/w/registrace`
 - Sloupec **Produkt:** Funkce (`#funkce`) · Ceník (`#cenik`) · Dotazy (`#dotazy`). Odkaz „Novinky“ z mockupu se vynechává, stránka neexistuje (vznikne v S15).
 - Sloupec **Právní:** Podmínky (`/podminky`) · Ochrana údajů (`/ochrana-udaju`) · Zpracovatelská smlouva (`/zpracovatelska-smlouva`)
-- Sloupec **Podpora:** „Napište nám“ + e-mail `[DOPLNIT]` jako `mailto:` odkaz (R-032)
-- Spodní řádek: „© 2026 ZakazIQ · IČO [DOPLNIT]“ vlevo, vpravo „Admin“ → `/login` (`quiet`/`navy-400`, malé písmo, žádné zvýraznění).
+- Sloupec **Podpora:** odkaz na kontaktní formulář a `info@vizeon.cz` jako `mailto:` záloha (R-065)
+- Spodní řádek: „© 2026 ZakazIQ · IČO 29977231“ vlevo, vpravo „Admin“ → `/login` (`quiet`/`navy-400`, malé písmo, žádné zvýraznění).
 
 ### 4.11 Odchylky od mockupu LP-D (souhrn)
 
 | V LP-D | V briefu | Proč |
 |---|---|---|
 | bez sekce Proč to řešit | nová sekce 01, ostatní čísla posunutá | R-031 |
-| „Domluvit hovor“ (tlačítko) | „Napište nám“ (textový odkaz na e-mail podpory) | R-032 |
+| „Domluvit hovor“ (tlačítko) | „Napište nám“ (odkaz na kontaktní formulář; e-mailová záloha) | R-032, R-065 |
 | `[DOMÉNA]/w/lenka.js` | `zakaziq.cz/embed/kadernictvi-lenka.js` | R-016, R-030 |
 | `[DPH: DOPLNIT]` | „konečná cena, nic se nepřipočítává · prvních 14 dní zdarma“ | R-018, R-038 |
 | „MODULY“ | „FUNKCE“ | slovník `zakaziq-ux-texty-cs` |
@@ -327,14 +329,11 @@ Odpovědi o zkušební době a zrušení stojí na R-038 a `AGENTS.md` → B5 (b
 
 ---
 
-## 5. Kontakt: e-mail místo formuláře (R-032)
+## 5. Kontakt: formulář a e-mail (R-065)
 
-Landing **nemá kontaktní formulář**. Kdo se chce zeptat, napíše na e-mail podpory (`[DOPLNIT]`, firemní adresa se ještě řeší). E-mail je v hero („Napište nám“), v dotazech a ve footeru, vždy jako `mailto:` odkaz.
+Návštěvník může napsat na `info@vizeon.cz` nebo použít formulář pod FAQ. Formulář zapíše dotaz do Hovorů (`client_leads`, `/dashboard/calls`) jako úkol odpovědět e-mailem do 24 hodin; přímý e-mail je záloha. Provozovatel musí Hovory pravidelně hlídat, automatická notifikace e-mailem se neposílá.
 
-- Adresa je v kódu **na jednom místě** (konstanta v `lib/ws/` nebo `app/(marketing)/`), aby šla doplnit jednou změnou. Dokud je `[DOPLNIT]`, odkaz se vykreslí, ale S19 ho musí doplnit (blokuje spuštění).
-- Stránka tím nemá žádný veřejný vstup: žádná server action, žádný honeypot, žádný rate limit.
-
-**Kdyby se formulář později vrátil** (rozhodnuto pro ten případ, R-032): vlastní server action v `app/(marketing)/actions.ts`. Zod s limitem délky každého pole, honeypot, rate limit přes `lib/api-rate-limit.ts` s vlastním endpointem (např. `landing_contact`) a zápis do `client_leads` přes `lib/db.ts` s vlastním popisem dalšího kroku (ne „Domluvená schůzka z chatbota“). Admin soubory se nemění, jen importují. `/api/public/leads` se nevolá: chce tajný `N8N_API_KEY` a rate limit by se počítal na IP serveru.
+Server action v `app/(marketing)/actions.ts` používá Zod limity délek, honeypot, krátký časový filtr, rate limit přes `lib/api-rate-limit.ts` s endpointem `landing_contact` a zápis přes `lib/db.ts`. Admin soubory se nemění, pouze se použije existující úložiště a rate limiter. `/api/public/leads` se nevolá: vyžaduje tajný `N8N_API_KEY` a rate limit by se počítal na IP serveru. Formulář i záznam o zpracování osobních údajů musí být popsány v právních textech před veřejným spuštěním.
 
 ---
 
@@ -364,8 +363,8 @@ Landing **nemá kontaktní formulář**. Kdo se chce zeptat, napíše na e-mail 
 ## 8. Právní
 
 - Stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` existují s nadpisem a textem `[DOPLNIT]`. **Právní texty se negenerují.** Skutečné texty nejpozději v S19 (R-023, otevřený problém).
-- IČO ve footeru `[DOPLNIT]`.
-- Bez formuláře a bez analytiky nejsou potřeba souhlas na stránce ani cookie lišta.
+- Úplné právní jméno a sídlo provozovatele v právních textech stále `[DOPLNIT]`; IČO `29977231` je potvrzené.
+- Formulář ukládá jméno, e-mail a zprávu do Hovorů. Právní texty musí uvést účel a dobu uchování před veřejným spuštěním; bez analytiky není potřeba cookie lišta.
 - Registrace a souhlas s podmínkami řeší `/w/registrace` (S07), ne landing.
 
 ---

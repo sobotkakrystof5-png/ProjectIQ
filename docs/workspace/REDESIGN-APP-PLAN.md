@@ -71,7 +71,7 @@
 6. Cache dat účtu jen s klíčem účtu a tagy, jinak ne (oddělení účtů má přednost). Volitelné, rozhodne se podle měření.
 
 ### F3 — Dnes a vizuální základ (RD04)
-- Dnes odpovídá na „Co mám teď udělat?“: nahoře jedna hlavní věc (poptávka k potvrzení / nejbližší termín / faktura po splatnosti), pod tím den. Týdenní kalendář zůstává (R-057), karta zákazníka se přesune do pravého panelu místo třetího sloupce (D-3).
+- Dnes odpovídá na „Co mám teď udělat?“: jedna hlavní věc (poptávka k potvrzení / nejbližší termín / faktura po splatnosti) je na telefonu nad agendou a na široké obrazovce vedle týdenního kalendáře (R-067). Karta zákazníka zůstává v pravém panelu místo třetího sloupce (D-3).
 - Jednotná hlavička obrazovek, hustota, rytmus, prázdné stavy (společné komponenty, které pak používají další sezení).
 
 ### F4 — Kalendář a Zakázky (RD05, RD06)
@@ -161,7 +161,7 @@ Pořadí je doporučené. Po RD04 jsou RD05–RD06, RD10–RD13 na sobě nezávi
 | RD16 | Zákazníci: kontakt a e-mail jedním klikem | M | 089 (typy šablon) | D-10 | hotovo v kódu 2026-10-18 (telefon/e-mail v kartě, doplnění kontaktu a bezpečný návrh sloučení duplicity, 5 šablon, osobní zprávy lze poslat i po odhlášení z nabídek, nabídky jen se souhlasem; fronta s 60 s „Zpět“, při chybějícím transportu bezpečný `mailto:`. Migrace 089 aplikována 2026-10-19. Ověřeno: `npm test` 570 + 1 přeskočený, `tsc`, `next build --webpack`; `build:check` blokuje sandbox při vytváření procesu/portu. Bezpečnostní kontrola po opravě vkládání adresy do `mailto:` bez otevřených nálezů. Odeslání na přihlášeném Preview s Resend transportem neověřeno.) |
 | RD13 | Nastavení: 5 sekcí, funkce podle oboru, autosave | M | — | — | hotovo v kódu 2026-10-18 (pět částí Firma/Nabídka/Objednávky/Zákazníci/Komunikace, staré cesty přesměrovávají, majitel může upravovat, automatické ukládání/přepínače nabízejí „Zpět“, barva pracovníka a checklist začátku na Dnes po byznysech. Bez migrace. Ověřeno: `npm test` 570 + 1 přeskočený, `tsc`, `next build --webpack`; přihlášený vizuální průchod neověřen.) |
 | RD14 | Návody | M | — | D-2 | hotovo v kódu 2026-10-19: 11 průvodců v 7 tématech, kroky s odkazy, délka čtení, vyhledávání a kontextová nápověda v záhlaví. Typovaný obsah v repu, bez migrace. Celá sada testů, typy a Webpack build prošly; přihlášené Preview neověřeno. |
-| RD15 | Vizuální sjednocení + závěrečné ověření | M | — | — | rozpracováno 2026-10-19: statický audit sjednotil výchozí akcent s `navy-700` a odstranil stíny ze statických karet/záložek; testy (582 + 1 přeskočený), typy a Webpack build prošly. Nové přihlášené Preview zatím není nasazené; zbývá průchod po obrazovkách na počítači a telefonu, měření a ověření pera/dotyku na skutečném zařízení |
+| RD15 | Vizuální sjednocení + závěrečné ověření | M | — | — | rozpracováno: k Dílky přidána specifikace Taste + Impeccable; podle R-067 přepracována kalendářová scéna Landing, společná kostra Workspace a Dnes. Lokálně prohlédnuty šířky 390, 768, 1280 a 1440 px; Workspace v dočasném náhledu se vzorovými daty, včetně tmavého režimu a zadokovaného detailu. Testy 588 + 1 přeskočený a izolovaný Webpack build prošly; `build:check` blokuje lokální port Turbopacku. Zbývá průchod přihlášenou aplikací po těchto změnách a dotyk na skutečném zařízení |
 
 Stav se po každém sezení přepíše tady (`hotovo YYYY-MM-DD`, co zbylo) a v `memory/memory.md`.
 

@@ -1,6 +1,8 @@
 # ZakazIQ — kontrolní seznam před spuštěním
 
-Stav k 2026-10-17. Položky označené **blokuje spuštění** musí být hotové a doložené
+Pořadí, rozdělení práce a rizika: [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
+
+Stav k 2026-10-31. Položky označené **blokuje spuštění** musí být hotové a doložené
 před veřejným spuštěním. Vercel eviduje `zakaziq.cz` i `www.zakaziq.cz` jako ověřené
 domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 
@@ -14,7 +16,7 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 - [ ] Zkontrolovat HSTS preload pro produkční doménu; další zařazení do preload listu řešit samostatně.
 - [ ] Nastavit `SITE_URL` v GitHub Actions a ověřit běh bezpečnostního CI jobu.
 - [ ] Zkontrolovat chybové hlášení ve Vercelu, selhané Stripe/Clerk/Resend webhooky a doručování e-mailů; určit adresu/kanál upozornění admina.
-- [ ] Dependency audit: Nodemailer 10.1.2; zbývá 5 high a 2 moderate v řetězci Tailwind 3. Oprava vyžaduje major migraci Tailwindu 4; viz `.claude/security/AUDIT-LOG.md` a rozhodnutí #006.
+- [x] Dependency audit (2026-10-31): po `npm audit fix` bez `--force` hlásí `npm audit` i `npm audit --omit=dev --audit-level=high` 0 zranitelností. CI job je znovu blokující podle rozhodnutí #006; výsledek v `.claude/security/AUDIT-LOG.md`.
 
 ## Provozní konfigurace
 
@@ -39,11 +41,11 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 ## Právní a zákaznická připravenost
 
 - [ ] **Blokuje spuštění:** doplnit skutečné obchodní podmínky, zásady ochrany údajů a zpracovatelskou smlouvu; právní texty musí dodat/projít provozovatel nebo právník.
-- [ ] **Blokuje spuštění:** doplnit IČO, adresu a kontaktní e-mail podpory do webu, Stripe a daňových dokladů.
+- [ ] **Blokuje spuštění:** doplnit právní jméno a úplnou adresu provozovatele do webu, Stripe a daňových dokladů. IČO `29977231` a kontaktní e-mail `info@vizeon.cz` potvrdil Kryštof 2026-10-31; doplnění je částečné.
 - [ ] Potvrdit, že cena 249 Kč/měsíc a 14denní zkušební doba odpovídají Stripe i textům; potvrdit režim DPH a text dokladu „Nejsem plátce DPH“.
 - [ ] Aktualizovat záznam o zpracování: provozovatel, regiony a doby uchování pro Vercel, Neon, Clerk, Stripe a Resend.
-- [ ] **Blokuje spuštění:** potvrdit prvního pilotního klienta a bezpečný postup jeho onboardingu.
-- [ ] **Blokuje spuštění:** určit podporu: kontaktní adresa, kdo hlídá požadavky, incidenty a selhání plateb, a obvyklá doba odpovědi.
+- [ ] **Blokuje spuštění:** potvrdit konkrétního pilotního klienta a bezpečný postup jeho onboardingu. Pilot bude zdarma; délka a nastavení ještě nejsou určené.
+- [ ] **Blokuje spuštění:** určit osobu, která hlídá Hovory (`/dashboard/calls`), incidenty a selhání plateb. Kanál podpory je formulář a `info@vizeon.cz`; Kryštof potvrdil odpověď do 24 hodin (2026-10-31).
 
 ## Spuštění
 
