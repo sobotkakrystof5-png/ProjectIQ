@@ -18,10 +18,11 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 
 ## Provozní konfigurace
 
+- [x] **Preview větve `ws/redesign-app`** (2026-10-31): stálá adresa `project-iq-git-ws-redesign-app-…vercel.app`, testovací Neon, vlastní `NEXTAUTH_SECRET`, `NEXT_PUBLIC_APP_URL` jen pro tuto větev (návrat z Checkoutu). Registrace → průvodce → Checkout sandbox ověřeny; karta nezadána.
 - [x] **Preview build:** aktuální pracovní strom sestaven ve Vercelu jako Preview; build i routy doběhly. Zbývá ruční funkční průchod po nastavení Preview env.
 - [ ] **Blokuje spuštění:** ověřit všechny produkční proměnné ve Vercelu; zejména databázi `ws_app`, `WS_KEY_PEPPER`, produkční Clerk, Stripe live a Resend. Tajné hodnoty nezapisovat do repa ani do tohoto seznamu.
-- [ ] **Blokuje spuštění:** aplikovat a ověřit migrace Workspace až do `084_ws_gdpr.sql` a granty `ws_app` podle `SETUP.md`.
-- [ ] **Blokuje spuštění:** založit produkční Clerk instanci, nastavit `clerk.zakaziq.cz`, vlastní OAuth údaje a webhook; ověřit přihlášení a registraci.
+- [x] Migrace Workspace 064–091 na produkci (084 aplikoval Kryštof 2026-10-31); zbývá ověřit čtením katalogu migrace až do `084_ws_gdpr.sql` a granty `ws_app` podle `SETUP.md`.
+- [ ] **Blokuje spuštění:** založit produkční Clerk instanci, v ní `organization_settings.force_organization_selection = false` (jinak Clerk po registraci ukáže anglické „Setup your organization“ a obejde průvodce `/w/novy`), nastavit `clerk.zakaziq.cz`, vlastní OAuth údaje a webhook; ověřit přihlášení a registraci.
 - [ ] **Blokuje spuštění:** nastavit Stripe live produkt/cenu, omezený klíč, Customer Portal, e-maily a webhook. Dokončit celý sandbox test Checkoutu, změny stavu, neúspěšné platby a zrušení.
 - [ ] **Blokuje spuštění:** ověřit doménu v Resendu, SPF/DKIM/DMARC, `WS_EMAIL_FROM` a webhook nedoručených zpráv; doručit test do Gmailu, Outlooku a Apple Mailu.
 - [ ] Doména `zakaziq.cz`: Vercel potvrzuje apex i www jako verified. Produkční security-check proběhl; ověřit apex DNS a e-mailové DNS záznamy ve správě domény.
