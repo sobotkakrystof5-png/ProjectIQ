@@ -9,7 +9,7 @@ import { useRevealState } from './use-in-view'
 // Cesty podle R-016 (objednávací stránka /r, widget /embed), doména R-030.
 const LINES = [
   { label: 'Odkaz pro objednání', code: `zakaziq.cz/r/${CONNECT_SLUG}` },
-  { label: 'Kód do webu', code: `<script src="https://zakaziq.cz/embed/${CONNECT_SLUG}.js"></script>` },
+  { label: 'Kód do webu', code: `<script src="https://www.zakaziq.cz/embed/${CONNECT_SLUG}.js"></script>` },
   { label: 'Pokyn pro web vytvořený v Claude Code', code: '„napoj formulář na ZakazIQ“' },
 ] as const
 

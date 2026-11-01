@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft, Download, FileDown, FileText } from 'lucide-react'
 import { AccentHeading, EmptyState, SectionLabel } from '@/components/ws/brand'
-import { CloseAccount, ReopenAccount } from '@/components/ws/account/close-account'
+import { CloseAccount, KeepAccount, ReopenAccount } from '@/components/ws/account/close-account'
 import { InstallApp } from '@/components/ws/account/install-app'
 import { ThemeSwitch } from '@/components/ws/account/theme-switch'
 import { BillingActionButton } from '@/components/ws/billing/billing-action-button'
@@ -12,7 +12,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { getBillingState, listInvoices, type AccountInvoice, type BillingState } from '@/lib/ws/billing'
 import { requireRole, requireWorkspace } from '@/lib/ws/context'
 import { wsDb } from '@/lib/ws/db'
-import { ACCOUNT_DELETE_DAYS, getAccountClosing } from '@/lib/ws/gdpr'
+import { ACCOUNT_DELETE_DAYS, getAccountCloseScheduled, getAccountClosing } from '@/lib/ws/gdpr'
 import { formatMoney } from '@/lib/ws/money'
 
 export const metadata: Metadata = { title: 'Účet' }
@@ -74,9 +74,10 @@ export default async function UcetPage() {
   const ctx = await requireWorkspace()
   requireRole(ctx, 'owner')
 
-  const [billing, closing, [account]] = await Promise.all([
+  const [billing, closing, scheduled, [account]] = await Promise.all([
     getBillingState(ctx.accountId),
     getAccountClosing(ctx),
+    getAccountCloseScheduled(ctx),
     wsDb(ctx)<{ name: string }>`SELECT name FROM ws.accounts WHERE id = ${ctx.accountId}`,
   ])
   let invoices: AccountInvoice[] | null
@@ -109,6 +110,29 @@ export default async function UcetPage() {
           </p>
           <div className="flex flex-wrap gap-2">
             <ReopenAccount />
+            <a href="/w/ucet/export" className={buttonVariants({ variant: 'outline' })}>
+              <Download aria-hidden size={18} strokeWidth={1.5} />
+              Stáhnout data
+            </a>
+          </div>
+        </section>
+      )}
+
+      {scheduled && (
+        <section role="status" className="flex flex-col gap-3 rounded-panel border border-danger/40 bg-surface p-6">
+          <h2 className="text-lg font-semibold tracking-[-0.01em]">Účet se zavře</h2>
+          <p className="text-[15px] text-quiet">
+            {scheduled.closesAt ? (
+              <>
+                Do <span className="font-num">{formatBillingDate(scheduled.closesAt)}</span> můžete pracovat jako dosud.
+              </>
+            ) : (
+              'Do konce zaplaceného období můžete pracovat jako dosud.'
+            )}{' '}
+            Pak se účet zavře a data smažeme o {ACCOUNT_DELETE_DAYS} dní později. Nic dalšího nezaplatíte.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <KeepAccount />
             <a href="/w/ucet/export" className={buttonVariants({ variant: 'outline' })}>
               <Download aria-hidden size={18} strokeWidth={1.5} />
               Stáhnout data
@@ -232,9 +256,11 @@ export default async function UcetPage() {
             </Link>
           </li>
         </ul>
-        {!closing && (
+        {!closing && !scheduled && (
           <div className="border-t border-navy-100 pt-4">
-            <p className="mb-2 text-sm text-quiet">Po zrušení účtu data držíme {ACCOUNT_DELETE_DAYS} dní, potom je smažeme.</p>
+            <p className="mb-2 text-sm text-quiet">
+              Po zrušení účet doběhne do konce zaplaceného období, pak data držíme {ACCOUNT_DELETE_DAYS} dní a potom je smažeme.
+            </p>
             <CloseAccount accountName={account?.name ?? ''} />
           </div>
         )}

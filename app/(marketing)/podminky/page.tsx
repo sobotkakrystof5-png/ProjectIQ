@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 }
 
 const FACTS = [
-  'Po zrušení účtu předplatné hned skončí. Data účtu necháváme 30 dní, během nich jde účet obnovit. Potom je nevratně smažeme; ze záloh databáze zmizí do [DOPLNIT: délka historie obnovy v Neonu].',
+  'Po zrušení účtu můžete aplikaci používat do konce zaplaceného období a nic dalšího nezaplatíte; za nevyčerpanou část období peníze nevracíme. Potom účet zavřeme. Data účtu necháváme ještě 30 dní, během nich jde účet obnovit. Potom je nevratně smažeme; ze záloh databáze zmizí do [DOPLNIT: délka historie obnovy v Neonu].',
   'Před zrušením i kdykoli jindy si můžete stáhnout všechna data v Účtu (tabulky CSV a faktury v PDF).',
 ]
 

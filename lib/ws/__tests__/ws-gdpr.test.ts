@@ -2,7 +2,18 @@ import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setWsDriverForTests } from '../db'
 import type { WsContext } from '../context'
-import { buildAccountExport, closeAccount, eraseCustomer, getAccountClosing, reopenAccount, runDailyGdpr } from '../gdpr'
+import {
+  buildAccountExport,
+  closeAccount,
+  eraseCustomer,
+  finishScheduledClose,
+  getAccountCloseScheduled,
+  getAccountClosing,
+  reopenAccount,
+  runDailyGdpr,
+  scheduleCloseAccount,
+  unscheduleCloseAccount,
+} from '../gdpr'
 import { toCsv } from '../csv'
 import { crc32, createZip } from '../zip'
 import { createWsTestDb, ids, pgliteDriver, seedAccount } from './helpers/ws-pglite'
@@ -198,5 +209,54 @@ describe('zrušení účtu', () => {
     expect(await count('SELECT count(*) AS n FROM ws.accounts WHERE id = $1', [A.account])).toBe(1)
     // a znovu založit jde (stejná data, nový účet)
     await seedAccount(db, 'b')
+  })
+})
+
+describe('zrušení ke konci zaplaceného období (R-074, migrace 097)', () => {
+  const periodEnd = async (status: string, cancelling: boolean) =>
+    db.query(
+      `UPDATE ws.subscriptions SET status = $2, cancel_at_period_end = $3, current_period_end = now() + interval '10 days' WHERE account_id = $1`,
+      [B.account, status, cancelling],
+    )
+  const openBusinesses = () => count('SELECT count(*) AS n FROM ws.businesses WHERE account_id = $1 AND archived_at IS NULL', [B.account])
+
+  it('předplatné obnovené v Portalu zrušení zruší', async () => {
+    await periodEnd('active', true)
+    expect(await scheduleCloseAccount(ctxB)).toBe(true)
+    expect(await finishScheduledClose(ctxB)).toBeNull()
+    expect(await getAccountCloseScheduled(ctxB)).not.toBeNull()
+
+    await periodEnd('active', false)
+    expect(await finishScheduledClose(ctxB)).toBeNull()
+    expect(await getAccountCloseScheduled(ctxB)).toBeNull()
+    expect(await unscheduleCloseAccount(ctxB)).toBe(false)
+  })
+
+  it('do konce období účet běží, potom ho cron zavře a začne lhůta', async () => {
+    await periodEnd('active', true)
+    expect(await scheduleCloseAccount(ctxB)).toBe(true)
+    const scheduled = await getAccountCloseScheduled(ctxB)
+    expect(scheduled?.closesAt).toBeInstanceOf(Date)
+    expect(await openBusinesses()).toBe(1)
+    expect(await getAccountClosing(ctxB)).toBeNull()
+
+    // cron obnoví předplatné ze Stripe (tady: skončilo) a účet zavře
+    const synced: string[] = []
+    const run = await runDailyGdpr(async () => {}, async (id) => {
+      synced.push(id)
+      await db.query(`UPDATE ws.subscriptions SET status = 'canceled' WHERE stripe_subscription_id = $1`, [id])
+    })
+    expect(synced).toEqual(['sub_b'])
+    expect(run).toMatchObject({ accountsClosed: 1, accountsDeleted: 0 })
+    expect(await getAccountCloseScheduled(ctxB)).toBeNull()
+    expect(await getAccountClosing(ctxB)).not.toBeNull()
+    expect(await openBusinesses()).toBe(0)
+    // zavřený účet už znovu naplánovat nejde
+    expect(await scheduleCloseAccount(ctxB)).toBe(false)
+  })
+
+  it('účet A se nedotkne', async () => {
+    expect(await finishScheduledClose(ctxA)).toBeNull()
+    expect(await count('SELECT count(*) AS n FROM ws.accounts WHERE id = $1 AND close_scheduled_at IS NULL AND delete_after IS NULL', [A.account])).toBe(1)
   })
 })

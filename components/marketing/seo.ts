@@ -7,7 +7,7 @@ import { PRICE_LABEL } from './content'
  * Veřejná adresa webu pro kanonické URL, sitemapu a Open Graph (R-017, R-030).
  * Musí odpovídat hlavní doméně v produkci (apex vs. www), jinak canonical míří jinam než web.
  */
-export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://zakaziq.cz').replace(/\/+$/, '')
+export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.zakaziq.cz').replace(/\/+$/, '')
 
 export const SITE_NAME = 'ZakazIQ'
 export const SITE_TITLE = 'ZakazIQ · poptávky, kalendář a zákazníci na jednom místě'

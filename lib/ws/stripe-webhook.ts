@@ -1,5 +1,6 @@
 import type Stripe from 'stripe'
 import { GRACE_DAYS, syncSubscription } from './billing'
+import { finishScheduledClose } from './gdpr'
 import { wsSystem } from './db'
 import { notifyPaymentFailed } from './email/notify'
 
@@ -39,6 +40,8 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<StripeEven
 
   const subscriptionId = subscriptionOf(event)
   const accountId = subscriptionId ? await syncSubscription(subscriptionId) : null
+  // Účet čekající na konec zaplaceného období se zavře, když předplatné skončí (R-074).
+  if (accountId) await finishScheduledClose({ accountId })
 
   // Neúspěšná platba: majitel dostane e-mail a upozornění (S15). Jen jednou
   // na fakturu Stripe; chyba e-mailu zpracování události nezastaví.

@@ -36,11 +36,11 @@
 
 | # | Rozhodnutí | Doporučení | Blokuje |
 |---|---|---|---|
-| D1 | Hlavní host: apex `zakaziq.cz`, nebo `www.zakaziq.cz` | Otevřené; doporučení `www` — Stripe webhook nenásleduje přesměrování, apex přesměrovává (SETUP.md). `NEXT_PUBLIC_APP_URL` musí být stejný host (R-055) | webhooky, canonical, sitemap |
+| D1 | Hlavní host: apex `zakaziq.cz`, nebo `www.zakaziq.cz` | **`www.zakaziq.cz`** (Kryštof, 2026-11-01, R-075); apex přesměrovává na www. Stripe webhook nenásleduje přesměrování (SETUP.md). `NEXT_PUBLIC_APP_URL` = `https://www.zakaziq.cz` (R-055) | webhooky, canonical, sitemap |
 | D2 | Provozovatel: jméno, IČO, adresa sídla | IČO `29977231`, obec Dobšín (Kryštof, 2026-10-31); celé právní jméno a úplná adresa sídla chybí | Stripe live, právní texty, faktury |
 | D3 | E-mail podpory | `info@vizeon.cz` (Kryštof, 2026-10-31) | landing, Stripe, podmínky |
 | D4 | Pilotní klient | Firma a způsob onboardingu stále otevřené | spuštění (LAUNCH.md) |
-| D5 | Zrušení účtu: vracet poměrnou část předplatného? | Otevřené; rozhodnout před psaním podmínek (dnes se neruší s vrácením) | podmínky |
+| D5 | Zrušení účtu: vracet poměrnou část předplatného? | **Ke konci zaplaceného období, bez vrácení** (Kryštof, 2026-11-01, R-074); kód a podmínky upraveny, migrace 097. Customer Portal ve Stripe live nastavit na zrušení ke konci období | podmínky |
 | D6 | Pilotní klient platí / sleva (kupón ve Stripe)? | Pilot zdarma (Kryštof, 2026-10-31); délku a způsob nastavení ve Stripe ještě určit | Stripe live, první platba |
 | D7 | Podpora: kdo hlídá požadavky, incidenty a selhání plateb a do kdy odpovídá | Kanál `info@vizeon.cz` a formulář na landing; odpověď do 24 hodin. Formulář ukládá dotazy do Hovorů (`/dashboard/calls`); odpovědná osoba a dohled nad incidenty/platbami k potvrzení | spuštění |
 
