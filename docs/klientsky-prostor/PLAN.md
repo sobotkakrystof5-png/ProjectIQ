@@ -1,6 +1,6 @@
 # Klientský prostor, hlášení práce a nový admin — plán
 
-> Stav: **rozpracováno** (2026-11-01). Kryštof zadal implementaci všech kroků, tím jsem přijal doporučení u D-K1–D-K11 (zapsáno jako R-070, `memory/memory.md`). Implementováno KP00 (zápis rozhodnutí), KP01–KP07 a KP09 úroveň 2 v kódu na větvi `ws/redesign-app`; **migrace 092–096 neaplikované, nic neověřeno v prohlížeči**, KP08 a KP10 nezačato. Prompty sezení jsou v `new - area of zakaziq/prompty/klientsky-prostor/` (rozcestník `00-README.md`).
+> Stav: **rozpracováno** (2026-11-01). Kryštof zadal implementaci všech kroků, tím jsem přijal doporučení u D-K1–D-K11 (zapsáno jako R-070, `memory/memory.md`). Implementováno KP00 (zápis rozhodnutí), KP01–KP07 a KP09 úroveň 2 v kódu na větvi `ws/redesign-app`; migrace 092–096 aplikované na produkci (2026-11-01), **nic neověřeno v prohlížeči**, KP08 odloženo, KP10 rozpracováno (DPA a rezidence AI zpracovatelů ověřeny, sekce 8.1). Prompty sezení jsou v `new - area of zakaziq/prompty/klientsky-prostor/` (rozcestník `00-README.md`).
 
 ## 1. Co chceme
 
@@ -175,8 +175,19 @@ Pořadí: KP00 → KP01 → KP02 → KP03 → KP04 jde čistě na adminu a nepot
 - **Větev.** Pokud se `main` mezitím posune, rebase před každým sezením (D-K9).
 - **Rozsah.** Klientský prostor je druhý velký celek vedle Workspace, který ještě nemá produkční Clerk, Stripe live ani ověřený Resend. KP05 sdílí práci s produkčním Clerkem; spuštění Workspace tím nezdržet.
 - **Experimentální platformní funkce.** Routines API a Channels se mění; KP09 před implementací znovu přečte aktuální dokumentaci a nestaví na nich nic, co nejde vrátit.
-- **Přepis hlasu.** Modely OpenAI pro přepis mají hlášená vyřazení v roce 2027; název modelu je v env. Evropskou rezidenci pro přepis jsem neověřil (KP00, KP10).
+- **Přepis hlasu.** Modely OpenAI pro přepis mají hlášená vyřazení v roce 2027; název modelu je v env. Rezidence a DPA ověřeny 2026-11-01, viz 8.1.
 - **Důvěra klienta.** Špatně napsané automatické hlášení působí hůř než žádné. Proto schvalování a texty podle `zakaziq-ux-texty-cs` a `humanize-text-cs`.
+
+### 8.1 Zpracovatelé AI: DPA a místo zpracování (ověřeno 2026-11-01, KP10)
+
+| | OpenAI (přepis hlasu, `lib/transcribe.ts`) | Anthropic (shrnutí požadavku, `lib/client-request-ai.ts`) |
+|---|---|---|
+| DPA | Verze 01/2026 je součástí OpenAI Services Agreement; pro zákazníky z EHP je smluvní stranou OpenAI Ireland Ltd. Zda je přijata automaticky, nebo přes formulář (starší podmínky 2023 formulář chtěly), z veřejných stránek jisté není → **ověřit v nastavení organizace OpenAI / u podpory** | Součást Commercial Terms automaticky, bez podpisu (účinnost 24. 2. 2025) |
+| Předání mimo EU | SCC 2021, modul 2 a 3 | SCC modul 2 a 3 zahrnuté v DPA |
+| Místo zpracování | Dnes `api.openai.com` = USA. Evropská rezidence pro `/v1/audio/transcriptions` existuje (i `gpt-4o-mini-transcribe`, `eu.api.openai.com`), ale jen pro projekt s regionem Evropa **a schválenou nulovou retencí nebo upraveným dohledem nad zneužitím** (žádost přes sales) | Vlastní API nemá EU: výpočet `global` nebo `us`, uložení jen `us`. EU jen přes Bedrock/Vertex (jiná integrace) |
+| Retence | Přepis: tabulka OpenAI u `/v1/audio/transcriptions` neuvádí uchování pro dohled nad zneužitím; data API se netrénují | Podle zásad retence API; netrénuje se |
+
+Důsledek pro texty: oba poskytovatele uvést jako zpracovatele s předáním do USA na základě SCC. Pokud bude potřeba EU rezidence přepisu: požádat OpenAI o EU projekt, pak jen změnit `ENDPOINT` na `https://eu.api.openai.com/v1/audio/transcriptions` a klíč projektu (bez další změny kódu). Zdroje: [OpenAI Your data](https://developers.openai.com/api/docs/guides/your-data), [OpenAI DPA PDF](https://cdn.openai.com/pdf/openai-data-processing-addendum.pdf), [Anthropic DPA](https://www.anthropic.com/legal/data-processing-addendum), [Claude data residency](https://platform.claude.com/docs/en/manage-claude/data-residency).
 
 ## 9. Odhad provozních nákladů
 
