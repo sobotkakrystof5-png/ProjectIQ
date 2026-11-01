@@ -74,7 +74,7 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 
 | Záznam | Hodnota | Zdroj |
 |---|---|---|
-| CAA (apex) | `0 issue "letsencrypt.org"` a CA, kterou používá Vercel (ověřit; Vercel vydává přes Let's Encrypt) | STATE.md, Vercel dokumentace |
+| CAA (apex) | `0 issue "letsencrypt.org"` a `0 issue "pki.goog"` (ověřeno 2026-11-01: Vercel vydává přes Let's Encrypt, Clerk přes Let's Encrypt nebo Google Trust Services). **Přidat až po vydání certifikátů Clerku** (`clerk deploy status` → complete), jinak hrozí zaseknuté vydávání | [Vercel troubleshooting](https://vercel.com/docs/domains/troubleshooting), [Clerk production](https://clerk.com/docs/guides/development/deployment/production) |
 | TXT apex (SPF) | `v=spf1 -all`, **pokud na doméně nebude běžná pošta** (`podpora@`); jinak SPF podle poskytovatele pošty | STATE.md |
 | MX + TXT `send` | MX `send` → `feedback-smtp.eu-west-1.amazonses.com` (10), TXT `send` = `v=spf1 include:amazonses.com ~all` | **přesné hodnoty z Resend dashboardu** |
 | TXT `resend._domainkey` | DKIM klíč | Resend dashboard |
@@ -85,6 +85,8 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Resendu a produkční instanci v Clerku (hodnoty jsou tam). **[K]** záznamy zadá. **[C]** ověří `dig +short TXT/CNAME/MX/CAA …` (opakovaně, propagace trvá minuty až hodiny).
 
 **Pozor:** apex A/ALIAS a `www` ukazují na Vercel a nesmí se při úpravách rozbít; před změnou si poznamenat současné záznamy.
+
+**Stav 2026-11-01 (`dig`):** NS WEDOS; apex A `216.198.79.1` (Vercel); `www` CNAME `…vercel-dns-017.com`; apex bez TXT, MX a CAA; `_dmarc` ani `clerk` neexistují. Resend: doména `zakaziq.cz` v účtu není (účet má prvotka.cz, vizeon.cz, estatiq.cz). Clerk: `clerk deploy status` = `not_started`, `clerk deploy` vyžaduje interaktivní terminál.
 
 ### Stopa C — Resend (závisí na B)
 

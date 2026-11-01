@@ -179,7 +179,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `plans_legacy_archived` | 042 | Stará plochá tabulka plánů — jen archiv, nepoužívat |
 | `project_activity` | 093 | Aktivita zakázky (KP03): koncepty a schválené zprávy, `status` draft/published/rejected, `source` manual/claude_code/system, `contains_sensitive`, `client_emailed_at` (souhrnný e-mail max. 1× za den) |
 | `project_agent_keys` | 094 | Klíče projektů pro hlášení z Claude Code (KP04): prefix + HMAC hash, jeden platný klíč na projekt, kdo a kdy vytvořil/zneplatnil |
-| schéma `portal` (`clients`, `members`, `invites`, `projects`, `activity`, `requests`, `messages`, `feedback`) | 095, 096 | Klientský prostor (KP05–KP07): projekce schváleného, RLS podle `app.client_id`, role `portal_app` bez práv do `public`. Podrobně `docs/klientsky-prostor/PLAN.md` a `.claude/security/DECISIONS.md` #020 |
+| schéma `portal` (`clients`, `members`, `invites`, `projects`, `activity`, `requests`, `messages`, `feedback`) | 095, 096, 098 | Klientský prostor (KP05–KP07), retence 3 roky (098): projekce schváleného, RLS podle `app.client_id`, role `portal_app` bez práv do `public`. Podrobně `docs/klientsky-prostor/PLAN.md` a `.claude/security/DECISIONS.md` #020 |
 
 **DB funkce/triggery:** `check_calendar_overlap`, `check_consultation_overlap` (overlap guard napříč tabulkami, migrace 008/043/044), `is_vizeon_pending()`, `is_alteno_pending()` (migrace 048/050).
 
@@ -323,6 +323,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 | `/api/cron/scrape-school` | denně 6:00 | LernSax + Beste Schule scraping |
 | `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací, lead akcí, školních termínů (idempotentní příznaky proti duplicitám) |
 | `/api/cron/tax-news` | pondělí 5:00 | Stažení legislativních novinek (`ON CONFLICT DO NOTHING`) |
+| `/api/cron/client-retention` | denně 3:30 | Retence D-K10 (R-076, migrace 098): `public.purge_client_retention(3)` — dokončená zakázka (`done`/`paid`) bez pohybu 3 roky přijde o aktivitu, požadavky (`client_requests`, `portal.requests`), zprávy a slovní hodnocení; zakázka, cena a číselné hodnocení zůstávají. Pozvánky 90 dní po použití/zrušení/vypršení. `lib/client-retention.ts` |
 
 ---
 

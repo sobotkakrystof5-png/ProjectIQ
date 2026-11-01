@@ -166,7 +166,7 @@ Pořadí: KP00 → KP01 → KP02 → KP03 → KP04 jde čistě na adminu a nepot
 | D-K7 | Předání do Claude Code: která úroveň | 1 (hotovo) + 2; úroveň 3 jen po experimentu a samostatném rozhodnutí | přijato doporučení (R-070) |
 | D-K8 | Soubory od klienta (screenshoty, podklady): ano/ne a kam je ukládat | odložit; až bude potřeba, úložiště rozhodnout zvlášť | přijato doporučení (R-070) |
 | D-K9 | Větev: admin patří na `main`, ale kód je na `ws/redesign-app` (Next 16, `main` je starší) | pracovat na větvi nad `ws/redesign-app` a sloučit s ní | přijato doporučení (R-070) |
-| D-K10 | Jak dlouho držet data klientů po skončení zakázky (aktivita, zprávy, požadavky) | 3 roky, pak anonymizace nebo výmaz; GDPR žádost okamžitě | přijato doporučení (R-070) |
+| D-K10 | Jak dlouho držet data klientů po skončení zakázky (aktivita, zprávy, požadavky) | 3 roky, pak anonymizace nebo výmaz; GDPR žádost okamžitě | přijato doporučení (R-070); implementováno migrací 098 a cronem `client-retention` (R-076) |
 | D-K11 | Zavést firmu klienta jako samostatný záznam (víc projektů pod jednou firmou) | ano, `portal.clients`; propojení se zakázkou při pozvání | přijato doporučení (R-070) |
 
 ## 8. Rizika

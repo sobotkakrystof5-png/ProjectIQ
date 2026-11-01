@@ -410,13 +410,18 @@
 **Proč:** rozhodl Kryštof 2026-11-01; Stripe webhook nenásleduje přesměrování, Vercel už www používá.
 **Důsledek:** `.env.example`, výchozí `SITE_URL`, kód widgetu na landing a `security.txt` přepnuté na www. `NEXT_PUBLIC_APP_URL` ve Vercelu Production se mění až s nasazením Workspace (dnes ho používá starý admin build).
 
+### R-076 · Retence dat klientů: 3 roky od posledního pohybu dokončené zakázky (2026-11-01)
+**Rozhodnutí:** (D-K10) dokončená zakázka (`done`/`paid`), na které se 3 roky nic nestalo (změna zakázky, aktivita, požadavek ani zpráva), přijde o aktivitu, požadavky (`client_requests`, `portal.requests`), zprávy a slovní hodnocení. Zakázka, cena, platby a číselné hodnocení zůstávají. Pozvánky do klientského prostoru se mažou 90 dní po použití, zrušení nebo vypršení. Rozpracované zakázky se nemažou. Žádost GDPR se řeší okamžitě ručně.
+**Proč:** Kryštof 2026-11-01 odsouhlasil návrh („pojďme do toho“) k D-K10 z R-070. Lhůta od posledního pohybu chrání klienta, který se ke staré zakázce vrátí.
+**Důsledek:** migrace 098 (`public.purge_client_retention`, jen vlastník tabulek), cron `/api/cron/client-retention` denně 3:30 UTC, `lib/client-retention.ts`, test `lib/__tests__/client-retention.test.ts`. Zmínit v právních textech (KP10).
+
 ---
 
 ## 3. Otevřené problémy
 
 - [ ] **Požadavky klientů (R-069) — před nasazením:** (1) ~~migrace 092~~ aplikovaná na produkci, (2) ~~`OPENAI_API_KEY`~~ ve Vercelu (Production i Preview), (3) ověřit v prohlížeči mikrofon a nahrávání (Chrome, Safari iOS `audio/mp4`) a že hlavička `Permissions-Policy` na `/p/*` má `microphone=(self)`, (4) ~~ověřit rezidenci a DPA~~ ověřeno 2026-11-01 (`docs/klientsky-prostor/PLAN.md` 8.1: OpenAI i Anthropic zpracovávají v USA na SCC; EU přepis jen s žádostí u OpenAI; zda je DPA OpenAI přijaté automaticky, ověřit v nastavení organizace), zbývá doplnit zpracovatele do právních textů, (5) nahrávku klienta zatím nikdo nevyzkoušel s češtinou · od 2026-11-01
 - [ ] **Klientský prostor — před nasazením (R-070–R-073):** (1) ~~migrace 092–096 a role `portal_app`~~ hotovo na produkci, (2) ~~env ve Vercelu~~ nastaveno (`DATABASE_URL_PORTAL` jen Production), (3) **průchod v prohlížeči nikdo neprošel** (jde jen na Neon větvi `projectiq` s migracemi 092–096 a `portal_app`, nebo na produkci se souhlasem; Preview míří na testovací DB bez schématu `portal`): pozvánka → registrace v Clerku → přijetí → přehled → požadavek (text i hlas) → zpráva → hodnocení; kostra adminu, Dnes, záložky detailu, schvalování hlášení a klíč projektu na datech; telefon 390 px, (4) Clerk je jen dev instance, `/klient` s ním ověřit až s produkční, (5) test hlášení ze skriptu `zakaziq-report.mjs` proti běžící aplikaci, (6) souhrnný e-mail o aktivitě se neposlal nikdy naostro · od 2026-11-01
-- [ ] **KP08 a KP10:** soubory od klienta jsou odložené (D-K8). KP10 (audit `web-security-audit`, GDPR a retence 3 roky D-K10, právní texty o zpracovateli OpenAI/Anthropic, pilot s jedním klientem) nezačato · od 2026-11-01
+- [ ] **KP08 a KP10:** soubory od klienta jsou odložené (D-K8). KP10: ~~retence 3 roky~~ v kódu (R-076, migrace 098), ~~DPA a rezidence AI~~ ověřeno; zbývá audit `web-security-audit`, právní texty se zpracovateli OpenAI/Anthropic a retencí, pilot s jedním klientem · od 2026-11-01
 - [ ] **Předání do Claude Code úroveň 3** (Routines API) se nedělá, dokud nebude experiment a samostatné rozhodnutí (D-K7) · od 2026-11-01
 - [ ] **Admin pod Dílky — zbytek:** obsah stránek adminu je dál v `brand-*` a Inter; přepis po stránkách je volitelný další krok. Starý seznam na `/dashboard` se přesunul na `/dashboard/zakazky`; odkazy z e-mailů a poznámek na `/dashboard` teď vedou na Dnes · od 2026-11-01
 - [ ] **Nestabilní test widgetu:** `ws-intake` test „skript je platný JS, malý a data jsou escapovaná“ jednou padl při plném běhu (časový limit), samostatně prochází · `lib/ws/__tests__` · od 2026-11-01
@@ -490,7 +495,10 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-01
-- **feat** D5 (R-074): zrušení účtu ke konci zaplaceného období místo okamžitého konce. Migrace 097 (aplikována: ne), `app/w/ucet/{actions,page}.tsx`, `components/ws/account/close-account.tsx` („Účet se zavře“, „Nechat účet“), `lib/ws/{gdpr,stripe-webhook}.ts`, cron `ws-gdpr`, `scripts/ws-grants.sql`, `/podminky`. Testy `ws-gdpr` (3 nové); test číslování migrací počítá s mezerami pro migrace mimo `ws` (092–096).
+- **feat** Retence D-K10 (R-076): migrace 098 (aplikována: ne, čeká na produkční heslo), cron `client-retention` ve `vercel.json`, `lib/client-retention.ts`, `docs/admin/AGENTS-ADMIN.md` → Crony. 3 testy v PGlite.
+- **db** Migrace 097 aplikována na testovací Neon (`ZakazIQ RD test`): ověřeno `close_scheduled_at`, `ws_app` smí `ws.scheduled_closings()`, PUBLIC ne. Produkce: ne (čeká na nové heslo `neondb_owner`).
+- **chore** Externí stopy: Resend doména `zakaziq.cz` zatím neexistuje (přidání přes API zamítnuto oprávněním, udělá Kryštof v dashboardu), Clerk `deploy status` = `not_started` (vyžaduje interaktivní `clerk deploy`), stav DNS a ověřené CAA (Let's Encrypt + Google Trust Services) v `docs/workspace/LAUNCH-PLAN.md` stopa B.
+- **feat** D5 (R-074): zrušení účtu ke konci zaplaceného období místo okamžitého konce. Migrace 097 (aplikována: test ano, produkce ne), `app/w/ucet/{actions,page}.tsx`, `components/ws/account/close-account.tsx` („Účet se zavře“, „Nechat účet“), `lib/ws/{gdpr,stripe-webhook}.ts`, cron `ws-gdpr`, `scripts/ws-grants.sql`, `/podminky`. Testy `ws-gdpr` (3 nové); test číslování migrací počítá s mezerami pro migrace mimo `ws` (092–096).
 - **decision** D1 (R-075): hlavní host `www.zakaziq.cz`; `.env.example`, `SITE_URL`, widget na landing, `security.txt` (záznam v `.claude/security/STATE.md`).
 - **chore** Nesledované soubory z instalace Impeccable (`.claude/agents/`, `.codex/{agents,hooks.json}`, `.github/{agents,hooks,skills}`) a `skills-lock.json` (taste-skill) zařazeny do repa; `.claude/launch.json` (lokální konfigurace náhledu) přidán do `.gitignore`.
 - **docs** KP10: DPA a místo zpracování OpenAI (přepis) a Anthropic (shrnutí) ověřeny na oficiálních stránkách, zapsáno do `docs/klientsky-prostor/PLAN.md` 8.1.
