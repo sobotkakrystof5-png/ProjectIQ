@@ -163,6 +163,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/hub/finance`), volitelná vazba na projekt |
 | `project_surveys` | 016, 046 | Dotazník spokojenosti (`/h/[token]`, `completed_projects.survey_token`) — max 1 na zakázku |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
+| `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
 | `invoices` | 053, 056 | Archiv faktur (PDF, AI přepis, vazba na transakci) |
 | `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
 | `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
@@ -176,6 +177,9 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `personal_projects` (+ `_improvements`, `_changelog`) | 033 | Hub › Projekty |
 | `plan_*` | 036–041 | Hub › Plány (škola, projekty, byznys, sport, finance) |
 | `plans_legacy_archived` | 042 | Stará plochá tabulka plánů — jen archiv, nepoužívat |
+| `project_activity` | 093 | Aktivita zakázky (KP03): koncepty a schválené zprávy, `status` draft/published/rejected, `source` manual/claude_code/system, `contains_sensitive`, `client_emailed_at` (souhrnný e-mail max. 1× za den) |
+| `project_agent_keys` | 094 | Klíče projektů pro hlášení z Claude Code (KP04): prefix + HMAC hash, jeden platný klíč na projekt, kdo a kdy vytvořil/zneplatnil |
+| schéma `portal` (`clients`, `members`, `invites`, `projects`, `activity`, `requests`, `messages`, `feedback`) | 095, 096 | Klientský prostor (KP05–KP07): projekce schváleného, RLS podle `app.client_id`, role `portal_app` bez práv do `public`. Podrobně `docs/klientsky-prostor/PLAN.md` a `.claude/security/DECISIONS.md` #020 |
 
 **DB funkce/triggery:** `check_calendar_overlap`, `check_consultation_overlap` (overlap guard napříč tabulkami, migrace 008/043/044), `is_vizeon_pending()`, `is_alteno_pending()` (migrace 048/050).
 
@@ -256,7 +260,8 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | Soubor | Oblast |
 |--------|--------|
 | `app/actions.ts` | Zakázky: CRUD, vzkazy, potvrzení/smazání poptávek z webu (VIZEON/ALTENO), `markProjectAsCompleted`, `notifyClientOfProjectChange` |
-| `app/portal-actions.ts` | Veřejné (token): `submitFeedback`, `submitConsultation`, `submitSurvey` |
+| `app/portal-actions.ts` | Veřejné (token): `submitFeedback`, `submitConsultation`, `submitSurvey`, `submitClientRequest` (AI shrnutí běží v `after()`) |
+| `app/client-requests-actions.ts` | Admin: změna stavu požadavku klienta (`/dashboard/pozadavky`) |
 | `app/calendar-actions.ts` | Kalendářní události (+ párový lead v Hovorech) |
 | `app/calls-actions.ts` | Hovory: leady, poznámky, waiting stav, převod na zakázku, portfolio email, vlastní email |
 | `app/completed-actions.ts` | Dokončené zakázky + dotazníky |
@@ -276,7 +281,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Sekce | Routy |
 |-------|-------|
-| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/[id]/sablona` (šablona webu zakázky), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/sablony` (knihovna bloků), `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
+| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/pozadavky` (požadavky klientů z portálu, napříč VIZEON i ALTENO), `/[id]/sablona` (šablona webu zakázky), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/sablony` (knihovna bloků), `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
 | ALTENO (`/alteno`) | `/alteno`, `/new`, `/[id]`, `/rezervace` |
 | Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/plany` (+ `/skola`, `/projekty`, `/byznys`, `/byznys/[id]`, `/sport`, `/finance`), `/projekty` (+ `/new`, `/[id]`), `/school`, `/sport` |
 | Legacy | `/dashboard/projekty/**` — z navigace odstraněno (přesunuto do Hubu), soubory zůstaly, viz `memory/memory.md` |
@@ -300,11 +305,14 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
+| `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
 | `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury |
 | `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
 | `GET /api/fatsecret/search` | — | Vyhledávání jídla (dnes Open Food Facts, název je historický) |
 | `POST /api/school/sync` | session | Ruční spuštění školního scraperu (proxy na cron) |
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
+| `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
+| `POST /api/klient/transcribe` | přihlášený člen klientského prostoru (Clerk) | Přepis hlasu pro požadavek klienta; limit po IP a členovi |
 
 Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-closed) + `lib/api-rate-limit.ts` + Zod validace. Klíč se nikdy neloguje.
 
@@ -325,24 +333,25 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Po přihlášení redirect na `/dashboard`
 - Čistý minimalistický design
 
-### `/dashboard`
-- **Summary bar:** počet aktivních zakázek · celková očekávaná platba · celkem nezaplaceno
-- **Tlačítko + Nová zakázka** — přechod na `/dashboard/new`
-- **Filtry:** Všechny | Probíhající | Čeká na platbu | Hotové
-- **Karta zakázky** zobrazuje: jméno klienta, popis, progress bar (%), status badge, cena, zaplaceno/ne, deadline, tlačítko Sdílet link
-- Kliknutí na kartu = přechod na `/dashboard/[id]`
+### Kostra administrace (KP01, R-071)
+- `/dashboard/*` a `/alteno/*` sdílí `components/admin/admin-shell.tsx`: postranní menu na počítači, horní lišta a spodní lišta s nabídkou „Více“ na telefonu, hledání ⌘K (stránky, zakázky, hovory, faktury; `app/admin-search-actions.ts`). Hub (`/hub`) má dál vlastní postranní panel.
+- Menu a odznaky: `lib/admin-nav.ts` (skupiny Dnes · Zakázky · Kalendář a hovory · Peníze · Klienti · Osobní) a `lib/admin-counts.ts` (počty jedním dotazem). Nová stránka adminu = položka v `ADMIN_NAV`; test `lib/__tests__/admin-nav.test.ts` hlídá, že žádná dřívější cesta nezmizela.
+- Vzhled: kostra používá Dílky (`data-app="admin"`, `app/admin-tokens.css`, jen barevné tokeny, bez přepsání proměnných shadcn). Obsah stránek zůstává na původním vzhledu (Inter, `brand-*`), dokud se nepřepne.
+
+### `/dashboard` — Dnes (KP02)
+- Jedna hlavní věc nahoře (`lib/admin-today.ts` → `pickFocus`): požadavek klienta → hlášení ke schválení → faktura po splatnosti → schůzka do 24 h → zakázka bez pohybu 14 dní. Pod ní sekce se stejnými věcmi. Data `lib/admin-today-queries.ts` (každá sekce se načítá zvlášť, chybějící tabulka = prázdná sekce).
+
+### `/dashboard/zakazky`
+- Seznam zakázek VIZEON i ALTENO s přepínačem firmy (`?firma=`), filtrem stavu (`?status=`), summary barem a počtem nevyřízených požadavků na kartě. `/alteno` zůstává seznamem ALTENO.
 
 ### `/dashboard/new`
 - Formulář: client_name, description, focus, project_url, status, progress, price, paid, deadline, notes, client_email
 - Po uložení redirect na `/dashboard`
 
-### `/dashboard/[id]`
-- Editace všech polí zakázky
-- Tlačítko **Kopírovat klientský link** — zkopíruje `/p/[public_token]` do schránky + toast potvrzení
-- QR kód pro sdílení
-- **FeedbackFeed** — NPS hodnocení od klienta pro tento projekt
-- **ConsultationCalendar** — rezervované konzultace pro tento projekt
-- Tlačítko smazat zakázku
+### `/dashboard/[id]` a `/alteno/[id]` — detail zakázky (KP02)
+- Jedna komponenta `components/admin/project-detail-view.tsx`, záložky v adrese `?zalozka=`: **Přehled** (editace, sdílení a QR, šablona webu, přidat do dokončených, smazat) · **Aktivita** (koncepty a schvalování, napojení Claude Code) · **Požadavky** (karty z `/dashboard/pozadavky` filtrované na zakázku) · **Zprávy** (vlákno v klientském prostoru, vzkazy, historie postupu, zpětná vazba, konzultace, poznámky) · **Fakturace** (jen VIZEON: faktury a náklady). Načítají se jen data aktivní záložky.
+- Špatná sekce (`/dashboard/[id]` pro ALTENO zakázku a naopak) přesměruje na správnou.
+- Nepřevedeno z plánu: změna stavu a fáze jedním klikem se „Zpět“. `updateProject` posílá klientovi e-mail, takže „Zpět“ by ho poslal podruhé.
 
 ### `/dashboard/calendar`
 - Globální kalendář (Month/Week/Day) napříč VIZEON projekty — konzultace + manuální události/blokace
@@ -385,6 +394,8 @@ Co ALTENO **nemá** (zůstává jen ve VIZEONu): Kalendář, Hovory, Dokončené
 - **Bez přihlášení, bez registrace**
 - Klient vidí: název projektu, jméno freelancera, popis, focus, vizuální progress bar, status badge, deadline, datum poslední aktualizace, link na živou verzi (pokud vyplněn `project_url`)
 - **FeedbackBlock** — klient může nechat NPS hodnocení + komentář
+- **ClientRequestBlock** — klient napíše nebo nadiktuje požadavek (mikrofon jen s `OPENAI_API_KEY`); AI z něj udělá shrnutí a zadání pro Claude Code, v adminu je to `/dashboard/pozadavky` (kopírování zadání, Hotovo/Zahodit), upozornění přijde zvonkem a e-mailem. Zadání nic nespouští, vkládá ho člověk
+- **Aktivita** (KP03): schválené zprávy o práci (`project_activity`, `status = 'published'`) jsou v jedné časové ose s historií postupu. Koncepty, zdroj ani příznak citlivosti klient nevidí
 - **BookingCTA** → **BookingModal** — klient si rezervuje konzultaci (kalendář, sloty po hodinách, kanál, svůj email)
 - Klient **NEVIDÍ:** notes, cenu (výchozí skryto), ostatní zakázky
 - Moderní branded design — buduje důvěru

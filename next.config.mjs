@@ -26,6 +26,10 @@ const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'off' },
 ]
 
+const portalPermissionsPolicy = securityHeaders
+  .find(h => h.key === 'Permissions-Policy')
+  .value.replace('microphone=()', 'microphone=(self)')
+
 // Co se vkládá na weby klientů: objednávací stránka /r/[slug] (iframe, rámování
 // řídí frame-ancestors z proxy.ts) a widget /embed/[slug].js + veřejné API
 // /api/public/v1 (načítají se z cizí domény). DECISIONS.md #004.
@@ -34,7 +38,7 @@ const notEmbeddable = '/((?!r/|r$|embed/|api/public/v1/).*)'
 // Do vyhledávačů smí jen landing page a právní stránky (S05). Aplikace, admin, API,
 // objednávací stránky klientů, widget a portály (/z, /p, /h — odkazy s tokenem) dostanou
 // noindex hlavičkou: funguje i pro soubory a přesměrování, kde meta značka není.
-const notIndexed = '/:area(w|r|z|embed|api|dashboard|alteno|hub|login|p|h)/:path*'
+const notIndexed = '/:area(w|r|z|klient|embed|api|dashboard|alteno|hub|login|p|h)/:path*'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -66,6 +70,17 @@ const nextConfig = {
     // Při shodě více pravidel vyhrává pozdější hodnota stejné hlavičky.
     return [
       { source: '/:path*', headers: securityHeaders },
+      {
+        // Klient na portálu nadiktuje požadavek (S: požadavky klientů). Mikrofon jen pro
+        // vlastní stránku, nikdy pro vložené rámce; zbytek politiky zůstává. DECISIONS.md #018.
+        source: '/p/:path*',
+        headers: [{ key: 'Permissions-Policy', value: portalPermissionsPolicy }],
+      },
+      {
+        // Klientský prostor (KP07): stejná výjimka pro mikrofon jako /p.
+        source: '/klient/:path*',
+        headers: [{ key: 'Permissions-Policy', value: portalPermissionsPolicy }],
+      },
       { source: notIndexed, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
       {
         source: notEmbeddable,

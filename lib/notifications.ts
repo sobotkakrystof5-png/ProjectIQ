@@ -10,6 +10,8 @@ export type NotificationType =
   | 'reminder_upcoming'
   | 'agent_lead_received'
   | 'invoice_received'
+  | 'client_request_received'
+  | 'activity_draft'
 
 export async function createNotification(params: {
   type: NotificationType

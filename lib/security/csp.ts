@@ -21,7 +21,7 @@ export type CspMode = 'enforce' | 'report-only'
 type Directives = Record<string, string[]>
 
 /** Cesty Workspace s profilem `workspace` (DECISIONS.md #003). */
-const WORKSPACE_PREFIXES = ['/w', '/r', '/z'] as const
+const WORKSPACE_PREFIXES = ['/w', '/r', '/z', '/klient'] as const
 
 /**
  * Landing page a její právní stránky — profil `workspace` jako přesné cesty (DECISIONS.md #007).
@@ -89,7 +89,7 @@ export function clerkFrontendApiHost(publishableKey: string | undefined): string
 }
 
 /**
- * Clerk (S07) jen pod /w — přihlášení, registrace, aplikace. Landing page Clerk
+ * Clerk (S07) jen pod /w a /klient (KP05) — přihlášení, registrace, aplikace. Landing page Clerk
  * nenačítá. Skript clerk-js jde z Frontend API s naším nonce (ClerkProvider
  * `dynamic`), Turnstile ho načte sám (strict-dynamic). Telemetrie je vypnutá
  * v `app/w/layout.tsx`, host clerk-telemetry.com proto není potřeba.
@@ -120,7 +120,7 @@ function extras(profile: CspProfile, pathname: string, clerkHost: string | null)
         : {}),
     }
   }
-  if (clerkHost && hasPrefix(pathname, '/w')) return clerkSources(clerkHost)
+  if (clerkHost && (hasPrefix(pathname, '/w') || hasPrefix(pathname, '/klient'))) return clerkSources(clerkHost)
   // S08: Stripe Checkout je přesměrování; pokud bude potřeba, `form-action https://checkout.stripe.com`.
   return {}
 }

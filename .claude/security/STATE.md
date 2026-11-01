@@ -42,7 +42,7 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 | X-Content-Type-Options | ✅ nosniff | |
 | X-Frame-Options | ✅ DENY | mimo `/r/*`, `/embed/*`, `/api/public/v1/*`; PDF faktury `SAMEORIGIN` (DECISIONS #004) |
 | Referrer-Policy | ✅ strict-origin-when-cross-origin | |
-| Permissions-Policy | ✅ vše zakázané (kamera, mikrofon, poloha, platby, USB…) | |
+| Permissions-Policy | ✅ vše zakázané (kamera, mikrofon, poloha, platby, USB…); výjimka `microphone=(self)` jen na `/p/*` a `/klient/*` | #018 |
 | Cross-Origin-Opener-Policy | ✅ same-origin | Clerk popup OAuth by ho porušil — používat přesměrování (S07) |
 | Cross-Origin-Resource-Policy | ✅ same-origin | `cross-origin` pro `/embed/*`, `/api/public/v1/*` a obrázek novinky `/z/novinky/[id]/obrazek` (DECISIONS #013) |
 | X-XSS-Protection | ✅ 0 | |
@@ -93,9 +93,12 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 - Klientský portál (S16): `/z/[token]` bez přihlášení, token je DB UUID. `ws.portal_lookup` (SECURITY DEFINER) vrací jen účet/byznys/druh/ID; další čtení a zápisy jdou přes RLS s oběma filtry. Neplatný, cizí, archivovaný i vypnutý odkaz = stejná 404. Akce mají Zod, honeypot hodnocení, limity na IP i záznam; PDF kontroluje vazbu faktury na zakázku a vrací `private, no-store`. Interní poznámky, kontakty a vlastní kolonky se nenačítají. DECISIONS #012
 - Kontext obrazovky (RD02): `ws.business_scope(org, slug)` (SECURITY DEFINER, migrace 085) vrací účet, byznys, předplatné, funkce a byznysy jen pro jednu Clerk organizaci; výsledek žije jen v paměti jednoho požadavku (klíč `accountId:slug`). Chybí-li funkce (42883), běží starý postup. DECISIONS #016
 - Admin nad Workspace (S17, zpřesněno RD11): `/dashboard/klienti`, `/dashboard/novinky` čtou `ws` vlastníkem tabulek (`lib/ws/admin/db.ts`, `server-only`), každá akce `getAdmin()` (NextAuth). Admin zapisuje novinky a audit; poznámky `ws.account_admin_notes` už konzole nečte ani neupravuje. Klientský přehled nečte osobní/finanční obsah zákazníků, poptávek, termínů a faktur ani volné podrobnosti auditu; zůstávají agregované počty a údaje účtu, byznysů a členů týmu. Vlastník tabulek má technicky širší DB přístup (DECISIONS #017). Obrázek novinky z DB, jen PNG/JPEG/WebP podle bajtů, veřejný jen po zveřejnění. DECISIONS #013, #017
+- Aktivita zakázky a hlášení z Claude Code (KP03/KP04): `project_activity` (migrace 093) drží koncepty a schválené zprávy; klient vidí jen `published` (`/p/[token]` i `/klient`), nikdy koncepty, zdroj ani příznak citlivosti. Schválení jen z adminu (`requireAuth`), citlivý koncept nejde schválit (CHECK v DB + server). Klíč projektu zapisuje jen koncepty, DECISIONS #019
+- Klientský prostor (KP05–KP07): `/klient` (Clerk bez organizací), schéma `portal` + role `portal_app` bez práv do `public`, RLS, pozvánky s HMAC hashem, zápisy jen funkcemi `portal.submit_*`, DECISIONS #020. Test oddělení `lib/__tests__/portal-isolation.test.ts` ✅ (PGlite). Požadavek, zpráva a hodnocení mají limity v DB funkcích. Přepis hlasu `POST /api/klient/transcribe` jen pro přihlášeného člena, limity po IP a členovi
+- Předání zadání do Claude Code (KP09, úroveň 2): příkaz pro terminál s textem klienta v dočasném souboru přes heredoc s náhodným oddělovačem, bez `$(…)`; test ve skutečném shellu (bash 3.2) potvrdil, že text nic nespustí. Plně automatické spuštění z textu klienta se nedělá
 - Captcha: žádná, honeypot `website` + rate limit (DECISIONS #010). Turnstile při prvním spamu
 - Secrets: jen env Vercelu, `.env*` v `.gitignore` (kromě vzorů), gitleaks v CI. Historie gitu 2026-10-08 čistá (90 commitů)
-- Session: NextAuth JWT (admin), Clerk (Workspace, jen pod `/w` a `/api/ws` — proxy Clerk jinde nespouští). Cookie `__session` Clerku není HttpOnly (DECISIONS #009)
+- Session: NextAuth JWT (admin), Clerk (Workspace pod `/w` a `/api/ws`, klientský prostor pod `/klient` a `/api/klient` — proxy Clerk jinde nespouští). Cookie `__session` Clerku není HttpOnly (DECISIONS #009)
 - Zálohy: Neon point-in-time restore (podle plánu Neonu) — test obnovy nikdy neproběhl
 
 ## Otevřené položky
@@ -116,6 +119,8 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 | CI proměnná `SITE_URL` | job `headers` se jinak neprovede | Kryštof | po prvním nasazení Workspace |
 | Živý audit produkce | `www.zakaziq.cz`: chybí CSP, COOP, CORP, `security.txt`, SPF a DMARC; `x-powered-by` zůstává. Produkce je starší `main`; opravy jsou v Preview/kódu | před spuštěním |
 | Chrome/Safari průchod vynucené CSP | Preview build READY; Chrome načetl landing page, ale konzole hlásí chybu konfigurace NextAuth; přihlášení Workspace i Safari čekají na ruční ověření | po doplnění Preview env |
+| Migrace 092–096 na produkci a role `portal_app` (`scripts/portal-create-role.js`), `DATABASE_URL_PORTAL`, `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER` do Vercelu | bez nich nejde vytvořit klíč projektu ani pozvánku a `/klient` nemá DB; roli jen skriptem, nikdy v konzoli (konzolové role obcházejí RLS) | Kryštof | před nasazením klientského prostoru |
+| Přihlášení přes Clerk na `/klient` v prohlížeči | proxy, CSP a pozvánka jsou ověřené jen testy; skutečný průchod (registrace z pozvánky, přihlášení, odhlášení) nikdo neprošel | Kryštof + Claude | před prvním klientem |
 | HSTS preload | zděděné `preload` — ověřit stav na hstspreload.org pro produkční doménu adminu | Kryštof | S19 |
 | Test obnovy zálohy Neonu | zálohu, kterou nikdo neobnovil, nelze brát jako zálohu | Kryštof | před spuštěním |
 

@@ -117,6 +117,8 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | Veřejná API | `VIZEON_API_KEY`, `ALTENO_API_KEY`, `ALTENO_LEAD_WEBHOOK_SECRET`, `N8N_API_KEY`, `VIZEON_AGENT_API_KEY`, `INVOICES_API_KEY` |
 | Crony | `CRON_SECRET` |
 | Hub | `LERNSAX_USER`, `LERNSAX_PASS`, `BESTESCHULE_USER`, `BESTESCHULE_PASS`, `BESTESCHULE_URL`, `CHROME_PATH` (dev), `ANTHROPIC_API_KEY` |
+| Požadavky klientů (portál `/p`) | `OPENAI_API_KEY` (přepis hlasu; bez něj je mikrofon skrytý), `OPENAI_TRANSCRIBE_MODEL` (volitelně, výchozí `gpt-4o-transcribe`), `CLIENT_REQUEST_AI_MODEL` (volitelně, výchozí `claude-sonnet-5-5`; používá `ANTHROPIC_API_KEY`) |
+| Klientský prostor a hlášení (KP03–KP07) | `DATABASE_URL_PORTAL` (role `portal_app`, `scripts/portal-create-role.js` po migracích 093–096), `PORTAL_INVITE_PEPPER` (hash pozvánek), `AGENT_KEY_PEPPER` (hash klíčů projektů pro hlášení z Claude Code); přepis hlasu a shrnutí jako u portálu `/p` |
 
 Nejdůležitější s popisem:
 
@@ -264,6 +266,16 @@ Pravidla schématu:
 
 - Denní cron posílá e-mailem jen novinky s `emailed_at` (admin je výslovně odeslal) za posledních 14 dní a jen účtům založeným před odesláním (`queueNewsForAccount` v `lib/ws/email/scheduled.ts`).
 - Odeslanou novinku nejde skrýt ani smazat (CHECK `emailed_at` → `published_at`), koncept jde smazat.
+
+### Klientský prostor a hlášení práce (KP01–KP09)
+
+Plán a rozhodnutí: `docs/klientsky-prostor/PLAN.md` (R-070 a dál v `memory/memory.md`), napojení projektu klienta `docs/klientsky-prostor/NAPOJENI-CLAUDE-CODE.md`, bezpečnost `.claude/security/DECISIONS.md` #019 a #020.
+
+- **Aktivita zakázky** (migrace 093): `lib/project-activity.ts` (Zod, `redactSensitive`, `buildTimeline`), `app/project-activity-actions.ts` (koncept → schválit/zamítnout, souhrnný e-mail max. 1× za 24 h, selhání e-mailu publikaci nezruší), `components/ProjectActivityPanel.tsx`, portál `/p/[token]` ukazuje jen `published`.
+- **Hlášení z Claude Code** (094): `lib/agent-keys.ts`, `POST /api/agent/v1/projects/{id}/reports` (jen koncept), `app/project-agent-key-actions.ts`, `components/AgentKeyPanel.tsx`, skript `scripts/zakaziq-report.mjs`, skill `zakaziq-hlaseni`.
+- **Klientský prostor** (095, 096): `/klient` (Clerk bez organizací, `proxy.ts` má pro něj vlastní middleware), `lib/portal/{db,context,invite,projects,paths,admin-queries}.ts`, `app/klient/**`, `components/portal/`, správa z adminu `/dashboard/klientsky-prostor` (`app/portal-admin-actions.ts`). Klientovi se ukazuje jen schválené (triggery), zapisuje funkcemi `portal.submit_*`. Nová tabulka s daty klienta = `client_id`, RLS politika, složené cizí klíče a řádek v testu `lib/__tests__/portal-isolation.test.ts`.
+- **Předání do Claude Code, úroveň 2** (KP09): `lib/claude-code-handoff.ts` (příkaz pro terminál s textem klienta v souboru přes heredoc, ne v `$(…)`), tlačítko na kartě požadavku.
+- **Kostra administrace** (KP01/KP02): viz `docs/admin/AGENTS-ADMIN.md` → Kostra administrace.
 
 ## B4. Přihlášení a role
 

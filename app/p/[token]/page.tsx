@@ -3,7 +3,10 @@ import { sql } from '@/lib/db'
 import { StatusBadge } from '@/components/StatusBadge'
 import { FeedbackBlock } from '@/components/FeedbackBlock'
 import { BookingCTA } from '@/components/BookingCTA'
+import { ClientRequestBlock } from '@/components/ClientRequestBlock'
+import { isTranscriptionConfigured } from '@/lib/transcribe'
 import { formatDate } from '@/lib/utils'
+import { ACTIVITY_KIND_LABELS, buildTimeline, type TimelineActivity } from '@/lib/project-activity'
 import { expandRangeToHourlySlots } from '@/lib/prague-time'
 import { Calendar, RefreshCw, MessageSquare, TrendingUp, Star, ExternalLink } from 'lucide-react'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/lib/types'
@@ -27,7 +30,7 @@ export default async function ClientPortalPage(props: PageProps) {
 
   const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at' | 'project_url'>
 
-  const [msgRows, progressRows, bookedRows, eventRows] = await Promise.all([
+  const [msgRows, progressRows, bookedRows, eventRows, activityRows] = await Promise.all([
     sql`
       SELECT id, content, created_at
       FROM client_messages
@@ -52,10 +55,20 @@ export default async function ClientPortalPage(props: PageProps) {
       WHERE ends_at > now()
       ORDER BY starts_at
     `,
+    // Jen schválené zprávy (KP03). Koncepty, zdroj ani příznak citlivosti klient
+    // nikdy nevidí. Tabulka vzniká migrací 093; do jejího nasazení portál nesmí spadnout.
+    sql`
+      SELECT id, kind, title, body, published_at
+      FROM project_activity
+      WHERE project_id = ${project.id} AND status = 'published' AND published_at IS NOT NULL
+      ORDER BY published_at DESC
+      LIMIT 50
+    `.catch(() => []),
   ])
 
   const messages = msgRows as Pick<ClientMessage, 'id' | 'content' | 'created_at'>[]
   const progressUpdates = progressRows as Pick<ProgressUpdate, 'id' | 'progress_from' | 'progress_to' | 'description' | 'created_at'>[]
+  const timeline = buildTimeline(progressUpdates, activityRows as TimelineActivity[])
   const consultationSlots = (bookedRows as { scheduled_at: Date | string }[]).map(r => new Date(r.scheduled_at).toISOString())
   const blockedRangeSlots = (eventRows as { starts_at: Date | string; ends_at: Date | string }[]).flatMap(r =>
     expandRangeToHourlySlots(new Date(r.starts_at).toISOString(), new Date(r.ends_at).toISOString()),
@@ -124,31 +137,46 @@ export default async function ClientPortalPage(props: PageProps) {
                 </div>
               )}
 
-              {/* Progress updates timeline */}
-              {progressUpdates.length > 0 && (
+              {/* Časová osa: schválené zprávy a historie postupu v jednom pořadí */}
+              {timeline.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <TrendingUp size={13} strokeWidth={1.5} className="text-brand-500" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Historie postupu</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {activityRows.length > 0 ? 'Co se dělo' : 'Historie postupu'}
+                    </p>
                   </div>
                   <ul className="space-y-3">
-                    {progressUpdates.map((u, i) => (
-                      <li key={u.id} className="relative flex gap-3">
+                    {timeline.map((entry, i) => (
+                      <li key={`${entry.type}-${entry.id}`} className="relative flex gap-3">
                         <div className="flex flex-col items-center">
                           <div className="w-2 h-2 rounded-full bg-brand-600 mt-1.5 shrink-0" />
-                          {i < progressUpdates.length - 1 && (
+                          {i < timeline.length - 1 && (
                             <div className="w-px flex-1 bg-brand-100 mt-1" />
                           )}
                         </div>
-                        <div className="pb-3 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
-                              {u.progress_from}% → {u.progress_to}%
-                            </span>
-                            <span className="text-xs text-muted-foreground">{formatDate(u.created_at)}</span>
+                        {entry.type === 'progress' ? (
+                          <div className="pb-3 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
+                                {entry.progress.progress_from}% → {entry.progress.progress_to}%
+                              </span>
+                              <span className="text-xs text-muted-foreground">{formatDate(entry.progress.created_at)}</span>
+                            </div>
+                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{entry.progress.description}</p>
                           </div>
-                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{u.description}</p>
-                        </div>
+                        ) : (
+                          <div className="pb-3 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
+                                {ACTIVITY_KIND_LABELS[entry.activity.kind]}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{formatDate(entry.activity.published_at)}</span>
+                            </div>
+                            <p className="text-sm font-medium text-foreground leading-relaxed">{entry.activity.title}</p>
+                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap mt-0.5">{entry.activity.body}</p>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -193,8 +221,11 @@ export default async function ClientPortalPage(props: PageProps) {
 
               {/* ── Client actions ── */}
               <div className="space-y-4 pt-2 border-t border-border">
+                {/* Požadavek / změna */}
+                <ClientRequestBlock token={params.token} voiceEnabled={isTranscriptionConfigured()} />
+
                 {/* Feedback */}
-                <div>
+                <div className="pt-4 border-t border-border">
                   <div className="flex items-center gap-2 mb-3">
                     <Star size={13} strokeWidth={1.5} className="text-brand-500" />
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vaše zpětná vazba</p>

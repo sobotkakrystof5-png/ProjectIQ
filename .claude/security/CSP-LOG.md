@@ -67,6 +67,11 @@ Kvůli: S19 vyžaduje vynucenou CSP před spuštěním; předchozí blokace stat
 Ověřeno: CSP hlavičky Preview S19 obsahují `default-src`, `frame-ancestors`, `base-uri`, `form-action`, `object-src 'none'`; bez holého `unsafe-inline`, `unsafe-eval` a wildcard ve `script-src`. Chrome landing page se vykreslila a v zaznamenaných warn/error zprávách nebylo CSP porušení. Vercel Preview build READY. Safari, admin login a přihlášení Workspace neověřeny; Chrome konzole hlásila chybu konfigurace NextAuth. Produkce stále běží ze staršího `main` bez CSP.
 Poznámka: výchozí statická 404 může být bez hydratace; viz DECISIONS #015. Do produkce nenasazovat, dokud se CSP neověří po deployi.
 
+## v6 — 2026-11-01
+Změna: cesty `/klient` (klientský prostor, KP05) dostaly profil `workspace` (vynucený) a stejné zdroje Clerku jako `/w`: `connect-src` Frontend API Clerku, `img-src img.clerk.com`, `frame-src challenges.cloudflare.com`. Nový externí host nepřibyl. `script-src` beze změny (nonce + strict-dynamic), žádné `unsafe-inline`/`unsafe-eval`, žádný wildcard. `Permissions-Policy` má `microphone=(self)` i na `/klient/*` (hlasový požadavek, DECISIONS #018).
+Kvůli: přihlášení klientů přes Clerk, přehled zakázek a hlasový požadavek.
+Ověřeno: testy `lib/security/__tests__/csp.test.ts` (profil, Clerk zdroje jen na `/w` a `/klient`, `/klientela` nechytá). Skutečné přihlášení přes Clerk na `/klient` v prohlížeči neověřeno.
+
 ## Čeká (zapsat jako vN při přidání)
 - Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.

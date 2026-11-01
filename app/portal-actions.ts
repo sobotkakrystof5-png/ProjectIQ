@@ -1,12 +1,15 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { sql } from '@/lib/db'
 import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@/lib/feedback-schema'
 import { sendBrandedEmail } from '@/lib/email'
 import { SURVEY_CATEGORIES } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
 import { projectPath, toBusiness, adminEmailFor, type Business } from '@/lib/business'
+import { clientRequestSchema, REQUEST_KIND_LABELS } from '@/lib/client-requests'
+import { summarizeClientRequest } from '@/lib/client-request-ai'
 
 type ActionResult = { success: boolean; error?: string }
 
@@ -23,13 +26,15 @@ async function getProjectByToken(token: string): Promise<{ id: string; business:
 // add a line here for any new public-action table instead of hardcoding a
 // two-way ternary.
 const RATE_LIMIT_QUERIES: Record<
-  'client_feedback' | 'consultation_slots' | 'project_surveys',
+  'client_feedback' | 'consultation_slots' | 'project_surveys' | 'client_requests',
   (id: string, windowMinutes: number) => Promise<{ count: string }[]>
 > = {
   client_feedback: (id, windowMinutes) =>
     sql`SELECT count(*) FROM client_feedback WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
   consultation_slots: (id, windowMinutes) =>
     sql`SELECT count(*) FROM consultation_slots WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
+  client_requests: (id, windowMinutes) =>
+    sql`SELECT count(*) FROM client_requests WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
   project_surveys: (id, windowMinutes) =>
     sql`SELECT count(*) FROM project_surveys WHERE completed_project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
 }
@@ -274,6 +279,100 @@ export async function submitSurvey(
       business: 'vizeon',
     })
   }
+
+  return { success: true }
+}
+
+// ─── Požadavek klienta (text nebo přepis hlasu) ─────────────────────────────────
+
+export async function submitClientRequest(
+  token: string,
+  rawData: { text: string; source: 'text' | 'voice' },
+): Promise<ActionResult> {
+  const parsed = clientRequestSchema.safeParse(rawData)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Neplatná data.' }
+
+  const project = await getProjectByToken(token)
+  if (!project) return { success: false, error: 'Projekt nenalezen.' }
+  const { id: projectId, business } = project
+
+  if (await isRateLimited('client_requests', projectId, 30, 5)) {
+    return { success: false, error: 'Poslali jste hodně požadavků v krátkém čase. Zkuste to prosím později.' }
+  }
+
+  const projectRows = await sql`
+    SELECT client_name, description, focus FROM projects WHERE id = ${projectId} LIMIT 1
+  `
+  const info = projectRows[0] as { client_name: string; description: string | null; focus: string | null } | undefined
+  if (!info) return { success: false, error: 'Projekt nenalezen.' }
+
+  let requestId: string
+  try {
+    const inserted = await sql`
+      INSERT INTO client_requests (project_id, source, raw_text)
+      VALUES (${projectId}, ${parsed.data.source}, ${parsed.data.text})
+      RETURNING id
+    `
+    requestId = (inserted[0] as { id: string }).id
+  } catch (err) {
+    console.error('[ClientRequest] DB chyba při INSERT:', err)
+    return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
+  }
+
+  revalidatePath('/dashboard/pozadavky')
+
+  void createNotification({
+    type: 'client_request_received',
+    title: `Nový požadavek od klienta — ${info.client_name}`,
+    body: parsed.data.text.slice(0, 200),
+    link: '/dashboard/pozadavky',
+  })
+
+  // Shrnutí od AI běží až po odpovědi klientovi a jeho selhání nic neruší:
+  // požadavek je uložený a v adminu čitelný i bez něj.
+  after(async () => {
+    const ai = await summarizeClientRequest({
+      text: parsed.data.text,
+      clientName: info.client_name,
+      description: info.description,
+      focus: info.focus,
+    })
+    try {
+      if (ai.data) {
+        await sql`
+          UPDATE client_requests
+          SET ai_status = 'ready', ai_kind = ${ai.data.kind}, ai_summary = ${ai.data.summary},
+              ai_prompt = ${ai.data.prompt}, ai_unclear = ${ai.data.unclear}
+          WHERE id = ${requestId}
+        `
+      } else {
+        await sql`UPDATE client_requests SET ai_status = 'failed' WHERE id = ${requestId}`
+      }
+    } catch (err) {
+      console.error('[ClientRequest] uložení shrnutí selhalo:', err)
+    }
+
+    const adminEmail = adminEmailFor(business)
+    if (adminEmail) {
+      await sendBrandedEmail({
+        to: adminEmail,
+        subject: `Nový požadavek od klienta – ${info.client_name}`,
+        heading: 'Nový požadavek od klienta',
+        intro: `Klient ${info.client_name} poslal požadavek přes klientský portál. Zadání pro Claude Code najdete v administraci.`,
+        fields: [
+          { label: 'Klient', value: info.client_name },
+          ...(ai.data
+            ? [
+                { label: 'Druh', value: REQUEST_KIND_LABELS[ai.data.kind] },
+                { label: 'Shrnutí', value: ai.data.summary },
+              ]
+            : [{ label: 'Text klienta', value: parsed.data.text }]),
+        ],
+        ctas: [{ label: 'Otevřít požadavky', href: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard/pozadavky` }],
+        business,
+      })
+    }
+  })
 
   return { success: true }
 }

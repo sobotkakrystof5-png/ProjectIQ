@@ -7,7 +7,7 @@ export default function NewProjectPage() {
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-8">
         <Link
-          href="/dashboard"
+          href="/dashboard/zakazky"
           className="p-1.5 rounded-lg text-muted-foreground hover:text-brand-800 hover:bg-brand-50 transition-colors"
         >
           <ArrowLeft size={18} strokeWidth={1.5} />

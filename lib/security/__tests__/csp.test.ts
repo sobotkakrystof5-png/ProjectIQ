@@ -10,6 +10,8 @@ describe('cspProfileFor', () => {
     expect(cspProfileFor('/w/dnes')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/r/kadernictvi')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/z/abc')).toEqual({ profile: 'workspace', mode: 'enforce' })
+    expect(cspProfileFor('/klient')).toEqual({ profile: 'workspace', mode: 'enforce' })
+    expect(cspProfileFor('/klient/projekt/abc')).toEqual({ profile: 'workspace', mode: 'enforce' })
     expect(cspProfileFor('/dashboard')).toEqual({ profile: 'admin', mode: 'enforce' })
     expect(cspProfileFor('/p/abc')).toEqual({ profile: 'admin', mode: 'enforce' })
   })
@@ -26,6 +28,8 @@ describe('cspProfileFor', () => {
 
   it('prefix nechytá podobné cesty', () => {
     expect(hasPrefix('/wiki', '/w')).toBe(false)
+    expect(hasPrefix('/klientela', '/klient')).toBe(false)
+    expect(cspProfileFor('/klientela').profile).toBe('admin')
     expect(hasPrefix('/hubert', '/hub')).toBe(false)
     expect(cspProfileFor('/wiki').profile).toBe('admin')
   })
@@ -122,6 +126,12 @@ describe('Clerk', () => {
     expect(directive(w, 'frame-src')).toBe('frame-src https://challenges.cloudflare.com')
     expect(directive(w, 'script-src')).not.toContain(host)
     expect(w).not.toContain('*')
+
+    // Klientský prostor (KP05) má stejné Clerk zdroje jako /w a nic víc.
+    const klient = buildCsp({ nonce, pathname: '/klient/prihlaseni', profile: 'workspace', mode: 'enforce', clerkHost: host })
+    expect(directive(klient, 'connect-src')).toBe(`connect-src 'self' https://${host}`)
+    expect(directive(klient, 'script-src')).not.toContain(host)
+    expect(klient).not.toContain('*')
 
     const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce', clerkHost: host })
     const admin = buildCsp({ nonce, pathname: '/hub', profile: 'admin', mode: 'report-only', clerkHost: host })

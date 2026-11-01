@@ -169,3 +169,32 @@ export async function sendPlainEmail(opts: { to: string; subject: string; text: 
     return false
   }
 }
+
+/** Nejvíc položek v souhrnném e-mailu o aktivitě; zbytek je na portálu. */
+export const ACTIVITY_DIGEST_MAX_ITEMS = 5
+
+/**
+ * Souhrnný e-mail klientovi „co je nového na vašem projektu“ (KP03). Posílá se
+ * nejvýš jednou za den a jen s nadpisy zpráv, texty jsou na portálu.
+ */
+export async function sendActivityDigestEmail(opts: {
+  to: string
+  clientName: string
+  items: { label: string; title: string }[]
+  portalUrl: string
+  business?: Business
+}): Promise<boolean> {
+  const shown = opts.items.slice(0, ACTIVITY_DIGEST_MAX_ITEMS)
+  const rest = opts.items.length - shown.length
+  const fields: EmailField[] = shown.map((item) => ({ label: item.label, value: item.title }))
+  if (rest > 0) fields.push({ label: 'Dále', value: rest === 1 ? 'Ještě jedna zpráva' : `Dalších zpráv: ${rest}` })
+  return sendBrandedEmail({
+    to: opts.to,
+    subject: 'Co je nového na vašem projektu – ZakazIQ',
+    heading: 'Co je nového na vašem projektu',
+    intro: `Dobrý den, ${opts.clientName}, na vašem projektu je něco nového.`,
+    fields,
+    ctas: [{ label: 'Otevřít přehled projektu', href: opts.portalUrl }],
+    business: opts.business,
+  })
+}

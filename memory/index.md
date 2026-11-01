@@ -37,6 +37,9 @@
 | [../docs/workspace/MONEY.md](../docs/workspace/MONEY.md) | Peníze S14: faktury/PDF/platby, přehledy, odhad daní a ověřené zdroje 2026, migrace 080 | S14/S15, finance | Při změně kódu, sazeb a postupu |
 | [`../docs/workspace/API.md`](../docs/workspace/API.md) | Veřejné API pro poptávky z webů (v1): klíče, schema, requests, kódy chyb, příklady Next.js a curl, widget (S11) | S11+, skill `zakaziq-napojeni`, prompt pro Claude Code | Když se mění API |
 | [`../docs/landing/PROJECT-BRIEF.md`](../docs/landing/PROJECT-BRIEF.md) | Brief landing page (S03): anti-šablona, sekce s texty, kontakt, CSP, SEO zadání pro S05 | S04, S05 a každá změna landing page | Když se mění struktura nebo texty landing page |
+| [`../docs/klientsky-prostor/PLAN.md`](../docs/klientsky-prostor/PLAN.md) | Plán klientského prostoru, hlášení práce z Claude Code a nového adminu: architektura, bezpečnostní model, rozhodnutí D-K1–D-K11, sezení KP00–KP10 a jejich stav | Každé sezení klientského prostoru a změny adminu | Po každém sezení KP |
+| [`../docs/klientsky-prostor/NAPOJENI-CLAUDE-CODE.md`](../docs/klientsky-prostor/NAPOJENI-CLAUDE-CODE.md) | Jak napojit projekt klienta na hlášení z Claude Code: klíč, skript, pravidlo do CLAUDE.md, hook | Při napojení nového projektu klienta | Při změně API hlášení |
+| [`../new - area of zakaziq/prompty/klientsky-prostor/00-README.md`](<../new - area of zakaziq/prompty/klientsky-prostor/00-README.md>) | Prompty sezení KP00–KP10 (jedno sezení = jedna konverzace), pořadí a společná pravidla | Na začátku každého sezení KP | Když se mění rozfázování |
 | [`../docs/REDESIGN-HANDOFF.md`](../docs/REDESIGN-HANDOFF.md) | Schválený směr redesignu Landing + Workspace, hranice zadání a startovací kontext pro další chat (R-057) | Před implementací redesignu | Když se změní vybraný směr nebo rozsah |
 | [`../new - area of zakaziq/prompty/redesign/00-README.md`](<../new - area of zakaziq/prompty/redesign/00-README.md>) | Prompty sezení RD00–RD16 pro redesign aplikace (jedno sezení = jedna konverzace), pořadí, společná pravidla | Na začátku každého sezení redesignu | Když se mění rozfázování |
 | [`../docs/CLAUDE_BOOKING_PROMPT.md`](../docs/CLAUDE_BOOKING_PROMPT.md) | Historický prompt pro booking a komunikaci s klienty (z doby ProjectIQ) | Jen pro kontext historie | Ne |
@@ -49,6 +52,7 @@
 | Zjistit, na čem se naposledy pracovalo | `memory.md` → Aktuální stav, Changelog |
 | Pochopit, proč je něco udělané „divně" | `memory.md` → Rozhodnutí; pak komentář v kódu / migraci |
 | Upravit zakázky (VIZEON/ALTENO) | `app/actions.ts`, `components/ProjectForm.tsx`, `ProjectCard.tsx`, `lib/business.ts` |
+| Požadavky klientů z portálu (text/hlas → shrnutí → zadání pro Claude Code) | `lib/{client-requests,client-request-ai,transcribe}.ts`, `app/api/public/portal/[token]/transcribe/`, `app/portal-actions.ts` (`submitClientRequest`), `app/dashboard/pozadavky/`, `components/ClientRequest*.tsx`, migrace 092, R-069, `.claude/security/DECISIONS.md` #018 |
 | Klientský portál | `app/p/[token]/page.tsx`, `app/portal-actions.ts`, `components/Feedback*`, `Booking*` |
 | Rezervace / kalendář / sloty | `lib/prague-time.ts`, `components/SmartCalendar.tsx`, `BookingModal.tsx`, `app/calendar-actions.ts` |
 | Poptávky z webů (vizeon.cz, alteno.cz) | `lib/web-booking.ts`, `app/api/public/booking/**`, `app/api/public/alteno-leads`, `components/BookingCard.tsx` |
@@ -74,6 +78,7 @@
 | Workspace z adminu — klienti, pozvání, klíče webu, novinky (S17) | `docs/AGENTS-REFERENCE.md` → B3 „Admin nad Workspace (S17, R-052)“, `app/dashboard/{klienti,novinky}/`, `lib/ws/admin/`, `lib/ws/news-format.ts`, `.claude/security/DECISIONS.md` #013 |
 | Workspace — databáze, oddělení účtů | `../docs/workspace/SETUP.md`, `migrations/064_ws_*`–`088_ws_*`, `lib/ws/db.ts`, `lib/ws/context.ts`, `lib/ws/templates/`, `lib/ws/__tests__/`, `docs/AGENTS-REFERENCE.md` → B3 |
 | Workspace — GDPR (výmaz, export, zrušení účtu), vzhled, PWA (S18) | `docs/AGENTS-REFERENCE.md` → B3 „GDPR, vzhled a PWA (S18)“, `lib/ws/{gdpr,zip,csv,theme}.ts`, `app/w/ucet/`, `app/api/cron/ws-gdpr`, `public/{sw.js,offline.html,zakaziq.webmanifest}`, migrace 084, R-054 |
+| Klientský prostor, hlášení z Claude Code, kostra adminu | `docs/AGENTS-REFERENCE.md` → „Klientský prostor a hlášení práce (KP01–KP09)“, `docs/klientsky-prostor/PLAN.md`, `lib/portal/`, `app/klient/`, `components/admin/`, `lib/admin-*.ts`, migrace 093–096, R-070–R-073, `.claude/security/DECISIONS.md` #019–#020 |
 | Typy | `lib/types.ts`, `types/*.ts` (Zod schémata API) |
 | DB schéma | admin: `docs/admin/AGENTS-ADMIN.md` → Databázový model + Katalog tabulek; Workspace: `docs/AGENTS-REFERENCE.md` → B3; detail v `migrations/` |
 | Testy | `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |

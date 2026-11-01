@@ -26,7 +26,7 @@ Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Ne
 ## Hranice v repu
 
 - **Admin neměnit bez výslovného zadání:** `app/{dashboard,alteno,hub,(auth),p,h}`, kořenové `app/*-actions.ts`, `components/*.tsx`, `lib/*.ts` a `app/api/*` mimo níže uvedené Workspace API. Převzatý kód kopíruj do `lib/ws/` nebo `components/ws/`, originál zůstává.
-- Workspace: `app/w/`, `components/ws/`, `lib/ws/`, `components/ui/`; veřejné `app/{r,embed,z}/`; API `app/api/{ws,public/v1,stripe,clerk}/`. Landing: `app/(marketing)/`, `components/marketing/`. Admin tabulky `public` se nemění.
+- Workspace: `app/w/`, `components/ws/`, `lib/ws/`, `components/ui/`; veřejné `app/{r,embed,z}/`; klientský prostor `app/klient/`, `lib/portal/`, `components/portal/`; API `app/api/{ws,public/v1,stripe,clerk,klient,agent}/`. Landing: `app/(marketing)/`, `components/marketing/`. Admin tabulky `public` se nemění.
 - DB: pouze nové sekvenční idempotentní migrace od 064; staré neupravuj. Bezpečnostní konfigurace celého repa pouze se zápisem do `.claude/security/` a synchronizací do `.agents/security/`.
 
 ## Workspace — nepřekročitelné základy
