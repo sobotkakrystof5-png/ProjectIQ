@@ -86,17 +86,17 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 **Pozor:** apex A/ALIAS a `www` ukazují na Vercel a nesmí se při úpravách rozbít; před změnou si poznamenat současné záznamy.
 
-**Stav 2026-11-01 (`dig`):** NS WEDOS; apex A `216.198.79.1` (Vercel); `www` CNAME `…vercel-dns-017.com`; apex bez TXT, MX a CAA; `_dmarc` ani `clerk` neexistují. Resend: doména `zakaziq.cz` v účtu není (účet má prvotka.cz, vizeon.cz, estatiq.cz). Clerk: `clerk deploy status` = `not_started`, `clerk deploy` vyžaduje interaktivní terminál.
+**Stav 2026-11-01 (`dig`):** NS WEDOS; apex A `216.198.79.1` (Vercel); `www` CNAME `…vercel-dns-017.com`; apex bez TXT, MX a CAA; `_dmarc` ani `clerk` neexistují. Resend: doména `zakaziq.cz` Verified (Kryštof, 2026-11-01); `_dmarc` zatím chybí. Clerk: `clerk deploy status` = `not_started`, `clerk deploy` vyžaduje interaktivní terminál.
 
 ### Stopa C — Resend (závisí na B)
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| C1 | K | Resend → Domains → Add `zakaziq.cz`, region **EU (Irsko)** |
-| C2 | K | Záznamy z Resendu do stopy B; počkat na „Verified" |
-| C3 | C | Vercel Production **i Preview**: `WS_EMAIL_FROM=rezervace@zakaziq.cz` (po schválení) |
-| C4 | K | Resend → Webhooks → `https://www.zakaziq.cz/api/resend/webhook`, události `email.bounced`, `email.complained`, `email.failed`, `email.suppressed` |
-| C5 | K→C | `RESEND_WEBHOOK_SECRET` do Vercelu; klíč `RESEND_API_KEY` s právem Sending access jen pro doménu |
+| C1 | K | ~~Resend → Domains → Add `zakaziq.cz`, region **EU (Irsko)**~~ hotovo 2026-11-01 |
+| C2 | K | ~~Záznamy z Resendu do stopy B; „Verified"~~ hotovo 2026-11-01 (DMARC `_dmarc` ještě chybí) |
+| C3 | C | ~~Vercel Production: `WS_EMAIL_FROM=rezervace@zakaziq.cz`~~ hotovo 2026-11-01. **Preview záměrně ne**: běží na ukázkových datech s `@example.cz`, odesílání by tvořilo nedoručitelné e-maily a kazilo reputaci domény |
+| C4 | C | ~~Webhook `https://www.zakaziq.cz/api/resend/webhook`~~ založen přes API 2026-11-01 (id `2a38645c…`), **vypnutý do nasazení**: webhooky Resendu platí pro celý účet a dnešní produkce cestu nemá (404). Při nasazení zapnout (`PATCH /webhooks/{id}` `status: enabled`) |
+| C5 | K→C | ~~`RESEND_WEBHOOK_SECRET` do Vercelu Production~~ hotovo 2026-11-01. Zbývá: samostatný klíč s právem Sending access jen pro `zakaziq.cz` místo dnešního plného `RESEND_API_KEY` (ten sdílí waitlist Startupu) |
 | C6 | K+C | Z Nastavení › E-maily poslat zkušební e-maily všech typů na Gmail, Outlook (hotmail) a Apple Mail; zkontrolovat doručení do doručené pošty (ne spam), vzhled, odkaz „Potvrdit" z telefonu, odhlášení |
 | C7 | C | Ověřit frontu: odeslaná zpráva dostane stav `sent`, simulovaný bounce přijde webhookem a označí zprávu |
 

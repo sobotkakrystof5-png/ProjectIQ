@@ -472,7 +472,7 @@
 - [ ] **S16 naostro:** ověřit skutečný termín, zakázku, fakturu a hodnocení v `/z/[token]` (migrace 082 na Neonu) · od 2026-10-10
 - [ ] **S17 — pozvaní klienti a platba:** pozvaný klient prochází stejným Checkoutem (14 dní s kartou, R-038). Rozhodnout, jestli klienti, kterým Kryštof staví web, mají mít Workspace zdarma nebo se slevou (kupón ve Stripe) · od 2026-10-10
 - [ ] **S17 naostro:** pozvánka Clerku (e-mail, registrace s `__clerk_ticket` na `/w/registrace`, aktivace organizace, `ensureMember`) a obě admin stránky s přihlášením neověřené · od 2026-10-10
-- [ ] **S15 — odesílání e-mailů:** doména `zakaziq.cz` v Resendu (DNS SPF/DKIM/DMARC), `WS_EMAIL_FROM`, endpoint webhooku + `RESEND_WEBHOOK_SECRET` (lokálně i Vercel). Do té doby nic neodchází. Postup `docs/workspace/SETUP.md` → E-maily · od 2026-10-10
+- [ ] **S15 — odesílání e-mailů:** ~~doména v Resendu, `WS_EMAIL_FROM`, webhook + `RESEND_WEBHOOK_SECRET`~~ hotovo 2026-11-01 pro Production (webhook vypnutý do nasazení, pak zapnout). Zbývá DMARC `_dmarc` a klíč jen pro odesílání. Postup `docs/workspace/SETUP.md` → E-maily · od 2026-10-10
 - [ ] **S15 — naostro neověřeno:** Nastavení › E-maily (náhled, zkušební e-mail) s přihlášením, skutečné doručení a vzhled v Gmailu/Outlooku/Apple Mailu, odkaz Potvrdit z telefonu, cron na Vercelu · od 2026-10-10
 - [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
 - [ ] **Workspace — toasty přes adminův `<Toaster>`** (R-027): pozice a délka jsou společné s adminem (vpravo nahoře). Až bude potřeba vlastní toaster (např. spodní lišta na mobilu v S09/S18), řešit upgradem sonneru na 2.x (víc toasterů) nebo úpravou `app/layout.tsx` — obojí sahá na admin, chce souhlas · od 2026-10-08
@@ -495,6 +495,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-01
+- **chore** Resend: doména `zakaziq.cz` Verified (Kryštof). Webhook `/api/resend/webhook` založen přes API a vypnutý do nasazení (webhooky platí pro celý účet Resendu, dnešní produkce cestu nemá). `RESEND_WEBHOOK_SECRET` (citlivé) a `WS_EMAIL_FROM=rezervace@zakaziq.cz` jen ve Vercel Production; Preview záměrně bez, kvůli ukázkovým adresám `@example.cz`. DMARC zatím chybí.
 - **feat** Retence D-K10 (R-076): migrace 098 (aplikována: ne, čeká na produkční heslo), cron `client-retention` ve `vercel.json`, `lib/client-retention.ts`, `docs/admin/AGENTS-ADMIN.md` → Crony. 3 testy v PGlite.
 - **db** Migrace 097 aplikována na testovací Neon (`ZakazIQ RD test`): ověřeno `close_scheduled_at`, `ws_app` smí `ws.scheduled_closings()`, PUBLIC ne. Produkce: ne (čeká na nové heslo `neondb_owner`).
 - **chore** Externí stopy: Resend doména `zakaziq.cz` zatím neexistuje (přidání přes API zamítnuto oprávněním, udělá Kryštof v dashboardu), Clerk `deploy status` = `not_started` (vyžaduje interaktivní `clerk deploy`), stav DNS a ověřené CAA (Let's Encrypt + Google Trust Services) v `docs/workspace/LAUNCH-PLAN.md` stopa B.
