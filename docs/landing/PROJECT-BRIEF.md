@@ -100,7 +100,7 @@ Závazný je design systém **Dílky** (R-021, `AGENTS.md` → B8). Všechno už
 - Kotvy v hlavičce: `#funkce` (01 Co to umí), `#jak-to-funguje`, `#napojeni`, `#cenik`. Další kotvy bez položky v menu: `#proc`, `#funkce-seznam` (moduly), `#dotazy`.
 - Plynulý scroll (`scroll-behavior: smooth`, vypnutý při `prefers-reduced-motion`), `scroll-margin-top` podle výšky hlavičky. Aktivní položka v menu podle sekce ve viewportu (`IntersectionObserver`).
 - **Ceník je kotva `#cenik`**, ne samostatná stránka. Jestli `/cenik` dává smysl kvůli vyhledávání, rozhodne S05 podle klíčových slov.
-- Samostatné stránky: `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` ve stejném layoutu (hlavička + footer), text `[DOPLNIT]` (R-023). Jak je indexovat, než budou texty, řeší S05.
+- Samostatné stránky: `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` ve stejném layoutu (hlavička + footer), plné texty od 2026-11-03 (R-079), indexované a v sitemapě.
 
 **Vykreslování a bezpečnost (R-033):**
 
@@ -155,7 +155,7 @@ Texty níže jsou návrh (prošly `zakaziq-ux-texty-cs` a `humanize-text-cs`). S
 - **H1:** „Každá poptávka na svém místě.“
 - **Perex:** „ZakazIQ je přehled podnikání pro malé firmy. Poptávky z webu, kalendář, zákazníci a věrnostní karty, zakázky, faktury a odhad daní v jedné aplikaci pro telefon i počítač.“
 - **Hlavní tlačítko:** „Vyzkoušet 14 dní zdarma“ → `/w/registrace` (bílá pilulka).
-- **Vedlejší odkaz:** „Napište nám“ → `mailto:[DOPLNIT e-mail podpory]` (textový odkaz `navy-200` s podtržením při hoveru, žádné druhé tlačítko).
+- **Vedlejší odkaz:** „Napište nám“ → `mailto:info@vizeon.cz` (textový odkaz `navy-200` s podtržením při hoveru, žádné druhé tlačítko).
 - **Podmínky zkušební doby:** „14 dní zdarma · kartu zadáte při registraci · poté 249 Kč měsíčně · zrušíte kdykoli“. Karta se zadává při registraci a první platba proběhne až po 14 dnech.
 
 **Ovladatelná ukázka** (`components/marketing/live-demo.tsx`):
@@ -293,7 +293,7 @@ Nikde „+ DPH“, žádná srovnávací tabulka balíčků, žádné přeškrtn
 | Musím umět s počítačem? | Ne. Když zvládnete e-mail v telefonu, zvládnete i ZakazIQ. Po registraci vyberete obor a aplikace má hned připravené služby a kolonky. |
 | Jak napojím svůj web? | Třemi způsoby. Pošlete zákazníkům odkaz na objednání, vložíte na web jeden řádek kódu, nebo vám web postavím a napojím sám. Napojení si pak ověříte jedním klikem. |
 | Co když nemám web? | Nevadí. Dostanete vlastní stránku pro objednání a QR kód. Odkaz dáte na Instagram, do Google profilu nebo na pult. |
-| Kde jsou moje data a kdo je vidí? | Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. `[DOPLNIT: kde jsou data uložená]` Podrobnosti najdete v Ochraně údajů. |
+| Kde jsou moje data a kdo je vidí? | Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. Databáze běží v Evropské unii, ve Frankfurtu v Německu. Podrobnosti najdete v Ochraně údajů. |
 | Co se stane po 14 dnech? | Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho zrušíte, nic nezaplatíte a k datům se dostanete dál, jen je nepůjde měnit. |
 | Můžu předplatné kdykoli zrušit? | Ano, sami v nastavení účtu. Data se nemažou, zůstanou vám k nahlédnutí. |
 | Funguje to na telefonu? | Ano. Aplikace je dělaná tak, aby šla ovládat jednou rukou mezi dvěma zákazníky. |
@@ -362,9 +362,9 @@ Server action v `app/(marketing)/actions.ts` používá Zod limity délek, honey
 
 ## 8. Právní
 
-- Stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` existují s nadpisem a textem `[DOPLNIT]`. **Právní texty se negenerují.** Skutečné texty nejpozději v S19 (R-023, otevřený problém).
-- Úplné právní jméno a sídlo provozovatele v právních textech stále `[DOPLNIT]`; IČO `29977231` je potvrzené.
-- Formulář ukládá jméno, e-mail a zprávu do Hovorů. Právní texty musí uvést účel a dobu uchování před veřejným spuštěním; bez analytiky není potřeba cookie lišta.
+- Stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` mají plné texty (R-079, nahrazuje „texty se negenerují“ z R-023). Připravil je agent podle chování aplikace, schvaluje Kryštof; kontrola právníkem doporučená. Údaje provozovatele a seznam zpracovatelů jsou v `components/marketing/legal.ts`.
+- Provozovatel podle ARES: Kryštof Sobotka, Kamenice 64, 294 04 Dobšín, IČO `29977231`, živnostenský úřad Magistrát města Mladá Boleslav. Patička ho uvádí celého.
+- Formulář ukládá jméno, e-mail a zprávu do Hovorů. Ochrana údajů uvádí účel a dobu uchování (nejdéle 3 roky od poslední komunikace); bez analytiky není potřeba cookie lišta.
 - Registrace a souhlas s podmínkami řeší `/w/registrace` (S07), ne landing.
 
 ---

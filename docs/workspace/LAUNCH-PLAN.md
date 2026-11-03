@@ -21,7 +21,7 @@
 | Stripe | jen sandbox „ZakazIQ"; live produkt, cena, klíče a webhook chybí |
 | Resend | doména `zakaziq.cz` ověřená, `WS_EMAIL_FROM` v Production, webhook vypnutý do nasazení; doručení nevyzkoušené |
 | DNS (WEDOS) | 5 CNAME Clerku a `_dmarc` (`p=none`, bez `rua`) hotové; chybí CAA a SPF apexu (DNSSEC neověřeno) |
-| Právní věci | právní texty a úplné právní jméno/adresa chybí; IČO `29977231` a podpora `info@vizeon.cz` potvrzené 2026-10-31 |
+| Právní věci | texty na webu od 2026-11-03 (R-079), provozovatel z ARES; čeká na schválení Kryštofem, případně kontrolu právníkem |
 
 ## 2. Principy plánu
 
@@ -37,7 +37,7 @@
 | # | Rozhodnutí | Doporučení | Blokuje |
 |---|---|---|---|
 | D1 | Hlavní host: apex `zakaziq.cz`, nebo `www.zakaziq.cz` | **`www.zakaziq.cz`** (Kryštof, 2026-11-01, R-075); apex přesměrovává na www. Stripe webhook nenásleduje přesměrování (SETUP.md). `NEXT_PUBLIC_APP_URL` = `https://www.zakaziq.cz` (R-055) | webhooky, canonical, sitemap |
-| D2 | Provozovatel: jméno, IČO, adresa sídla | IČO `29977231`, obec Dobšín (Kryštof, 2026-10-31); celé právní jméno a úplná adresa sídla chybí | Stripe live, právní texty, faktury |
+| D2 | Provozovatel: jméno, IČO, adresa sídla | Kryštof Sobotka, Kamenice 64, 294 04 Dobšín, IČO `29977231` (ARES, 2026-11-03) | Stripe live, právní texty, faktury |
 | D3 | E-mail podpory | `info@vizeon.cz` (Kryštof, 2026-10-31) | landing, Stripe, podmínky |
 | D4 | Pilotní klient | Firma a způsob onboardingu stále otevřené | spuštění (LAUNCH.md) |
 | D5 | Zrušení účtu: vracet poměrnou část předplatného? | **Ke konci zaplaceného období, bez vrácení** (Kryštof, 2026-11-01, R-074); kód a podmínky upraveny, migrace 097. Customer Portal ve Stripe live nastavit na zrušení ke konci období | podmínky |
@@ -61,11 +61,11 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| A1 | K | Doplnit IČO, adresu, e-mail podpory (D2, D3) |
-| A2 | C | Předvyplnit podklady pro právní stránky: lhůty z S18 (R-054 GDPR: výmaz, 10 let faktury, 30 dní po zrušení), seznam zpracovatelů (Vercel, Neon, Clerk, Stripe, Resend), regiony (Resend EU/Irsko; **region Neonu a Vercelu dohledat v dashboardech** — dnes `[DOPLNIT]`) |
-| A3 | K | Obchodní podmínky, zásady ochrany údajů a zpracovatelskou smlouvu musí napsat/projít právník nebo Kryštof. Agent text nevymýšlí (AGENTS.md: žádná vymyšlená fakta) |
-| A4 | C | Vložit texty do `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`; odstranit `LEGAL_ROBOTS` (`components/marketing/seo.ts`), přidat stránky do `app/sitemap.ts`; vyplnit `[DOPLNIT]` v landing Dotazech (kde jsou data uložená) |
-| A5 | C | Doplnit IČO a adresu do Stripe šablony faktury, Public details a patičky dokladů; aktualizovat záznam o zpracování |
+| A1 | K | ~~Doplnit IČO, adresu, e-mail podpory~~ hotovo 2026-11-03 (ARES) |
+| A2 | C | ~~Hotovo 2026-11-03~~ Předvyplnit podklady pro právní stránky: lhůty z S18 (R-054 GDPR: výmaz, 10 let faktury, 30 dní po zrušení), seznam zpracovatelů (Vercel, Neon, Clerk, Stripe, Resend), regiony (Resend EU/Irsko; **region Neonu a Vercelu dohledat v dashboardech** — dnes `[DOPLNIT]`) |
+| A3 | K | Texty připravil agent podle chování aplikace (R-079); **Kryštof je přečte a schválí**, kontrola právníkem doporučená. Potvrdit volby v R-079 (odpovědnost, lhůty) |
+| A4 | C | ~~Hotovo 2026-11-03~~ Vložit texty do `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`; odstranit `LEGAL_ROBOTS` (`components/marketing/seo.ts`), přidat stránky do `app/sitemap.ts`; vyplnit `[DOPLNIT]` v landing Dotazech (kde jsou data uložená) |
+| A5 | C | Doplnit IČO a adresu do Stripe šablony faktury, Public details a patičky dokladů (zbývá, dashboard Stripe); záznam o zpracování hotový 2026-11-03 |
 | A6 | C | `humanize-text-cs` a `zakaziq-ux-texty-cs` nad novými texty (ne nad právním textem samotným) |
 
 **Hotovo, když:** v kódu a na landing nezůstane žádné `[DOPLNIT]` (kontrola `grep -rn "DOPLNIT" app components lib docs/landing`), právní stránky jsou v sitemapě a bez `noindex`.

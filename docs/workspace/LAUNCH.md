@@ -42,8 +42,8 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 
 ## Právní a zákaznická připravenost
 
-- [ ] **Blokuje spuštění:** doplnit skutečné obchodní podmínky, zásady ochrany údajů a zpracovatelskou smlouvu; právní texty musí dodat/projít provozovatel nebo právník.
-- [ ] **Blokuje spuštění:** doplnit právní jméno a úplnou adresu provozovatele do webu, Stripe a daňových dokladů. IČO `29977231` a kontaktní e-mail `info@vizeon.cz` potvrdil Kryštof 2026-10-31; doplnění je částečné.
+- [ ] **Blokuje spuštění:** obchodní podmínky, ochrana údajů a zpracovatelská smlouva jsou na webu (R-079, 2026-11-03); zbývá schválení Kryštofem, doporučená kontrola právníkem.
+- [ ] **Blokuje spuštění:** provozovatel (Kryštof Sobotka, Kamenice 64, 294 04 Dobšín, IČO `29977231`) je na webu a v právních textech od 2026-11-03; zbývá doplnit ho do Stripe (Public details, šablona faktury) a daňových dokladů.
 - [ ] Potvrdit, že cena 249 Kč/měsíc a 14denní zkušební doba odpovídají Stripe i textům; potvrdit režim DPH a text dokladu „Nejsem plátce DPH“.
 - [ ] Aktualizovat záznam o zpracování: provozovatel, regiony a doby uchování pro Vercel, Neon, Clerk, Stripe a Resend.
 - [ ] **Blokuje spuštění:** potvrdit konkrétního pilotního klienta a bezpečný postup jeho onboardingu. Pilot bude zdarma; délka a nastavení ještě nejsou určené.

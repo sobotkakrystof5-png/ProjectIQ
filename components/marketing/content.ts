@@ -1,6 +1,6 @@
 // Obsah landing page na jednom místě (docs/landing/PROJECT-BRIEF.md § 4).
-// Údaje označené [DOPLNIT] chybí záměrně — nevymýšlet (AGENTS.md → B10). Fakta o ceně
-// a zkušební době: R-018, R-026, R-038.
+// Nevymýšlet údaje (AGENTS.md → B10). Fakta o ceně a zkušební době: R-018, R-026,
+// R-038. Provozovatel a zpracovatelé pro právní texty: legal.ts (R-079).
 
 /** E-mail podpory pro „Napište nám". Potvrdil Kryštof 2026-10-31. */
 export const SUPPORT_EMAIL = 'info@vizeon.cz'
@@ -8,8 +8,11 @@ export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`
 export const SUPPORT_LABEL = SUPPORT_EMAIL
 export const SUPPORT_FORM_HREF = '/#kontakt'
 
-/** IČO provozovatele do footeru. */
+/** IČO provozovatele (ARES, potvrdil Kryštof 2026-10-31). */
 export const COMPANY_ID = '29977231'
+
+/** Kde běží databáze: Neon eu-central-1 (Dotazy, ochrana údajů). */
+export const DATA_LOCATION = 'Databáze běží v Evropské unii, ve Frankfurtu v Německu.'
 
 /** Cesty do aplikace — přesné cesty Clerku potvrdí S07. */
 export const ROUTES = {
@@ -128,7 +131,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
   {
     q: 'Kde jsou moje data a kdo je vidí?',
-    a: 'Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. [DOPLNIT: kde jsou data uložená] Podrobnosti najdete v Ochraně údajů.',
+    a: `Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. ${DATA_LOCATION} Podrobnosti najdete v Ochraně údajů.`,
   },
   {
     q: 'Co se stane po 14 dnech?',

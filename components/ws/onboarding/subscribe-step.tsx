@@ -2,8 +2,10 @@ import { Check } from 'lucide-react'
 import { AccentHeading, SectionLabel } from '@/components/ws/brand'
 import { BillingActionButton } from '@/components/ws/billing/billing-action-button'
 import { formatBillingDate } from '@/components/ws/billing/format'
-import { PRICE_INCLUDES } from '@/components/marketing/content'
+import { PRICE_INCLUDES, ROUTES } from '@/components/marketing/content'
 import { WizardHeader } from './wizard-header'
+
+const legalLinkClass = 'text-navy-700 underline underline-offset-2 hover:text-navy-900'
 
 /**
  * Průvodce Nový byznys, krok 2 ze 2: předplatné (S08, R-038). 14 dní zdarma,
@@ -91,6 +93,24 @@ export function SubscribeStep({
             <p className="text-center text-xs text-quiet">
               Platíte kartou, Apple Pay nebo Google Pay přes Stripe. Zrušíte kdykoli v Účtu.
             </p>
+            {/* Souhlas s podmínkami při uzavření smlouvy (podmínky, Registrace a účet; R-079). */}
+            {isOwner && (
+              <p className="text-center text-xs leading-relaxed text-quiet">
+                Pokračováním souhlasíte s{' '}
+                <a href={ROUTES.terms} target="_blank" rel="noopener" className={legalLinkClass}>
+                  obchodními podmínkami
+                </a>{' '}
+                a{' '}
+                <a href={ROUTES.dpa} target="_blank" rel="noopener" className={legalLinkClass}>
+                  zpracovatelskou smlouvou
+                </a>
+                . Jak nakládáme s údaji, popisuje{' '}
+                <a href={ROUTES.privacy} target="_blank" rel="noopener" className={legalLinkClass}>
+                  Ochrana údajů
+                </a>
+                .
+              </p>
+            )}
           </div>
         </aside>
       </div>

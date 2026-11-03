@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AccentHeading, Logo } from '@/components/ws/brand'
-import { COMPANY_ID, CTA_LABEL, ROUTES, SUPPORT_LABEL, SUPPORT_MAILTO } from './content'
+import { CTA_LABEL, ROUTES, SUPPORT_LABEL, SUPPORT_MAILTO } from './content'
+import { OPERATOR_LINE } from './legal'
 
 const linkClass = 'inline-flex min-h-[44px] items-center text-[17px] text-navy-200 transition-colors hover:text-white'
 
@@ -53,8 +54,8 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-navy-800 pt-6 font-num text-sm text-navy-400">
-          <span>© 2026 ZakazIQ · IČO {COMPANY_ID}</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-navy-800 pt-6 text-sm text-navy-400">
+          <span>© 2026 ZakazIQ · Provozuje {OPERATOR_LINE}</span>
           <a href={ROUTES.admin} className="inline-flex min-h-[44px] items-center text-navy-400 transition-colors hover:text-navy-200">
             Admin
           </a>

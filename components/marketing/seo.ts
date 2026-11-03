@@ -21,15 +21,14 @@ export const OPEN_GRAPH_BASE = {
   siteName: SITE_NAME,
 } satisfies Metadata['openGraph']
 
-/** Právní stránky mají zatím text [DOPLNIT] (R-023) — do vyplnění je nechceme ve výsledcích hledání. */
-export const LEGAL_ROBOTS = { index: false, follow: true } satisfies Metadata['robots']
+/** Právní stránky s plným textem (R-079): indexovatelné a v sitemapě. */
+export const LEGAL_PATHS = ['/podminky', '/ochrana-udaju', '/zpracovatelska-smlouva'] as const
 
 const PRICE_CZK = PRICE_LABEL.replace(/\D/g, '')
 
 /**
- * JSON-LD pro úvodní stránku. Bez hodnocení a recenzí (žádné nemáme) a bez e-mailu
- * podpory, dokud je [DOPLNIT]. FAQPage záměrně ne: Google bohaté výsledky FAQ v roce 2026
- * zrušil a jedna odpověď má ještě [DOPLNIT].
+ * JSON-LD pro úvodní stránku. Bez hodnocení a recenzí (žádné nemáme). FAQPage
+ * záměrně ne: Google bohaté výsledky FAQ v roce 2026 zrušil.
  */
 export function landingJsonLd() {
   const org = `${SITE_URL}/#organizace`
