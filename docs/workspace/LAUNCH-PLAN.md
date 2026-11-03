@@ -2,7 +2,7 @@
 
 > Plán, **jak** se dostat od stavu „hotové v kódu a ověřené na Preview" k veřejnému spuštění. Kontrolní seznam *co* musí platit je v [`LAUNCH.md`](LAUNCH.md); postupy nastavení služeb v [`SETUP.md`](SETUP.md). Tenhle dokument je řadí do pořadí, přiděluje práci a hlídá závislosti.
 >
-> **Stav k:** 2026-10-31 · větev `ws/redesign-app` · produkce běží na starém `main` (`d948400`), nic z Workspace tam není.
+> **Stav k:** 2026-11-03 · větev `ws/redesign-app` · produkce běží na starém `main` (`d948400`), nic z Workspace tam není.
 > **Značky:** **[K]** dělá Kryštof (účty, identita, DNS, rozhodnutí, ostré karty) · **[C]** dělá agent (kód, texty, ověření, zápisy do paměti) · **[K+C]** společně.
 > Tajné hodnoty se do repa, paměti ani sem nikdy nepíší (jen názvy proměnných).
 
@@ -13,14 +13,14 @@
 | Oblast | Stav |
 |---|---|
 | Kód Workspace + landing | S00–S18 a RD01–RD14, RD16 hotové; RD15 (vizuální audit) rozpracovaný |
-| Testy a build | `npm test`: 588 prošlo, 1 přeskočený; `npx tsc --noEmit` čistý; `npx next build --webpack` úspěšný, 47/47 stránek (2026-10-31) |
+| Testy a build | `npm test`: 721 prošlo, 1 přeskočený; `npx tsc --noEmit` čistý; `npm run build:check` prošel (2026-11-03) |
 | Závislosti | `npm audit` a `npm audit --omit=dev --audit-level=high`: 0 zranitelností po aktualizaci lockfile (2026-10-31); CI audit je znovu blokující podle rozhodnutí #006 |
 | Preview `ws/redesign-app` | testovací Neon, Clerk dev, Stripe sandbox; přihlášený průchod hlavními obrazovkami 2026-10-31 v pořádku |
-| Produkční Neon | migrace 064–091 aplikované; práva `ws_app` po 2026-10-31 neověřená |
-| Clerk | jen dev instance, `force_organization_selection=false` nastaveno jen tam |
+| Produkční Neon | migrace 064–096 aplikované; 097–099 čekají na nové heslo `neondb_owner`; práva `ws_app` po 2026-10-31 neověřená |
+| Clerk | produkční instance `zakaziq.cz`: DNS, SSL a pošta hotové (2026-11-03, `oauth_pending`); chybí Google OAuth, webhook a klíče ve Vercelu. Aplikace běží na dev instanci |
 | Stripe | jen sandbox „ZakazIQ"; live produkt, cena, klíče a webhook chybí |
-| Resend | doména `zakaziq.cz` neověřená → e-maily Workspace nechodí (`WS_EMAIL_FROM` nenastaveno) |
-| DNS (WEDOS) | bez SPF, DMARC, CAA (DNSSEC neověřeno) |
+| Resend | doména `zakaziq.cz` ověřená, `WS_EMAIL_FROM` v Production, webhook vypnutý do nasazení; doručení nevyzkoušené |
+| DNS (WEDOS) | 5 CNAME Clerku a `_dmarc` (`p=none`, bez `rua`) hotové; chybí CAA a SPF apexu (DNSSEC neověřeno) |
 | Právní věci | právní texty a úplné právní jméno/adresa chybí; IČO `29977231` a podpora `info@vizeon.cz` potvrzené 2026-10-31 |
 
 ## 2. Principy plánu
@@ -88,6 +88,8 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 **Stav 2026-11-01 (`dig`):** NS WEDOS; apex A `216.198.79.1` (Vercel); `www` CNAME `…vercel-dns-017.com`; apex bez TXT, MX a CAA; `_dmarc` ani `clerk` neexistují. Resend: doména `zakaziq.cz` Verified (Kryštof, 2026-11-01); `_dmarc` zatím chybí. Clerk: `clerk deploy status` = `not_started`, `clerk deploy` vyžaduje interaktivní terminál.
 
+**Stav 2026-11-03 (`dig`, `clerk deploy status`):** CNAME `clerk`, `accounts`, `clkmail`, `clk._domainkey`, `clk2._domainkey` existují, Clerk hlásí DNS, SSL i poštu `complete`. `_dmarc` = `v=DMARC1; p=none;` (bez `rua`). CAA a TXT apexu (SPF) dál chybí; CAA už jde přidat.
+
 ### Stopa C — Resend (závisí na B)
 
 | Krok | Kdo | Detail |
@@ -106,8 +108,8 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| D1 | K | `clerk deploy` → produkční instance, doména `clerk.zakaziq.cz` (CNAME do stopy B) |
-| D2 | K | Google Cloud Console → vlastní OAuth klient (redirect URI z Clerku); údaje vložit do Clerku (sdílené dev údaje v produkci nepoužít) |
+| D1 | K | ~~`clerk deploy` → produkční instance, doména `clerk.zakaziq.cz` (CNAME do stopy B)~~ hotovo, DNS/SSL/pošta `complete` 2026-11-03 |
+| D2 | K | **Další krok.** Google Cloud Console → vlastní OAuth klient (redirect URI z Clerku); údaje vložit do Clerku (sdílené dev údaje v produkci nepoužít) |
 | D3 | C | `clerk config patch`: `organization_settings.force_organization_selection=false` (jinak Clerk obejde průvodce `/w/novy`, R-037, stalo se 2026-10-31 na dev); česká lokalizace; ověřit, že platí i čeština e-mailů s kódem (jinak Customization → Emails) |
 | D4 | C | Zjistit, jestli jde na našem plánu zvednout limit 5 členů organizace (R-020 slibuje neomezeně pracovníků; pracovníci ve `ws.staff` se přihlašovat nemusí) |
 | D5 | K | Webhook `https://www.zakaziq.cz/api/clerk/webhook`, události `organization.updated`, `organizationMembership.*`; podpisový klíč → `CLERK_WEBHOOK_SECRET` |
