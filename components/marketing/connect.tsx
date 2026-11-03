@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AccentHeading, SectionLabel, TileField } from '@/components/ws/brand'
+import { AccentHeading, TileField } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
 import { CONNECT_SLUG } from './content'
 import { useRevealState } from './use-in-view'
@@ -64,13 +64,12 @@ export function Connect() {
     <section id="napojeni" aria-labelledby="napojeni-title" className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]">
       <div className="grid items-center gap-10 lg:grid-cols-[5fr_6fr] lg:gap-16">
         <div className="flex flex-col gap-6">
-          <SectionLabel number="05">Napojení na váš web</SectionLabel>
-          <AccentHeading id="napojeni-title" as="h2" size="section" accent="a rovnou napojím.">
-            Web vám postavím
+          <AccentHeading id="napojeni-title" as="h2" size="section">
+            Web vám postavím a rovnou napojím.
           </AccentHeading>
           <p className="max-w-[480px] text-[19px] leading-relaxed text-quiet">
-            Nemáte web? Dostanete stránku pro objednání a QR kód na pult. Máte web? Stačí jeden řádek kódu. Napojení si
-            ověříte jedním klikem.
+            Když web nemáte, dostanete vlastní stránku pro objednání a QR kód na pult. Do hotového webu stačí vložit
+            jeden řádek kódu a jedním klikem si ověříte, že poptávky chodí.
           </p>
         </div>
         <Terminal />

@@ -67,7 +67,7 @@ const TONE: Record<Tone, { band: string; time: string; label: string; title: str
   soft: { band: 'bg-navy-50 text-ink', time: 'text-navy-500', label: 'text-quiet', title: 'text-ink', text: 'text-quiet' },
 }
 
-const mono = 'font-num text-[13px] uppercase tracking-[0.08em]'
+const caption = 'text-[14px] font-medium'
 
 /** Kousek skutečného rozhraní k řešení. Jen ilustrace (text vedle říká totéž), proto aria-hidden. */
 function ArtifactView({ kind }: { kind: Artifact }) {
@@ -94,7 +94,7 @@ function ArtifactView({ kind }: { kind: Artifact }) {
     case 'move':
       return (
         <div className="bg-ground p-4 text-ink">
-          <p className={cn(mono, 'text-quiet')}>Pátek · přesunuto</p>
+          <p className={cn(caption, 'text-quiet')}>Pátek · přesunuto</p>
           <div className="mt-4 flex flex-col gap-2">
             <div className="rounded-chip border border-dashed border-navy-300 px-4 py-3 text-quiet">
               <s className="font-num text-[15px] decoration-quiet">9:00–10:30</s>
@@ -113,7 +113,7 @@ function ArtifactView({ kind }: { kind: Artifact }) {
       return (
         <div className="bg-surface p-4 text-ink">
           <div className="flex items-center justify-between gap-3">
-            <span className={cn(mono, 'text-quiet')}>Příjmy · říjen</span>
+            <span className={cn(caption, 'text-quiet')}>Příjmy · říjen</span>
             <span className="rounded-full bg-navy-50 px-3 py-1 font-num text-[13px] text-navy-700">Zaplaceno</span>
           </div>
           <p className="mt-4 font-num text-[36px] leading-none tracking-[-0.03em]">
@@ -148,9 +148,9 @@ function ArtifactView({ kind }: { kind: Artifact }) {
 export function WhyBother() {
   return (
     <section id="proc" aria-labelledby="proc-title" className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]">
-      <SectionHead id="proc-title" number="01" label="Proč to řešit" title="Práce nepočká." accent="Poptávka taky ne." />
+      <SectionHead id="proc-title" title="Den, kdy máte plné ruce." />
       <p className="mt-5 max-w-[620px] text-[17px] leading-relaxed text-quiet">
-        Firmu vedete z telefonu a diáře. Něco občas uteče, hlavně když máte plné ruce. ZakazIQ jsem postavil pro tyhle chvíle.
+        Firmu vedete z telefonu a z diáře a většinou to stačí. Tady jsou chvíle, kdy ne. Kvůli nim jsem ZakazIQ postavil.
       </p>
 
       <ol className="mt-10 flex flex-col gap-1 md:mt-12">
@@ -169,14 +169,13 @@ export function WhyBother() {
                 <p
                   className={cn(
                     'font-num leading-none',
-                    m.when.length > 5 ? 'text-[20px] uppercase tracking-[0.04em]' : 'text-[36px]',
+                    m.when.length > 5 ? 'text-[20px]' : 'text-[36px]',
                     t.time,
                   )}
                 >
                   {m.when}
                 </p>
-                <p className={cn(mono, 'mt-4', t.label)}>Dnes</p>
-                <h3 className={cn('mt-2 text-[24px] font-semibold leading-tight tracking-[-0.02em] sm:text-[28px]', t.title)}>
+                <h3 className={cn('mt-5 text-[24px] font-semibold leading-tight tracking-[-0.02em] sm:text-[28px]', t.title)}>
                   {m.problem.title}
                 </h3>
                 <p className={cn('mt-2 max-w-[46ch] text-[17px] leading-relaxed', t.text)}>{m.problem.today}</p>
@@ -184,11 +183,11 @@ export function WhyBother() {
 
               <div className="flex min-w-0 flex-col gap-4">
                 <div>
-                  <p className={cn(mono, t.label)}>Se ZakazIQ</p>
+                  <p className={cn(caption, t.label)}>Se ZakazIQ</p>
                   <p className={cn('mt-2 text-[18px] font-semibold leading-snug', t.title)}>{m.solution}</p>
                 </div>
                 <div className="w-full max-w-[340px]">
-                  <p className={cn(mono, 'mb-3', t.label)}>Ukázka</p>
+                  <p className={cn(caption, 'mb-3', t.label)}>Ukázka</p>
                   <div aria-hidden>
                     <ArtifactView kind={m.artifact} />
                   </div>

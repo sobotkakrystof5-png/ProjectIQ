@@ -420,10 +420,16 @@
 **Rozhodnutí:** `/r/[slug]` a widget podle slugu fungují jen pro účet, který aspoň jednou dokončil Stripe Checkout (má řádek ve `ws.subscriptions`). Po skončeném nebo nezaplaceném předplatném se poptávky přijímají dál (R-045, B5). Nedokončené registrace se nemažou (AGENTS.md: účty ani data se kvůli neplacení nemažou); případný úklid je samostatné rozhodnutí.
 **Proč:** review před spuštěním 2026-11-03, opravu Kryštof zadal („oprav vše“). Účet s byznysem vzniká před Checkoutem (R-038). Kdokoli by tak dostal zdarma veřejnou objednávku na zakaziq.cz pod libovolným názvem firmy a poptávky skutečných lidí by nikdo nečetl.
 **Důsledek:** migrace 099 (`ws.business_by_public_slug`), test v `ws-intake.test.ts`. Klíče webu (API, widget s klíčem) se nemění. Pozvaný klient (S17) má objednávací stránku až po dokončení Checkoutu. `.claude/security/STATE.md` → Aplikace.
+### R-078 · Nadpisy landing page bez vzhledu AI šablony (2026-11-03)
+**Rozhodnutí:** nadpis na landing page je jedna obyčejná věta jedním písmem (Instrument Sans). Nemá kurzívu Instrument Serif v druhé půlce ani štítek nebo číslo sekce nad sebou („01 — Proč to řešit“, „01 / 04“). Popisek „Ukázka“ je malým textovým písmem, ne verzálkami v JetBrains Mono. Nové nadpisy: „Zákazníci se objednají sami.“, „Den, kdy máte plné ruce.“, „Co vám zůstane po návštěvě.“, „Od objednávky po zaplacení.“, „Zapněte si jen to, co použijete.“, „Web vám postavím a rovnou napojím.“, „Všechny funkce za jednu cenu.“, „Než se zaregistrujete.“, „Máte ještě nějaký dotaz?“, v patičce „První poptávku můžete přijmout ještě dnes.“
+**Proč:** Kryštof 2026-11-03 chtěl, aby landing nepůsobila jako vygenerovaná. Kontrola skillem `design-taste-frontend` našla kurzívu ve 12 nadpisech, 64 drobných štítků verzálkami a stejný vzorec „Věta. Druhá věta.“ v každé sekci.
+**Důsledek:** upravuje R-021 (serifová kurzíva se na nadpisech landing page nepoužívá, ve Workspace zůstává) a R-031 (pořadí sekcí platí, čísla se nezobrazují). Mono jen pro časy, data a částky. `SectionHead` nemá `number`, `label` ani `accent`. Upraveno v `docs/landing/PROJECT-BRIEF.md`, `DESIGN.md` a `.impeccable/design.json`.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Landing — zbytek auditu R-078:** (1) na telefonu 390 px je v Jak to funguje úsek asi 3 100 px skoro bez obsahu (velké mezery mezi kroky), (2) žádná fotka, (3) ozdoby: tenké a čárkované čáry, stíny v klidu, modrá záře v hero, plovoucí navigace ve tvaru pilulky, (4) 21 velikostí písma a texty pod 13 px, (5) karty Funkce se stejným rámečkem · `components/marketing/` · od 2026-11-03
 - [ ] **Vercel Hobby a komerční provoz:** podle podmínek Vercelu je Hobby jen pro nekomerční osobní použití; placený Workspace potřebuje Pro. Pro zároveň dovolí častější crony (připomínky 2 h předem, rychlejší fronta e-mailů, R-006, R-050) a Observability. Rozhodnutí a platba: Kryštof · před spuštěním · od 2026-11-03
 - [ ] **Heslo `neondb_owner`:** po vložení do chatu (2026-11-01) výměna nepotvrzená; potvrdit, upravit `DATABASE_URL` ve Vercelu a `.env.local`, zapsat do `.claude/security/AUDIT-LOG.md`. Blokuje i aplikaci 097–099 na produkci · od 2026-11-01
 - [ ] **Admin bez dvoufázového ověření:** session je od 2026-11-03 jen 12 h, zámek na IP zůstává; dvoufázové ověření (TOTP s novou závislostí, nebo admin přes Clerk s MFA) potřebuje rozhodnutí · `lib/auth.ts`, DECISIONS #021 · od 2026-11-03
@@ -507,6 +513,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-03
+- **feat** Landing: přepsané nadpisy a popisky bez vzhledu AI šablony (R-078). Bez kurzívy, čísel sekcí a štítků nad nadpisy; nový text hero, Proč to řešit, Co to umí, Jak to funguje, Funkce, Napojení, Ceník, Dotazy, Kontakt a patičky; OG obrázek s novým H1 (bez serifového písma). Soubory: `components/marketing/*`, `app/(marketing)/opengraph-image.tsx`, brief, `DESIGN.md`, `.impeccable/design.json`. Ověřeno: `tsc`, Vitest landing (9 testů), měření `design-taste-frontend` na 1440/768/390 px (štítky verzálkami 64 → 5, zbylé jen uvnitř ukázek rozhraní; kurzíva v nadpisech 12 → 0). Celé `npm test` a build neproběhly.
 - **fix** Review před spuštěním (`.claude/security/AUDIT-LOG.md`): Clerk `authorizedParties` v produkci (`lib/security/clerk.ts`, `proxy.ts`, DECISIONS #021), session adminu 12 h (`lib/auth.ts`), předání do Claude Code s `--permission-mode plan` (`lib/claude-code-handoff.ts`).
 - **feat** Objednávací stránka jen po dokončeném Checkoutu (R-077): migrace 099 (aplikována: ne), test v `ws-intake.test.ts`.
 - **feat** Chybové stránky v Dílkách: `components/ws/error-screen.tsx`, `error.tsx` v `app/w`, `app/w/[business]`, `app/r`, `app/z`, `app/klient`, `app/(marketing)`, kořen `app/global-error.tsx`. V prohlížeči neověřeno.

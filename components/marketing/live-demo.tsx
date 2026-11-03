@@ -11,8 +11,8 @@ const STORY = [
     text: 'Tereza si vybrala pátek v 9:00. Čárkovaný blok ukazuje její přání, termín zatím není potvrzený.',
   },
   {
-    title: 'Vše potřebné po ruce.',
-    text: 'Služba, čas i zákaznice na jednom místě. Detail otevřete vedle kalendáře.',
+    title: 'Detail máte vedle kalendáře.',
+    text: 'Vidíte službu, čas a jestli je termín volný. Týden přitom pořád máte před sebou.',
   },
   {
     title: 'Z přání je domluvený termín.',
@@ -99,7 +99,7 @@ export function LiveDemo() {
             <p className="text-xl font-semibold tracking-[-0.02em]">Kalendář</p>
             <p className="mt-1 hidden text-sm text-navy-200 sm:block">Jedna poptávka, od přání po potvrzení</p>
           </div>
-          <span className="shrink-0 font-num text-xs text-navy-200">UKÁZKA</span>
+          <span className="shrink-0 text-sm text-navy-200">Ukázka</span>
         </div>
 
         <div id="ukazka-kalendar" className="overflow-hidden rounded-box bg-surface text-ink">
@@ -203,8 +203,7 @@ export function LiveDemo() {
             ref={(el) => { markers.current[i] = el }}
             className="flex min-h-[24vh] flex-col items-start justify-center border-t border-navy-800 py-7 lg:min-h-[48vh]"
           >
-            <span className="font-num text-xs text-navy-300">0{i + 1} / 03</span>
-            <h2 className="mt-4 max-w-[14ch] text-[28px] font-semibold leading-[1.05] tracking-[-0.025em] text-white sm:text-[32px]">
+            <h2 className="max-w-[14ch] text-[28px] font-semibold leading-[1.05] tracking-[-0.025em] text-white sm:text-[32px]">
               {item.title}
             </h2>
             <p className="mt-3 max-w-[32ch] text-[15px] leading-relaxed text-navy-200">{item.text}</p>

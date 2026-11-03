@@ -6,7 +6,7 @@ import { ImageResponse } from 'next/og'
 // a výřez kalendáře s čárkovanou novou poptávkou. Generuje se při buildu.
 // Písma Dílků jako TTF v _og/ (next/og neumí woff2), licence OFL tamtéž.
 
-export const alt = 'ZakazIQ · Každá poptávka na svém místě.'
+export const alt = 'ZakazIQ · Zákazníci se objednají sami.'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const dynamic = 'force-static'
@@ -146,9 +146,8 @@ function CalendarCut() {
 }
 
 export default async function OpengraphImage() {
-  const [sans, serif, mono] = await Promise.all([
+  const [sans, mono] = await Promise.all([
     font('InstrumentSans-SemiBold.ttf'),
-    font('InstrumentSerif-Italic.ttf'),
     font('JetBrainsMono-Medium.ttf'),
   ])
 
@@ -190,10 +189,10 @@ export default async function OpengraphImage() {
             <Logo />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: 86, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.02 }}>
-                Každá poptávka
+                Zákazníci se
               </div>
-              <div style={{ fontFamily: 'Serif', fontStyle: 'italic', fontSize: 96, color: C.navy300, lineHeight: 1.05 }}>
-                na svém místě.
+              <div style={{ fontSize: 86, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.02 }}>
+                objednají sami.
               </div>
             </div>
             <div style={{ fontFamily: 'Mono', fontSize: 21, color: C.navy200 }}>
@@ -208,7 +207,6 @@ export default async function OpengraphImage() {
       ...size,
       fonts: [
         { name: 'Sans', data: sans, weight: 600, style: 'normal' },
-        { name: 'Serif', data: serif, weight: 400, style: 'italic' },
         { name: 'Mono', data: mono, weight: 500, style: 'normal' },
       ],
     },

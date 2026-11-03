@@ -10,8 +10,8 @@ export function Footer() {
     <footer className="mt-[72px] rounded-t-hero bg-navy-950 text-white md:mt-[120px]">
       <div className="mx-auto max-w-[1200px] px-5 pb-8 pt-14 sm:px-7 md:pt-20">
         <div className="flex flex-col gap-8 border-b border-navy-800 pb-12 lg:flex-row lg:items-end lg:justify-between">
-          <AccentHeading as="h2" size="section" accent="Za tři minuty." onDark className="max-w-[640px]">
-            Začněte ještě dnes.
+          <AccentHeading as="h2" size="section" onDark className="max-w-[640px]">
+            První poptávku můžete přijmout ještě dnes.
           </AccentHeading>
           <a
             href={ROUTES.signUp}

@@ -159,7 +159,7 @@ The palette is a deep navy system with cool light surfaces. Warm amber is reserv
 **Label/Mono Font:** JetBrains Mono (ui-monospace, monospace)  
 **Accent Font:** Instrument Serif italic (Georgia, serif)
 
-Instrument Sans carries the interface. Instrument Serif appears only as the second, emphasized part of a selected page heading. JetBrains Mono is reserved for measured data and purposeful chapter labels: times, dates, amounts, counts and the landing page’s section markers.
+Instrument Sans carries the interface. Instrument Serif appears only as the second, emphasized part of a selected Workspace heading; landing page headings are one sentence in Instrument Sans with no italic accent and no section marker above them (R-078). JetBrains Mono is reserved for measured data: times, dates, amounts and counts.
 
 ### Hierarchy
 
