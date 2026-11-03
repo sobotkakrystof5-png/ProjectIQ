@@ -362,7 +362,7 @@ Server action v `app/(marketing)/actions.ts` používá Zod limity délek, honey
 
 ## 8. Právní
 
-- Stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` mají plné texty (R-079, nahrazuje „texty se negenerují“ z R-023). Připravil je agent podle chování aplikace, schvaluje Kryštof; kontrola právníkem doporučená. Údaje provozovatele a seznam zpracovatelů jsou v `components/marketing/legal.ts`.
+- Stránky `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva` mají plné texty (R-079, nahrazuje „texty se negenerují“ z R-023). Připravil je agent podle chování aplikace, Kryštof je potvrdil 2026-11-03 (bez kontroly právníkem). Údaje provozovatele a seznam zpracovatelů jsou v `components/marketing/legal.ts`.
 - Provozovatel podle ARES: Kryštof Sobotka, Kamenice 64, 294 04 Dobšín, IČO `29977231`, živnostenský úřad Magistrát města Mladá Boleslav. Patička ho uvádí celého.
 - Formulář ukládá jméno, e-mail a zprávu do Hovorů. Ochrana údajů uvádí účel a dobu uchování (nejdéle 3 roky od poslední komunikace); bez analytiky není potřeba cookie lišta.
 - Registrace a souhlas s podmínkami řeší `/w/registrace` (S07), ne landing.
