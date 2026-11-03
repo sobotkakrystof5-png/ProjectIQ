@@ -24,7 +24,7 @@
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
 | Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
-| Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session, chráněno i přes `proxy.ts` |
+| Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session s platností 12 h (`lib/auth.ts`, od 2026-11-03), zámek 5 chybných pokusů za 15 min na IP, chráněno i přes `proxy.ts` |
 | Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
 | Deployment | Vercel | Zero-ops, napojení na GitHub, Hobby plán (crony max 1× denně) |
 | AI | `@anthropic-ai/sdk` | AI asistenti (Startup) + AI přepis PDF faktur (`lib/invoice-ai.ts`) |

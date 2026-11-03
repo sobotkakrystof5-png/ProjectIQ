@@ -4,9 +4,11 @@ import { existsSync } from 'fs'
 import { buildTerminalCommand, pickDelimiter, sanitizeForTerminal } from '@/lib/claude-code-handoff'
 
 // Příkaz se v testu opravdu spustí v shellu s příkazem `claude` nahrazeným funkcí,
-// která vypíše svůj argument — ověřuje se tedy skutečné chování, ne jen tvar textu.
+// která vypíše zadání — ověřuje se tedy skutečné chování, ne jen tvar textu.
+// Bez režimu plánu funkce skončí chybou (nedůvěryhodný text nesmí nic spustit sám).
 function run(command: string): string {
-  const script = `claude() { printf '%s' "$1"; }\n${command}\n`
+  const stub = `claude() { [ "$1" = --permission-mode ] && [ "$2" = plan ] || { echo 'bez režimu plánu' >&2; return 9; }; printf '%s' "$3"; }`
+  const script = `${stub}\n${command}\n`
   return execFileSync('bash', ['-c', script], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '' } as unknown as NodeJS.ProcessEnv })
 }
 

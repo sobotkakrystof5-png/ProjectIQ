@@ -157,6 +157,30 @@ describe('klíče', () => {
     expect(await businessBySlug('neni-tu')).toBeNull()
     expect(await businessBySlug("x' OR 1=1 --")).toBeNull()
   })
+
+  it('účet bez dokončeného Checkoutu nemá veřejnou stránku, po skončeném předplatném ano (R-077)', async () => {
+    const { rows } = await db.query<{ stripe_subscription_id: string; status: string }>(
+      `SELECT stripe_subscription_id, status FROM ws.subscriptions WHERE account_id = $1`,
+      [B.account],
+    )
+    await db.query(`DELETE FROM ws.subscriptions WHERE account_id = $1`, [B.account])
+    try {
+      expect(await businessBySlug('byznys-b')).toBeNull()
+      await db.query(
+        `INSERT INTO ws.subscriptions (account_id, stripe_subscription_id, status) VALUES ($1, 'sub_b_konec', 'canceled')`,
+        [B.account],
+      )
+      expect(await businessBySlug('byznys-b')).toMatchObject({ accountId: B.account, businessId: B.business })
+    } finally {
+      await db.query(`DELETE FROM ws.subscriptions WHERE account_id = $1`, [B.account])
+      for (const r of rows) {
+        await db.query(
+          `INSERT INTO ws.subscriptions (account_id, stripe_subscription_id, status) VALUES ($1, $2, $3)`,
+          [B.account, r.stripe_subscription_id, r.status],
+        )
+      }
+    }
+  })
 })
 
 describe('kolonky', () => {

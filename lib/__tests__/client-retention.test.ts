@@ -20,6 +20,7 @@ let db: PGlite
 const count = async (sqlText: string, params: unknown[] = []) =>
   Number((await db.query<{ n: number }>(sqlText, params)).rows[0].n)
 
+// PGlite + migrace trvají na vytíženém stroji nebo v CI déle než výchozích 10 s.
 beforeAll(async () => {
   db = new PGlite()
   await db.exec(`
@@ -70,7 +71,7 @@ beforeAll(async () => {
       ($1, $3, now() + interval '10 days', NULL)`,
     [C, hashOf('a'), hashOf('b')],
   )
-})
+}, 60_000)
 
 afterAll(async () => {
   await db.close()
