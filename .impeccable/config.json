@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-11-03T09:29:54.435Z",
         "reason": "R-027 a R-071 v memory/memory.md: admin konzole si záměrně nechává Inter, Dílky platí jen v [data-app=ws]"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "app/globals.css"
+        ],
+        "createdAt": "2026-11-03T09:42:21.546Z",
+        "reason": "R-027 a R-071 v memory/memory.md: admin konzole si záměrně nechává Inter, Dílky platí jen v [data-app=ws]"
       }
     ]
   }
