@@ -21,7 +21,7 @@
 | Stripe | jen sandbox „ZakazIQ"; live produkt, cena, klíče a webhook chybí |
 | Resend | doména `zakaziq.cz` ověřená, `WS_EMAIL_FROM` v Production, webhook vypnutý do nasazení; doručení nevyzkoušené |
 | DNS (WEDOS) | 5 CNAME Clerku a `_dmarc` (`p=none`, bez `rua`) hotové; chybí CAA a SPF apexu (DNSSEC neověřeno) |
-| Právní věci | texty na webu od 2026-11-03 (R-079), provozovatel z ARES; čeká na schválení Kryštofem, případně kontrolu právníkem |
+| Právní věci | texty na webu od 2026-11-03 (R-079), provozovatel z ARES; volby potvrzené Kryštofem, doporučená kontrola právníkem |
 
 ## 2. Principy plánu
 
@@ -63,7 +63,7 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 |---|---|---|
 | A1 | K | ~~Doplnit IČO, adresu, e-mail podpory~~ hotovo 2026-11-03 (ARES) |
 | A2 | C | ~~Hotovo 2026-11-03~~ Předvyplnit podklady pro právní stránky: lhůty z S18 (R-054 GDPR: výmaz, 10 let faktury, 30 dní po zrušení), seznam zpracovatelů (Vercel, Neon, Clerk, Stripe, Resend), regiony (Resend EU/Irsko; **region Neonu a Vercelu dohledat v dashboardech** — dnes `[DOPLNIT]`) |
-| A3 | K | Texty připravil agent podle chování aplikace (R-079); **Kryštof je přečte a schválí**, kontrola právníkem doporučená. Potvrdit volby v R-079 (odpovědnost, lhůty) |
+| A3 | K | Texty připravil agent podle chování aplikace (R-079); volby Kryštof potvrdil 2026-11-03; zbývá doporučená kontrola právníkem |
 | A4 | C | ~~Hotovo 2026-11-03~~ Vložit texty do `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`; odstranit `LEGAL_ROBOTS` (`components/marketing/seo.ts`), přidat stránky do `app/sitemap.ts`; vyplnit `[DOPLNIT]` v landing Dotazech (kde jsou data uložená) |
 | A5 | C | Doplnit IČO a adresu do Stripe šablony faktury, Public details a patičky dokladů (zbývá, dashboard Stripe); záznam o zpracování hotový 2026-11-03 |
 | A6 | C | `humanize-text-cs` a `zakaziq-ux-texty-cs` nad novými texty (ne nad právním textem samotným) |

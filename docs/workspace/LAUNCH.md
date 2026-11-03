@@ -42,7 +42,7 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 
 ## Právní a zákaznická připravenost
 
-- [ ] **Blokuje spuštění:** obchodní podmínky, ochrana údajů a zpracovatelská smlouva jsou na webu (R-079, 2026-11-03); zbývá schválení Kryštofem, doporučená kontrola právníkem.
+- [ ] **Blokuje spuštění:** obchodní podmínky, ochrana údajů a zpracovatelská smlouva jsou na webu (R-079, 2026-11-03); volby potvrdil Kryštof 2026-11-03, zbývá doporučená kontrola právníkem.
 - [ ] **Blokuje spuštění:** provozovatel (Kryštof Sobotka, Kamenice 64, 294 04 Dobšín, IČO `29977231`) je na webu a v právních textech od 2026-11-03; zbývá doplnit ho do Stripe (Public details, šablona faktury) a daňových dokladů.
 - [ ] Potvrdit, že cena 249 Kč/měsíc a 14denní zkušební doba odpovídají Stripe i textům; potvrdit režim DPH a text dokladu „Nejsem plátce DPH“.
 - [ ] Aktualizovat záznam o zpracování: provozovatel, regiony a doby uchování pro Vercel, Neon, Clerk, Stripe a Resend.
