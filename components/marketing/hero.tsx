@@ -21,10 +21,10 @@ export function Hero() {
           <div className="flex max-w-[860px] flex-col items-start gap-6">
             {/* Nadpis a perex bez nájezdu — jsou LCP prvek, nesmí čekat na animaci. */}
             <AccentHeading as="h1" size="hero" onDark>
-              Zákazníci se objednají sami.
+              Každá poptávka na svém místě.
             </AccentHeading>
             <p className="max-w-[620px] text-[15px] font-normal leading-relaxed text-white sm:text-[17px]">
-              Poptávka z webu se zařadí do kalendáře a vy ji potvrdíte jedním
+              Objednávka z webu se zařadí do kalendáře a vy ji potvrdíte jedním
               klikem. Ve stejné aplikaci máte zákazníky s věrnostními kartami,
               zakázky, faktury i odhad daní, na telefonu i na počítači.
             </p>

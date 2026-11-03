@@ -124,7 +124,7 @@ Pořadí: LP-D + sekce Proč to řešit (R-031). Čísla sekcí jsou proto posun
 
 ```
 Hlavička (v hero)
-Hero „Zákazníci se objednají sami.“ + střídmý motiv dílků + ovladatelný příběh v kalendáři
+Hero „Každá poptávka na svém místě.“ + střídmý motiv dílků + ovladatelný příběh v kalendáři
 Pás oborů
 01 Proč to řešit            (nové oproti LP-D)
 02 Co to umí                (#funkce)
@@ -152,7 +152,7 @@ Texty níže jsou návrh (prošly `zakaziq-ux-texty-cs` a `humanize-text-cs`). S
 **Texty:**
 
 - Štítek: „Ukázka · jedna poptávka od začátku do konce“.
-- **H1:** „Zákazníci se objednají sami.“
+- **H1:** „Každá poptávka na svém místě.“
 - **Perex:** „ZakazIQ je přehled podnikání pro malé firmy. Poptávky z webu, kalendář, zákazníci a věrnostní karty, zakázky, faktury a odhad daní v jedné aplikaci pro telefon i počítač.“
 - **Hlavní tlačítko:** „Vyzkoušet 14 dní zdarma“ → `/w/registrace` (bílá pilulka).
 - **Vedlejší odkaz:** „Napište nám“ → `mailto:[DOPLNIT e-mail podpory]` (textový odkaz `navy-200` s podtržením při hoveru, žádné druhé tlačítko).
@@ -341,7 +341,7 @@ Server action v `app/(marketing)/actions.ts` používá Zod limity délek, honey
 
 - Žádné fotky ani stock obrázky. Vizuál nesou ukázky aplikace, dílky a typografie.
 - Ilustrace jsou React/CSS komponenty, ne obrázky, takže se nenačítají a neposouvají layout. Každá má pevnou výšku nebo `aspect-ratio`, aby animace nezpůsobila CLS.
-- Jediný obrázek: **OG obrázek** 1200 × 630 (S05). Námět: tmavá plocha s polem dílků, logo, H1 „Zákazníci se objednají sami.“, vpravo výřez kalendáře s čárkovaným blokem nové poptávky. Generovat přes `next/og` (`opengraph-image.tsx`), písma Dílků, bez externího skriptu.
+- Jediný obrázek: **OG obrázek** 1200 × 630 (S05). Námět: tmavá plocha s polem dílků, logo, H1 „Každá poptávka na svém místě.“, vpravo výřez kalendáře s čárkovaným blokem nové poptávky. Generovat přes `next/og` (`opengraph-image.tsx`), písma Dílků, bez externího skriptu.
 - Favicon: znak loga (2×2 dílky na `navy-700`), řeší S05.
 
 ---

@@ -6,7 +6,7 @@ import { ImageResponse } from 'next/og'
 // a výřez kalendáře s čárkovanou novou poptávkou. Generuje se při buildu.
 // Písma Dílků jako TTF v _og/ (next/og neumí woff2), licence OFL tamtéž.
 
-export const alt = 'ZakazIQ · Zákazníci se objednají sami.'
+export const alt = 'ZakazIQ · Každá poptávka na svém místě.'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const dynamic = 'force-static'
@@ -189,10 +189,10 @@ export default async function OpengraphImage() {
             <Logo />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: 86, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.02 }}>
-                Zákazníci se
+                Každá poptávka
               </div>
               <div style={{ fontSize: 86, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.02 }}>
-                objednají sami.
+                na svém místě.
               </div>
             </div>
             <div style={{ fontFamily: 'Mono', fontSize: 21, color: C.navy200 }}>
