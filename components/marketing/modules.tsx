@@ -193,12 +193,12 @@ export function Modules() {
 
   return (
     <section id="funkce-seznam" aria-labelledby="moduly-title" className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]">
-      <SectionHead id="moduly-title" number="04" label="Funkce · všechny v ceně" title="Skládejte si to" accent="po dílcích." />
+      <SectionHead id="moduly-title" title="Zapněte si jen to, co použijete." />
       <p className="mt-6 max-w-[560px] text-[19px] leading-relaxed text-quiet">
-        Zapněte si jen to, co potřebujete. Vypnutá funkce zmizí z menu a data zůstanou.
+        Vypnutá funkce zmizí z menu a její data zůstanou uložená. Platíte stejně, ať jich máte zapnutých kolik chcete.
       </p>
       <p className="mt-3 max-w-[560px] text-base leading-relaxed text-quiet">
-        Přepínače na kartách si můžete vyzkoušet. Je to jen ukázka, vaše nastavení se tím nemění.
+        Přepínače na kartách si klidně vyzkoušejte. Je to jen ukázka, nic se tím nenastaví.
       </p>
 
       <ul className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-12">

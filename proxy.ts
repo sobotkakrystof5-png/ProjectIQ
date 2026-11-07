@@ -1,6 +1,7 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
 import { withAuth, type NextRequestWithAuth } from 'next-auth/middleware'
 import { clerkMiddleware } from '@clerk/nextjs/server'
+import { clerkAuthorizedParties } from '@/lib/security/clerk'
 import { buildCsp, clerkFrontendApiHost, cspProfileFor, createNonce, hasPrefix } from '@/lib/security/csp'
 import { frameAncestorsFor } from '@/lib/security/embed'
 import { embedOriginsForSlug, orderSlugFromPath } from '@/lib/ws/intake/embed-origins'
@@ -33,6 +34,9 @@ const WS_PUBLIC = [WS_SIGN_IN_PATH, WS_SIGN_UP_PATH, '/w/_design'] as const
 
 const CLERK_HOST = clerkFrontendApiHost(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
 
+/** V produkci jen session tokeny vydané pro hlavní host (`lib/security/clerk.ts`). */
+const CLERK_AUTHORIZED_PARTIES = clerkAuthorizedParties(process.env.VERCEL_ENV, process.env.NEXT_PUBLIC_APP_URL)
+
 const workspace = clerkMiddleware(
   async (auth, req) => {
     const { pathname } = req.nextUrl
@@ -41,7 +45,7 @@ const workspace = clerkMiddleware(
     if (!WS_PUBLIC.some((p) => hasPrefix(pathname, p))) await auth.protect()
     return withCsp(req)
   },
-  { signInUrl: WS_SIGN_IN_PATH, signUpUrl: WS_SIGN_UP_PATH },
+  { signInUrl: WS_SIGN_IN_PATH, signUpUrl: WS_SIGN_UP_PATH, authorizedParties: CLERK_AUTHORIZED_PARTIES },
 )
 
 const portal = clerkMiddleware(
@@ -52,7 +56,7 @@ const portal = clerkMiddleware(
     if (!PORTAL_PUBLIC_PATHS.some((p) => hasPrefix(pathname, p))) await auth.protect()
     return withCsp(req)
   },
-  { signInUrl: PORTAL_SIGN_IN_PATH, signUpUrl: PORTAL_SIGN_UP_PATH },
+  { signInUrl: PORTAL_SIGN_IN_PATH, signUpUrl: PORTAL_SIGN_UP_PATH, authorizedParties: CLERK_AUTHORIZED_PARTIES },
 )
 
 export default async function proxy(req: NextRequest, event: NextFetchEvent) {

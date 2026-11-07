@@ -91,11 +91,11 @@
       },
       "accent": {
         "displayName": "Instrument Serif italic",
-        "purpose": "The occasional second half of a heading."
+        "purpose": "The occasional second half of a Workspace heading; not on landing page headings (R-078)."
       },
       "data": {
         "displayName": "JetBrains Mono data",
-        "purpose": "Times, dates, amounts, counts and section markers."
+        "purpose": "Times, dates, amounts and counts."
       }
     },
     "shadows": [

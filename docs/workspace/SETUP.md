@@ -149,7 +149,8 @@ Vypíše podpisový klíč `whsec_…` → `STRIPE_WEBHOOK_SECRET` v `.env.local
 2. **Konec zkušební doby:** `stripe subscriptions update sub_… --trial-end now` → `invoice.paid` → `/w/ucet` „Aktivní“, v Dokladech první doklad.
 3. **Neúspěšná platba:** v `/w/ucet` → Spravovat předplatné → změnit kartu na `4000 0000 0000 0341` (uloží se, ale platba selže) → `stripe subscriptions update sub_… --trial-end now` → pruh „Platba se nepovedla“, `/w/ucet` „Platba se nepovedla“. Úpravy dál fungují (lhůta 7 dní).
 4. **Po lhůtě:** v DB posunout `past_due_since` o 8 dní zpět, nebo nechat Stripe předplatné zrušit → pruh „Účet jde teď jen prohlížet“, mutační akce vrací hlášku.
-5. **Zrušení:** Customer Portal → Zrušit předplatné → `/w/ucet` „Předplatné jste zrušili. Skončí …“. Okamžitě: `stripe subscriptions cancel sub_…` → jen čtení, data zůstanou. „Obnovit předplatné“ otevře Checkout **bez** zkušební doby.
+5. **Zrušení účtu (R-074):** `/w/ucet` → Zrušit účet → předplatné má ve Stripe „Cancels …“, aplikace dál funguje a ukazuje „Účet se zavře“. `stripe subscriptions cancel sub_…` (simulace konce období) → webhook účet zavře (byznysy archivované, lhůta 30 dní). „Nechat účet“ před koncem období vrátí předplatné.
+6. **Zrušení předplatného:** Customer Portal → Zrušit předplatné → `/w/ucet` „Předplatné jste zrušili. Skončí …“. Okamžitě: `stripe subscriptions cancel sub_…` → jen čtení, data zůstanou. „Obnovit předplatné“ otevře Checkout **bez** zkušební doby.
 
 Na delší scénáře (obnova po měsíci, opakované pokusy o platbu) jsou v dashboardu Stripe **Test clocks**.
 

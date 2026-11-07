@@ -7,7 +7,9 @@ import { randomBytes } from 'crypto'
 // macOS v něm hledá závorku i uvnitř textu a řádek `)"` v textu by ukončil
 // substituci a spustil zbytek). Oddělovač je uvozený, náhodný a v textu se
 // nevyskytuje, takže ho text nemůže ukončit. Obsah souboru se do argumentu
-// dostane jako data, shell ho znovu nevyhodnocuje.
+// dostane jako data, shell ho znovu nevyhodnocuje. Claude Code se spouští v režimu
+// plánu: zadání odvozené z textu klienta může obsahovat pokyny pro agenta, takže
+// nic nezmění ani nespustí, dokud plán neschválí člověk.
 
 const DELIMITER_PREFIX = 'ZAKAZIQ_ZADANI_'
 
@@ -35,6 +37,6 @@ export function buildTerminalCommand(prompt: string, random?: () => string): str
     `f=$(mktemp) && cat > "$f" <<'${delimiter}'`,
     clean,
     delimiter,
-    'claude "$(cat "$f")"; rm -f "$f"',
+    'claude --permission-mode plan "$(cat "$f")"; rm -f "$f"',
   ].join('\n')
 }

@@ -236,6 +236,7 @@ Pravidla schématu:
 | 089 | RD16: rozšiřuje `message_settings_type_check` o pět ručních šablon pro zákazníky. Aplikovaná na produkci 2026-10-19 a na testovací DB |
 | 090 | RD08: `appointments.group_id`, `requests.request_services` pro pořadí služeb v jedné rezervaci a potřebné unikátní indexy. Aplikovaná na produkci 2026-10-19 a na testovací DB |
 | 091 | RD09: `sessions`, `session_attendees` a `requests.session_id` pro skupinové lekce s kapacitou 2–30 míst. Aplikovaná na produkci 2026-10-19 a na testovací DB |
+| 099 | R-077: `ws.business_by_public_slug` vrací byznys jen pro účet s aspoň jedním řádkem `ws.subscriptions` (dokončený Checkout); objednávací stránka `/r` a widget podle slugu pro nedokončenou registraci = 404. Aplikovaná: ne |
 
 ### GDPR, vzhled a PWA (S18, R-054)
 
@@ -243,7 +244,7 @@ Pravidla schématu:
 |---|---|
 | Výmaz zákazníka na žádost | akce `eraseCustomer` v `app/w/[business]/zakaznici/actions.ts` (jen majitel, i bez předplatného) → `lib/ws/gdpr.ts` → `ws.erase_customer`; v kartě zákazníka `EraseCustomer` s potvrzením jménem |
 | Export všech dat účtu | `GET /w/ucet/export` (jen majitel, 5×/h): ZIP (`lib/ws/zip.ts`, bez komprese, bez závislosti) s CSV (`lib/ws/csv.ts`, středník + BOM) a PDF faktur; PDF bez uloženého souboru se vykreslí do 40 s, zbytek vypíše `CTI-MNE.txt` |
-| Zrušení účtu | `closeAccountAction` v `app/w/ucet/actions.ts`: potvrzení názvem účtu, zruší předplatné ve Stripe hned, `ws.close_account` (výmaz za 30 dní); rušený účet `/w` i `/w/novy` přesměrují na `/w/ucet` s „Obnovit účet“ |
+| Zrušení účtu (R-074, migrace 097) | `closeAccountAction` v `app/w/ucet/actions.ts`: potvrzení názvem účtu. Běžící předplatné (`active`, `trialing`) dostane ve Stripe `cancel_at_period_end` a účet jen `ws.schedule_close_account` (`accounts.close_scheduled_at`); do konce období funguje normálně, `/w/ucet` ukáže „Účet se zavře“ s „Nechat účet“ (`keepAccountAction`, vrátí předplatné). Nezaplacené předplatné končí hned. Bez živého předplatného rovnou `ws.close_account` (výmaz za 30 dní). Dokončení: `ws.finish_scheduled_close` po každém webhooku Stripe (`lib/ws/stripe-webhook.ts`) a záložně cron `ws-gdpr` (`ws.scheduled_closings()` → znovu načíst předplatná ze Stripe → dokončit); předplatné obnovené v Portalu naplánování zruší. Zavřený účet `/w` i `/w/novy` přesměrují na `/w/ucet` s „Obnovit účet“ |
 | Denní úklid | `/api/cron/ws-gdpr` (`0 3 * * *` UTC, `CRON_SECRET`): faktury po lhůtě, smazání účtů po 30 dnech + organizace v Clerku (chyba Clerku výmaz dat nezastaví) |
 | Záznam o zpracování | `/w/ucet/zpracovani` (čl. 30 odst. 2, subzpracovatelé, historie žádostí z `ws.audit_log`: `customer.erase`, `account.export`, `account.close`, `account.reopen`) |
 | Souhlas s nabídkami | pole `marketingConsent` v API v1, políčko na `/r` a ve widgetu (předem nezaškrtnuté); jen přidává `customers.contact_consent_at`, neodvolává |
@@ -347,7 +348,7 @@ Popis API s příklady pro weby klientů: **`docs/workspace/API.md`** (zdroj pro
 | HTTP | `lib/ws/intake/http.ts`: `authenticate` (tajný klíč jen bez `Origin`, veřejný jen z `allowed_origins`; nepovolená doména jde do záznamu), `respond` (CORS jen ověřenému originu), `readJson` (64 kB), `businessBySlug` |
 | Rate limit | `lib/ws/intake/rate-limit.ts` nad `ws.rate_limits` (pevné okno, klíč = HMAC hodnoty, ne IP): 20/min na IP, 300/h na byznys, schema 120/min, objednávací stránka 8/10 min, ověření 10/10 min |
 | Routy | `app/api/public/v1/requests/route.ts` (POST, OPTIONS), `app/api/public/v1/schema/route.ts` (GET, OPTIONS; tvar `lib/ws/intake/schema.ts`, cache 60 s; `serviceId`/`serviceIds` a `staffId` zúží nabídku, odpověď obsahuje volné skupinové `sessions`) |
-| Objednávací stránka (RD07–RD09) | `app/r/layout.tsx` (Dílky, `force-dynamic`), `app/r/[slug]/page.tsx`, akce `app/r/[slug]/actions.ts` (`getOrderSlots`, `submitOrder` — byznys jen ze slugu), UI `components/ws/order/order-flow.tsx` dovolí vybrat až pět navazujících služeb nebo jednu skupinovou lekci s atomickou rezervací místa. Widget používá stejný tok přes `/r/<slug>?embed=1`. Barva byznysu přes `lib/ws/accent.ts` (jen s kontrastem ≥ 4.5 k bílé) |
+| Objednávací stránka (RD07–RD09) | `app/r/layout.tsx` (Dílky, `force-dynamic`), `app/r/[slug]/page.tsx`, akce `app/r/[slug]/actions.ts` (`getOrderSlots`, `submitOrder` — byznys jen ze slugu), UI `components/ws/order/order-flow.tsx` dovolí vybrat až pět navazujících služeb nebo jednu skupinovou lekci s atomickou rezervací místa. Widget používá stejný tok přes `/r/<slug>?embed=1`. Barva byznysu přes `lib/ws/accent.ts` (jen s kontrastem ≥ 4.5 k bílé). Jen pro účet, který dokončil Checkout (migrace 099, R-077). Chyba stránky = `app/r/error.tsx` |
 | Widget | `app/embed/[file]/route.ts` (`/embed/<slug>.js`, cache 5 min) + `app/embed/widget.css/route.ts`; zdrojáky `lib/ws/intake/widget-script.ts` a `widget-css.ts` (bez frameworku, shadow DOM, tlačítko nebo inline iframe se sandboxem, CSS jako externí zdroj; v prohlížeči není veřejný API klíč) |
 | Rámování `/r` | `proxy.ts` → `lib/ws/intake/embed-origins.ts` (povolené domény ze slugu, cache 60 s v instanci, chyba = jen `'self'`) |
 | Nastavení › Napojený web | `/w/[byznys]/nastaveni/web` (jen vlastník): prompt pro Claude Code (`lib/ws/intake/claude-prompt.ts`), tajný klíč, Ověřit napojení, odkaz + QR (PNG/SVG, `qrcode.react`), kód widgetu, povolené weby, Poslat návod webáři (`mailto:`), posledních 20 požadavků (`lib/ws/intake/log.ts`). Akce `app/w/[business]/nastaveni/web/actions.ts`, UI `components/ws/settings/web-integration.tsx`. Rozcestník `/w/[byznys]/nastaveni` |
@@ -553,6 +554,9 @@ Jak je systém v kódu (S01, R-027):
 2. Nové pravidlo (oddělení účtů, razítka, segmenty, webhooky) má test ve Vitestu.
 3. Admin stránky `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]` fungují jako předtím.
 4. UI změna: porovnat s mockupem a s pravidly Dílky, zkontrolovat šířku telefonu.
+5. CI (`.github/workflows/ci.yml`) pouští na `main`, `workspace`, `ws/**` a v PR `npx tsc --noEmit` a `npm test` (Node 24, bez secrets a DB); build dělá Vercel u každého pushe. `security.yml` běží na stejných větvích.
+6. Testy nemíchají pevná data s `now()`: termín „teď + pár dní“ narazí na pevný termín, až ten den přijde (2026-11-03 tak spadl `ws-email.test.ts`). Pevná data, nebo `now()` daleko od nich; úklid nastavení v `finally`.
+7. Chyba obrazovky mimo admin = `error.tsx` se společným `ErrorScreen` (`components/ws/error-screen.tsx`): „Zkusit znovu“ (`retry`) a odkaz na bezpečné místo, bez kódu chyby. Jsou v `app/w`, `app/w/[business]`, `app/r`, `app/z`, `app/klient`, `app/(marketing)`; kořen `app/global-error.tsx` (i pro admin, vlastní `<html>` a tokeny Dílků).
 
 ## B13. Bezpečnost
 

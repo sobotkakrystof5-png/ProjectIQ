@@ -20,14 +20,13 @@ export function Hero() {
         <div className="mx-auto max-w-[1200px] px-5 pt-10 sm:px-7 md:pt-16">
           <div className="flex max-w-[860px] flex-col items-start gap-6">
             {/* Nadpis a perex bez nájezdu — jsou LCP prvek, nesmí čekat na animaci. */}
-            <AccentHeading as="h1" size="hero" onDark accent="na svém místě.">
-              Každá poptávka
-              <br />
+            <AccentHeading as="h1" size="hero" onDark>
+              Každá poptávka na svém místě.
             </AccentHeading>
             <p className="max-w-[620px] text-[15px] font-normal leading-relaxed text-white sm:text-[17px]">
-              ZakazIQ je přehled podnikání pro malé firmy. Poptávky z webu,
-              kalendář, zákazníci a věrnostní karty, zakázky, faktury a odhad
-              daní v jedné aplikaci pro telefon i počítač.
+              Objednávka z webu se zařadí do kalendáře a vy ji potvrdíte jedním
+              klikem. Ve stejné aplikaci máte zákazníky s věrnostními kartami,
+              zakázky, faktury i odhad daní, na telefonu i na počítači.
             </p>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 animate-zq-rise [animation-delay:240ms]">
               <a

@@ -6,6 +6,7 @@
     { "path": "/api/cron/tax-news", "schedule": "0 5 * * 1" },
     { "path": "/api/cron/ws-segments", "schedule": "30 2 * * *" },
     { "path": "/api/cron/ws-email", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/ws-gdpr", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/ws-gdpr", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/client-retention", "schedule": "30 3 * * *" }
   ]
 }

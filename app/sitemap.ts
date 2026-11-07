@@ -1,11 +1,10 @@
 import type { MetadataRoute } from 'next'
-import { SITE_URL } from '@/components/marketing/seo'
+import { LEGAL_PATHS, SITE_URL } from '@/components/marketing/seo'
 
 /**
- * sitemap.xml (S05) — jen indexovatelné stránky. Právní stránky přibydou, až budou mít
- * skutečný text a zmizí jim noindex (LEGAL_ROBOTS). Bez lastModified: datum by muselo
- * odpovídat skutečné změně obsahu, ne času buildu.
+ * sitemap.xml (S05) — jen indexovatelné stránky: úvod a právní texty (R-079).
+ * Bez lastModified: datum by muselo odpovídat skutečné změně obsahu, ne času buildu.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [{ url: `${SITE_URL}/` }]
+  return [{ url: `${SITE_URL}/` }, ...LEGAL_PATHS.map((path) => ({ url: `${SITE_URL}${path}` }))]
 }

@@ -1,6 +1,6 @@
 // Obsah landing page na jednom místě (docs/landing/PROJECT-BRIEF.md § 4).
-// Údaje označené [DOPLNIT] chybí záměrně — nevymýšlet (AGENTS.md → B10). Fakta o ceně
-// a zkušební době: R-018, R-026, R-038.
+// Nevymýšlet údaje (AGENTS.md → B10). Fakta o ceně a zkušební době: R-018, R-026,
+// R-038. Provozovatel a zpracovatelé pro právní texty: legal.ts (R-079).
 
 /** E-mail podpory pro „Napište nám". Potvrdil Kryštof 2026-10-31. */
 export const SUPPORT_EMAIL = 'info@vizeon.cz'
@@ -8,8 +8,11 @@ export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`
 export const SUPPORT_LABEL = SUPPORT_EMAIL
 export const SUPPORT_FORM_HREF = '/#kontakt'
 
-/** IČO provozovatele do footeru. */
+/** IČO provozovatele (ARES, potvrdil Kryštof 2026-10-31). */
 export const COMPANY_ID = '29977231'
+
+/** Kde běží databáze: Neon eu-central-1 (Dotazy, ochrana údajů). */
+export const DATA_LOCATION = 'Databáze běží v Evropské unii, ve Frankfurtu v Německu.'
 
 /** Cesty do aplikace — přesné cesty Clerku potvrdí S07. */
 export const ROUTES = {
@@ -128,7 +131,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
   {
     q: 'Kde jsou moje data a kdo je vidí?',
-    a: 'Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. [DOPLNIT: kde jsou data uložená] Podrobnosti najdete v Ochraně údajů.',
+    a: `Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. ${DATA_LOCATION} Podrobnosti najdete v Ochraně údajů.`,
   },
   {
     q: 'Co se stane po 14 dnech?',
@@ -147,3 +150,69 @@ export const FAQ: readonly { q: string; a: string }[] = [
     a: `Napište mi na ${SUPPORT_LABEL}.`,
   },
 ]
+
+// --- Kolik vás stojí chaos (R-080) ----------------------------------------
+// Jen zveřejněná čísla s pojmenovaným zdrojem a odkazem. Bez zdroje se číslo nesmí použít.
+// Hodnoty jsou celá čísla, formát (minuty → „6 h 20 min“) řeší komponenta.
+
+export type ChaosUnit = 'minutes' | 'hours' | 'percent' | 'days'
+
+export interface ChaosStat {
+  id: string
+  /** Cílová hodnota v jednotce `unit` (minuty, hodiny, procenta, dny). */
+  target: number
+  unit: ChaosUnit
+  /** Co číslo znamená, jedna věta bez tečky na začátku. */
+  label: string
+  source: { name: string; href: string }
+}
+
+export const CHAOS_STATS: readonly ChaosStat[] = [
+  {
+    id: 'admin-tydne',
+    target: 380,
+    unit: 'minutes',
+    label: 'týdně ztratí živnostník papírováním a administrativou',
+    source: {
+      name: 'Raiffeisenbank a Mastercard',
+      href: 'https://cc.cz/podnikatele-administrativou-ztrati-az-petinu-tydne-raiffeisenbank-reaguje-specialnim-uctem/',
+    },
+  },
+  {
+    id: 'admin-rocne',
+    target: 204,
+    unit: 'hours',
+    label: 'ročně stráví freelancer administrativou. I s umělou inteligencí.',
+    source: { name: 'Smallpdf, 2026', href: 'https://contentgrip.com/freelancer-admin-ai-gap' },
+  },
+  {
+    id: 'neplati-vcas',
+    target: 40,
+    unit: 'percent',
+    label: 'zákazníků neplatí faktury včas',
+    source: {
+      name: 'Hospodářská komora ČR',
+      href: 'https://www.businessinfo.cz/clanky/hospodarska-komora-pres-40-procent-zakazniku-neplati-faktury-vcas/',
+    },
+  },
+  {
+    id: 'po-splatnosti',
+    target: 21,
+    unit: 'days',
+    label: 'po splatnosti čekají české firmy na své peníze',
+    source: {
+      name: 'EOS Payment Practices, 2025',
+      href: 'https://www.businessinfo.cz/clanky/evropskym-spolecnostem-hradi-pozde-nebo-vubec-ctvrtina-firem-se-spatnou-platebni-moralkou-se-potykaji-i-ceske-firmy/',
+    },
+  },
+  {
+    id: 'nezaplaceno',
+    target: 45,
+    unit: 'percent',
+    label: 'firem zažilo za půl roku fakturu, kterou nikdo nezaplatil',
+    source: {
+      name: 'Atradius',
+      href: 'https://www.e15.cz/finexpert/vydelavame/pruzkum-temer-kazda-firma-v-cesku-ma-nyni-zkusenost-s-opozdenymi-platbami-1391710',
+    },
+  },
+] as const

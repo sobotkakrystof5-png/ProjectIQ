@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { AccentHeading, SectionLabel } from '@/components/ws/brand'
+import { AccentHeading } from '@/components/ws/brand'
 import { FAQ, SUPPORT_LABEL, SUPPORT_MAILTO } from './content'
 
 /** Odpověď s odkazem na e-mail podpory místo holé adresy. */
@@ -23,9 +23,8 @@ export function Faq() {
     <section id="dotazy" aria-labelledby="dotazy-title" className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]">
       <div className="grid gap-10 lg:grid-cols-[4fr_7fr] lg:gap-16">
         <div className="flex flex-col gap-6 lg:sticky lg:top-28 lg:self-start">
-          <SectionLabel number="07">Dotazy</SectionLabel>
-          <AccentHeading id="dotazy-title" as="h2" size="section" accent="ptáte.">
-            Na co se
+          <AccentHeading id="dotazy-title" as="h2" size="section">
+            Než se zaregistrujete.
           </AccentHeading>
         </div>
 

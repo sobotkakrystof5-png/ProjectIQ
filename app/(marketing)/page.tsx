@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Chaos } from '@/components/marketing/chaos'
 import { Connect } from '@/components/marketing/connect'
 import { ContactSection } from '@/components/marketing/contact-section'
 import { Faq } from '@/components/marketing/faq'
@@ -39,6 +40,7 @@ export default function LandingPage() {
       <Hero />
       <main id="obsah">
         <OborMarquee />
+        <Chaos />
         <WhyBother />
         <Features />
         <HowItWorks />
