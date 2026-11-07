@@ -40,8 +40,10 @@ REVOKE ALL ON ws.account_admin_notes FROM ws_app;
 -- GDPR: denní úklid faktur a zrušených účtů (migrace 084, S18)
 GRANT EXECUTE ON FUNCTION ws.anonymize_expired_invoices() TO ws_app;
 GRANT EXECUTE ON FUNCTION ws.purge_closed_accounts() TO ws_app;
+-- Zrušení ke konci zaplaceného období (migrace 097, R-074)
+GRANT EXECUTE ON FUNCTION ws.scheduled_closings() TO ws_app;
 
--- Peníze (migrace 080 a 088). Od RD02 předpokládá skript migrace 064–091;
+-- Peníze (migrace 080 a 088). Od RD02 předpokládá skript migrace 064–091 (od R-074 i 097);
 -- ws-create-role.js dělí soubor podle středníků, bloky DO $$ sem nepatří.
 GRANT EXECUTE ON FUNCTION ws.money_issue(uuid,jsonb), ws.money_adopt_visit() TO ws_app;
 GRANT EXECUTE ON FUNCTION ws.money_pay(uuid,uuid,date,text), ws.money_unpay(uuid,uuid) TO ws_app;

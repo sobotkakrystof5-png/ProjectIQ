@@ -40,3 +40,6 @@ next-env.d.ts
 
 # graphify output
 /graphify-out/
+
+# Lokální konfigurace náhledu Claude Code
+.claude/launch.json

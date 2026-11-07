@@ -277,11 +277,17 @@ describe('nastavení a souhlas', () => {
        ON CONFLICT (business_id, type) DO UPDATE SET enabled = false`,
       [A.account, A.business],
     )
-    await notifyBookingConfirmed(scopeA, A.business, A.appointment)
-    await db.query(`UPDATE ws.appointments SET starts_at = now() + interval '2 days', ends_at = now() + interval '2 days 1 hour' WHERE id = $1`, [A.appointment])
-    await notifyBookingConfirmed(scopeA, A.business, A.appointment)
-    expect(await messages('booking_confirmed')).toHaveLength(0)
-    await db.query(`DELETE FROM ws.message_settings WHERE type = 'booking_confirmed'`)
+    try {
+      await notifyBookingConfirmed(scopeA, A.business, A.appointment)
+      // Daleko za pevnými daty ostatních testů: „teď + 2 dny“ od 2026-11-03 narazilo
+      // na termín 2026-11-05 10:00 a spadlo na EXCLUDE.
+      await db.query(`UPDATE ws.appointments SET starts_at = now() + interval '90 days', ends_at = now() + interval '90 days 1 hour' WHERE id = $1`, [A.appointment])
+      await notifyBookingConfirmed(scopeA, A.business, A.appointment)
+      expect(await messages('booking_confirmed')).toHaveLength(0)
+    } finally {
+      // Vypnutý typ nesmí zůstat pro další testy ani po selhání.
+      await db.query(`DELETE FROM ws.message_settings WHERE type = 'booking_confirmed'`)
+    }
     await notifyBookingConfirmed(scopeA, A.business, A.appointment)
     expect(await messages('booking_confirmed')).toHaveLength(1)
   })

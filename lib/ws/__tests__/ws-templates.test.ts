@@ -21,9 +21,13 @@ afterAll(async () => {
 })
 
 describe('šablony oborů', () => {
-  it('jsou všechny obory ze zadání S06 a klíče jsou unikátní', () => {
+  it('jsou všechny obory ze zadání S06 a z landing page (R-081), „Jiný obor“ poslední', () => {
     expect(INDUSTRY_TEMPLATES.map((t) => t.key)).toEqual([
       'kadernictvi-kosmetika',
+      'kavarna-restaurace',
+      'fitness-lekce',
+      'ucetni-poradci',
+      'ordinace-pece',
       'zamecnictvi',
       'studnarstvi',
       'azbest',
@@ -33,6 +37,26 @@ describe('šablony oborů', () => {
       'vlastni',
     ])
     expect(getIndustryTemplate('neznamy').key).toBe('vlastni')
+  })
+
+  it('klíče jsou unikátní a každý obor kromě „Jiný obor“ má aspoň jednu službu', () => {
+    const keys = INDUSTRY_TEMPLATES.map((t) => t.key)
+    expect(new Set(keys).size).toBe(keys.length)
+    for (const t of INDUSTRY_TEMPLATES) {
+      if (t.key === 'vlastni') continue
+      expect(t.services.length, t.label).toBeGreaterThan(0)
+      expect(t.services.length, t.label).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('obory z landing page mají slíbené kolonky (R-081)', () => {
+    const field = (key: string, label: string) => getIndustryTemplate(key).fields.find((f) => f.label === label)
+    expect(field('kavarna-restaurace', 'Počet osob')).toMatchObject({ type: 'number', required: true })
+    expect(field('kavarna-restaurace', 'Příležitost')).toMatchObject({ type: 'choice', required: false })
+    expect(getIndustryTemplate('fitness-lekce').fields).toEqual([])
+    expect(getIndustryTemplate('fitness-lekce').note).toMatch(/lekce/i)
+    expect(field('ucetni-poradci', 'O co jde')).toMatchObject({ type: 'choice', required: true })
+    expect(field('ordinace-pece', 'Co vás trápí')).toMatchObject({ type: 'text', required: false })
   })
 
   for (const t of INDUSTRY_TEMPLATES) {

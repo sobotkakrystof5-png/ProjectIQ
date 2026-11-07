@@ -349,13 +349,7 @@ export function HowItWorks() {
       aria-labelledby="jak-title"
       className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]"
     >
-      <SectionHead
-        id="jak-title"
-        number="03"
-        label="Jak to funguje"
-        title="Jedna poptávka."
-        accent="Nula přepisování."
-      />
+      <SectionHead id="jak-title" title="Od objednávky po zaplacení." />
       <div className="story-layout relative mt-10 grid items-start gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)] lg:gap-8">
         <div className="order-2 lg:order-1">
           {STEPS.map((item, i) => (
@@ -364,13 +358,8 @@ export function HowItWorks() {
               ref={(el) => {
                 markers.current[i] = el
               }}
-              className="flex min-h-[40vh] flex-col justify-center py-6 lg:min-h-[56vh] lg:py-8"
+              className="flex min-h-[30vh] flex-col justify-center py-6 lg:min-h-[40vh] lg:py-8"
             >
-              <p className="mb-3 flex items-center gap-3 font-num text-sm font-medium uppercase tracking-[0.12em] text-navy-400">
-                <span className={i === step ? 'text-signal' : undefined}>0{i + 1}</span>
-                <span>/ 04</span>
-                <span aria-hidden className="h-0 flex-1 border-t-[1.5px] border-dashed border-signal-line" />
-              </p>
               <h3 className="text-2xl font-semibold leading-tight tracking-[-0.02em]">{item.title}</h3>
               <p className="mt-3 text-[17px] leading-relaxed text-quiet">{item.text}</p>
               <button
@@ -393,9 +382,9 @@ export function HowItWorks() {
             <span aria-live="polite" className="font-semibold">
               {STEPS[step].title}
             </span>
-            <span className="font-num text-[13px] uppercase tracking-[0.08em] text-quiet">Ukázka</span>
+            <span className="text-sm text-quiet">Ukázka</span>
           </div>
-          <div id="jak-scena" className="min-h-[400px]">
+          <div id="jak-scena" className="min-h-[360px]">
             <div key={step} className={cn('animate-zq-rise', motion)}>
               {renderScene(step, fill)}
             </div>

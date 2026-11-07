@@ -6,7 +6,15 @@ import { revalidatePath } from 'next/cache'
 import { createCheckoutSession, createPortalSession, syncSubscription } from '@/lib/ws/billing'
 import { hasRole, requireWorkspace } from '@/lib/ws/context'
 import { wsDb } from '@/lib/ws/db'
-import { closeAccount, getAccountClosing, liveSubscriptionIds, reopenAccount } from '@/lib/ws/gdpr'
+import {
+  closeAccount,
+  getAccountCloseScheduled,
+  getAccountClosing,
+  liveSubscriptionIds,
+  reopenAccount,
+  scheduleCloseAccount,
+  unscheduleCloseAccount,
+} from '@/lib/ws/gdpr'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { getStripe } from '@/lib/ws/stripe'
 
@@ -54,10 +62,14 @@ export async function startCheckout(raw: unknown): Promise<Result<never>> {
 const ACCOUNT_OWNER_ONLY = 'Účet může zrušit jen jeho majitel.'
 
 /**
- * Zruší předplatné ve Stripe (nic dalšího se nezaplatí) a nastaví výmaz dat
- * za 30 dní. Potvrzuje se názvem účtu, ten porovná server.
+ * Zrušení účtu ke konci zaplaceného období (R-074): předplatné ve Stripe doběhne
+ * (nic dalšího se nezaplatí) a účet se zavře, až skončí. Nezaplacené předplatné
+ * končí hned. Bez živého předplatného se účet zavře rovnou a běží 30denní lhůta.
+ * Potvrzuje se názvem účtu, ten porovná server.
  */
-export async function closeAccountAction(raw: unknown): Promise<Result<{ deleteAfter: string }>> {
+export async function closeAccountAction(
+  raw: unknown,
+): Promise<Result<{ scheduled: true; closesAt: string | null } | { scheduled: false; deleteAfter: string }>> {
   const ctx = await requireWorkspace()
   if (!hasRole(ctx, 'owner')) return fail(ACCOUNT_OWNER_ONLY)
   const input = z.object({ confirm: z.string().trim().max(200) }).safeParse(raw)
@@ -69,21 +81,57 @@ export async function closeAccountAction(raw: unknown): Promise<Result<{ deleteA
       return fail(`Název nesedí. Napište přesně: ${acc?.name ?? 'název účtu'}`)
     }
     const existing = await getAccountClosing(ctx)
-    if (existing) return ok({ deleteAfter: existing.deleteAfter.toISOString() })
+    if (existing) return ok({ scheduled: false, deleteAfter: existing.deleteAfter.toISOString() })
 
     // Nejdřív Stripe: když selže, účet zůstane, jak byl, a jde to zkusit znovu.
+    let runsUntilPeriodEnd = false
     for (const id of await liveSubscriptionIds(ctx)) {
       const sub = await getStripe().subscriptions.retrieve(id)
-      if (sub.status !== 'canceled' && sub.status !== 'incomplete_expired') await getStripe().subscriptions.cancel(id)
+      if (sub.status === 'active' || sub.status === 'trialing') {
+        if (!sub.cancel_at_period_end) await getStripe().subscriptions.update(id, { cancel_at_period_end: true })
+        runsUntilPeriodEnd = true
+      } else if (sub.status !== 'canceled' && sub.status !== 'incomplete_expired') {
+        await getStripe().subscriptions.cancel(id)
+      }
       await syncSubscription(id)
     }
+
+    if (runsUntilPeriodEnd) {
+      if (!(await scheduleCloseAccount(ctx))) return fail('Účet se nepodařilo zrušit. Zkuste to prosím znovu.')
+      const scheduled = await getAccountCloseScheduled(ctx)
+      revalidatePath('/w', 'layout')
+      return ok({ scheduled: true, closesAt: scheduled?.closesAt?.toISOString() ?? null })
+    }
+
     const until = await closeAccount(ctx)
     if (!until) return fail('Účet se nepodařilo zrušit. Zkuste to prosím znovu.')
     revalidatePath('/w', 'layout')
-    return ok({ deleteAfter: until.toISOString() })
+    return ok({ scheduled: false, deleteAfter: until.toISOString() })
   } catch (e) {
     console.error('[ws/ucet] zrušení účtu selhalo', { accountId: ctx.accountId, error: (e as Error).message })
     return fail('Účet se nepodařilo zrušit. Zkuste to prosím za chvíli.')
+  }
+}
+
+/** Rozmyšlení před koncem období: předplatné ve Stripe zase pokračuje. */
+export async function keepAccountAction(): Promise<Result<null>> {
+  const ctx = await requireWorkspace()
+  if (!hasRole(ctx, 'owner')) return fail(ACCOUNT_OWNER_ONLY)
+  try {
+    if (!(await getAccountCloseScheduled(ctx))) return ok(null)
+    for (const id of await liveSubscriptionIds(ctx)) {
+      const sub = await getStripe().subscriptions.retrieve(id)
+      if ((sub.status === 'active' || sub.status === 'trialing') && sub.cancel_at_period_end) {
+        await getStripe().subscriptions.update(id, { cancel_at_period_end: false })
+      }
+      await syncSubscription(id)
+    }
+    await unscheduleCloseAccount(ctx)
+    revalidatePath('/w', 'layout')
+    return ok(null)
+  } catch (e) {
+    console.error('[ws/ucet] zrušení zrušení účtu selhalo', { accountId: ctx.accountId, error: (e as Error).message })
+    return fail('Nepodařilo se to. Zkuste to prosím za chvíli.')
   }
 }
 

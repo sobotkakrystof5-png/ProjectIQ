@@ -27,6 +27,8 @@ type OrderSession = OrderAvailability['sessions'][number]
 
 type Step = 'service' | 'time' | 'contact' | 'done'
 
+const STEP_LABEL: Record<Exclude<Step, 'done'>, string> = { service: 'Služba', time: 'Termín', contact: 'Kontakt' }
+
 type When = { day: string; minutes: number }
 
 const FREE_TIMES = Array.from({ length: (20 - 7) * 2 + 1 }, (_, i) => 7 * 60 + i * 30)
@@ -252,15 +254,29 @@ export function OrderFlow({
               <ChevronLeft aria-hidden size={20} strokeWidth={1.5} />
             </button>
           ) : null}
-          <ol className="flex flex-1 gap-1.5" aria-label={`Krok ${stepIndex + 1} ze ${steps.length}`}>
-            {steps.map((s, i) => (
-              <li key={s} className="h-1.5 flex-1 overflow-hidden rounded-full bg-navy-100">
-                <span
-                  className="block h-full rounded-full bg-navy-700 transition-[width] duration-200 motion-reduce:transition-none"
-                  style={{ width: i <= stepIndex ? '100%' : '0%' }}
-                />
-              </li>
-            ))}
+          <ol className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1" aria-label={`Krok ${stepIndex + 1} ze ${steps.length}`}>
+            {steps.map((s, i) => {
+              const done = i < stepIndex
+              const current = i === stepIndex
+              return (
+                <li key={s} className="flex items-center gap-2" aria-current={current ? 'step' : undefined}>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-num text-[12px] font-medium transition-colors duration-200',
+                      done || current ? 'bg-navy-700 text-white' : 'bg-navy-50 text-quiet',
+                      current && 'ring-4 ring-navy-100',
+                    )}
+                  >
+                    {done ? <Check size={14} strokeWidth={2.5} /> : i + 1}
+                  </span>
+                  <span className={cn('text-[13px] font-medium', current ? 'text-ink' : 'text-quiet', !current && 'hidden sm:inline')}>
+                    {STEP_LABEL[s as Exclude<Step, 'done'>]}
+                  </span>
+                  {i < steps.length - 1 && <span aria-hidden className="mx-1 h-px w-5 bg-navy-100 sm:w-8" />}
+                </li>
+              )
+            })}
           </ol>
         </div>
       )}
@@ -272,7 +288,8 @@ export function OrderFlow({
       )}
 
       {step !== 'done' && (selectedServices.length > 0 || chosenWhen || selectedStaffName) && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-box bg-navy-50 px-4 py-3 text-[14px] text-navy-900" aria-label="Shrnutí objednávky">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-box bg-navy-50 px-4 py-3 text-[14px] text-navy-900" aria-label="Shrnutí objednávky">
+          <span className="font-num text-[11px] font-medium uppercase tracking-[0.08em] text-quiet">Vaše volba</span>
           {selectedServices.length > 0 && <span className="font-semibold">{selectedServices.map((s) => s.name).join(' + ')}</span>}
           {Object.entries(priceByCurrency).map(([currency, amount]) => (
             <span key={currency} className="font-num">{formatMoney(amount, { currency: currency as WsCurrency })}</span>
@@ -307,16 +324,26 @@ export function OrderFlow({
                           setError(null)
                         }}
                         className={cn(
-                          'flex min-h-[64px] w-full items-center justify-between gap-4 rounded-box border px-5 py-3 text-left transition-colors',
+                          'group flex min-h-[64px] w-full items-center gap-4 rounded-box border px-4 py-3 text-left transition-colors duration-200 ease-zq sm:px-5',
                           active ? 'border-navy-700 bg-navy-50' : 'border-navy-100 bg-surface hover:border-navy-300',
+                          'disabled:cursor-not-allowed disabled:opacity-50',
                         )}
                       >
-                        <span className="flex flex-col">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-200',
+                            active ? 'border-navy-700 bg-navy-700 text-white' : 'border-navy-200 bg-surface group-hover:border-navy-400',
+                          )}
+                        >
+                          {active && <Check size={14} strokeWidth={2.5} />}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col">
                           <span className="text-[16px] font-semibold text-ink">{s.name}</span>
                           <span className="font-num text-[13px] text-quiet">{s.durationMin} min</span>
                         </span>
                         {s.price !== null && (
-                          <span className="font-num text-[15px] font-medium text-ink">
+                          <span className="shrink-0 font-num text-[15px] font-medium text-ink">
                             {formatMoney(s.price, { currency: (s.currency as WsCurrency) ?? 'CZK' })}
                           </span>
                         )}
@@ -386,7 +413,7 @@ export function OrderFlow({
                         ))}
                       </div>
                       {activeDay?.times.length ? (
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label="Čas">
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5" role="group" aria-label="Čas">
                           {activeDay.times.map((t) => (
                             <Pill
                               key={t.minutes}
@@ -562,16 +589,40 @@ export function OrderFlow({
           )}
 
           {step === 'done' && (
-            <div className="ws-order-step-in flex flex-col items-start gap-4 rounded-panel bg-surface p-6">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-navy-700 text-white">
-                <Check aria-hidden size={24} strokeWidth={2} />
+            <div className="ws-order-step-in flex flex-col items-start gap-5">
+              <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-navy-700 text-white">
+                <Check aria-hidden size={28} strokeWidth={2} />
               </span>
-              <h2 ref={stepHeading} tabIndex={-1} className="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em] focus:outline-none">Poptávka je odeslaná</h2>
-              <p className="text-[16px] text-quiet">
-                {chosenWhen
-                  ? `Termín ${formatDayShort(chosenWhen.day)} v ${formatMinutes(chosenWhen.minutes)} zatím čeká na potvrzení firmy.`
-                  : 'Firma vaši poptávku dostala a ozve se vám.'}
-              </p>
+              <div className="flex flex-col gap-2">
+                <h2 ref={stepHeading} tabIndex={-1} className="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em] focus:outline-none sm:text-[30px]">Poptávka je odeslaná</h2>
+                <p className="max-w-[46ch] text-[16px] leading-relaxed text-quiet">
+                  {chosenWhen
+                    ? `Termín ${formatDayShort(chosenWhen.day)} v ${formatMinutes(chosenWhen.minutes)} zatím čeká na potvrzení firmy ${businessName}. Potvrzení přijde e-mailem.`
+                    : `Firma ${businessName} vaši poptávku dostala a ozve se vám.`}
+                </p>
+              </div>
+              {(selectedServices.length > 0 || chosenWhen) && (
+                <dl className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2 rounded-box bg-navy-50 px-4 py-3 text-[15px] text-navy-900">
+                  {selectedServices.length > 0 && (
+                    <>
+                      <dt className="text-quiet">Služba</dt>
+                      <dd className="font-semibold">{selectedServices.map((s) => s.name).join(' + ')}</dd>
+                    </>
+                  )}
+                  {chosenWhen && (
+                    <>
+                      <dt className="text-quiet">Termín</dt>
+                      <dd className="font-num">{formatDayShort(chosenWhen.day)} v {formatMinutes(chosenWhen.minutes)}{durationMin ? `, ${durationMin} min` : ''}</dd>
+                    </>
+                  )}
+                  {selectedStaffName && (
+                    <>
+                      <dt className="text-quiet">Kdo</dt>
+                      <dd>{selectedStaffName}</dd>
+                    </>
+                  )}
+                </dl>
+              )}
               {chosenWhen && (
                 <Button variant="outline" onClick={() => downloadTentativeCalendar({
                   day: chosenWhen.day,

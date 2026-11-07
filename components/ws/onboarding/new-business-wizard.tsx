@@ -3,7 +3,22 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOrganizationList } from '@clerk/nextjs'
-import { Biohazard, Car, Check, Droplets, HardHat, KeyRound, Scissors, Shapes, Sparkles, type LucideIcon } from 'lucide-react'
+import {
+  Biohazard,
+  Calculator,
+  Car,
+  Check,
+  Coffee,
+  Droplets,
+  Dumbbell,
+  HardHat,
+  KeyRound,
+  Scissors,
+  Shapes,
+  Sparkles,
+  Stethoscope,
+  type LucideIcon,
+} from 'lucide-react'
 import { AccentHeading, SectionLabel } from '@/components/ws/brand'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +34,8 @@ export type IndustrySummary = {
   label: string
   /** Funkce zapnuté navíc, obyčejnými slovy („kalendář, zakázky“). */
   modules: string
+  /** Věta navíc k oboru (lekce s kapacitou, navržený čas), nebo null. */
+  note: string | null
   stages: { name: string; type: StageType }[]
   fields: { label: string; type: FieldType }[]
   services: string[]
@@ -26,6 +43,10 @@ export type IndustrySummary = {
 
 const ICONS: Record<IndustryKey, LucideIcon> = {
   'kadernictvi-kosmetika': Scissors,
+  'kavarna-restaurace': Coffee,
+  'fitness-lekce': Dumbbell,
+  'ucetni-poradci': Calculator,
+  'ordinace-pece': Stethoscope,
   zamecnictvi: KeyRound,
   studnarstvi: Droplets,
   azbest: Biohazard,
@@ -199,6 +220,8 @@ function Preview({ industry }: { industry: IndustrySummary }) {
   const stages = industry.stages.filter((s) => s.type !== 'cancelled')
   return (
     <div className="flex flex-col gap-6">
+      {industry.note && <p className="text-[13px] leading-relaxed text-quiet">{industry.note}</p>}
+
       <div className="flex flex-col gap-2">
         <h3 className="text-[13px] font-semibold">Stavy zakázky</h3>
         <ul className="flex flex-wrap gap-1.5">

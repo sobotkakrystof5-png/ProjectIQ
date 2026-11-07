@@ -1,0 +1,30 @@
+# Kontrola kódu: typy a testy (Vitest + PGlite, bez přístupu k databázi a bez
+# secrets). Build dělá Vercel u každého pushe (Preview), proto tu není.
+# Pravidla ověření: AGENTS.md → B12.
+
+name: ci
+
+on:
+  push:
+    branches: [main, workspace, 'ws/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
