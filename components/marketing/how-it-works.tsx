@@ -358,7 +358,7 @@ export function HowItWorks() {
               ref={(el) => {
                 markers.current[i] = el
               }}
-              className="flex min-h-[40vh] flex-col justify-center py-6 lg:min-h-[56vh] lg:py-8"
+              className="flex min-h-[30vh] flex-col justify-center py-6 lg:min-h-[40vh] lg:py-8"
             >
               <h3 className="text-2xl font-semibold leading-tight tracking-[-0.02em]">{item.title}</h3>
               <p className="mt-3 text-[17px] leading-relaxed text-quiet">{item.text}</p>
@@ -384,7 +384,7 @@ export function HowItWorks() {
             </span>
             <span className="text-sm text-quiet">Ukázka</span>
           </div>
-          <div id="jak-scena" className="min-h-[400px]">
+          <div id="jak-scena" className="min-h-[360px]">
             <div key={step} className={cn('animate-zq-rise', motion)}>
               {renderScene(step, fill)}
             </div>

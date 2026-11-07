@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
 import { AccentHeading } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
-import { CTA_LABEL, PRICE_INCLUDES, ROUTES } from './content'
+import { CTA_LABEL, PRICE_INCLUDES, PRICE_PER_DAY_LABEL, ROUTES } from './content'
 
 /** Statické pole dílků 56 px za cenou: každý pátý plný, ostatní jen obrys (LP-D). */
 function PriceTiles() {
@@ -35,6 +35,7 @@ export function Pricing() {
                 <span className="font-num text-white">Kč</span> / měsíc
               </span>
             </p>
+            <p className="font-num text-[15px] text-navy-300">To je {PRICE_PER_DAY_LABEL}.</p>
             <p className="max-w-[420px] text-base leading-relaxed text-navy-200">
               Konečná cena, nic se nepřipočítává. Kartu zadáte při registraci; první platba proběhne až po 14 dnech.
               Zrušíte kdykoli.

@@ -51,7 +51,7 @@ Tohle je nejdůležitější část zadání a platí pro každé rozhodnutí n�
 
 **Cena:** 249 Kč měsíčně, konečná cena bez DPH navíc (R-018). Prvních 14 dní zdarma, karta se zadává při registraci (R-038, nahradilo R-019). V ceně 1 byznys a neomezeně pracovníků, všechny funkce (R-026).
 
-**Obory** (pás oborů, šablony): Kadeřnictví, Kosmetika, Zámečnictví, Studnařství, Likvidace azbestu, Autoservis, Úklid, Stavba a řemesla.
+**Obory** (pás oborů, R-080): kadeřnictví, kosmetika a nehty, barbershop, masáže a wellness, kavárny, restaurace, fitness a lekce, účetní, poradci a lektoři, ordinace a fyzio, veterina, fotografové, autoservis, zámečnictví, úklid, stavba a řemesla, studnařství, likvidace azbestu. Šablony se službami existují jen pro kadeřnictví a kosmetiku, zámečnictví, studnařství, azbest, autoservis, úklid a stavbu (`lib/ws/templates`); texty říkají, že ostatní si služby napíšou sami.
 
 **Cíl stránky:** registrace (`/w/registrace`). Jedna hlavní akce na celé stránce: „Vyzkoušet 14 dní zdarma“. Vedlejší cesta je kontakt na podporu, pro lidi, kteří se chtějí nejdřív zeptat. Podmínky u CTA vždy jasně uvádějí kartu při registraci, první platbu po 14 dnech, cenu 249 Kč měsíčně a možnost kdykoli zrušit.
 
@@ -124,15 +124,19 @@ Pořadí: LP-D + sekce Proč to řešit (R-031). Čísla sekcí jsou proto posun
 
 ```
 Hlavička (v hero)
-Hero „Každá poptávka na svém místě.“ + střídmý motiv dílků + ovladatelný příběh v kalendáři
-Pás oborů
-01 Proč to řešit            (nové oproti LP-D)
+Hero „Každá poptávka na svém místě.“ + střídmý motiv dílků + ukázka v kalendáři s kroky jako kartami (R-080)
+Pás oborů (18 oborů, R-080)
+Pro koho                    (#pro-koho, R-080: přepínač šesti oborů s výřezem objednávky)
+01 Proč to řešit            (nové oproti LP-D; jedna tmavá + tři světlé karty, R-080)
 02 Co to umí                (#funkce)
 03 Jak to funguje           (#jak-to-funguje)
 04 Funkce: Zapněte si jen to, co použijete
+Srovnání                    (#srovnani, R-080: diář a telefon × ZakazIQ, bez čísel)
 05 Napojení na váš web      (#napojeni)
-06 Ceník                    (#cenik)
+Začátek                     (#zacatek, R-080: tři kroky po registraci + vzkaz zakladatele)
+06 Ceník                    (#cenik, s přepočtem „asi 8 Kč na den“)
 07 Dotazy                   (#dotazy)
+Kontakt                     (#kontakt)
 Footer s výzvou a odkazem Admin
 ```
 
