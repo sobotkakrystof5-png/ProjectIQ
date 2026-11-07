@@ -51,7 +51,7 @@ Tohle je nejdůležitější část zadání a platí pro každé rozhodnutí n�
 
 **Cena:** 249 Kč měsíčně, konečná cena bez DPH navíc (R-018). Prvních 14 dní zdarma, karta se zadává při registraci (R-038, nahradilo R-019). V ceně 1 byznys a neomezeně pracovníků, všechny funkce (R-026).
 
-**Obory** (pás oborů, R-080): kadeřnictví, kosmetika a nehty, barbershop, masáže a wellness, kavárny, restaurace, fitness a lekce, účetní, poradci a lektoři, ordinace a fyzio, veterina, fotografové, autoservis, zámečnictví, úklid, stavba a řemesla, studnařství, likvidace azbestu. Šablony se službami existují jen pro kadeřnictví a kosmetiku, zámečnictví, studnařství, azbest, autoservis, úklid a stavbu (`lib/ws/templates`); texty říkají, že ostatní si služby napíšou sami.
+**Obory** (pás oborů, R-080): kadeřnictví, kosmetika a nehty, barbershop, masáže a wellness, kavárny, restaurace, fitness a lekce, účetní, poradci a lektoři, ordinace a fyzio, veterina, fotografové, autoservis, zámečnictví, úklid, stavba a řemesla, studnařství, likvidace azbestu. Šablony se službami a kolonkami (`lib/ws/templates`, R-081) pokrývají všech šest oborů ze sekce Pro koho: kadeřnictví a kosmetiku, kavárny a restaurace, fitness a lekce, účetní a poradce, ordinace a péči, a řemesla (zámečnictví, studnařství, azbest, autoservis, úklid, stavba); obory mimo nabídku si služby napíšou sami („Jiný obor“).
 
 **Cíl stránky:** registrace (`/w/registrace`). Jedna hlavní akce na celé stránce: „Vyzkoušet 14 dní zdarma“. Vedlejší cesta je kontakt na podporu, pro lidi, kteří se chtějí nejdřív zeptat. Podmínky u CTA vždy jasně uvádějí kartu při registraci, první platbu po 14 dnech, cenu 249 Kč měsíčně a možnost kdykoli zrušit.
 

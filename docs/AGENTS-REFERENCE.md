@@ -194,7 +194,7 @@ Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind C
 | Cesty | `lib/ws/paths.ts` — `/w`, `/w/prihlaseni`, `/w/registrace`, `/w/novy` (bez závislostí, importuje i proxy) |
 | Založení účtu | `lib/ws/onboarding.ts`: `createAccountWithBusiness()` — účet, vlastník, byznys a šablona oboru v jedné transakci pod RLS s nově vygenerovaným `account_id`; obsazený slug zkusí s koncovkou, existující organizace vrátí její účet; `accountIdForOrg()`, `slugify()` |
 | Výsledek akcí | `lib/ws/result.ts` (`ok`, `fail`, `Result<T>`) |
-| Šablony oborů | `lib/ws/templates/` — 8 oborů, `templateSeedQueries()` naplní nový byznys (funkce, služby bez cen, kolonky, stavy, hranice skupin, vypnutá věrnost) |
+| Šablony oborů | `lib/ws/templates/` — 12 oborů (R-081), `templateSeedQueries()` naplní nový byznys (funkce, služby bez cen, kolonky, stavy, hranice skupin, vypnutá věrnost) |
 | Testy | `lib/ws/__tests__/ws-*.test.ts` proti PGlite (R-036) |
 
 Pravidla schématu:

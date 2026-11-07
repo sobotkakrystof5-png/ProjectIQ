@@ -238,7 +238,7 @@ export const COMPARE: readonly { what: string; before: string; after: string }[]
 
 /** Obory s připravenými službami a kolonkami (lib/ws/templates). Ostatní si služby napíšou sami. */
 export const TEMPLATE_INDUSTRIES =
-  'kadeřnictví a kosmetiku, zámečnictví, studnařství, likvidaci azbestu, autoservis, úklid a stavbu'
+  'kadeřnictví a kosmetiku, kavárny a restaurace, fitness a lekce, účetní a poradce, ordinace a péči, zámečnictví, studnařství, likvidaci azbestu, autoservis, úklid a stavbu'
 
 export const START_STEPS = [
   {
@@ -333,7 +333,7 @@ export const CONNECT_SLUG = 'kadernictvi-lenka'
 export const FAQ: readonly { q: string; a: string }[] = [
   {
     q: 'Musím umět s počítačem?',
-    a: 'Ne. Když zvládnete e-mail v telefonu, zvládnete i ZakazIQ. Po registraci vyberete obor; pro některé obory jsou služby a kolonky připravené, jinak si je napíšete sami.',
+    a: 'Ne. Když zvládnete e-mail v telefonu, zvládnete i ZakazIQ. Po registraci vyberete obor a služby, kolonky i stavy zakázek máte připravené. Cokoli z toho si pak upravíte, a když váš obor v nabídce není, napíšete si služby sami.',
   },
   {
     q: 'Jak napojím svůj web?',

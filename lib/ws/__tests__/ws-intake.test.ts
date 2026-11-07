@@ -84,7 +84,7 @@ beforeAll(async () => {
 afterAll(async () => {
   setWsDriverForTests(null)
   await db.close()
-})
+}, 60_000)
 
 const valid = (extra: Record<string, unknown> = {}) => ({
   name: 'Tereza Testová',

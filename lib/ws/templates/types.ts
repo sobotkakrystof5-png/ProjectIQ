@@ -27,6 +27,10 @@ export type StageType = 'new' | 'in_progress' | 'done' | 'paid' | 'cancelled'
 
 export type IndustryKey =
   | 'kadernictvi-kosmetika'
+  | 'kavarna-restaurace'
+  | 'fitness-lekce'
+  | 'ucetni-poradci'
+  | 'ordinace-pece'
   | 'zamecnictvi'
   | 'studnarstvi'
   | 'azbest'
@@ -70,6 +74,8 @@ export type IndustryTemplate = {
   key: IndustryKey
   /** Název oboru v průvodci Nový byznys. */
   label: string
+  /** Jedna až dvě věty pro náhled v průvodci — jen tam, kde šablona sama nenapoví, jak s ní pracovat. */
+  note?: string
   /** Zapnuté funkce navíc k Poptávkám a Zákazníkům. */
   modules: WsModule[]
   services: TemplateService[]

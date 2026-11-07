@@ -21,6 +21,7 @@ function summary(t: IndustryTemplate): IndustrySummary {
     key: t.key,
     label: t.label,
     modules: modules.length > 0 ? modules.join(', ') : 'poptávky a zákazníci',
+    note: t.note ?? null,
     stages: t.stages.map((s) => ({ name: s.name, type: s.type })),
     fields: t.fields.map((f) => ({ label: f.label, type: f.type })),
     services: t.services.map((s) => s.name),

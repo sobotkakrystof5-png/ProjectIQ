@@ -19,7 +19,7 @@ const biz={id:A.business}
 const party={name:'Firma s háčky',address:'Ulice 1, Praha',ico:'12345678',dic:'',bank:'123/0800',email:'test@example.cz'}
 const input=(patch:Partial<IssueInput>={}):IssueInput=>({slug:'byznys-a',issuer:{...party,vatPayer:false},counterparty:party,jobId:null,customerId:A.customer,
  issuedOn:'2026-10-10',suppliedOn:'2026-10-10',dueOn:'2026-10-24',currency:'CZK',items:[{description:'Služba',quantity:1,unitPrice:1000,vatRate:0}],note:'',...patch})
-beforeAll(async()=>{({db}=await createWsTestDb());setWsDriverForTests(pgliteDriver(db))},30000)
+beforeAll(async()=>{({db}=await createWsTestDb());setWsDriverForTests(pgliteDriver(db))},60_000)
 afterAll(async()=>{setWsDriverForTests(null);await db?.close()})
 describe('Peníze: částky a sazby',()=>{
  it('měny zůstávají oddělené, haléře se neztratí',()=>{
