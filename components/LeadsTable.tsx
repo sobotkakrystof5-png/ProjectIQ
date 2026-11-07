@@ -1,11 +1,13 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote, ListChecks } from 'lucide-react'
 import { toast } from 'sonner'
 import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
+import { CallScriptPanel } from '@/components/CallScriptPanel'
+import type { CallStats } from '@/lib/call-script'
 import { whatsappHref, formatDate } from '@/lib/utils'
 import {
   LEAD_STATUS_LABELS,
@@ -334,11 +336,16 @@ function ContactCell({ lead }: { lead: ClientLead }) {
   )
 }
 
-function PhoneCell({ lead }: { lead: ClientLead }) {
+function PhoneCell({ lead, onCall }: { lead: ClientLead; onCall?: () => void }) {
   return (
     <td className="px-3 py-2.5">
       {lead.phone && (
-        <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline">
+        <a
+          href={`tel:${lead.phone}`}
+          onClick={onCall}
+          title={onCall ? 'Zavolat a otevřít oporu pro hovor' : undefined}
+          className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline"
+        >
           <Phone size={12} strokeWidth={1.5} />
           {lead.phone}
         </a>
@@ -392,6 +399,7 @@ function LeadRow({
   onToggleAnswered,
   onSendPortfolio,
   onOpenCustomMessage,
+  onStartCall,
   onAddNote,
   onDeleteNote,
   isPending,
@@ -408,6 +416,7 @@ function LeadRow({
   onToggleAnswered: (val: boolean | null) => void
   onSendPortfolio: () => void
   onOpenCustomMessage: () => void
+  onStartCall: () => void
   onAddNote: (content: string) => void
   onDeleteNote: (id: string) => void
   isPending: boolean
@@ -437,7 +446,7 @@ function LeadRow({
     >
       <CompanyCell lead={lead} expanded={expanded} onToggleExpand={onToggleExpand} notes={notes} />
       <ContactCell lead={lead} />
-      <PhoneCell lead={lead} />
+      <PhoneCell lead={lead} onCall={onStartCall} />
       <td className="px-3 py-2.5">
         <CallAnsweredToggle
           answered={lead.call_answered}
@@ -473,6 +482,13 @@ function LeadRow({
       <ValueCell lead={lead} />
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1">
+          <button
+            onClick={onStartCall}
+            title="Opora pro hovor"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors"
+          >
+            <ListChecks size={13} strokeWidth={1.5} />
+          </button>
           {lead.email && lead.next_action_date && (
             <button
               onClick={onSendPortfolio}
@@ -834,10 +850,12 @@ export default function LeadsTable({
   initialLeads,
   initialNotes,
   focusLeadId,
+  callStats,
 }: {
   initialLeads: ClientLead[]
   initialNotes: LeadNote[]
   focusLeadId?: string
+  callStats: CallStats
 }) {
   const [leads, setLeads] = useState<ClientLead[]>(initialLeads)
   const [notes, setNotes] = useState<LeadNote[]>(initialNotes)
@@ -845,6 +863,14 @@ export default function LeadsTable({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
   const [portfolioModalLead, setPortfolioModalLead] = useState<ClientLead | null>(null)
+  // Opora pro hovor: otevřená bez kontaktu (obecný hovor) nebo pro konkrétní kontakt.
+  const [callOpen, setCallOpen] = useState(false)
+  const [callLeadId, setCallLeadId] = useState<string | null>(null)
+  const callLead = callLeadId ? leads.find(l => l.id === callLeadId) ?? null : null
+  const startCall = (leadId: string | null) => {
+    setCallLeadId(leadId)
+    setCallOpen(true)
+  }
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -996,14 +1022,23 @@ export default function LeadsTable({
               )}
             </p>
           </div>
-          <button
-            onClick={() => { setAddingNew(true); setEditingId(null) }}
-            disabled={addingNew}
-            className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-          >
-            <Plus size={14} />
-            Přidat kontakt
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => startCall(null)}
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-border bg-white text-foreground hover:border-brand-300 hover:text-brand-700 transition-colors"
+            >
+              <ListChecks size={14} strokeWidth={1.5} />
+              Opora pro hovor
+            </button>
+            <button
+              onClick={() => { setAddingNew(true); setEditingId(null) }}
+              disabled={addingNew}
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+            >
+              <Plus size={14} />
+              Přidat kontakt
+            </button>
+          </div>
         </div>
 
         <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
@@ -1074,6 +1109,7 @@ export default function LeadsTable({
                       onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
                       onSendPortfolio={() => handleSendPortfolio(lead.id)}
                       onOpenCustomMessage={() => setPortfolioModalLead(lead)}
+                      onStartCall={() => startCall(lead.id)}
                       onAddNote={(content) => handleAddNote(lead.id, content)}
                       onDeleteNote={handleDeleteNote}
                       isPending={isPending}
@@ -1169,6 +1205,16 @@ export default function LeadsTable({
           </div>
         </div>
       </div>
+
+      <CallScriptPanel
+        open={callOpen}
+        lead={callLead}
+        stats={callStats}
+        onClose={() => setCallOpen(false)}
+        onAddNote={(content) => callLead && handleAddNote(callLead.id, content)}
+        onSendPortfolio={() => callLead && setPortfolioModalLead(callLead)}
+        isPending={isPending}
+      />
 
       <PortfolioEmailModal
         isOpen={!!portfolioModalLead}

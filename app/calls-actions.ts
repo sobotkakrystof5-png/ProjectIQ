@@ -10,6 +10,7 @@ import { notifyClientOfProjectChange } from '@/app/actions'
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import type { ClientLead, LeadNote, LeadStatus, LeadActionType } from '@/lib/types'
+import type { CallStats } from '@/lib/call-script'
 
 export type LeadPayload = {
   company_name: string
@@ -229,4 +230,40 @@ export async function sendCustomLeadEmail(
 
   await markPortfolioSent(leadId)
   return { success: true }
+}
+
+// Čísla pro oporu pro hovor (krok Statistiky) — jen ze skutečných dat, nic odhadnutého.
+export async function getCallStats(): Promise<CallStats> {
+  const empty: CallStats = { completedProjects: 0, surveyCount: 0, avgRating: null, reference: null }
+  const session = await getServerSession(authOptions)
+  if (!session) return empty
+
+  const [countRows, ratingRows, referenceRows] = await Promise.all([
+    sql`SELECT count(*)::int AS count FROM completed_projects WHERE project_type = 'client'`,
+    sql`
+      SELECT
+        count(*)::int AS count,
+        round(avg((rating_cooperation + rating_speed + rating_design
+                 + rating_functionality + rating_reliability + rating_flexibility) / 6.0), 1)::float AS avg
+      FROM project_surveys
+    `,
+    sql`
+      SELECT s.reference_text, COALESCE(NULLIF(cp.company, ''), NULLIF(cp.client_name, '')) AS author
+      FROM project_surveys s
+      JOIN completed_projects cp ON cp.id = s.completed_project_id
+      WHERE s.consent AND length(trim(coalesce(s.reference_text, ''))) > 0
+      ORDER BY s.created_at DESC
+      LIMIT 1
+    `,
+  ])
+
+  const rating = ratingRows[0] as { count: number; avg: number | null }
+  const ref = referenceRows[0] as { reference_text: string; author: string | null } | undefined
+
+  return {
+    completedProjects: (countRows[0] as { count: number }).count,
+    surveyCount: rating.count,
+    avgRating: rating.count > 0 ? rating.avg : null,
+    reference: ref ? { text: ref.reference_text.trim(), author: ref.author } : null,
+  }
 }

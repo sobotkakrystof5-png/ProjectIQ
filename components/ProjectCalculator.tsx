@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Plus, Trash2, Copy, Check, Calculator, Briefcase, Layers } from 'lucide-react'
+import { CLIENT_PRESETS } from '@/lib/vizeon-pricing'
 
 type CalcType = 'client' | 'personal'
 
@@ -9,40 +10,6 @@ type Preset = {
   label: string
   items: { name: string; price: number }[]
 }
-
-// VIZEON ceník — zakázky pro klienty
-const CLIENT_PRESETS: Preset[] = [
-  {
-    label: 'Online Vizitka',
-    items: [
-      { name: 'Online Vizitka (web)', price: 7499 },
-    ],
-  },
-  {
-    label: 'Promo Page',
-    items: [
-      { name: 'Promo Page (web)', price: 9999 },
-    ],
-  },
-  {
-    label: 'Pro Web',
-    items: [
-      { name: 'Pro Web (kompletní web)', price: 14999 },
-    ],
-  },
-  {
-    label: 'Slide Deck Standard',
-    items: [
-      { name: 'Slide Deck Standard (prezentace)', price: 1099 },
-    ],
-  },
-  {
-    label: 'Slide Deck Premium',
-    items: [
-      { name: 'Slide Deck Premium (prezentace)', price: 3499 },
-    ],
-  },
-]
 
 const CLIENT_ADDONS = [
   { name: 'Brand Logo', price: 699 },
