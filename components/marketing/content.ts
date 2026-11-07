@@ -150,3 +150,69 @@ export const FAQ: readonly { q: string; a: string }[] = [
     a: `Napište mi na ${SUPPORT_LABEL}.`,
   },
 ]
+
+// --- Kolik vás stojí chaos (R-080) ----------------------------------------
+// Jen zveřejněná čísla s pojmenovaným zdrojem a odkazem. Bez zdroje se číslo nesmí použít.
+// Hodnoty jsou celá čísla, formát (minuty → „6 h 20 min“) řeší komponenta.
+
+export type ChaosUnit = 'minutes' | 'hours' | 'percent' | 'days'
+
+export interface ChaosStat {
+  id: string
+  /** Cílová hodnota v jednotce `unit` (minuty, hodiny, procenta, dny). */
+  target: number
+  unit: ChaosUnit
+  /** Co číslo znamená, jedna věta bez tečky na začátku. */
+  label: string
+  source: { name: string; href: string }
+}
+
+export const CHAOS_STATS: readonly ChaosStat[] = [
+  {
+    id: 'admin-tydne',
+    target: 380,
+    unit: 'minutes',
+    label: 'týdně ztratí živnostník papírováním a administrativou',
+    source: {
+      name: 'Raiffeisenbank a Mastercard',
+      href: 'https://cc.cz/podnikatele-administrativou-ztrati-az-petinu-tydne-raiffeisenbank-reaguje-specialnim-uctem/',
+    },
+  },
+  {
+    id: 'admin-rocne',
+    target: 204,
+    unit: 'hours',
+    label: 'ročně stráví freelancer administrativou. I s umělou inteligencí.',
+    source: { name: 'Smallpdf, 2026', href: 'https://contentgrip.com/freelancer-admin-ai-gap' },
+  },
+  {
+    id: 'neplati-vcas',
+    target: 40,
+    unit: 'percent',
+    label: 'zákazníků neplatí faktury včas',
+    source: {
+      name: 'Hospodářská komora ČR',
+      href: 'https://www.businessinfo.cz/clanky/hospodarska-komora-pres-40-procent-zakazniku-neplati-faktury-vcas/',
+    },
+  },
+  {
+    id: 'po-splatnosti',
+    target: 21,
+    unit: 'days',
+    label: 'po splatnosti čekají české firmy na své peníze',
+    source: {
+      name: 'EOS Payment Practices, 2025',
+      href: 'https://www.businessinfo.cz/clanky/evropskym-spolecnostem-hradi-pozde-nebo-vubec-ctvrtina-firem-se-spatnou-platebni-moralkou-se-potykaji-i-ceske-firmy/',
+    },
+  },
+  {
+    id: 'nezaplaceno',
+    target: 45,
+    unit: 'percent',
+    label: 'firem zažilo za půl roku fakturu, kterou nikdo nezaplatil',
+    source: {
+      name: 'Atradius',
+      href: 'https://www.e15.cz/finexpert/vydelavame/pruzkum-temer-kazda-firma-v-cesku-ma-nyni-zkusenost-s-opozdenymi-platbami-1391710',
+    },
+  },
+] as const

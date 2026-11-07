@@ -39,6 +39,10 @@ The current plan includes these functions, one business and an unlimited number 
 - Describe a request as pending until the owner confirms it. Describe income only after payment is recorded.
 - Do not promise a feature, integration or legal/compliance outcome beyond the current product plan.
 
+## Landing page story
+
+The public landing page tells one story: first the chaos (a business run from a phone, a diary, a spreadsheet, email and a paper note, backed by published statistics with a named source), then the question "do you recognise yourself?", then ZakazIQ as the one place for all of it. Statistics on the page must come from a named published source with a link; the product never claims its own numbers (time saved, income gained).
+
 ## Product surfaces
 
 - The public landing page explains the product and its pricing.

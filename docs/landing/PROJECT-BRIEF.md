@@ -126,6 +126,7 @@ Pořadí: LP-D + sekce Proč to řešit (R-031). Čísla sekcí jsou proto posun
 Hlavička (v hero)
 Hero „Každá poptávka na svém místě.“ + střídmý motiv dílků + ovladatelný příběh v kalendáři
 Pás oborů
+00 Kolik vás stojí chaos    (#chaos, R-080, nové 2026-11-07)
 01 Proč to řešit            (nové oproti LP-D)
 02 Co to umí                (#funkce)
 03 Jak to funguje           (#jak-to-funguje)
@@ -171,6 +172,15 @@ Texty níže jsou návrh (prošly `zakaziq-ux-texty-cs` a `humanize-text-cs`). S
 
 Úzký světlý pás těsně pod přetékající ukázkou. Nekonečně běžící řada oborů se znakem 2×2 jako odrážkou: Kadeřnictví · Kosmetika · Zámečnictví · Studnařství · Likvidace azbestu · Autoservis · Úklid · Stavba a řemesla. CSS `zq-marquee`, při hoveru se zastaví, při `prefers-reduced-motion` stojí a zalomí se do řádků. Pro čtečky jeden seznam (`aria-label="Obory"`), duplikát smyčky `aria-hidden`.
 
+### 4.2b 00 Kolik vás stojí chaos (`#chaos`), nová sekce (R-080, 2026-11-07)
+
+Obchodní příběh stránky od 2026-11-07: **nejdřív chaos, pak řešení** (postup jako u představení produktu na pódiu). Sekce je první v `<main>`, hned pod pásem oborů, a vede do „Den, kdy máte plné ruce“.
+
+- **H2:** „Kolik vás stojí chaos.“ Text: „Firma na pěti místech: telefon, diář, tabulka, e-mail a papírek na pultu. Takhle to vypadá v číslech z průzkumů. Zdroj je pod každým z nich.“
+- **Scéna** (tmavý panel `navy-950` s polem dílků, `rounded-slab`). Na šířce od 1024 px je přichycená pod hlavičkou a řídí ji posun stránky (`components/marketing/chaos.tsx`, `ScrubStage`, dráha 380 vh): pět karet s čísly „skočí“ na scénu jedna po druhé (keyframe `zq-slam`, číslo doběhne za 900 ms), rozházené a natočené. Pak se karty ztlumí a uprostřed se objeví **„Poznáváte se?“** („Telefon, diář, tabulka, e-mail a papírek na pultu. Každá z těch věcí funguje. Dohromady ne. A čas, který mezi nimi ztratíte, vám nikdo nezaplatí.“). Nakonec se karty sesypou za jednu kartu ZakazIQ (ukázka „dnes“: 2 nové poptávky, 5 termínů, faktura 1 850 Kč, připomínka odešla sama) a vlevo je **„Představujeme ZakazIQ.“** + text + tlačítko „Vyzkoušet 14 dní zdarma“. Na telefonu a při `prefers-reduced-motion` je to obyčejný tok: karty pod sebou s lehkým natočením, otázka, představení.
+- **Čísla** (`CHAOS_STATS` v `content.ts`, každé se zdrojem a odkazem, bez zdroje se nesmí použít): 6 h 20 min týdně administrativa (Raiffeisenbank a Mastercard) · 204 h ročně administrativa i s AI (Smallpdf, 2026) · 40 % zákazníků neplatí včas (Hospodářská komora ČR) · 21 dní po splatnosti (EOS Payment Practices, 2025) · 45 % firem zažilo nezaplacenou fakturu (Atradius). Čísla jsou z druhotných článků; před nasazením ověřit v původních zprávách (otevřený problém).
+- Žádné vlastní sliby v číslech („ušetříte 5 hodin“). Věta „zbývá vám čas na práci, která vydělává“ je jediný slib a je bez čísla.
+
 ### 4.3 01 Proč to řešit (`#proc`), nová sekce (R-031, přepracováno 2026-10-17)
 
 Plní roli sekce „Proč to řešit“ z `PLAN.md`: problém a jeho řešení. Je to jediné místo, kde je vidět „před“. Původní rozházené kousky (SMS, Instagram, diář) Kryštof odmítl jako bezvýznamné a „moc AI“.
@@ -188,7 +198,7 @@ Plní roli sekce „Proč to řešit“ z `PLAN.md`: problém a jeho řešení. 
 | 19:30 | Večer počítáte, kdo zaplatil. Něco přišlo na účet, něco v hotovosti. Faktury máte v tabulce a na konci roku to skládáte znovu. | Platba se zapíše k návštěvě a objeví se v přehledu měsíce. Odhad daní vidíte během roku. | příjmy říjen, Tereza Malá, 1 850 Kč, Zaplaceno (stejná data jako kapitola Peníze) |
 | Za půl roku | Stálá zákaznice přestala chodit. Všimnete si, až ji potkáte na ulici. | ZakazIQ ji zařadí mezi Spící. Zprávu pro ni máte připravenou v panelu Komu napsat. | skupina Spící, Jana, naposledy 14. 4., Připravit zprávu |
 
-Žádná čísla („ušetříte 5 hodin týdně“) ani statistiky ztracených zákazníků. Nemáme je.
+Žádná vlastní čísla („ušetříte 5 hodin týdně“). Cizí statistiky s pojmenovaným zdrojem patří jen do sekce 00 Kolik vás stojí chaos (R-080).
 
 ### 4.4 02 Co to umí (`#funkce`)
 
