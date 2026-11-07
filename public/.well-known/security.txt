@@ -3,4 +3,4 @@
 Contact: mailto:info@vizeon.cz
 Expires: 2027-10-01T00:00:00.000Z
 Preferred-Languages: cs, en
-Canonical: https://zakaziq.cz/.well-known/security.txt
+Canonical: https://www.zakaziq.cz/.well-known/security.txt

@@ -146,9 +146,8 @@ function CalendarCut() {
 }
 
 export default async function OpengraphImage() {
-  const [sans, serif, mono] = await Promise.all([
+  const [sans, mono] = await Promise.all([
     font('InstrumentSans-SemiBold.ttf'),
-    font('InstrumentSerif-Italic.ttf'),
     font('JetBrainsMono-Medium.ttf'),
   ])
 
@@ -192,7 +191,7 @@ export default async function OpengraphImage() {
               <div style={{ fontSize: 86, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.02 }}>
                 Každá poptávka
               </div>
-              <div style={{ fontFamily: 'Serif', fontStyle: 'italic', fontSize: 96, color: C.navy300, lineHeight: 1.05 }}>
+              <div style={{ fontSize: 86, color: '#fff', letterSpacing: '-0.035em', lineHeight: 1.02 }}>
                 na svém místě.
               </div>
             </div>
@@ -208,7 +207,6 @@ export default async function OpengraphImage() {
       ...size,
       fonts: [
         { name: 'Sans', data: sans, weight: 600, style: 'normal' },
-        { name: 'Serif', data: serif, weight: 400, style: 'italic' },
         { name: 'Mono', data: mono, weight: 500, style: 'normal' },
       ],
     },

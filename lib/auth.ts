@@ -56,7 +56,9 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  session: { strategy: 'jwt' },
+  // Admin čte data všech klientů (i ws rolí vlastníka tabulek), proto session
+  // nejvýš 12 h místo výchozích 30 dní. Při práci se token průběžně obnovuje.
+  session: { strategy: 'jwt', maxAge: 12 * 60 * 60 },
   pages: {
     signIn: '/login',
   },

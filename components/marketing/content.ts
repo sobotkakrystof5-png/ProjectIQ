@@ -1,6 +1,6 @@
 // Obsah landing page na jednom místě (docs/landing/PROJECT-BRIEF.md § 4).
-// Údaje označené [DOPLNIT] chybí záměrně — nevymýšlet (AGENTS.md → B10). Fakta o ceně
-// a zkušební době: R-018, R-026, R-038.
+// Nevymýšlet údaje (AGENTS.md → B10). Fakta o ceně a zkušební době: R-018, R-026,
+// R-038. Provozovatel a zpracovatelé pro právní texty: legal.ts (R-079).
 
 /** E-mail podpory pro „Napište nám". Potvrdil Kryštof 2026-10-31. */
 export const SUPPORT_EMAIL = 'info@vizeon.cz'
@@ -8,8 +8,11 @@ export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`
 export const SUPPORT_LABEL = SUPPORT_EMAIL
 export const SUPPORT_FORM_HREF = '/#kontakt'
 
-/** IČO provozovatele do footeru. */
+/** IČO provozovatele (ARES, potvrdil Kryštof 2026-10-31). */
 export const COMPANY_ID = '29977231'
+
+/** Kde běží databáze: Neon eu-central-1 (Dotazy, ochrana údajů). */
+export const DATA_LOCATION = 'Databáze běží v Evropské unii, ve Frankfurtu v Německu.'
 
 /** Cesty do aplikace — přesné cesty Clerku potvrdí S07. */
 export const ROUTES = {
@@ -25,12 +28,12 @@ export const ROUTES = {
 export const PRICE_LABEL = '249 Kč'
 export const CTA_LABEL = 'Vyzkoušet 14 dní zdarma'
 
-/** Kotvy v hlavičce (scrollspy). */
+/** Kotvy v hlavičce (scrollspy): čtyři bloky stránky v pořadí (R-081). */
 export const NAV = [
+  { id: 'chaos', label: 'Čísla' },
   { id: 'funkce', label: 'Funkce' },
-  { id: 'jak-to-funguje', label: 'Jak to funguje' },
-  { id: 'napojeni', label: 'Napojení webu' },
   { id: 'cenik', label: 'Ceník' },
+  { id: 'kontakt', label: 'Kontakt' },
 ] as const
 
 export const OBORY = [
@@ -80,29 +83,11 @@ export const DEMO_REQUESTS: readonly DemoRequest[] = [
 
 // --- Sekce -----------------------------------------------------------------
 
-export const STEPS = [
-  { n: '01', title: 'Zákazník se objedná', text: 'Na webu, přes odkaz nebo QR kód na pultu.' },
-  { n: '02', title: 'Zařadí se do kalendáře', text: 'Jako čárkovaný blok. Hned vidíte, kam padne.' },
-  { n: '03', title: 'Potvrdíte jedním klikem', text: 'V aplikaci nebo přímo z e-mailu.' },
-  { n: '04', title: 'Zbytek se počítá sám', text: 'Razítko, příjem do přehledu, připomínka.' },
-] as const
-
-export const MODULES = [
-  { n: '01', title: 'Poptávky', text: 'z webu, e-shopu, ručně' },
-  { n: '02', title: 'Kalendář a rezervace', text: 'služby, směny, blokace' },
-  { n: '03', title: 'Zákazníci', text: 'historie, poznámky, skupiny' },
-  { n: '04', title: 'Věrnostní karty', text: 'razítka a odměny' },
-  { n: '05', title: 'Zakázky', text: 'vlastní stavy a kolonky' },
-  { n: '06', title: 'Faktury', text: 'PDF a hlídání splatnosti' },
-  { n: '07', title: 'Příjmy a výdaje', text: 'graf a přehled měsíce' },
-  { n: '08', title: 'Daně', text: 'odhad a termíny' },
-  { n: '09', title: 'E-maily zákazníkům', text: 'potvrzení, připomínky' },
-] as const
-
 export const PRICE_INCLUDES = [
   'Neomezené poptávky a zákazníci',
   'Kalendář a rezervace',
   'Věrnostní karty',
+  'Zakázky s vlastními stavy a kolonkami',
   'Faktury, příjmy, odhad daní',
   'E-maily zákazníkům',
   'Napojení na web',
@@ -110,40 +95,90 @@ export const PRICE_INCLUDES = [
   'Jeden byznys a neomezeně pracovníků',
 ] as const
 
-/** Ukázkový název byznysu v sekci Napojení. Cesty podle R-016, doména R-030. */
+/** Ukázkový název byznysu v ukázce napojení (blok Představení). Cesty podle R-016, doména R-030. */
 export const CONNECT_SLUG = 'kadernictvi-lenka'
 
+/**
+ * Dotazy vedle formuláře v bloku Poptávka (R-081). Jen to, co stránka jinde neříká:
+ * napojení webu je v Představení, telefon i počítač v úvodu, kontakt je formulář hned vedle.
+ */
 export const FAQ: readonly { q: string; a: string }[] = [
   {
     q: 'Musím umět s počítačem?',
     a: 'Ne. Když zvládnete e-mail v telefonu, zvládnete i ZakazIQ. Po registraci vyberete obor a aplikace má hned připravené služby a kolonky.',
   },
   {
-    q: 'Jak napojím svůj web?',
-    a: 'Třemi způsoby. Pošlete zákazníkům odkaz na objednání, vložíte na web jeden řádek kódu, nebo vám web postavím a napojím sám. Napojení si pak ověříte jedním klikem.',
-  },
-  {
-    q: 'Co když nemám web?',
-    a: 'Nevadí. Dostanete vlastní stránku pro objednání a QR kód. Odkaz dáte na Instagram, do Google profilu nebo na pult.',
+    q: 'Co se stane po 14 dnech?',
+    a: 'Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho během zkušební doby zrušíte, nic nezaplatíte. Zrušit ho můžete kdykoli sami v nastavení účtu a data se nemažou, zůstanou vám k nahlédnutí.',
   },
   {
     q: 'Kde jsou moje data a kdo je vidí?',
-    a: 'Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. [DOPLNIT: kde jsou data uložená] Podrobnosti najdete v Ochraně údajů.',
-  },
-  {
-    q: 'Co se stane po 14 dnech?',
-    a: 'Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho zrušíte, nic nezaplatíte a k datům se dostanete dál, jen je nepůjde měnit.',
-  },
-  {
-    q: 'Můžu předplatné kdykoli zrušit?',
-    a: 'Ano, sami v nastavení účtu. Data se nemažou, zůstanou vám k nahlédnutí.',
-  },
-  {
-    q: 'Funguje to na telefonu?',
-    a: 'Ano. Aplikace je dělaná tak, aby šla ovládat jednou rukou mezi dvěma zákazníky.',
-  },
-  {
-    q: 'Kde najdu pomoc, když se něco nedaří?',
-    a: `Napište mi na ${SUPPORT_LABEL}.`,
+    a: `Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. ${DATA_LOCATION} Podrobnosti najdete v Ochraně údajů.`,
   },
 ]
+
+// --- Kolik vás stojí chaos (R-080) ----------------------------------------
+// Jen zveřejněná čísla s pojmenovaným zdrojem a odkazem. Bez zdroje se číslo nesmí použít.
+// Hodnoty jsou celá čísla, formát (minuty → „6 h 20 min“) řeší komponenta.
+
+export type ChaosUnit = 'minutes' | 'hours' | 'percent' | 'days'
+
+export interface ChaosStat {
+  id: string
+  /** Cílová hodnota v jednotce `unit` (minuty, hodiny, procenta, dny). */
+  target: number
+  unit: ChaosUnit
+  /** Co číslo znamená, jedna věta bez tečky na začátku. */
+  label: string
+  source: { name: string; href: string }
+}
+
+export const CHAOS_STATS: readonly ChaosStat[] = [
+  {
+    id: 'admin-tydne',
+    target: 380,
+    unit: 'minutes',
+    label: 'týdně ztratí živnostník papírováním a administrativou',
+    source: {
+      name: 'Raiffeisenbank a Mastercard',
+      href: 'https://cc.cz/podnikatele-administrativou-ztrati-az-petinu-tydne-raiffeisenbank-reaguje-specialnim-uctem/',
+    },
+  },
+  {
+    id: 'admin-rocne',
+    target: 204,
+    unit: 'hours',
+    label: 'ročně stráví freelancer administrativou. I s umělou inteligencí.',
+    source: { name: 'Smallpdf, 2026', href: 'https://contentgrip.com/freelancer-admin-ai-gap' },
+  },
+  {
+    id: 'neplati-vcas',
+    target: 40,
+    unit: 'percent',
+    label: 'zákazníků neplatí faktury včas',
+    source: {
+      name: 'Hospodářská komora ČR',
+      href: 'https://www.businessinfo.cz/clanky/hospodarska-komora-pres-40-procent-zakazniku-neplati-faktury-vcas/',
+    },
+  },
+  {
+    id: 'po-splatnosti',
+    target: 21,
+    unit: 'days',
+    label: 'po splatnosti čekají české firmy na své peníze',
+    source: {
+      name: 'EOS Payment Practices, 2025',
+      href: 'https://www.businessinfo.cz/clanky/evropskym-spolecnostem-hradi-pozde-nebo-vubec-ctvrtina-firem-se-spatnou-platebni-moralkou-se-potykaji-i-ceske-firmy/',
+    },
+  },
+  {
+    id: 'nezaplaceno',
+    target: 45,
+    unit: 'percent',
+    label: 'firem zažilo za půl roku fakturu, kterou nikdo nezaplatil',
+    source: {
+      name: 'Atradius',
+      href: 'https://www.e15.cz/finexpert/vydelavame/pruzkum-temer-kazda-firma-v-cesku-ma-nyni-zkusenost-s-opozdenymi-platbami-1391710',
+    },
+  },
+] as const

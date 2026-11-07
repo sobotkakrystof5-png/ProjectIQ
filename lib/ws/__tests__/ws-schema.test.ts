@@ -1,4 +1,6 @@
 import type { PGlite } from '@electric-sql/pglite'
+import { readdirSync } from 'node:fs'
+import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { asApp, createWsTestDb, ids, pgCode, WS_ADMIN_TABLES, WS_GLOBAL_TABLES, WS_MIGRATIONS, WS_SYSTEM_TABLES } from './helpers/ws-pglite'
 
@@ -29,10 +31,16 @@ afterAll(async () => {
 })
 
 describe('migrace ws', () => {
-  it('jsou číslované od 064 a navazují bez mezer', () => {
+  it('jsou číslované od 064 a navazují bez mezer (mezery jen pro migrace mimo ws)', () => {
     const numbers = WS_MIGRATIONS.map((f) => Number(f.slice(0, 3)))
     expect(numbers[0]).toBe(64)
-    numbers.forEach((n, i) => expect(n).toBe(64 + i))
+    const all = readdirSync(path.join(process.cwd(), 'migrations'))
+      .filter((f) => /^\d{3}_.*\.sql$/.test(f))
+      .map((f) => Number(f.slice(0, 3)))
+      .filter((n) => n >= 64)
+      .sort((a, b) => a - b)
+    all.forEach((n, i) => expect(n).toBe(64 + i))
+    expect(new Set(numbers).size).toBe(numbers.length)
   })
 
   it('projdou dvakrát po sobě a schéma zůstane stejné', () => {

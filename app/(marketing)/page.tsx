@@ -1,15 +1,11 @@
 import type { Metadata } from 'next'
-import { Connect } from '@/components/marketing/connect'
+import { Chaos } from '@/components/marketing/chaos'
 import { ContactSection } from '@/components/marketing/contact-section'
-import { Faq } from '@/components/marketing/faq'
-import { Features } from '@/components/marketing/features'
 import { Footer } from '@/components/marketing/footer'
 import { Hero } from '@/components/marketing/hero'
-import { HowItWorks } from '@/components/marketing/how-it-works'
-import { Modules } from '@/components/marketing/modules'
+import { Introduction } from '@/components/marketing/introduction'
 import { OborMarquee } from '@/components/marketing/obor-marquee'
 import { Pricing } from '@/components/marketing/pricing'
-import { WhyBother } from '@/components/marketing/why-bother'
 import {
   jsonLdString,
   landingJsonLd,
@@ -24,7 +20,8 @@ export const metadata: Metadata = {
   openGraph: { ...OPEN_GRAPH_BASE, url: '/', title: SITE_TITLE, description: SITE_DESCRIPTION },
 }
 
-// Landing page ZakazIQ podle docs/landing/PROJECT-BRIEF.md (pořadí sekcí R-031).
+// Landing page ZakazIQ podle docs/landing/PROJECT-BRIEF.md. Za úvodem čtyři bloky (R-081):
+// statistiky → představení → nabídka → poptávka. Nový obsah patří do jednoho z nich, ne do páté sekce.
 export default function LandingPage() {
   return (
     <>
@@ -39,13 +36,9 @@ export default function LandingPage() {
       <Hero />
       <main id="obsah">
         <OborMarquee />
-        <WhyBother />
-        <Features />
-        <HowItWorks />
-        <Modules />
-        <Connect />
+        <Chaos />
+        <Introduction />
         <Pricing />
-        <Faq />
         <ContactSection />
       </main>
       <Footer />

@@ -5,7 +5,7 @@ import { toCsv, type CsvValue } from './csv'
 import { createZip, type ZipEntry } from './zip'
 
 // GDPR Workspace (S18, R-054): výmaz zákazníka, export všech dat účtu,
-// zrušení účtu s 30denní lhůtou a denní úklid. Pravidla výmazu jsou
+// zrušení účtu ke konci zaplaceného období (R-074) s 30denní lhůtou a denní úklid. Pravidla výmazu jsou
 // v migraci 084 (jedna transakce v DB), tady jen volání a export.
 
 // --- Výmaz zákazníka ------------------------------------------------------------
@@ -32,12 +32,46 @@ export const ACCOUNT_DELETE_DAYS = 30
 
 export type AccountClosing = { requestedAt: Date; deleteAfter: Date } | null
 
+/** Žádost o zrušení čeká na konec zaplaceného období (R-074). */
+export type AccountCloseScheduled = { requestedAt: Date; closesAt: Date | null } | null
+
 export async function getAccountClosing(scope: { accountId: string }): Promise<AccountClosing> {
   const [r] = await wsDb(scope)<{ closing_requested_at: Date | null; delete_after: Date | null }>`
     SELECT closing_requested_at, delete_after FROM ws.accounts WHERE id = ${scope.accountId}`
   return r?.closing_requested_at && r.delete_after
     ? { requestedAt: new Date(r.closing_requested_at), deleteAfter: new Date(r.delete_after) }
     : null
+}
+
+/** closesAt = konec posledního zaplaceného období (null, když ho ještě neznáme). */
+export async function getAccountCloseScheduled(scope: { accountId: string }): Promise<AccountCloseScheduled> {
+  const [r] = await wsDb(scope)<{ close_scheduled_at: Date | null; closes_at: Date | null }>`
+    SELECT a.close_scheduled_at,
+      (SELECT max(s.current_period_end) FROM ws.subscriptions s
+       WHERE s.account_id = a.id AND s.status IN ('trialing', 'active', 'past_due', 'unpaid', 'paused', 'incomplete')) AS closes_at
+    FROM ws.accounts a WHERE a.id = ${scope.accountId} AND a.delete_after IS NULL`
+  return r?.close_scheduled_at
+    ? { requestedAt: new Date(r.close_scheduled_at), closesAt: r.closes_at ? new Date(r.closes_at) : null }
+    : null
+}
+
+export async function scheduleCloseAccount(ctx: WsContext): Promise<boolean> {
+  const [row] = await wsDb(ctx)`SELECT ws.schedule_close_account(${ctx.accountId}, ${ctx.userId}) AS ok`
+  return Boolean(row?.ok)
+}
+
+export async function unscheduleCloseAccount(ctx: WsContext): Promise<boolean> {
+  const [row] = await wsDb(ctx)`SELECT ws.unschedule_close_account(${ctx.accountId}, ${ctx.userId}) AS ok`
+  return Boolean(row?.ok)
+}
+
+/**
+ * Po synchronizaci předplatného: zavře účet čekající na konec období, když
+ * už nic neúčtuje. Vrací konec 30denní lhůty, nebo null (nic se nestalo).
+ */
+export async function finishScheduledClose(scope: { accountId: string }): Promise<Date | null> {
+  const [row] = await wsDb(scope)`SELECT ws.finish_scheduled_close(${scope.accountId}) AS d`
+  return row?.d ? new Date(row.d as string) : null
 }
 
 /** Nastaví výmaz za 30 dní a archivuje byznysy. Předplatné ruší volající dřív (Stripe). */
@@ -61,13 +95,29 @@ export async function liveSubscriptionIds(scope: { accountId: string }): Promise
 
 // --- Denní úklid ------------------------------------------------------------------
 
-export type GdprRun = { invoicesAnonymized: number; accountsDeleted: number; orgsFailed: number }
+export type GdprRun = { accountsClosed: number; invoicesAnonymized: number; accountsDeleted: number; orgsFailed: number }
 
 /**
- * Faktury po zákonné lhůtě a účty po 30 dnech. Organizaci v Clerku maže
- * `deleteOrg` (předává cron); její chyba výmaz dat nezastaví, jen se zapíše.
+ * Účty po konci zaplaceného období (záloha, kdyby nedorazil webhook Stripe),
+ * faktury po zákonné lhůtě a účty po 30 dnech. Předplatná obnovuje ze Stripe
+ * `syncSub`, organizaci v Clerku maže `deleteOrg` (obojí předává cron); jejich
+ * chyba ostatní úklid nezastaví, jen se zapíše.
  */
-export async function runDailyGdpr(deleteOrg: (orgId: string) => Promise<void>): Promise<GdprRun> {
+export async function runDailyGdpr(
+  deleteOrg: (orgId: string) => Promise<void>,
+  syncSub: (subscriptionId: string) => Promise<unknown> = async () => null,
+): Promise<GdprRun> {
+  let accountsClosed = 0
+  const scheduled = await wsSystem<{ account_id: string; subscription_ids: string[] }>`SELECT account_id, subscription_ids FROM ws.scheduled_closings()`
+  for (const s of scheduled) {
+    try {
+      for (const id of s.subscription_ids) await syncSub(id)
+      if (await finishScheduledClose({ accountId: s.account_id })) accountsClosed++
+    } catch (e) {
+      console.error('cron.ws-gdpr: naplánované zrušení se nedokončilo', { accountId: s.account_id, error: e instanceof Error ? e.message : 'unknown' })
+    }
+  }
+
   const [inv] = await wsSystem<{ n: number }>`SELECT ws.anonymize_expired_invoices() AS n`
   const purged = await wsSystem<{ account_id: string; clerk_org_id: string }>`SELECT account_id, clerk_org_id FROM ws.purge_closed_accounts()`
   let orgsFailed = 0
@@ -79,7 +129,7 @@ export async function runDailyGdpr(deleteOrg: (orgId: string) => Promise<void>):
       console.error('cron.ws-gdpr: organizaci se nepodařilo smazat', { accountId: p.account_id, error: e instanceof Error ? e.message : 'unknown' })
     }
   }
-  return { invoicesAnonymized: Number(inv?.n ?? 0), accountsDeleted: purged.length, orgsFailed }
+  return { accountsClosed, invoicesAnonymized: Number(inv?.n ?? 0), accountsDeleted: purged.length, orgsFailed }
 }
 
 // --- Export -----------------------------------------------------------------------

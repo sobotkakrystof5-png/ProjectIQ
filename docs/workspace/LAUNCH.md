@@ -2,7 +2,7 @@
 
 Pořadí, rozdělení práce a rizika: [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
 
-Stav k 2026-10-31. Položky označené **blokuje spuštění** musí být hotové a doložené
+Stav k 2026-11-03. Položky označené **blokuje spuštění** musí být hotové a doložené
 před veřejným spuštěním. Vercel eviduje `zakaziq.cz` i `www.zakaziq.cz` jako ověřené
 domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 
@@ -12,7 +12,7 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 - [ ] Lokálně ověřit přihlášení do adminu, statické/chybové stránky a stránky s externím obsahem pod CSP.
 - [ ] Preview `https://project-pnfallur8-sobotkakrystof5-pngs-projects.vercel.app` je READY a sestavilo se; Chrome načetl landing page. Konzole hlásila chybu konfigurace NextAuth. Přihlášení a Workspace ověřit po doplnění Preview env; Safari zůstává ruční krok.
 - [x] Spustit `security-check.sh` na produkčním `www.zakaziq.cz` a Preview; výsledky jsou v `.claude/security/AUDIT-LOG.md`. Preview audit prošel hlavičkami/CSP; produkce zatím nemá CSP/COOP/CORP.
-- [ ] Ověřit TLS, přesměrování apex/www, `security.txt`, CAA a DNSSEC. TLS 1.3 a platný certifikát `www.zakaziq.cz` jsou ověřeny přímo; apex DS/CAA chybí. SPF/DMARC chybí. Audit hlásil `security.txt` jako nedostupný, ale soubor je v repu i Preview balíčku — ověřit HTTP odpověď po odblokování Preview.
+- [ ] Ověřit TLS, přesměrování apex/www, `security.txt`, CAA a DNSSEC. TLS 1.3 a platný certifikát `www.zakaziq.cz` jsou ověřeny přímo; apex DS/CAA chybí. SPF apexu chybí, DMARC `p=none` bez `rua` (2026-11-03). CAA jde přidat, certifikáty Clerku jsou vydané. Audit hlásil `security.txt` jako nedostupný, ale soubor je v repu i Preview balíčku — ověřit HTTP odpověď po odblokování Preview.
 - [ ] Zkontrolovat HSTS preload pro produkční doménu; další zařazení do preload listu řešit samostatně.
 - [ ] Nastavit `SITE_URL` v GitHub Actions a ověřit běh bezpečnostního CI jobu.
 - [ ] Zkontrolovat chybové hlášení ve Vercelu, selhané Stripe/Clerk/Resend webhooky a doručování e-mailů; určit adresu/kanál upozornění admina.
@@ -23,10 +23,12 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 - [x] **Preview větve `ws/redesign-app`** (2026-10-31): stálá adresa `project-iq-git-ws-redesign-app-…vercel.app`, testovací Neon, vlastní `NEXTAUTH_SECRET`, `NEXT_PUBLIC_APP_URL` jen pro tuto větev (návrat z Checkoutu). Registrace → průvodce → Checkout sandbox ověřeny; karta nezadána.
 - [x] **Preview build:** aktuální pracovní strom sestaven ve Vercelu jako Preview; build i routy doběhly. Zbývá ruční funkční průchod po nastavení Preview env.
 - [ ] **Blokuje spuštění:** ověřit všechny produkční proměnné ve Vercelu; zejména databázi `ws_app`, `WS_KEY_PEPPER`, produkční Clerk, Stripe live a Resend. Tajné hodnoty nezapisovat do repa ani do tohoto seznamu.
-- [x] Migrace Workspace 064–091 na produkci (084 aplikoval Kryštof 2026-10-31); zbývá ověřit čtením katalogu migrace až do `084_ws_gdpr.sql` a granty `ws_app` podle `SETUP.md`.
-- [ ] **Blokuje spuštění:** založit produkční Clerk instanci, v ní `organization_settings.force_organization_selection = false` (jinak Clerk po registraci ukáže anglické „Setup your organization“ a obejde průvodce `/w/novy`), nastavit `clerk.zakaziq.cz`, vlastní OAuth údaje a webhook; ověřit přihlášení a registraci.
+- [x] Migrace 064–096 na produkci (084 aplikoval Kryštof 2026-10-31, 092–096 2026-11-01); zbývá ověřit čtením katalogu migrace a granty `ws_app` podle `SETUP.md`.
+- [ ] **Blokuje spuštění:** vyměnit heslo `neondb_owner`, upravit `DATABASE_URL` ve Vercelu a `.env.local`, pak aplikovat migrace 097–099 na produkci.
+- [ ] **Blokuje spuštění:** přejít na Vercel Pro (Hobby je podle podmínek Vercelu jen pro nekomerční použití); rozhodnutí a platba Kryštof.
+- [ ] **Blokuje spuštění:** produkční Clerk instance — založená, `clerk.zakaziq.cz` s DNS, SSL a poštou hotové (2026-11-03). Zbývá vlastní Google OAuth klient (consent screen „In production“), `organization_settings.force_organization_selection = false` (jinak Clerk po registraci ukáže anglické „Setup your organization“ a obejde průvodce `/w/novy`), webhook a klíče ve Vercel Production; ověřit přihlášení a registraci.
 - [ ] **Blokuje spuštění:** nastavit Stripe live produkt/cenu, omezený klíč, Customer Portal, e-maily a webhook. Dokončit celý sandbox test Checkoutu, změny stavu, neúspěšné platby a zrušení.
-- [ ] **Blokuje spuštění:** ověřit doménu v Resendu, SPF/DKIM/DMARC, `WS_EMAIL_FROM` a webhook nedoručených zpráv; doručit test do Gmailu, Outlooku a Apple Mailu.
+- [ ] **Blokuje spuštění:** ověřit doménu v Resendu, SPF/DKIM/DMARC, `WS_EMAIL_FROM` a webhook nedoručených zpráv; doručit test do Gmailu, Outlooku a Apple Mailu. Stav 2026-11-03: doména ověřená, `WS_EMAIL_FROM` a `RESEND_WEBHOOK_SECRET` ve Vercel Production, webhook vypnutý do nasazení, DMARC bez `rua`; zkušební doručení chybí.
 - [ ] Doména `zakaziq.cz`: Vercel potvrzuje apex i www jako verified. Produkční security-check proběhl; ověřit apex DNS a e-mailové DNS záznamy ve správě domény.
 
 ## Data, obnova a ověření produktu
@@ -40,8 +42,8 @@ domény projektu `project-iq`; produkce stále běží ze staršího `main`.
 
 ## Právní a zákaznická připravenost
 
-- [ ] **Blokuje spuštění:** doplnit skutečné obchodní podmínky, zásady ochrany údajů a zpracovatelskou smlouvu; právní texty musí dodat/projít provozovatel nebo právník.
-- [ ] **Blokuje spuštění:** doplnit právní jméno a úplnou adresu provozovatele do webu, Stripe a daňových dokladů. IČO `29977231` a kontaktní e-mail `info@vizeon.cz` potvrdil Kryštof 2026-10-31; doplnění je částečné.
+- [x] Obchodní podmínky, ochrana údajů a zpracovatelská smlouva jsou na webu (R-079, 2026-11-03); Kryštof je potvrdil, kontrola právníkem se nedělá.
+- [ ] **Blokuje spuštění:** provozovatel (Kryštof Sobotka, Kamenice 64, 294 04 Dobšín, IČO `29977231`) je na webu a v právních textech od 2026-11-03; zbývá doplnit ho do Stripe (Public details, šablona faktury) a daňových dokladů.
 - [ ] Potvrdit, že cena 249 Kč/měsíc a 14denní zkušební doba odpovídají Stripe i textům; potvrdit režim DPH a text dokladu „Nejsem plátce DPH“.
 - [ ] Aktualizovat záznam o zpracování: provozovatel, regiony a doby uchování pro Vercel, Neon, Clerk, Stripe a Resend.
 - [ ] **Blokuje spuštění:** potvrdit konkrétního pilotního klienta a bezpečný postup jeho onboardingu. Pilot bude zdarma; délka a nastavení ještě nejsou určené.
