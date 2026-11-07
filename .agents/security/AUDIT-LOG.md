@@ -16,6 +16,15 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-03 — review celého kódu před spuštěním
+Spouštěč: žádost Kryštofa o kompletní revizi designu, frontendu a backendu před spuštěním.
+Rozsah: `proxy.ts`, `next.config.mjs`, `lib/security/*`, autorizace všech 53 souborů se server actions a všech API rout (admin, Workspace, veřejné, webhooky, crony), `lib/ws/db.ts`, `context.ts`, klíče, rate limit, příjem poptávek, `/r` a `/z` akce, kontaktní formulář, přepis hlasu, hlášení z Claude Code, pozvánky, předání do terminálu, e-mailové šablony, PDF (Puppeteer), Stripe/Resend webhooky, NextAuth, CI, design systém ve frontendu. `npm audit` (0), `tsc` (0 chyb), `npm test`.
+Výsledek: bez zneužitelné díry. Nálezy jsou provozní a zpevnění.
+Nálezy: (1) Clerk middleware bez `authorizedParties`; (2) session adminu 30 dní, bez dvoufázového ověření, zámek jen na IP; (3) `/r/[slug]` fungovala i pro účet, který nedokončil Checkout (veřejná objednávka pod libovolným názvem firmy zdarma, poptávky bez čtenáře); (4) předání do Claude Code spouštělo agenta s textem klienta v běžném režimu; (5) žádné `error.tsx`/`global-error.tsx` (anglická výchozí stránka Nextu) a žádný monitoring chyb; (6) CI bez testů a typů, `security.yml` neběžel na větvích `ws/*`, Node 20; (7) 2 testy padaly na pevném datu (`ws-email.test.ts`); (8) admin běží rolí vlastníka DB; (9) výměna hesla `neondb_owner` po úniku do chatu (2026-11-01) nepotvrzená; (10) Vercel Hobby je podle podmínek jen pro nekomerční použití.
+Opraveno: (1) `lib/security/clerk.ts` + `proxy.ts`, DECISIONS #021; (2) session 12 h; (3) migrace 099 (aplikována: ne), R-077; (4) `--permission-mode plan` + test ve shellu; (5) `error.tsx` pro `/w`, `/w/[byznys]`, `/r`, `/z`, `/klient`, landing a `app/global-error.tsx`; (6) `.github/workflows/ci.yml`, `security.yml` na `ws/**` a Node 24; (7) test mimo pevná data a s úklidem v `finally`.
+Zůstává: dvoufázové ověření adminu, monitoring chyb, samostatná DB role adminu, potvrzení výměny hesla `neondb_owner`, přechod na Vercel Pro (STATE → Otevřené položky). Další testy míchají pevná data z listopadu 2026 se skutečnými hodinami (16 souborů). Veřejný klíč widgetu jde mimo prohlížeč použít s podvrženým `Origin`, proti spamu chrání jen limit (DECISIONS #010).
+Kontrola oprav (`web-security-review` nad rozdílem): bez nového tajemství, vstupu ani HTML výstupu; chybové stránky nevykreslují text chyby; migrace 099 má `SECURITY DEFINER` s pevným `search_path` a `REVOKE PUBLIC`; CI bez secrets s `contents: read`. Bez nálezu. Ověřeno: `tsc` 0 chyb, `npm test` 721 + 1 přeskočený, `next build` prošel.
+
 ## 2026-10-31 — statická analýza Semgrep (kód a CI)
 Spouštěč: žádost Kryštofa o test bezpečnosti kódu nástrojem Semgrep.
 Rozsah: celé repo (1015 souborů, bez `node_modules`, `.next`, `graphify-out`, `.agents`, `public`); pravidla `p/security-audit`, `typescript`, `nextjs`, `react`, `secrets`, `owasp-top-ten`, `jwt`, `sql-injection`, `xss`; telemetrie vypnutá, nic se nenahrává. Semgrep 1.183.0 v dočasném venv mimo repo.

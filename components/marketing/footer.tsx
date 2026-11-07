@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AccentHeading, Logo } from '@/components/ws/brand'
-import { COMPANY_ID, CTA_LABEL, ROUTES, SUPPORT_LABEL, SUPPORT_MAILTO } from './content'
+import { CTA_LABEL, ROUTES, SUPPORT_LABEL, SUPPORT_MAILTO } from './content'
+import { OPERATOR_LINE } from './legal'
 
 const linkClass = 'inline-flex min-h-[44px] items-center text-[17px] text-navy-200 transition-colors hover:text-white'
 
@@ -10,8 +11,8 @@ export function Footer() {
     <footer className="mt-[72px] rounded-t-hero bg-navy-950 text-white md:mt-[120px]">
       <div className="mx-auto max-w-[1200px] px-5 pb-8 pt-14 sm:px-7 md:pt-20">
         <div className="flex flex-col gap-8 border-b border-navy-800 pb-12 lg:flex-row lg:items-end lg:justify-between">
-          <AccentHeading as="h2" size="section" accent="Za tři minuty." onDark className="max-w-[640px]">
-            Začněte ještě dnes.
+          <AccentHeading as="h2" size="section" onDark className="max-w-[640px]">
+            První poptávku můžete přijmout ještě dnes.
           </AccentHeading>
           <a
             href={ROUTES.signUp}
@@ -53,8 +54,8 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-navy-800 pt-6 font-num text-sm text-navy-400">
-          <span>© 2026 ZakazIQ · IČO {COMPANY_ID}</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-navy-800 pt-6 text-sm text-navy-400">
+          <span>© 2026 ZakazIQ · Provozuje {OPERATOR_LINE}</span>
           <a href={ROUTES.admin} className="inline-flex min-h-[44px] items-center text-navy-400 transition-colors hover:text-navy-200">
             Admin
           </a>

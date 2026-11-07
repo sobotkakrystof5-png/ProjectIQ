@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { submitContactForm, type ContactFormState } from '../../app/(marketing)/actions'
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from './content'
+import { ROUTES, SUPPORT_EMAIL, SUPPORT_MAILTO } from './content'
 
 const inputClass = 'mt-2 min-h-[50px] w-full rounded-chip border border-navy-100 bg-surface px-4 text-base text-ink outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-100'
 const initialContactFormState: ContactFormState = { status: 'idle', message: '' }
@@ -41,6 +41,8 @@ export function ContactForm() {
       <p id="contact-privacy" className="text-sm leading-relaxed text-quiet">
         Jméno a e-mail použijeme jen k odpovědi na váš dotaz. Můžete nám také napsat na{' '}
         <a href={SUPPORT_MAILTO} className="text-navy-700 underline underline-offset-4 hover:text-navy-900">{SUPPORT_EMAIL}</a>.
+        Podrobnosti najdete v{' '}
+        <a href={ROUTES.privacy} className="text-navy-700 underline underline-offset-4 hover:text-navy-900">Ochraně údajů</a>.
       </p>
 
       <div className="flex flex-wrap items-center gap-4">

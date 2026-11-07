@@ -2,7 +2,7 @@
 
 > Plán, **jak** se dostat od stavu „hotové v kódu a ověřené na Preview" k veřejnému spuštění. Kontrolní seznam *co* musí platit je v [`LAUNCH.md`](LAUNCH.md); postupy nastavení služeb v [`SETUP.md`](SETUP.md). Tenhle dokument je řadí do pořadí, přiděluje práci a hlídá závislosti.
 >
-> **Stav k:** 2026-10-31 · větev `ws/redesign-app` · produkce běží na starém `main` (`d948400`), nic z Workspace tam není.
+> **Stav k:** 2026-11-03 · větev `ws/redesign-app` · produkce běží na starém `main` (`d948400`), nic z Workspace tam není.
 > **Značky:** **[K]** dělá Kryštof (účty, identita, DNS, rozhodnutí, ostré karty) · **[C]** dělá agent (kód, texty, ověření, zápisy do paměti) · **[K+C]** společně.
 > Tajné hodnoty se do repa, paměti ani sem nikdy nepíší (jen názvy proměnných).
 
@@ -13,15 +13,15 @@
 | Oblast | Stav |
 |---|---|
 | Kód Workspace + landing | S00–S18 a RD01–RD14, RD16 hotové; RD15 (vizuální audit) rozpracovaný |
-| Testy a build | `npm test`: 588 prošlo, 1 přeskočený; `npx tsc --noEmit` čistý; `npx next build --webpack` úspěšný, 47/47 stránek (2026-10-31) |
+| Testy a build | `npm test`: 721 prošlo, 1 přeskočený; `npx tsc --noEmit` čistý; `npm run build:check` prošel (2026-11-03) |
 | Závislosti | `npm audit` a `npm audit --omit=dev --audit-level=high`: 0 zranitelností po aktualizaci lockfile (2026-10-31); CI audit je znovu blokující podle rozhodnutí #006 |
 | Preview `ws/redesign-app` | testovací Neon, Clerk dev, Stripe sandbox; přihlášený průchod hlavními obrazovkami 2026-10-31 v pořádku |
-| Produkční Neon | migrace 064–091 aplikované; práva `ws_app` po 2026-10-31 neověřená |
-| Clerk | jen dev instance, `force_organization_selection=false` nastaveno jen tam |
+| Produkční Neon | migrace 064–096 aplikované; 097–099 čekají na nové heslo `neondb_owner`; práva `ws_app` po 2026-10-31 neověřená |
+| Clerk | produkční instance `zakaziq.cz`: DNS, SSL a pošta hotové (2026-11-03, `oauth_pending`); chybí Google OAuth, webhook a klíče ve Vercelu. Aplikace běží na dev instanci |
 | Stripe | jen sandbox „ZakazIQ"; live produkt, cena, klíče a webhook chybí |
-| Resend | doména `zakaziq.cz` neověřená → e-maily Workspace nechodí (`WS_EMAIL_FROM` nenastaveno) |
-| DNS (WEDOS) | bez SPF, DMARC, CAA (DNSSEC neověřeno) |
-| Právní věci | právní texty a úplné právní jméno/adresa chybí; IČO `29977231` a podpora `info@vizeon.cz` potvrzené 2026-10-31 |
+| Resend | doména `zakaziq.cz` ověřená, `WS_EMAIL_FROM` v Production, webhook vypnutý do nasazení; doručení nevyzkoušené |
+| DNS (WEDOS) | 5 CNAME Clerku a `_dmarc` (`p=none`, bez `rua`) hotové; chybí CAA a SPF apexu (DNSSEC neověřeno) |
+| Právní věci | texty na webu od 2026-11-03 (R-079), provozovatel z ARES; potvrzené Kryštofem, kontrola právníkem se nedělá |
 
 ## 2. Principy plánu
 
@@ -36,11 +36,11 @@
 
 | # | Rozhodnutí | Doporučení | Blokuje |
 |---|---|---|---|
-| D1 | Hlavní host: apex `zakaziq.cz`, nebo `www.zakaziq.cz` | Otevřené; doporučení `www` — Stripe webhook nenásleduje přesměrování, apex přesměrovává (SETUP.md). `NEXT_PUBLIC_APP_URL` musí být stejný host (R-055) | webhooky, canonical, sitemap |
-| D2 | Provozovatel: jméno, IČO, adresa sídla | IČO `29977231`, obec Dobšín (Kryštof, 2026-10-31); celé právní jméno a úplná adresa sídla chybí | Stripe live, právní texty, faktury |
+| D1 | Hlavní host: apex `zakaziq.cz`, nebo `www.zakaziq.cz` | **`www.zakaziq.cz`** (Kryštof, 2026-11-01, R-075); apex přesměrovává na www. Stripe webhook nenásleduje přesměrování (SETUP.md). `NEXT_PUBLIC_APP_URL` = `https://www.zakaziq.cz` (R-055) | webhooky, canonical, sitemap |
+| D2 | Provozovatel: jméno, IČO, adresa sídla | Kryštof Sobotka, Kamenice 64, 294 04 Dobšín, IČO `29977231` (ARES, 2026-11-03) | Stripe live, právní texty, faktury |
 | D3 | E-mail podpory | `info@vizeon.cz` (Kryštof, 2026-10-31) | landing, Stripe, podmínky |
 | D4 | Pilotní klient | Firma a způsob onboardingu stále otevřené | spuštění (LAUNCH.md) |
-| D5 | Zrušení účtu: vracet poměrnou část předplatného? | Otevřené; rozhodnout před psaním podmínek (dnes se neruší s vrácením) | podmínky |
+| D5 | Zrušení účtu: vracet poměrnou část předplatného? | **Ke konci zaplaceného období, bez vrácení** (Kryštof, 2026-11-01, R-074); kód a podmínky upraveny, migrace 097. Customer Portal ve Stripe live nastavit na zrušení ke konci období | podmínky |
 | D6 | Pilotní klient platí / sleva (kupón ve Stripe)? | Pilot zdarma (Kryštof, 2026-10-31); délku a způsob nastavení ve Stripe ještě určit | Stripe live, první platba |
 | D7 | Podpora: kdo hlídá požadavky, incidenty a selhání plateb a do kdy odpovídá | Kanál `info@vizeon.cz` a formulář na landing; odpověď do 24 hodin. Formulář ukládá dotazy do Hovorů (`/dashboard/calls`); odpovědná osoba a dohled nad incidenty/platbami k potvrzení | spuštění |
 
@@ -61,11 +61,11 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| A1 | K | Doplnit IČO, adresu, e-mail podpory (D2, D3) |
-| A2 | C | Předvyplnit podklady pro právní stránky: lhůty z S18 (R-054 GDPR: výmaz, 10 let faktury, 30 dní po zrušení), seznam zpracovatelů (Vercel, Neon, Clerk, Stripe, Resend), regiony (Resend EU/Irsko; **region Neonu a Vercelu dohledat v dashboardech** — dnes `[DOPLNIT]`) |
-| A3 | K | Obchodní podmínky, zásady ochrany údajů a zpracovatelskou smlouvu musí napsat/projít právník nebo Kryštof. Agent text nevymýšlí (AGENTS.md: žádná vymyšlená fakta) |
-| A4 | C | Vložit texty do `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`; odstranit `LEGAL_ROBOTS` (`components/marketing/seo.ts`), přidat stránky do `app/sitemap.ts`; vyplnit `[DOPLNIT]` v landing Dotazech (kde jsou data uložená) |
-| A5 | C | Doplnit IČO a adresu do Stripe šablony faktury, Public details a patičky dokladů; aktualizovat záznam o zpracování |
+| A1 | K | ~~Doplnit IČO, adresu, e-mail podpory~~ hotovo 2026-11-03 (ARES) |
+| A2 | C | ~~Hotovo 2026-11-03~~ Předvyplnit podklady pro právní stránky: lhůty z S18 (R-054 GDPR: výmaz, 10 let faktury, 30 dní po zrušení), seznam zpracovatelů (Vercel, Neon, Clerk, Stripe, Resend), regiony (Resend EU/Irsko; **region Neonu a Vercelu dohledat v dashboardech** — dnes `[DOPLNIT]`) |
+| A3 | K | ~~Hotovo 2026-11-03~~ Texty připravil agent podle chování aplikace (R-079), Kryštof je potvrdil; kontrola právníkem se nedělá |
+| A4 | C | ~~Hotovo 2026-11-03~~ Vložit texty do `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`; odstranit `LEGAL_ROBOTS` (`components/marketing/seo.ts`), přidat stránky do `app/sitemap.ts`; vyplnit `[DOPLNIT]` v landing Dotazech (kde jsou data uložená) |
+| A5 | C | Doplnit IČO a adresu do Stripe šablony faktury, Public details a patičky dokladů (zbývá, dashboard Stripe); záznam o zpracování hotový 2026-11-03 |
 | A6 | C | `humanize-text-cs` a `zakaziq-ux-texty-cs` nad novými texty (ne nad právním textem samotným) |
 
 **Hotovo, když:** v kódu a na landing nezůstane žádné `[DOPLNIT]` (kontrola `grep -rn "DOPLNIT" app components lib docs/landing`), právní stránky jsou v sitemapě a bez `noindex`.
@@ -74,7 +74,7 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 
 | Záznam | Hodnota | Zdroj |
 |---|---|---|
-| CAA (apex) | `0 issue "letsencrypt.org"` a CA, kterou používá Vercel (ověřit; Vercel vydává přes Let's Encrypt) | STATE.md, Vercel dokumentace |
+| CAA (apex) | `0 issue "letsencrypt.org"` a `0 issue "pki.goog"` (ověřeno 2026-11-01: Vercel vydává přes Let's Encrypt, Clerk přes Let's Encrypt nebo Google Trust Services). **Přidat až po vydání certifikátů Clerku** (`clerk deploy status` → complete), jinak hrozí zaseknuté vydávání | [Vercel troubleshooting](https://vercel.com/docs/domains/troubleshooting), [Clerk production](https://clerk.com/docs/guides/development/deployment/production) |
 | TXT apex (SPF) | `v=spf1 -all`, **pokud na doméně nebude běžná pošta** (`podpora@`); jinak SPF podle poskytovatele pošty | STATE.md |
 | MX + TXT `send` | MX `send` → `feedback-smtp.eu-west-1.amazonses.com` (10), TXT `send` = `v=spf1 include:amazonses.com ~all` | **přesné hodnoty z Resend dashboardu** |
 | TXT `resend._domainkey` | DKIM klíč | Resend dashboard |
@@ -86,15 +86,19 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 **Pozor:** apex A/ALIAS a `www` ukazují na Vercel a nesmí se při úpravách rozbít; před změnou si poznamenat současné záznamy.
 
+**Stav 2026-11-01 (`dig`):** NS WEDOS; apex A `216.198.79.1` (Vercel); `www` CNAME `…vercel-dns-017.com`; apex bez TXT, MX a CAA; `_dmarc` ani `clerk` neexistují. Resend: doména `zakaziq.cz` Verified (Kryštof, 2026-11-01); `_dmarc` zatím chybí. Clerk: `clerk deploy status` = `not_started`, `clerk deploy` vyžaduje interaktivní terminál.
+
+**Stav 2026-11-03 (`dig`, `clerk deploy status`):** CNAME `clerk`, `accounts`, `clkmail`, `clk._domainkey`, `clk2._domainkey` existují, Clerk hlásí DNS, SSL i poštu `complete`. `_dmarc` = `v=DMARC1; p=none;` (bez `rua`). CAA a TXT apexu (SPF) dál chybí; CAA už jde přidat.
+
 ### Stopa C — Resend (závisí na B)
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| C1 | K | Resend → Domains → Add `zakaziq.cz`, region **EU (Irsko)** |
-| C2 | K | Záznamy z Resendu do stopy B; počkat na „Verified" |
-| C3 | C | Vercel Production **i Preview**: `WS_EMAIL_FROM=rezervace@zakaziq.cz` (po schválení) |
-| C4 | K | Resend → Webhooks → `https://www.zakaziq.cz/api/resend/webhook`, události `email.bounced`, `email.complained`, `email.failed`, `email.suppressed` |
-| C5 | K→C | `RESEND_WEBHOOK_SECRET` do Vercelu; klíč `RESEND_API_KEY` s právem Sending access jen pro doménu |
+| C1 | K | ~~Resend → Domains → Add `zakaziq.cz`, region **EU (Irsko)**~~ hotovo 2026-11-01 |
+| C2 | K | ~~Záznamy z Resendu do stopy B; „Verified"~~ hotovo 2026-11-01 (DMARC `_dmarc` ještě chybí) |
+| C3 | C | ~~Vercel Production: `WS_EMAIL_FROM=rezervace@zakaziq.cz`~~ hotovo 2026-11-01. **Preview záměrně ne**: běží na ukázkových datech s `@example.cz`, odesílání by tvořilo nedoručitelné e-maily a kazilo reputaci domény |
+| C4 | C | ~~Webhook `https://www.zakaziq.cz/api/resend/webhook`~~ založen přes API 2026-11-01 (id `2a38645c…`), **vypnutý do nasazení**: webhooky Resendu platí pro celý účet a dnešní produkce cestu nemá (404). Při nasazení zapnout (`PATCH /webhooks/{id}` `status: enabled`) |
+| C5 | K→C | ~~`RESEND_WEBHOOK_SECRET` do Vercelu Production~~ hotovo 2026-11-01. Zbývá: samostatný klíč s právem Sending access jen pro `zakaziq.cz` místo dnešního plného `RESEND_API_KEY` (ten sdílí waitlist Startupu) |
 | C6 | K+C | Z Nastavení › E-maily poslat zkušební e-maily všech typů na Gmail, Outlook (hotmail) a Apple Mail; zkontrolovat doručení do doručené pošty (ne spam), vzhled, odkaz „Potvrdit" z telefonu, odhlášení |
 | C7 | C | Ověřit frontu: odeslaná zpráva dostane stav `sent`, simulovaný bounce přijde webhookem a označí zprávu |
 
@@ -104,8 +108,8 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| D1 | K | `clerk deploy` → produkční instance, doména `clerk.zakaziq.cz` (CNAME do stopy B) |
-| D2 | K | Google Cloud Console → vlastní OAuth klient (redirect URI z Clerku); údaje vložit do Clerku (sdílené dev údaje v produkci nepoužít) |
+| D1 | K | ~~`clerk deploy` → produkční instance, doména `clerk.zakaziq.cz` (CNAME do stopy B)~~ hotovo, DNS/SSL/pošta `complete` 2026-11-03 |
+| D2 | K | **Další krok.** Google Cloud Console → vlastní OAuth klient (redirect URI z Clerku); údaje vložit do Clerku (sdílené dev údaje v produkci nepoužít) |
 | D3 | C | `clerk config patch`: `organization_settings.force_organization_selection=false` (jinak Clerk obejde průvodce `/w/novy`, R-037, stalo se 2026-10-31 na dev); česká lokalizace; ověřit, že platí i čeština e-mailů s kódem (jinak Customization → Emails) |
 | D4 | C | Zjistit, jestli jde na našem plánu zvednout limit 5 členů organizace (R-020 slibuje neomezeně pracovníků; pracovníci ve `ws.staff` se přihlašovat nemusí) |
 | D5 | K | Webhook `https://www.zakaziq.cz/api/clerk/webhook`, události `organization.updated`, `organizationMembership.*`; podpisový klíč → `CLERK_WEBHOOK_SECRET` |

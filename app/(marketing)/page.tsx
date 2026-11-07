@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Compare } from '@/components/marketing/compare'
 import { Connect } from '@/components/marketing/connect'
 import { ContactSection } from '@/components/marketing/contact-section'
 import { Faq } from '@/components/marketing/faq'
@@ -9,6 +10,8 @@ import { HowItWorks } from '@/components/marketing/how-it-works'
 import { Modules } from '@/components/marketing/modules'
 import { OborMarquee } from '@/components/marketing/obor-marquee'
 import { Pricing } from '@/components/marketing/pricing'
+import { Segments } from '@/components/marketing/segments'
+import { Start } from '@/components/marketing/start'
 import { WhyBother } from '@/components/marketing/why-bother'
 import {
   jsonLdString,
@@ -24,7 +27,7 @@ export const metadata: Metadata = {
   openGraph: { ...OPEN_GRAPH_BASE, url: '/', title: SITE_TITLE, description: SITE_DESCRIPTION },
 }
 
-// Landing page ZakazIQ podle docs/landing/PROJECT-BRIEF.md (pořadí sekcí R-031).
+// Landing page ZakazIQ podle docs/landing/PROJECT-BRIEF.md (pořadí sekcí R-031, R-080: Pro koho, Srovnání, Začátek).
 export default function LandingPage() {
   return (
     <>
@@ -39,11 +42,14 @@ export default function LandingPage() {
       <Hero />
       <main id="obsah">
         <OborMarquee />
+        <Segments />
         <WhyBother />
         <Features />
         <HowItWorks />
         <Modules />
+        <Compare />
         <Connect />
+        <Start />
         <Pricing />
         <Faq />
         <ContactSection />

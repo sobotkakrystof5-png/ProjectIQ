@@ -180,3 +180,10 @@ Zvažované alternativy: izolace jen v kódu (`requireClient()` + filtr, o týde
 Přijaté riziko: kdo má platnou pozvánku a ovládá přihlášení v Clerku, vstoupí; vázání na e-mail je volitelné. Admin spojení (vlastník) technicky čte i `portal`. Clerk je zatím jen dev instance (viz STATE). Pozvánku v adrese může zachytit historie prohlížeče nebo proxy; kód je jednorázový a krátkodobý, stránka posílá `referrer: no-referrer`.
 Revize: před spuštěním s prvním klientem (KP10) a při zavedení produkční instance Clerku.
 
+## 021 — Clerk `authorizedParties` jen v produkci, kratší session adminu
+Datum: 2026-11-03
+Rozhodnutí: Oba Clerk middlewary v `proxy.ts` (Workspace a klientský prostor) dostávají `authorizedParties` z `lib/security/clerk.ts`: na Vercelu Production jen origin `NEXT_PUBLIC_APP_URL` (https), jinde nic. NextAuth session adminu platí 12 h místo výchozích 30 dní (`lib/auth.ts`). Předání zadání do Claude Code (KP09) spouští `claude --permission-mode plan`.
+Důvod: review před spuštěním 2026-11-03 (AUDIT-LOG). Clerk `authorizedParties` doporučuje pro produkci: session token vydaný pro jinou (sub)doménu proxy odmítne. Admin čte data všech klientů, ukradená session nemá platit měsíc. Text zadání pochází od klienta a může obsahovat pokyny pro agenta.
+Zvažované alternativy: `authorizedParties` všude včetně Preview (Preview adresy se mění podle větve, přihlášení by padalo); celkový limit chybných přihlášení adminu napříč IP (útočník by jím mohl admina trvale zamknout, bcrypt a zámek na IP stačí, skutečná pojistka je dvoufázové ověření).
+Přijaté riziko: Preview a dev kontrolu `azp` nemají. Špatná `NEXT_PUBLIC_APP_URL` v Production rozbije přihlášení přes Clerk, neplatná nebo http adresa kontrolu vypne (fail-open kvůli dostupnosti). Admin zůstává bez dvoufázového ověření (STATE → Otevřené položky). Režim plánu brání změnám a spouštění příkazů, ale čtecí nástroje (soubory, podle nastavení i web) zůstávají; pokyn vložený do zadání by se mohl pokusit obsah repa někam vynést. Hlavní pojistkou zůstává, že zadání před spuštěním přečte člověk.
+Revize: nejpozději 2026-12-31, dřív při zavedení dvoufázového ověření adminu nebo změně hlavního hostu.

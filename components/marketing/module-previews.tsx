@@ -7,7 +7,7 @@ import { cn } from '@/lib/ws/utils'
 
 function Sample({ dark = false }: { dark?: boolean }) {
   return (
-    <span className={cn('font-num text-[12px] uppercase tracking-[0.08em]', dark ? 'text-navy-300' : 'text-quiet')}>
+    <span className={cn('text-[13px]', dark ? 'text-navy-300' : 'text-quiet')}>
       Ukázka
     </span>
   )

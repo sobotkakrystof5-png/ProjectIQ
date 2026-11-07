@@ -6,7 +6,7 @@ import type { CalendarEntry } from '@/lib/ws/today'
 import { addDays, formatClock, formatDayShort, formatTimeRange, pragueParts } from '@/lib/ws/time'
 import { cn } from '@/lib/ws/utils'
 
-const HOUR_PX = 44
+const HOUR_PX = 52
 
 const KIND_CLASS: Record<CalendarEntry['kind'], string> = {
   visit:
@@ -87,13 +87,13 @@ export function WeekCalendar({
         </div>
       </div>
 
-      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))]">
+      <div className="grid grid-cols-[48px_repeat(7,minmax(0,1fr))]">
         <div aria-hidden />
         {days.map((day) => (
           <div key={day} className="flex justify-center pb-2">
             <span
               className={cn(
-                'inline-flex min-h-7 items-center rounded-full px-2 font-num text-[11px] uppercase tracking-[0.04em]',
+                'inline-flex min-h-7 items-center rounded-full px-2.5 font-num text-[11px] uppercase tracking-[0.04em]',
                 day === today ? 'bg-navy-700 text-white' : 'text-quiet',
               )}
             >
@@ -105,8 +105,8 @@ export function WeekCalendar({
         {/* Hodiny */}
         <div className="relative" style={{ height }} aria-hidden>
           {Array.from({ length: hours.to - hours.from }, (_, i) => (
-            <span key={i} className="absolute right-2 -translate-y-1/2 font-num text-[10px] text-quiet" style={{ top: i * HOUR_PX }}>
-              {i === 0 ? '' : `${hours.from + i}`}
+            <span key={i} className="absolute right-2 -translate-y-1/2 font-num text-[11px] text-quiet" style={{ top: i * HOUR_PX }}>
+              {`${hours.from + i}:00`}
             </span>
           ))}
         </div>
@@ -116,7 +116,7 @@ export function WeekCalendar({
           return (
             <div
               key={day}
-              className={cn('relative border-l', day === today && 'bg-navy-50/60 dark:bg-navy-900/60')}
+              className={cn('relative border-l', day === today && 'bg-navy-50 dark:bg-navy-900/60')}
               style={{
                 height,
                 backgroundImage: `repeating-linear-gradient(to bottom, hsl(var(--border)) 0 1px, transparent 1px ${HOUR_PX}px)`,
@@ -132,8 +132,8 @@ export function WeekCalendar({
                   const selected = selectedId != null && e.id === selectedId
                   const body = (
                     <>
-                      <span className="block truncate font-num text-[10px] leading-tight opacity-80">{formatClock(e.start)}</span>
-                      {!short && <span data-ws-private-value={e.kind === 'block' ? undefined : true} className="block truncate text-[12px] font-semibold leading-tight">{e.title}</span>}
+                      <span className="block truncate font-num text-[11px] leading-tight opacity-80">{formatClock(e.start)}</span>
+                      {!short && <span data-ws-private-value={e.kind === 'block' ? undefined : true} className="block truncate text-[13px] font-semibold leading-tight">{e.title}</span>}
                     </>
                   )
                   const cls = cn(

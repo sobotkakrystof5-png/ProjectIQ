@@ -33,6 +33,7 @@ async function asClient<T = Record<string, unknown>>(clientId: string | null, sq
   }
 }
 
+// PGlite + migrace trvají na vytíženém stroji nebo v CI déle než výchozích 10 s.
 beforeAll(async () => {
   db = new PGlite()
   await db.exec(`
@@ -74,7 +75,7 @@ beforeAll(async () => {
       ($2, 'published', 'Hotovo B', 'Text B', now())`,
     [PA, PB],
   )
-})
+}, 60_000)
 
 afterAll(async () => {
   await db.close()

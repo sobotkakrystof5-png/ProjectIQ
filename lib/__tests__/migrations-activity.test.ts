@@ -13,6 +13,7 @@ const OTHER = '33333333-3333-4333-8333-333333333333'
 
 let db: PGlite
 
+// PGlite + migrace trvají na vytíženém stroji nebo v CI déle než výchozích 10 s.
 beforeAll(async () => {
   db = new PGlite()
   await db.exec('CREATE TABLE projects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), client_name text)')
@@ -21,7 +22,7 @@ beforeAll(async () => {
     await db.exec(read('093_project_activity.sql'))
     await db.exec(read('094_project_agent_keys.sql'))
   }
-})
+}, 60_000)
 
 afterAll(async () => {
   await db.close()

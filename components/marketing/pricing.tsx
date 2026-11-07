@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
-import { AccentHeading, SectionLabel } from '@/components/ws/brand'
+import { AccentHeading } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
-import { CTA_LABEL, PRICE_INCLUDES, ROUTES } from './content'
+import { CTA_LABEL, PRICE_INCLUDES, PRICE_PER_DAY_LABEL, ROUTES } from './content'
 
 /** Statické pole dílků 56 px za cenou: každý pátý plný, ostatní jen obrys (LP-D). */
 function PriceTiles() {
@@ -26,11 +26,8 @@ export function Pricing() {
         <div className="relative overflow-hidden px-5 py-12 sm:px-10 md:py-16">
           <PriceTiles />
           <div className="relative flex flex-col gap-6">
-            <SectionLabel number="06" onDark>
-              Ceník
-            </SectionLabel>
-            <AccentHeading id="cenik-title" as="h2" size="section" accent="Žádné balíčky." onDark>
-              Jedna cena.
+            <AccentHeading id="cenik-title" as="h2" size="section" onDark>
+              Všechny funkce za jednu cenu.
             </AccentHeading>
             <p className="flex items-baseline gap-3">
               <span className="font-num text-[72px] font-medium leading-none tracking-[-0.05em] sm:text-[96px]">249</span>
@@ -38,6 +35,7 @@ export function Pricing() {
                 <span className="font-num text-white">Kč</span> / měsíc
               </span>
             </p>
+            <p className="font-num text-[15px] text-navy-300">To je {PRICE_PER_DAY_LABEL}.</p>
             <p className="max-w-[420px] text-base leading-relaxed text-navy-200">
               Konečná cena, nic se nepřipočítává. Kartu zadáte při registraci; první platba proběhne až po 14 dnech.
               Zrušíte kdykoli.
@@ -47,7 +45,7 @@ export function Pricing() {
 
         <div className="flex flex-col justify-center gap-8 border-t border-navy-800 px-5 py-12 sm:px-10 md:py-16 lg:border-l lg:border-t-0">
           <div>
-            <h3 className="font-num text-sm uppercase tracking-[0.12em] text-navy-400">V ceně</h3>
+            <h3 className="text-lg font-semibold text-white">Co je v ceně</h3>
             <ul className="mt-5 flex flex-col gap-3.5">
               {PRICE_INCLUDES.map((item) => (
                 <li key={item} className="flex items-start gap-3 text-[19px] text-navy-50">

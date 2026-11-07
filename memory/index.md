@@ -18,7 +18,7 @@
 | [`index.md`](index.md) | Tahle mapa | Každý AI nástroj | Nový dokument / nová oblast |
 | [`pravidla.md`](pravidla.md) | Meta-pravidla paměti — co kam, kdy, formát | Každý AI nástroj | Zřídka |
 | [`memory.md`](memory.md) | Živý stav, rozhodnutí s důvody, otevřené problémy, changelog | Každý AI nástroj | **Po každé dokončené změně** |
-| `archiv/` | Starší části changelogu: `2026-10.md`, `2026-06-az-09.md` (viz pravidla §4) | Při pátrání v historii | Při archivaci |
+| `archiv/` | Starší části changelogu: `2026-11.md`, `2026-10.md`, `2026-06-az-09.md` (viz pravidla §4) | Při pátrání v historii | Při archivaci |
 | [`../.env.example`](../.env.example) | Zdroj pravdy pro env proměnné | — | Nová env proměnná |
 | [`../.claude/security/STATE.md`](../.claude/security/STATE.md) | Bezpečnostní stav: hlavičky, CSP, threat model, DNS, otevřené položky; vedle `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (R-029) | Sezení, které sahá na hlavičky, CSP, proxy, API, vstupy | Se každou bezpečnostní změnou |
 | [`../.agents/security/STATE.md`](../.agents/security/STATE.md) | Identická kopie `.claude/security/`, včetně záznamů a kontrolního skriptu | Codex a další agenti | Při synchronizaci s `.claude/security/` |

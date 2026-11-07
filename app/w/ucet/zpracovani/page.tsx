@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { AccentHeading, SectionLabel } from '@/components/ws/brand'
 import { formatBillingDate } from '@/components/ws/billing/format'
+import { OPERATOR, OPERATOR_LINE, PROCESSORS } from '@/components/marketing/legal'
 import { requireRole, requireWorkspace } from '@/lib/ws/context'
 import { wsDb } from '@/lib/ws/db'
 
@@ -11,29 +12,23 @@ export const metadata: Metadata = { title: 'Záznam o zpracování' }
 // Záznam o zpracování osobních údajů (S18, GDPR čl. 30 odst. 2): co ZakazIQ
 // jako zpracovatel dělá s údaji zákazníků firmy, kdo je subzpracovatel a
 // historie žádostí (export, výmaz, zrušení) z ws.audit_log. Jen majitel.
-// Údaje, které nevíme jistě (region databáze, adresa provozovatele), jsou [DOPLNIT].
+// Provozovatel a seznam zpracovatelů jsou společné s právními texty (R-079).
 
 const ROWS: { label: string; value: string }[] = [
   { label: 'Správce', value: 'Vy jako provozovatel firmy (účet v ZakazIQ).' },
-  { label: 'Zpracovatel', value: 'ZakazIQ, provozovatel [DOPLNIT: jméno, IČO, adresa].' },
+  { label: 'Zpracovatel', value: `ZakazIQ, provozovatel ${OPERATOR_LINE}, ${OPERATOR.email}.` },
   { label: 'Účel', value: 'Evidence poptávek, termínů, zakázek, zákazníků, věrnosti a faktur; e-maily zákazníkům jménem firmy.' },
   { label: 'Koho se týká', value: 'Vaši zákazníci a lidé, kteří poslali poptávku; vaši pracovníci s přístupem do účtu.' },
   {
     label: 'Jaké údaje',
     value: 'Jméno, telefon, e-mail, narozeniny (jen když je zadáte), poznámky, odpovědi z formuláře, historie návštěv a zakázek, platby, fakturační údaje, souhlas s nabídkami.',
   },
-  { label: 'Jak dlouho', value: 'Po dobu účtu. Po zrušení účtu 30 dní, potom výmaz. Vystavené faktury vymazaného zákazníka 10 let od konce roku vystavení.' },
+  {
+    label: 'Jak dlouho',
+    value: 'Po dobu účtu. Po zrušení účtu a konci zaplaceného období 30 dní, potom výmaz; ze záloh databáze zmizí nejpozději do dalších 30 dní. Vystavené faktury vymazaného zákazníka 10 let od konce roku vystavení.',
+  },
   { label: 'Zabezpečení', value: 'Šifrované spojení (HTTPS), oddělená data každého účtu v databázi, přihlášení přes ověřený e-mail nebo Google, záznam změn.' },
   { label: 'Přístup k údajům', value: 'Konzole podpory ZakazIQ zobrazuje jen souhrny o účtu, ne záznamy vašich zákazníků. Provozovatel databáze k nim má technicky přístup. Režim soukromí pouze rozmazává jména a částky na tomto zařízení.' },
-]
-
-const PROCESSORS: { name: string; role: string; where: string }[] = [
-  { name: 'Vercel', role: 'provoz aplikace', where: '[DOPLNIT]' },
-  { name: 'Neon', role: 'databáze', where: '[DOPLNIT: region]' },
-  { name: 'Clerk', role: 'přihlášení', where: 'USA' },
-  { name: 'Stripe', role: 'platby předplatného (jen údaje o vás, ne o zákaznících)', where: '[DOPLNIT]' },
-  { name: 'Resend', role: 'odesílání e-mailů', where: '[DOPLNIT]' },
-  { name: 'Anthropic', role: 'přepis přijatých faktur z PDF, jen když ho použijete', where: 'USA' },
 ]
 
 const ACTIONS: Record<string, string> = {

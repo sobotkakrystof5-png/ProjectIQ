@@ -1,4 +1,4 @@
-import { AccentHeading, LoyaltyCard, SectionLabel } from '@/components/ws/brand'
+import { AccentHeading, LoyaltyCard } from '@/components/ws/brand'
 
 /** Dvě kapitoly pokračují stejnou ukázkovou návštěvou jako kalendář v úvodu. */
 export function Features() {
@@ -8,15 +8,9 @@ export function Features() {
       aria-labelledby="funkce-title"
       className="mx-auto max-w-[1200px] px-5 pt-[56px] sm:px-7 md:pt-[96px]"
     >
-      <div className="mb-10 flex flex-col gap-4">
-        <SectionLabel number="02">Co to umí</SectionLabel>
-        <AccentHeading
-          id="funkce-title"
-          as="h2"
-          size="section"
-          accent="navazují další dílky."
-        >
-          Na jeden termín
+      <div className="mb-10">
+        <AccentHeading id="funkce-title" as="h2" size="section">
+          Co vám zůstane po návštěvě.
         </AccentHeading>
       </div>
 
@@ -26,20 +20,16 @@ export function Features() {
         className="grid scroll-mt-28 items-center gap-10 py-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 md:py-20"
       >
         <div>
-          <SectionLabel>Zákazníci</SectionLabel>
           <h3
             id="zakaznici-title"
-            className="mt-4 text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]"
+            className="text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]"
           >
-            Termín skončí.
-            <br />
-            <span className="font-accent font-normal text-navy-500">
-              Zákaznice zůstává.
-            </span>
+            Každá zákaznice má svou kartu.
           </h3>
           <p className="mt-5 max-w-[38ch] text-lg leading-relaxed text-quiet">
-            Historie návštěv, poznámky i věrnostní karta patří k zákaznici. A
-            když dlouho nepřišla, ZakazIQ vám řekne, komu napsat.
+            Na kartě vidíte, kdy u vás byla, co si dávala a kolik razítek jí
+            chybí do odměny. Když dlouho nepřijde, najdete ji v seznamu Komu
+            napsat.
           </p>
           <a
             href="#ukazka-penize"
@@ -103,28 +93,24 @@ export function Features() {
       >
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div>
-            <SectionLabel onDark>Peníze</SectionLabel>
             <h3
               id="penize-title"
-              className="mt-4 text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]"
+              className="text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[44px]"
             >
-              Zaplacená návštěva.
-              <br />
-              <span className="font-accent font-normal text-navy-300">
-                Příjem v přehledu.
-              </span>
+              Příjmy vidíte průběžně.
             </h3>
           </div>
           <p className="max-w-[36ch] text-lg leading-relaxed text-navy-200">
-            Faktury, příjmy, výdaje a odhad daní. Každý měsíc vám přijde přehled
+            Platbu zapíšete k návštěvě a hned je v přehledu měsíce. Tam najdete
+            i faktury, výdaje a odhad daní. Jednou za měsíc vám přehled přijde
             e-mailem.
           </p>
         </div>
         <div className="mt-10 overflow-hidden bg-surface text-ink">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-100 p-5 sm:px-8">
             <span className="font-semibold">Příjmy · říjen 2026</span>
-            <span className="font-num text-[13px] text-quiet">
-              UKÁZKA · FIKTIVNÍ ČÁSTKY
+            <span className="text-sm text-quiet">
+              Ukázka s vymyšlenými částkami
             </span>
           </div>
           <div className="grid md:grid-cols-[1fr_1.25fr]">

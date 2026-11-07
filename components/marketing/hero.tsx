@@ -19,17 +19,16 @@ export function Hero() {
 
         <div className="mx-auto max-w-[1200px] px-5 pt-10 sm:px-7 md:pt-16">
           <div className="flex max-w-[860px] flex-col items-start gap-6">
-            {/* Nadpis a perex bez nájezdu — jsou LCP prvek, nesmí čekat na animaci. */}
-            <AccentHeading as="h1" size="hero" onDark accent="na svém místě.">
-              Každá poptávka
-              <br />
+            {/* Nadpis, perex i hlavní tlačítko bez nájezdu — jsou LCP prvek a hlavní akce, nesmí čekat na animaci. */}
+            <AccentHeading as="h1" size="hero" onDark>
+              Každá poptávka na svém místě.
             </AccentHeading>
             <p className="max-w-[620px] text-[15px] font-normal leading-relaxed text-white sm:text-[17px]">
-              ZakazIQ je přehled podnikání pro malé firmy. Poptávky z webu,
-              kalendář, zákazníci a věrnostní karty, zakázky, faktury a odhad
-              daní v jedné aplikaci pro telefon i počítač.
+              Zákazník si vybere termín na vašem webu, přes odkaz nebo QR kód. Vy ho
+              potvrdíte jedním klikem. Kalendář, zákazníci s věrnostní kartou, zakázky,
+              faktury i odhad daní jsou v jedné aplikaci, na telefonu i na počítači.
             </p>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 animate-zq-rise [animation-delay:240ms]">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <a
                 href={ROUTES.signUp}
                 className="inline-flex min-h-[54px] items-center rounded-full bg-white px-7 text-lg font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50 sm:text-[19px]"
@@ -45,7 +44,7 @@ export function Hero() {
             </div>
             <ul
               aria-label="Podmínky zkušební doby"
-              className="flex flex-wrap gap-x-2.5 gap-y-1 text-[14px] leading-relaxed text-navy-200 animate-zq-rise [animation-delay:300ms]"
+              className="flex flex-wrap gap-x-2.5 gap-y-1 text-[14px] leading-relaxed text-navy-200"
             >
               {TRUST.map((label, i) => (
                 <li key={label} className="inline-flex items-center whitespace-nowrap">
@@ -55,7 +54,7 @@ export function Hero() {
             </ul>
           </div>
 
-          <div className="mt-8 pb-16 md:mt-12">
+          <div className="mt-10 pb-12 md:mt-14 md:pb-16">
             <LiveDemo />
           </div>
         </div>
