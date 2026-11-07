@@ -43,6 +43,8 @@ The current plan includes these functions, one business and an unlimited number 
 
 The public landing page tells one story: first the chaos (a business run from a phone, a diary, a spreadsheet, email and a paper note, backed by published statistics with a named source), then the question "do you recognise yourself?", then ZakazIQ as the one place for all of it. Statistics on the page must come from a named published source with a link; the product never claims its own numbers (time saved, income gained).
 
+After the hero the page has exactly four blocks, in this order (R-081): statistics (ending with "do you recognise yourself?"), introduction (how a request arrives, the customer card, money), offer (the single price and the one main action), and inquiry (three short questions and the contact form as the end of the page). New landing content goes into one of these four blocks, not into a fifth section.
+
 ## Product surfaces
 
 - The public landing page explains the product and its pricing.

@@ -1,26 +1,25 @@
 'use client'
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { LiveDot, Logo, TileField } from '@/components/ws/brand'
+import { TileField } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
-import { CHAOS_STATS, CTA_LABEL, ROUTES, type ChaosStat, type ChaosUnit } from './content'
+import { CHAOS_STATS, type ChaosStat, type ChaosUnit } from './content'
 import { SectionHead } from './section-head'
 import { useInView, useReducedMotion } from './use-in-view'
 
 /**
- * Kolik vás stojí chaos (R-080). Nejdřív chaos, pak řešení: při posouvání na scénu
- * „skáčou“ čísla z průzkumů, pak otázka „Poznáváte se?“ a nakonec se všechna
- * čísla sesypou za jednu kartu ZakazIQ. Na širokých obrazovkách je scéna přichycená
+ * Blok 1 ze 4, Statistiky (R-080, R-081). Při posouvání na scénu „skáčou“ čísla
+ * z průzkumů a blok končí otázkou „Poznáváte se?“. Odpověď (představení ZakazIQ)
+ * je až další blok, `introduction.tsx`. Na širokých obrazovkách je scéna přichycená
  * a řídí ji posun stránky; na telefonu a při omezeném pohybu je to obyčejný tok.
  * Každé číslo má pojmenovaný zdroj s odkazem, bez něj se nesmí použít.
  */
 
 type Mode = 'static' | 'scrub'
 
-/** Kdy se které číslo objeví (podíl posunu scénou), pak otázka, pak sesypání. */
-const APPEAR = [0, 0.11, 0.22, 0.33, 0.44] as const
-const ASK_AT = 0.58
-const GATHER_AT = 0.8
+/** Kdy se které číslo objeví (podíl posunu scénou), pak otázka do konce scény. */
+const APPEAR = [0, 0.13, 0.26, 0.39, 0.52] as const
+const ASK_AT = 0.7
 
 /** Rozházení po scéně: levý a horní okraj v procentech a natočení. */
 const SCATTER = [
@@ -30,9 +29,6 @@ const SCATTER = [
   { left: 6, top: 61, rot: 4 },
   { left: 62, top: 57, rot: -5 },
 ] as const
-
-/** Kam se karty sesypou: za ukázkovou kartu vpravo. */
-const GATHER = { left: 70, top: 50 } as const
 
 /** Na telefonu jen lehké natočení, ať je znát, že to k sobě nepatří. */
 const STATIC_ROT = [-2, 1.5, -1, 2, -1.5] as const
@@ -133,42 +129,6 @@ function StatCard({
   )
 }
 
-/** Jedna karta místo pěti míst. Fiktivní den, proto označeno jako ukázka. */
-function OnePlaceCard({ className }: { className?: string }) {
-  return (
-    <div className={cn('rounded-panel bg-surface p-6 text-ink shadow-[0_24px_60px_-20px_rgb(var(--navy-950)/0.6)]', className)}>
-      <div className="flex items-center justify-between gap-3">
-        <Logo size={28} wordmark />
-        <span className="text-sm text-quiet">Ukázka · dnes</span>
-      </div>
-      <ul className="mt-5 space-y-3 text-[15px] leading-snug">
-        <li className="flex items-center gap-3">
-          <LiveDot label="Nová poptávka" />
-          <span>
-            <span className="font-semibold">2 nové poptávky</span> z webu čekají na potvrzení
-          </span>
-        </li>
-        <li className="flex items-center gap-3">
-          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-navy-700" />
-          <span>
-            <span className="font-semibold">5 termínů</span>, všechny potvrzené
-          </span>
-        </li>
-        <li className="flex items-center gap-3">
-          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-navy-700" />
-          <span>
-            Faktura <span className="font-num font-semibold">1 850 Kč</span> odeslaná, splatnost hlídáme
-          </span>
-        </li>
-        <li className="flex items-center gap-3">
-          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-navy-700" />
-          <span>Připomínka Tereze Malé odešla sama</span>
-        </li>
-      </ul>
-    </div>
-  )
-}
-
 function AskCopy({ className }: { className?: string }) {
   return (
     <div className={className}>
@@ -177,26 +137,6 @@ function AskCopy({ className }: { className?: string }) {
         Telefon, diář, tabulka, e-mail a papírek na pultu. Každá z těch věcí funguje. Dohromady ne. A čas, který
         mezi nimi ztratíte, vám nikdo nezaplatí.
       </p>
-    </div>
-  )
-}
-
-function RevealCopy({ className }: { className?: string }) {
-  return (
-    <div className={className}>
-      <h3 className="text-[36px] font-semibold leading-[1.02] tracking-[-0.03em] text-white sm:text-[56px]">
-        Představujeme ZakazIQ.
-      </h3>
-      <p className="mt-4 max-w-[44ch] text-[17px] leading-relaxed text-navy-200">
-        Poptávky, kalendář, zákazníci, faktury, e-maily i přehled peněz a čísla vašeho byznysu na jednom místě.
-        Když o firmě víte všechno, zbývá vám čas na práci, která vydělává.
-      </p>
-      <a
-        href={ROUTES.signUp}
-        className="mt-7 inline-flex min-h-[54px] items-center rounded-full bg-white px-7 text-lg font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50"
-      >
-        {CTA_LABEL}
-      </a>
     </div>
   )
 }
@@ -243,11 +183,10 @@ function useScrubProgress(track: RefObject<HTMLElement | null>, enabled: boolean
 function ScrubStage({ reduced }: { reduced: boolean }) {
   const track = useRef<HTMLDivElement>(null)
   const progress = useScrubProgress(track, true)
-  const asking = progress >= ASK_AT && progress < GATHER_AT
-  const gathered = progress >= GATHER_AT
+  const asking = progress >= ASK_AT
 
   return (
-    <div ref={track} className="relative h-[380vh]">
+    <div ref={track} className="relative h-[300vh]">
       <div
         className="sticky overflow-hidden rounded-slab bg-navy-950"
         style={{ top: STAGE_TOP, height: `calc(100vh - ${STAGE_INSET}px)` }}
@@ -267,7 +206,6 @@ function ScrubStage({ reduced }: { reduced: boolean }) {
           {CHAOS_STATS.map((stat, i) => {
             if (progress < APPEAR[i]) return null
             const s = SCATTER[i]
-            const pos = gathered ? GATHER : s
             return (
               <StatCard
                 key={stat.id}
@@ -275,16 +213,14 @@ function ScrubStage({ reduced }: { reduced: boolean }) {
                 tone={TONES[i]}
                 active
                 reduced={reduced}
-                className={cn('chaos-slam absolute w-[300px]', gathered ? 'z-10' : 'z-20')}
+                className="chaos-slam absolute z-20 w-[264px] xl:w-[300px]"
                 style={
                   {
-                    left: `${pos.left}%`,
-                    top: `${pos.top}%`,
-                    opacity: gathered ? 0.28 : asking ? 0.3 : 1,
-                    '--zq-rot': `${gathered ? s.rot * 0.4 : s.rot}deg`,
-                    '--zq-dx': gathered ? `calc(-50% + ${(i - 2) * 10}px)` : '0px',
-                    '--zq-dy': gathered ? `calc(-50% + ${(i - 2) * 6}px)` : '0px',
-                    transform: `translate(var(--zq-dx), var(--zq-dy)) rotate(var(--zq-rot)) scale(${gathered ? 0.88 : 1})`,
+                    left: `${s.left}%`,
+                    top: `${s.top}%`,
+                    opacity: asking ? 0.3 : 1,
+                    '--zq-rot': `${s.rot}deg`,
+                    transform: 'rotate(var(--zq-rot))',
                   } as React.CSSProperties
                 }
               />
@@ -309,16 +245,6 @@ function ScrubStage({ reduced }: { reduced: boolean }) {
             </div>
           </div>
         )}
-
-        <div
-          className={cn(
-            'absolute inset-0 z-30 grid grid-cols-[minmax(0,1fr)_340px] items-center gap-12 px-12 transition-opacity duration-500',
-            gathered ? 'opacity-100' : 'pointer-events-none opacity-0',
-          )}
-        >
-          <RevealCopy className={cn(gathered && 'animate-zq-rise')} />
-          <OnePlaceCard className={cn('justify-self-end', gathered && 'animate-zq-rise [animation-delay:160ms]')} />
-        </div>
       </div>
     </div>
   )
@@ -353,10 +279,6 @@ function StaticStage({ reduced }: { reduced: boolean }) {
           ))}
         </div>
         <AskCopy className="mt-16 sm:mt-20" />
-        <div className="mt-16 grid items-center gap-10 sm:mt-20 md:grid-cols-[minmax(0,1fr)_340px]">
-          <RevealCopy />
-          <OnePlaceCard className="w-full max-w-[340px]" />
-        </div>
       </div>
     </div>
   )

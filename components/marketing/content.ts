@@ -28,12 +28,12 @@ export const ROUTES = {
 export const PRICE_LABEL = '249 Kč'
 export const CTA_LABEL = 'Vyzkoušet 14 dní zdarma'
 
-/** Kotvy v hlavičce (scrollspy). */
+/** Kotvy v hlavičce (scrollspy): čtyři bloky stránky v pořadí (R-081). */
 export const NAV = [
+  { id: 'chaos', label: 'Čísla' },
   { id: 'funkce', label: 'Funkce' },
-  { id: 'jak-to-funguje', label: 'Jak to funguje' },
-  { id: 'napojeni', label: 'Napojení webu' },
   { id: 'cenik', label: 'Ceník' },
+  { id: 'kontakt', label: 'Kontakt' },
 ] as const
 
 export const OBORY = [
@@ -83,29 +83,11 @@ export const DEMO_REQUESTS: readonly DemoRequest[] = [
 
 // --- Sekce -----------------------------------------------------------------
 
-export const STEPS = [
-  { n: '01', title: 'Zákazník se objedná', text: 'Na webu, přes odkaz nebo QR kód na pultu.' },
-  { n: '02', title: 'Zařadí se do kalendáře', text: 'Jako čárkovaný blok. Hned vidíte, kam padne.' },
-  { n: '03', title: 'Potvrdíte jedním klikem', text: 'V aplikaci nebo přímo z e-mailu.' },
-  { n: '04', title: 'Zbytek se počítá sám', text: 'Razítko, příjem do přehledu, připomínka.' },
-] as const
-
-export const MODULES = [
-  { n: '01', title: 'Poptávky', text: 'z webu, e-shopu, ručně' },
-  { n: '02', title: 'Kalendář a rezervace', text: 'služby, směny, blokace' },
-  { n: '03', title: 'Zákazníci', text: 'historie, poznámky, skupiny' },
-  { n: '04', title: 'Věrnostní karty', text: 'razítka a odměny' },
-  { n: '05', title: 'Zakázky', text: 'vlastní stavy a kolonky' },
-  { n: '06', title: 'Faktury', text: 'PDF a hlídání splatnosti' },
-  { n: '07', title: 'Příjmy a výdaje', text: 'graf a přehled měsíce' },
-  { n: '08', title: 'Daně', text: 'odhad a termíny' },
-  { n: '09', title: 'E-maily zákazníkům', text: 'potvrzení, připomínky' },
-] as const
-
 export const PRICE_INCLUDES = [
   'Neomezené poptávky a zákazníci',
   'Kalendář a rezervace',
   'Věrnostní karty',
+  'Zakázky s vlastními stavy a kolonkami',
   'Faktury, příjmy, odhad daní',
   'E-maily zákazníkům',
   'Napojení na web',
@@ -113,41 +95,25 @@ export const PRICE_INCLUDES = [
   'Jeden byznys a neomezeně pracovníků',
 ] as const
 
-/** Ukázkový název byznysu v sekci Napojení. Cesty podle R-016, doména R-030. */
+/** Ukázkový název byznysu v ukázce napojení (blok Představení). Cesty podle R-016, doména R-030. */
 export const CONNECT_SLUG = 'kadernictvi-lenka'
 
+/**
+ * Dotazy vedle formuláře v bloku Poptávka (R-081). Jen to, co stránka jinde neříká:
+ * napojení webu je v Představení, telefon i počítač v úvodu, kontakt je formulář hned vedle.
+ */
 export const FAQ: readonly { q: string; a: string }[] = [
   {
     q: 'Musím umět s počítačem?',
     a: 'Ne. Když zvládnete e-mail v telefonu, zvládnete i ZakazIQ. Po registraci vyberete obor a aplikace má hned připravené služby a kolonky.',
   },
   {
-    q: 'Jak napojím svůj web?',
-    a: 'Třemi způsoby. Pošlete zákazníkům odkaz na objednání, vložíte na web jeden řádek kódu, nebo vám web postavím a napojím sám. Napojení si pak ověříte jedním klikem.',
-  },
-  {
-    q: 'Co když nemám web?',
-    a: 'Nevadí. Dostanete vlastní stránku pro objednání a QR kód. Odkaz dáte na Instagram, do Google profilu nebo na pult.',
+    q: 'Co se stane po 14 dnech?',
+    a: 'Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho během zkušební doby zrušíte, nic nezaplatíte. Zrušit ho můžete kdykoli sami v nastavení účtu a data se nemažou, zůstanou vám k nahlédnutí.',
   },
   {
     q: 'Kde jsou moje data a kdo je vidí?',
     a: `Vidíte je jen vy a lidé, které do účtu pozvete. Data každé firmy jsou oddělená od ostatních. ${DATA_LOCATION} Podrobnosti najdete v Ochraně údajů.`,
-  },
-  {
-    q: 'Co se stane po 14 dnech?',
-    a: 'Pokud předplatné do té doby nezrušíte, strhneme z karty 249 Kč a dál každý měsíc. Týden předem vám přijde připomínka e-mailem. Když ho zrušíte, nic nezaplatíte a k datům se dostanete dál, jen je nepůjde měnit.',
-  },
-  {
-    q: 'Můžu předplatné kdykoli zrušit?',
-    a: 'Ano, sami v nastavení účtu. Data se nemažou, zůstanou vám k nahlédnutí.',
-  },
-  {
-    q: 'Funguje to na telefonu?',
-    a: 'Ano. Aplikace je dělaná tak, aby šla ovládat jednou rukou mezi dvěma zákazníky.',
-  },
-  {
-    q: 'Kde najdu pomoc, když se něco nedaří?',
-    a: `Napište mi na ${SUPPORT_LABEL}.`,
   },
 ]
 

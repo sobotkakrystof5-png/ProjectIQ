@@ -18,10 +18,10 @@ function PriceTiles() {
   )
 }
 
-/** 06 Ceník — jedna cena, žádné balíčky (R-018, R-026, R-038). */
+/** Blok 3 ze 4, Nabídka: jedna cena, žádné balíčky, jedna hlavní akce (R-018, R-026, R-038, R-081). */
 export function Pricing() {
   return (
-    <section id="cenik" aria-labelledby="cenik-title" className="mx-auto max-w-[1200px] px-3 pt-[56px] sm:px-7 md:pt-[96px]">
+    <section id="cenik" aria-labelledby="cenik-title" className="mx-auto max-w-[1200px] px-3 pt-[72px] sm:px-7 md:pt-[120px]">
       <div className="relative grid overflow-hidden rounded-slab bg-navy-950 text-white lg:grid-cols-2">
         <div className="relative overflow-hidden px-5 py-12 sm:px-10 md:py-16">
           <PriceTiles />
@@ -55,6 +55,9 @@ export function Pricing() {
                 </li>
               ))}
             </ul>
+            <p className="mt-5 max-w-[44ch] text-base leading-relaxed text-navy-200">
+              Co nepoužijete, si v nastavení vypnete. Z menu zmizí a data zůstanou.
+            </p>
           </div>
           <a
             href={ROUTES.signUp}
