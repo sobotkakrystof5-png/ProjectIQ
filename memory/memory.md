@@ -530,7 +530,7 @@
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-10
-- **chore** Práce na Supabase ze 2026-11-07 commitnutá na nové větvi `ws/supabase` (z `480d4d1`, stejný základ). Do té doby ležela jen necommitnutá ve worktree `claude/migrate-zakaziq-supabase-8a0dc9`, odkud je přenesená beze změny (187 souborů, porovnáno bajt po bajtu); ten worktree ji má dál necommitnutou. Starší worktree `claude/migrate-to-supabase-8c0cb9` je v ní celý obsažený (117 souborů shodných, 33 dál upravených, nic chybějícího). Ověřeno před commitem: `npx tsc --noEmit` 0 chyb, `npm test` 58 souborů (722 + 1 přeskočený), `sync-agent-context.mjs --check` shodné; build a prohlížeč ne. Nepushnuto.
+- **chore** Práce na Supabase ze 2026-11-07 commitnutá na nové větvi `ws/supabase` (z `480d4d1`, stejný základ). Do té doby ležela jen necommitnutá ve worktree `claude/migrate-zakaziq-supabase-8a0dc9`, odkud je přenesená beze změny (187 souborů, porovnáno bajt po bajtu); ten worktree ji má dál necommitnutou. Starší worktree `claude/migrate-to-supabase-8c0cb9` je v ní celý obsažený (117 souborů shodných, 33 dál upravených, nic chybějícího). Ověřeno před commitem: `npx tsc --noEmit` 0 chyb, `npm test` 58 souborů (722 + 1 přeskočený), `sync-agent-context.mjs --check` shodné; build a prohlížeč ne. Pushnuto na `origin/ws/supabase` i s 13 dříve nepushnutými commity z `ws/redesign-app` (před pushem prohledané na tajné hodnoty, nic nenalezeno).
 
 ### 2026-11-07
 - **chore** Supabase `zakaziq`: migrace 097–101, 103, 104 nahrané (102 už dřív), role `ws_app`/`portal_app` s přihlášením a právy, `.env.local` s připojením rolí; `scripts/neon-to-supabase.sh` umí `PRENOS_SCHEMATA` (výchozí `public portal`).
