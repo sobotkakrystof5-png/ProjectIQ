@@ -1,7 +1,7 @@
 -- Práva role ws_app na schéma ws (S06). Idempotentní, pouští se po migracích
 -- 064+ rolí, která migrace pouští (vlastník tabulek):
 --   node scripts/ws-create-role.js          (založí roli a pustí tenhle soubor)
---   nebo ručně v Neon SQL editoru
+--   nebo ručně v Supabase SQL editoru
 --
 -- ws_app nedostává nic ve schématu public — admin data nevidí. Vlastník
 -- tabulek (admin) RLS nepodléhá a ws čte bez dalšího grantu (/dashboard/klienti).
@@ -13,7 +13,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ws TO ws_app;
 -- Audit jen zapisovat a číst, nikdy přepisovat.
 REVOKE UPDATE, DELETE, TRUNCATE ON ws.audit_log FROM ws_app;
 
-GRANT EXECUTE ON FUNCTION ws.account_by_clerk_org(text) TO ws_app;
+-- Účet a role přihlášeného uživatele Supabase Auth (migrace 100, R-080)
+GRANT EXECUTE ON FUNCTION ws.membership_for_user(text, uuid) TO ws_app;
+-- Platnost relace a zapnuté 2FA (migrace 103, R-081).
+GRANT EXECUTE ON FUNCTION ws.auth_state(text, text) TO ws_app;
 
 -- Veřejné API, objednávací stránka a widget (migrace 076, S11)
 GRANT EXECUTE ON FUNCTION ws.integration_by_public_key(text) TO ws_app;
@@ -43,10 +46,14 @@ GRANT EXECUTE ON FUNCTION ws.purge_closed_accounts() TO ws_app;
 -- Zrušení ke konci zaplaceného období (migrace 097, R-074)
 GRANT EXECUTE ON FUNCTION ws.scheduled_closings() TO ws_app;
 
--- Peníze (migrace 080 a 088). Od RD02 předpokládá skript migrace 064–091 (od R-074 i 097);
+-- Peníze (migrace 080 a 088). Od RD02 předpokládá skript migrace 064–091 (od R-074 i 097, od R-080 i 100);
 -- ws-create-role.js dělí soubor podle středníků, bloky DO $$ sem nepatří.
 GRANT EXECUTE ON FUNCTION ws.money_issue(uuid,jsonb), ws.money_adopt_visit() TO ws_app;
 GRANT EXECUTE ON FUNCTION ws.money_pay(uuid,uuid,date,text), ws.money_unpay(uuid,uuid) TO ws_app;
 
--- Kontext byznysu jedním dotazem (migrace 085, RD02)
-GRANT EXECUTE ON FUNCTION ws.business_scope(text, text) TO ws_app;
+-- Kontext byznysu jedním dotazem (migrace 085, RD02; od 100 podle uživatele)
+GRANT EXECUTE ON FUNCTION ws.business_scope(text, uuid, text) TO ws_app;
+
+-- Pozvánky vlastníků z adminu (migrace 100): tabulku nevidí, kód uplatní jen funkce.
+REVOKE ALL ON ws.account_invites FROM ws_app;
+GRANT EXECUTE ON FUNCTION ws.redeem_account_invite(text, text, text, text) TO ws_app;

@@ -6,9 +6,12 @@
 //
 // Pouští se po migracích 064+ s DATABASE_URL (vlastník tabulek) z .env.local.
 //
-// Proč skript a ne Neon konzole: role založené v konzoli dostanou členství
-// v neon_superuser, který má BYPASSRLS — Row Level Security by pro ně
-// neplatila. Role založená přes SQL ho nemá. Skript to na konci ověří.
+// Proč skript a ne Supabase dashboard: role se musí založit bez BYPASSRLS a bez
+// členství v rolích, které ho mají (postgres, service_role…), jinak by pro ni
+// Row Level Security neplatila. Skript to na konci ověří.
+//
+// V Supabase se role připojuje přes Supavisor jako `ws_app.<project_ref>`
+// (skript uživatele v connection stringu odvodí z DATABASE_URL).
 //
 // Heslo se nikdy nevypisuje: connection string se zapíše rovnou do
 // .env.local jako DATABASE_URL_WS. Do Vercelu ho zkopírujte odtamtud.
@@ -16,30 +19,9 @@
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
-const { neon } = require('@neondatabase/serverless')
+const { BYPASS_CHECK_SQL, connect, loadEnvLocal, ownerDatabaseUrl, urlForRole, writeEnvValue } = require('./lib/db')
 
-const ENV_FILE = path.join(__dirname, '..', '.env.local')
 const GRANTS_FILE = path.join(__dirname, 'ws-grants.sql')
-
-// .env.local se čte ručně — dotenv není v závislostech projektu.
-function loadEnvLocal() {
-  if (!fs.existsSync(ENV_FILE)) return
-  for (const line of fs.readFileSync(ENV_FILE, 'utf8').split('\n')) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-    if (!m) continue
-    if (process.env[m[1]] === undefined) {
-      process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
-    }
-  }
-}
-
-function writeEnvValue(name, value) {
-  const raw = fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8') : ''
-  const line = `${name}=${value}`
-  const re = new RegExp(`^\\s*${name}\\s*=.*$`, 'm')
-  const next = re.test(raw) ? raw.replace(re, line) : `${raw}${raw.endsWith('\n') || raw === '' ? '' : '\n'}${line}\n`
-  fs.writeFileSync(ENV_FILE, next, { mode: 0o600 })
-}
 
 // Soubor s právy nemá $$ bloky, stačí dělit po střednících.
 function grantStatements() {
@@ -58,12 +40,13 @@ const newPassword = () => crypto.randomBytes(32).toString('base64url')
 
 async function main() {
   loadEnvLocal()
-  if (!process.env.DATABASE_URL) {
-    console.error('Chybí DATABASE_URL (.env.local nebo prostředí).')
+  const ownerUrl = ownerDatabaseUrl()
+  if (!ownerUrl) {
+    console.error('Chybí DATABASE_URL nebo POSTGRES_URL (.env.local nebo prostředí).')
     process.exit(1)
   }
   const rotate = process.argv.includes('--rotate')
-  const admin = neon(process.env.DATABASE_URL)
+  const admin = connect(ownerUrl)
 
   const [state] = await admin`
     SELECT
@@ -98,27 +81,18 @@ async function main() {
   console.log('✓ práva z scripts/ws-grants.sql nastavena')
 
   if (password) {
-    const url = new URL(process.env.DATABASE_URL)
-    url.username = 'ws_app'
-    url.password = password
-    writeEnvValue('DATABASE_URL_WS', url.toString())
-    process.env.DATABASE_URL_WS = url.toString()
+    const url = urlForRole(ownerUrl, 'ws_app', password)
+    writeEnvValue('DATABASE_URL_WS', url)
+    process.env.DATABASE_URL_WS = url
     console.log('✓ DATABASE_URL_WS zapsáno do .env.local (hodnota se nevypisuje) — nastavte ji i ve Vercelu')
   }
 
   // Kontrola: přihlásit se jako ws_app a ověřit, že RLS platí a public je zavřený.
-  const app = neon(process.env.DATABASE_URL_WS)
-  const [me] = await app`
-    SELECT current_user AS name, r.rolbypassrls AS bypass, r.rolsuper AS super,
-      EXISTS (
-        SELECT 1 FROM pg_auth_members m JOIN pg_roles g ON g.oid = m.roleid
-        WHERE m.member = r.oid AND g.rolname = 'neon_superuser'
-      ) AS neon_superuser
-    FROM pg_roles r WHERE r.rolname = current_user
-  `
+  const app = connect(process.env.DATABASE_URL_WS)
+  const [me] = await app.query(BYPASS_CHECK_SQL)
   const problems = []
   if (me.name !== 'ws_app') problems.push(`přihlášen jako ${me.name}, ne ws_app`)
-  if (me.bypass || me.super || me.neon_superuser) problems.push('role obchází RLS (BYPASSRLS / superuser / neon_superuser)')
+  if (me.bypass || me.super || me.inherits_bypass) problems.push('role obchází RLS (BYPASSRLS / superuser / členství v roli, která ho má)')
 
   try {
     await app`SELECT 1 FROM public.projects LIMIT 1`
@@ -137,7 +111,7 @@ async function main() {
   console.log('✓ kontrola: ws_app bez BYPASSRLS, do public nevidí, bez účtu nevidí nic')
 }
 
-main().catch((e) => {
+main().then(() => process.exit(0)).catch((e) => {
   console.error(`✗ ${e.message}${e.code ? ` (${e.code})` : ''}`)
   process.exit(1)
 })

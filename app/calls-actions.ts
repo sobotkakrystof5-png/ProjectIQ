@@ -2,8 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { getAdminSession, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { sendPlainEmail } from '@/lib/email'
 import { notifyClientOfProjectChange } from '@/app/actions'
@@ -27,7 +26,7 @@ export type LeadPayload = {
 }
 
 export async function getLeads() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return []
   return await sql`
     SELECT *, next_action_date::text AS next_action_date FROM client_leads ORDER BY created_at DESC
@@ -35,7 +34,7 @@ export async function getLeads() {
 }
 
 export async function getAllLeadNotes(): Promise<LeadNote[]> {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return []
   return (await sql`SELECT * FROM lead_notes ORDER BY created_at DESC`) as unknown as LeadNote[]
 }

@@ -32,7 +32,7 @@ beforeAll(async () => {
     )
   `)
   await db.exec('CREATE TABLE client_feedback (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE, nps integer NOT NULL, content text, created_at timestamptz DEFAULT now())')
-  for (const f of ['092_client_requests.sql', '093_project_activity.sql', '095_portal_schema.sql', '096_portal_requests_messages.sql']) {
+  for (const f of ['092_client_requests.sql', '093_project_activity.sql', '095_portal_schema.sql', '096_portal_requests_messages.sql', '101_portal_supabase_auth.sql']) {
     await db.exec(read('migrations', f))
   }
   // idempotence
@@ -48,7 +48,7 @@ beforeAll(async () => {
     [OLD, RECENT_MSG, OPEN],
   )
   await db.query("INSERT INTO portal.clients (id, name) VALUES ($1, 'Klient')", [C])
-  await db.query("INSERT INTO portal.members (id, client_id, clerk_user_id) VALUES ($1, $2, 'user_1')", [M, C])
+  await db.query("INSERT INTO portal.members (id, client_id, user_id) VALUES ($1, $2, 'user_1')", [M, C])
   for (const p of [OLD, RECENT_MSG, OPEN]) {
     await db.query('SELECT portal.link_project($1, $2)', [C, p])
     await db.query(

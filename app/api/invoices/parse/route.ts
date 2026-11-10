@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { readPdfUpload } from '@/lib/invoices'
 import { extractInvoiceFromPdf } from '@/lib/invoice-ai'
 
@@ -11,7 +10,7 @@ import { extractInvoiceFromPdf } from '@/lib/invoice-ai'
  * prohlédl a případně přepsal. Uložení řeší až server action archivu.
  *
  * Stejně jako u servírování PDF platí, že `proxy.ts` na `/api` nesahá:
- * `getServerSession` je jediná ochrana, ne pojistka navíc. Faktury nesou
+ * `getAdminSession` je jediná ochrana, ne pojistka navíc. Faktury nesou
  * údaje klientů a nesmí projít ven.
  */
 
@@ -19,7 +18,7 @@ import { extractInvoiceFromPdf } from '@/lib/invoice-ai'
 export const maxDuration = 60
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) {
     return NextResponse.json({ success: false, error: 'Neautorizovaný přístup' }, { status: 401 })
   }

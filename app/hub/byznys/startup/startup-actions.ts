@@ -1,12 +1,11 @@
 'use server'
 
 import { sql } from '@/lib/db'
-import { neon } from '@neondatabase/serverless'
+import { createSql } from '@/lib/pg'
 import { Resend } from 'resend'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import type {
   StartupProject,
   StartupImprovement,
@@ -18,7 +17,7 @@ import type {
 } from '@/lib/types'
 
 async function requireAuth() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Unauthorized')
 }
 
@@ -299,10 +298,14 @@ export async function deleteChangelogEntry(
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────
 
+// Waitlist žije v databázi startupu (libovolný Postgres — Supabase, Neon…),
+// URL je uložená u projektu.
+const waitlistSql = (dbUrl: string) => createSql(() => dbUrl, 'Chybí URL databáze waitlistu.')
+
 export async function getWaitlistEntries(dbUrl: string): Promise<WaitlistEntry[]> {
   await requireAuth()
   try {
-    const wsql = neon(dbUrl)
+    const wsql = waitlistSql(dbUrl)
     const rows = await wsql`
       SELECT id, email, name, locale, created_at::text, launch_notified
       FROM waitlist
@@ -327,7 +330,7 @@ export async function sendLaunchEmailBlast(
   const resend = new Resend(resendKey)
 
   try {
-    const wsql = neon(opts.dbUrl)
+    const wsql = waitlistSql(opts.dbUrl)
     const entries = await wsql`
       SELECT id, email, name FROM waitlist
       WHERE launch_notified = FALSE

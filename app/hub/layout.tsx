@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
 import Link from 'next/link'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { HubSidebarNav } from '@/components/HubSidebarNav'
 import { LogoutButton } from '@/app/dashboard/LogoutButton'
 
@@ -19,7 +18,7 @@ function HubLogo() {
 }
 
 export default async function HubLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) redirect('/login')
 
   const email = session.user?.email ?? ''

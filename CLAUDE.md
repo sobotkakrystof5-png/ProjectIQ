@@ -17,8 +17,8 @@ Jedna Next.js aplikace se třemi částmi:
 
 | Část | Cesty | Přihlášení | Stav |
 |---|---|---|---|
-| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/alteno/*`, `/hub/*`, `/login`, `/p/[token]`, `/h/[token]` | NextAuth (jeden admin) | **beze změny**, dokumentace v `docs/admin/AGENTS-ADMIN.md` |
-| **ZakazIQ Workspace** (SaaS pro firmy) | `/w/*`, `/api/ws/*`, `/api/public/v1/*` | Clerk | ve výstavbě |
+| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/alteno/*`, `/hub/*`, `/login`, `/p/[token]`, `/h/[token]` | Supabase Auth (jeden admin, `ADMIN_EMAIL`, R-080) | dokumentace v `docs/admin/AGENTS-ADMIN.md` |
+| **ZakazIQ Workspace** (SaaS pro firmy) | `/w/*`, `/api/ws/*`, `/api/public/v1/*` | Supabase Auth (e-mail + heslo, Google) | ve výstavbě |
 | **Landing page** | `/` a marketingové stránky v `app/(marketing)/` | žádné | ve výstavbě |
 
 Workspace je přehled podnikání pro malé firmy (kadeřnictví, zámečnictví, studnařství, likvidace azbestu…): poptávky z webu, kalendář, zákazníci a věrnostní karty, zakázky, faktury, příjmy, odhad daní. Jeden tarif **249 Kč měsíčně** přes Stripe, registrace přímo z landing page.
@@ -48,7 +48,7 @@ Projektové skilly (`.claude/skills/`, identická kopie pro Codex v `.agents/ski
 | Skill | Kdy |
 |---|---|
 | `zakaziq-design-dilky` | jakákoli UI práce ve Workspace, portálu, landing page, e-mailech |
-| `zakaziq-workspace-backend` | DB, migrace, server actions, API, Clerk, Stripe, příjem poptávek |
+| `zakaziq-workspace-backend` | DB, migrace, server actions, API, Supabase Auth, Stripe, příjem poptávek |
 | `zakaziq-ux-texty-cs` | každý text, který uvidí uživatel nebo zákazník |
 | `zakaziq-memory` | začátek a konec sezení, zápis rozhodnutí — zapisuje do `memory/` podle `memory/pravidla.md` |
 

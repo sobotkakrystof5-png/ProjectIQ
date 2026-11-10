@@ -90,7 +90,7 @@ describe('migrace ws', () => {
         [table],
       )
       expect({ table, ...rows[0] }).toEqual({ table, rls: true, policies: 1 })
-      for (const sql of [`SELECT * FROM ws.${table}`, `DELETE FROM ws.${table}`, `INSERT INTO ws.${table} (account_id, note, updated_by) VALUES ('${A.account}', 'x', 'x')`]) {
+      for (const sql of [`SELECT * FROM ws.${table}`, `DELETE FROM ws.${table}`, `INSERT INTO ws.${table} (account_id) VALUES ('${A.account}')`]) {
         expect({ table, sql, code: await pgCode(asApp(db, A.account, (tx) => tx.query(sql))) }).toEqual({ table, sql, code: '42501' })
       }
     }
@@ -195,13 +195,20 @@ describe('oddělení účtů (RLS jako ws_app)', () => {
     expect(await pgCode(asApp(db, A.account, (tx) => tx.query('ALTER TABLE ws.customers DISABLE ROW LEVEL SECURITY')))).toBe('42501')
   })
 
-  it('ws.account_by_clerk_org najde účet bez kontextu, přímý SELECT ne', async () => {
+  it('ws.membership_for_user najde účet a roli bez kontextu, přímý SELECT ne', async () => {
     const res = await asApp(db, null, async (tx) => ({
-      viaFunction: (await tx.query<{ id: string }>(`SELECT ws.account_by_clerk_org('org_b') AS id`)).rows[0].id,
-      direct: (await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM ws.accounts`)).rows[0].n,
-      unknown: (await tx.query<{ id: string | null }>(`SELECT ws.account_by_clerk_org('org_neni') AS id`)).rows[0].id,
+      viaFunction: (await tx.query(`SELECT account_id, role FROM ws.membership_for_user('user_b')`)).rows,
+      direct: (await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM ws.members`)).rows[0].n,
+      unknown: (await tx.query(`SELECT * FROM ws.membership_for_user('user_neni')`)).rows,
+      // Zvolený cizí účet nic nezmění — vrátí se jen vlastní členství.
+      foreign: (await tx.query(`SELECT account_id FROM ws.membership_for_user('user_b', '${A.account}')`)).rows,
     }))
-    expect(res).toEqual({ viaFunction: B.account, direct: 0, unknown: null })
+    expect(res).toEqual({
+      viaFunction: [{ account_id: B.account, role: 'owner' }],
+      direct: 0,
+      unknown: [],
+      foreign: [{ account_id: B.account }],
+    })
   })
 
   it('pomocné funkce migrací ws_app spustit nesmí', async () => {

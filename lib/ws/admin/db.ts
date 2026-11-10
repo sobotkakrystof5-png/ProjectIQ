@@ -1,5 +1,6 @@
 import 'server-only'
-import { neon } from '@neondatabase/serverless'
+import { unstable_noStore as noStore } from 'next/cache'
+import { ownerDatabaseUrl, pgTransaction } from '../../pg'
 import { q, type WsDriver, type WsQuery, type WsRow } from '../db'
 
 // Admin konzole nad schématem ws (S17, R-052). Připojení přes DATABASE_URL —
@@ -11,21 +12,21 @@ import { q, type WsDriver, type WsQuery, type WsRow } from '../db'
 // Všechno, co mění data účtu klienta (založení účtu, klíče webu), jde přes
 // lib/ws (role ws_app pod RLS) s accountId ověřeným tady.
 
-function neonOwnerDriver(): WsDriver {
-  const url = process.env.DATABASE_URL
-  if (!url) throw new Error('Chybí DATABASE_URL — admin čte ws rolí vlastníka tabulek.')
-  const sql = neon(url, { fetchOptions: { cache: 'no-store' } })
+function ownerDriver(): WsDriver {
+  const url = ownerDatabaseUrl()
+  if (!url) throw new Error('Chybí DATABASE_URL (nebo POSTGRES_URL) — admin čte ws rolí vlastníka tabulek.')
   return {
     async transaction(queries) {
-      return (await sql.transaction(queries.map((x) => sql.query(x.text, [...x.params])))) as WsRow[][]
+      noStore()
+      return pgTransaction(url, queries)
     },
   }
 }
 
 let driver: WsDriver | null = null
-const getDriver = (): WsDriver => (driver ??= neonOwnerDriver())
+const getDriver = (): WsDriver => (driver ??= ownerDriver())
 
-/** Jen pro testy: PGlite jako vlastník (bez SET ROLE). `null` vrátí Neon. */
+/** Jen pro testy: PGlite jako vlastník (bez SET ROLE). `null` vrátí Postgres z DATABASE_URL. */
 export function setAdminDriverForTests(next: WsDriver | null): void {
   driver = next
 }

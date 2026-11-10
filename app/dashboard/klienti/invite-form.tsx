@@ -9,7 +9,7 @@ import { inviteClientAction } from './actions'
 const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
 
 /**
- * Pozvat klienta (S17): Clerk organizace + účet a byznys ze šablony oboru +
+ * Pozvat klienta (S17): účet a byznys ze šablony oboru +
  * pozvánka e-mailem. Klient po registraci rovnou zadá kartu (krok 2 průvodce).
  */
 export function InviteClientForm({ industries }: { industries: { key: string; label: string }[] }) {
@@ -61,7 +61,7 @@ export function InviteClientForm({ industries }: { industries: { key: string; la
         </button>
       </div>
       <p className="text-[12px] text-muted-foreground">
-        Založí účet a byznys podle šablony oboru a pošle klientovi pozvánku z Clerku. Po registraci zadá kartu (14 dní zdarma) a může začít.
+        Založí účet a byznys podle šablony oboru a pošle klientovi pozvánku e-mailem. Po převzetí účtu zadá kartu (14 dní zdarma) a může začít.
       </p>
       <div className="grid sm:grid-cols-3 gap-3">
         <label className="space-y-1">

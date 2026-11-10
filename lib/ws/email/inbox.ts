@@ -24,7 +24,7 @@ export function newsQueries(ctx: WsContext): [WsQuery, WsQuery] {
     q`SELECT id, title, body, link_url, tag, image_type IS NOT NULL AS has_image, published_at FROM ws.product_news
       WHERE published_at IS NOT NULL AND published_at <= now() AND published_at > now() - interval '120 days'
       ORDER BY published_at DESC LIMIT 3`,
-    q`SELECT news_seen_at FROM ws.members WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`,
+    q`SELECT news_seen_at FROM ws.members WHERE account_id = ${ctx.accountId} AND user_id = ${ctx.userId}`,
   ]
 }
 
@@ -52,6 +52,6 @@ export async function markBellSeen(ctx: WsContext, business: Pick<WsBusiness, 'i
   await wsDb(ctx).batch([
     q`UPDATE ws.notifications SET read_at = now()
       WHERE account_id = ${ctx.accountId} AND (business_id = ${business.id} OR business_id IS NULL) AND read_at IS NULL`,
-    q`UPDATE ws.members SET news_seen_at = now() WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`,
+    q`UPDATE ws.members SET news_seen_at = now() WHERE account_id = ${ctx.accountId} AND user_id = ${ctx.userId}`,
   ])
 }

@@ -1,33 +1,40 @@
 import * as React from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { wsDb, wsSystem } from './db'
-import { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH } from './paths'
+import { WS_MFA_PATH, WS_ONBOARDING_PATH, WS_SIGN_IN_PATH } from './paths'
 
 // Kontext každé server action, route handleru a server komponenty Workspace
 // (AGENTS.md B3): `const ctx = await requireWorkspace()` je první řádek.
 //
-// Přihlášení je za rozhraním WsAuthProvider. Výchozí je Clerk (auth() z
-// @clerk/nextjs/server → userId, aktivní organizace, role). Testy si přes
-// setWsAuthProvider podstrčí vlastní identitu a Clerk se v nich nenačte.
+// Přihlášení je za rozhraním WsAuthProvider. Výchozí je Supabase Auth (R-080):
+// id uživatele z ověřeného JWT. Do kterého účtu patří a s jakou rolí, říká jen
+// databáze (ws.members přes ws.membership_for_user). Testy si přes
+// setWsAuthProvider podstrčí vlastní identitu a Supabase se v nich nenačte.
 
 export type WsRole = 'owner' | 'staff'
 export type WsContext = { userId: string; accountId: string; role: WsRole }
 
-export type WsIdentity = { userId: string; orgId: string | null; orgRole: string | null }
+export type WsIdentity = {
+  userId: string
+  email: string | null
+  /** Úroveň ověření relace (R-081). Chybí jen u testovacích identit. */
+  aal?: 'aal1' | 'aal2'
+  /** Relace v auth.sessions. Bez ní (testy) se stav přihlášení v DB neověřuje. */
+  sessionId?: string | null
+}
 export type WsAuthProvider = () => Promise<WsIdentity | null>
 
-const clerkAuthProvider: WsAuthProvider = async () => {
-  const { auth } = await import('@clerk/nextjs/server')
-  const { userId, orgId, orgRole } = await auth()
-  if (!userId) return null
-  return { userId, orgId: orgId ?? null, orgRole: orgRole ?? null }
+const supabaseAuthProvider: WsAuthProvider = async () => {
+  const { getAuthIdentity } = await import('@/lib/supabase/server')
+  const identity = await getAuthIdentity()
+  return identity ? { userId: identity.id, email: identity.email, aal: identity.aal, sessionId: identity.sessionId } : null
 }
 
-let authProvider: WsAuthProvider = clerkAuthProvider
+let authProvider: WsAuthProvider = supabaseAuthProvider
 
-/** Jen pro testy: vlastní identita. `null` vrátí Clerk. */
+/** Jen pro testy: vlastní identita. `null` vrátí Supabase Auth. */
 export function setWsAuthProvider(provider: WsAuthProvider | null): void {
-  authProvider = provider ?? clerkAuthProvider
+  authProvider = provider ?? supabaseAuthProvider
 }
 
 export { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH }
@@ -39,15 +46,41 @@ export { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH }
 type Cache = <F extends (...args: never[]) => unknown>(fn: F) => F
 const cache: Cache = (React as unknown as { cache?: Cache }).cache ?? ((fn) => fn)
 
-/** Přihlášený člověk s aktivní organizací; jinak přesměruje na přihlášení nebo průvodce. */
-export async function requireIdentity(): Promise<WsIdentity & { orgId: string }> {
+/** Zrušená relace (Odhlásit všude): /auth/odhlaseni smaže cookies a pošle na přihlášení. */
+export const WS_REVOKED_PATH = '/auth/odhlaseni?kam=w'
+
+// Platí relace ještě a má člověk zapnuté 2FA? (migrace 103, R-081). JWT se
+// ověřuje jen podpisem, tohle ví jen databáze. Jednou na požadavek.
+const authState = cache(async (userId: string, sessionId: string) => {
+  const [row] = await wsSystem<{ session_ok: boolean; mfa_enrolled: boolean }>`
+    SELECT session_ok, mfa_enrolled FROM ws.auth_state(${userId}, ${sessionId})
+  `
+  return row ?? { session_ok: false, mfa_enrolled: false }
+})
+
+/**
+ * Přihlášený člověk; jinak přesměruje na přihlášení. Účet ještě nemusí mít.
+ * Relaci zrušenou z jiného zařízení pošle na odhlášení, se zapnutým 2FA bez
+ * ověřeného kódu na /w/overeni (R-081).
+ */
+export async function requireIdentity(): Promise<WsIdentity> {
   const identity = await authProvider()
   if (!identity) redirect(WS_SIGN_IN_PATH)
-  if (!identity.orgId) redirect(WS_ONBOARDING_PATH)
-  return { ...identity, orgId: identity.orgId }
+  if (identity.sessionId) {
+    const state = await authState(identity.userId, identity.sessionId)
+    if (!state.session_ok) redirect(WS_REVOKED_PATH)
+    if (state.mfa_enrolled && identity.aal !== 'aal2') redirect(WS_MFA_PATH)
+  }
+  return identity
 }
 
-export const roleOf = (orgRole: string | null): WsRole => (orgRole === 'org:admin' ? 'owner' : 'staff')
+/** Přihlášený člověk, nebo null (bez přesměrování) — průvodce /w/novy, pozvánka. */
+export async function currentIdentity(): Promise<WsIdentity | null> {
+  return authProvider()
+}
+
+/** Role z ws.members. Cokoli jiného než `owner` = pracovník (méně práv). */
+export const roleOf = (role: unknown): WsRole => (role === 'owner' ? 'owner' : 'staff')
 
 // Co o účtu a byznysu už víme z jednoho dotazu na začátku požadavku
 // (`loadBusinessScope` v scope.ts, RD02). Stejný React.cache jako výše, takže
@@ -81,13 +114,15 @@ export const requireWorkspace = cache(async function requireWorkspace(): Promise
   const identity = await requireIdentity()
 
   // Účet ještě neznáme, proto SECURITY DEFINER funkce místo SELECT pod RLS.
-  const [row] = await wsSystem<{ id: string | null }>`SELECT ws.account_by_clerk_org(${identity.orgId}) AS id`
-  if (!row?.id) redirect(WS_ONBOARDING_PATH)
+  const [row] = await wsSystem<{ account_id: string | null; role: string | null }>`
+    SELECT account_id, role FROM ws.membership_for_user(${identity.userId})
+  `
+  if (!row?.account_id) redirect(WS_ONBOARDING_PATH)
 
   return {
     userId: identity.userId,
-    accountId: row.id,
-    role: roleOf(identity.orgRole),
+    accountId: row.account_id,
+    role: roleOf(row.role),
   }
 })
 

@@ -3,7 +3,7 @@ import { AccentHeading, Logo, TileField } from '@/components/ws/brand'
 
 /**
  * Rozložení přihlášení a registrace: vlevo tmavý panel s polem dílků (jen na
- * širokém displeji), vpravo formulář Clerku. Na telefonu jen logo a formulář.
+ * širokém displeji), vpravo formulář (components/ws/auth/auth-form.tsx). Na telefonu jen logo a formulář.
  */
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (

@@ -3,18 +3,18 @@ import { isUniqueViolation, pgConstraint, q, wsDb, wsSystem } from './db'
 import { RESERVED_BUSINESS_SLUGS } from './paths'
 import { getIndustryTemplate, templateSeedQueries, type IndustryKey } from './templates'
 
-// Založení účtu s prvním byznysem (průvodce /w/novy, S07). Clerk organizaci
-// zakládá server action, tady je jen databázová část, aby šla otestovat.
+// Založení účtu s prvním byznysem (průvodce /w/novy, S07). Účet = firma;
+// kdo do něj patří, drží ws.members (od R-080 bez Clerk organizací).
 //
 // Účet ještě neexistuje, takže jeho id vygenerujeme sami a celá transakce
 // běží s app.account_id = to nové id — RLS (WITH CHECK) pustí jen řádky
 // zakládaného účtu. Účet, vlastník, byznys a šablona oboru jdou v jedné
 // transakci: buď je všechno, nebo nic.
 
-/** Účet k organizaci Clerku, nebo null. Jediný dotaz před známým účtem (SECURITY DEFINER). */
-export async function accountIdForOrg(orgId: string): Promise<string | null> {
-  const [row] = await wsSystem<{ id: string | null }>`SELECT ws.account_by_clerk_org(${orgId}) AS id`
-  return row?.id ?? null
+/** Účet, do kterého uživatel patří (nejstarší členství), nebo null. SECURITY DEFINER — účet ještě neznáme. */
+export async function accountIdForUser(userId: string): Promise<string | null> {
+  const [row] = await wsSystem<{ account_id: string | null }>`SELECT account_id FROM ws.membership_for_user(${userId})`
+  return row?.account_id ?? null
 }
 
 const SLUG_MAX = 60
@@ -43,13 +43,12 @@ function slugCandidate(base: string, attempt: number): string {
 }
 
 export type NewAccountInput = {
-  orgId: string
   /** Název byznysu — zatím i název účtu (firmy), IČO a fakturační údaje se doplní v Nastavení. */
   name: string
   industry: IndustryKey
   /**
    * Vlastník z průvodce. `null` = účet zakládá admin pro pozvaného klienta
-   * (S17) — člen se zapíše, až pozvánku přijme (`ensureMember`).
+   * (S17) — člen se zapíše, až pozvánku přijme (ws.redeem_account_invite).
    */
   owner: { userId: string; name: string | null; email: string | null } | null
 }
@@ -60,8 +59,8 @@ const MAX_ATTEMPTS = 5
 
 /**
  * Založí účet, vlastníka, byznys a obsah ze šablony oboru. Obsazený slug zkusí
- * znovu s náhodnou koncovkou. Má-li organizace účet už teď (dvojklik, druhá
- * záložka), vrátí ten existující s `created: false`.
+ * znovu s náhodnou koncovkou. Vlastní-li uživatel účet už teď (dvojklik, druhá
+ * záložka), vrátí ten existující s `created: false` (members_one_owned_account_uq).
  */
 export async function createAccountWithBusiness(input: NewAccountInput): Promise<NewAccountResult> {
   const template = getIndustryTemplate(input.industry)
@@ -73,11 +72,11 @@ export async function createAccountWithBusiness(input: NewAccountInput): Promise
     const slug = slugCandidate(base, attempt)
     try {
       await wsDb({ accountId }).batch([
-        q`INSERT INTO ws.accounts (id, clerk_org_id, name) VALUES (${accountId}, ${input.orgId}, ${input.name})`,
+        q`INSERT INTO ws.accounts (id, name) VALUES (${accountId}, ${input.name})`,
         ...(input.owner
           ? [
               q`
-                INSERT INTO ws.members (account_id, clerk_user_id, role, name, email)
+                INSERT INTO ws.members (account_id, user_id, role, name, email)
                 VALUES (${accountId}, ${input.owner.userId}, 'owner', ${input.owner.name}, ${input.owner.email})
               `,
             ]
@@ -92,34 +91,12 @@ export async function createAccountWithBusiness(input: NewAccountInput): Promise
     } catch (e) {
       if (!isUniqueViolation(e)) throw e
       const constraint = pgConstraint(e)
-      if (constraint === 'accounts_clerk_org_id_key') {
-        const existing = await accountIdForOrg(input.orgId)
+      if (constraint === 'members_one_owned_account_uq' && input.owner) {
+        const existing = await accountIdForUser(input.owner.userId)
         if (existing) return { accountId: existing, created: false }
       }
       if (constraint !== 'businesses_slug_key') throw e
     }
   }
   throw new Error('createAccountWithBusiness: nenašel se volný slug')
-}
-
-/**
- * Člen účtu podle organizace Clerku, když ho ws.members ještě nezná — klient
- * pozvaný z adminu (S17) bez webhooku Clerku. Existující řádek nemění.
- * Vrací true, když člena zapsal.
- */
-export async function ensureMember(
-  ctx: { accountId: string; userId: string; role: 'owner' | 'staff' },
-  profile: () => Promise<{ name: string | null; email: string | null }>,
-): Promise<boolean> {
-  const db = wsDb(ctx)
-  const [known] = await db<{ id: string }>`
-    SELECT id FROM ws.members WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}`
-  if (known) return false
-  const p = await profile()
-  const rows = await db<{ id: string }>`
-    INSERT INTO ws.members (account_id, clerk_user_id, role, name, email)
-    VALUES (${ctx.accountId}, ${ctx.userId}, ${ctx.role}, ${p.name}, ${p.email})
-    ON CONFLICT (account_id, clerk_user_id) DO NOTHING
-    RETURNING id`
-  return rows.length > 0
 }

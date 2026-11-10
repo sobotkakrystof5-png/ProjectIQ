@@ -10,7 +10,7 @@
 // Byznys se dohledá rolí vlastníka (DATABASE_URL), zápis jde rolí ws_app
 // (DATABASE_URL_WS) pod Row Level Security, stejně jako aplikace.
 //
-// Pozor: DATABASE_URL v .env.local míří na produkční Neon. Pouštět jen na
+// Pozor: DATABASE_URL v .env.local míří na produkční databázi. Pouštět jen na
 // vlastním testovacím účtu.
 //
 // Potřebuje Node 22.18+ (spouští lib/ws/demo-seed.ts bez překladu).
@@ -18,8 +18,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { neon } from '@neondatabase/serverless'
+import { createRequire } from 'node:module'
 import { demoCleanupQueries, demoSeedQueries } from '../lib/ws/demo-seed.ts'
+
+const { connect, ownerDatabaseUrl } = createRequire(import.meta.url)('./lib/db.js')
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -54,14 +56,12 @@ async function main() {
     console.error('Použití: node scripts/ws-seed.mjs <slug-byznysu> [--smazat] --ano')
     process.exit(1)
   }
-  for (const name of ['DATABASE_URL', 'DATABASE_URL_WS']) {
-    if (!process.env[name]) {
-      console.error(`Chybí ${name} v .env.local (docs/workspace/SETUP.md).`)
-      process.exit(1)
-    }
+  if (!ownerDatabaseUrl() || !process.env.DATABASE_URL_WS) {
+    console.error('Chybí DATABASE_URL (nebo POSTGRES_URL) a DATABASE_URL_WS v .env.local (docs/workspace/SETUP.md).')
+    process.exit(1)
   }
 
-  const owner = neon(process.env.DATABASE_URL)
+  const owner = connect(ownerDatabaseUrl())
   const rows = await owner.query('SELECT id, account_id, name FROM ws.businesses WHERE slug = $1', [slug])
   const business = rows[0]
   if (!business) {
@@ -80,11 +80,12 @@ async function main() {
     return
   }
 
-  const app = neon(process.env.DATABASE_URL_WS)
+  const app = connect(process.env.DATABASE_URL_WS)
   await app.transaction([
-    app.query("SELECT set_config('app.account_id', $1, true)", [scope.accountId]),
-    ...queries.map((x) => app.query(x.text, x.params)),
+    { text: "SELECT set_config('app.account_id', $1, true)", params: [scope.accountId] },
+    ...queries.map((x) => ({ text: x.text, params: [...x.params] })),
   ])
+  await Promise.all([owner.end(), app.end()])
   console.log(`Hotovo: ${business.name} (${slug}) — ${what}.`)
   if (!removeOnly) console.log(`Otevřete /w/${slug}. Smazání: node scripts/ws-seed.mjs ${slug} --smazat --ano`)
 }

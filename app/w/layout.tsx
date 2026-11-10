@@ -1,12 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { cookies, headers } from 'next/headers'
-import { ClerkProvider } from '@clerk/nextjs'
-import { csCZ } from '@clerk/localizations'
 import { PwaRegister } from '@/components/ws/app/pwa-register'
 import { WsRoot } from '@/components/ws/ws-root'
-import { clerkAppearance } from '@/components/ws/auth/clerk-appearance'
 import { wsFontVariables } from '@/lib/ws/fonts'
-import { WS_HOME_PATH, WS_ONBOARDING_PATH, WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
 import { parseThemePref, THEME_COOKIE } from '@/lib/ws/theme'
 import { parsePrivacyMode, PRIVACY_COOKIE } from '@/lib/ws/privacy'
 import '../ws-tokens.css'
@@ -33,9 +29,8 @@ export const viewport: Viewport = {
 // renderované stránky — statická by měla skripty bez nonce a prohlížeč je zablokuje.
 export const dynamic = 'force-dynamic'
 
-// Layout aplikace Workspace. Clerk jen tady (ne v kořenovém layoutu adminu):
-// `dynamic` = ClerkProvider vezme nonce z hlavičky x-nonce a dá ho skriptu
-// clerk-js. Telemetrie vypnutá — jinak by potřebovala další host v CSP.
+// Layout aplikace Workspace. Přihlášení (Supabase Auth, R-080) hlídá proxy.ts
+// a requireWorkspace(); layout žádného poskytovatele přihlášení nepotřebuje.
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   // Vzhled z Účtu (S18); nonce kvůli skriptu „Podle systému“ ve WsRoot.
   const cookieJar = await cookies()
@@ -43,21 +38,9 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
   const privacyMode = parsePrivacyMode(cookieJar.get(PRIVACY_COOKIE)?.value)
   const nonce = (await headers()).get('x-nonce') ?? undefined
   return (
-    <ClerkProvider
-      dynamic
-      localization={csCZ}
-      appearance={clerkAppearance}
-      telemetry={false}
-      signInUrl={WS_SIGN_IN_PATH}
-      signUpUrl={WS_SIGN_UP_PATH}
-      signInFallbackRedirectUrl={WS_HOME_PATH}
-      signUpFallbackRedirectUrl={WS_ONBOARDING_PATH}
-      afterSignOutUrl="/"
-    >
-      <WsRoot fontClassName={wsFontVariables} themePref={themePref} privacyMode={privacyMode} nonce={nonce}>
-        <PwaRegister />
-        {children}
-      </WsRoot>
-    </ClerkProvider>
+    <WsRoot fontClassName={wsFontVariables} themePref={themePref} privacyMode={privacyMode} nonce={nonce}>
+      <PwaRegister />
+      {children}
+    </WsRoot>
   )
 }

@@ -1,70 +1,35 @@
-import type { NextAuthOptions } from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { getServerSession } from 'next-auth'
-import bcrypt from 'bcryptjs'
-import { sql } from './db'
+import 'server-only'
+import { cache } from 'react'
+import { getAuthIdentity, getAuthUser } from './supabase/server'
+import { isAdminIdentity } from './auth/admin-identity'
 
-const MAX_FAILED_ATTEMPTS = 5
-const LOCKOUT_WINDOW_MINUTES = 15
+// Přihlášení do admin konzole (/dashboard, /alteno, /hub) přes Supabase Auth
+// (R-080, dřív NextAuth). Admin je jediný účet s ADMIN_EMAIL a ověřeným
+// e-mailem (lib/auth/admin-identity.ts). Od R-081 navíc povinně dvoufázové
+// ověření: relace musí mít úroveň aal2 (heslo + kód z aplikace). Kontrolu dělá
+// i proxy.ts; tady je ta rozhodující — uživatel se čte přímo z Auth serveru
+// (zrušená relace = null), úroveň z ověřeného JWT.
 
-function getClientIp(req?: { headers?: Record<string, string | string[] | undefined> }): string {
-  const fwd = req?.headers?.['x-forwarded-for']
-  const value = Array.isArray(fwd) ? fwd[0] : fwd
-  return value ? value.split(',')[0].trim() : 'unknown'
-}
+export type AdminSession = { user: { id: string; email: string } }
 
-async function isLockedOut(ip: string): Promise<boolean> {
-  const rows = await sql`
-    SELECT count(*)::int AS count FROM login_attempts
-    WHERE ip = ${ip} AND success = false
-      AND created_at > now() - interval '1 minute' * ${LOCKOUT_WINDOW_MINUTES}
-  `
-  return (rows[0] as { count: number }).count >= MAX_FAILED_ATTEMPTS
-}
+/**
+ * Admin účet přihlášený heslem, ať už s 2FA, nebo bez — jen pro /login a
+ * /login/overeni, kde se druhý faktor ověřuje nebo zakládá. Jinde vždy
+ * `getAdminSession`. Jednou na požadavek.
+ */
+export const getAdminCandidate = cache(async (): Promise<AdminSession | null> => {
+  const user = await getAuthUser()
+  if (!user || !user.emailConfirmed || !user.email || !isAdminIdentity(user)) return null
+  return { user: { id: user.id, email: user.email } }
+})
 
-async function recordAttempt(ip: string, success: boolean): Promise<void> {
-  await sql`INSERT INTO login_attempts (ip, success) VALUES (${ip}, ${success})`
-  await sql`DELETE FROM login_attempts WHERE created_at < now() - interval '1 day'`
-}
-
-export const authOptions: NextAuthOptions = {
-  providers: [
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Heslo', type: 'password' },
-      },
-      async authorize(credentials, req) {
-        if (!credentials?.email || !credentials?.password) return null
-
-        const ip = getClientIp(req)
-        if (await isLockedOut(ip)) return null
-
-        const adminEmail = process.env.ADMIN_EMAIL
-        const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH
-
-        let valid = false
-        if (adminEmail && adminPasswordHash && credentials.email === adminEmail) {
-          valid = await bcrypt.compare(credentials.password, adminPasswordHash)
-        }
-
-        await recordAttempt(ip, valid)
-        if (!valid) return null
-
-        return { id: '1', email: adminEmail! }
-      },
-    }),
-  ],
-  // Admin čte data všech klientů (i ws rolí vlastníka tabulek), proto session
-  // nejvýš 12 h místo výchozích 30 dní. Při práci se token průběžně obnovuje.
-  session: { strategy: 'jwt', maxAge: 12 * 60 * 60 },
-  pages: {
-    signIn: '/login',
-  },
-}
+/** Session admina ověřená i druhým faktorem, nebo null. Jednou na požadavek. */
+export const getAdminSession = cache(async (): Promise<AdminSession | null> => {
+  const [candidate, identity] = await Promise.all([getAdminCandidate(), getAuthIdentity()])
+  if (!candidate || !identity || identity.id !== candidate.user.id || identity.aal !== 'aal2') return null
+  return candidate
+})
 
 export async function requireAuth(): Promise<void> {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error('Neautorizovaný přístup')
+  if (!(await getAdminSession())) throw new Error('Neautorizovaný přístup')
 }

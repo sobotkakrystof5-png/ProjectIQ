@@ -28,9 +28,9 @@ Port 3001 odpovídá dosavadnímu lokálnímu vývoji projektu. Je-li obsazený,
 
 ## Připojení služeb
 
-Ignorovaná `.env.local` v novém worktree chybí. Nastav potřebné vývojové proměnné podle `.env.example` a `docs/workspace/SETUP.md`; nevkládej jejich hodnoty do konfigurace Codexu ani do chatu. Setup je automaticky nekopíruje. Pro lokální přihlášení a návraty z plateb mají `NEXTAUTH_URL` a `NEXT_PUBLIC_APP_URL` odpovídat skutečnému portu, například `http://localhost:3001`.
+Ignorovaná `.env.local` v novém worktree chybí. Nastav potřebné vývojové proměnné podle `.env.example` a `docs/workspace/SETUP.md`; nevkládej jejich hodnoty do konfigurace Codexu ani do chatu. Setup je automaticky nekopíruje. Pro lokální přihlášení a návraty z plateb má `NEXT_PUBLIC_APP_URL` odpovídat skutečnému portu, například `http://localhost:3001`. Přihlášení běží přes Supabase Auth, proto je potřeba `NEXT_PUBLIC_SUPABASE_URL` a `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
-Testy Workspace používají místní PGlite a podstrčené služby, nepotřebují připojení k Neonu. Ověření aplikace s přihlášením vyžaduje Clerk a příslušná připojení. Produkční build může potřebovat env a síť kvůli `next/font`; chybějící přístup popiš ve výsledku kontroly. Migrace a seed proti skutečné DB se pouštějí pouze podle pravidel `AGENTS.md`.
+Testy Workspace používají místní PGlite a podstrčené služby, nepotřebují připojení k Supabase. Ověření aplikace s přihlášením vyžaduje Supabase Auth a příslušná připojení. Produkční build může potřebovat env a síť kvůli `next/font`; chybějící přístup popiš ve výsledku kontroly. Migrace a seed proti skutečné DB se pouštějí pouze podle pravidel `AGENTS.md`.
 
 ## Skills a bezpečnostní paměť
 

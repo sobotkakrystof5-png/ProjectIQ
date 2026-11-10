@@ -1,4 +1,5 @@
-import { neon } from '@neondatabase/serverless'
+import { unstable_noStore as noStore } from 'next/cache'
+import { pgTransaction } from '../pg'
 
 // Jediný vstup do schématu ws (AGENTS.md B3, skill zakaziq-workspace-backend).
 //
@@ -23,29 +24,27 @@ export function q(strings: TemplateStringsArray, ...values: unknown[]): WsQuery 
 /** Ovladač DB: jedno volání = jedna transakce, výsledky v pořadí dotazů. */
 export type WsDriver = { transaction(queries: WsQuery[]): Promise<WsRow[][]> }
 
-// Neon HTTP: celá transakce jde jedním požadavkem (neinteraktivní —
-// dotaz nemůže číst výsledek předchozího; na to S10 přidá Pool).
-function neonDriver(): WsDriver {
+// Transakce na jednom spojení z poolu (lib/pg.ts). Dotazy jdou za sebou,
+// výsledek předchozího ale aplikace nečte — tvar zůstal z doby Neon HTTP.
+function pgDriver(): WsDriver {
   const url = process.env.DATABASE_URL_WS
   if (!url) {
     throw new Error('Chybí DATABASE_URL_WS — Workspace se k DB připojuje jen rolí ws_app (docs/workspace/SETUP.md).')
   }
-  // Neon HTTP jde přes fetch a Next 14 by odpovědi uložil do data cache
-  // (i v route handlerech s force-dynamic) — veřejné stránky by pak četly
-  // stará data. Dotazy do DB se nikdy necachují.
-  const sql = neon(url, { fetchOptions: { cache: 'no-store' } })
   return {
     async transaction(queries) {
-      const results = await sql.transaction(queries.map((x) => sql.query(x.text, [...x.params])))
-      return results as WsRow[][]
+      // Data účtů se nikdy necachují: stránka, která čte ws, se renderuje vždy
+      // na požadavek (dřív to zařizoval fetch s cache: 'no-store').
+      noStore()
+      return pgTransaction(url, queries)
     },
   }
 }
 
 let driver: WsDriver | null = null
-const getDriver = (): WsDriver => (driver ??= neonDriver())
+const getDriver = (): WsDriver => (driver ??= pgDriver())
 
-/** Jen pro testy: podstrčí ovladač (PGlite). `null` vrátí Neon. */
+/** Jen pro testy: podstrčí ovladač (PGlite). `null` vrátí Postgres z DATABASE_URL_WS. */
 export function setWsDriverForTests(next: WsDriver | null): void {
   driver = next
 }
@@ -77,7 +76,7 @@ export function wsDb(scope: { accountId: string }): WsDb {
 }
 
 /**
- * Dotaz bez účtu — jen SECURITY DEFINER funkce (ws.account_by_clerk_org…)
+ * Dotaz bez účtu — jen SECURITY DEFINER funkce (ws.membership_for_user…)
  * a systémové tabulky bez RLS (stripe_events, webhook_events, rate_limits).
  * Na tabulky s daty účtů pod RLS nevidí nic.
  */
@@ -88,7 +87,7 @@ export async function wsSystem<T extends WsRow = WsRow>(
   return (await getDriver().transaction([q(strings, ...values)]))[0] as T[]
 }
 
-/** Kód chyby Postgresu (Neon i PGlite ho dávají do `code`). */
+/** Kód chyby Postgresu (pg i PGlite ho dávají do `code`). */
 export function pgErrorCode(e: unknown): string | undefined {
   if (typeof e === 'object' && e !== null && 'code' in e && typeof e.code === 'string') return e.code
   return undefined

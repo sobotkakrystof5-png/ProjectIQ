@@ -15,20 +15,20 @@
 | Kód Workspace + landing | S00–S18 a RD01–RD14, RD16 hotové; RD15 (vizuální audit) rozpracovaný |
 | Testy a build | `npm test`: 721 prošlo, 1 přeskočený; `npx tsc --noEmit` čistý; `npm run build:check` prošel (2026-11-03) |
 | Závislosti | `npm audit` a `npm audit --omit=dev --audit-level=high`: 0 zranitelností po aktualizaci lockfile (2026-10-31); CI audit je znovu blokující podle rozhodnutí #006 |
-| Preview `ws/redesign-app` | testovací Neon, Clerk dev, Stripe sandbox; přihlášený průchod hlavními obrazovkami 2026-10-31 v pořádku |
-| Produkční Neon | migrace 064–096 aplikované; 097–099 čekají na nové heslo `neondb_owner`; práva `ws_app` po 2026-10-31 neověřená |
-| Clerk | produkční instance `zakaziq.cz`: DNS, SSL a pošta hotové (2026-11-03, `oauth_pending`); chybí Google OAuth, webhook a klíče ve Vercelu. Aplikace běží na dev instanci |
+| Preview `ws/redesign-app` | testovací Neon, Clerk dev (dřív; od R-080 Supabase Auth), Stripe sandbox; přihlášený průchod hlavními obrazovkami 2026-10-31 v pořádku |
+| Produkční Neon (zdroj přenosu) | migrace 064–096 aplikované; práva `ws_app` po 2026-10-31 neověřená; Supabase projekt zatím nezaložen, migrace 097–102 čekají na něj |
+| Supabase Auth (dřív Clerk, od R-080) | kód migrovaný; projekt `zakaziq` (Frankfurt, Pro) zatím nezaložen; chybí Auth nastavení, Google provider, SMTP přes Resend, české šablony a admin účet. Clerk produkční instance (`zakaziq.cz`, DNS a SSL hotové 2026-11-03) se po přechodu odstraní |
 | Stripe | jen sandbox „ZakazIQ"; live produkt, cena, klíče a webhook chybí |
 | Resend | doména `zakaziq.cz` ověřená, `WS_EMAIL_FROM` v Production, webhook vypnutý do nasazení; doručení nevyzkoušené |
-| DNS (WEDOS) | 5 CNAME Clerku a `_dmarc` (`p=none`, bez `rua`) hotové; chybí CAA a SPF apexu (DNSSEC neověřeno) |
+| DNS (WEDOS) | 5 CNAME Clerku (k odstranění po přechodu) a `_dmarc` (`p=none`, bez `rua`) hotové; chybí CAA a SPF apexu (DNSSEC neověřeno) |
 | Právní věci | texty na webu od 2026-11-03 (R-079), provozovatel z ARES; potvrzené Kryštofem, kontrola právníkem se nedělá |
 
 ## 2. Principy plánu
 
 1. **Nejdřív to, co trvá a závisí na vnějšku:** aktivace Stripe live, právní texty, propagace DNS. Kód čeká na ně, ne naopak.
 2. **Měkký start.** Produkce se nasadí, ale prvním uživatelem je pilotní klient pozvaný z adminu (`/dashboard/klienti`, S17). Veřejnou registraci z landing page pustit až po úspěšném pilotu.
-3. **Jedna dávka DNS záznamů** (Resend, Clerk, CAA, SPF/DMARC), ať se do WEDOS nechodí třikrát.
-4. **Prostředí se nemíchají.** Live klíče (Clerk, Stripe) jen do Vercel **Production**; Preview a `.env.local` zůstávají na sandboxu a testovací DB.
+3. **Jedna dávka DNS záznamů** (Resend, CAA, SPF/DMARC), ať se do WEDOS nechodí třikrát.
+4. **Prostředí se nemíchají.** Live klíče (Stripe, `SUPABASE_SECRET_KEY` produkčního projektu) jen do Vercel **Production**; Preview a `.env.local` zůstávají na sandboxu a testovací DB.
 5. **Změny externích služeb a produkční DB jen s výslovným souhlasem** (AGENTS.md). Agent připravuje příkazy a kontroly; zápisové kroky dělá po schválení nebo je dělá Kryštof.
 6. **Nic se nevydává za hotové bez ověření.** Každá stopa končí kontrolou s doloženým výsledkem (viz „Kritérium hotovo").
 
@@ -53,7 +53,7 @@
 ```
 A Právní + IČO ─────────────────────────────────────────────┐
 B DNS (WEDOS) ──┬─ C Resend ─────────────────┐              │
-                └─ D Clerk produkce ─────────┤              ├─► Fáze 2 → 3 → 4
+                └─ D Supabase Auth produkce ─┤              ├─► Fáze 2 → 3 → 4
 E Stripe live (aktivace účtu trvá dny) ──────┘──────────────┘
 ```
 
@@ -62,7 +62,7 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 | Krok | Kdo | Detail |
 |---|---|---|
 | A1 | K | ~~Doplnit IČO, adresu, e-mail podpory~~ hotovo 2026-11-03 (ARES) |
-| A2 | C | ~~Hotovo 2026-11-03~~ Předvyplnit podklady pro právní stránky: lhůty z S18 (R-054 GDPR: výmaz, 10 let faktury, 30 dní po zrušení), seznam zpracovatelů (Vercel, Neon, Clerk, Stripe, Resend), regiony (Resend EU/Irsko; **region Neonu a Vercelu dohledat v dashboardech** — dnes `[DOPLNIT]`) |
+| A2 | C | ~~Hotovo 2026-11-03~~ Předvyplnit podklady pro právní stránky: lhůty z S18 (R-054 GDPR: výmaz, 10 let faktury, 30 dní po zrušení), seznam zpracovatelů (Vercel, Supabase, Stripe, Resend; Neon a Clerk do úklidu), regiony (Resend EU/Irsko; **region Neonu a Vercelu dohledat v dashboardech** — dnes `[DOPLNIT]`) |
 | A3 | K | ~~Hotovo 2026-11-03~~ Texty připravil agent podle chování aplikace (R-079), Kryštof je potvrdil; kontrola právníkem se nedělá |
 | A4 | C | ~~Hotovo 2026-11-03~~ Vložit texty do `/podminky`, `/ochrana-udaju`, `/zpracovatelska-smlouva`; odstranit `LEGAL_ROBOTS` (`components/marketing/seo.ts`), přidat stránky do `app/sitemap.ts`; vyplnit `[DOPLNIT]` v landing Dotazech (kde jsou data uložená) |
 | A5 | C | Doplnit IČO a adresu do Stripe šablony faktury, Public details a patičky dokladů (zbývá, dashboard Stripe); záznam o zpracování hotový 2026-11-03 |
@@ -74,15 +74,15 @@ E Stripe live (aktivace účtu trvá dny) ──────┘─────�
 
 | Záznam | Hodnota | Zdroj |
 |---|---|---|
-| CAA (apex) | `0 issue "letsencrypt.org"` a `0 issue "pki.goog"` (ověřeno 2026-11-01: Vercel vydává přes Let's Encrypt, Clerk přes Let's Encrypt nebo Google Trust Services). **Přidat až po vydání certifikátů Clerku** (`clerk deploy status` → complete), jinak hrozí zaseknuté vydávání | [Vercel troubleshooting](https://vercel.com/docs/domains/troubleshooting), [Clerk production](https://clerk.com/docs/guides/development/deployment/production) |
+| CAA (apex) | `0 issue "letsencrypt.org"` a `0 issue "pki.goog"` (ověřeno 2026-11-01: Vercel vydává přes Let's Encrypt, Clerk přes Let's Encrypt nebo Google Trust Services). **Přidat lze už teď:** certifikáty Clerku jsou vydané (2026-11-03) a Clerk se po přechodu odstraní | [Vercel troubleshooting](https://vercel.com/docs/domains/troubleshooting), [Clerk production](https://clerk.com/docs/guides/development/deployment/production) |
 | TXT apex (SPF) | `v=spf1 -all`, **pokud na doméně nebude běžná pošta** (`podpora@`); jinak SPF podle poskytovatele pošty | STATE.md |
 | MX + TXT `send` | MX `send` → `feedback-smtp.eu-west-1.amazonses.com` (10), TXT `send` = `v=spf1 include:amazonses.com ~all` | **přesné hodnoty z Resend dashboardu** |
 | TXT `resend._domainkey` | DKIM klíč | Resend dashboard |
 | TXT `_dmarc` | `v=DMARC1; p=none; rua=mailto:info@vizeon.cz` | SETUP.md |
-| CNAME pro Clerk | `clerk`, `accounts`, `clkmail`, `clk._domainkey`, `clk2._domainkey` (přesný seznam ukáže Clerk po `clerk deploy`) | Clerk dashboard |
+| CNAME pro Clerk (k odstranění po úklidu) | `clerk`, `accounts`, `clkmail`, `clk._domainkey`, `clk2._domainkey` (přesný seznam ukáže Clerk po `clerk deploy`) | Clerk dashboard |
 | DNSSEC | zapnout u WEDOS, DS záznam (pokud WEDOS podporuje) | STATE.md |
 
-Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Resendu a produkční instanci v Clerku (hodnoty jsou tam). **[K]** záznamy zadá. **[C]** ověří `dig +short TXT/CNAME/MX/CAA …` (opakovaně, propagace trvá minuty až hodiny).
+Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Resendu (hodnoty jsou tam). **[K]** záznamy zadá. **[C]** ověří `dig +short TXT/CNAME/MX/CAA …` (opakovaně, propagace trvá minuty až hodiny).
 
 **Pozor:** apex A/ALIAS a `www` ukazují na Vercel a nesmí se při úpravách rozbít; před změnou si poznamenat současné záznamy.
 
@@ -104,19 +104,19 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 **Hotovo, když:** e-maily z `rezervace@zakaziq.cz` dorazí do 3 klientů poštou mimo spam a bounce webhook odpovídá 200.
 
-### Stopa D — Clerk produkce (závisí na B)
+### Stopa D — Supabase Auth produkce (závisí na B)
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| D1 | K | ~~`clerk deploy` → produkční instance, doména `clerk.zakaziq.cz` (CNAME do stopy B)~~ hotovo, DNS/SSL/pošta `complete` 2026-11-03 |
-| D2 | K | **Další krok.** Google Cloud Console → vlastní OAuth klient (redirect URI z Clerku); údaje vložit do Clerku (sdílené dev údaje v produkci nepoužít) |
-| D3 | C | `clerk config patch`: `organization_settings.force_organization_selection=false` (jinak Clerk obejde průvodce `/w/novy`, R-037, stalo se 2026-10-31 na dev); česká lokalizace; ověřit, že platí i čeština e-mailů s kódem (jinak Customization → Emails) |
-| D4 | C | Zjistit, jestli jde na našem plánu zvednout limit 5 členů organizace (R-020 slibuje neomezeně pracovníků; pracovníci ve `ws.staff` se přihlašovat nemusí) |
-| D5 | K | Webhook `https://www.zakaziq.cz/api/clerk/webhook`, události `organization.updated`, `organizationMembership.*`; podpisový klíč → `CLERK_WEBHOOK_SECRET` |
-| D6 | C | Vercel **Production**: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_live_…`), `CLERK_SECRET_KEY` (`sk_live_…`), `CLERK_WEBHOOK_SECRET`. **Preview zůstává na dev klíčích** |
-| D7 | C | CSP: host Frontend API se bere z publishable key sám (`clerkFrontendApiHost`, CSP-LOG); po nasazení ověřit konzoli na `/w/prihlaseni` a `/w/registrace` (Turnstile, Google přihlášení). Případná změna CSP = zápis do `CSP-LOG.md` ve stejném commitu, bez oslabení |
+| D1 | K | ~~`clerk deploy` → produkční instance, doména `clerk.zakaziq.cz` (CNAME do stopy B)~~ hotovo, DNS/SSL/pošta `complete` 2026-11-03; od R-080 Clerk nahrazen Supabase Auth, instance se odstraní při úklidu |
+| D2 | K | **Další krok.** Supabase projekt `zakaziq` (Frankfurt, Pro); Google Cloud Console → vlastní OAuth klient s redirect `https://<project_ref>.supabase.co/auth/v1/callback`; údaje vložit do Supabase Auth → Google (sdílené dev údaje v produkci nepoužít) |
+| D3 | C | Supabase Auth: Site URL `https://www.zakaziq.cz`, Redirect URLs (`/auth/callback` pro produkci, `localhost:3000`, Preview), Confirm email zapnuto, minimální délka hesla 8, registrace zapnuta (`docs/supabase/SETUP.md` §3) |
+| D4 | C | SMTP v Supabase přes Resend (`smtp.resend.com`, odesílatel z ověřené domény `zakaziq.cz`); české šablony z `docs/supabase/emaily/`; zkušební e-mail do Gmailu |
+| D5 | K | Admin účet v Supabase: `ADMIN_EMAIL`, Auto Confirm, UID do `ADMIN_USER_ID`; založit dřív, než se otevře registrace |
+| D6 | C | Vercel **Production**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `ADMIN_USER_ID`; smazat `NEXTAUTH_*`, `ADMIN_PASSWORD_HASH` a Clerk proměnné. **Preview může mít vlastní Supabase projekt** (`docs/supabase/SETUP.md` §4) |
+| D7 | C | CSP: `connect-src` dostane Supabase origin jen na `/w`, `/klient` a `/login` (`supabaseOrigin()` v `lib/security/csp.ts`); po nasazení ověřit konzoli na `/w/prihlaseni`, `/w/registrace` a `/klient/prihlaseni` (Google přihlášení). Případná změna CSP = zápis do `CSP-LOG.md` ve stejném commitu, bez oslabení |
 
-**Hotovo, když:** na produkční doméně projde registrace e-mailem i Googlem, průvodce `/w/novy` se otevře (ne anglický krok Clerku) a webhook vrací 200.
+**Hotovo, když:** na produkční doméně projde registrace e-mailem i Googlem, zapomenuté heslo a pozvánka doručí e-mail a průvodce `/w/novy` se otevře po přihlášení.
 
 ### Stopa E — Stripe live (aktivace trvá dny, začít hned)
 
@@ -139,10 +139,10 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 
 | Krok | Kdo | Detail |
 |---|---|---|
-| P1 | C | Projít proměnné ve Vercel Production proti `.env.example` (jen **názvy** a přítomnost): `DATABASE_URL_WS`, `DATABASE_URL`, `WS_KEY_PEPPER`, `NEXT_PUBLIC_APP_URL` (= host z D1), `NEXTAUTH_*`, `CRON_SECRET`, Clerk, Stripe, Resend, `WS_EMAIL_FROM`, `ANTHROPIC_API_KEY` |
+| P1 | C | Projít proměnné ve Vercel Production proti `.env.example` (jen **názvy** a přítomnost): `DATABASE_URL_WS`, `DATABASE_URL`, `WS_KEY_PEPPER`, `NEXT_PUBLIC_APP_URL` (= host z D1), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `ADMIN_USER_ID` (bez `NEXTAUTH_*` a Clerk proměnných), `CRON_SECRET`, Stripe, Resend, `WS_EMAIL_FROM`, `ANTHROPIC_API_KEY` |
 | P2 | C | Preview: potvrdit, že nemá live klíče a míří na testovací DB |
-| P3 | C+K | Produkční DB čtením katalogu (připojení vlastníka má Kryštof): všechny migrace do 091, funkce a `EXECUTE` pro `ws_app` (`business_scope`, `money_issue`, `money_adopt_visit`, `money_pay`, `money_unpay`, GDPR funkce). Pokud chybí, `node scripts/ws-create-role.js` pouští **Kryštof** nebo po schválení agent — na testovací DB právě tohle chybělo a Preview padalo |
-| P4 | K | Neon: potvrdit retenci záloh (point-in-time restore), provést test obnovy do větve; **C** zapíše postup, datum a výsledek bez klientských dat (LAUNCH.md) |
+| P3 | C+K | Produkční DB (Supabase) čtením katalogu (připojení vlastníka má Kryštof): všechny migrace do 102 (včetně 100–101 Supabase Auth a zamčení Data API 102), funkce a `EXECUTE` pro `ws_app` (`business_scope`, `money_issue`, `money_adopt_visit`, `money_pay`, `money_unpay`, GDPR funkce). Pokud chybí, `node scripts/ws-create-role.js` pouští **Kryštof** nebo po schválení agent — na testovací DB právě tohle chybělo a Preview padalo |
+| P4 | K | Supabase (Pro): potvrdit zálohy a retenci (point-in-time restore), provést test obnovy do větve; **C** zapíše postup, datum a výsledek bez klientských dat (LAUNCH.md) |
 | P5 | C | Test oddělení dvou účtů na nasazené roli `ws_app` (RLS, složené klíče) — nad pilotními daty ne, jen na prázdných testovacích účtech |
 | P6 | C | Cron: `vercel.json` (`ws-email` 5:00 UTC, `ws-gdpr`, `ws-segments`) + `CRON_SECRET` ve Vercelu; po nasazení ověřit v logu první běh |
 | P7 | K | GitHub Actions: `SITE_URL` pro bezpečnostní CI job |
@@ -152,7 +152,7 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 | Krok | Kdo | Detail |
 |---|---|---|
 | V1 | C | `npm test`, `npx tsc --noEmit`, `npm run build:check` |
-| V2 | C | **Admin po Next 16 a `proxy.ts`** — největší skryté riziko. Větev mění celé repo (R-053), ale admin NextAuth s daty nikdo neověřil (Preview má DB bez admin tabulek). Ověřit lokálně nebo na samostatném Preview s kopií admin dat: přihlášení `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]`, `/dashboard/klienti` (pozvání), veřejná booking API (`/api/public/booking/**`, `alteno-leads`, `leads`, `agent-leads`), crony. Admin se nesmí rozbít — produkce je jeho osobní nástroj |
+| V2 | C | **Admin po Next 16 a `proxy.ts`** — největší skryté riziko. Větev mění celé repo (R-053), ale admin na Supabase Auth s daty nikdo neověřil (Preview má DB bez admin tabulek). Ověřit lokálně nebo na samostatném Preview s kopií admin dat: přihlášení `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]`, `/dashboard/klienti` (pozvání), veřejná booking API (`/api/public/booking/**`, `alteno-leads`, `leads`, `agent-leads`), crony. Admin se nesmí rozbít — produkce je jeho osobní nástroj |
 | V3 | C | `web-security-review` nad celým rozdílem proti `main`; zápisy do `.claude/security/`, `sync-agent-context.mjs --write` a `--check` |
 | V4 | C | Dependency audit (`npm audit`); po aktualizaci lockfile oba audity hlásí 0 zranitelností (2026-10-31) |
 | V5 | K | Telefon 390 px (Chrome i Safari): registrace → průvodce → poptávka přes `/r` → potvrzení → zákazník → faktura/PDF → e-mail → portál `/z`. Doplnit dokončení RD15 |
@@ -174,7 +174,7 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 | N3 | C | `web-security-audit` na `www.zakaziq.cz`; výsledek do `.claude/security/AUDIT-LOG.md` |
 | N4 | K | Sitemapa do Google Search Console a Bing Webmaster Tools; Rich Results Test schématu |
 | N5 | K | Pozvat pilotního klienta z `/dashboard/klienti`, projít první den společně |
-| N6 | K+C | První ostrá platba (249 Kč, nebo kupón) ověří řetěz Clerk → Stripe Checkout → webhook → přístup → e-mail. **C** po ní zkontroluje `trialing`, doklad, doručení |
+| N6 | K+C | První ostrá platba (249 Kč, nebo kupón) ověří řetěz Supabase Auth → Stripe Checkout → webhook → přístup → e-mail. **C** po ní zkontroluje `trialing`, doklad, doručení |
 | N7 | K | Rollback připraven: Vercel „Instant Rollback" na `d948400` (poznamenat ID nasazení před mergem) |
 
 ## 8. Fáze 5 — provoz prvních 14 dní
@@ -182,7 +182,7 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 | Co | Jak často | Kdo |
 |---|---|---|
 | Runtime chyby a logy ve Vercelu | denně | C (`get_runtime_errors`) |
-| Selhané webhooky Stripe, Clerk, Resend | denně | K+C |
+| Selhané webhooky Stripe a Resend | denně | K+C |
 | Fronta `ws.outbound_messages` (čekající, selhané) | denně | C |
 | Registrace a zpětná vazba pilotního klienta | denně | K |
 | Podpora podle D7 | průběžně | K |
@@ -204,9 +204,8 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 | `ws_app` bez práv na produkci | stránky padají (stalo se na testovací DB) | P3 před merge |
 | SPF kořene `-all` vs. pošta `podpora@` | pošta z domény padá do spamu | rozhodnout D3 před zadáním SPF; SPF dle poskytovatele pošty |
 | Přepsání A/ALIAS záznamů při úpravě DNS | web mimo provoz | zálohovat současné záznamy před zásahem |
-| Clerk limit 5 členů | tým větší než 5 přihlášených | D4; pracovníci bez přihlášení nejsou dotčeni |
-| CSP blokuje Clerk/Turnstile na produkční doméně | nejde se přihlásit | D7; měnit jen to, co ukáže konzole, nikdy `unsafe-*` |
-| Zrušení účtu bez vrácení poměrné části | spor se zákazníkem | D5, text v podmínkách |
+| CSP blokuje Supabase Auth na produkční doméně | nejde se přihlásit | D7; měnit jen to, co ukáže konzole, nikdy `unsafe-*` |
+| Zrušení účtu bez vrácení poměrné části | spor se zákazníkem | text v podmínkách (stopa A) |
 
 **Neřešit před spuštěním:** Tailwind 4 / `npm audit` Tailwind řetězec, oborové podstránky landing, Stripe Connect zálohy, cena za druhý byznys, SMS, `Dockerfile`, legacy `/dashboard/projekty`.
 
@@ -216,7 +215,7 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 - Změna bezpečnostní konfigurace (CSP, hlavičky, DNS doporučení) = zápis do `.claude/security/` ve stejném commitu + `node scripts/sync-agent-context.mjs --write`, pak `--check`.
 - Každý dokončený krok: odškrtnout v `LAUNCH.md`, zapsat do changelogu v `memory/memory.md` (typ `chore`/`docs`/`db`), nová rozhodnutí jako `R-xxx`.
 - Commity česky na větvi `workspace`/`ws/…`: `ws/oblast: co a proč`. Admin neměnit (výjimka jen oprava vzniklá upgradem, se souhlasem).
-- Nic neposílat do externích služeb (Resend, Clerk, Stripe, Vercel env, produkční DB) bez souhlasu pro daný krok.
+- Nic neposílat do externích služeb (Resend, Supabase, Stripe, Vercel env, produkční DB) bez souhlasu pro daný krok.
 
 ## 11. Kritérium „připraveno ke spuštění"
 

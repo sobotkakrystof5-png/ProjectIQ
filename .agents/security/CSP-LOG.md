@@ -72,8 +72,17 @@ Změna: cesty `/klient` (klientský prostor, KP05) dostaly profil `workspace` (v
 Kvůli: přihlášení klientů přes Clerk, přehled zakázek a hlasový požadavek.
 Ověřeno: testy `lib/security/__tests__/csp.test.ts` (profil, Clerk zdroje jen na `/w` a `/klient`, `/klientela` nechytá). Skutečné přihlášení přes Clerk na `/klient` v prohlížeči neověřeno.
 
+## v7 — 2026-11-07
+Změna: Clerk odebrán (R-080, DECISIONS #022). Pryč jsou Frontend API Clerku v `connect-src`, `img-src img.clerk.com` a `frame-src challenges.cloudflare.com` na `/w` a `/klient`. Nově jen `connect-src` = origin Supabase projektu (`supabaseOrigin(NEXT_PUBLIC_SUPABASE_URL)`, jen https bez cesty, jinak nic) na `/w`, `/klient` a `/login` — přihlašovací formuláře volají Supabase Auth z prohlížeče. Google přihlášení je přesměrování celé stránky. `script-src` beze změny, žádný nový skript ani rámeček, žádný wildcard.
+Kvůli: přechod na Supabase Auth.
+Ověřeno: `lib/security/__tests__/csp.test.ts` (Supabase jen na přihlašovacích cestách, landing, admin mimo `/login`, `/z` a `/r` bez Supabase; neplatná adresa nepustí nic). V prohlížeči neověřeno (Supabase projekt zatím neexistuje).
+
+## v8 — 2026-11-07
+Změna: `frame-src https://challenges.cloudflare.com` jen na přihlášení, registraci a obnově hesla (`/login`, `/w/prihlaseni`, `/w/registrace`, `/w/zapomenute-heslo`, `/klient/prihlaseni`, `/klient/registrace`, `/klient/zapomenute-heslo`) — rámeček Cloudflare Turnstile. Skript `challenges.cloudflare.com/turnstile/v0/api.js` vkládá náš skript s nonce, pouští ho `strict-dynamic` (žádný nový host ve `script-src`). `connect-src` Supabase navíc na `/dashboard/zabezpeceni` (správa 2FA admina z prohlížeče). QR kód 2FA je `data:` obrázek — `img-src data:` už byl.
+Kvůli: R-081 (DECISIONS #023) — ochrana proti botům a dvoufázové ověření.
+Ověřeno: `lib/security/__tests__/csp.test.ts` (Turnstile jen na přihlašovacích stránkách, ne na `/w/zabezpeceni`, landing, adminu ani `/r`; Supabase na `/dashboard/zabezpeceni`, jinde v adminu ne). V prohlížeči neověřeno (chybí klíč Turnstile).
+
 ## Čeká (zapsat jako vN při přidání)
-- Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.
 
 ## Odebrané

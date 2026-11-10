@@ -1,11 +1,10 @@
 'use server'
 
 import { sql } from '@/lib/db'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 
 async function requireAuth() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Unauthorized')
 }
 

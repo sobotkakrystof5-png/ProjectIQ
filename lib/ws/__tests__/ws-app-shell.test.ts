@@ -202,16 +202,16 @@ describe('navigace podle zapnutých funkcí', () => {
     expect(labels(paletteItems(new Set()))).toEqual(['Dnes', 'Poptávky', 'Zákazníci', 'Návody'])
   })
 
-  it('Účet: majitel má Nastavení, Předplatné a Zpracování údajů, pracovník žádný odkaz', () => {
+  it('Účet: majitel má Nastavení, Předplatné, Zabezpečení a Zpracování údajů, pracovník jen Zabezpečení', () => {
     const links = accountLinks('lenka', true)
-    expect(links.map((l) => l.label)).toEqual(['Nastavení firmy', 'Předplatné a doklady', 'Zpracování údajů'])
-    expect(links.map((l) => l.href)).toEqual(['/w/lenka/nastaveni', '/w/ucet', '/w/ucet/zpracovani'])
+    expect(links.map((l) => l.label)).toEqual(['Nastavení firmy', 'Předplatné a doklady', 'Přihlášení a zabezpečení', 'Zpracování údajů'])
+    expect(links.map((l) => l.href)).toEqual(['/w/lenka/nastaveni', '/w/ucet', '/w/zabezpeceni', '/w/ucet/zpracovani'])
     expect(links.map((l) => l.paletteLabel)).toContain('Účet a předplatné')
-    expect(accountLinks('lenka', false)).toEqual([])
+    expect(accountLinks('lenka', false).map((l) => l.href)).toEqual(['/w/zabezpeceni'])
   })
 
   it('Účet svítí na stránkách účtu i na Nastavení, jinde ne', () => {
-    for (const path of ['/w/ucet', '/w/ucet/zpracovani', '/w/lenka/nastaveni', '/w/lenka/nastaveni/vernost']) {
+    for (const path of ['/w/ucet', '/w/ucet/zpracovani', '/w/zabezpeceni', '/w/lenka/nastaveni', '/w/lenka/nastaveni/vernost']) {
       expect(isAccountActive(path, 'lenka')).toBe(true)
     }
     expect(isAccountActive('/w/lenka', 'lenka')).toBe(false)

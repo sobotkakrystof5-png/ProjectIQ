@@ -4,13 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getAdmin } from '@/lib/ws/admin/auth'
 import { getClientBusiness, getClientDetail } from '@/lib/ws/admin/clients'
-import { InviteSetupError, inviteClient, sendInvite } from '@/lib/ws/admin/invite'
+import { InviteConfigError, inviteClient, sendInvite } from '@/lib/ws/admin/invite'
 import { generateWebKeys, WebKeysUnavailable, type WebKeysResult } from '@/lib/ws/admin/web-keys'
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { isIndustryKey, type IndustryKey } from '@/lib/ws/templates'
 
-// Akce /dashboard/klienti (S17). Každá začíná getAdmin() — bez NextAuth
-// session nic. Účet z URL je v adminu v pořádku (admin vidí všechny), ale
+// Akce /dashboard/klienti (S17). Každá začíná getAdmin() — bez přihlášeného
+// admina (Supabase Auth, R-080) nic. Účet z URL je v adminu v pořádku (admin vidí všechny), ale
 // vždy se ověří, že existuje. Každá akce se zapíše do ws.audit_log účtu.
 
 const NO_ADMIN = 'Přihlášení vypršelo. Přihlas se prosím znovu.'
@@ -33,7 +33,7 @@ export async function inviteClientAction(raw: unknown): Promise<Result<{ account
     return ok({ accountId: result.accountId, inviteSent: result.status === 'invited' })
   } catch (e) {
     console.error('admin.inviteClient', { error: e instanceof Error ? e.message : 'unknown' })
-    if (e instanceof InviteSetupError) return fail('Clerk teď organizaci nezaložil. Zkontroluj klíče Clerku a zkus to znovu.')
+    if (e instanceof InviteConfigError) return fail('Chybí WS_KEY_PEPPER, pozvánku nejde vytvořit. Nic nevzniklo.')
     return fail('Účet se nepodařilo založit. Nic nevzniklo, zkus to prosím znovu.')
   }
 }
@@ -45,9 +45,12 @@ export async function resendInviteAction(raw: unknown): Promise<Result<null>> {
   if (!parsed.success) return fail('Zkontroluj e-mail.')
   const client = await getClientDetail(parsed.data.accountId)
   if (!client) return fail('Tenhle účet neexistuje.')
-  const sent = await sendInvite(admin, client.id, client.clerkOrgId, parsed.data.email)
+  const sent = await sendInvite(admin, client.id, parsed.data.email).catch((e) => {
+    console.error('admin.resendInvite', { error: e instanceof Error ? e.message : 'unknown' })
+    return false
+  })
   revalidatePath(`/dashboard/klienti/${client.id}`)
-  return sent ? ok(null) : fail('Clerk pozvánku neposlal. Možná už na ten e-mail čeká jiná — zkontroluj to v Clerku.')
+  return sent ? ok(null) : fail('Pozvánka neodešla. Zkontroluj WS_EMAIL_FROM, RESEND_API_KEY a SUPABASE_SECRET_KEY a zkus to znovu.')
 }
 
 export async function generateWebKeysAction(raw: unknown): Promise<Result<WebKeysResult>> {

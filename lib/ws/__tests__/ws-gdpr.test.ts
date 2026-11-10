@@ -157,7 +157,7 @@ describe('výmaz zákazníka', () => {
 
   it('po lhůtě cron fakturu anonymizuje', async () => {
     await db.query(`UPDATE ws.invoices SET anonymize_after = current_date WHERE id = $1`, [A.invoice])
-    const run = await runDailyGdpr(async () => {})
+    const run = await runDailyGdpr()
     expect(run.invoicesAnonymized).toBe(1)
     const { rows: [inv] } = await db.query<{ counterparty: Record<string, string>; anonymize_after: string | null }>(
       'SELECT counterparty, anonymize_after FROM ws.invoices WHERE id = $1', [A.invoice])
@@ -189,17 +189,13 @@ describe('zrušení účtu', () => {
     expect(await reopenAccount(ctxB)).toBe(false)
   })
 
-  it('cron smaže účet po lhůtě celý a vrátí organizaci ke smazání v Clerku', async () => {
+  it('cron smaže účet po lhůtě celý, i s členy', async () => {
     await closeAccount(ctxB)
-    expect((await runDailyGdpr(async () => {})).accountsDeleted).toBe(0) // lhůta neuplynula
+    expect((await runDailyGdpr()).accountsDeleted).toBe(0) // lhůta neuplynula
     await db.query(`UPDATE ws.accounts SET delete_after = now() - interval '1 minute' WHERE id = $1`, [B.account])
-    const orgs: string[] = []
-    const run = await runDailyGdpr(async (org) => {
-      orgs.push(org)
-      throw new Error('Clerk nedostupný') // chyba Clerku výmaz dat nezastaví
-    })
-    expect(run).toMatchObject({ accountsDeleted: 1, orgsFailed: 1 })
-    expect(orgs).toEqual(['org_b'])
+    const run = await runDailyGdpr()
+    expect(run).toMatchObject({ accountsDeleted: 1 })
+    expect(await count('SELECT count(*) AS n FROM ws.members WHERE account_id = $1', [B.account])).toBe(0)
 
     const { rows } = await db.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.columns WHERE table_schema = 'ws' AND column_name = 'account_id'`)
@@ -242,7 +238,7 @@ describe('zrušení ke konci zaplaceného období (R-074, migrace 097)', () => {
 
     // cron obnoví předplatné ze Stripe (tady: skončilo) a účet zavře
     const synced: string[] = []
-    const run = await runDailyGdpr(async () => {}, async (id) => {
+    const run = await runDailyGdpr(async (id) => {
       synced.push(id)
       await db.query(`UPDATE ws.subscriptions SET status = 'canceled' WHERE stripe_subscription_id = $1`, [id])
     })

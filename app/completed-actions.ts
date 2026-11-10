@@ -1,8 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { getAdminSession, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import type { ProjectType } from '@/lib/types'
 
@@ -23,13 +22,13 @@ export type CompletedProjectPayload = {
 }
 
 export async function getCompletedProjects() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return []
   return await sql`SELECT * FROM completed_projects ORDER BY completed_at DESC`
 }
 
 export async function getProjectSurveys() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return []
   return await sql`SELECT * FROM project_surveys ORDER BY created_at DESC`
 }

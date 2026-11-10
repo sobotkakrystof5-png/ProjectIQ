@@ -51,6 +51,8 @@ beforeAll(async () => {
     // idempotence: obě migrace dvakrát po sobě
     await db.exec(read('migrations', '095_portal_schema.sql'))
     await db.exec(read('migrations', '096_portal_requests_messages.sql'))
+    await db.exec(read('migrations', '101_portal_supabase_auth.sql'))
+    await db.exec(read('migrations', '104_portal_auth_stav.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')
@@ -185,7 +187,7 @@ describe('pozvánky a přihlášení', () => {
       [A, hash, over.email ?? null, over.role ?? 'member', over.expires ?? '2099-01-01T00:00:00Z'],
     )
   const redeem = async (hash: string, user: string, email = 'novy@example.cz') => {
-    const res = await asClient<{ c: string | null }>(null, 'SELECT portal.redeem_invite($1, $2, $3, $4) AS c', [hash, user, email, 'Jana'])
+    const res = await asClient<{ c: string | null }>(null, 'SELECT portal.redeem_invite_for_user($1, $2, $3, $4) AS c', [hash, user, email, 'Jana'])
     return res[0].c
   }
 
@@ -194,7 +196,7 @@ describe('pozvánky a přihlášení', () => {
     await invite(h)
     expect(await redeem(h, 'user_1')).toBe(A)
     expect(await redeem(h, 'user_2')).toBeNull()
-    const members = await asClient<{ client_id: string }>(null, "SELECT * FROM portal.member_lookup('user_1')")
+    const members = await asClient<{ client_id: string }>(null, "SELECT * FROM portal.memberships_for_user('user_1')")
     expect(members.map((m) => m.client_id)).toEqual([A])
   })
 
@@ -207,7 +209,7 @@ describe('pozvánky a přihlášení', () => {
     expect(await redeem(expired, 'user_3')).toBeNull()
     expect(await redeem(revoked, 'user_3')).toBeNull()
     expect(await redeem(hashOf('f'), 'user_3')).toBeNull()
-    expect(await asClient(null, "SELECT * FROM portal.member_lookup('user_3')")).toHaveLength(0)
+    expect(await asClient(null, "SELECT * FROM portal.memberships_for_user('user_3')")).toHaveLength(0)
   })
 
   it('pozvánka vázaná na e-mail projde jen se shodným e-mailem (bez ohledu na velikost)', async () => {
@@ -221,8 +223,8 @@ describe('pozvánky a přihlášení', () => {
     const h = hashOf('5')
     await invite(h)
     await redeem(h, 'user_5')
-    await db.query("UPDATE portal.members SET removed_at = now() WHERE clerk_user_id = 'user_5'")
-    expect(await asClient(null, "SELECT * FROM portal.member_lookup('user_5')")).toHaveLength(0)
+    await db.query("UPDATE portal.members SET removed_at = now() WHERE user_id = 'user_5'")
+    expect(await asClient(null, "SELECT * FROM portal.memberships_for_user('user_5')")).toHaveLength(0)
 
     const h2 = hashOf('6')
     await invite(h2)
@@ -242,7 +244,7 @@ describe('požadavky, zprávy a hodnocení (096)', () => {
   const MEMBER_B = 'bbbbbbbb-0000-4000-8000-0000000000e1'
 
   beforeAll(async () => {
-    await db.query("INSERT INTO portal.members (id, client_id, clerk_user_id) VALUES ($1, $2, 'mu_a'), ($3, $4, 'mu_b')", [MEMBER_A, A, MEMBER_B, B])
+    await db.query("INSERT INTO portal.members (id, client_id, user_id) VALUES ($1, $2, 'mu_a'), ($3, $4, 'mu_b')", [MEMBER_A, A, MEMBER_B, B])
   })
 
   it('požadavek se zapíše klientovi i adminovi a stav následuje práci admina', async () => {
@@ -300,5 +302,53 @@ describe('požadavky, zprávy a hodnocení (096)', () => {
   it('odebraný člen už nic neodešle', async () => {
     await db.query('UPDATE portal.members SET removed_at = now() WHERE id = $1', [MEMBER_A])
     await expect(asClient(A, 'SELECT portal.submit_message($1, $2, $3)', [PA, MEMBER_A, 'Ještě tu jsem'])).rejects.toThrow(/not_found/)
+  })
+})
+
+describe('stav přihlášení (portal.auth_state, R-081)', () => {
+  const USER = '0b9f3c8e-1a2b-4c3d-8e9f-001122334455'
+  const SESSION = '5a6b7c8d-9e0f-4a1b-8c2d-334455667788'
+
+  it('bez schématu auth (mimo Supabase): relace platí, 2FA není', async () => {
+    expect(await asClient(null, 'SELECT * FROM portal.auth_state($1, $2)', [USER, SESSION])).toEqual([{ session_ok: true, mfa_enrolled: false }])
+  })
+
+  it('se schématem auth: zrušená relace, prošlá relace a zapnuté 2FA', async () => {
+    await db.exec(`
+      CREATE SCHEMA auth;
+      CREATE TABLE auth.sessions (id uuid PRIMARY KEY, user_id uuid NOT NULL, not_after timestamptz);
+      CREATE TABLE auth.mfa_factors (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL, status text NOT NULL);
+    `)
+    try {
+      const state = () => asClient(null, 'SELECT * FROM portal.auth_state($1, $2)', [USER, SESSION])
+      expect(await state()).toEqual([{ session_ok: false, mfa_enrolled: false }])
+
+      await db.query('INSERT INTO auth.sessions (id, user_id) VALUES ($1, $2)', [SESSION, USER])
+      expect(await state()).toEqual([{ session_ok: true, mfa_enrolled: false }])
+
+      await db.query("INSERT INTO auth.mfa_factors (user_id, status) VALUES ($1, 'unverified')", [USER])
+      expect((await state())[0].mfa_enrolled).toBe(false)
+      await db.query("INSERT INTO auth.mfa_factors (user_id, status) VALUES ($1, 'verified')", [USER])
+      expect((await state())[0].mfa_enrolled).toBe(true)
+
+      await db.query("UPDATE auth.sessions SET not_after = now() - interval '1 minute'")
+      expect((await state())[0].session_ok).toBe(false)
+
+      // Relace cizího uživatele ani nesmyslné id neprojdou.
+      await db.query('UPDATE auth.sessions SET not_after = NULL')
+      expect((await asClient(null, 'SELECT * FROM portal.auth_state($1, $2)', ['6c7d8e9f-0a1b-4c2d-9e3f-445566778899', SESSION]))[0].session_ok).toBe(false)
+      expect(await asClient(null, 'SELECT * FROM portal.auth_state($1, $2)', ['user_x', 'nesmysl'])).toEqual([{ session_ok: false, mfa_enrolled: false }])
+    } finally {
+      await db.exec('DROP SCHEMA auth CASCADE')
+    }
+  })
+
+  it('portal_app do schématu auth sám nevidí', async () => {
+    await db.exec('CREATE SCHEMA auth; CREATE TABLE auth.sessions (id uuid PRIMARY KEY, user_id uuid NOT NULL, not_after timestamptz)')
+    try {
+      await expect(asClient(null, 'SELECT * FROM auth.sessions')).rejects.toThrow(/permission denied/)
+    } finally {
+      await db.exec('DROP SCHEMA auth CASCADE')
+    }
   })
 })

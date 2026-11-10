@@ -1,6 +1,6 @@
 'use client'
 
-import { SignOutButton } from '@clerk/nextjs'
+import { SignOutButton } from '@/components/auth/sign-out-button'
 import { Logo } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
 
@@ -39,13 +39,11 @@ export function WizardHeader({ step }: { step: 1 | 2 }) {
             )
           })}
         </ol>
-        <SignOutButton redirectUrl="/">
-          <button
-            type="button"
-            className="min-h-[44px] rounded-full px-3 text-[13px] text-navy-300 transition-colors duration-200 ease-zq hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-300"
-          >
-            Odhlásit se
-          </button>
+        <SignOutButton
+          target="w"
+          className="min-h-[44px] rounded-full px-3 text-[13px] text-navy-300 transition-colors duration-200 ease-zq hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-300"
+        >
+          Odhlásit se
         </SignOutButton>
       </div>
     </header>

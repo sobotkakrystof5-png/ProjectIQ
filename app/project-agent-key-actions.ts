@@ -1,9 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
 import { z } from 'zod'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { getAdminSession, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { projectPath, toBusiness } from '@/lib/business'
 import { AgentKeyConfigError, issueAgentKey, revokeAgentKey } from '@/lib/agent-keys'
@@ -14,7 +13,7 @@ import { AgentKeyConfigError, issueAgentKey, revokeAgentKey } from '@/lib/agent-
 const idSchema = z.string().uuid()
 
 async function adminEmail(): Promise<string> {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   return session?.user?.email ?? 'admin'
 }
 

@@ -1,11 +1,10 @@
-import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import {
   Briefcase, CheckCircle2, Clock, TrendingUp, Wallet,
   AlertCircle, Users, Inbox, PhoneCall, Star, BarChart3,
   Receipt, CalendarCheck, CircleDot, ArrowRight,
 } from 'lucide-react'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
 import { STATUS_LABELS } from '@/lib/types'
@@ -155,7 +154,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 }
 
 export default async function ProfilPage() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) redirect('/login')
 
   const stats = await loadStats()

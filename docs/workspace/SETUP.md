@@ -1,12 +1,14 @@
 # ZakazIQ Workspace — nastavení databáze a Stripe
 
-> Jak rozjet schéma `ws` v Neonu, jak spouštět testy oddělení účtů a jak nastavit Stripe pro předplatné. Pravidla jsou v `AGENTS.md` → B3 a B5, proč je to takhle v `memory/memory.md` → R-035, R-036, R-038, R-039.
+> Jak rozjet schéma `ws` v Supabase Postgresu, jak spouštět testy oddělení účtů a jak nastavit Stripe pro předplatné. Pravidla jsou v `AGENTS.md` → B3 a B5, proč je to takhle v `memory/memory.md` → R-035, R-036, R-038, R-039.
+
+> Založení Supabase projektu, přenos dat z Neonu a Auth nastavení jsou v [`docs/supabase/SETUP.md`](../supabase/SETUP.md). Tady je jen role `ws_app` a migrace schématu `ws`.
 
 ## Co v databázi je
 
 - **Schéma `ws`** — tabulky Workspace a navazující funkce/indexy (migrace `064`–`091`). Admin tabulky v `public` se nemění.
 - **Role `ws_app`** — jediná role, kterou se aplikace Workspace připojuje (`DATABASE_URL_WS`). Platí pro ni Row Level Security, do `public` nevidí.
-- **Vlastník tabulek** (`neondb_owner`, `DATABASE_URL`) — pouští migrace a čte `ws` pro admin stránku `/dashboard/klienti`. RLS pro něj neplatí.
+- **Vlastník tabulek** (`postgres.<project_ref>`, `DATABASE_URL`) — pouští migrace a čte `ws` pro admin stránku `/dashboard/klienti`. RLS pro něj neplatí.
 
 ## První nastavení (jednou)
 
@@ -29,7 +31,7 @@ node scripts/apply-migration.js \
   091_ws_skupinove_lekce.sql
 ```
 
-Jde to i ručně v Neon SQL editoru (obsah souborů po jednom, v tomhle pořadí). Migrace jsou idempotentní, opakované spuštění nic nerozbije.
+Jde to i ručně v SQL editoru Supabase rolí vlastníka (`postgres`), obsah souborů po jednom, v tomhle pořadí. Migrace jsou idempotentní, opakované spuštění nic nerozbije.
 
 ### 2. Role `ws_app`
 
@@ -43,7 +45,7 @@ Skript:
 3. zapíše `DATABASE_URL_WS` do `.env.local` — **heslo nevypisuje**,
 4. přihlásí se jako `ws_app` a ověří: role nemá `BYPASSRLS`, do `public.projects` nevidí, bez nastaveného účtu nevidí žádný řádek.
 
-> **Roli nezakládejte v Neon konzoli.** Role z konzole dostanou členství v `neon_superuser`, který má `BYPASSRLS` — Row Level Security by pro ně neplatila a druhá pojistka oddělení účtů by zmizela.
+> **Role `ws_app` nesmí mít `BYPASSRLS` ani být členem role, která ho má** (`postgres`, `service_role`). Row Level Security by pro ni neplatila a druhá pojistka oddělení účtů by zmizela. Skript `scripts/ws-create-role.js` to kontroluje.
 
 ### 3. Vercel
 
@@ -68,7 +70,7 @@ npm test                                  # vše
 npx vitest run lib/ws/__tests__           # jen Workspace
 ```
 
-Testy Workspace běží proti **PGlite** (Postgres 18 ve WASM, `@electric-sql/pglite`, jen vývojová závislost) — bez Dockeru, bez Neonu, bez sítě. Každý testovací soubor si vytvoří čistou databázi (`lib/ws/__tests__/helpers/ws-pglite.ts`):
+Testy Workspace běží proti **PGlite** (Postgres 18 ve WASM, `@electric-sql/pglite`, jen vývojová závislost) — bez Dockeru, bez Supabase, bez sítě. Každý testovací soubor si vytvoří čistou databázi (`lib/ws/__tests__/helpers/ws-pglite.ts`):
 
 1. role `ws_app` a jedna „admin“ tabulka `public.projects`,
 2. migrace `0NN_ws_*.sql` + `ws-grants.sql` **dvakrát po sobě** (kontrola idempotence),
@@ -79,7 +81,7 @@ Co se testuje:
 
 | Soubor | Co |
 |---|---|
-| `ws-schema.test.ts` | idempotence; každá tabulka s daty účtu má RLS a politiku; účet A nevidí, nezmění ani nesmaže nic z účtu B v **žádné** tabulce; složené cizí klíče (cizí zákazník, cizí pracovník); `ws_app` nevidí do `public`; překryv termínů; jedno razítko za návštěvu; duplicitní Stripe/Clerk událost; unikátní zákazník, číslo faktury, slug |
+| `ws-schema.test.ts` | idempotence; každá tabulka s daty účtu má RLS a politiku; účet A nevidí, nezmění ani nesmaže nic z účtu B v **žádné** tabulce; složené cizí klíče (cizí zákazník, cizí pracovník); `ws_app` nevidí do `public`; překryv termínů; jedno razítko za návštěvu; duplicitní Stripe událost; unikátní zákazník, číslo faktury, slug |
 | `ws-db-context.test.ts` | `lib/ws/db.ts` (`q`, `wsDb`, transakce, kontext nezůstane viset) a `lib/ws/context.ts` (`requireWorkspace`, `requireBusiness`, role) |
 | `ws-templates.test.ts` | každá šablona oboru jde vložit do DB jako `ws_app`, žádné vymyšlené ceny |
 
@@ -168,7 +170,7 @@ Postup a odhad daní: [MONEY.md](MONEY.md). Pro lokální PDF je potřeba Chrome
 
 ### 1. Migrace
 
-Po 080 ručně aplikovat `migrations/081_ws_emaily_odkazy_novinky.sql` v Neon SQL editoru rolí vlastníka, potom znovu `scripts/ws-grants.sql` (odebere ws_app zápis do `ws.product_news`, dá EXECUTE na `ws.accounts_with_due_messages`). Data nemění. Bez 081 nefungují odkazy z e-mailů, připomínky ani přehledy (fronta potřebuje `dedupe_key`).
+Po 080 ručně aplikovat `migrations/081_ws_emaily_odkazy_novinky.sql` v SQL editoru (dřív Neon, od R-080 Supabase) rolí vlastníka, potom znovu `scripts/ws-grants.sql` (odebere ws_app zápis do `ws.product_news`, dá EXECUTE na `ws.accounts_with_due_messages`). Data nemění. Bez 081 nefungují odkazy z e-mailů, připomínky ani přehledy (fronta potřebuje `dedupe_key`).
 
 ### 2. Doména v Resendu
 
@@ -193,7 +195,7 @@ Cron `/api/cron/ws-email` běží denně v 5:00 UTC (7:00 letního času, 6:00 z
 Po 082 aplikovat `migrations/083_ws_admin_klienti_novinky.sql` rolí vlastníka a znovu `scripts/ws-grants.sql` (odebere `ws_app` práva na `ws.account_admin_notes`; migrace to dělá i sama). Data nemění. Na Neonu ověřeno čtením 2026-10-10: sloupce novinek, tabulka poznámek s RLS a bez práv `ws_app`.
 
 - `/dashboard/klienti` a `/dashboard/novinky` čtou `ws` přes `DATABASE_URL` (stejná proměnná jako zbytek adminu), nová env není potřeba.
-- Pozvání klienta volá Clerk Backend API (`CLERK_SECRET_KEY`), pozvánku posílá Clerk e-mailem; odkaz vede na `NEXT_PUBLIC_APP_URL` + `/w/registrace`. V produkci musí být produkční instance Clerku (Otevřené problémy).
+- Pozvání klienta: vlastník vytvoří pozvánku v `ws.account_invites` (kód se ukládá jen jako hash s `WS_KEY_PEPPER`) a přijetí ji uplatní `ws.redeem_account_invite`. E-mail posílá aplikace přes Resend s přihlašovacím odkazem ze Supabase `generateLink`; odkaz vede na `NEXT_PUBLIC_APP_URL` + `/w/pozvanka/[kod]`.
 - Klíče pro web potřebují `WS_KEY_PEPPER` jako Nastavení › Napojený web.
 - Novinky e-mailem odcházejí přes frontu S15 — bez `WS_EMAIL_FROM` čekají ve frontě.
 
@@ -201,7 +203,7 @@ Po 082 aplikovat `migrations/083_ws_admin_klienti_novinky.sql` rolí vlastníka 
 
 Po 083 aplikovat `migrations/084_ws_gdpr.sql` rolí vlastníka a znovu `scripts/ws-grants.sql` (dá `ws_app` právo spouštět `ws.anonymize_expired_invoices()` a `ws.purge_closed_accounts()`; migrace to dělá i sama). Data nemění, jen přidá sloupce a funkce.
 
-- Cron `/api/cron/ws-gdpr` je ve `vercel.json`, potřebuje `CRON_SECRET` (už existuje) a pro smazání organizace `CLERK_SECRET_KEY`.
+- Cron `/api/cron/ws-gdpr` je ve `vercel.json`, potřebuje jen `CRON_SECRET` (už existuje). Clerk klíč není potřeba.
 - Ověření po migraci: `SELECT proname FROM pg_proc WHERE pronamespace = 'ws'::regnamespace AND proname IN ('erase_customer','close_account','reopen_account','anonymize_expired_invoices','purge_closed_accounts')` vrátí 5 řádků.
 
 ## Fakturace (RD10): migrace 088

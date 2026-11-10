@@ -7,18 +7,18 @@ Platí pro Codex, Claude Code, Cursor, Copilot i lidi. Závaznou součástí je 
 - Česky, stručně, věcně (i komentáře, commity, paměť); rozuměj překlepům. Na začátku řekni záměr, průběžně důležitá zjištění, na konci výsledek, skutečné ověření a zbývající kroky.
 - Před prací čti [index](memory/index.md), [živý stav a rozhodnutí](memory/memory.md), [pravidla paměti](memory/pravidla.md), plán oblasti a její skilly; zkontroluj větev a `git status`. Codex musí paměť otevřít výslovně, `@soubor` z CLAUDE.md ji neimportuje.
 - Navazuj na rozpracované, čti dotčený kód, dokonči a ověř zadání. Cizí změny nepřepisuj, nevracej ani nestaguj. Běžné vratné kroky v zadání nevyžadují další souhlas; mimo zadání schval nové produktové rozhodnutí, změnu rozhodnutí v paměti, destruktivní operaci či deploy. Dřívější souhlas platí dál.
-- Skutečné migrace, seed a změny externích služeb jen s výslovným zadáním/souhlasem; příprava SQL a PGlite bez dalšího schválení. `.env.local` může mířit na produkční Neon.
+- Skutečné migrace, seed a změny externích služeb jen s výslovným zadáním/souhlasem; příprava SQL a PGlite bez dalšího schválení. `.env.local` může mířit na produkční databázi.
 - Každou dokončenou změnu zapiš do changelogu; podle potřeby aktualizuj stav, rozhodnutí a problémy. Technická fakta oprav v referenci, nové dokumenty v indexu; paměť patří do stejného commitu. Historie a stav žijí pouze v `memory/`.
 
 ## Kontext a povinné čtení
 
-Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Neon bez ORM, Vercel Hobby): osobní admin VIZEON/ALTENO/Hub (NextAuth), veřejná landing page a SaaS Workspace (Clerk, Stripe, Resend). Workspace: poptávky → kalendář → zákazníci/věrnost, zakázky, faktury, příjmy a daně. 249 Kč konečná cena/měsíc, 14 dní s kartou, 1 byznys a neomezeně pracovníků; další byznys v UI vypnutý.
+Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Supabase Postgres přes `pg` bez ORM, Vercel Hobby): osobní admin VIZEON/ALTENO/Hub, veřejná landing page a SaaS Workspace (Stripe, Resend). Přihlášení všude Supabase Auth (R-080, `docs/supabase/SETUP.md`). Workspace: poptávky → kalendář → zákazníci/věrnost, zakázky, faktury, příjmy a daně. 249 Kč konečná cena/měsíc, 14 dní s kartou, 1 byznys a neomezeně pracovníků; další byznys v UI vypnutý.
 
 | Úloha | Před prací čti |
 |---|---|
 | Workspace | `docs/workspace/PLAN.md` (zdroj rozsahu, ne kopie v `new - area of zakaziq/`); reference B1–B2 + dotčená oblast |
 | Admin (jen s výslovným zadáním) | `docs/admin/AGENTS-ADMIN.md`, reference A |
-| DB, auth, billing, intake, e-maily | reference B3–B7, `docs/workspace/SETUP.md`; veřejné API i `docs/workspace/API.md` |
+| DB, auth, billing, intake, e-maily | reference B3–B7, `docs/supabase/SETUP.md`, `docs/workspace/SETUP.md`; veřejné API i `docs/workspace/API.md` |
 | UI, navigace, texty | reference B8–B11; landing i `docs/landing/PROJECT-BRIEF.md` |
 | Testy / bezpečnost / deploy | reference B12–B13; `.claude/security/STATE.md`, před bezpečnostní změnou `DECISIONS.md`, před CSP `CSP-LOG.md` |
 | Codex, worktree, setup a akce | `docs/CODEX.md`; Node.js 24+, `bash scripts/codex-setup.sh` |
@@ -26,12 +26,12 @@ Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Ne
 ## Hranice v repu
 
 - **Admin neměnit bez výslovného zadání:** `app/{dashboard,alteno,hub,(auth),p,h}`, kořenové `app/*-actions.ts`, `components/*.tsx`, `lib/*.ts` a `app/api/*` mimo níže uvedené Workspace API. Převzatý kód kopíruj do `lib/ws/` nebo `components/ws/`, originál zůstává.
-- Workspace: `app/w/`, `components/ws/`, `lib/ws/`, `components/ui/`; veřejné `app/{r,embed,z}/`; klientský prostor `app/klient/`, `lib/portal/`, `components/portal/`; API `app/api/{ws,public/v1,stripe,clerk,klient,agent}/`. Landing: `app/(marketing)/`, `components/marketing/`. Admin tabulky `public` se nemění.
+- Workspace: `app/w/`, `components/ws/`, `lib/ws/`, `components/ui/`; veřejné `app/{r,embed,z}/`; klientský prostor `app/klient/`, `lib/portal/`, `components/portal/`; API `app/api/{ws,public/v1,stripe,klient,agent}/`; přihlášení `app/auth/`, `lib/supabase/`, `lib/auth/`. Landing: `app/(marketing)/`, `components/marketing/`. Admin tabulky `public` se nemění.
 - DB: pouze nové sekvenční idempotentní migrace od 064; staré neupravuj. Bezpečnostní konfigurace celého repa pouze se zápisem do `.claude/security/` a synchronizací do `.agents/security/`.
 
 ## Workspace — nepřekročitelné základy
 
-- Data jen přes `DATABASE_URL_WS`/`ws_app`, schéma `ws`, `requireWorkspace()` a filtr `account_id = ctx.accountId`; účet nikdy z URL/formuláře, byznys ověř proti účtu. RLS je další pojistka, nevypíná se. Vazby jsou složené `(account_id, id)`; novou tabulku doplň do `seedAccount()`.
+- Data jen přes `DATABASE_URL_WS`/`ws_app`, schéma `ws`, `requireWorkspace()` (účet a role z `ws.members`) a filtr `account_id = ctx.accountId`; účet nikdy z URL/formuláře, byznys ověř proti účtu. RLS je další pojistka, nevypíná se. Vazby jsou složené `(account_id, id)`; novou tabulku doplň do `seedAccount()`.
 - Mutace ověřují `assertWritable`; příjem poptávek pokračuje i bez předplatného a selhání notifikace/e-mailu nesmí zrušit uložení. Účty ani data se kvůli neplacení nemažou.
 - Server components výchozí, mutace Server Actions + Zod včetně délek, výsledek `Result` bez throw do UI; žádné `any` ani tiché catch. Kolize atomicky v DB (`EXCLUDE`/UNIQUE), `23P01`/`23505` převeď na českou hlášku. Čas `lib/ws/time.ts`, Europe/Prague; peníze v haléřích či `numeric(12,2)`, měny nesčítej.
 - Nové závislosti zdůvodni rozhodnutím v paměti; hlavní verze Next/React je samostatný krok s ověřením celého repa (R-053). Novou env zapiš do `.env.example` i referenční tabulky a připomeň Vercel. Novou pevnou cestu `/w` přidej do rezervovaných slugů; zkušební poptávky ve výpisech vynechávej (`NOT r.is_test`).
@@ -40,7 +40,7 @@ Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Ne
 
 ## B13. Bezpečnost
 
-Neoslabuj CSP (žádné nové `unsafe-inline`/`unsafe-eval` ve skriptech, wildcard ani mazání direktiv). Secrets jen server, žádné citlivé `NEXT_PUBLIC_`, `.env.local` necommituj ani nevypisuj; uniklý klíč rotuj a zaznamenej. Nedůvěryhodné HTML nikdy bez DOMPurify. Veřejné vstupy: serverová validace, limity, honeypot/captcha; webhooky: podpis a idempotence. CORS jen přesné originy, bez `*`/credentials; rámování jen `/r` pro povolené domény. Skript třetí strany nejdřív schval, zapiš CSP a při statickém načtení SRI. Ostatní bezpečnostní pravidla a checklist jsou závazné v referenci B13; bezpečnostní změnu zaznamenej do příslušného souboru `.claude/security/` ve stejném commitu.
+Neoslabuj CSP (žádné nové `unsafe-inline`/`unsafe-eval` ve skriptech, wildcard ani mazání direktiv). Secrets jen server, žádné citlivé `NEXT_PUBLIC_` (`SUPABASE_SECRET_KEY` nikdy); nová tabulka v `public` = RLS zapnout (Supabase Data API, migrace 102); admin = jen účet `ADMIN_EMAIL` s 2FA (`aal2`, R-081), nikdy jakýkoli přihlášený; přihlášenou identitu ve Workspace a klientském prostoru ber jen přes `requireIdentity`/`requireWorkspace`/`requireClient` (hlídají zrušenou relaci a 2FA), ne přímo z `getAuthIdentity`; `.env.local` necommituj ani nevypisuj; uniklý klíč rotuj a zaznamenej. Nedůvěryhodné HTML nikdy bez DOMPurify. Veřejné vstupy: serverová validace, limity, honeypot/captcha; webhooky: podpis a idempotence. CORS jen přesné originy, bez `*`/credentials; rámování jen `/r` pro povolené domény. Skript třetí strany nejdřív schval, zapiš CSP a při statickém načtení SRI. Ostatní bezpečnostní pravidla a checklist jsou závazné v referenci B13; bezpečnostní změnu zaznamenej do příslušného souboru `.claude/security/` ve stejném commitu.
 
 ## B12. Ověření a Git
 

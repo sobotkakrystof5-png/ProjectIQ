@@ -41,7 +41,7 @@ function subscriptionRows(raw: unknown): SubscriptionRow[] {
 }
 
 // Poslední aktivita = nejnovější změna v poptávkách, termínech, zakázkách,
-// zákaznících nebo fakturách (ne přihlášení — to Clerk do ws nepíše).
+// zákaznících nebo fakturách (ne přihlášení — to se do ws nepíše).
 const ACTIVITY_SQL = `GREATEST(
   (SELECT max(created_at) FROM ws.requests r WHERE r.account_id = a.id AND NOT r.is_test),
   (SELECT max(updated_at) FROM ws.appointments ap WHERE ap.account_id = a.id),
@@ -93,7 +93,6 @@ export type ClientMember = { role: 'owner' | 'staff'; name: string | null; email
 export type ClientAudit = { at: Date; actor: string; action: string }
 
 export type ClientDetail = ClientRow & {
-  clerkOrgId: string
   ico: string | null
   newsEmails: boolean
   cancelAtPeriodEnd: boolean
@@ -109,7 +108,7 @@ export async function getClientDetail(accountId: string): Promise<ClientDetail |
   if (!UUID_RE.test(accountId)) return null
   const [base, extra, businesses, members, audit] = await adminDb.batch([
     { text: `${LIST_SQL} WHERE a.id = $1`, params: [accountId] },
-    q`SELECT a.clerk_org_id, a.ico, a.news_emails FROM ws.accounts a WHERE a.id = ${accountId}`,
+    q`SELECT a.ico, a.news_emails FROM ws.accounts a WHERE a.id = ${accountId}`,
     q`SELECT b.id, b.name, b.slug, b.industry, b.archived_at IS NOT NULL AS archived,
         (SELECT max(w.last_used_at) FROM ws.web_integrations w WHERE w.account_id = b.account_id AND w.business_id = b.id AND w.active AND w.revoked_at IS NULL) AS web_used_at,
         EXISTS (SELECT 1 FROM ws.web_integrations w WHERE w.account_id = b.account_id AND w.business_id = b.id AND w.active AND w.revoked_at IS NULL) AS web_ready,
@@ -123,7 +122,6 @@ export async function getClientDetail(accountId: string): Promise<ClientDetail |
   const billing = billingStateFrom(subscriptionRows(base[0].subscriptions))
   return {
     ...row,
-    clerkOrgId: String(extra[0].clerk_org_id),
     ico: (extra[0].ico as string | null) ?? null,
     newsEmails: Boolean(extra[0].news_emails),
     cancelAtPeriodEnd: billing.cancelAtPeriodEnd,

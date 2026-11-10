@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { SignOutButton } from '@clerk/nextjs'
+import { SignOutButton } from '@/components/auth/sign-out-button'
 import { Logo } from '@/components/ws/brand'
 
 /** Rámec klientského prostoru: logo, jméno firmy, odhlášení. Obsah drží stránky. */
@@ -13,10 +13,11 @@ export function PortalFrame({ clientName, children }: { clientName: string; chil
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden max-w-[16rem] truncate text-sm text-quiet sm:inline">{clientName}</span>
-            <SignOutButton>
-              <button type="button" className="inline-flex min-h-[44px] items-center rounded-chip px-3 text-sm font-medium text-quiet hover:bg-navy-50 hover:text-ink">
-                Odhlásit
-              </button>
+            <Link href="/klient/zabezpeceni" className="inline-flex min-h-[44px] items-center rounded-chip px-3 text-sm font-medium text-quiet hover:bg-navy-50 hover:text-ink">
+              Zabezpečení
+            </Link>
+            <SignOutButton target="klient" className="inline-flex min-h-[44px] items-center rounded-chip px-3 text-sm font-medium text-quiet hover:bg-navy-50 hover:text-ink">
+              Odhlásit
             </SignOutButton>
           </div>
         </div>

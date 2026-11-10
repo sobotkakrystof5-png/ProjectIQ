@@ -6,26 +6,16 @@
 //
 // S --dry se příkazy jen vypíšou, nic se neprovede.
 //
-// Neonový HTTP driver pošle jeden příkaz na request, proto se soubor
-// rozdělí po středníkách. Splitter respektuje dollar-quoted bloky
-// ($$ ... $$), aby se DO bloky s vnitřními středníky nerozsekaly.
+// Soubor se rozdělí po středníkách a příkazy běží po jednom (stejně jako
+// dřív v Neonu), aby chybová hláška ukázala, který příkaz selhal. Splitter
+// respektuje dollar-quoted bloky ($$ ... $$), aby se DO bloky s vnitřními
+// středníky nerozsekaly.
+//
+// DATABASE_URL = vlastník tabulek v Supabase (role postgres).
 
 const fs = require('fs')
 const path = require('path')
-const { neon } = require('@neondatabase/serverless')
-
-// .env.local se čte ručně — dotenv není v závislostech projektu.
-function loadEnvLocal() {
-  const file = path.join(__dirname, '..', '.env.local')
-  if (!fs.existsSync(file)) return
-  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-    if (!m) continue
-    if (process.env[m[1]] === undefined) {
-      process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
-    }
-  }
-}
+const { connect, loadEnvLocal, ownerDatabaseUrl } = require('./lib/db')
 
 function splitStatements(raw) {
   const statements = []
@@ -68,8 +58,9 @@ function splitStatements(raw) {
 
 async function main() {
   loadEnvLocal()
-  if (!process.env.DATABASE_URL) {
-    console.error('Chybí DATABASE_URL (.env.local nebo prostředí).')
+  const ownerUrl = ownerDatabaseUrl()
+  if (!ownerUrl) {
+    console.error('Chybí DATABASE_URL nebo POSTGRES_URL (.env.local nebo prostředí).')
     process.exit(1)
   }
 
@@ -81,7 +72,7 @@ async function main() {
     process.exit(1)
   }
 
-  const sql = neon(process.env.DATABASE_URL)
+  const sql = connect(ownerUrl)
 
   for (const file of files) {
     const filePath = path.join(__dirname, '..', 'migrations', path.basename(file))
@@ -105,6 +96,7 @@ async function main() {
   }
 
   console.log('\nVšechny migrace aplikovány.')
+  await sql.end()
 }
 
 main()

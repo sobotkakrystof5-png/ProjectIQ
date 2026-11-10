@@ -95,16 +95,16 @@ export async function liveSubscriptionIds(scope: { accountId: string }): Promise
 
 // --- Denní úklid ------------------------------------------------------------------
 
-export type GdprRun = { accountsClosed: number; invoicesAnonymized: number; accountsDeleted: number; orgsFailed: number }
+export type GdprRun = { accountsClosed: number; invoicesAnonymized: number; accountsDeleted: number }
 
 /**
  * Účty po konci zaplaceného období (záloha, kdyby nedorazil webhook Stripe),
  * faktury po zákonné lhůtě a účty po 30 dnech. Předplatná obnovuje ze Stripe
- * `syncSub`, organizaci v Clerku maže `deleteOrg` (obojí předává cron); jejich
- * chyba ostatní úklid nezastaví, jen se zapíše.
+ * `syncSub` (předává cron); jeho chyba ostatní úklid nezastaví, jen se zapíše.
+ * Mimo databázi už se nic nemaže — členství v účtu drží ws.members, které
+ * zmizí s účtem (od R-080 bez Clerk organizací).
  */
 export async function runDailyGdpr(
-  deleteOrg: (orgId: string) => Promise<void>,
   syncSub: (subscriptionId: string) => Promise<unknown> = async () => null,
 ): Promise<GdprRun> {
   let accountsClosed = 0
@@ -119,17 +119,8 @@ export async function runDailyGdpr(
   }
 
   const [inv] = await wsSystem<{ n: number }>`SELECT ws.anonymize_expired_invoices() AS n`
-  const purged = await wsSystem<{ account_id: string; clerk_org_id: string }>`SELECT account_id, clerk_org_id FROM ws.purge_closed_accounts()`
-  let orgsFailed = 0
-  for (const p of purged) {
-    try {
-      await deleteOrg(p.clerk_org_id)
-    } catch (e) {
-      orgsFailed++
-      console.error('cron.ws-gdpr: organizaci se nepodařilo smazat', { accountId: p.account_id, error: e instanceof Error ? e.message : 'unknown' })
-    }
-  }
-  return { accountsClosed, invoicesAnonymized: Number(inv?.n ?? 0), accountsDeleted: purged.length, orgsFailed }
+  const purged = await wsSystem<{ account_id: string }>`SELECT account_id FROM ws.purge_closed_accounts()`
+  return { accountsClosed, invoicesAnonymized: Number(inv?.n ?? 0), accountsDeleted: purged.length }
 }
 
 // --- Export -----------------------------------------------------------------------

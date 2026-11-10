@@ -52,7 +52,7 @@ Projektové skilly:
 | Skill | Kdy |
 |---|---|
 | `zakaziq-design-dilky` | jakákoli UI práce mimo admin konzoli |
-| `zakaziq-workspace-backend` | DB, migrace, server actions, API, Clerk, Stripe, příjem poptávek |
+| `zakaziq-workspace-backend` | DB, migrace, server actions, API, Supabase Auth, Stripe, příjem poptávek |
 | `zakaziq-ux-texty-cs` | každý text aplikace, který uvidí uživatel nebo zákazník |
 | `zakaziq-memory` | navázání na stav projektu a zápis dokončené práce |
 
@@ -64,15 +64,15 @@ Soubor má dvě části: **[A — Admin konzole](#část-a--admin-konzole)** (b�
 
 ## Hranice v repu
 
-Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin), **ZakazIQ Workspace** (Clerk, firmy) a **landing page** (veřejná).
+Jedna Next.js aplikace, tři části: **admin konzole** (Supabase Auth, jeden admin), **ZakazIQ Workspace** (Supabase Auth, firmy) a **landing page** (veřejná).
 
 | Oblast | Složky | Pravidlo |
 |---|---|---|
-| Admin konzole | `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/api/*` mimo `public/v1`, `ws`, `stripe`, `clerk`, `app/*-actions.ts`, `components/*.tsx` (kořen), `lib/*.ts` (kořen) | **neměnit**. Výjimky jen s výslovným souhlasem v zadání sezení (např. nová stránka `/dashboard/klienti`). |
+| Admin konzole | `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/api/*` mimo `public/v1`, `ws`, `stripe`, `app/*-actions.ts`, `components/*.tsx` (kořen), `lib/*.ts` (kořen) | **neměnit**. Výjimky jen s výslovným souhlasem v zadání sezení (např. nová stránka `/dashboard/klienti`). |
 | Landing page | `app/(marketing)/`, `components/marketing/`, `app/robots.ts`, `app/sitemap.ts` | nová (`app/page.tsx` smazán, R-034). SEO (S05, R-055): `components/marketing/seo.ts` (adresa webu, metadata, JSON-LD), OG obrázek `app/(marketing)/opengraph-image.tsx` + písma `_og/`, ikony `icon.svg`/`apple-icon.png` (Next jim v route group přidá koncovku, pro schéma je `public/zakaziq-logo.png`), noindex hlavičkou `X-Robots-Tag` v `next.config.mjs`. Nová veřejná stránka = canonical + řádek v `app/sitemap.ts` |
 | Workspace | `app/w/`, `components/ws/`, `lib/ws/` | nová |
 | Veřejné části Workspace | `app/r/` (objednávací stránka `/r/[slug]`), `app/embed/` (widget `/embed/[slug].js`), `app/z/` (klientský portál `/z/[token]`) | nové (R-016) |
-| API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/`, `app/api/clerk/` | nové |
+| API Workspace | `app/api/ws/`, `app/api/public/v1/`, `app/api/stripe/` | nové |
 | UI kit | `components/ui/` (shadcn/ui, tokeny Dílky) | nový, admin ho nepoužívá |
 | DB | `migrations/064_*.sql` a dál | jen nové migrace, staré se nemění |
 | Bezpečnost (celé repo) | `proxy.ts`, `next.config.mjs` (hlavičky), `lib/security/`, `public/.well-known/`, `.github/workflows/security.yml`, `.claude/security/`, `.agents/security/` | mění se jen spolu se zápisem do `.claude/security/` a synchronizací do `.agents/security/` (B13) |
@@ -85,7 +85,7 @@ Co se z adminu přebírá (příjem poptávek, časové helpery, faktury, daně,
 
 > Kryštofův osobní produkční systém (VIZEON, ALTENO, Hub, klientský portál). **Úplný popis kódu adminu je v [`docs/admin/AGENTS-ADMIN.md`](../docs/admin/AGENTS-ADMIN.md)** — tech stack, databázový model a katalog tabulek, struktura aplikace, server actions, routy, API, crony, stránky, stavy zakázky, e-maily, bezpečnost, UX pravidla a poznámky pro AI. Přečti ho před jakoukoli změnou adminu (R-042). Tady zůstávají jen příkazy a env proměnné, které platí pro celé repo.
 
-Admin v kostce: Next.js 16 App Router, Neon přes `sql` tag z `lib/db.ts` (bez ORM), NextAuth s jedním adminem, e-maily přes Gmail SMTP v `lib/email.ts`, Vercel Hobby (crony max 1× denně). Neon vrací `date`/`timestamptz` jako `Date`, ne string. Částky v CZK a EUR se nikdy nesčítají.
+Admin v kostce: Next.js 16 App Router, Supabase Postgres přes `pg` a `sql` tag z `lib/db.ts` (bez ORM), Supabase Auth s jedním adminem, e-maily přes Gmail SMTP v `lib/email.ts`, Vercel Hobby (crony max 1× denně). `pg` vrací `date`/`timestamptz` jako `Date`, ne string. Částky v CZK a EUR se nikdy nesčítají.
 
 ### Příkazy
 
@@ -106,9 +106,9 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 
 | Skupina | Proměnné |
 |---------|----------|
-| DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
+| DB + auth | `DATABASE_URL` (Supabase Postgres, Transaction pooler; bez něj `POSTGRES_URL` z integrace Supabase ↔ Vercel), `DATABASE_CA_CERT`, `PG_POOL_MAX` (volitelné), `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_USER_ID` |
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
-| Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
+| Workspace přihlášení | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publikovatelný; z něj i origin v CSP na `/w`, `/klient`, `/login`), `SUPABASE_SECRET_KEY` (jen server). Nastavení Auth a e-mailů v `docs/supabase/SETUP.md` |
 | Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení, hash klíčů rate limitu a (odvozeným klíčem) podpis odkazů v e-mailech. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) a e-maily s odkazy nevzniknou. Změna zneplatní klíče i odeslané odkazy |
 | Workspace e-maily | `WS_EMAIL_FROM` (adresa na doméně ověřené v Resendu, např. `rezervace@zakaziq.cz`; bez ní fronta nic neodešle), `RESEND_API_KEY` (sdílený s adminem), `RESEND_WEBHOOK_SECRET` (`/api/resend/webhook`, bez něj 503), `CRON_SECRET` (`/api/cron/ws-email`, `/api/cron/ws-gdpr`) |
 | Workspace platby | `STRIPE_SECRET_KEY` (omezený `rk_…`, jen server), `STRIPE_WEBHOOK_SECRET` (`/api/stripe/webhook`, bez něj 503), `STRIPE_PRICE_MONTHLY` (cena 249 Kč), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (zatím nepoužitý). Postup `docs/workspace/SETUP.md` → Stripe |
@@ -123,11 +123,12 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 Nejdůležitější s popisem:
 
 ```env
-DATABASE_URL=             # Neon connection string (pooled)
-NEXTAUTH_SECRET=          # openssl rand -base64 32
-NEXTAUTH_URL=             # http://localhost:3000 (dev) / https://... (prod)
-ADMIN_EMAIL=              # e-mail pro přihlášení i pro notifikace o nových rezervacích
-ADMIN_PASSWORD_HASH=      # bcrypt hash hesla (generuj: node -e "require('bcryptjs').hash('heslo',12).then(console.log)")
+DATABASE_URL=             # Supabase connection string (Transaction pooler, port 6543)
+NEXT_PUBLIC_SUPABASE_URL= # Project Settings → API → Project URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY= # Project Settings → API Keys → Publishable key (sb_publishable_…)
+SUPABASE_SECRET_KEY=      # Secret key (sb_secret_…), jen server
+ADMIN_EMAIL=              # e-mail admin účtu v Supabase Auth (přihlášení i notifikace o nových rezervacích)
+ADMIN_USER_ID=            # UID admin účtu v Supabase Auth (Authentication → Users)
 
 GMAIL_USER=               # Výchozí odesílací účet — přihlášení, ALTENO, Hub (vše, co není VIZEON)
 GMAIL_APP_PASSWORD=       # App password (Google Account → Security → App passwords)
@@ -161,7 +162,7 @@ ZakazIQ Workspace je SaaS pro malé firmy, které dostávají poptávky (kadeřn
 
 ## B2. Tech stack
 
-Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Neon Postgres (`@neondatabase/serverless`) · Clerk (klienti) · NextAuth (jen admin) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
+Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Supabase Postgres (`pg`) · Supabase Auth (admin, Workspace, klientský prostor) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
 
 - Nové závislosti jen s důvodem zapsaným do `memory/memory.md` → Rozhodnutí.
 - UI kit stojí na Radix UI (`@radix-ui/react-*`), `class-variance-authority`, `cmdk` (⌘K) a `react-day-picker` (kalendář) — R-028.
@@ -185,10 +186,10 @@ Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind C
 
 | Co | Kde |
 |---|---|
-| Schéma `ws` — 42 tabulek | migrace `064_ws_zaklad` … `091_ws_skupinove_lekce` (přehled níže; na produkčním Neonu jsou aplikované 064–083 a 085–091; migrace 084 stále čeká. Migrace 080 a 087–091 byly aplikovány 2026-10-19 v tomto pořadí: 080 → 087 → 088 → 089 → 090 → 091) |
-| Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL, nikdy v Neon konzoli — `neon_superuser` má BYPASSRLS), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
-| Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes Neon HTTP; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). Neon HTTP volá `fetch` s `cache: 'no-store'` — jinak by odpovědi DB skončily v data cache Nextu |
-| Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet přes `ws.account_by_clerk_org`, role z Clerku `org:admin` → `owner`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; přihlášení přes Clerk `auth()` (aktivní organizace = účet), testy si identitu podstrčí `setWsAuthProvider` |
+| Schéma `ws` — 42 tabulek | migrace `064_ws_zaklad` … `091_ws_skupinove_lekce` (přehled níže; na produkčním Neonu jsou aplikované 064–083 a 085–091; migrace 084 stále čeká. Migrace 100–102 (Supabase Auth, zamčení Data API) nejsou nikde aplikované. Migrace 080 a 087–091 byly aplikovány 2026-10-19 v tomto pořadí: 080 → 087 → 088 → 089 → 090 → 091) |
+| Role `ws_app` a její práva | `scripts/ws-create-role.js` (zakládá přes SQL; role nesmí mít `BYPASSRLS` ani být členem `postgres` nebo `service_role`, skript to kontroluje), `scripts/ws-grants.sql`, postup `docs/workspace/SETUP.md` |
+| Přístup do DB | `lib/ws/db.ts`: `wsDb(ctx)` (tag + `.batch()`), každé volání = transakce `set_config('app.account_id')` + dotazy přes pool `lib/pg.ts`; `wsSystem` jen pro `SECURITY DEFINER` funkce a systémové tabulky; `q` pro sestavení dotazu do dávky; `isOverlapError` (23P01), `isUniqueViolation` (23505). |
+| Kontext | `lib/ws/context.ts`: `requireWorkspace()` (účet a role přes `ws.membership_for_user(user_id)`, role `owner` nebo `staff` z `ws.members`), `requireBusiness(ctx, slug)` (cizí = 404), `requireRole`/`hasRole`; identita přes Supabase Auth (`requireIdentity()`), testy si identitu podstrčí `setWsAuthProvider` |
 | Kontext obrazovky byznysu (RD02) | `lib/ws/scope.ts`: `loadBusinessScope(slug)` volá layout `/w/[business]` jako první a jedním dotazem `ws.business_scope(org, slug)` (migrace 085, SECURITY DEFINER, DECISIONS #016) dostane účet, byznys, předplatné, zapnuté funkce a byznysy pro přepínač. Výsledek uloží do paměti požadavku (`seedRequestScope` v `context.ts`, `React.cache`, klíč `accountId:slug`), takže `requireWorkspace()`, `requireBusiness()` a `getEnabledModules()` na stránce už do DB nesahají. Mimo render (server action, route handler, testy) se nic neukládá a čte se jako dřív. Chybí-li funkce v DB (kód 42883), jede se starým postupem po částech — záložní větev smazat, až bude 085 všude. Zvonek, novinky a služby pro ⌘K (`lib/ws/chrome.ts`, jeden `wsDb.batch`) se neawaitují: layout je pošle kostře jako Promise (`AppFrame` prop `chrome`, `use()` + `Suspense`), takže stránka na ně nečeká; chyba se jen zaloguje a vrátí prázdné hodnoty. Každá hlavní obrazovka má `loading.tsx` (kostry v `components/ws/app/skeletons.tsx`), `DetailSlot` má vlastní `Suspense`. Test: `ws-request-scope.test.ts` (izolace účtů, počet kol) |
 | Rychlost (RD03) | Součty plateb po měsících a měnách jdou z SQL (`getMoneyTotals` v `lib/ws/money/data.ts`, výstup ve tvaru `MoneyEntry`, takže `currencyTotals`/`monthSeries` zůstaly; řádky `getFinance` jen za zvolený měsíc, Daně čtou jen součty), shodnost hlídá `ws-money-totals.test.ts`. `getChangeStamp` = `max(updated_at)` ze tří tabulek (aplikace řádky nemaže); route `/api/ws/[byznys]/zmeny` bere kontext z `loadBusinessScope` a e-maily odesílá po odpovědi (`after`). Framer Motion jen jako `m` pod `LazyMotion` ve `WsRoot` (funkce `lib/ws/motion-features.ts`, `domAnimation`: bez `layout` a `drag`), paleta ⌘K je `next/dynamic` a zkratka je v `components/ui/use-command-shortcut.ts`; hlídá `ws-bundle-guard.test.ts` |
 | Cesty | `lib/ws/paths.ts` — `/w`, `/w/prihlaseni`, `/w/registrace`, `/w/novy` (bez závislostí, importuje i proxy) |
@@ -208,7 +209,7 @@ Pravidla schématu:
 
 | Migrace | Tabulky |
 |---|---|
-| 064 | `accounts` (Clerk org, IČO, `stripe_customer_id`, `trial_ends_at` — nepoužívá se, R-038), `members`, `businesses` (slug unikátní globálně), `business_modules` |
+| 064 | `accounts` (IČO, `stripe_customer_id`, `trial_ends_at` — nepoužívá se, R-038; `clerk_org_id` dřív Clerk organizace, od R-080 nepovinný a zastaralý), `members` (od 100 `user_id` místo `clerk_user_id`), `businesses` (slug unikátní globálně), `business_modules` |
 | 065 | `services`, `staff`, `service_staff`, `opening_hours` |
 | 066 | `field_definitions`, `stages` |
 | 067 | `customers` (účet, ne byznys; telefon E.164 a e-mail malými unikátní v účtu) |
@@ -229,7 +230,7 @@ Pravidla schématu:
 | 082 | Klientský portál S16: `appointments.public_token`, `jobs.result_url`, `job_updates`, `reviews`, typ e-mailu `job_update`; `ws.portal_lookup(uuid)` (SECURITY DEFINER, vrací jen ID); aplikovaná na produkci a testovací DB |
 | 083 | Admin S17: `product_news.tag` (`new`/`improvement`/`fix`), obrázek `image_data`/`image_type` (PNG/JPEG/WebP, max. 600 kB), `emailed_at`, `email_recipients`, `updated_at`; `account_admin_notes` (poznámka admina k účtu, RLS, ws_app bez práv); aplikovaná na produkci a testovací DB |
 | 084 | GDPR S18 (R-054): `invoices.anonymize_after`, `accounts.closing_requested_at`/`delete_after`; `ws.erase_customer` (výmaz zákazníka v jedné transakci, faktury zůstanou s povinnými údaji, koncepty pryč), `ws.close_account`/`ws.reopen_account` (archivace byznysů, výmaz za 30 dní), pro cron `SECURITY DEFINER` `ws.anonymize_expired_invoices()` a `ws.purge_closed_accounts()` |
-| 085 | RD02 (R-058): `ws.business_scope(org_id, business_slug)` — SECURITY DEFINER, vrací jsonb s účtem, byznysem podle slugu, byznysy účtu, zapnutými funkcemi a předplatným jedné Clerk organizace; `EXECUTE` jen `ws_app`; aplikovaná na produkci i testovací DB, bez ní běží pomalejší záložní postup |
+| 085 | RD02 (R-058): `ws.business_scope(user_id, account, business_slug)` (od 100 podle uživatele, dřív Clerk organizace) — SECURITY DEFINER, vrací jsonb s účtem, byznysem podle slugu, byznysy účtu, zapnutými funkcemi a předplatným účtu; `EXECUTE` jen `ws_app`; aplikovaná na produkci i testovací DB, bez ní běží pomalejší záložní postup |
 | 086 | RD03 (R-058): indexy z `EXPLAIN` — `transactions_customer_idx` (součet plateb zákazníka v seznamu), `transactions_business_day_idx`, `requests_changed_idx`, `appointments_changed_idx`, `jobs_changed_idx` (nahrazují `*_account_business_idx`, jsou jejich začátkem), `appointments_request_idx` (termín poptávky); aplikovaná na produkci i testovací DB |
 | 087 | RD07: `requests.requested_staff_id` (předvolba pracovníka při potvrzení), `requests.public_token` (portál čekající poptávky); `ws.portal_lookup` přepne stejný odkaz na vzniklý termín. Aplikovaná na produkci 2026-10-19 a na testovací DB |
 | 088 | RD10: `accounts.invoice_profile`, `invoices.payment_origin`; nahrazuje `ws.money_pay` a přidává `ws.money_unpay` jako `SECURITY INVOKER` s `EXECUTE` jen pro `ws_app`. Aplikovaná na produkci 2026-10-19 a na testovací DB |
@@ -245,7 +246,7 @@ Pravidla schématu:
 | Výmaz zákazníka na žádost | akce `eraseCustomer` v `app/w/[business]/zakaznici/actions.ts` (jen majitel, i bez předplatného) → `lib/ws/gdpr.ts` → `ws.erase_customer`; v kartě zákazníka `EraseCustomer` s potvrzením jménem |
 | Export všech dat účtu | `GET /w/ucet/export` (jen majitel, 5×/h): ZIP (`lib/ws/zip.ts`, bez komprese, bez závislosti) s CSV (`lib/ws/csv.ts`, středník + BOM) a PDF faktur; PDF bez uloženého souboru se vykreslí do 40 s, zbytek vypíše `CTI-MNE.txt` |
 | Zrušení účtu (R-074, migrace 097) | `closeAccountAction` v `app/w/ucet/actions.ts`: potvrzení názvem účtu. Běžící předplatné (`active`, `trialing`) dostane ve Stripe `cancel_at_period_end` a účet jen `ws.schedule_close_account` (`accounts.close_scheduled_at`); do konce období funguje normálně, `/w/ucet` ukáže „Účet se zavře“ s „Nechat účet“ (`keepAccountAction`, vrátí předplatné). Nezaplacené předplatné končí hned. Bez živého předplatného rovnou `ws.close_account` (výmaz za 30 dní). Dokončení: `ws.finish_scheduled_close` po každém webhooku Stripe (`lib/ws/stripe-webhook.ts`) a záložně cron `ws-gdpr` (`ws.scheduled_closings()` → znovu načíst předplatná ze Stripe → dokončit); předplatné obnovené v Portalu naplánování zruší. Zavřený účet `/w` i `/w/novy` přesměrují na `/w/ucet` s „Obnovit účet“ |
-| Denní úklid | `/api/cron/ws-gdpr` (`0 3 * * *` UTC, `CRON_SECRET`): faktury po lhůtě, smazání účtů po 30 dnech + organizace v Clerku (chyba Clerku výmaz dat nezastaví) |
+| Denní úklid | `/api/cron/ws-gdpr` (`0 3 * * *` UTC, `CRON_SECRET`): faktury po lhůtě, smazání účtů po 30 dnech (`ws.purge_closed_accounts()`) |
 | Záznam o zpracování | `/w/ucet/zpracovani` (čl. 30 odst. 2, subzpracovatelé, historie žádostí z `ws.audit_log`: `customer.erase`, `account.export`, `account.close`, `account.reopen`) |
 | Souhlas s nabídkami | pole `marketingConsent` v API v1, políčko na `/r` a ve widgetu (předem nezaškrtnuté); jen přidává `customers.contact_consent_at`, neodvolává |
 | Vzhled | cookie `ws_vzhled` (`system`/`light`/`dark`, `Path=/w`) čte `app/w/layout.tsx`, `WsRoot` nastaví `data-theme`; „Podle systému“ řeší inline skript s nonce bez bliknutí. Tmavé tokeny a přemapování světlých tříd (`bg-navy-50`, `border-navy-100`, `text-navy-700/900`…) v `app/ws-tokens.css`; prvek s vlastní třídou `dark:` má přednost, bílé prvky se nemění. `/r`, `/z` a landing zůstávají světlé |
@@ -256,11 +257,11 @@ Pravidla schématu:
 
 | Co | Kde |
 |---|---|
-| Stránky (vzhled adminu, NextAuth) | `/dashboard/klienti` (přehled účtů: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, napojený web), `/dashboard/klienti/[id]` (detail účtu, klíče a prompt, pozvánka znovu, omezená historie auditu), `/dashboard/novinky` (editor s náhledem v aplikaci a e-mailu, seznam). Vykreslení v `clients-view.tsx`, `[id]/detail-view.tsx`, akce `actions.ts` |
+| Stránky (vzhled adminu, Supabase Auth) | `/dashboard/klienti` (přehled účtů: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, napojený web), `/dashboard/klienti/[id]` (detail účtu, klíče a prompt, pozvánka znovu, omezená historie auditu), `/dashboard/novinky` (editor s náhledem v aplikaci a e-mailu, seznam). Vykreslení v `clients-view.tsx`, `[id]/detail-view.tsx`, akce `actions.ts` |
 | Přístup do DB | `lib/ws/admin/db.ts`: `adminDb` přes `DATABASE_URL` (vlastník tabulek, mimo RLS), `server-only`, v testech `setAdminDriverForTests`. Jen z `lib/ws/admin/*` |
-| Kdo smí | `lib/ws/admin/auth.ts`: `getAdmin()` = NextAuth session; každá server action ho volá první (testy `setAdminAuthForTests`). Audit `actor = 'admin'` |
+| Kdo smí | `lib/ws/admin/auth.ts`: `getAdmin()` = přihlášený admin přes Supabase Auth (`ADMIN_EMAIL`); každá server action ho volá první (testy `setAdminAuthForTests`). Audit `actor = 'admin'` |
 | Přehled a detail | `lib/ws/admin/clients.ts`: `listClients`, `getClientDetail`, `getClientBusiness`, `auditAdmin`. Poslední aktivita = nejnovější změna poptávek, termínů, zakázek, zákazníků a faktur; jejich osobní/finanční obsah ani poznámky a podrobnosti auditu admin nečte. Zůstávají souhrny účtu, byznysů, předplatného a členů týmu. |
-| Pozvat klienta | `lib/ws/admin/invite.ts`: Clerk organizace (bez vlastníka) → `createAccountWithBusiness({ owner: null })` → pozvánka `org:admin` s návratem na `/w/registrace`. Člen se zapíše až v průvodci `/w/novy` (`ensureMember` v `lib/ws/onboarding.ts`, bez webhooku Clerku). Klient pak projde Checkoutem (R-038) |
+| Pozvat klienta | `lib/ws/admin/invite.ts`: `createAccountWithBusiness({ owner: null })` → pozvánka v `ws.account_invites` (kód jen jako hash s `WS_KEY_PEPPER`) → e-mail přes Resend s přihlašovacím odkazem ze Supabase `generateLink`, odkaz `/w/pozvanka/[kod]`. Přijetí přes `ws.redeem_account_invite` nastaví člena vlastníka v `ws.members`. Klient pak projde Checkoutem (R-038) |
 | Klíče a prompt pro web | `lib/ws/admin/web-keys.ts`: `ensureIntegration` + `rotateSecretKey` + `buildClaudePrompt` jako Nastavení › Napojený web (S11), zápis rolí `ws_app` pod RLS účtu |
 | Novinky | `lib/ws/admin/news.ts` (koncept → `publishNews` → `sendNewsEmail` s potvrzeným počtem příjemců, jednou), `lib/ws/news-format.ts` (štítky, limity, kontrola obrázku podle bajtů, tipy „Učesat text“ bez AI), `lib/ws/email/news-email.ts` (jeden e-mail pro náhled, odeslání i cron), zvonek `components/ws/app/news-entry.tsx`, obrázek `/z/novinky/[id]/obrazek` (jen zveřejněná, CORP `cross-origin`) |
 | Testy | `lib/ws/__tests__/ws-admin.test.ts` |
@@ -274,34 +275,34 @@ Plán a rozhodnutí: `docs/klientsky-prostor/PLAN.md` (R-070 a dál v `memory/me
 
 - **Aktivita zakázky** (migrace 093): `lib/project-activity.ts` (Zod, `redactSensitive`, `buildTimeline`), `app/project-activity-actions.ts` (koncept → schválit/zamítnout, souhrnný e-mail max. 1× za 24 h, selhání e-mailu publikaci nezruší), `components/ProjectActivityPanel.tsx`, portál `/p/[token]` ukazuje jen `published`.
 - **Hlášení z Claude Code** (094): `lib/agent-keys.ts`, `POST /api/agent/v1/projects/{id}/reports` (jen koncept), `app/project-agent-key-actions.ts`, `components/AgentKeyPanel.tsx`, skript `scripts/zakaziq-report.mjs`, skill `zakaziq-hlaseni`.
-- **Klientský prostor** (095, 096): `/klient` (Clerk bez organizací, `proxy.ts` má pro něj vlastní middleware), `lib/portal/{db,context,invite,projects,paths,admin-queries}.ts`, `app/klient/**`, `components/portal/`, správa z adminu `/dashboard/klientsky-prostor` (`app/portal-admin-actions.ts`). Klientovi se ukazuje jen schválené (triggery), zapisuje funkcemi `portal.submit_*`. Nová tabulka s daty klienta = `client_id`, RLS politika, složené cizí klíče a řádek v testu `lib/__tests__/portal-isolation.test.ts`.
+- **Klientský prostor** (095, 096): `/klient` (Supabase Auth, členství v `portal.members`, funkce `portal.memberships_for_user` a `portal.redeem_invite_for_user`, migrace 101), `lib/portal/{db,context,invite,projects,paths,admin-queries}.ts`, `app/klient/**`, `components/portal/`, správa z adminu `/dashboard/klientsky-prostor` (`app/portal-admin-actions.ts`). Klientovi se ukazuje jen schválené (triggery), zapisuje funkcemi `portal.submit_*`. Nová tabulka s daty klienta = `client_id`, RLS politika, složené cizí klíče a řádek v testu `lib/__tests__/portal-isolation.test.ts`.
 - **Předání do Claude Code, úroveň 2** (KP09): `lib/claude-code-handoff.ts` (příkaz pro terminál s textem klienta v souboru přes heredoc, ne v `$(…)`), tlačítko na kartě požadavku.
 - **Kostra administrace** (KP01/KP02): viz `docs/admin/AGENTS-ADMIN.md` → Kostra administrace.
 
 ## B4. Přihlášení a role
 
-- Clerk: Organization = účet (firma, jedno IČO, předplatné). Role `owner`, `staff`.
-- Přihlášení bez hesla: e-mailový kód nebo Google.
-- Jedna doména: landing na `/`, aplikace na `/w/*`, jedna Clerk instance (R-017). Cesty veřejných částí viz Hranice v repu (R-016).
-- Jeden `proxy.ts` (dřív `proxy.ts`, Next 16, Node runtime): veřejné cesty; Workspace přes Clerk; admin cesty přes NextAuth token jako dnes. Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
-- Webhook Clerk (`/api/clerk/webhook`, ověření podpisu) synchronizuje účty a členy do `ws`.
+- Supabase Auth: účet = firma (jedno IČO, předplatné), členství v `ws.members` (jeden vlastněný účet na uživatele). Role `owner`, `staff`. Žádné organizace.
+- Přihlášení: e-mail a heslo, nebo Google.
+- Jedna doména: landing na `/`, aplikace na `/w/*`, jeden Supabase Auth projekt (R-017). Cesty veřejných částí viz Hranice v repu (R-016).
+- Jeden `proxy.ts` (dřív `middleware.ts`, Next 16, Node runtime): veřejné cesty; Workspace i admin přes Supabase Auth session (obnovuje `lib/supabase/proxy.ts`). Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
+- Webhook identity není (Clerk webhook smazán). Členství a pozvánky se řeší funkcemi v DB (`ws.members`, `ws.account_invites`).
 
 ### Jak je to v kódu (S07, R-037)
 
 | Co | Kde |
 |---|---|
-| SDK | `@clerk/nextjs` **6.39.7** (podporuje Next 14–16 i React 19, upgrade na v7 nebyl při přechodu na Next 16 potřeba) + `@clerk/localizations` (`csCZ`) |
-| Proxy | `proxy.ts`: `clerkMiddleware` jen pro `/w` a `/api/ws`; bez přihlášení `auth.protect()` → `/w/prihlaseni` (veřejné jen přihlášení, registrace a `/w/_design`). Admin a landing Clerk vůbec nespouští. CSP s nonce zůstává (`withCsp` uvnitř Clerku) |
-| Provider | `app/w/layout.tsx`: `ClerkProvider dynamic` (nonce z `x-nonce`), česky, `telemetry={false}`, po přihlášení `/w`, po registraci `/w/novy`. Kořenový `app/layout.tsx` beze změny |
-| Vzhled | `components/ws/auth/clerk-appearance.ts` (třídy Tailwindu s tokeny Dílků, `!`), rozložení `components/ws/auth/auth-shell.tsx` |
-| Stránky | `/w/prihlaseni/[[...prihlaseni]]`, `/w/registrace/[[...registrace]]` (catch-all kvůli krokům Clerku), `/w/novy` (průvodce), `/w` (přesměruje na `/w/[byznys]`, kostra a Dnes viz B9 „Jak je to v kódu (S09)“) |
-| Průvodce Nový byznys | `app/w/novy/actions.ts` (`createBusiness`: Zod, `auth()`, organizace přes `lib/ws/clerk-orgs.ts`, pak `createAccountWithBusiness`), UI `components/ws/onboarding/` (rozložení C5, náhled šablony z `industry-summaries.ts`). Krok 2 = platba (S08) |
-| Organizace | `lib/ws/clerk-orgs.ts` (`server-only`): má-li uživatel organizaci s účtem, nový účet se nezakládá (R-026) a průvodce ji jen aktivuje (`ActivateAccount`, Clerk po přihlášení organizaci sám nevybere); organizace bez účtu (spadlé založení) se použije znovu |
-| Webhook | `app/api/clerk/webhook/route.ts` (`verifyWebhook` = Svix podpis + čerstvost, limit 256 kB) → `lib/ws/clerk-webhook.ts`: `organization.updated` (název účtu), `organizationMembership.created/updated/deleted` (`ws.members`, `org:admin` → `owner`). Účet nezakládá — to dělá jen průvodce. `organization.deleted` data nemaže. Idempotence `ws.webhook_events` (`processed_at`) |
-| Testy | `lib/ws/__tests__/ws-onboarding.test.ts` (založení, dva účty se nevidí, opakování, webhook, podpis route) |
+| SDK | `@supabase/supabase-js` 2.118.0 + `@supabase/ssr` 0.12.7 (session v cookies); helpery `lib/supabase/{config,server,browser,admin}.ts` |
+| Proxy | `proxy.ts` → `lib/supabase/proxy.ts`: obnova Supabase session; bez přihlášení na `/w` přesměrování na `/w/prihlaseni` (veřejné jen přihlášení, registrace, zapomenuté a nové heslo, pozvánka a `/w/_design`). CSP s nonce zůstává |
+| Identita v layoutu | `app/w/layout.tsx`: identita se čte na serveru (`requireIdentity()`), po přihlášení `/w`, po registraci `/w/novy`. Kořenový `app/layout.tsx` beze změny |
+| Vzhled | `components/ws/auth/auth-shell.tsx` (rozložení přihlášení a registrace, tokeny Dílků) |
+| Stránky | `/w/prihlaseni`, `/w/registrace`, `/w/zapomenute-heslo`, `/w/nove-heslo`, `/w/pozvanka/[kod]` (formuláře Supabase Auth), `/w/novy` (průvodce), `/w` (přesměruje na `/w/[byznys]`, kostra a Dnes viz B9 „Jak je to v kódu (S09)“) |
+| Průvodce Nový byznys | `app/w/novy/actions.ts` (`createBusiness`: Zod, `requireIdentity()`, pak `createAccountWithBusiness`), UI `components/ws/onboarding/` (rozložení C5, náhled šablony z `industry-summaries.ts`). Krok 2 = platba (S08) |
+| Účet a členství | `ws.members` (jeden vlastněný účet na uživatele, unikátní index), `ws.membership_for_user(user_id)`; pozvánky `ws.account_invites` a `ws.redeem_account_invite` (migrace 100) |
+| Webhook | není; Clerk webhook (`app/api/clerk/webhook`, `lib/ws/clerk-webhook.ts`) byl při přechodu na Supabase Auth smazán |
+| Testy | `lib/ws/__tests__/ws-onboarding.test.ts` (založení, dva účty se nevidí, opakování) |
 
-- Instance Clerku (dev): přihlášení jen e-mailový kód a Google, bez hesla, telefonu a uživatelského jména; organizace zapnuté, max. 5 členů na organizaci (limit Clerku). Nastavení přes `clerk config pull/patch`, ne ručně v dashboardu.
-- Odhlášení vlastním tlačítkem (`SignOutButton`), ne `UserButton` — jeho okno správy účtu se vykresluje mimo `[data-app="ws"]` bez tokenů.
+- Supabase Auth: e-mail + heslo a Google; registrace zapnutá, potvrzení e-mailu zapnuté, minimální délka hesla 8. Nastavení a šablony v `docs/supabase/SETUP.md` §3.
+- Odhlášení vlastním tlačítkem, ne přes cizí komponentu se správou účtu (dřív `UserButton` Clerku, který se vykresloval mimo `[data-app="ws"]` bez tokenů).
 
 ## B5. Platby
 
@@ -432,7 +433,7 @@ Jak je systém v kódu (S01, R-027):
 | Zatím nepostavené obrazovky | `app/w/[business]/[section]/page.tsx` — zástupná stránka pro zapnuté funkce; skutečná `app/w/[business]/<část>/page.tsx` má přednost (od S10 Poptávky, Kalendář, Zakázky; od S11 Nastavení) |
 | Rezervované slugy | `RESERVED_BUSINESS_SLUGS` v `lib/ws/paths.ts` — pevné cesty pod `/w` (`novy`, `ucet`…). Nová pevná cesta pod `/w` = přidat sem, jinak by zakryla byznys se stejným slugem |
 | Čas | `lib/ws/time.ts`: `pragueToday`, `pragueParts`, `pragueToUtc` (přes letní/zimní čas), `weekStartOf`, `formatDayShort` („pá 9. 10.“), `formatRelativeDay` |
-| Ukázková data | `node scripts/ws-seed.mjs <slug> --ano` (smazání `--smazat --ano`), data v `lib/ws/demo-seed.ts` (bez runtime importů, Node 24 ho spustí bez překladu). Označená, jiných dat se nedotkne. Pozor: `.env.local` míří na produkční Neon |
+| Ukázková data | `node scripts/ws-seed.mjs <slug> --ano` (smazání `--smazat --ano`), data v `lib/ws/demo-seed.ts` (bez runtime importů, Node 24 ho spustí bez překladu). Označená, jiných dat se nedotkne. Pozor: `.env.local` míří na produkční Supabase (dřív Neon) |
 | Testy | `lib/ws/__tests__/ws-app-shell.test.ts` (čas, parser, kalendář, navigace, `?detail=`), `ws-today.test.ts` (Dnes nad ukázkovými daty v PGlite, oddělení účtů, hledání, smazání ukázky) |
 
 - `requireWorkspace` a `requireBusiness` jsou obalené `React.cache` — layout a stránka téhož požadavku se ptají jen jednou.
@@ -446,7 +447,7 @@ Jak je systém v kódu (S01, R-027):
 | Hlavní věc a začátek na Dnes | `pickFocus` v `lib/ws/today.ts` (čistá funkce): nejdéle čekající nová poptávka → nejbližší dnešní termín, který neskončil → nejstarší vystavená faktura po splatnosti (jen se zapnutou funkcí Faktury, `getTodayData(…, { invoices })`) → nic. Podklady jdou v téže dávce jako zbytek Dnes (3 dotazy navíc, bez nového kola do DB), nezávisí na zobrazeném týdnu. Termín je omezený na poslední dva dny, aby index `(byznys, začátek)` neprocházel historii. `TodayFocus` nabízí hlavní akci, `TodayBoard` kalendář/poptávky a úvodní kontrolní seznam pro nastavení služeb, otevírací doby, odkazu na objednání a první poptávky; splnění se posuzuje podle konkrétního byznysu, zavření seznamu se pamatuje lokálně pro tento byznys. |
 | Karta zákazníka | už není třetí sloupec. Klik na termín nebo poptávku v kalendáři otevře panel (`termin:` / `poptavka:`), ten má kartu zákazníka v sobě; `?zakaznik=<id>` přesměruje na `?detail=zakaznik:<id>` |
 | Věrnostní karta (RD12) | `lib/ws/loyalty-card-view.ts` sjednocuje průběh a hlášku pro kartu v detailu zákazníka, Dnes, portálu a e-mailu. `lib/ws/loyalty.ts` používá zámek na zákazníka a program; ruční razítko i uplatnění odměny lze vrátit po dobu jedné minuty, pokud karta mezitím nedostala další událost. Akce v `app/w/[business]/zakaznici/actions.ts` ověřují Zod, účet a byznys. Nastavení ukazuje zapnutí, počet a odměnu; ostatní pravidla jsou v „Pokročilé“. Bez migrace. Testy `ws-loyalty.test.ts`, `ws-loyalty-card-view.test.ts`, `ws-email.test.ts` |
-| Kontakt a zprávy zákazníkům (RD16) | `components/ws/customers/customer-contact-actions.tsx`: telefon/e-mail s voláním a e-mailovým odkazem, doplnění chybějícího údaje, návrh bezpečného sloučení duplicity, pět ručních šablon a 60 s na zrušení fronty. `lib/ws/customers.ts` hlídá účet a vazbu na byznys; kontakt normalizuje server. Vstup poptávky vyžaduje alespoň telefon nebo e-mail. Migrace 089 rozšiřuje CHECK šablon, je připravená a na Neonu nenasazená. Testy `ws-customers.test.ts`, `ws-email.test.ts`, `ws-gdpr.test.ts` |
+| Kontakt a zprávy zákazníkům (RD16) | `components/ws/customers/customer-contact-actions.tsx`: telefon/e-mail s voláním a e-mailovým odkazem, doplnění chybějícího údaje, návrh bezpečného sloučení duplicity, pět ručních šablon a 60 s na zrušení fronty. `lib/ws/customers.ts` hlídá účet a vazbu na byznys; kontakt normalizuje server. Vstup poptávky vyžaduje alespoň telefon nebo e-mail. Migrace 089 rozšiřuje CHECK šablon, je připravená a na produkční DB nenasazená. Testy `ws-customers.test.ts`, `ws-email.test.ts`, `ws-gdpr.test.ts` |
 | Nastavení (RD13) | `/w/[byznys]/nastaveni` nabízí pět částí: Firma, Nabídka, Objednávky, Zákazníci a Komunikace. Detailní cesty jsou `/nastaveni/{firma,nabidka,objednavky,zakaznici,komunikace}`; původní cesty pod `/nastaveni/{emaily,formular,funkce,oteviraci-doba,skupiny,sluzby,stavy,vernost,vzhled,web}` zůstávají jako přesměrování. Obsah formulářů používá původní komponenty nastavení, které zůstávají v samostatných souborech. Firma mění profil dodavatele a vzhled; nabídka služby, otevírací dobu a pracovníky včetně barev; ostatní části sdružují původní funkce. Přepínače a autosave nabízejí „Zpět“; závislé funkce se při vypnutí obnoví bezpečně. Psaní mění jen vlastník; pracovník uvidí informaci o oprávnění. Barvy pracovníků jsou editovatelné jen při více aktivních pracovnících, jinak se dál používají výchozí Dílků. Testy `ws-settings.test.ts` |
 | Společné komponenty obrazovek | `components/ws/app/page-header.tsx`: `PageShell` (šířka `narrow` 960 / `default` 1280 / `wide` 1440, rytmus 20 px) a `PageHeader` (nadpis s akcentem, oddělovací linka, podnadpis, jedna hlavní akce vpravo, slot `help` pro „?“ z RD14). `components/ws/app/toolbar.tsx`: `Toolbar` (řádek filtrů) a `PillNav` (aktivní filtr v pilulce, ostatní textové; `segmented` pro pohled). `EmptyState` má třetí velikost `compact` do úzkého sloupce a karty |
 | Kde se používají | Dnes, Poptávky, Zákazníci (`PageShell` + `PageHeader` + `PillNav`) a pohled Kalendáře (`PillNav` segmented). Kalendář a Zakázky (RD05, RD06) mají `PageShell` + `PageHeader` + `Toolbar`/`PillNav`; Peníze a Daně se upravují v RD11, Nastavení v RD13. Ukázky všech variant v `/w/_design` (oddíl 09) |
@@ -589,7 +590,7 @@ Stav zabezpečení je v `.claude/security/`:
 |---|---|
 | Statické hlavičky (HSTS, nosniff, X-Frame-Options, CORP, COOP, Permissions-Policy…) pro všechny odpovědi | `next.config.mjs` |
 | CSP s nonce per request (`strict-dynamic`), výběr profilu podle cesty | `proxy.ts` + `lib/security/csp.ts` |
-| Admin přihlášení (NextAuth), Workspace (Clerk jen `/w`, `/api/ws`) | `proxy.ts` — Clerk větev (`/w`, `/api/ws`) → admin NextAuth → CSP |
+| Admin přihlášení a Workspace (Supabase Auth) | `proxy.ts` — obnova Supabase session, ochrana `/w`, `/api/ws`, admin cest → CSP |
 | `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`); domény z `web_integrations.allowed_origins` — `/r` přes `lib/ws/intake/embed-origins.ts` v proxy, API přes `lib/ws/intake/http.ts` |
 | Hlášení zranitelností | `public/.well-known/security.txt` (`Expires` obnovit) |
 | CI: audit závislostí, gitleaks, kontrola hlaviček živého webu | `.github/workflows/security.yml`, skript `.claude/security/security-check.sh` |
@@ -603,7 +604,7 @@ Nejsou to stylové preference — porušení = skutečná zranitelnost v aplikac
 
 **Nikdy neoslabuj CSP, aby něco fungovalo.** Žádné `unsafe-inline` ani `unsafe-eval` do `script-src` (mimo dev větev v `csp.ts`), žádný wildcard, žádné mazání direktivy kvůli chybě v konzoli. Když funkce do politiky nepasuje: vyměnit funkci, načíst skript přes nonce, nebo se zeptat. Nový zdroj = konkrétní host v `lib/security/csp.ts` + řádek v `CSP-LOG.md`.
 
-**Nikdy secret v kódu, kam dosáhne prohlížeč.** Nic citlivého za `NEXT_PUBLIC_`, žádný Stripe secret, Clerk secret, `DATABASE_URL*`, Resend/Anthropic klíč ani SMTP heslo mimo serverový kód. Publikovatelné klíče (Clerk publishable, Stripe publishable, veřejný klíč widgetu) jsou v pořádku. Commitnutý secret se musí **rotovat**, ne jen smazat — a zapsat do `AUDIT-LOG.md`.
+**Nikdy secret v kódu, kam dosáhne prohlížeč.** Nic citlivého za `NEXT_PUBLIC_`, žádný Stripe secret, `SUPABASE_SECRET_KEY`, `DATABASE_URL*`, Resend/Anthropic klíč ani SMTP heslo mimo serverový kód. Publikovatelné klíče (Supabase publishable, Stripe publishable, veřejný klíč widgetu) jsou v pořádku. Commitnutý secret se musí **rotovat**, ne jen smazat — a zapsat do `AUDIT-LOG.md`.
 
 **Nikdy vstup bez validace na serveru.** Každá server action, route handler a veřejné API validuje Zodem a omezuje délku každého pole. Klientská validace je jen UX.
 
@@ -613,7 +614,7 @@ Nejsou to stylové preference — porušení = skutečná zranitelnost v aplikac
 
 **Nikdy nepřidávej skript třetí strany bez zeptání.** Běží s plnými právy na stránce a vidí formulář, do kterého zákazník píše. Když zůstane, potřebuje záznam v `CSP-LOG.md` (a SRI hash, pokud se načítá staticky).
 
-**Nikdy veřejný vstup bez ochrany.** Veřejné API a formuláře: rate limit, validace, honeypot nebo captcha, odeslání jen ze serveru. Webhooky (Stripe, Clerk) vždy s ověřeným podpisem a idempotentní.
+**Nikdy veřejný vstup bez ochrany.** Veřejné API a formuláře: rate limit, validace, honeypot nebo captcha, odeslání jen ze serveru. Webhooky (Stripe, Resend) vždy s ověřeným podpisem a idempotentní.
 
 **CORS a rámování jen pro přesné domény.** CORS jen na `/api/public/v1/*` přes `corsHeaders()` — přesný origin, nikdy `*`, nikdy `Allow-Credentials`. Rámování jen `/r/*` přes `frameAncestorsFor()`. Neplatný origin se přeskočí, nikdy nerozšíří povolení.
 
@@ -624,7 +625,7 @@ Nejsou to stylové preference — porušení = skutečná zranitelnost v aplikac
 - Cookies: `Secure; HttpOnly; SameSite=Lax`, pokud není zapsaný důvod jinak.
 - Chyby pro návštěvníky obecné a česky (B6), detaily do logu — se `account_id`, bez osobních údajů.
 - Zdrojové mapy a `console.log` interních dat nepatří do produkce (`productionBrowserSourceMaps: false`).
-- OAuth (Clerk) přesměrováním, ne popupem — `Cross-Origin-Opener-Policy: same-origin` popup rozbije.
+- OAuth (Google přes Supabase Auth) přesměrováním, ne popupem — `Cross-Origin-Opener-Policy: same-origin` popup rozbije.
 - Lockfile v repu; `npm audit --omit=dev --audit-level=high` čistý před spuštěním (dnes výjimka, `DECISIONS.md` #006).
 
 ### Skilly

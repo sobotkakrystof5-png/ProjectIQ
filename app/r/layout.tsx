@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: '#f4f6fb' }
 
-// Objednávací stránka /r/[slug] (S11, R-016): bez přihlášení, bez Clerku.
+// Objednávací stránka /r/[slug] (S11, R-016): bez přihlášení.
 // CSP je vynucená s nonce (proxy), nonce dostane jen dynamická stránka.
 // Rámování jen z povolených domén byznysu (frame-ancestors v proxy.ts).
 export const dynamic = 'force-dynamic'

@@ -3,7 +3,7 @@
  *
  * Skládá ji `proxy.ts` pro každý request zvlášť: náhodný nonce +
  * `strict-dynamic`, takže se spustí jen skripty, které vygeneroval náš server
- * (a skripty, které ony samy načtou — tak fungují chunky Nextu, Clerk i Stripe).
+ * (a skripty, které ony samy načtou — tak fungují chunky Nextu i Stripe).
  * Next.js si nonce sám přečte z request hlavičky `Content-Security-Policy`
  * a dá ho na své `<script>` — ale jen u dynamicky renderovaných stránek.
  * Statická stránka nonce nemá a její skripty by vynucená CSP zablokovala,
@@ -71,42 +71,59 @@ function base(nonce: string, isDev: boolean): Directives {
 }
 
 /**
- * Host Frontend API Clerku z publishable key (`pk_test_…`/`pk_live_…` = base64
- * z `<host>$`). Dev instance je `*.clerk.accounts.dev`, produkce `clerk.<doména>`.
- * Neplatný klíč = `null`, CSP pak Clerk nepustí (selže zavřeně).
+ * Origin Supabase projektu z `NEXT_PUBLIC_SUPABASE_URL` (`https://<ref>.supabase.co`
+ * nebo vlastní doména). Jen https a holý host bez cesty; cokoli jiného = `null`
+ * a CSP Supabase nepustí (selže zavřeně).
  */
-export function clerkFrontendApiHost(publishableKey: string | undefined): string | null {
-  const match = /^pk_(test|live)_([A-Za-z0-9+/=]+)$/.exec(publishableKey ?? '')
-  if (!match) return null
-  let decoded: string
+export function supabaseOrigin(url: string | undefined): string | null {
+  if (!url) return null
+  let parsed: URL
   try {
-    decoded = atob(match[2])
+    parsed = new URL(url)
   } catch {
     return null
   }
-  const host = decoded.endsWith('$') ? decoded.slice(0, -1) : ''
-  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(host) ? host.toLowerCase() : null
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(parsed.hostname))) return null
+  if (parsed.username || parsed.password || (parsed.pathname !== '/' && parsed.pathname !== '')) return null
+  return parsed.origin
 }
 
+/** Kde prohlížeč volá Supabase Auth (přihlášení, registrace, obnova hesla, 2FA, zabezpečení účtu). */
+const SUPABASE_AUTH_PATHS = ['/w', '/klient', '/login', '/dashboard/zabezpeceni'] as const
+
 /**
- * Clerk (S07) jen pod /w a /klient (KP05) — přihlášení, registrace, aplikace. Landing page Clerk
- * nenačítá. Skript clerk-js jde z Frontend API s naším nonce (ClerkProvider
- * `dynamic`), Turnstile ho načte sám (strict-dynamic). Telemetrie je vypnutá
- * v `app/w/layout.tsx`, host clerk-telemetry.com proto není potřeba.
+ * Formuláře s ochranou proti botům (Cloudflare Turnstile, R-081): přihlášení,
+ * registrace a obnova hesla všech tří částí. Skript Turnstile vkládá náš
+ * skript (strict-dynamic), rámeček s ověřením potřebuje frame-src.
  */
-function clerkSources(host: string): Directives {
-  return {
-    'connect-src': [`https://${host}`],
-    'img-src': ['https://img.clerk.com'],
-    // Bot ochrana při registraci (Cloudflare Turnstile v rámečku)
-    'frame-src': ['https://challenges.cloudflare.com'],
-  }
+const CAPTCHA_PATHS = [
+  '/login',
+  '/w/prihlaseni',
+  '/w/registrace',
+  '/w/zapomenute-heslo',
+  '/klient/prihlaseni',
+  '/klient/registrace',
+  '/klient/zapomenute-heslo',
+] as const
+
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
+
+/**
+ * Supabase Auth (R-080): formuláře přihlášení volají `<ref>.supabase.co/auth/v1`
+ * z prohlížeče (fetch → connect-src). Google přihlášení je přesměrování celé
+ * stránky, CSP se ho netýká. Žádné skripty ani rámečky z cizích hostů.
+ */
+function supabaseSources(origin: string): Directives {
+  return { 'connect-src': [origin] }
 }
 
 /** Zdroje navíc podle profilu. Jen konkrétní hosty, každý zapsaný v CSP-LOG.md. */
-function extras(profile: CspProfile, pathname: string, clerkHost: string | null): Directives {
+function extras(profile: CspProfile, pathname: string, supabase: string | null): Directives {
+  const supabaseAuth = supabase && SUPABASE_AUTH_PATHS.some((p) => hasPrefix(pathname, p)) ? supabaseSources(supabase) : {}
+  const captcha: Directives = CAPTCHA_PATHS.some((p) => hasPrefix(pathname, p)) ? { 'frame-src': [TURNSTILE_ORIGIN] } : {}
+  const auth = merge(supabaseAuth, captcha)
   if (profile === 'admin') {
-    return {
+    return merge(auth, {
       // Inter přes @import v app/globals.css
       'style-src': ['https://fonts.googleapis.com'],
       'font-src': ['https://fonts.gstatic.com'],
@@ -118,11 +135,10 @@ function extras(profile: CspProfile, pathname: string, clerkHost: string | null)
       ...(hasPrefix(pathname, '/dashboard/faktury')
         ? { 'object-src': ["'self'"], 'frame-src': ["'self'", 'https://www.tradingview-widget.com'] }
         : {}),
-    }
+    })
   }
-  if (clerkHost && (hasPrefix(pathname, '/w') || hasPrefix(pathname, '/klient'))) return clerkSources(clerkHost)
   // S08: Stripe Checkout je přesměrování; pokud bude potřeba, `form-action https://checkout.stripe.com`.
-  return {}
+  return auth
 }
 
 function merge(a: Directives, b: Directives): Directives {
@@ -142,8 +158,8 @@ export interface BuildCspOptions {
   isDev?: boolean
   /** Hodnota `frame-ancestors` pro stránky vkládané na cizí weby (`/r/[slug]`). */
   frameAncestors?: string[]
-  /** Host Frontend API Clerku (`clerkFrontendApiHost`), pouští Clerk na /w. */
-  clerkHost?: string | null
+  /** Origin Supabase (`supabaseOrigin`), pouští volání Supabase Auth z přihlašovacích formulářů. */
+  supabaseOrigin?: string | null
 }
 
 export function buildCsp({
@@ -153,9 +169,9 @@ export function buildCsp({
   mode,
   isDev = false,
   frameAncestors,
-  clerkHost = null,
+  supabaseOrigin: supabase = null,
 }: BuildCspOptions): string {
-  let directives = merge(base(nonce, isDev), extras(profile, pathname, clerkHost))
+  let directives = merge(base(nonce, isDev), extras(profile, pathname, supabase))
   if (frameAncestors) directives = { ...directives, 'frame-ancestors': frameAncestors }
 
   const parts = Object.entries(directives).map(([key, values]) => `${key} ${values.join(' ')}`)

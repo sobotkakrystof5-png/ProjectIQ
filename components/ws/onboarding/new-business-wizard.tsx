@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { useOrganizationList } from '@clerk/nextjs'
 import { Biohazard, Car, Check, Droplets, HardHat, KeyRound, Scissors, Shapes, Sparkles, type LucideIcon } from 'lucide-react'
 import { AccentHeading, SectionLabel } from '@/components/ws/brand'
 import { Button } from '@/components/ui/button'
@@ -54,7 +53,6 @@ const FIELD_TYPES: Record<FieldType, string> = {
  */
 export function NewBusinessWizard({ industries }: { industries: IndustrySummary[] }) {
   const router = useRouter()
-  const { setActive } = useOrganizationList()
   const [name, setName] = useState('')
   const [industry, setIndustry] = useState<IndustryKey | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -76,13 +74,9 @@ export function NewBusinessWizard({ industries }: { industries: IndustrySummary[
         setError(result.error)
         return
       }
-      try {
-        await setActive?.({ organization: result.data.orgId })
-        router.replace('/w/novy')
-        router.refresh()
-      } catch {
-        setError('Byznys je založený, jen se nepodařilo otevřít. Načtěte prosím stránku znovu.')
-      }
+      // Účet je založený, /w/novy teď ukáže krok 2 (předplatné).
+      router.replace('/w/novy')
+      router.refresh()
     })
   }
 

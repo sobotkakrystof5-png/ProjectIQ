@@ -71,7 +71,13 @@ BEGIN
  RETURN t;
 END $$;
 REVOKE ALL ON FUNCTION ws.money_issue(uuid,jsonb), ws.money_pay(uuid,uuid,date,text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION ws.money_issue(uuid,jsonb), ws.money_pay(uuid,uuid,date,text) TO ws_app;
+-- Grant jen když role existuje (čistá databáze ji dostane až ze scripts/ws-create-role.js,
+-- který práva doplní z scripts/ws-grants.sql).
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ws_app') THEN
+    GRANT EXECUTE ON FUNCTION ws.money_issue(uuid,jsonb), ws.money_pay(uuid,uuid,date,text) TO ws_app;
+  END IF;
+END $$;
 
 -- Zaplacená faktura a následné „Zaplatit návštěvu“ nesmí vytvořit druhý příjem.
 CREATE OR REPLACE FUNCTION ws.money_adopt_visit()
@@ -91,4 +97,8 @@ END $$;
 DROP TRIGGER IF EXISTS money_adopt_visit ON ws.transactions;
 CREATE TRIGGER money_adopt_visit BEFORE INSERT ON ws.transactions FOR EACH ROW EXECUTE FUNCTION ws.money_adopt_visit();
 REVOKE ALL ON FUNCTION ws.money_adopt_visit() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION ws.money_adopt_visit() TO ws_app;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ws_app') THEN
+    GRANT EXECUTE ON FUNCTION ws.money_adopt_visit() TO ws_app;
+  END IF;
+END $$;

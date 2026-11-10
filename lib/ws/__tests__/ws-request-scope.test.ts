@@ -54,7 +54,7 @@ beforeAll(async () => {
 beforeEach(() => {
   request.reset()
   rounds = 0
-  setWsAuthProvider(async () => ({ userId: 'user_a', orgId: 'org_a', orgRole: 'org:admin' }))
+  setWsAuthProvider(async () => ({ userId: 'user_a', email: null }))
 })
 
 afterAll(async () => {
@@ -73,11 +73,11 @@ async function digestOf(p: Promise<unknown>): Promise<string> {
 }
 
 describe('ws.business_scope (SECURITY DEFINER)', () => {
-  const scopeOf = async (org: string, slug: string) =>
-    (await wsSystem<{ scope: Record<string, unknown> | null }>`SELECT ws.business_scope(${org}, ${slug}) AS scope`)[0].scope
+  const scopeOf = async (user: string, slug: string) =>
+    (await wsSystem<{ scope: Record<string, unknown> | null }>`SELECT ws.business_scope(${user}, NULL, ${slug}) AS scope`)[0].scope
 
-  it('vrátí účet, byznys, předplatné a byznysy jen jedné organizace', async () => {
-    const scope = await scopeOf('org_a', 'byznys-a')
+  it('vrátí účet, byznys, předplatné a byznysy jen účtu přihlášeného', async () => {
+    const scope = await scopeOf('user_a', 'byznys-a')
     expect(scope).toMatchObject({ account_id: A.account, business: { id: A.business, slug: 'byznys-a' } })
     expect(scope?.businesses).toEqual([{ name: expect.any(String), slug: 'byznys-a' }])
     expect(scope?.subscriptions).toHaveLength(1)
@@ -87,16 +87,16 @@ describe('ws.business_scope (SECURITY DEFINER)', () => {
   })
 
   it('cizí slug nevrátí byznys a nic cizího neprozradí', async () => {
-    const scope = await scopeOf('org_a', 'byznys-b')
+    const scope = await scopeOf('user_a', 'byznys-b')
     expect(scope?.account_id).toBe(A.account)
     expect(scope?.business).toBeNull()
     expect(scope?.modules).toEqual([])
     expect(JSON.stringify(scope)).not.toContain(B.business)
   })
 
-  it('neznámá organizace nebo nesmyslný slug = žádný účet / žádný byznys', async () => {
-    expect(await scopeOf('org_neexistuje', 'byznys-a')).toBeNull()
-    expect((await scopeOf('org_a', "x'; DROP TABLE ws.accounts; --"))?.business).toBeNull()
+  it('neznámý uživatel nebo nesmyslný slug = žádný účet / žádný byznys', async () => {
+    expect(await scopeOf('user_neexistuje', 'byznys-a')).toBeNull()
+    expect((await scopeOf('user_a', "x'; DROP TABLE ws.accounts; --"))?.business).toBeNull()
     // Tabulky jsou celé (kontrola jako vlastník, mimo RLS).
     expect((await db.query<{ n: number }>('SELECT count(*)::int AS n FROM ws.accounts')).rows[0].n).toBe(2)
   })
@@ -104,7 +104,7 @@ describe('ws.business_scope (SECURITY DEFINER)', () => {
   it('archivovaný byznys = jako by nebyl', async () => {
     await db.exec(`UPDATE ws.businesses SET archived_at = now() WHERE id = '${A.business}'`)
     try {
-      const scope = await scopeOf('org_a', 'byznys-a')
+      const scope = await scopeOf('user_a', 'byznys-a')
       expect(scope?.business).toBeNull()
       expect(scope?.businesses).toEqual([])
     } finally {
@@ -119,8 +119,8 @@ describe('ws.business_scope (SECURITY DEFINER)', () => {
       ON CONFLICT (business_id, module) DO UPDATE SET enabled = EXCLUDED.enabled
     `)
     try {
-      expect((await scopeOf('org_a', 'byznys-a'))?.modules).toEqual(['calendar'])
-      expect((await scopeOf('org_a', 'byznys-b'))?.modules).toEqual([])
+      expect((await scopeOf('user_a', 'byznys-a'))?.modules).toEqual(['calendar'])
+      expect((await scopeOf('user_a', 'byznys-b'))?.modules).toEqual([])
     } finally {
       await db.exec(`DELETE FROM ws.business_modules WHERE business_id = '${A.business}'`)
     }
@@ -128,19 +128,20 @@ describe('ws.business_scope (SECURITY DEFINER)', () => {
 })
 
 describe('parseBusinessScope', () => {
-  it('bez účtu vrátí null, role se bere z Clerku', () => {
-    expect(parseBusinessScope(null, { userId: 'u', orgRole: null })).toBeNull()
+  it('bez účtu vrátí null, role se bere z ws.members', () => {
+    expect(parseBusinessScope(null, { userId: 'u' })).toBeNull()
     const raw = { account_id: A.account, business: null, businesses: [], modules: [], subscriptions: [] }
-    expect(parseBusinessScope(raw, { userId: 'u', orgRole: 'org:admin' })?.ctx.role).toBe('owner')
-    expect(parseBusinessScope(raw, { userId: 'u', orgRole: 'org:member' })?.ctx.role).toBe('staff')
-    expect(parseBusinessScope(JSON.stringify(raw), { userId: 'u', orgRole: null })?.ctx.accountId).toBe(A.account)
+    expect(parseBusinessScope({ ...raw, role: 'owner' }, { userId: 'u' })?.ctx.role).toBe('owner')
+    expect(parseBusinessScope({ ...raw, role: 'staff' }, { userId: 'u' })?.ctx.role).toBe('staff')
+    expect(parseBusinessScope(raw, { userId: 'u' })?.ctx.role).toBe('staff')
+    expect(parseBusinessScope(JSON.stringify(raw), { userId: 'u' })?.ctx.accountId).toBe(A.account)
   })
 
   it('předplatné bez řádků = bez přístupu, zkušební doba = trialing', () => {
     const base = { account_id: A.account, business: null, businesses: [], modules: [] }
-    expect(parseBusinessScope({ ...base, subscriptions: [] }, { userId: 'u', orgRole: null })?.billing.access).toBe('none')
+    expect(parseBusinessScope({ ...base, subscriptions: [] }, { userId: 'u' })?.billing.access).toBe('none')
     const trial = { status: 'trialing', current_period_end: '2030-01-01T00:00:00+00:00', cancel_at_period_end: false, past_due_since: null, created_at: '2026-10-01T00:00:00+00:00' }
-    const parsed = parseBusinessScope({ ...base, subscriptions: [trial] }, { userId: 'u', orgRole: null })
+    const parsed = parseBusinessScope({ ...base, subscriptions: [trial] }, { userId: 'u' })
     expect(parsed?.billing.access).toBe('trialing')
     expect(parsed?.billing.periodEnd).toEqual(new Date('2030-01-01T00:00:00+00:00'))
   })
@@ -165,12 +166,12 @@ describe('loadBusinessScope', () => {
     setWsAuthProvider(async () => null)
     expect(await digestOf(loadBusinessScope('byznys-a'))).toContain('/w/prihlaseni')
     request.reset()
-    setWsAuthProvider(async () => ({ userId: 'u', orgId: 'org_neexistuje', orgRole: 'org:admin' }))
+    setWsAuthProvider(async () => ({ userId: 'u', email: null }))
     expect(await digestOf(loadBusinessScope('byznys-a'))).toContain('/w/novy')
   })
 
-  it('organizace B nevidí byznys A ani přes seed A v téže paměti požadavku', async () => {
-    setWsAuthProvider(async () => ({ userId: 'user_b', orgId: 'org_b', orgRole: 'org:admin' }))
+  it('účet B nevidí byznys A ani přes seed A v téže paměti požadavku', async () => {
+    setWsAuthProvider(async () => ({ userId: 'user_b', email: null }))
     expect(await digestOf(loadBusinessScope('byznys-a'))).toMatch(NOT_FOUND)
     expect((await loadBusinessScope('byznys-b')).ctx.accountId).toBe(B.account)
   })
@@ -191,9 +192,9 @@ describe('loadBusinessScope', () => {
     expect(await digestOf(requireBusiness(other, 'byznys-a'))).toMatch(NOT_FOUND)
   })
 
-  it('před migrací 085 (funkce chybí) se kontext načte po částech a aplikace funguje', async () => {
-    const migration = fs.readFileSync(path.join(__dirname, '../../../migrations/085_ws_kontext_jednim_dotazem.sql'), 'utf8')
-    await db.exec('DROP FUNCTION ws.business_scope(text, text)')
+  it('bez ws.business_scope (funkce chybí) se kontext načte po částech a aplikace funguje', async () => {
+    const migration = fs.readFileSync(path.join(__dirname, '../../../migrations/100_ws_supabase_auth.sql'), 'utf8')
+    await db.exec('DROP FUNCTION ws.business_scope(text, uuid, text)')
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
       const scope = await loadBusinessScope('byznys-a')

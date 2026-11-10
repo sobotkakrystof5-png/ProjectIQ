@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { sql } from '@/lib/db'
 
 /**
@@ -15,7 +14,7 @@ import { sql } from '@/lib/db'
  */
 export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const params = await props.params
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) {
     return new NextResponse('Neautorizovaný přístup', { status: 401 })
   }

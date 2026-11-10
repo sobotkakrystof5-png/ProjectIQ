@@ -39,7 +39,7 @@ export async function getEmailSettings(ctx: WsContext, business: Pick<WsBusiness
     q`SELECT type, enabled, subject, body FROM ws.message_settings WHERE account_id = ${acc} AND business_id = ${business.id}`,
     q`SELECT module FROM ws.business_modules WHERE account_id = ${acc} AND business_id = ${business.id} AND enabled`,
     q`SELECT email FROM ws.members WHERE account_id = ${acc} AND role = 'owner' AND email IS NOT NULL ORDER BY created_at LIMIT 1`,
-    q`SELECT email FROM ws.members WHERE account_id = ${acc} AND clerk_user_id = ${ctx.userId}`,
+    q`SELECT email FROM ws.members WHERE account_id = ${acc} AND user_id = ${ctx.userId}`,
     q`SELECT news_emails FROM ws.accounts WHERE id = ${acc}`,
   ])
   const on = new Set<string>([...modules.map((m: WsRow) => String(m.module)), ...ALWAYS_ON_MODULES])

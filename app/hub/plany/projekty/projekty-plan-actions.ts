@@ -2,8 +2,7 @@
 
 import { sql } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 
 export type PlanProjectStatus = 'validace' | 'schvaleno' | 'zamitnuto' | 'prevedeno_do_byznysu'
 
@@ -50,7 +49,7 @@ export interface PlanProjectPayload {
 }
 
 async function requireAuth() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Unauthorized')
 }
 

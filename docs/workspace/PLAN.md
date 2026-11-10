@@ -11,8 +11,8 @@ ZakazIQ zůstává jednou Next.js aplikací v tomto repu. Stávající část se
 | Část | Pro koho | Přihlášení | Stav |
 | --- | --- | --- | --- |
 | Landing page (`/`) | návštěvníci, budoucí klienti | žádné | nová |
-| ZakazIQ Workspace (`/w/...`) | firmy: kadeřnictví, zámečnictví, studnařství, likvidace azbestu… | Clerk | nová |
-| Admin konzole (`/dashboard`, `/alteno`, `/hub`, `/login`) | jen Kryštof | NextAuth jako dnes, odkaz „Admin“ ve footeru landing page | beze změny |
+| ZakazIQ Workspace (`/w/...`) | firmy: kadeřnictví, zámečnictví, studnařství, likvidace azbestu… | Supabase Auth (dřív Clerk, od R-080 Supabase Auth) | nová |
+| Admin konzole (`/dashboard`, `/alteno`, `/hub`, `/login`) | jen Kryštof | Supabase Auth (dřív NextAuth, od R-080 Supabase Auth), odkaz „Admin“ ve footeru landing page | beze změny |
 | Klientský portál (`/p/[token]`) | zákazníci firem | bez přihlášení | převzít do Workspace |
 
 &#91;embedded content: architektura · landing, Workspace, admin, jedna databáze\]
@@ -31,9 +31,9 @@ Workspace je přehled podnikání pro malé firmy, které dostávají poptávky.
 
 ## Výchozí stav repa
 
-Repo `sobotkakrystof5-png/projectiq` je Next.js 14 (App Router) + TypeScript + Tailwind + Neon, zhruba 300 souborů a 63 SQL migrací. Je postavené pro jednoho uživatele: jediný admin účet z env proměnných, dva byznysy napevno v kódu (`'vizeon' | 'alteno'`) a kořenová stránka `/` dnes jen přesměruje na `/hub` nebo `/login`.
+Repo `sobotkakrystof5-png/projectiq` je Next.js 14 (App Router) + TypeScript + Tailwind + Supabase Postgres (dřív Neon, od R-080), zhruba 300 souborů a 63 SQL migrací. Je postavené pro jednoho uživatele: jediný admin účet z env proměnných, dva byznysy napevno v kódu (`'vizeon' | 'alteno'`) a kořenová stránka `/` dnes jen přesměruje na `/hub` nebo `/login`.
 
-**Zůstává beze změny (admin konzole):** `/dashboard/*`, `/alteno/*`, `/hub/*`, `/login`, všechny stávající tabulky, NextAuth, e-maily přes Gmail, cron joby a stávající vzhled (brand-\* modrá, Inter).
+**Zůstává beze změny (admin konzole):** `/dashboard/*`, `/alteno/*`, `/hub/*`, `/login`, všechny stávající tabulky, Supabase Auth (dřív NextAuth, od R-080), e-maily přes Gmail, cron joby a stávající vzhled (brand-\* modrá, Inter).
 
 **Co převzít jako vzor do Workspace** (zkopírovat a zobecnit, ne měnit původní soubory):
 
@@ -196,7 +196,7 @@ Landing page běží na `/` ve stejné aplikaci a nahrazuje dnešní přesměrov
 **Registrace přímo z landing page, bez složitostí:**
 
 1. Tlačítko „Začít za 249 Kč měsíčně“ (v hero, v ceníku a ve footeru).
-2. Registrace přes Clerk: e-mail s jednorázovým kódem nebo „Pokračovat přes Google“. Žádné heslo, žádné potvrzování e-mailu odkazem.
+2. Registrace přes Supabase Auth (dřív Clerk, od R-080): e-mail a heslo nebo „Pokračovat přes Google“.
 3. Dvě otázky: název byznysu a obor (dlaždice). Vše ostatní doplní šablona.
 4. 14 dní zdarma, bez platební karty. Stripe Checkout na 249 Kč měsíčně přijde na řadu až na konci zkušební doby.
 5. Obrazovka Dnes s jediným úkolem: „Zkopírujte odkaz na objednání“ nebo „Vložte kód na web“.
@@ -271,15 +271,15 @@ E-maily fungují hned po registraci bez nastavování. Odcházejí z domény Zak
 
 ## Technologie, přihlášení, platby a admin
 
-Navržený stack sedí na to, co repo už používá. Přibývají jen Clerk, Stripe a shadcn/ui komponenty.
+Navržený stack sedí na to, co repo už používá. Přibývají jen Supabase Auth (dřív Clerk, od R-080), Stripe a shadcn/ui komponenty.
 
 | Vrstva | Volba | Poznámka |
 | --- | --- | --- |
 | Framework | Next.js 14 App Router + React 18 + TypeScript | jako dnes; upgrade na Next 15 až jako samostatný krok po spuštění |
 | Styl | Tailwind CSS + shadcn/ui | `components/ui` je dnes prázdná, nainstalovat nově s tokeny systému Dílky pro Workspace, klientský portál a landing page |
-| Databáze | Neon (stávající projekt) | nové schéma `ws`, vlastní DB role bez přístupu k admin tabulkám, migrace dál v `migrations/` od čísla 064 |
-| Přihlášení klientů | Clerk | Organizations = účet (firma), role vlastník / pracovník, webhook synchronizuje účty do DB |
-| Přihlášení admina | NextAuth jako dnes | odkaz „Admin“ ve footeru landing page vede na `/login` |
+| Databáze | Supabase Postgres (dřív Neon, od R-080) | nové schéma `ws`, vlastní DB role bez přístupu k admin tabulkám, migrace dál v `migrations/` od čísla 064 |
+| Přihlášení klientů | Supabase Auth (dřív Clerk, od R-080) | účet = firma (`ws.accounts`), členství v `ws.members`, role vlastník / pracovník, pozvánky přes `ws.account_invites`, bez webhooku |
+| Přihlášení admina | Supabase Auth (dřív NextAuth, od R-080) | admin = účet s `ADMIN_EMAIL`; odkaz „Admin“ ve footeru landing page vede na `/login` |
 | Platby | Stripe Billing | předplatné účtu, Checkout, Customer Portal, webhooky |
 | E-maily klientů | Resend | odesílání za byznys (jméno a odpovědní adresa klienta); admin dál Gmail |
 | Formuláře a validace | Zod + react-hook-form | jako dnes |
@@ -288,9 +288,9 @@ Navržený stack sedí na to, co repo už používá. Přibývají jen Clerk, St
 
 **Jak se přihlášení dělí (jeden `middleware.ts`):**
 
-- Veřejné: `/`, landing stránky, `/p/[token]`, `/api/public/*`, `/api/stripe/webhook`, `/api/clerk/webhook`.
-- Workspace (`/w/*`, `/api/ws/*`): Clerk, bez přihlášení přesměruje na registraci nebo přihlášení.
-- Admin (`/dashboard/*`, `/alteno/*`, `/hub/*`): NextAuth token jako dnes, bez něj přesměrování na `/login`.
+- Veřejné: `/`, landing stránky, `/p/[token]`, `/api/public/*`, `/api/stripe/webhook`.
+- Workspace (`/w/*`, `/api/ws/*`): Supabase Auth (dřív Clerk, od R-080), bez přihlášení přesměruje na registraci nebo přihlášení.
+- Admin (`/dashboard/*`, `/alteno/*`, `/hub/*`): Supabase Auth session (dřív NextAuth token, od R-080), bez ní přesměrování na `/login`.
 - Každá serverová akce ve Workspace začíná `requireWorkspace()`: ověří uživatele, účet a roli a že byznys patří tomu účtu. Bez ní se do DB nesmí.
 
 **Stripe:**
@@ -306,7 +306,7 @@ Navržený stack sedí na to, co repo už používá. Přibývají jen Clerk, St
 
 **Admin konzole** zůstává, jak je. Jediný doplněk je nová stránka `/dashboard/klienti`, která nic stávajícího nemění: seznam účtů Workspace, stav předplatného, počet poptávek, založení účtu pro klienta a vygenerování klíče pro jeho web. Admin ji čte přes vlastní roli databáze.
 
-**Nové env proměnné:** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_*` (po tarifu), `DATABASE_URL_WS` (role pro schéma `ws`), `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`. Přidat do `.env.example`.
+**Nové env proměnné:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `ADMIN_USER_ID`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_*` (po tarifu), `DATABASE_URL_WS` (role pro schéma `ws`), `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`. Přidat do `.env.example`.
 
 ## Datový model pro více klientů
 
@@ -314,8 +314,8 @@ Všechny tabulky Workspace jsou ve schématu `ws` a nesou `account_id`. Tabulky 
 
 | Tabulka | Klíčové sloupce | Účel |
 | --- | --- | --- |
-| `accounts` | id (Clerk org), název, IČO, tarif, stripe\_customer\_id, stav předplatného | firma = jednotka fakturace |
-| `members` | account\_id, clerk\_user\_id, role | kdo má do účtu přístup |
+| `accounts` | id (dřív Clerk org; `clerk_org_id` je od R-080 nepovinný a zastaralý), název, IČO, tarif, stripe\_customer\_id, stav předplatného | firma = jednotka fakturace |
+| `members` | account\_id, user\_id (Supabase Auth; dřív clerk\_user\_id), role | kdo má do účtu přístup |
 | `businesses` | account\_id, název, slug, obor, barva, logo | byznys uvnitř účtu |
 | `business_modules` | business\_id, modul, zapnuto | přepínače modulů |
 | `services` | business\_id, název, délka\_min, cena, aktivní, na\_webu | ceník a délky slotů |
@@ -345,9 +345,9 @@ Všechny tabulky Workspace jsou ve schématu `ws` a nesou `account_id`. Tabulky 
 
 Stavíme v tomto repu na samostatné větvi `workspace`, po fázích a každou fázi v nové konverzaci s Claude Code. Každá fáze končí kontrolou, že admin konzole funguje beze změny.
 
-1. **Příprava.** Větev, nová sekce „Workspace“ v `CLAUDE.md`, závislosti (Clerk, Stripe, shadcn/ui), design systém Dílky (tokeny, písma, animace) pro Workspace, klientský portál a landing page, složený `middleware.ts`, doplněný `.env.example`. *Hotovo, když:* `/login`, `/dashboard`, `/alteno`, `/hub` a `/p/[token]` vypadají a fungují jako předtím a `npm run build` a `npm test` procházejí.
+1. **Příprava.** Větev, nová sekce „Workspace“ v `CLAUDE.md`, závislosti (dřív Clerk, od R-080 Supabase Auth; Stripe, shadcn/ui), design systém Dílky (tokeny, písma, animace) pro Workspace, klientský portál a landing page, složený `middleware.ts`, doplněný `.env.example`. *Hotovo, když:* `/login`, `/dashboard`, `/alteno`, `/hub` a `/p/[token]` vypadají a fungují jako předtím a `npm run build` a `npm test` procházejí.
 2. **Landing page.** `/` podle sekce Landing page, footer s odkazem Admin, responzivní, metadata. *Hotovo, když:* stránka je statická, funguje na telefonu a kontaktní formulář založí poptávku v adminu.
-3. **Základ více klientů.** Schéma `ws` (migrace od 064), DB role, Row Level Security, webhook Clerk, `requireWorkspace()`, průvodce Nový byznys se šablonami oborů (C5). *Hotovo, když:* dva testovací účty navzájem nevidí data, ověřené testem.
+3. **Základ více klientů.** Schéma `ws` (migrace od 064), DB role, Row Level Security, dřív webhook Clerk (od R-080 pozvánky přes DB), `requireWorkspace()`, průvodce Nový byznys se šablonami oborů (C5). *Hotovo, když:* dva testovací účty navzájem nevidí data, ověřené testem.
 4. **Jádro.** Rozložení aplikace (postranní panel, přepínač byznysů, ⌘K), obrazovky Dnes, Poptávky, Kalendář, Zákazníci, veřejné API (schema + requests), tlačítko „Zkopírovat prompt pro Claude Code“, skill zakaziq-napojeni, stránka pro objednání a záložní widget. *Hotovo, když:* poptávka z testovací stránky se do 15 s objeví v kalendáři jako čárkovaný blok a jde potvrdit jedním klikem.
 5. **Nastavení.** Moduly, služby, kolonky s náhledem (C4), stavy, otevírací doba, pracovníci, napojený web. *Hotovo, když:* vypnutý modul zmizí z menu a nová kolonka se hned ukáže ve widgetu.
 6. **Věrnost a segmenty.** Program, karty, razítka, segmenty, panel „Komu napsat“, připomínky. *Hotovo, když:* testy pokrývají pravidla razítek a všech pěti segmentů.
@@ -374,7 +374,7 @@ Tyto body je potřeba rozhodnout před fází, kterou ovlivňují.
 
 - [x] Cena 249 Kč měsíčně je rozhodnutá. Rozhodnuto 8. 10. 2026: konečná cena bez DPH (neplátce), 14 dní zdarma bez karty, v ceně 1 byznys a neomezeně pracovníků.
 - [x] Doména Workspace: běží landing page i aplikace na jedné doméně (např. zakaziq.cz + `/w`), nebo aplikace na subdoméně? Rozhodnuto 8. 10. 2026: jedna doména, aplikace na /w.
-- [ ] Admin přihlášení: nechat NextAuth natrvalo, nebo později převést admina na Clerk s rolí admin a mít jeden způsob přihlášení?
+- [x] Admin přihlášení: vyřešeno v R-080, admin je Supabase účet s `ADMIN_EMAIL` (jeden způsob přihlášení pro všechny tři oblasti).
 - [ ] SMS: který poskytovatel pro připomínky a „Komu napsat“, a platí SMS klient zvlášť?
 - [ ] Zálohy online: chceme ve fázi 1 přijímat platby od zákazníků firem (Stripe Connect), nebo až později?
 - [ ] Právní stránka: obchodní podmínky, zpracovatelská smlouva a zásady ochrany údajů; kdo je připraví. Do spuštění jsou na landing page zástupně \[DOPLNIT\].

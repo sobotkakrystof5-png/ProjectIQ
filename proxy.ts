@@ -1,78 +1,77 @@
-import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
-import { withAuth, type NextRequestWithAuth } from 'next-auth/middleware'
-import { clerkMiddleware } from '@clerk/nextjs/server'
-import { clerkAuthorizedParties } from '@/lib/security/clerk'
-import { buildCsp, clerkFrontendApiHost, cspProfileFor, createNonce, hasPrefix } from '@/lib/security/csp'
+import { NextResponse, type NextRequest } from 'next/server'
+import { readProxySession } from '@/lib/supabase/proxy'
+import { isAdminIdentity } from '@/lib/auth/admin-identity'
+import { buildCsp, cspProfileFor, createNonce, hasPrefix, supabaseOrigin } from '@/lib/security/csp'
 import { frameAncestorsFor } from '@/lib/security/embed'
 import { embedOriginsForSlug, orderSlugFromPath } from '@/lib/ws/intake/embed-origins'
-import { WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
-import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH, PORTAL_SIGN_UP_PATH } from '@/lib/portal/paths'
+import { WS_PUBLIC_PATHS, WS_SIGN_IN_PATH } from '@/lib/ws/paths'
+import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH } from '@/lib/portal/paths'
 
 /**
- * Jediný proxy (dřív middleware) celého repa; od Next 16 běží na Node runtime. Pořadí:
- *   1. Admin konzole — přihlášení přes NextAuth, chování beze změny
- *      (stejné cesty jako dřív, přesměrování na /api/auth/signin → /login).
- *   2. Workspace (`/w`, `/api/ws`) — Clerk. Běží jen tady, admin a landing page
- *      Clerk vůbec nespouští. Bez přihlášení → `/w/prihlaseni` (kromě
- *      přihlášení a registrace). Účet a organizaci hlídá `requireWorkspace()`.
- *      Klientský prostor (`/klient`, KP05) má vlastní Clerk middleware: veřejné jsou
- *      jen přihlášení, registrace a pozvánka, zbytek chce přihlášení. Členství
- *      firmy hlídá `requireClient()`.
- *   3. CSP s nonce pro každou stránku (`lib/security/csp.ts`). Clerk hlavičky
- *      požadavku s nonce zachová (přidává k nim své), ClerkProvider si nonce
- *      přečte z `x-nonce`.
+ * Jediný proxy (dřív middleware) celého repa; od Next 16 běží na Node runtime.
+ * Přihlášení všude přes Supabase Auth (R-080). Pořadí:
+ *   1. Session — jen na cestách, kde se přihlášení používá (aplikace, admin,
+ *      přihlašovací stránky, /auth). Ověří JWT z cookie a prošlý token obnoví
+ *      (lib/supabase/proxy.ts). Landing page a veřejné stránky Supabase nevolají.
+ *   2. Klientský prostor (`/klient`, KP05) — bez přihlášení jen přihlášení,
+ *      registrace, obnova hesla a pozvánka. Členství firmy hlídá `requireClient()`.
+ *   3. Workspace (`/w`, `/api/ws`) — bez přihlášení → `/w/prihlaseni`. Účet
+ *      a roli hlídá `requireWorkspace()`. API si přihlášení ověří samo.
+ *   4. Admin konzole — přihlášený účet s ADMIN_EMAIL, jinak `/login`; bez
+ *      ověřeného kódu z aplikace (2FA, úroveň aal2) na `/login/overeni` (R-081).
+ *      Rozhodující kontrola je v layoutu (`getAdminSession`, uživatel z Auth serveru).
+ *   5. CSP s nonce pro každou stránku (`lib/security/csp.ts`).
  * Statické hlavičky (HSTS, nosniff, X-Frame-Options…) jsou v `next.config.mjs`.
  * Stav a důvody: `.claude/security/STATE.md`.
  */
 
 const ADMIN_PROTECTED = ['/dashboard', '/alteno', '/hub'] as const
+/** Admin bez ověřeného kódu z aplikace (2FA) — R-081. */
+const ADMIN_MFA_PATH = '/login/overeni'
+const WS_PATHS = ['/w', '/api/ws'] as const
+const PORTAL_PATHS = ['/klient', '/api/klient'] as const
 
-const CLERK_PATHS = ['/w', '/api/ws'] as const
+/** Kde proxy čte a obnovuje session. */
+const SESSION_PATHS = [...WS_PATHS, ...PORTAL_PATHS, ...ADMIN_PROTECTED, '/login', '/auth'] as const
 
-/** Stránky /w přístupné bez přihlášení. `/w/_design` je v produkci 404. */
-const WS_PUBLIC = [WS_SIGN_IN_PATH, WS_SIGN_UP_PATH, '/w/_design'] as const
+const SUPABASE_ORIGIN = supabaseOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL)
 
-const CLERK_HOST = clerkFrontendApiHost(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
+const startsWithAny = (pathname: string, prefixes: readonly string[]) => prefixes.some((p) => hasPrefix(pathname, p))
 
-/** V produkci jen session tokeny vydané pro hlavní host (`lib/security/clerk.ts`). */
-const CLERK_AUTHORIZED_PARTIES = clerkAuthorizedParties(process.env.VERCEL_ENV, process.env.NEXT_PUBLIC_APP_URL)
+/** Na přihlášení a po něm zpátky, kam člověk mířil. */
+function toSignIn(req: NextRequest, signInPath: string): NextResponse {
+  const url = new URL(signInPath, req.nextUrl.origin)
+  url.searchParams.set('next', `${req.nextUrl.pathname}${req.nextUrl.search}`)
+  return NextResponse.redirect(url)
+}
 
-const workspace = clerkMiddleware(
-  async (auth, req) => {
-    const { pathname } = req.nextUrl
-    // API Workspace si přihlášení ověří samo (requireWorkspace), CSP nepotřebuje.
-    if (hasPrefix(pathname, '/api/ws')) return NextResponse.next()
-    if (!WS_PUBLIC.some((p) => hasPrefix(pathname, p))) await auth.protect()
-    return withCsp(req)
-  },
-  { signInUrl: WS_SIGN_IN_PATH, signUpUrl: WS_SIGN_UP_PATH, authorizedParties: CLERK_AUTHORIZED_PARTIES },
-)
+/** API: obnovené cookies musí vidět i route handler v tomtéž požadavku. */
+const passThrough = (req: NextRequest) => NextResponse.next({ request: { headers: new Headers(req.headers) } })
 
-const portal = clerkMiddleware(
-  async (auth, req) => {
-    const { pathname } = req.nextUrl
-    // API klientského prostoru si členství ověří samo (getPortalContext), CSP nepotřebuje.
-    if (hasPrefix(pathname, '/api/klient')) return NextResponse.next()
-    if (!PORTAL_PUBLIC_PATHS.some((p) => hasPrefix(pathname, p))) await auth.protect()
-    return withCsp(req)
-  },
-  { signInUrl: PORTAL_SIGN_IN_PATH, signUpUrl: PORTAL_SIGN_UP_PATH, authorizedParties: CLERK_AUTHORIZED_PARTIES },
-)
-
-export default async function proxy(req: NextRequest, event: NextFetchEvent) {
+export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+  if (!startsWithAny(pathname, SESSION_PATHS)) return withCsp(req)
 
-  if (hasPrefix(pathname, '/klient') || hasPrefix(pathname, '/api/klient')) return portal(req, event)
+  const session = await readProxySession(req)
 
-  if (CLERK_PATHS.some((p) => hasPrefix(pathname, p))) return workspace(req, event)
-
-  if (ADMIN_PROTECTED.some((p) => hasPrefix(pathname, p))) {
-    // withAuth(req) vrátí přesměrování na přihlášení, nebo nic, když je session platná.
-    const denied = await withAuth(req as NextRequestWithAuth)
-    if (denied) return denied
+  if (startsWithAny(pathname, PORTAL_PATHS)) {
+    if (hasPrefix(pathname, '/api/klient')) return session.apply(passThrough(req))
+    if (!session.userId && !startsWithAny(pathname, PORTAL_PUBLIC_PATHS)) return session.apply(toSignIn(req, PORTAL_SIGN_IN_PATH))
+    return session.apply(await withCsp(req))
   }
 
-  return withCsp(req)
+  if (startsWithAny(pathname, WS_PATHS)) {
+    if (hasPrefix(pathname, '/api/ws')) return session.apply(passThrough(req))
+    if (!session.userId && !startsWithAny(pathname, WS_PUBLIC_PATHS)) return session.apply(toSignIn(req, WS_SIGN_IN_PATH))
+    return session.apply(await withCsp(req))
+  }
+
+  if (startsWithAny(pathname, ADMIN_PROTECTED)) {
+    if (!isAdminIdentity({ id: session.userId, email: session.email })) return session.apply(toSignIn(req, '/login'))
+    if (session.aal !== 'aal2') return session.apply(toSignIn(req, ADMIN_MFA_PATH))
+  }
+
+  return session.apply(await withCsp(req))
 }
 
 /**
@@ -98,7 +97,7 @@ async function withCsp(req: NextRequest): Promise<NextResponse> {
     mode,
     isDev: process.env.NODE_ENV === 'development',
     frameAncestors: await frameAncestorsForPath(pathname),
-    clerkHost: CLERK_HOST,
+    supabaseOrigin: SUPABASE_ORIGIN,
   })
   const header = mode === 'enforce' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only'
 
@@ -117,9 +116,8 @@ export const config = {
     // Stránky. API, widget /embed/*.js, statické soubory Nextu a /.well-known CSP nepotřebují
     // (API routy si přihlášení kontrolují samy, viz AGENTS.md → Bezpečnost).
     '/((?!api/|embed/|_next/static|_next/image|favicon.ico|\\.well-known/).*)',
-    // API Workspace — jen kvůli Clerku (auth() v route handlerech)
+    // API Workspace a klientského prostoru — kvůli obnově session Supabase
     '/api/ws/:path*',
-    // API klientského prostoru — jen kvůli Clerku (auth() v route handlerech)
     '/api/klient/:path*',
   ],
 }

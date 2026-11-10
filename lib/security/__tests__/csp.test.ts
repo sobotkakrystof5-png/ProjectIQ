@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCsp, clerkFrontendApiHost, createNonce, cspProfileFor, hasPrefix } from '@/lib/security/csp'
+import { buildCsp, createNonce, cspProfileFor, hasPrefix, supabaseOrigin } from '@/lib/security/csp'
 
 const directive = (csp: string, name: string) =>
   csp.split('; ').find((d) => d === name || d.startsWith(`${name} `))
@@ -100,43 +100,57 @@ describe('buildCsp', () => {
   })
 })
 
-describe('Clerk', () => {
+describe('Supabase Auth', () => {
   const nonce = 'dGVzdG5vbmNl'
-  // pk_test_ + base64("demo-app-12.clerk.accounts.dev$")
-  const key = `pk_test_${btoa('demo-app-12.clerk.accounts.dev$')}`
-  const host = 'demo-app-12.clerk.accounts.dev'
+  const origin = 'https://abcdefghijklmnop.supabase.co'
 
-  it('host Frontend API z publishable key', () => {
-    expect(clerkFrontendApiHost(key)).toBe(host)
-    expect(clerkFrontendApiHost(`pk_live_${btoa('clerk.zakaziq.cz$')}`)).toBe('clerk.zakaziq.cz')
+  it('origin jen z platné https adresy projektu', () => {
+    expect(supabaseOrigin('https://abcdefghijklmnop.supabase.co')).toBe(origin)
+    expect(supabaseOrigin('https://abcdefghijklmnop.supabase.co/')).toBe(origin)
+    expect(supabaseOrigin('http://localhost:54321')).toBe('http://localhost:54321')
   })
 
-  it('neplatný klíč nepustí nic', () => {
-    expect(clerkFrontendApiHost(undefined)).toBeNull()
-    expect(clerkFrontendApiHost('sk_test_abc')).toBeNull()
-    expect(clerkFrontendApiHost(`pk_test_${btoa('*.evil.com$')}`)).toBeNull()
-    expect(clerkFrontendApiHost(`pk_test_${btoa('a.b.cz https://x.cz$')}`)).toBeNull()
-    expect(clerkFrontendApiHost(`pk_test_${btoa('bez-dolaru.cz')}`)).toBeNull()
+  it('neplatná adresa nepustí nic', () => {
+    expect(supabaseOrigin(undefined)).toBeNull()
+    expect(supabaseOrigin('')).toBeNull()
+    expect(supabaseOrigin('http://evil.example.com')).toBeNull()
+    expect(supabaseOrigin('https://x.supabase.co/rest/v1')).toBeNull()
+    expect(supabaseOrigin('https://user:pass@x.supabase.co')).toBeNull()
+    expect(supabaseOrigin('javascript:alert(1)')).toBeNull()
+    expect(supabaseOrigin('nesmysl')).toBeNull()
   })
 
-  it('jen na /w, konkrétní hosty, script-src beze změny', () => {
-    const w = buildCsp({ nonce, pathname: '/w/prihlaseni', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    expect(directive(w, 'connect-src')).toBe(`connect-src 'self' https://${host}`)
-    expect(directive(w, 'img-src')).toContain('https://img.clerk.com')
+  it('connect-src na přihlašovacích cestách, script-src beze změny, rámeček jen Turnstile', () => {
+    const w = buildCsp({ nonce, pathname: '/w/prihlaseni', profile: 'workspace', mode: 'enforce', supabaseOrigin: origin })
+    expect(directive(w, 'connect-src')).toBe(`connect-src 'self' ${origin}`)
+    expect(directive(w, 'script-src')).not.toContain(origin)
     expect(directive(w, 'frame-src')).toBe('frame-src https://challenges.cloudflare.com')
-    expect(directive(w, 'script-src')).not.toContain(host)
     expect(w).not.toContain('*')
 
-    // Klientský prostor (KP05) má stejné Clerk zdroje jako /w a nic víc.
-    const klient = buildCsp({ nonce, pathname: '/klient/prihlaseni', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    expect(directive(klient, 'connect-src')).toBe(`connect-src 'self' https://${host}`)
-    expect(directive(klient, 'script-src')).not.toContain(host)
-    expect(klient).not.toContain('*')
+    // Přihlášený Workspace (2FA, zabezpečení) Supabase volá, rámeček Turnstile nepotřebuje.
+    const ucet = buildCsp({ nonce, pathname: '/w/zabezpeceni', profile: 'workspace', mode: 'enforce', supabaseOrigin: origin })
+    expect(directive(ucet, 'connect-src')).toBe(`connect-src 'self' ${origin}`)
+    expect(directive(ucet, 'frame-src')).toBe("frame-src 'none'")
 
-    const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    const admin = buildCsp({ nonce, pathname: '/hub', profile: 'admin', mode: 'report-only', clerkHost: host })
-    const portal = buildCsp({ nonce, pathname: '/z/abc', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    for (const csp of [landing, admin, portal]) expect(csp).not.toContain('clerk')
+    const klient = buildCsp({ nonce, pathname: '/klient/prihlaseni', profile: 'workspace', mode: 'enforce', supabaseOrigin: origin })
+    expect(directive(klient, 'connect-src')).toBe(`connect-src 'self' ${origin}`)
+
+    // Admin přihlášení (/login) volá Supabase taky, zbytek adminu ne.
+    const login = buildCsp({ nonce, pathname: '/login', profile: 'admin', mode: 'enforce', supabaseOrigin: origin })
+    expect(directive(login, 'connect-src')).toBe(`connect-src 'self' ${origin}`)
+    expect(directive(login, 'frame-src')).toContain('https://challenges.cloudflare.com')
+
+    // Zabezpečení admin účtu (2FA) volá Supabase z prohlížeče, ostatní admin stránky ne.
+    const security = buildCsp({ nonce, pathname: '/dashboard/zabezpeceni', profile: 'admin', mode: 'enforce', supabaseOrigin: origin })
+    expect(directive(security, 'connect-src')).toBe(`connect-src 'self' ${origin}`)
+    expect(directive(security, 'frame-src')).not.toContain('challenges.cloudflare.com')
+
+    const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce', supabaseOrigin: origin })
+    const admin = buildCsp({ nonce, pathname: '/hub', profile: 'admin', mode: 'report-only', supabaseOrigin: origin })
+    const portal = buildCsp({ nonce, pathname: '/z/abc', profile: 'workspace', mode: 'enforce', supabaseOrigin: origin })
+    const order = buildCsp({ nonce, pathname: '/r/kadernictvi', profile: 'workspace', mode: 'enforce', supabaseOrigin: origin })
+    for (const csp of [landing, admin, portal, order]) expect(csp).not.toContain('supabase')
+    for (const csp of [landing, admin, portal, order]) expect(csp).not.toContain('challenges.cloudflare.com')
   })
 })
 

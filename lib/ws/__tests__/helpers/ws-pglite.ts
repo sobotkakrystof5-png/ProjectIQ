@@ -4,8 +4,8 @@ import { PGlite, type Transaction } from '@electric-sql/pglite'
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 import type { WsDriver, WsRow } from '../../db'
 
-// Testovací Postgres (PGlite = Postgres 18 ve WASM, Neon běží na 18.6).
-// Migrace se pouští jako superuser (= vlastník tabulek jako na Neonu),
+// Testovací Postgres (PGlite = Postgres 18 ve WASM; Supabase běží na 17).
+// Migrace se pouští jako superuser (= vlastník tabulek jako v Supabase),
 // aplikace jako ws_app — přesně jako v produkci, jen bez sítě.
 
 const ROOT = path.resolve(__dirname, '../../../..')
@@ -22,8 +22,8 @@ export const WS_SYSTEM_TABLES = ['rate_limits', 'stripe_events', 'webhook_events
 /** Globální obsah bez dat účtů (novinky ZakazIQ, migrace 081): ws_app jen čte. */
 export const WS_GLOBAL_TABLES = ['product_news']
 
-/** Interní tabulky admin konzole (migrace 083): account_id a RLS mají, ws_app nemá žádná práva. */
-export const WS_ADMIN_TABLES = ['account_admin_notes']
+/** Interní tabulky admin konzole (migrace 083, 100): account_id a RLS mají, ws_app nemá žádná práva. */
+export const WS_ADMIN_TABLES = ['account_admin_notes', 'account_invites']
 
 const read = (file: string) => fs.readFileSync(file, 'utf8')
 
@@ -72,8 +72,9 @@ export const ids = (L: 'a' | 'b' | 'c') => ({
 export async function seedAccount(db: PGlite, L: 'a' | 'b'): Promise<void> {
   const i = ids(L)
   await db.exec(`
-    INSERT INTO ws.accounts (id, clerk_org_id, name) VALUES ('${i.account}', 'org_${L}', 'Firma ${L}');
-    INSERT INTO ws.members (id, account_id, clerk_user_id, role) VALUES ('${i.member}', '${i.account}', 'user_${L}', 'owner');
+    INSERT INTO ws.accounts (id, name) VALUES ('${i.account}', 'Firma ${L}');
+    INSERT INTO ws.members (id, account_id, user_id, role) VALUES ('${i.member}', '${i.account}', 'user_${L}', 'owner');
+    INSERT INTO ws.account_invites (account_id, email, code_hash) VALUES ('${i.account}', 'pozvany-${L}@example.cz', repeat('${L}', 64));
     INSERT INTO ws.businesses (id, account_id, name, slug) VALUES ('${i.business}', '${i.account}', 'Byznys ${L}', 'byznys-${L}');
     INSERT INTO ws.business_modules (account_id, business_id, module, enabled) VALUES ('${i.account}', '${i.business}', 'calendar', true);
     INSERT INTO ws.services (id, account_id, business_id, name) VALUES ('${i.service}', '${i.account}', '${i.business}', 'Služba');

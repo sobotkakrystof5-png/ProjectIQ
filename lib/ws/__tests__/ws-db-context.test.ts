@@ -13,6 +13,8 @@ const ctxA: WsContext = { userId: 'user_a', accountId: A.account, role: 'owner' 
 
 beforeAll(async () => {
   ;({ db } = await createWsTestDb())
+  // Pracovník účtu B (role z ws.members, migrace 100).
+  await db.exec(`INSERT INTO ws.members (account_id, user_id, role) VALUES ('${B.account}', 'user_b2', 'staff')`)
   setWsDriverForTests(pgliteDriver(db))
 }, 60_000)
 
@@ -92,18 +94,57 @@ describe('requireWorkspace', () => {
     expect(await digestOf(requireWorkspace())).toContain('/w/prihlaseni')
   })
 
-  it('přihlášený bez firmy nebo s neznámou firmou → nový byznys', async () => {
-    setWsAuthProvider(async () => ({ userId: 'user_x', orgId: null, orgRole: null }))
-    expect(await digestOf(requireWorkspace())).toContain('/w/novy')
-    setWsAuthProvider(async () => ({ userId: 'user_x', orgId: 'org_neexistuje', orgRole: 'org:admin' }))
+  it('přihlášený bez účtu → nový byznys', async () => {
+    setWsAuthProvider(async () => ({ userId: 'user_x', email: null }))
     expect(await digestOf(requireWorkspace())).toContain('/w/novy')
   })
 
-  it('účet se bere z Clerk organizace, role z role v organizaci', async () => {
-    setWsAuthProvider(async () => ({ userId: 'user_a', orgId: 'org_a', orgRole: 'org:admin' }))
+  it('účet a role se berou z ws.members podle uživatele', async () => {
+    setWsAuthProvider(async () => ({ userId: 'user_a', email: null }))
     expect(await requireWorkspace()).toEqual({ userId: 'user_a', accountId: A.account, role: 'owner' })
-    setWsAuthProvider(async () => ({ userId: 'user_b2', orgId: 'org_b', orgRole: 'org:member' }))
+    setWsAuthProvider(async () => ({ userId: 'user_b2', email: null }))
     expect(await requireWorkspace()).toEqual({ userId: 'user_b2', accountId: B.account, role: 'staff' })
+  })
+})
+
+describe('requireWorkspace: zrušená relace a dvoufázové ověření (R-081)', () => {
+  const USER = '7d1e2f3a-4b5c-4d6e-8f70-112233445566'
+  const SESSION = '8e2f3a4b-5c6d-4e7f-9a81-223344556677'
+  const identity = (aal: 'aal1' | 'aal2', sessionId = SESSION) => async () => ({ userId: USER, email: null, aal, sessionId })
+
+  beforeAll(async () => {
+    await db.exec(`INSERT INTO ws.members (account_id, user_id, role) VALUES ('${A.account}', '${USER}', 'staff')`)
+  })
+
+  it('bez schématu auth (testy, mimo Supabase) se nic nemění', async () => {
+    setWsAuthProvider(identity('aal1'))
+    expect(await requireWorkspace()).toEqual({ userId: USER, accountId: A.account, role: 'staff' })
+  })
+
+  it('se schématem auth: zrušená relace → odhlášení, 2FA bez kódu → ověření, s kódem dál', async () => {
+    await db.exec(`
+      CREATE SCHEMA auth;
+      CREATE TABLE auth.sessions (id uuid PRIMARY KEY, user_id uuid NOT NULL, not_after timestamptz);
+      CREATE TABLE auth.mfa_factors (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL, status text NOT NULL);
+    `)
+    try {
+      setWsAuthProvider(identity('aal1'))
+      expect(await digestOf(requireWorkspace())).toContain('/auth/odhlaseni?kam=w')
+
+      await db.query('INSERT INTO auth.sessions (id, user_id) VALUES ($1, $2)', [SESSION, USER])
+      expect(await requireWorkspace()).toEqual({ userId: USER, accountId: A.account, role: 'staff' })
+
+      await db.query("INSERT INTO auth.mfa_factors (user_id, status) VALUES ($1, 'verified')", [USER])
+      expect(await digestOf(requireWorkspace())).toContain('/w/overeni')
+      setWsAuthProvider(identity('aal2'))
+      expect(await requireWorkspace()).toEqual({ userId: USER, accountId: A.account, role: 'staff' })
+
+      // Cizí relace (Odhlásit všude smazal tu naši) neprojde ani s aal2.
+      setWsAuthProvider(identity('aal2', '9f3a4b5c-6d7e-4f80-8b92-334455667788'))
+      expect(await digestOf(requireWorkspace())).toContain('/auth/odhlaseni?kam=w')
+    } finally {
+      await db.exec('DROP SCHEMA auth CASCADE')
+    }
   })
 })
 

@@ -411,7 +411,7 @@ async function confirmWebBooking(projectId: string, business: Business) {
         ...(p.service_type ? [{ label: 'Typ projektu', value: p.service_type }] : []),
         ...(p.description ? [{ label: 'Popis', value: p.description }] : []),
       ],
-      ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}${projectPath(business, projectId)}` }],
+      ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}${projectPath(business, projectId)}` }],
       business,
     })
   }

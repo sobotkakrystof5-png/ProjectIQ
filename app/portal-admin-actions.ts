@@ -1,9 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
 import { z } from 'zod'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { getAdminSession, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { generateInviteCode, inviteExpiry, InviteConfigError } from '@/lib/portal/invite'
 
@@ -19,11 +18,11 @@ const emailSchema = z.string().trim().toLowerCase().email('Zadejte platný e-mai
 const PATH = '/dashboard/klientsky-prostor'
 
 async function adminEmail(): Promise<string> {
-  return (await getServerSession(authOptions))?.user?.email ?? 'admin'
+  return (await getAdminSession())?.user?.email ?? 'admin'
 }
 
 function appUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '').replace(/\/+$/, '')
+  return (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
 }
 
 export async function createPortalClient(name: string): Promise<Result<{ id: string }>> {

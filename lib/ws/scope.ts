@@ -17,9 +17,9 @@ import { getBusinesses, getEnabledModules } from './today'
 
 // Kontext obrazovky byznysu jedním dotazem (RD02, migrace 085).
 //
-// Dřív šel účet (ws.account_by_clerk_org) → byznys ∥ předplatné → funkce a
-// byznysy za sebou. ws.business_scope() vrátí všechno najednou pro Clerk
-// organizaci z přihlášení a slug z URL; výsledek se uloží do požadavku, takže
+// Dřív šel účet → byznys ∥ předplatné → funkce a byznysy za sebou.
+// ws.business_scope() vrátí všechno najednou pro přihlášeného uživatele
+// (účet a role z ws.members, migrace 100) a slug z URL; výsledek se uloží do požadavku, takže
 // `requireWorkspace()`, `requireBusiness()` a `getEnabledModules()` v layoutu
 // i na stránce už do DB nesahají.
 
@@ -49,16 +49,16 @@ function subscriptionRows(raw: unknown): SubscriptionRow[] {
   }))
 }
 
-/** Odpověď ws.business_scope() → typy aplikace. `null` = organizace nemá účet. */
+/** Odpověď ws.business_scope() → typy aplikace. `null` = uživatel nemá účet. */
 export function parseBusinessScope(
   raw: unknown,
-  orgContext: { userId: string; orgRole: string | null },
+  identity: { userId: string },
   now: Date = new Date(),
 ): { ctx: WsContext; business: WsBusiness | null; billing: BillingState; modules: Set<string>; businesses: BusinessScope['businesses'] } | null {
   const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
   if (!isObject(value) || typeof value.account_id !== 'string') return null
 
-  const ctx: WsContext = { userId: orgContext.userId, accountId: value.account_id, role: roleOf(orgContext.orgRole) }
+  const ctx: WsContext = { userId: identity.userId, accountId: value.account_id, role: roleOf(value.role) }
   const b = isObject(value.business) ? value.business : null
   const business: WsBusiness | null = b
     ? {
@@ -82,7 +82,7 @@ export function parseBusinessScope(
   return { ctx, business, billing: billingStateFrom(subscriptionRows(value.subscriptions), now), modules, businesses }
 }
 
-/** Postup před migrací 085: účet → byznys → předplatné, funkce a byznysy. */
+/** Postup bez ws.business_scope: účet → byznys → předplatné, funkce a byznysy. */
 async function loadBusinessScopeSeparately(slug: string): Promise<BusinessScope> {
   const ctx = await requireWorkspace()
   const business = await requireBusiness(ctx, slug)
@@ -96,9 +96,9 @@ async function loadBusinessScopeSeparately(slug: string): Promise<BusinessScope>
 
 /**
  * Účet, byznys z URL, předplatné, zapnuté funkce a byznysy v jednom kole do DB.
- * Neznámá organizace → průvodce; cizí, archivovaný nebo neexistující slug = 404.
+ * Uživatel bez účtu → průvodce; cizí, archivovaný nebo neexistující slug = 404.
  *
- * Dokud na databázi neběží migrace 085 (funkce chybí, kód 42883), vrací se
+ * Dokud na databázi neběží migrace 100 (funkce s touhle signaturou chybí, kód 42883), vrací se
  * pomalejší postup po částech — nasazení kódu před migrací tak neshodí aplikaci.
  */
 export const loadBusinessScope = cache(async function loadBusinessScope(slug: string): Promise<BusinessScope> {
@@ -106,11 +106,11 @@ export const loadBusinessScope = cache(async function loadBusinessScope(slug: st
   const identity = await requireIdentity()
   let raw: unknown
   try {
-    const [row] = await wsSystem<{ scope: unknown }>`SELECT ws.business_scope(${identity.orgId}, ${slug}) AS scope`
+    const [row] = await wsSystem<{ scope: unknown }>`SELECT ws.business_scope(${identity.userId}, NULL, ${slug}) AS scope`
     raw = row?.scope
   } catch (e) {
     if (pgErrorCode(e) !== '42883') throw e
-    console.error('ws: chybí ws.business_scope (migrace 085), načítám kontext po částech')
+    console.error('ws: chybí ws.business_scope (migrace 100), načítám kontext po částech')
     return loadBusinessScopeSeparately(slug)
   }
   const parsed = parseBusinessScope(raw, identity)

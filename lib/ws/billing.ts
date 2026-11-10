@@ -218,7 +218,7 @@ async function ensureCustomer(ctx: WsContext): Promise<string> {
   if (account.stripe_customer_id) return account.stripe_customer_id
 
   const [owner] = await db<{ email: string | null }>`
-    SELECT email FROM ws.members WHERE account_id = ${ctx.accountId} AND clerk_user_id = ${ctx.userId}
+    SELECT email FROM ws.members WHERE account_id = ${ctx.accountId} AND user_id = ${ctx.userId}
   `
   // Idempotentní klíč: dvojklik ani druhá záložka nezaloží druhého zákazníka (24 h u Stripe).
   const customer = await getStripe().customers.create(

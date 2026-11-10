@@ -5,8 +5,10 @@ const requireAuthMock = vi.fn()
 const sendDigestMock = vi.fn()
 
 vi.mock('@/lib/db', () => ({ sql: (...args: unknown[]) => sqlMock(...args) }))
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: () => requireAuthMock() }))
-vi.mock('next-auth', () => ({ getServerSession: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('@/lib/auth', () => ({
+  getAdminSession: async () => ({ user: { id: 'admin-id', email: 'admin@example.cz' } }),
+  requireAuth: () => requireAuthMock(),
+}))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendActivityDigestEmail: (...a: unknown[]) => sendDigestMock(...a) }))
 vi.mock('@/lib/utils', () => ({ getPublicUrl: (t: string) => `https://app.example.cz/p/${t}` }))

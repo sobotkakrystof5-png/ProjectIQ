@@ -11,10 +11,10 @@ export const SUPPORT_FORM_HREF = '/#kontakt'
 /** IČO provozovatele (ARES, potvrdil Kryštof 2026-10-31). */
 export const COMPANY_ID = '29977231'
 
-/** Kde běží databáze: Neon eu-central-1 (Dotazy, ochrana údajů). */
+/** Kde běží databáze: Supabase eu-central-1 (Dotazy, ochrana údajů). */
 export const DATA_LOCATION = 'Databáze běží v Evropské unii, ve Frankfurtu v Německu.'
 
-/** Cesty do aplikace — přesné cesty Clerku potvrdí S07. */
+/** Cesty do aplikace (přihlášení Supabase Auth, R-080). */
 export const ROUTES = {
   signUp: '/w/registrace',
   signIn: '/w/prihlaseni',

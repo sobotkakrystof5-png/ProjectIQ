@@ -2,8 +2,7 @@
 
 import { sql } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { createStartupProject } from '@/app/hub/byznys/startup/startup-actions'
 
 export type PlanBusinessStatus = 'planovani' | 'pripraveno_k_exportu' | 'exportovano'
@@ -56,7 +55,7 @@ export interface PlanBusinessPhasePayload {
 }
 
 async function requireAuth() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Unauthorized')
 }
 

@@ -22,9 +22,9 @@
 | Styling | Tailwind CSS (+ `clsx`, `tailwind-merge`) | Vlastní komponenty, brand-* barvy — shadcn/ui admin nepoužívá |
 | Animace | Framer Motion | Booking modal, success states |
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
-| Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL` |
+| Databáze | Supabase Postgres (Frankfurt, eu-central-1) | `pg` přes pool v `lib/pg.ts`, připojení přes `DATABASE_URL` (Supabase Transaction pooler) |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
-| Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session s platností 12 h (`lib/auth.ts`, od 2026-11-03), zámek 5 chybných pokusů za 15 min na IP, chráněno i přes `proxy.ts` |
+| Auth | Supabase Auth (e-mail + heslo, Google) | Admin = Supabase účet s `ADMIN_EMAIL` a potvrzeným e-mailem (volitelně `ADMIN_USER_ID`), `lib/auth.ts` → `getAdminSession()`, chráněno i přes `proxy.ts` |
 | Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
 | Deployment | Vercel | Zero-ops, napojení na GitHub, Hobby plán (crony max 1× denně) |
 | AI | `@anthropic-ai/sdk` | AI asistenti (Startup) + AI přepis PDF faktur (`lib/invoice-ai.ts`) |
@@ -190,15 +190,14 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 ```
 app/
 ├── (auth)/
-│   └── login/page.tsx           ← Přihlášení (NextAuth credentials)
-├── api/auth/[...nextauth]/
-│   └── route.ts                 ← NextAuth handler
+│   └── login/page.tsx           ← Přihlášení (Supabase Auth)
+├── auth/callback/route.ts       ← Callback Supabase Auth
 ├── actions.ts                   ← Server Actions: createProject, updateProject, deleteProject, client messages
 ├── portal-actions.ts            ← Public Server Actions: submitFeedback, submitConsultation (token-only auth, rate-limited)
 ├── calendar-actions.ts          ← Server Actions: createCalendarEvent, deleteCalendarEvent
 ├── providers.tsx                ← SessionProvider wrapper (client)
 ├── dashboard/
-│   ├── layout.tsx               ← Ochrana routy (getServerSession) + nav
+│   ├── layout.tsx               ← Ochrana routy (getAdminSession) + nav
 │   ├── page.tsx                 ← Přehled zakázek
 │   ├── new/page.tsx             ← Nová zakázka
 │   ├── calendar/page.tsx        ← Globální kalendář (všechny projekty)
@@ -236,17 +235,17 @@ components/
 └── AdminEventModal.tsx          ← Admin: vytvoření manuální události/blokace
 
 lib/
-├── db.ts                        ← Neon klient: sql tagged template
+├── db.ts                        ← admin klient (`DATABASE_URL`): sql tagged template nad `lib/pg.ts`
 ├── business.ts                  ← VIZEON/ALTENO konfigurace: cesty, domény, source, branding
 ├── web-booking.ts               ← Sdílená implementace veřejného booking endpointu (obě domény)
-├── auth.ts                      ← NextAuth authOptions
+├── auth.ts                      ← `getAdminSession()` (Supabase Auth)
 ├── email.ts                     ← Sdílený nodemailer transporter + branded HTML layout (sendBrandedEmail)
 ├── feedback-schema.ts           ← Zod schémata: feedbackSchema, bookingSchema
 ├── prague-time.ts               ← Timezone helpery (Europe/Prague), generování slotů, kalendářní utility
 ├── utils.ts
 └── types.ts
 
-proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard, /alteno, /hub (vč. podcest), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
+proxy.ts                         ← jediný proxy (dřív middleware.ts): obnova Supabase session (`lib/supabase/proxy.ts`), ochrana /dashboard, /alteno, /hub (vč. podcest), CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -312,7 +311,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/school/sync` | session | Ruční spuštění školního scraperu (proxy na cron) |
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
 | `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
-| `POST /api/klient/transcribe` | přihlášený člen klientského prostoru (Clerk) | Přepis hlasu pro požadavek klienta; limit po IP a členovi |
+| `POST /api/klient/transcribe` | přihlášený člen klientského prostoru (Supabase Auth) | Přepis hlasu pro požadavek klienta; limit po IP a členovi |
 
 Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-closed) + `lib/api-rate-limit.ts` + Zod validace. Klíč se nikdy neloguje.
 
@@ -330,7 +329,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 ## Stránky — co každá dělá
 
 ### `/login`
-- Email + heslo přes NextAuth Credentials
+- Email + heslo přes Supabase Auth
 - Po přihlášení redirect na `/dashboard`
 - Čistý minimalistický design
 
@@ -437,11 +436,11 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 ## Bezpečnost
 
-- **NextAuth JWT session** — admin chráněn `proxy.ts` (matcher `/dashboard`, `/alteno`, `/hub` vč. podcest) + `getServerSession` v layoutu. `/api/*` proxy **nehlídá** — každá neveřejná API routa si session kontroluje sama
+- **Supabase Auth session** — admin chráněn `proxy.ts` (matcher `/dashboard`, `/alteno`, `/hub` vč. podcest) + `getAdminSession()` v layoutu. `/api/*` proxy **nehlídá** — každá neveřejná API routa si session kontroluje sama
 - **Security hlavičky** v `next.config.mjs`, CSP s nonce v `proxy.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
-- **Heslo uloženo jako bcrypt hash** v env proměnné `ADMIN_PASSWORD_HASH`
+- **Identita admina** — Supabase účet s `ADMIN_EMAIL` a potvrzeným e-mailem (volitelně pevné `ADMIN_USER_ID`). Heslo spravuje Supabase Auth, v env není žádný hash
 - **Veřejné server actions** (`submitFeedback`, `submitConsultation`) jsou chráněné jen tokenem (bez auth) — mají DB-backed rate limit (`isRateLimited` v `app/portal-actions.ts`: max 3 hodnocení / 10 min, max 3 rezervace / 30 min per projekt), aby nešlo endpoint zaspamovat
 - **Race condition na rezervacích** řešená přes DB `UNIQUE` constraint na `scheduled_at` + catch na Postgres chybový kód `23505` — nikdy přes "zkontroluj a pak vlož"
 
@@ -468,15 +467,15 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - Nová emailová šablona → rozšiř `lib/email.ts`, nepiš HTML inline v actions
 - `notes` je výhradně pro admina — **nikdy ho neposílej na `/p/[token]`**
 - `public_token` se generuje v databázi — **nikdy ho negeneruj na frontendu**
-- Auth check v server komponentě: `getServerSession(authOptions)` z `next-auth`
+- Auth check v server komponentě: `getAdminSession()` z `lib/auth.ts`
 - Výchozí chování na portálu: cena je **skrytá** (volitelné zapnutí)
 - Nová DB změna → nová idempotentní migrace v `migrations/`, ne přímá úprava základního schématu výše
 - Časové sloty/kalendářní logika → vždy přes `lib/prague-time.ts`, nepřepočítávej timezony znovu v komponentě
 - **Dva byznysy:** cesty, domény, `source` a názvy ber vždy z `BUSINESSES` v `lib/business.ts` — nikdy nehardcoduj `/dashboard`, `/alteno` ani `'vizeon_web'` v nové logice
 - Nový dotaz nad `projects` nebo `calendar_events` → rozmysli, jestli patří jen jednomu byznysu, a filtruj `business`. Bez filtru se ALTENO data objeví ve VIZEONu
 - Nová sdílená komponenta pro obě sekce → prop `business?: Business` s defaultem `'vizeon'`, ne duplikát souboru
-- Podmínka „nepotvrzená poptávka z webu" žije v DB jako `is_vizeon_pending()` / `is_alteno_pending()` — neon `sql` tag neumí skládat fragmenty, takže ji nelze sdílet jako JS konstantu
-- Neon vrací `date`/`timestamptz` jako **`Date` objekt, ne string** — nikdy na tom nevolej `.split()` apod. (opakovaný zdroj pádů v historii)
+- Podmínka „nepotvrzená poptávka z webu" žije v DB jako `is_vizeon_pending()` / `is_alteno_pending()` — `sql` tag neumí skládat fragmenty, takže ji nelze sdílet jako JS konstantu
+- `pg` vrací `date`/`timestamptz` jako **`Date` objekt, ne string** — nikdy na tom nevolej `.split()` apod. (opakovaný zdroj pádů v historii)
 - Daně a odvody počítej **jen** přes `lib/tax.ts` + `lib/tax-constants.ts`; daňové termíny jsou pevný kalendář v `lib/tax-deadlines.ts`
 - AI přepis faktury **nikdy neblokuje** ruční uložení — bez `ANTHROPIC_API_KEY` musí appka fungovat dál
 - Částky v různých měnách (CZK/EUR) se **nikdy** nesčítají do jednoho čísla

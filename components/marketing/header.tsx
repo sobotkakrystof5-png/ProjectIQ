@@ -2,25 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSession } from 'next-auth/react'
 import { Menu, X } from 'lucide-react'
 import { Logo } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
 import { NAV, ROUTES } from './content'
 
 /**
- * Přihlášený admin (NextAuth z kořenového SessionProvideru) uvidí místo „Přihlásit"
- * odkaz do administrace — dřív ho tam `/` přesměrovala sama (R-034).
+ * Odkaz na přihlášení do Workspace. Přihlášeného tamní stránka pošle rovnou do
+ * aplikace. Landing page Supabase nevolá (R-080), stav přihlášení tu proto
+ * neznáme — dřívější „Do administrace“ pro admina (R-034) odpadl, admin
+ * chodí přes /login.
  */
 function SignInLink({ className }: { className?: string }) {
-  const { status } = useSession()
-  if (status === 'authenticated') {
-    return (
-      <a href={ROUTES.adminHome} className={className}>
-        Do administrace
-      </a>
-    )
-  }
   return (
     <a href={ROUTES.signIn} className={className}>
       Přihlásit

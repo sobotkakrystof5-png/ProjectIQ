@@ -1,24 +1,24 @@
 import 'server-only'
 
-// Kdo smí do /dashboard/klienti a /dashboard/novinky: jen admin s NextAuth
-// session (R-001, jeden admin). Přihlášení Workspace (Clerk) tu nic neznamená.
-// Každá server action adminu nad ws začíná `const admin = await getAdmin()`.
+// Kdo smí do /dashboard/klienti a /dashboard/novinky: jen admin (R-001, jeden
+// admin; od R-080 účet Supabase Auth s ADMIN_EMAIL, viz lib/auth.ts). Přihlášení
+// do Workspace tu nic neznamená. Každá server action adminu nad ws začíná
+// `const admin = await getAdmin()`.
 
 export type AdminIdentity = { email: string }
 export type AdminAuthProvider = () => Promise<AdminIdentity | null>
 
-const nextAuthProvider: AdminAuthProvider = async () => {
-  const [{ getServerSession }, { authOptions }] = await Promise.all([import('next-auth'), import('@/lib/auth')])
-  const session = await getServerSession(authOptions)
-  if (!session) return null
-  return { email: session.user?.email ?? 'admin' }
+const supabaseAdminProvider: AdminAuthProvider = async () => {
+  const { getAdminSession } = await import('@/lib/auth')
+  const session = await getAdminSession()
+  return session ? { email: session.user.email } : null
 }
 
-let provider: AdminAuthProvider = nextAuthProvider
+let provider: AdminAuthProvider = supabaseAdminProvider
 
-/** Jen pro testy. `null` vrátí NextAuth. */
+/** Jen pro testy. `null` vrátí skutečné přihlášení (Supabase). */
 export function setAdminAuthForTests(next: AdminAuthProvider | null): void {
-  provider = next ?? nextAuthProvider
+  provider = next ?? supabaseAdminProvider
 }
 
 export async function getAdmin(): Promise<AdminIdentity | null> {

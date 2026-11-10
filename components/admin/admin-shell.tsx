@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Bell } from 'lucide-react'
+import { Bell, ShieldCheck } from 'lucide-react'
 import { LogoutButton } from '@/app/dashboard/LogoutButton'
 import { wsFontVariables } from '@/lib/ws/fonts'
 import { formatBadge, type AdminCounts } from '@/lib/admin-nav'
@@ -85,7 +85,17 @@ export function AdminShell({
             </span>
             <span className="truncate text-xs text-quiet">{email.split('@')[0]}</span>
           </Link>
-          <LogoutButton />
+          <div className="flex items-center gap-1">
+            <Link
+              href="/dashboard/zabezpeceni"
+              title="Přihlášení a zabezpečení"
+              aria-label="Přihlášení a zabezpečení"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-quiet transition-colors hover:bg-navy-50 hover:text-ink"
+            >
+              <ShieldCheck aria-hidden size={18} strokeWidth={1.5} />
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
       </aside>
 

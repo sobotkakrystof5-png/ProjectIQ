@@ -1,36 +1,30 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { auth } from '@clerk/nextjs/server'
-import { ActivateAccount } from '@/components/ws/onboarding/activate-account'
 import { industrySummaries } from '@/components/ws/onboarding/industry-summaries'
 import { NewBusinessWizard } from '@/components/ws/onboarding/new-business-wizard'
 import { SubscribeStep } from '@/components/ws/onboarding/subscribe-step'
 import { getBillingState, TRIAL_DAYS } from '@/lib/ws/billing'
-import { orgWithAccount, ownerProfile } from '@/lib/ws/clerk-orgs'
-import { hasRole, requireWorkspace } from '@/lib/ws/context'
+import { currentIdentity, hasRole, requireWorkspace } from '@/lib/ws/context'
 import { wsDb } from '@/lib/ws/db'
 import { getAccountClosing } from '@/lib/ws/gdpr'
-import { accountIdForOrg, ensureMember } from '@/lib/ws/onboarding'
-import { WS_HOME_PATH, WS_SIGN_IN_PATH } from '@/lib/ws/paths'
+import { accountIdForUser } from '@/lib/ws/onboarding'
+import { WS_HOME_PATH, WS_ONBOARDING_PATH, WS_SIGN_IN_PATH } from '@/lib/ws/paths'
 
 export const metadata: Metadata = { title: 'Nový byznys' }
 
 // Průvodce Nový byznys (S07, S08). Kam koho poslat:
-//   účet má, organizace aktivní, předplatné založené → rovnou do /w
-//   účet má, organizace aktivní, předplatné nikdy    → krok 2 (předplatné, R-038)
-//   účet má, organizace neaktivní                    → aktivovat (ActivateAccount)
-//   účet nemá                                        → krok 1
+//   účet má, předplatné založené → rovnou do /w
+//   účet má, předplatné nikdy    → krok 2 (předplatné, R-038)
+//   účet nemá                    → krok 1
+// Účet a roli určuje ws.members (R-080); klient pozvaný z adminu se do účtu
+// zapíše už při uplatnění pozvánky (/w/pozvanka).
 
 export default async function NovyPage() {
-  const { userId, orgId } = await auth()
-  if (!userId) redirect(WS_SIGN_IN_PATH)
+  const identity = await currentIdentity()
+  if (!identity) redirect(`${WS_SIGN_IN_PATH}?next=${encodeURIComponent(WS_ONBOARDING_PATH)}`)
 
-  if (orgId && (await accountIdForOrg(orgId))) {
+  if (await accountIdForUser(identity.userId)) {
     const ctx = await requireWorkspace()
-    // Klient pozvaný z adminu (S17): účet existuje, člen ještě ne (bez webhooku Clerku).
-    await ensureMember(ctx, () => ownerProfile(userId)).catch((e) =>
-      console.error('[ws/novy] člen se nezapsal', { error: e instanceof Error ? e.message : 'unknown' }),
-    )
     if (await getAccountClosing(ctx)) redirect('/w/ucet')
     const billing = await getBillingState(ctx.accountId)
     if (billing.access !== 'none') redirect(WS_HOME_PATH)
@@ -48,9 +42,6 @@ export default async function NovyPage() {
       />
     )
   }
-
-  const existing = await orgWithAccount(userId)
-  if (existing) return <ActivateAccount orgId={existing} />
 
   return <NewBusinessWizard industries={industrySummaries()} />
 }

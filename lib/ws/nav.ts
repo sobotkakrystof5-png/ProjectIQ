@@ -100,7 +100,10 @@ export function isNavActive(pathname: string, slug: string, item: Pick<NavItem, 
 /** Cesta k účtu mimo byznys (S08). */
 export const ACCOUNT_PATH = '/w/ucet'
 
-export type AccountLinkKey = 'nastaveni' | 'predplatne' | 'zpracovani'
+export type AccountLinkKey = 'nastaveni' | 'predplatne' | 'zpracovani' | 'zabezpeceni'
+
+/** Přihlášení a zabezpečení — 2FA, heslo, odhlášení všude (R-081). Pro každého. */
+export const SECURITY_PATH = '/w/zabezpeceni'
 
 export type AccountLink = {
   key: AccountLinkKey
@@ -111,15 +114,24 @@ export type AccountLink = {
   href: string
 }
 
+const SECURITY_LINK: AccountLink = {
+  key: 'zabezpeceni',
+  label: 'Přihlášení a zabezpečení',
+  paletteLabel: 'Zabezpečení a dvoufázové ověření',
+  href: SECURITY_PATH,
+}
+
 /**
- * Odkazy z menu Účet, které mění jen majitel (RD01). Pracovník jich nemá žádný,
- * v Účtu vidí jen Vzhled a Odhlásit. Adresy Nastavení se nemění (e-maily, ⌘K).
+ * Odkazy z menu Účet (RD01). Firmu, předplatné a zpracování údajů mění jen
+ * majitel; Přihlášení a zabezpečení (R-081) má každý, i pracovník — 2FA a heslo
+ * jsou jeho vlastní. Adresy Nastavení se nemění (e-maily, ⌘K).
  */
 export function accountLinks(slug: string, isOwner: boolean): AccountLink[] {
-  if (!isOwner) return []
+  if (!isOwner) return [SECURITY_LINK]
   return [
     { key: 'nastaveni', label: 'Nastavení firmy', paletteLabel: 'Nastavení', href: navHref(slug, 'nastaveni') },
     { key: 'predplatne', label: 'Předplatné a doklady', paletteLabel: 'Účet a předplatné', href: ACCOUNT_PATH },
+    SECURITY_LINK,
     { key: 'zpracovani', label: 'Zpracování údajů', paletteLabel: 'Zpracování údajů', href: `${ACCOUNT_PATH}/zpracovani` },
   ]
 }
@@ -127,7 +139,13 @@ export function accountLinks(slug: string, isOwner: boolean): AccountLink[] {
 /** Účet svítí na stránkách účtu i na Nastavení. */
 export function isAccountActive(pathname: string, slug: string): boolean {
   const settings = navHref(slug, 'nastaveni')
-  return pathname === ACCOUNT_PATH || pathname.startsWith(`${ACCOUNT_PATH}/`) || pathname === settings || pathname.startsWith(`${settings}/`)
+  return (
+    pathname === ACCOUNT_PATH ||
+    pathname.startsWith(`${ACCOUNT_PATH}/`) ||
+    pathname === SECURITY_PATH ||
+    pathname === settings ||
+    pathname.startsWith(`${settings}/`)
+  )
 }
 
 export type BottomBarSlot =

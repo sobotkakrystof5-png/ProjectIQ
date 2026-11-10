@@ -12,7 +12,7 @@ export const viewport: Viewport = { themeColor: '#f4f6fb' }
 
 // Veřejné odkazy Workspace pod /z (R-016): odkazy z e-mailů (S15 — potvrzení
 // poptávky majitelem, odhlášení, termín do kalendáře), později klientský
-// portál (S16). Bez přihlášení a bez Clerku, oprávnění dává podepsaný odkaz.
+// portál (S16). Bez přihlášení, oprávnění dává podepsaný odkaz.
 // CSP je vynucená s nonce (proxy), proto dynamicky.
 export const dynamic = 'force-dynamic'
 

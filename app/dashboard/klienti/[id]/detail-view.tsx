@@ -41,7 +41,7 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
           <h1 className="text-2xl font-semibold text-foreground tracking-tight truncate">{client.name}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Účet od {formatDate(client.createdAt)}
-            {client.ico ? ` · IČO ${client.ico}` : ''} · <span className="font-mono text-[12px]">{client.clerkOrgId}</span>
+            {client.ico ? ` · IČO ${client.ico}` : ''}
           </p>
         </div>
         <span className={cn('inline-flex text-[12px] font-medium px-2.5 py-1 rounded-full ring-1', ACCESS_CLASS[client.access])}>

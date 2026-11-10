@@ -37,7 +37,6 @@ export function formatDateTime(date: string | Date | null): string {
 function appBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXTAUTH_URL ||
     (typeof window !== 'undefined' ? window.location.origin : '')
   )
 }

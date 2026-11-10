@@ -1,8 +1,7 @@
 'use server'
 
 import { sql } from '@/lib/db'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 
 export interface PlanyDashboardStats {
   skola: { activeCount: number; nearestDate: string | null }
@@ -19,7 +18,7 @@ export interface UpcomingDeadline {
 }
 
 async function requireAuth() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Unauthorized')
 }
 

@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useClerk } from '@clerk/nextjs'
-import { CreditCard, LogOut, Palette, Settings, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { signOutTo } from '@/lib/auth/actions'
+import { CreditCard, KeyRound, LogOut, Palette, Settings, ShieldCheck, type LucideIcon } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,9 +24,15 @@ import { cn } from '@/lib/ws/utils'
 // Menu Účet (RD01): Nastavení firmy, Předplatné a doklady, Vzhled, Zpracování
 // údajů, Odhlásit. Dole v postranním panelu je to jedno tlačítko, na telefonu
 // stejné položky pod oddělovačem ve výsuvném menu. Nastavení tak není mezi
-// pracovními částmi. Pracovník (nevlastník) vidí jen Vzhled a Odhlásit.
+// pracovními částmi. Pracovník (nevlastník) vidí Přihlášení a zabezpečení
+// (R-081), Vzhled a Odhlásit.
 
-export const ACCOUNT_ICONS: Record<AccountLinkKey, LucideIcon> = { nastaveni: Settings, predplatne: CreditCard, zpracovani: ShieldCheck }
+export const ACCOUNT_ICONS: Record<AccountLinkKey, LucideIcon> = {
+  nastaveni: Settings,
+  predplatne: CreditCard,
+  zpracovani: ShieldCheck,
+  zabezpeceni: KeyRound,
+}
 
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
@@ -44,7 +50,6 @@ export function AccountMenu({
   triggerClassName: string
 }) {
   const { pref, setPref } = useWsTheme()
-  const { signOut } = useClerk()
   const main = links.filter((l) => l.key !== 'zpracovani')
   const processing = links.find((l) => l.key === 'zpracovani')
 
@@ -82,7 +87,7 @@ export function AccountMenu({
         </DropdownMenuSub>
         {processing && <LinkItem link={processing} />}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void signOut({ redirectUrl: '/' })}>
+        <DropdownMenuItem onSelect={() => void signOutTo('w')}>
           <LogOut aria-hidden size={18} strokeWidth={1.5} />
           Odhlásit se
         </DropdownMenuItem>
@@ -109,7 +114,6 @@ const linkActive = (pathname: string, link: AccountLink): boolean =>
 
 /** Účet ve výsuvném menu na telefonu: odkazy, Vzhled a Odhlásit pod oddělovačem. */
 export function AccountSheetSection({ links, pathname }: { links: AccountLink[]; pathname: string }) {
-  const { signOut } = useClerk()
   return (
     <section aria-label="Účet" className="mt-auto flex flex-col gap-1 border-t pt-3">
       <p className="px-3 pb-1 font-num text-[11px] uppercase tracking-[0.08em] text-quiet">Účet</p>
@@ -138,7 +142,7 @@ export function AccountSheetSection({ links, pathname }: { links: AccountLink[];
       </div>
       <button
         type="button"
-        onClick={() => void signOut({ redirectUrl: '/' })}
+        onClick={() => void signOutTo('w')}
         className={cn('flex min-h-12 items-center gap-3 rounded-chip px-3 text-[15px] text-quiet hover:bg-accent hover:text-ink', focusRing)}
       >
         <LogOut aria-hidden size={20} strokeWidth={1.5} />

@@ -4,7 +4,7 @@
 
 export type NavIcon =
   | 'today' | 'projects' | 'requests' | 'inbox' | 'templates' | 'done' | 'rating'
-  | 'calendar' | 'calls' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news' | 'hub' | 'bell' | 'profile'
+  | 'calendar' | 'calls' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news' | 'hub' | 'bell' | 'profile' | 'security'
 
 export type CountKey = 'requests' | 'vizeon' | 'alteno' | 'notifications' | 'drafts'
 
@@ -73,10 +73,11 @@ export const ADMIN_NAV: NavGroup[] = [
   },
 ]
 
-/** Položky mimo skupiny (záhlaví): oznámení a profil. */
+/** Položky mimo skupiny (záhlaví): oznámení, profil a zabezpečení (R-081). */
 export const ADMIN_UTILITY_NAV: NavItem[] = [
   { href: '/dashboard/notifications', label: 'Oznámení', icon: 'bell', count: 'notifications' },
   { href: '/dashboard/profil', label: 'Profil a statistiky', icon: 'profile' },
+  { href: '/dashboard/zabezpeceni', label: 'Přihlášení a zabezpečení', icon: 'security' },
 ]
 
 /** Čtyři nejčastější místa pro spodní lištu na telefonu; zbytek je v nabídce „Více“. */

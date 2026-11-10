@@ -1,4 +1,5 @@
-import { neon } from '@neondatabase/serverless'
+import { unstable_noStore as noStore } from 'next/cache'
+import { pgTransaction } from '../pg'
 
 // Jediný vstup do schématu portal (KP05, migrace 095).
 //
@@ -24,22 +25,22 @@ export class PortalConfigError extends Error {
   }
 }
 
-function neonDriver(): PortalDriver {
+function pgDriver(): PortalDriver {
   const url = process.env.DATABASE_URL_PORTAL
   if (!url) throw new PortalConfigError()
-  // Dotazy do DB se nikdy necachují (data cache Nextu by vracela stará data).
-  const sql = neon(url, { fetchOptions: { cache: 'no-store' } })
   return {
     async transaction(queries) {
-      return (await sql.transaction(queries.map((x) => sql.query(x.text, [...x.params])))) as PortalRow[][]
+      // Data klienta se nikdy necachují (stránka se renderuje na požadavek).
+      noStore()
+      return pgTransaction(url, queries)
     },
   }
 }
 
 let driver: PortalDriver | null = null
-const getDriver = (): PortalDriver => (driver ??= neonDriver())
+const getDriver = (): PortalDriver => (driver ??= pgDriver())
 
-/** Jen pro testy: podstrčí ovladač. `null` vrátí Neon. */
+/** Jen pro testy: podstrčí ovladač. `null` vrátí Postgres z DATABASE_URL_PORTAL. */
 export function setPortalDriverForTests(next: PortalDriver | null): void {
   driver = next
 }
