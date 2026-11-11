@@ -19,6 +19,8 @@ let db: PGlite
 const one = async <T extends Record<string, unknown>>(sqlText: string, params: unknown[] = []) =>
   (await db.query<T>(sqlText, params)).rows[0]
 
+// PGlite + migrace trvají na vytíženém stroji nebo v CI déle než výchozích 10 s
+// (stejně jako client-retention.test.ts a portal-isolation.test.ts).
 beforeAll(async () => {
   db = new PGlite()
   await db.exec(`
@@ -61,7 +63,7 @@ beforeAll(async () => {
   // Idempotence: dvakrát za sebou nesmí spadnout ani nic změnit.
   await db.exec(read('migrations', '102_jeden_inbox_poptavek.sql'))
   await db.exec(read('migrations', '102_jeden_inbox_poptavek.sql'))
-})
+}, 60_000)
 
 describe('migrace 102 — jeden inbox poptávek', () => {
   it('business se přejmenoval na lead_origin ve všech třech tabulkách i v indexech', async () => {
