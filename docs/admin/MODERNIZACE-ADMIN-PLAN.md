@@ -439,6 +439,24 @@ a konzole nehlásí blokaci; ⌘K, zvonek, menu a toasty fungují na 390/768/128
 žádná obrazovka nemá vlastní odznak ani vlastní pevnou šířku.
 **Riziko:** střední (12 souborů bývalého Hubu má vlastní vzhled).
 
+**Provedeno 2026-11-11**, se třemi upřesněními oproti zadání:
+1. **Odznaků bylo víc než 17.** Kromě `STATUS_STYLES`, `LEAD_STATUS_STYLES` a `ACTION_TYPE_STYLES`
+   měly vlastní paletu i `IMPROVEMENT_STATUS_STYLES`, `CHANGE_TYPE_STYLES`, `STARTUP_PHASES.color`,
+   `ACCESS_CLASS` (klienti), `AREA_STYLES` (finance), `CATEGORY_STYLES` (náklady),
+   `SOURCE_STYLES` (daňové novinky), `DIFFICULTY_COLORS` (dokončené) a tři natvrdo psané stavy
+   faktury — dohromady deset map a 40 kombinací.
+2. **Pět tónů nestačí na 1:1 mapování pěti stavů zakázky.** Tón proto nese naléhavost, ne druh
+   (R-091): `new` i `review` jsou `signal` („čeká se"), `in_progress` i `done` `info` („běží"),
+   `paid` `success`. Kategorie jsou vždy `neutral`.
+3. **Barvy událostí v kalendáři zůstaly.** `CHANNEL_COLORS` a `KIND_COLORS` ve `SmartCalendar`
+   nejsou odznaky stavu, ale rozlišení bloků; patří k opravám kalendáře v AD08.
+
+Komponenty `help-link.tsx` a `nav-icon.tsx` ze zadání se **nepřevzaly** — obě jsou vázané na typy
+Workspace (`GuideTopicKey`, `NavKey`), takže adminu nejsou k ničemu. Převzaly se `page-header`
+(`PageShell` + `PageHeader`), `toolbar` (`Toolbar`, `PillNav`) a `EmptyState` z `components/ws/brand`.
+`PageShell` dostal pátou šířku `table` = 1600 px a `PageHeader` volitelný `subtitleFont`
+(výchozí `num` kvůli Workspace, admin posílá `sans`).
+
 ### AD06 — Rychlost I: dávkování, indexy, streaming (M, **migrace 103**)
 **Cíl:** navigace dělá jednotky dotazů místo desítek a kostra je vidět hned.
 - **Nový `lib/admin/db.ts`** podle `lib/ws/db.ts`: `neon(DATABASE_URL, { fetchOptions: { cache: 'no-store' } })`,
@@ -859,7 +877,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | **hotovo 2026-11-11** (migrace jen na testu) |
 | AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | **hotovo 2026-11-11** |
 | AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | nezačato |
+| AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | nezačato |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | nezačato |
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | nezačato |
@@ -1015,14 +1033,20 @@ nad `app/dashboard`, `app/p`, `app/h`, `app/(auth)`, `app/globals.css`, `compone
 Test tvrdí „nejvýš strop", takže úklid nikdy neblokuje, ale návrat staré třídy ano.
 **Po každém sezení snížit na naměřenou hodnotu.**
 
-| Třída | Strop po AD04 (2026-11-11) | Po AD05 | Po AD17 |
+| Třída | Strop po AD04 (2026-11-11) | Po AD05 (2026-11-11) | Po AD17 |
 |---|---|---|---|
-| `muted-foreground` | 743 | — | — |
-| `rounded-lg\|xl\|2xl` | 463 | — | — |
-| `border-border` | 335 | — | — |
-| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | — | — |
-| `bg-white` | 211 | — | — |
+| `muted-foreground` | 743 | 691 | — |
+| `rounded-lg\|xl\|2xl` | 463 | 434 | — |
+| `border-border` | 335 | 314 | — |
+| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | 755 | — |
+| `bg-white` | 211 | 199 | — |
 | `brand-*` | **0** | 0 | 0 |
+
+Z AD05 ubylo hlavně 172 duhových tříd v odznacích. Zbytek duhy je jinde než na odznacích:
+zelená a červená u částek ve Financích (`IncomeExpenseSection` 52, `ScenarioSection` 42,
+`FinanceHealthSection` 28, `BusinessCalculator` 24), barvy událostí v kalendáři
+(`SmartCalendar` 36) a emeraldový vzhled evidence faktur (`InvoiceRegistry`, `InvoiceArchive`,
+`InvoiceFields`). To překresluje AD17, kalendář AD08 a fakturaci AD12/AD13.
 
 Čísla z plánu (1057 / 710 / 536 / 477 / 302) byla měřená před AD01, který smazal čtyři moduly,
 a nad jiným rozsahem souborů — nejsou s těmihle porovnatelná. `brand-*` je nula od AD04;
