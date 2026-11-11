@@ -2,14 +2,15 @@
 
 import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
 import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toast'
+import { LEAD_ACTION_TONE, LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
 import { whatsappHref, formatDate } from '@/lib/utils'
 import {
   LEAD_STATUS_LABELS,
-  LEAD_STATUS_STYLES,
   LEAD_ACTION_TYPE_LABELS,
   type ClientLead,
   type LeadStatus,
@@ -29,15 +30,6 @@ const ACTION_TYPE_ICONS: Record<LeadActionType, React.ReactNode> = {
   other:   <MoreHorizontal size={11} strokeWidth={1.5} />,
 }
 
-const ACTION_TYPE_STYLES: Record<LeadActionType, string> = {
-  call:    'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  meeting: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
-  email:   'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
-  whatsapp:'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-  online:  'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
-  other:   'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-}
-
 const EMPTY_FORM: LeadPayload = {
   company_name: '',
   contact_name: null,
@@ -55,18 +47,18 @@ const EMPTY_FORM: LeadPayload = {
 
 function StatusBadge({ status }: { status: LeadStatus }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${LEAD_STATUS_STYLES[status]}`}>
+    <Badge variant={toneVariant(LEAD_STATUS_TONE[status])}>
       {LEAD_STATUS_LABELS[status]}
-    </span>
+    </Badge>
   )
 }
 
 function ActionTypeBadge({ type }: { type: LeadActionType }) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_TYPE_STYLES[type]}`}>
+    <Badge variant={toneVariant(LEAD_ACTION_TONE[type])}>
       {ACTION_TYPE_ICONS[type]}
       {LEAD_ACTION_TYPE_LABELS[type]}
-    </span>
+    </Badge>
   )
 }
 
@@ -1010,7 +1002,7 @@ export default function LeadsTable({
           <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[1100px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-border">
+                <tr className="border-b border-navy-100 bg-navy-50">
                   <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma</th>
                   <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kontakt</th>
                   <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefon</th>

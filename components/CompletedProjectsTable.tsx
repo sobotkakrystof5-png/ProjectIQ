@@ -11,21 +11,16 @@ import {
 import { getPragueTodayISO } from '@/lib/prague-time'
 import type { CompletedProject, ProjectType } from '@/lib/types'
 
-const DIFFICULTY_COLORS: Record<number, string> = {
-  1: 'bg-emerald-100 text-emerald-700',
-  2: 'bg-emerald-100 text-emerald-700',
-  3: 'bg-emerald-100 text-emerald-700',
-  4: 'bg-amber-100 text-amber-700',
-  5: 'bg-amber-100 text-amber-700',
-  6: 'bg-amber-100 text-amber-700',
-  7: 'bg-orange-100 text-orange-700',
-  8: 'bg-orange-100 text-orange-700',
-  9: 'bg-red-100 text-red-700',
-  10: 'bg-red-100 text-red-700',
-}
-
+/**
+ * Náročnost 1–10 je škála, ne stav: roste jí tmavost, ne odstín (AD05).
+ * Barvy, které se musí rozlišit, se liší i světlostí — viz design systém Dílky.
+ */
 function difficultyColor(d: number) {
-  return DIFFICULTY_COLORS[Math.min(10, Math.max(1, Math.round(d)))] ?? 'bg-slate-100 text-slate-600'
+  const level = Math.min(10, Math.max(1, Math.round(d)))
+  if (level <= 3) return 'bg-navy-50 text-navy-700'
+  if (level <= 6) return 'bg-navy-100 text-navy-900'
+  if (level <= 8) return 'bg-navy-300 text-navy-950'
+  return 'bg-navy-700 text-white'
 }
 
 const EMPTY_FORM = (type: ProjectType): CompletedProjectPayload => ({
@@ -357,7 +352,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[980px]">
             <thead>
-              <tr className="bg-slate-50 border-b border-border">
+              <tr className="border-b border-navy-100 bg-navy-50">
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Název</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Klient</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma</th>

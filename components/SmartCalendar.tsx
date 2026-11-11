@@ -12,9 +12,11 @@ import {
 import { AdminEventModal } from './AdminEventModal'
 import { deleteCalendarEvent } from '@/app/calendar-actions'
 import {
-  CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS, LEAD_STATUS_STYLES,
+  CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS,
   type ConsultationChannel, type CalendarEventType, type LeadActionType, type LeadStatus,
 } from '@/lib/types'
+import { Badge } from '@/components/ui/badge'
+import { LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { cn, whatsappHref } from '@/lib/utils'
 import { toMondayFirst, getDaysInMonth, getMonthStartOffset } from '@/lib/prague-time'
 
@@ -365,9 +367,9 @@ function EventDetailModal({
                   )}
 
                   <div className="flex items-center gap-2">
-                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', LEAD_STATUS_STYLES[lead.status])}>
+                    <Badge variant={toneVariant(LEAD_STATUS_TONE[lead.status])}>
                       {LEAD_STATUS_LABELS[lead.status]}
-                    </span>
+                    </Badge>
                     {lead.estimatedValue != null && (
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                         <Coins size={12} strokeWidth={1.5} />

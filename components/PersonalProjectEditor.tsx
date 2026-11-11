@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/toast'
+import { Badge, badgeVariants } from '@/components/ui/badge'
+import { CHANGE_TYPE_TONE, IMPROVEMENT_STATUS_TONE, STARTUP_PHASE_TONE, toneVariant } from '@/lib/admin-status'
+import { cn } from '@/lib/utils'
 import {
   ChevronDown, ChevronUp, Loader2, Archive, Trash2,
   ExternalLink, Save, Info, BookOpen, Lightbulb,
@@ -11,8 +14,8 @@ import {
 } from 'lucide-react'
 import {
   STARTUP_PHASES, STARTUP_SEGMENTS, STARTUP_CURRENCIES,
-  IMPROVEMENT_STATUS_LABELS, IMPROVEMENT_STATUS_STYLES,
-  CHANGE_TYPE_LABELS, CHANGE_TYPE_STYLES,
+  IMPROVEMENT_STATUS_LABELS,
+  CHANGE_TYPE_LABELS,
   type PersonalProject,
   type PersonalProjectImprovement,
   type PersonalProjectChangelogEntry,
@@ -155,7 +158,7 @@ function PersonalImprovements({
             <button
               type="button"
               onClick={() => handleCycleStatus(item)}
-              className={`shrink-0 mt-0.5 inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-md transition-all hover:opacity-80 cursor-pointer ${IMPROVEMENT_STATUS_STYLES[item.status]}`}
+              className={cn('mt-0.5 shrink-0 cursor-pointer transition-opacity hover:opacity-80', badgeVariants({ variant: toneVariant(IMPROVEMENT_STATUS_TONE[item.status]) }))}
             >
               {IMPROVEMENT_STATUS_LABELS[item.status]}
             </button>
@@ -338,7 +341,7 @@ function PersonalChangelog({
                   <div className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${CHANGE_TYPE_STYLES[entry.change_type as ChangeType]}`}>
+                        <span className={badgeVariants({ variant: toneVariant(CHANGE_TYPE_TONE[entry.change_type as ChangeType]) })}>
                           {CHANGE_TYPE_LABELS[entry.change_type as ChangeType] ?? entry.change_type}
                         </span>
                         <span className="text-xs text-muted-foreground">
@@ -486,9 +489,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
       {/* Sticky save bar */}
       <div className="flex items-center justify-between py-3 px-5 bg-white border border-border rounded-2xl">
         <div className="flex items-center gap-2.5">
-          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${currentPhase.color}`}>
-            {currentPhase.emoji} {currentPhase.label}
-          </span>
+          <Badge variant={toneVariant(STARTUP_PHASE_TONE[currentPhase.value])}>{currentPhase.label}</Badge>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <span className="tabular-nums font-medium text-foreground">{progress} %</span>
             <span>hotovo</span>
@@ -611,13 +612,13 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
               key={p.value}
               type="button"
               onClick={() => setPhase(p.value)}
-              className={`text-left px-3 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+              aria-pressed={phase === p.value}
+              className={`rounded-chip border px-3 py-2.5 text-left text-xs font-medium transition-colors ${
                 phase === p.value
-                  ? `${p.color} border-current shadow-sm`
-                  : 'border-border text-muted-foreground hover:border-navy-300 hover:text-foreground'
+                  ? 'border-navy-700 bg-navy-700 text-white'
+                  : 'border-navy-100 text-quiet hover:border-navy-300 hover:text-ink'
               }`}
             >
-              <span className="mr-1">{p.emoji}</span>
               {p.label}
             </button>
           ))}

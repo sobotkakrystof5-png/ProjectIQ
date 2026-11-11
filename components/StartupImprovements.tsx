@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { toast } from '@/components/ui/toast'
+import { badgeVariants } from '@/components/ui/badge'
+import { IMPROVEMENT_STATUS_TONE, toneVariant } from '@/lib/admin-status'
+import { cn } from '@/lib/utils'
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
 import {
   addImprovement,
@@ -10,7 +13,6 @@ import {
 } from '@/app/dashboard/startup/startup-actions'
 import {
   IMPROVEMENT_STATUS_LABELS,
-  IMPROVEMENT_STATUS_STYLES,
   type StartupImprovement,
   type ImprovementStatus,
 } from '@/lib/types'
@@ -106,7 +108,7 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
             <button
               type="button"
               onClick={() => handleCycleStatus(item)}
-              className={`shrink-0 mt-0.5 inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-md transition-all hover:opacity-80 cursor-pointer ${IMPROVEMENT_STATUS_STYLES[item.status]}`}
+              className={cn('mt-0.5 shrink-0 cursor-pointer transition-opacity hover:opacity-80', badgeVariants({ variant: toneVariant(IMPROVEMENT_STATUS_TONE[item.status]) }))}
               title="Kliknutím změnit stav"
             >
               {IMPROVEMENT_STATUS_LABELS[item.status]}

@@ -1,4 +1,5 @@
 'use client'
+import { badgeVariants } from '@/components/ui/badge'
 
 import { useState, useTransition } from 'react'
 import { Plus, Trash2, Pencil, Check, X, ChevronDown, RefreshCw, Zap } from 'lucide-react'
@@ -166,7 +167,7 @@ function CostRow({
         </span>
       </td>
       <td className="px-3 py-2.5">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_STYLES[cost.category ?? 'all']}`}>
+        <span className={badgeVariants({ variant: 'neutral' })}>
           {CATEGORY_SHORT[cost.category ?? 'all']}
         </span>
       </td>

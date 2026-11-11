@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { ArrowUpRight, TrendingUp } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { STARTUP_PHASE_TONE, toneVariant } from '@/lib/admin-status'
 import { STARTUP_PHASES, type StartupProject } from '@/lib/types'
 
 interface Props {
@@ -16,9 +18,7 @@ export function StartupProjectCard({ project }: Props) {
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${phase.color}`}>
-          {phase.emoji} {phase.label}
-        </span>
+        <Badge variant={toneVariant(STARTUP_PHASE_TONE[phase.value])}>{phase.label}</Badge>
         <ArrowUpRight
           size={15}
           strokeWidth={1.5}

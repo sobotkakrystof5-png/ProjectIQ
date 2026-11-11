@@ -1,4 +1,6 @@
 'use client'
+import { Badge } from '@/components/ui/badge'
+import { invoiceTone, toneVariant } from '@/lib/admin-status'
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -106,34 +108,23 @@ function InvoiceRow({ invoice }: { invoice: InvoiceRegistryItem }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-foreground">{invoice.invoice_number}</span>
-          {invoice.paid_on ? (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
-              Zaplaceno
-            </span>
-          ) : overdue ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">
-              <Clock size={9} strokeWidth={1.5} />
-              Po splatnosti
-            </span>
-          ) : (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-              Pohledávka
-            </span>
-          )}
+          <Badge variant={toneVariant(invoiceTone(Boolean(invoice.paid_on), overdue))}>
+            {invoice.paid_on ? 'Zaplaceno' : overdue ? <><Clock size={10} strokeWidth={1.5} aria-hidden="true" />Po splatnosti</> : 'Pohledávka'}
+          </Badge>
           {invoice.has_pdf && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-              <Paperclip size={9} strokeWidth={1.5} />
+            <Badge variant="neutral" className="hidden sm:inline-flex">
+              <Paperclip size={10} strokeWidth={1.5} aria-hidden="true" />
               PDF
-            </span>
+            </Badge>
           )}
           {invoice.duplicate_risk && (
-            <span
-              title="Zakázka má v ledgeru i vlastní příjem. Zkontroluj, že se stejné peníze nezapočítaly dvakrát."
-              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+            <Badge
+              variant="signal"
+              title="Zakázka má v ledgeru i vlastní příjem. Zkontrolujte, že se stejné peníze nezapočítaly dvakrát."
             >
-              <AlertTriangle size={9} strokeWidth={1.5} />
+              <AlertTriangle size={10} strokeWidth={1.5} aria-hidden="true" />
               Zkontrolovat příjem
-            </span>
+            </Badge>
           )}
         </div>
         <p className="text-[12px] text-muted-foreground mt-0.5 truncate">

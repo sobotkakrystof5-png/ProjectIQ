@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/toast'
+import { Badge } from '@/components/ui/badge'
+import { STARTUP_PHASE_TONE, toneVariant } from '@/lib/admin-status'
 import {
   ChevronDown, ChevronUp, Loader2, Archive, Trash2,
   ExternalLink, Save, Info, BookOpen, Calculator,
@@ -316,9 +318,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
       {/* Sticky save bar */}
       <div className="flex items-center justify-between py-3 px-5 bg-white border border-border rounded-2xl">
         <div className="flex items-center gap-2.5">
-          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${currentPhase.color}`}>
-            {currentPhase.emoji} {currentPhase.label}
-          </span>
+          <Badge variant={toneVariant(STARTUP_PHASE_TONE[currentPhase.value])}>{currentPhase.label}</Badge>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <span className="tabular-nums font-medium text-foreground">{progress} %</span>
             <span>hotovo</span>
@@ -457,13 +457,13 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               key={p.value}
               type="button"
               onClick={() => setPhase(p.value)}
-              className={`text-left px-3 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+              aria-pressed={phase === p.value}
+              className={`rounded-chip border px-3 py-2.5 text-left text-xs font-medium transition-colors ${
                 phase === p.value
-                  ? `${p.color} border-current shadow-sm`
-                  : 'border-border text-muted-foreground hover:border-navy-300 hover:text-foreground'
+                  ? 'border-navy-700 bg-navy-700 text-white'
+                  : 'border-navy-100 text-quiet hover:border-navy-300 hover:text-ink'
               }`}
             >
-              <span className="mr-1">{p.emoji}</span>
               {p.label}
             </button>
           ))}
@@ -584,8 +584,8 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           <p className="text-sm font-medium text-foreground mb-2">Jak zákazníci platí?</p>
           <div className="grid grid-cols-2 gap-2">
             {([
-              { key: 'saas' as const, emoji: '📅', title: 'Opakovaně', sub: 'jako Netflix nebo Spotify' },
-              { key: 'onetime' as const, emoji: '💳', title: 'Jednorázově', sub: 'jako nákup v obchodě' },
+              { key: 'saas' as const, title: 'Opakovaně', sub: 'jako Netflix nebo Spotify' },
+              { key: 'onetime' as const, title: 'Jednorázově', sub: 'jako nákup v obchodě' },
             ] as const).map(m => (
               <button
                 key={m.key}
@@ -598,7 +598,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 }`}
               >
                 <p className={`text-sm font-medium ${monetizationModel === m.key ? 'text-navy-700' : 'text-foreground'}`}>
-                  {m.emoji} {m.title}
+                  {m.title}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">{m.sub}</p>
               </button>

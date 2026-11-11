@@ -1,4 +1,5 @@
 'use client'
+import { Badge } from '@/components/ui/badge'
 
 import { useState, useTransition } from 'react'
 import {
@@ -14,11 +15,6 @@ function formatDate(value: string | null) {
   if (Number.isNaN(date.getTime())) return 'datum neuvedeno'
 
   return date.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-const SOURCE_STYLES: Record<string, string> = {
-  financni_sprava: 'bg-blue-50 text-blue-700 ring-blue-200',
-  cssz: 'bg-violet-50 text-violet-700 ring-violet-200',
 }
 
 function NewsRow({ item, onRead, isPending }: {
@@ -38,11 +34,7 @@ function NewsRow({ item, onRead, isPending }: {
         {/* Zdroj a datum jsou vždy vidět — je to informace z úřadu,
             ne daňové poradenství, a musí se dát ověřit u originálu. */}
         <div className="flex items-center gap-1.5 flex-wrap mb-1">
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ring-1 ${
-            SOURCE_STYLES[item.source] ?? 'bg-muted text-muted-foreground ring-border'
-          }`}>
-            {TAX_NEWS_SOURCE_LABELS[item.source] ?? item.source}
-          </span>
+          <Badge variant="neutral">{TAX_NEWS_SOURCE_LABELS[item.source] ?? item.source}</Badge>
           <span className="text-[11px] text-muted-foreground">{formatDate(item.published_at)}</span>
         </div>
 

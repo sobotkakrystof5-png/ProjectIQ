@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { toast } from '@/components/ui/toast'
+import { badgeVariants } from '@/components/ui/badge'
+import { CHANGE_TYPE_TONE, toneVariant } from '@/lib/admin-status'
 import { Plus, Trash2, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
 import {
   addChangelogEntry,
@@ -9,7 +11,6 @@ import {
 } from '@/app/dashboard/startup/startup-actions'
 import {
   CHANGE_TYPE_LABELS,
-  CHANGE_TYPE_STYLES,
   type StartupChangelogEntry,
   type ChangeType,
 } from '@/lib/types'
@@ -194,7 +195,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                   <div className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${CHANGE_TYPE_STYLES[entry.change_type as ChangeType]}`}>
+                        <span className={badgeVariants({ variant: toneVariant(CHANGE_TYPE_TONE[entry.change_type as ChangeType]) })}>
                           {CHANGE_TYPE_LABELS[entry.change_type as ChangeType] ?? entry.change_type}
                         </span>
                         <span className="text-xs text-muted-foreground">

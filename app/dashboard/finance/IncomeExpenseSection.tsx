@@ -1,4 +1,5 @@
 'use client'
+import { Badge } from '@/components/ui/badge'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -18,7 +19,7 @@ import {
 import type { Cost } from '@/lib/types'
 import {
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
-  LIFE_AREAS, AREA_LABELS, AREA_STYLES, type LifeArea,
+  LIFE_AREAS, AREA_LABELS, type LifeArea,
 } from './finance-constants'
 
 const MONTHS_FULL = [
@@ -46,13 +47,7 @@ function formatDate(dateStr: string) {
 
 function AreaBadge({ area }: { area: string | null }) {
   if (!area) return null
-  const style = AREA_STYLES[area as LifeArea] ?? 'bg-slate-50 text-slate-600 ring-1 ring-slate-200'
-  const label = AREA_LABELS[area as LifeArea] ?? area
-  return (
-    <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full ${style}`}>
-      {label}
-    </span>
-  )
+  return <Badge variant="neutral">{AREA_LABELS[area as LifeArea] ?? area}</Badge>
 }
 
 interface RecurringRow {

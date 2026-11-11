@@ -1,21 +1,12 @@
-import { cn } from '@/lib/utils'
-import { STATUS_LABELS, STATUS_STYLES, type ProjectStatus } from '@/lib/types'
+import { Badge } from '@/components/ui/badge'
+import { PROJECT_STATUS_TONE, toneVariant } from '@/lib/admin-status'
+import { STATUS_LABELS, type ProjectStatus } from '@/lib/types'
 
-interface StatusBadgeProps {
-  status: ProjectStatus
-  className?: string
-}
-
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+/** Stav zakázky. Barvu vybírá jeden systém tónů (AD05), ne obrazovka. */
+export function StatusBadge({ status, className }: { status: ProjectStatus; className?: string }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-        STATUS_STYLES[status],
-        className
-      )}
-    >
+    <Badge variant={toneVariant(PROJECT_STATUS_TONE[status])} className={className}>
       {STATUS_LABELS[status]}
-    </span>
+    </Badge>
   )
 }

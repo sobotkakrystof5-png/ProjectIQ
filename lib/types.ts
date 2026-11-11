@@ -37,14 +37,6 @@ export const STATUS_LABELS: Record<ProjectStatus, string> = {
   paid: 'Zaplaceno',
 }
 
-export const STATUS_STYLES: Record<ProjectStatus, string> = {
-  new: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  in_progress: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  review: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200',
-  done: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-  paid: 'bg-navy-800 text-white',
-}
-
 export const STATUS_ORDER: ProjectStatus[] = ['new', 'in_progress', 'review', 'done', 'paid']
 
 export interface ClientMessage {
@@ -111,15 +103,6 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   converted: 'Převeden na zakázku',
   lost: 'Ztracen',
   waiting: 'Čeká na odpověď',
-}
-
-export const LEAD_STATUS_STYLES: Record<LeadStatus, string> = {
-  cold: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
-  warm: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  hot: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
-  converted: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-  lost: 'bg-red-50 text-red-600 ring-1 ring-red-200',
-  waiting: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200',
 }
 
 export type LeadActionType = 'call' | 'meeting' | 'email' | 'whatsapp' | 'online' | 'other'
@@ -286,22 +269,21 @@ export type StartupPhase =
   | 'paused'
   | 'cancelled'
 
+// Barvu fáze nese `STARTUP_PHASE_TONE` v `lib/admin-status.ts`; emoji v UI nejsou (AD05).
 export const STARTUP_PHASES: {
   value: StartupPhase
   label: string
-  emoji: string
-  color: string
 }[] = [
-  { value: 'idea', label: 'Nápad', emoji: '💡', color: 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200' },
-  { value: 'research', label: 'Výzkum / Validace', emoji: '🔬', color: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' },
-  { value: 'mvp', label: 'Vývoj (MVP)', emoji: '🛠️', color: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' },
-  { value: 'launch', label: 'Spuštění', emoji: '🚀', color: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
-  { value: 'growth', label: 'Růst', emoji: '📈', color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
-  { value: 'monetization', label: 'Monetizace', emoji: '💰', color: 'bg-green-50 text-green-700 ring-1 ring-green-200' },
-  { value: 'pivot', label: 'Pivotování', emoji: '🔄', color: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200' },
-  { value: 'active', label: 'Aktivní / Stabilní', emoji: '✅', color: 'bg-teal-50 text-teal-700 ring-1 ring-teal-200' },
-  { value: 'paused', label: 'Pozastaveno', emoji: '⏸️', color: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200' },
-  { value: 'cancelled', label: 'Ukončeno', emoji: '❌', color: 'bg-red-50 text-red-600 ring-1 ring-red-200' },
+  { value: 'idea', label: 'Nápad' },
+  { value: 'research', label: 'Výzkum a ověření' },
+  { value: 'mvp', label: 'Vývoj (MVP)' },
+  { value: 'launch', label: 'Spuštění' },
+  { value: 'growth', label: 'Růst' },
+  { value: 'monetization', label: 'Monetizace' },
+  { value: 'pivot', label: 'Pivotování' },
+  { value: 'active', label: 'Aktivní' },
+  { value: 'paused', label: 'Pozastaveno' },
+  { value: 'cancelled', label: 'Ukončeno' },
 ]
 
 export type ImprovementStatus = 'idea' | 'in_progress' | 'done'
@@ -310,12 +292,6 @@ export const IMPROVEMENT_STATUS_LABELS: Record<ImprovementStatus, string> = {
   idea: 'Nápad',
   in_progress: 'V řešení',
   done: 'Hotovo',
-}
-
-export const IMPROVEMENT_STATUS_STYLES: Record<ImprovementStatus, string> = {
-  idea: 'bg-slate-50 text-slate-600 ring-1 ring-slate-200',
-  in_progress: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  done: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
 }
 
 export type ChangeType = 'development' | 'fix' | 'content' | 'marketing' | 'pricing' | 'strategy' | 'other'
@@ -328,16 +304,6 @@ export const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
   pricing: 'Cenová změna',
   strategy: 'Strategie',
   other: 'Jiné',
-}
-
-export const CHANGE_TYPE_STYLES: Record<ChangeType, string> = {
-  development: 'bg-blue-50 text-blue-700',
-  fix: 'bg-red-50 text-red-700',
-  content: 'bg-slate-50 text-slate-600',
-  marketing: 'bg-pink-50 text-pink-700',
-  pricing: 'bg-green-50 text-green-700',
-  strategy: 'bg-purple-50 text-purple-700',
-  other: 'bg-amber-50 text-amber-700',
 }
 
 export type MonetizationModel = 'saas' | 'onetime'
