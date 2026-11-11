@@ -28,8 +28,7 @@
 | Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
 | Deployment | Vercel | Zero-ops, napojení na GitHub, Hobby plán (crony max 1× denně) |
 | AI | `@anthropic-ai/sdk` | AI asistenti (Startup) + AI přepis PDF faktur (`lib/invoice-ai.ts`) |
-| Drag-and-drop | `@dnd-kit/*` | Řazení bloků šablony webu (`ProjectBlockList`) |
-| Scraping | `puppeteer-core` + `@sparticuz/chromium` | Hub › Škola (LernSax, Beste Schule) |
+| PDF | `puppeteer-core` + `@sparticuz/chromium` | Vykreslení PDF (faktury Workspace; admin faktury AD12) |
 | Testy | Vitest | `npm test` — testy v `lib/__tests__`, `components/__tests__`, `types/__tests__`, `app/api/**/__tests__` |
 
 
@@ -42,6 +41,8 @@
 Základní schéma je v tomto souboru níže. Inkrementální změny (nové tabulky/sloupce, opravy constraintů) jsou v `migrations/*.sql` — čísluj sekvenčně a pište idempotentně (`IF NOT EXISTS`, `DO $$ ... $$` guard na constrainty).
 
 **Tabulky `projects`, `client_messages` a `progress_updates` žádná migrace nezakládá** — vznikly ručně v Neon konzoli před migrací 001. Na čistou databázi je dostane `node scripts/apply-migration.js scripts/admin-base-schema.sql`, pak teprve jdou migrace 001+ (AD00).
+
+**Smazané moduly (AD01, R-089):** Škola, Sport a zdraví, Plány a Šablony webu odešly z kódu i z databáze — 24 tabulek maže migrace 100, `project_blocks` a `block_templates` migrace 101. Obsah se před spuštěním vyveze `node scripts/export-before-drop.mjs --ano`.
 
 **Evidence aplikovaných migrací:** `public.schema_migrations` (soubor, čas, hash, počet příkazů) — vede ji `scripts/apply-migration.js`, který už aplikovanou migraci přeskočí a změněný soubor pustí znovu.
 
@@ -171,15 +172,10 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `invoices` | 053, 056 | Archiv faktur (PDF, AI přepis, vazba na transakci) |
 | `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
 | `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
-| `block_templates` | 061 | Globální knihovna bloků šablon webu |
-| `project_blocks` | 062 | Bloky šablony per zakázka (řazení drag-and-drop) |
 | `finance_transactions` | 019, 026, 027, 054 | Hub › Finance — transakce; `declared` = přiznaná linie (fakturováno na IČO) |
 | `finance_goals`, `recurring_cash_flow` | 019, 031 | Finanční cíle, opakované cash-flow položky |
-| `school_*` | 019, 020, 022, 025 | Hub › Škola — známky, termíny, zprávy, rozvrh, ruční záznamy, sync log |
-| `nutrition_logs`, `workout_logs`, `health_scores`, `weight_logs` | 019, 021, 023 | Hub › Sport |
 | `startup_projects` (+ `_improvements`, `_changelog`) | 032, 034, 035 | Hub › Byznys › Startup (waitlist DB URL, cenové tiery) |
 | `personal_projects` (+ `_improvements`, `_changelog`) | 033 | Hub › Projekty |
-| `plan_*` | 036–041 | Hub › Plány (škola, projekty, byznys, sport, finance) |
 | `plans_legacy_archived` | 042 | Stará plochá tabulka plánů — jen archiv, nepoužívat |
 | `project_activity` | 093 | Aktivita zakázky (KP03): koncepty a schválené zprávy, `status` draft/published/rejected, `source` manual/claude_code/system, `contains_sensitive`, `client_emailed_at` (souhrnný e-mail max. 1× za den) |
 | `project_agent_keys` | 094 | Klíče projektů pro hlášení z Claude Code (KP04): prefix + HMAC hash, jeden platný klíč na projekt, kdo a kdy vytvořil/zneplatnil |
@@ -272,22 +268,19 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `app/costs-actions.ts` | Náklady — jediný zdroj pravdy pro firemní i osobní náklady |
 | `app/notification-actions.ts` | Notifikace (přečteno) |
 | `app/project-notes-actions.ts` | Log schůzek u zakázky |
-| `app/block-templates-actions.ts`, `app/project-blocks-actions.ts` | Šablony webu — knihovna bloků / bloky zakázky |
 | `app/hub/finance/finance-actions.ts` | Transakce, měsíční agregace, opakované cash-flow, příjmy z byznysu |
 | `app/hub/finance/invoice-actions.ts` | **Veškerá logika faktur** (sdílené jádro v `lib/invoices.ts`) |
 | `app/hub/finance/tax-news-actions.ts` | Novinky z legislativy |
 | `app/hub/byznys/…` | Přehled byznysu, Startup projekty (+ waitlist, launch email přes Resend) |
 | `app/hub/projekty/projekty-actions.ts` | Osobní projekty |
-| `app/hub/plany/**/…-actions.ts` | Plány po kategoriích |
-| `app/hub/school/actions.ts`, `app/hub/sport/sport-actions.ts` | Škola, Sport |
 
 ### Mapa rout (admin)
 
 | Sekce | Routy |
 |-------|-------|
-| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/pozadavky` (požadavky klientů z portálu, napříč VIZEON i ALTENO), `/[id]/sablona` (šablona webu zakázky), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/sablony` (knihovna bloků), `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
+| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/pozadavky` (požadavky klientů z portálu, napříč VIZEON i ALTENO), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
 | ALTENO (`/alteno`) | `/alteno`, `/new`, `/[id]`, `/rezervace` |
-| Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/plany` (+ `/skola`, `/projekty`, `/byznys`, `/byznys/[id]`, `/sport`, `/finance`), `/projekty` (+ `/new`, `/[id]`), `/school`, `/sport` |
+| Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/projekty` (+ `/new`, `/[id]`) |
 
 ### Veřejné stránky
 
@@ -311,8 +304,6 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
 | `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury |
 | `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
-| `GET /api/fatsecret/search` | — | Vyhledávání jídla (dnes Open Food Facts, název je historický) |
-| `POST /api/school/sync` | session | Ruční spuštění školního scraperu (proxy na cron) |
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
 | `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
 | `POST /api/klient/transcribe` | přihlášený člen klientského prostoru (Clerk) | Přepis hlasu pro požadavek klienta; limit po IP a členovi |
@@ -323,7 +314,6 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 
 | Endpoint | Kdy (UTC) | Co |
 |----------|-----------|----|
-| `/api/cron/scrape-school` | denně 6:00 | LernSax + Beste Schule scraping |
 | `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací, lead akcí, školních termínů (idempotentní příznaky proti duplicitám) |
 | `/api/cron/tax-news` | pondělí 5:00 | Stažení legislativních novinek (`ON CONFLICT DO NOTHING`) |
 | `/api/cron/client-retention` | denně 3:30 | Retence D-K10 (R-076, migrace 098): `public.purge_client_retention(3)` — dokončená zakázka (`done`/`paid`) bez pohybu 3 roky přijde o aktivitu, požadavky (`client_requests`, `portal.requests`), zprávy a slovní hodnocení; zakázka, cena a číselné hodnocení zůstávají. Pozvánky 90 dní po použití/zrušení/vypršení. `lib/client-retention.ts` |
@@ -353,7 +343,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Po uložení redirect na `/dashboard`
 
 ### `/dashboard/[id]` a `/alteno/[id]` — detail zakázky (KP02)
-- Jedna komponenta `components/admin/project-detail-view.tsx`, záložky v adrese `?zalozka=`: **Přehled** (editace, sdílení a QR, šablona webu, přidat do dokončených, smazat) · **Aktivita** (koncepty a schvalování, napojení Claude Code) · **Požadavky** (karty z `/dashboard/pozadavky` filtrované na zakázku) · **Zprávy** (vlákno v klientském prostoru, vzkazy, historie postupu, zpětná vazba, konzultace, poznámky) · **Fakturace** (jen VIZEON: faktury a náklady). Načítají se jen data aktivní záložky.
+- Jedna komponenta `components/admin/project-detail-view.tsx`, záložky v adrese `?zalozka=`: **Přehled** (editace, sdílení a QR, přidat do dokončených, smazat) · **Aktivita** (koncepty a schvalování, napojení Claude Code) · **Požadavky** (karty z `/dashboard/pozadavky` filtrované na zakázku) · **Zprávy** (vlákno v klientském prostoru, vzkazy, historie postupu, zpětná vazba, konzultace, poznámky) · **Fakturace** (jen VIZEON: faktury a náklady). Načítají se jen data aktivní záložky.
 - Špatná sekce (`/dashboard/[id]` pro ALTENO zakázku a naopak) přesměruje na správnou.
 - Nepřevedeno z plánu: změna stavu a fáze jedním klikem se „Zpět“. `updateProject` posílá klientovi e-mail, takže „Zpět“ by ho poslal podruhé.
 

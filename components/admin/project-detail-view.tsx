@@ -60,6 +60,8 @@ async function appBaseUrl(): Promise<string> {
   return (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function ProjectDetailView({
   projectId,
   expectedBusiness,
@@ -69,6 +71,9 @@ export async function ProjectDetailView({
   expectedBusiness: Business
   tabParam: string | undefined
 }) {
+  // Adresa, která není UUID (třeba zrušená /dashboard/sablony), spadne sem jako
+  // id zakázky. Bez téhle kontroly by dotaz skončil chybou typu a stránka 500.
+  if (!UUID.test(projectId)) notFound()
   const rows = await sql`SELECT * FROM projects WHERE id = ${projectId} LIMIT 1`
   if (!rows.length) notFound()
   const project = rows[0] as Project & { business?: string }

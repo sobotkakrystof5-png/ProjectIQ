@@ -45,7 +45,7 @@ stejná rychlost, podstatně méně ručního opisování.
 | Alteno | **Není druhá firma, je zdroj poptávky.** Web alteno.cz běží dál beze změny | R-088 |
 | Weby | **vizeon.cz, alteno.cz, prvotka.cz** do jednoho inboxu; estetik.cz má být jeden řádek konfigurace | R-088 |
 | Škola, Sport, Plány | **Smazat včetně 23 tabulek** (po exportu do CSV) | R-089 |
-| Šablony webu | **Celou funkci pryč** — knihovna i bloky u zakázek, včetně `@dnd-kit` | R-089 |
+| Šablony webu | **Celou funkci pryč** — knihovna i bloky u zakázek (`@dnd-kit` ale zůstává, používá ho Nastavení Workspace) | R-089 |
 | Dokončené | **Sloučit do zakázky.** Zakázka hotovo/zaplaceno *je* dokončená | R-090 |
 | Hodnocení | **Automaticky** při uzavření + jedna připomínka po 7 dnech + reference pro web | R-090 |
 | Předávací dokument | **Ano** — co bylo dodané, PDF stejnou cestou jako faktura | R-090 |
@@ -287,7 +287,7 @@ který se v AD04 nemusí přepisovat a v AD17 překreslovat.
 | Cron | `vercel.json` — `scrape-school` (zbyde 6 cronů; pravidelné náklady už jedou z `send-reminders`, AD13 je jen opraví) |
 | Typy | `lib/types.ts` — `DeadlineType`, `DEADLINE_TYPE_LABEL`, `BlockTemplate`, `ProjectBlock` |
 | Připomínky | `app/api/cron/send-reminders/route.ts:150–180, 305–335` — školní připomínky |
-| Závislosti | `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` |
+| ~~Závislosti~~ | `@dnd-kit/*` **zůstává** — používá ho `components/ws/settings/sortable-list.tsx` (pořadí v Nastavení Workspace, R-054) |
 | Env | `.env.example` — `FATSECRET_*` (mrtvé od 2026-06-22), přihlašovací údaje do školy |
 
 **Krok 2 — migrace (připravit, neaplikovat):**
@@ -815,7 +815,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | # | Sezení | Velikost | Migrace | Závisí na | Stav |
 |---|---|---|---|---|---|
 | AD00 | Příprava, větev, testovací data, měření | S | — | — | **hotovo 2026-11-11** |
-| AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | nezačato |
+| AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | **hotovo 2026-11-11** (migrace jen na testu) |
 | AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | nezačato |
 | AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | nezačato |
 | AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | nezačato |

@@ -1,5 +1,8 @@
 # ZakazIQ — Poznámky, Náklady, Šablony webu, Design skladač
 
+> **Část „Šablony webu" už neplatí.** Knihovna bloků i bloky u zakázky byly 2026-11-11
+> smazány z kódu i z databáze (AD01, R-089, migrace 101). Poznámky a náklady platí dál.
+
 ## Kontext
 
 Aplikace ZakazIQ dnes řeší admin-only "poznámky" u kontaktů v Hovorech (`client_leads.notes`) i u zakázek (`projects.notes`) jako jedno ploché textové pole bez historie a bez struktury — u Hovorů je navíc schované za rozkliknutím řádku. Uživatel při telefonátu s klientem potřebuje mít místo, kam si zapíše užitečný kontext a příště se v tom vyzná — dnešní řešení tenhle účel neplní.
