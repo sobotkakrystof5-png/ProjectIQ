@@ -113,7 +113,7 @@ describe('bez admina nic', () => {
 
 describe('přehled klientů', () => {
   it('ukáže oba účty se stavem, poptávkami za 30 dní a napojením webu', async () => {
-    const list = await listClients()
+    const list = (await listClients()).rows
     const a = list.find((c) => c.id === A.account)
     expect(a).toMatchObject({ name: 'Firma a', businesses: 1, access: 'trialing', requests30d: 1, web: 'ready', members: 1 })
     expect(a?.lastActivity).toBeInstanceOf(Date)
@@ -124,7 +124,7 @@ describe('přehled klientů', () => {
     await db.query(`INSERT INTO ws.requests (account_id, business_id, source, is_test) VALUES ($1, $2, 'web', true)`, [B.account, B.business])
     await db.query(`INSERT INTO ws.requests (account_id, business_id, source, created_at) VALUES ($1, $2, 'web', now() - interval '40 days')`, [B.account, B.business])
     await db.query(`UPDATE ws.web_integrations SET last_used_at = now() WHERE account_id = $1`, [B.account])
-    const b = (await listClients()).find((c) => c.id === B.account)
+    const b = (await listClients()).rows.find((c) => c.id === B.account)
     expect(b).toMatchObject({ requests30d: 1, web: 'used' })
   })
 

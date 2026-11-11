@@ -6,6 +6,7 @@ import { sql } from '@/lib/db'
 import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import {
   parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow,
+  INVOICE_COLUMNS, INCOME_JOIN, OTHER_INCOME_COUNT,
 } from '@/lib/invoices'
 import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import type { InvoiceAiExtract } from '@/lib/types'
@@ -71,29 +72,6 @@ type Row = Omit<InvoiceListItem, 'project_href' | 'duplicate_risk'> & {
  * výpisu. Teď se příjmy sečtou jednou (`GROUP BY`) a od součtu se odečte
  * vlastní transakce faktury, když do téhož součtu patří. Výsledek je stejný.
  */
-const INVOICE_COLUMNS = `
-  i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
-  i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
-  i.currency, i.note, i.pdf_filename, i.pdf_size,
-  (i.pdf_data IS NOT NULL) AS has_pdf,
-  p.lead_origin AS project_lead_origin,
-  p.client_name AS project_client_name
-`
-
-const INCOME_JOIN = `
-  LEFT JOIN (
-    SELECT source_project_id AS project_id, count(*)::int AS n
-    FROM finance_transactions
-    WHERE type = 'income' AND user_id IS NULL AND source_project_id IS NOT NULL
-    GROUP BY source_project_id
-  ) inc ON inc.project_id = i.project_id
-  LEFT JOIN finance_transactions own
-    ON own.id = i.finance_transaction_id
-   AND own.type = 'income' AND own.user_id IS NULL AND own.source_project_id = i.project_id
-`
-
-const OTHER_INCOME_COUNT = `GREATEST(COALESCE(inc.n, 0) - CASE WHEN own.id IS NULL THEN 0 ELSE 1 END, 0)::int AS other_income_count`
-
 function toItem(row: Row): InvoiceListItem {
   const { project_lead_origin: _origin, other_income_count, ...rest } = row
   return {

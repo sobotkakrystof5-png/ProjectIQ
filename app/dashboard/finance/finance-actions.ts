@@ -1,6 +1,7 @@
 'use server'
 
 import { sql } from '@/lib/db'
+import { adminDb, q } from '@/lib/admin/db'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import {
@@ -421,8 +422,9 @@ const EMPTY_LINE: IncomeLine = { income: 0, transactionCount: 0, projectCount: 0
 export async function getBusinessIncome(year: number): Promise<BusinessIncomeSummary> {
   await requireAuth()
 
-  const [incomeRows, outstandingRows, yearRows] = await Promise.all([
-    sql`
+  // Tři dotazy jedním požadavkem (AD06).
+  const [incomeRows, outstandingRows, yearRows] = await adminDb.batch([
+    q`
       SELECT
         declared,
         SUM(amount)::float AS income,
@@ -436,7 +438,7 @@ export async function getBusinessIncome(year: number): Promise<BusinessIncomeSum
     `,
     // Zbývá doplatit = cena − už zaplacená záloha. Zakázky obou byznysů
     // dohromady: je to jedno IČO a jedno daňové přiznání.
-    sql`
+    q`
       SELECT
         invoiced_on_ico AS declared,
         SUM(GREATEST(price - CASE WHEN deposit_paid THEN COALESCE(deposit_amount, 0) ELSE 0 END, 0))::float AS outstanding
@@ -446,7 +448,7 @@ export async function getBusinessIncome(year: number): Promise<BusinessIncomeSum
         AND price > 0
       GROUP BY invoiced_on_ico
     `,
-    sql`
+    q`
       SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS year
       FROM finance_transactions
       WHERE user_id IS NULL AND type = 'income'

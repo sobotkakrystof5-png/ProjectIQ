@@ -1,6 +1,6 @@
 'use server'
 
-import { sql } from '@/lib/db'
+import { adminDb, q } from '@/lib/admin/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
@@ -27,26 +27,27 @@ export interface BusinessOverview {
 export async function getBusinessOverview(): Promise<BusinessOverview> {
   await requireAuth()
 
-  const [incomeRows, depositRows, expenseRows, fixedCostRows] = await Promise.all([
-    sql`
+  // Čtyři dotazy jedním požadavkem (AD06).
+  const [incomeRows, depositRows, expenseRows, fixedCostRows] = await adminDb.batch([
+    q`
       SELECT COALESCE(SUM(amount), 0)::float AS total
       FROM finance_transactions
       WHERE user_id IS NULL AND type = 'income'
         AND (area = 'byznys' OR category IN ('zakázka', 'dokončený projekt'))
     `,
-    sql`
+    q`
       SELECT COALESCE(SUM(deposit_amount), 0)::float AS total
       FROM completed_projects
       WHERE project_type = 'client'
     `,
-    sql`
+    q`
       SELECT COALESCE(SUM(ft.amount), 0)::float AS total
       FROM finance_transactions ft
       LEFT JOIN costs c ON c.id = ft.source_cost_id
       WHERE ft.user_id IS NULL AND ft.type = 'expense'
         AND (ft.area = 'byznys' OR (ft.source_cost_id IS NOT NULL AND COALESCE(c.category, 'all') <> 'personal'))
     `,
-    sql`
+    q`
       SELECT amount::float AS amount, cost_type
       FROM costs
       WHERE category IS DISTINCT FROM 'personal'

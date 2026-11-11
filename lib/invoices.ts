@@ -10,6 +10,29 @@ export {
   INVOICE_CURRENCIES, type InvoiceCurrency,
 }
 
+export const INVOICE_COLUMNS = `
+  i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
+  i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
+  i.currency, i.note, i.pdf_filename, i.pdf_size,
+  (i.pdf_data IS NOT NULL) AS has_pdf,
+  p.lead_origin AS project_lead_origin,
+  p.client_name AS project_client_name
+`
+
+export const INCOME_JOIN = `
+  LEFT JOIN (
+    SELECT source_project_id AS project_id, count(*)::int AS n
+    FROM finance_transactions
+    WHERE type = 'income' AND user_id IS NULL AND source_project_id IS NOT NULL
+    GROUP BY source_project_id
+  ) inc ON inc.project_id = i.project_id
+  LEFT JOIN finance_transactions own
+    ON own.id = i.finance_transaction_id
+   AND own.type = 'income' AND own.user_id IS NULL AND own.source_project_id = i.project_id
+`
+
+export const OTHER_INCOME_COUNT = `GREATEST(COALESCE(inc.n, 0) - CASE WHEN own.id IS NULL THEN 0 ELSE 1 END, 0)::int AS other_income_count`
+
 /**
  * Sdílené jádro archivu faktur. Žije mimo `'use server'` soubor schválně —
  * volají ho jak server actions ve Financích, tak `createProject`, kde jde

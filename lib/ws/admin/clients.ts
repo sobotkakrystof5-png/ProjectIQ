@@ -40,29 +40,46 @@ function subscriptionRows(raw: unknown): SubscriptionRow[] {
   }))
 }
 
-// Poslední aktivita = nejnovější změna v poptávkách, termínech, zakázkách,
-// zákaznících nebo fakturách (ne přihlášení — to Clerk do ws nepíše).
-const ACTIVITY_SQL = `GREATEST(
-  (SELECT max(created_at) FROM ws.requests r WHERE r.account_id = a.id AND NOT r.is_test),
-  (SELECT max(updated_at) FROM ws.appointments ap WHERE ap.account_id = a.id),
-  (SELECT max(updated_at) FROM ws.jobs j WHERE j.account_id = a.id),
-  (SELECT max(updated_at) FROM ws.customers c WHERE c.account_id = a.id),
-  (SELECT max(updated_at) FROM ws.invoices i WHERE i.account_id = a.id)
-)`
-
+// Řádek seznamu klientů. Do AD06 to bylo jedenáct korelovaných podvýběrů na
+// každý účet (z toho `ws.requests` dvakrát a `ws.web_integrations` dvakrát)
+// a řazení přes `GREATEST(pět podvýběrů)`. Teď je to osm `LEFT JOIN LATERAL`,
+// každá tabulka se čte jednou a poslední aktivita se skládá z jejich sloupců.
+//
+// Pořád žádné osobní ani finanční údaje zákazníků klientů (R-063,
+// DECISIONS #017) — jen počty, stav předplatného a časy.
 const LIST_SQL = `
   SELECT a.id, a.name, a.created_at,
-    (SELECT coalesce(array_agg(DISTINCT b.industry), '{}') FROM ws.businesses b WHERE b.account_id = a.id AND b.archived_at IS NULL) AS industries,
-    (SELECT count(*) FROM ws.businesses b WHERE b.account_id = a.id AND b.archived_at IS NULL) AS businesses,
-    (SELECT coalesce(json_agg(json_build_object('status', s.status, 'current_period_end', s.current_period_end,
-       'cancel_at_period_end', s.cancel_at_period_end, 'past_due_since', s.past_due_since, 'created_at', s.created_at)), '[]')
-     FROM ws.subscriptions s WHERE s.account_id = a.id) AS subscriptions,
-    ${ACTIVITY_SQL} AS last_activity,
-    (SELECT count(*) FROM ws.requests r WHERE r.account_id = a.id AND NOT r.is_test AND r.created_at > now() - interval '30 days') AS requests_30d,
-    EXISTS (SELECT 1 FROM ws.web_integrations w WHERE w.account_id = a.id AND w.active AND w.revoked_at IS NULL AND w.last_used_at IS NOT NULL) AS web_used,
-    EXISTS (SELECT 1 FROM ws.web_integrations w WHERE w.account_id = a.id AND w.active AND w.revoked_at IS NULL) AS web_ready,
-    (SELECT count(*) FROM ws.members m WHERE m.account_id = a.id) AS members
+    b.industries, b.businesses,
+    s.subscriptions,
+    GREATEST(r.last_request, ap.last_at, j.last_at, c.last_at, i.last_at) AS last_activity,
+    r.requests_30d,
+    coalesce(w.web_used, false) AS web_used,
+    coalesce(w.web_ready, false) AS web_ready,
+    m.members
   FROM ws.accounts a
+  LEFT JOIN LATERAL (
+    SELECT coalesce(array_agg(DISTINCT b.industry), '{}') AS industries, count(*) AS businesses
+    FROM ws.businesses b WHERE b.account_id = a.id AND b.archived_at IS NULL
+  ) b ON true
+  LEFT JOIN LATERAL (
+    SELECT coalesce(json_agg(json_build_object('status', s.status, 'current_period_end', s.current_period_end,
+      'cancel_at_period_end', s.cancel_at_period_end, 'past_due_since', s.past_due_since, 'created_at', s.created_at)), '[]') AS subscriptions
+    FROM ws.subscriptions s WHERE s.account_id = a.id
+  ) s ON true
+  LEFT JOIN LATERAL (
+    SELECT max(r.created_at) AS last_request,
+           count(*) FILTER (WHERE r.created_at > now() - interval '30 days') AS requests_30d
+    FROM ws.requests r WHERE r.account_id = a.id AND NOT r.is_test
+  ) r ON true
+  LEFT JOIN LATERAL (SELECT max(ap.updated_at) AS last_at FROM ws.appointments ap WHERE ap.account_id = a.id) ap ON true
+  LEFT JOIN LATERAL (SELECT max(j.updated_at) AS last_at FROM ws.jobs j WHERE j.account_id = a.id) j ON true
+  LEFT JOIN LATERAL (SELECT max(c.updated_at) AS last_at FROM ws.customers c WHERE c.account_id = a.id) c ON true
+  LEFT JOIN LATERAL (SELECT max(i.updated_at) AS last_at FROM ws.invoices i WHERE i.account_id = a.id) i ON true
+  LEFT JOIN LATERAL (
+    SELECT bool_or(w.last_used_at IS NOT NULL) AS web_used, count(*) > 0 AS web_ready
+    FROM ws.web_integrations w WHERE w.account_id = a.id AND w.active AND w.revoked_at IS NULL
+  ) w ON true
+  LEFT JOIN LATERAL (SELECT count(*) AS members FROM ws.members m WHERE m.account_id = a.id) m ON true
 `
 
 function mapClient(r: Record<string, unknown>): ClientRow {
@@ -82,10 +99,48 @@ function mapClient(r: Record<string, unknown>): ClientRow {
   }
 }
 
-/** Všechny účty, nejnovější aktivita nahoře. */
-export async function listClients(): Promise<ClientRow[]> {
-  const [rows] = await adminDb.batch([{ text: `${LIST_SQL} ORDER BY last_activity DESC NULLS LAST, a.created_at DESC LIMIT 500`, params: [] }])
-  return rows.map(mapClient)
+/** Kolik účtů se vejde na stránku. Stránkování v URL staví AD07. */
+export const CLIENTS_PAGE_SIZE = 50
+
+export type ClientList = {
+  rows: ClientRow[]
+  /** Účtů celkem, ne jen na téhle stránce. */
+  total: number
+  /** Počty podle stavu předplatného přes **všechny** účty, aby čísla
+   *  v hlavičce nezávisela na tom, kterou stránku má člověk otevřenou. */
+  byAccess: Record<BillingAccess, number>
+}
+
+/**
+ * Stránka seznamu účtů, nejnovější aktivita nahoře. Jeden požadavek: řádky
+ * stránky (drahé laterály jen pro ně), lehký dotaz na stav předplatného všech
+ * účtů kvůli číslům v hlavičce a celkový počet.
+ */
+export async function listClients(page = 1): Promise<ClientList> {
+  const offset = Math.max(0, (Math.max(1, page) - 1) * CLIENTS_PAGE_SIZE)
+  const [rows, states, totals] = await adminDb.batch([
+    {
+      text: `${LIST_SQL} ORDER BY last_activity DESC NULLS LAST, a.created_at DESC LIMIT ${CLIENTS_PAGE_SIZE} OFFSET $1`,
+      params: [offset],
+    },
+    q`SELECT coalesce(json_agg(json_build_object('status', s.status, 'current_period_end', s.current_period_end,
+         'cancel_at_period_end', s.cancel_at_period_end, 'past_due_since', s.past_due_since, 'created_at', s.created_at)), '[]') AS subscriptions
+       FROM ws.accounts a LEFT JOIN ws.subscriptions s ON s.account_id = a.id
+       GROUP BY a.id`,
+    q`SELECT count(*)::int AS total FROM ws.accounts`,
+  ])
+
+  const byAccess: Record<BillingAccess, number> = { none: 0, trialing: 0, active: 0, grace: 0, read_only: 0 }
+  for (const row of states) {
+    const access = billingStateFrom(subscriptionRows(row.subscriptions)).access
+    byAccess[access] = (byAccess[access] ?? 0) + 1
+  }
+
+  return {
+    rows: rows.map(mapClient),
+    total: Number((totals[0] as { total?: number } | undefined)?.total ?? 0),
+    byAccess,
+  }
 }
 
 export type ClientBusiness = { id: string; name: string; slug: string; industry: string; archived: boolean; webUsedAt: Date | null; webReady: boolean; hasSecret: boolean }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronRight, Globe, Building2 } from "lucide-react";
-import type { ClientRow } from "@/lib/ws/admin/clients";
+import type { ClientRow, ClientList } from "@/lib/ws/admin/clients";
 import { cn } from "@/lib/utils";
 import { InviteClientForm } from "./invite-form";
 import { Badge } from "@/components/ui/badge";
@@ -25,15 +25,24 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 export function ClientsView({
   clients,
+  total,
+  byAccess,
+  page,
+  pageSize,
   failed,
   industries,
 }: {
   clients: ClientRow[];
+  total: number;
+  byAccess: ClientList["byAccess"];
+  page: number;
+  pageSize: number;
   failed: boolean;
   industries: { key: string; label: string }[];
 }) {
-  const count = (access: string) =>
-    clients.filter((c) => c.access === access).length;
+  // Čísla v hlavičce jsou přes všechny účty, ne jen přes otevřenou stránku.
+  const count = (access: keyof ClientList["byAccess"]) => byAccess[access] ?? 0;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <PageShell width="wide">
@@ -45,7 +54,7 @@ export function ClientsView({
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat label="Účtů" value={clients.length} />
+        <Stat label="Účtů" value={total} />
         <Stat label="Platí" value={count("active")} />
         <Stat label="Zkušební doba" value={count("trialing")} />
         <Stat
@@ -139,6 +148,34 @@ export function ClientsView({
           </div>
         </div>
       )}
+
+      {pages > 1 && (
+        <nav className="flex items-center justify-between gap-3" aria-label="Stránky klientů">
+          <PageLink href={`/dashboard/klienti?strana=${page - 1}`} disabled={page <= 1}>
+            Předchozí
+          </PageLink>
+          <p className="text-sm text-muted-foreground">
+            Strana {page} z {pages}
+          </p>
+          <PageLink href={`/dashboard/klienti?strana=${page + 1}`} disabled={page >= pages}>
+            Další
+          </PageLink>
+        </nav>
+      )}
     </PageShell>
+  );
+}
+
+/** Odkaz na stránku seznamu; vypnutý se nevykreslí jako odkaz. */
+function PageLink({ href, disabled, children }: { href: string; disabled: boolean; children: React.ReactNode }) {
+  const className =
+    "inline-flex min-h-11 items-center rounded-chip border border-border px-4 text-sm font-medium";
+  if (disabled) {
+    return <span className={cn(className, "text-muted-foreground/50")}>{children}</span>;
+  }
+  return (
+    <Link href={href} className={cn(className, "text-foreground hover:border-navy-300")}>
+      {children}
+    </Link>
   );
 }
