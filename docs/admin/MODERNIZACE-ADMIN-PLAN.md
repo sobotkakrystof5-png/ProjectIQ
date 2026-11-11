@@ -1,0 +1,970 @@
+# Modernizace admin konzole — plán implementace
+
+> Zdroj pravdy pro rozsah, fáze a stav modernizace admin konzole (VIZEON, ALTENO, Hub).
+> Prompty sezení: [`new - area of zakaziq/prompty/admin/00-README.md`](<../../new - area of zakaziq/prompty/admin/00-README.md>).
+> Popis dnešního kódu adminu: [`AGENTS-ADMIN.md`](AGENTS-ADMIN.md). Rozhodnutí a changelog: `memory/memory.md`.
+> Při rozporu s tímto plánem platí Rozhodnutí v paměti.
+
+**Stav:** plán schválený 2026-11-10, rozšířený týž den večer o úklid, sjednocení byznysu,
+zrušení Hubu, sloučení Dokončených a hodnocení (sezení AD01–AD03, AD11, AD16).
+Žádné sezení ještě neproběhlo.
+
+---
+
+## 1. Co chceme (Kryštofovými slovy, upřesněno)
+
+Admin konzole je Kryštofův denní pracovní systém. Vedle ní v tomtéž repu vyrostl Workspace
+s design systémem Dílky, novou kostrou, dávkovaným datovým přístupem a vlastním peněžním modulem.
+Rozdíl je tak velký, že se za admin stydí: „je to moc retro, škaredé CRM oproti tomu SaaS."
+
+Zadání: zmodernizovat vzhled a tabulky, zjednodušit fakturaci a tok dat, zrychlit načítání, propojit
+kalendář, hovory a kontakty, volat jedním klikem bez opisování, přidat AI asistenta, který z věty
+udělá návrh akce, a dát systému paměť, ze které se učí.
+
+**Cíl:** admin, který vypadá a běží jako produkt, který Kryštof prodává — stejný design systém,
+stejná rychlost, podstatně méně ručního opisování.
+
+### Rozhodnutí Kryštofa (2026-11-10)
+
+| Otázka | Rozhodnutí | Zapsáno |
+|---|---|---|
+| Pořadí vůči spuštění Workspace | **Paralelně** — admin na vlastní větvi, launch neblokovat | R-082 |
+| Vzhled | **Dílky i v adminu**, mechanické sjednocení všude + ruční překreslení denních obrazovek | R-081 |
+| Hub | **V rozsahu** — modernizuje se celý admin včetně `/hub` | R-081 |
+| Fakturace | **Vystavovat faktury přímo v adminu** (vzor Workspace), archiv cizích PDF zůstává | R-083 |
+| AI asistent | **Navrhne, Kryštof potvrdí klikem.** Nic se neuloží samo | R-084 |
+| Volání z appky | **`tel:` / `mailto:` / `sms:` + šablony zpráv.** VoIP ne | R-084 |
+| Paměť projektu | **Předvyplnění z historie + kontext doplňovaný AI**, používaný při návrzích | R-085 |
+| Testovací data | **Admin migrace na testovací Neon + ukázková data** | R-082 |
+
+### Rozhodnutí Kryštofa — druhé kolo (2026-11-10 večer)
+
+| Otázka | Rozhodnutí | Zapsáno |
+|---|---|---|
+| Hub | **Zrušit**, ne modernizovat. Finance, Projekty a Startup do hlavní navigace | R-087 (mění R-081) |
+| Alteno | **Není druhá firma, je zdroj poptávky.** Web alteno.cz běží dál beze změny | R-088 |
+| Weby | **vizeon.cz, alteno.cz, prvotka.cz** do jednoho inboxu; estetik.cz má být jeden řádek konfigurace | R-088 |
+| Škola, Sport, Plány | **Smazat včetně 23 tabulek** (po exportu do CSV) | R-089 |
+| Šablony webu | **Celou funkci pryč** — knihovna i bloky u zakázek, včetně `@dnd-kit` | R-089 |
+| Dokončené | **Sloučit do zakázky.** Zakázka hotovo/zaplaceno *je* dokončená | R-090 |
+| Hodnocení | **Automaticky** při uzavření + jedna připomínka po 7 dnech + reference pro web | R-090 |
+| Předávací dokument | **Ano** — co bylo dodané, PDF stejnou cestou jako faktura | R-090 |
+| Cesta na produkci (otázka A) | **Varianta A:** `ws/redesign-app` → `main` fast-forwardem a deploy, pak `admin/modernizace` z `main` | R-082 doplněno |
+| `app/dashboard/projekty` (otázka B) | **Smazat** — Hub se ruší, přesměrovávat není kam | R-087 |
+
+---
+
+## 2. Co jsem našel v kódu (průzkum 2026-11-10)
+
+### Vzhled
+- Všech 11 odstínů `brand-*` má **shodnou hodnotu** s `navy-*` (`brand-700 = #23478b = --navy-700`,
+  `brand-50 = #eef2fb = --navy-50`). Přejmenování je opticky neutrální.
+- **Past:** `brand-*` je literální hex, `navy-*` se kompiluje na `rgb(var(--navy-700) / <alpha>)`
+  (`lib/ws/tailwind-dilky.ts`) a proměnné existují **jen** v `[data-app="ws"]` a `[data-app="admin"]`.
+  `/p/[token]`, `/h/[token]` a `/login` `data-app` nemají a portál importuje pět kořenových komponent
+  (`StatusBadge`, `FeedbackBlock`, `SurveyForm`, `BookingCTA`, `ClientRequestBlock`).
+  **Přejmenování bez přípravy rozbije barvy klientům v portálu.** Řeší se paletou v `:root`.
+- Stará vrstva ve 143 souborech: `muted-foreground` 122 souborů/1057×, `border-border` 99/536,
+  `bg-white` 97/302, duhové `bg-{barva}-NNN` 81/477, `brand-*` 79/668, `brand-gradient` 25/44.
+  Dílky jsou v obsahu jen ve 3 souborech. V `app/w`, `app/r`, `app/z`, `app/klient`, `components/ws`,
+  `app/(marketing)` **žádný výskyt** `brand-*` — Workspace a landing se přepisu nedotknou.
+- `AdminShell` (125 ř.) dává všem obrazovkám jednu pevnou šířku `max-w-5xl` a **nemá hlavičku stránky
+  ani řádek filtrů**. `app/hub/layout.tsx` kostru nepoužívá vůbec (vlastní panel, `brand-gradient`,
+  pět duhových barev pilířů, bez `data-app` → tokeny tam neplatí).
+- `components/ui/*` (20 komponent) ani Radix admin nepoužívá (0 importů): 9 ručně psaných modálů
+  `fixed inset-0` bez focus trapu, tlačítka inline, **tři nezávislé barevné systémy stavů**
+  (`STATUS_STYLES` 5 + `LEAD_STATUS_STYLES` 6 + `ACTION_TYPE_STYLES` 6 = 17 kombinací).
+- `app/globals.css:1` stahuje Inter z Google Fonts a nastavuje `body { font-family: Inter }` pro celý
+  dokument; `admin-tokens.css` se proti tomu (na rozdíl od `ws-tokens.css`) nebrání. Kvůli tomu má
+  CSP profil `admin` výjimku na `fonts.googleapis.com` a `fonts.gstatic.com`.
+
+### Tabulky
+Sdílená tabulková komponenta **neexistuje**. Pět `<table>` (`LeadsTable` 1181 ř., `CostsManager`,
+`CompletedProjectsTable` 11 sloupců, `WaitlistSection`, `ProjectCalculator`) a sedm grid výpisů.
+**Řazení nemá ani jedna tabulka, stránkování ani jedna, mobilní variantu jen jedna.** Stejný
+`className` hlavičky je ručně opsaný ve třech souborech. Pět dotazů táhne celou tabulku bez `LIMIT`,
+včetně `getAllLeadNotes`, které posílá do prohlížeče **všechny poznámky všech leadů**.
+
+### Rychlost
+- `lib/db.ts` (17 ř.) je **jediná datová vrstva v repu bez dávkování a bez transakcí** — každý dotaz
+  je samostatný HTTPS POST. `lib/ws/db.ts`, `lib/ws/admin/db.ts` i `lib/portal/db.ts` mají `batch()`.
+- Žádná cache: `unstable_cache` 0×, `React.cache` 2 místa, `force-dynamic` 34×, `staleTimes`
+  nenastavené → každá navigace tam a zpět spustí všechny dotazy znovu.
+- Detail zakázky **12 dotazů v 5 sekvenčních vlnách** (`components/admin/project-detail-view.tsx`
+  :72 → :83 → :335 → :347 → :430 → :432), z toho 5× `SELECT *` bez `LIMIT`.
+  Kalendář 4 dotazy **bez časového okna** — celá historie jde do prohlížeče, měsíc se filtruje v JS.
+  `/dashboard/faktury` korelovaný `COUNT(*)` na každou fakturu, bez `LIMIT`, `ORDER BY issued_on`
+  bez indexu. `/dashboard/klienti` 11 korelovaných podvýběrů na 500 účtů a `ORDER BY GREATEST(5)`.
+  `/hub/finance` pouští **dva zápisové generátory při každém GET**, před čtením dat.
+- **Chybějící indexy:** `client_leads` nic na `created_at`, `lead_status`, `next_action_date`;
+  `projects` jen `business`; `calendar_events` nic na `starts_at` ani `project_id`; `invoices` nic na
+  `issued_on`; `completed_projects`, `project_surveys`, `costs` řadí bez indexu. Žádný `pg_trgm`
+  → ⌘K dělá na každý úhoz tři sekvenční scany.
+- **E-maily blokují akce:** `app/actions.ts:237` awaituje Gmail SMTP uprostřed `updateProject`, před
+  zápisy do financí a před `revalidatePath` (totéž :154, :387, :404, :502, `calls-actions.ts:209,227`).
+- `useOptimistic` **0× v celém repu**; `next/dynamic` v adminu 0×, `framer-motion` staticky v 6
+  souborech. `app/providers.tsx` obaluje `SessionProvider` celou aplikaci včetně `/w` a landing page.
+
+### Kontakty
+**Entita „kontakt" neexistuje.** Telefony a e-maily jsou v **8 tabulkách** ve třech schématech, bez
+unique, bez indexu, bez normalizace (jen `ws.customers` má CHECK na E.164) — shodu člověka nelze
+zjistit. `convertLeadToProject` kontakt zkopíruje a kopie se dál rozcházejí. Termín z kalendáře
+založí hovor **jen s titulkem a popisem**; změna času leadu nepřepíše `calendar_events.starts_at`
+→ pár se rozpadne. `consultation_slots` (rezervace z portálu) nemá vazbu na kalendář ani hovory
+a v Hovorech není vidět. **Na detailu zakázky není jediný klikací kontakt** — telefon je jen
+`<input>` v `ProjectForm.tsx:264`. `sms:` se v repu nevyskytuje.
+
+### Fakturace — admin faktury vůbec nevystavuje
+`invoices` (migrace 053) je **archiv cizích PDF**: jedna `amount`, žádné položky, DPH, dodavatel,
+šablona, generování PDF ani e-mail; PDF jako `bytea` v řádku (limit 4 MB). Číslo faktury je **ruční
+textové pole**, pojistkou je unique index. Splatnost, IČO, DIČ a odběratel se vypisují znovu u každé
+faktury; IČO/DIČ klienta není v `projects` vůbec, jediný zdroj je poslední faktura téhož klienta
+a nikdo ho nečte. ARES lookup v repu není. Uložení = **4–6 samostatných dotazů bez transakce**.
+AI přepis PDF: `claude-opus-5`, celé PDF v requestu, **v synchronní cestě formuláře**.
+Křehká místa: **EUR faktura se v ledgeru sčítá s korunami** (`finance_transactions` nemá `currency`),
+adopce příjmu podle přesné rovnosti částky s `LIMIT 1`, `updateProject` přepíše `declared` všem
+transakcím zakázky, „po splatnosti" se počítá třemi způsoby, `declared` se zapisuje na šesti místech,
+stejný 18sloupcový SELECT je 4× zkopírovaný, dvě sady daňových sazeb.
+Workspace má hotový vzor: `ws.money_issue` (migrace 080, atomické číslo se zámkem), `invoice_profile`
+(088), snímek `issuer`, `items jsonb` v haléřích, `money_pay`/`money_unpay` s `payment_origin`,
+součty po měnách, SPAYD QR, vlastní PDF, e-mail jako koncept, jedno Zod schéma, testy nad PGlite.
+
+### AI dnes
+Čtyři modely ve čtyřech souborech, dva natvrdo: `claude-opus-5` na čtení PDF faktur
+(`claude-haiku-5-5` je na stejnou práci ~50× levnější), `claude-sonnet-5-5` na požadavky klientů,
+`claude-opus-4-6` v asistentovi Hubu, OpenAI `gpt-4o-transcribe` na přepis hlasu.
+**`app/api/ai-assistant/route.ts` přijímá `systemPrompt` i `messages` z prohlížeče bez validace** —
+jediná ochrana je `getServerSession`. Paměť v DB žádná; `memory/*.md` čte jen Claude Code.
+`@anthropic-ai/sdk` 0.105 už v projektu je.
+
+### Ověřeno spuštěním
+- **`npm test` lokálně nic neříká.** Vitest sbírá i 11 worktree v `.claude/worktrees/`: 494 souborů,
+  62 padajících, 161 s. Bez nich **58 souborů, 721 testů zelených, 23 s**. Worktree nejsou v gitu
+  (`.git/info/exclude`), takže CI je zelené — rozbitá je jen kontrola, kterou `AGENTS.md` předepisuje
+  před commitem. Zabírají 7,5 GB.
+- **`app/dashboard/projekty` (559 ř.) je mrtvý duplikát `app/hub/projekty`** — odkazuje jen sám na
+  sebe, v žádné navigaci není (ověřeno grepem). Dávno otevřený problém v paměti.
+- Obecný běhoun migrací je **`scripts/apply-migration.js`** (jednotné číslo, bere jména souborů,
+  `--dry`, respektuje `$$` bloky). `scripts/apply-migrations.js` (množné) je jednorázový skript pro
+  migrace 007/008, ne běhoun. 96 z 99 migrací je idempotentních.
+- `next` 16.4.2 → `after()` z `next/server` je k dispozici.
+
+---
+
+## 3. Pravidla pro všechny kroky
+
+- Jedno sezení = jedna konverzace. Začátek a konec podle `zakaziq-memory`.
+- **Migrace se jen připraví, aplikuje je Kryštof**, teprve pak deploy. Číslování od **100**
+  (poslední v repu je 099, neaplikovaná). Migrace jsou aditivní, aby starý build fungoval dál.
+- **Žádný nový npm balíček.** `qrcode`, `@anthropic-ai/sdk`, `puppeteer-core`, `@sparticuz/chromium`,
+  `cmdk`, `sonner` už v projektu jsou. Jediná nová vnější závislost je **ARES** (AD12) → R-086.
+- Vzhled jen Dílky (`zakaziq-design-dilky`), texty podle `zakaziq-ux-texty-cs`.
+- Hromadné úpravy **vždy přes `git grep`** (jen verzované soubory) — tím automaticky vypadne
+  `.claude/worktrees/` (11 kopií, 7,5 GB), `.agents/`, `node_modules` a `new - area of zakaziq`.
+- Po každém sezení: `npx tsc --noEmit`, `npm test`, `npm run build:check` (při běžícím dev),
+  changelog v `memory/memory.md`, stav v tabulce sekce 6, technická fakta do `AGENTS-ADMIN.md`.
+- Bezpečnostní změna = zápis do `.claude/security/` ve stejném commitu + `node scripts/sync-agent-context.mjs --write` a `--check`.
+- **Workspace a landing page se nesmí změnit.** Kontrolní podmínka každého vizuálního sezení:
+  `/w` a `/` porovnat před a po (screenshot i zkompilované CSS, jako to dělal R-027).
+- Cizí neuložené změny nepřepisovat, nevracet ani nestageovat. `git add` po konkrétních souborech.
+- Merge do `main` a deploy **jen s výslovným souhlasem Kryštofa**.
+
+---
+
+## 4. Vizuální základ — technická rozhodnutí (platí pro AD04)
+
+Tohle je nejdůležitější technická část celého plánu. Bez ní nejde přejmenovat barvy ani použít
+hotové komponenty.
+
+**a) Nový `app/tokens-dilky.css`** — jediný zdroj palety, importovaný z `app/globals.css`, selektor
+`:root`: `--navy-50…950`, `--ground`, `--surface`, `--ink`, `--quiet`, `--signal` + `-bg/-line/-ink`,
+`--reward`, `--danger`, `--danger-ink`, `--staff-1…5`, `--staff-tint`. Opticky nulová změna (dnes
+nikdo mimo `data-app` třídy `navy-*` nepoužívá), ale `navy-*` začne fungovat i v portálu a na
+`/login`. `app/ws-tokens.css` a `app/admin-tokens.css` přestanou hodnoty duplikovat.
+Paleta jsou RGB trojice, shadcn proměnné jsou HSL — jiný jmenný prostor, nekolidují.
+
+**b) `app/globals.css`:**
+- smazat řádek 1 `@import url('…fonts.googleapis.com…Inter…')`;
+- `body { font-family: var(--font-instrument-sans), system-ui, sans-serif }` a smazat
+  `font-feature-settings: 'cv02','cv03','cv04','cv11'` (znakové varianty Interu);
+- `wsFontVariables` (`lib/ws/fonts.ts`) přesunout z `AdminShell`/`WsRoot` na `<html>` v
+  `app/layout.tsx`, jinak `body` proměnnou nezná. Test, že třída na `<html>` je;
+- `* { @apply border-border }` **nechat** — po (c) se `--border` v adminu vyhodnotí na hodnotu Dílků
+  a chová se správně samo. Odstranění by změnilo každý prvek s `border` bez barvy. Doplnit komentář;
+- `.brand-gradient` přepsat na `linear-gradient(135deg, rgb(var(--navy-800)), rgb(var(--navy-700)))`
+  (stejné hexy; `/hub` ho používá 44×), označit jako dočasný alias a smazat až v AD18.
+
+**c) `app/admin-tokens.css` doplnit** (zkopírovat z `app/ws-tokens.css:38-66`, **bez** tmavého
+režimu): `--background`, `--foreground`, `--card`, `--popover`, `--primary`, `--secondary`, `--muted`,
+`--muted-foreground`, `--accent`, `--destructive`, `--border`, `--input`, `--ring`, `--radius: 12px`,
+`color-scheme: light`, `font-family`, `font-feature-settings: normal`.
+Je to jemný posun, ne přemalování: dnešní `:root` má `--radius: 0.75rem` = **přesně 12 px**,
+`--background 220 20% 97%` vs. `223 47% 97%`, `--border 217 20% 90%` vs. `216 63% 92%` — mění se
+saturace o jednotky procent, ne světlost. **Posun je záměr (R-081), napsat do changelogu.**
+
+**d) Odemčení `components/ui/*`** (20 komponent, dnes 0 importů z adminu):
+- **nový `components/admin/admin-root.tsx`** (`'use client'`) podle `components/ws/ws-root.tsx`:
+  ref na kořenový `div` → `PortalContainerProvider`; `AdminShell` ho obalí. Bez toho se Radix
+  dialogy portálují do `<body>` mimo tokeny;
+- `components/ui/toast.tsx`: k `currentTheme` přidat `currentApp: 'ws' | 'admin'` + `setToastApp()`,
+  volá ho `WsRoot` / `AdminRoot`; `data-app={currentApp}`. Pak v 22 admin souborech mechanicky
+  `from 'sonner'` → `from '@/components/ui/toast'` (`toast(x)` → `toast.message(x)`, zbytek API sedí)
+  — zdarma se tím získá vzor „akce hned + Zpět" místo potvrzovacích dialogů;
+- **`cn()` nesjednocovat.** Dvě identické implementace; přejmenovat import ve 153 souborech má nulový
+  přínos. Zapsat do `AGENTS-ADMIN.md` jako záměr.
+
+**e) `brand-*` → `navy-*` mechanicky, ale až po (a).** Rozsah mimo worktree: `app/dashboard` 16,
+`app/hub` 12, `components/*` ~45, `components/admin` 3, `app/p`, `app/h`, `app/(auth)/login`,
+`lib/types.ts`. Jak ověřit bez screenshot testů:
+1. **nový test `lib/__tests__/palette-equality.test.ts`** — načte `colors.brand` z `tailwind.config.ts`
+   i `app/tokens-dilky.css` a tvrdí rovnost pro všech 11 odstínů (`#23478b === rgb(35 71 139)`).
+   Zůstává v repu jako pojistka proti rozjetí palet;
+2. **codemod s hranicí tokenu**, ne `sed` přes repo:
+   `(bg|text|border|ring|from|via|to|divide|placeholder|decoration|outline|accent|caret|fill|stroke|shadow)-brand-(\d{2,3})\b`,
+   pouštěný přes `git grep`, po souborech, s `git diff --stat` ke čtení;
+3. kontrola zbytků: `git grep -n 'brand-' -- '*.tsx' '*.ts' '*.css'` smí vrátit jen `brand-gradient`;
+4. `tsc`, `npm test`, `build:check` + ruční průchod denních obrazovek na 390 a 1280 px.
+
+**f) CSP a bezpečnostní zápis.** V `lib/security/csp.ts:111-112` smazat
+`'style-src': ['https://fonts.googleapis.com']` a `'font-src': ['https://fonts.gstatic.com']`
+z `extras(profile === 'admin')`. Profil `admin` platí i pro `/p`, `/h` a `/login`; výjimku potřeboval
+jen globální `@import`, takže po (b) padá všude. Je to **zúžení** politiky.
+Do stejného commitu: `CSP-LOG.md` (odebrání + důvod), řádek CSP v `STATE.md`, `AUDIT-LOG.md`
+(ověřeno, že admin po změně nehlásí blokaci), pak `sync-agent-context.mjs`.
+
+**g) Přepsat tři zápisy, které to dnes zakazují** — bez toho je plán v rozporu s pravidly repa:
+- `DESIGN.md:253` — „Don't apply this design system to the … admin" přepsat: Dílky jsou design systém
+  celého repa včetně adminu; admin nemá tmavý režim, `:root` drží starší hodnoty pro `/p`, `/h`, `/login`;
+- `.impeccable/config.json` — odstranit **obě** výjimky `design-system-font` / `overused-font` pro
+  `inter` v `app/globals.css` (stanou se nepravdivé);
+- `memory/memory.md` — **R-081** (Dílky i v adminu; přepisuje R-027, rozšiřuje R-071).
+
+**h) Ukazatel postupu místo screenshot testů:** **nový
+`components/admin/__tests__/admin-classes.test.ts`** počítá výskyty zakázaných tříd
+(`muted-foreground`, `bg-white`, `rounded-xl|2xl`, duhové `bg-{barva}-NNN`, `brand-`) a tvrdí, že
+číslo je **≤ strop**, který se po každém sezení sníží. Z 1057/302/710/477 se stane sledovatelné
+číslo a nikdo omylem nepřidá starou třídu.
+
+---
+
+## 5. Obsah fází
+
+### AD00 — Příprava: větev, zelené testy, viditelný admin, měření (S)
+**Cíl:** admin je vidět v prohlížeči na testovacích datech a máme výchozí čísla.
+- Větev podle rozhodnutí v sekci 8 (otázka A). Rozhodnutí R-081–R-085 do `memory/memory.md`.
+- `vitest.config.ts`: `test.exclude` na `**/.claude/worktrees/**` → `npm test` je zase pojistka (23 s).
+- Testovací Neon („ZakazIQ RD test", větev `rd-test`, kam už `.env.local` míří): aplikovat **admin
+  migrace** 001–063 a adminové části 092–096 cyklem přes `scripts/apply-migration.js`.
+  Běhounu přidat tabulku `schema_migrations` — zavírá dávno otevřený problém „evidence migrací".
+- **Nový `scripts/admin-seed.mjs`** + `lib/admin/demo-seed.ts` podle `scripts/ws-seed.mjs`:
+  dry-run výchozí, `--ano` zapisuje, `--smazat`, data označená (`[ukázková data]`, telefony
+  `+420000000xxx`, e-maily `@example.cz`), cizích řádků se nedotkne. Obsah: 2 zakázky VIZEON + 1
+  ALTENO, 8 leadů ve všech stavech, 12 termínů kolem dneška, 6 faktur (2 po splatnosti), náklady,
+  dotazník, 3 projekty Hubu. Skript vypíše host DB a bez `--ano` nic nezapíše.
+- **Měření před** (do sekce 11): počet kol do DB na navigaci (čítač v testu, nezůstane v kódu),
+  `route-bundle-stats.json` z `next build`, a po deployi p75 z Vercelu pro `/dashboard`,
+  `/dashboard/[id]`, `/dashboard/calendar`, `/dashboard/faktury`, `/hub/finance`.
+- Smazat mrtvé `app/dashboard/projekty` (559 ř.) nebo přesměrovat na `/hub/projekty`.
+
+**Hotovo, když:** `npm run dev` + přihlášení ukáže Dnes, zakázky, hovory, kalendář a faktury
+s ukázkovými daty; `npm test` zelený bez worktree; výchozí čísla a rozhodnutí zapsané.
+**Riziko:** nízké. Seed nikdy proti produkčnímu `DATABASE_URL`.
+
+### AD01 — Úklid: pryč s tím, co se nepoužívá (M, **migrace 100 + 101**)
+**Cíl:** zmenšit plochu dřív, než se začne překreslovat. Každý soubor smazaný tady je soubor,
+který se v AD04 nemusí přepisovat a v AD17 překreslovat.
+
+**Krok 1 — kód a stránky (jeden commit na oblast):**
+
+| Pryč | Soubory |
+|---|---|
+| Škola | `app/hub/school/**`, `app/api/cron/scrape-school/**`, `app/api/school/**`, `lib/lernsax.ts`, `lib/besteschule.ts`, `scripts/debug-lernsax.js` |
+| Sport a zdraví | `app/hub/sport/**`, `app/api/fatsecret/**`, `lib/fatsecret.ts` |
+| Plány | `app/hub/plany/**`, `scripts/apply-037-041-plans.js` |
+| Šablony webu | `app/dashboard/sablony/**`, `app/dashboard/[id]/sablona/**`, `app/block-templates-actions.ts`, `app/project-blocks-actions.ts`, `components/{BlockTemplateLibrary,ProjectBlockList,BlockLibraryPicker}.tsx`, panel v `components/admin/project-detail-view.tsx:168–170, 199, 207–210` |
+| Dlaždice | `app/hub/page.tsx` — `getSchoolStats`, `getSportStats`, `getPlanyStats` |
+| Navigace | `components/HubSidebarNav.tsx` (Škola, Sport, Plány), `lib/admin-nav.ts:42` (Šablony) + `OLD_MENU_PATHS` v `lib/__tests__/admin-nav.test.ts` |
+| Cron | `vercel.json` — `scrape-school` (zbyde 6 cronů; pravidelné náklady už jedou z `send-reminders`, AD13 je jen opraví) |
+| Typy | `lib/types.ts` — `DeadlineType`, `DEADLINE_TYPE_LABEL`, `BlockTemplate`, `ProjectBlock` |
+| Připomínky | `app/api/cron/send-reminders/route.ts:150–180, 305–335` — školní připomínky |
+| Závislosti | `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` |
+| Env | `.env.example` — `FATSECRET_*` (mrtvé od 2026-06-22), přihlašovací údaje do školy |
+
+**Krok 2 — migrace (připravit, neaplikovat):**
+- **Migrace 100:** `DROP TABLE` 23 tabulek — `school_grades`, `school_deadlines`, `school_messages`,
+  `school_sync_log`, `school_timetable`, `school_grades_manual`, `school_deadlines_manual`,
+  `nutrition_logs`, `workout_logs`, `health_scores`, `weight_logs`, `plan_school_goals`,
+  `plan_school_goal_actions`, `plan_projects`, `plan_project_actions`, `plan_businesses`,
+  `plan_business_phases`, `plan_health_goals`, `plan_health_goal_actions`, `plan_health_goal_logs`,
+  `plan_finance_goals`, `plan_savings_snapshots`, `plan_wishlist_items` (+ `plans_legacy_archived`).
+- **Migrace 101:** `DROP TABLE project_blocks, block_templates`.
+- **Před spuštěním obou vyexportovat obsah do CSV** mimo repo (`scripts/export-before-drop.mjs`).
+  `DROP` je jediná nevratná věc v celém plánu.
+
+> **`puppeteer-core` a `@sparticuz/chromium` NEodstraňovat.** Scraper školy byl jejich jediný
+> dnešní konzument, ale AD12 je potřebuje na generování PDF faktur.
+
+**Hotovo, když:** `git grep -l 'school_\|plan_\|nutrition_logs\|block_templates'` vrací jen migrace;
+`npm test` i build zelené; `/hub` bez smazaných dlaždic; detail zakázky bez panelu šablony;
+export do CSV leží mimo repo a Kryštof ho potvrdil.
+**Riziko:** nízké v kódu, **vysoké u migrací** — proto zvlášť a až po exportu.
+
+### AD02 — Jeden byznys, tři zdroje poptávek (M, **migrace 102**)
+**Cíl:** Alteno přestává být druhá firma a stává se zdrojem poptávky. Web alteno.cz funguje dál
+beze změny, přidává se prvotka.cz.
+
+- **Nový `lib/sources.ts`** — jeden seznam zdrojů (`vizeon.cz`, `alteno.cz`, `prvotka.cz`) s klíčem
+  API, názvem, výchozím typem služby a vlastním oknem rate limitu. Přidání estetik.cz = jeden řádek.
+  Nahrazuje `lib/business.ts` (`BUSINESSES`, `toBusiness`, `projectPath`, `adminEmailFor`).
+- Sekce `/alteno/**` (5 souborů) zaniká, `/alteno/*` trvale přesměruje na `/dashboard/*` —
+  uložené odkazy v `notifications.link` a ve starých e-mailech musí dál fungovat.
+- Dva inboxy → **jeden** `/dashboard/poptavky` s filtrem podle zdroje. `is_vizeon_pending()`
+  a `is_alteno_pending()` se slučují do jedné funkce nad `source`.
+- Zmizí 7 míst s natvrdo zapsaným `business: 'vizeon'` (`app/actions.ts:511`,
+  `app/portal-actions.ts:268,279`, `app/calls-actions.ts:184,209,227`,
+  `app/api/cron/send-reminders/route.ts:146`) — po sloučení už nemají co obcházet.
+- Staré ALTENO zakázky tím **získají fakturaci, dokončení i poznámky schůzek** (dnes je nemají,
+  `project-detail-view.tsx:50–53, 81, 196, 340, 414`).
+- **Migrace 102:** `projects.source` dostane hodnoty podle zdroje, `alteno_confirmed` se slije do
+  `vizeon_confirmed`, `business` zůstane (jen se přestane číst) — sloupec se nemaže, aby šlo couvnout.
+
+**Na co si dát pozor:**
+1. `types/alteno-lead.ts:8` vyžaduje `section: z.literal('alteno')`, `types/booking.ts:22`
+   `source: z.literal('alteno_web')`. **Schéma musí zůstat kompatibilní** — jinak přestane fungovat
+   formulář na alteno.cz, který je v cizím repu. Endpoint jen uloží jiný zdroj.
+2. `ALTENO_API_KEY` a `ALTENO_LEAD_WEBHOOK_SECRET` zůstávají v platnosti.
+3. Rate limit musí zůstat **per zdroj**, jinak si tři weby berou limit navzájem.
+4. Kalendář a Hovory dnes ALTENO filtrují pryč — po sloučení se tam historické záznamy objeví.
+   Je to správně, ale ať to není překvapení.
+5. Typ oznámení `alteno_booking` zůstane v `lib/notifications.ts` kvůli starým řádkům.
+6. ALTENO poptávky začnou chodit z `info@vizeon.cz` — ověřit `VIZEON_GMAIL_APP_PASSWORD`.
+
+**Hotovo, když:** testovací poptávka z každého ze tří zdrojů dorazí do jednoho inboxu se správným
+štítkem; stará ALTENO zakázka má záložku Fakturace; `/alteno/rezervace` přesměruje; odkaz ze starého
+oznámení funguje; `git grep 'business'` v adminu vrací jen migrace a `lib/sources.ts`.
+**Riziko:** střední — dotýká se veřejných API, která volají cizí repozitáře.
+
+### AD03 — Jedna navigace, jeden přehled (M, bez migrace)
+**Cíl:** konec dvou navigací a tří layoutů. Hub se ruší, jeho zbytek se vlije do hlavního menu.
+
+| Odkud | Kam |
+|---|---|
+| `/hub/finance` | `/dashboard/finance` |
+| `/hub/projekty` | `/dashboard/projekty` |
+| `/hub/byznys/startup` | `/dashboard/startup` |
+| `/hub/byznys` | zaniká — jeho čísla jsou na Dnes |
+| `/hub` | zaniká — přesměruje na `/dashboard` |
+
+- Smaže se `components/HubSidebarNav.tsx`, `app/hub/layout.tsx` a `app/hub/page.tsx`.
+- `lib/admin-nav.ts` dostane čtyři skupiny: **Přehled** (Dnes) · **Práce** (Zakázky, Poptávky,
+  Hovory, Kalendář, Kontakty) · **Peníze** (Faktury, Náklady, Finance a daně) · **Osobní**
+  (Projekty, Startup). Klientský prostor, Klienti Workspace a Novinky zůstávají — patří k SaaS.
+- **Dnes** se doplní o pravý sloupec „Jak se daří tenhle měsíc": příjem a z toho přiznaný,
+  nezaplacené faktury, odhad daně a rezerva. Čísla z existujících `getBusinessIncome`,
+  `calculateTax` a `getInvoices` — žádná nová logika, jen přesun tam, kam se Kryštof dívá.
+- Staré adresy `/hub/*` trvale přesměrují (jsou v e-mailech a oznámeních).
+
+> **Tím odpadá práce v AD05 a AD17** — Hub se nemusí překreslovat do Dílků, protože nebude.
+> R-081 („Hub v rozsahu") tím přestává platit, nahrazuje ho rozhodnutí z 2026-11-10.
+
+**Hotovo, když:** `/hub/*` všechno přesměruje; `app/hub/` neexistuje; menu má jednu podobu na
+počítači i na telefonu; Dnes ukazuje měsíční čísla na testovacích datech.
+**Riziko:** nízké — přesuny a přesměrování, žádná změna dat.
+
+### AD04 — Vizuální základ (M, bez migrace)
+**Cíl:** Dílky jsou výchozí vzhled adminu a `components/ui/*` v něm fungují.
+Vše ze sekce 4 (a–h). Soubory: `app/globals.css`, nový `app/tokens-dilky.css`, `app/ws-tokens.css`,
+`app/admin-tokens.css`, `app/layout.tsx`, nový `components/admin/admin-root.tsx`,
+`components/admin/admin-shell.tsx`, `components/ui/toast.tsx`, `lib/security/csp.ts`, `DESIGN.md`,
+`.impeccable/config.json`, `.claude/security/{CSP-LOG,STATE,AUDIT-LOG}.md` + codemod `brand-*`.
+**Čtyři oddělené commity:** paleta do `:root` → písmo a CSP → portály a toast → přejmenování.
+**Hotovo, když:** `git grep 'brand-'` vrací jen `brand-gradient`; testy rovnosti palety i
+`admin-classes` procházejí; Inter není nikde (`git grep -i inter`); CSP adminu nemá `fonts.*`
+a konzole nehlásí blokaci; ⌘K, zvonek, menu a toasty fungují na 390/768/1280/1440 px;
+`/w` a `/` nezměněné.
+**Riziko: střední–vysoké** — jediná změna, která se dotkne všech 143 souborů.
+
+### AD05 — Kostra, šířky, jeden systém odznaků (M, bez migrace)
+**Cíl:** jedna kostra pro všechny obrazovky a konec jediné pevné šířky.
+- `AdminShell`: z `<main>` zmizí `max-w-5xl` (dnes mačká 11sloupcový `CompletedProjectsTable`);
+  šířku volí stránka přes `PageShell`, do kterého se přidá `width: 'table'` = `max-w-[1600px]`.
+- Použít `components/ws/app/{page-header,toolbar,skeletons,detail-sheet,nav-icon,help-link}.tsx`
+  (ověřeno: závisí jen na `AccentHeading` a `cn`, žádná data Workspace).
+- **Hub už tu není** — `app/hub/layout.tsx` i `HubSidebarNav.tsx` zmizely v AD03 a přesunuté
+  obrazovky (`/dashboard/finance`, `/projekty`, `/startup`) jedou na `AdminShell`. Tady se jen
+  dotáhne jejich obsah: pět duhových barev pilířů → jeden akcent + `TileGlyph` / `SectionLabel`.
+- **Nový `lib/admin-status.ts`**: 17 kombinací ze `STATUS_STYLES`, `LEAD_STATUS_STYLES`,
+  `ACTION_TYPE_STYLES` → 5 tónů `neutral | info | signal | success | danger` + `components/ui/badge.tsx`.
+**Hotovo, když:** přesunuté obrazovky mají stejný panel, hledání a spodní lištu jako `/dashboard`;
+žádná obrazovka nemá vlastní odznak ani vlastní pevnou šířku.
+**Riziko:** střední (12 souborů bývalého Hubu má vlastní vzhled).
+
+### AD06 — Rychlost I: dávkování, indexy, streaming (M, **migrace 103**)
+**Cíl:** navigace dělá jednotky dotazů místo desítek a kostra je vidět hned.
+- **Nový `lib/admin/db.ts`** podle `lib/ws/db.ts`: `neon(DATABASE_URL, { fetchOptions: { cache: 'no-store' } })`,
+  tag `q`, `adminDb.batch(queries)` = transakce jedním požadavkem, `setAdminDriverForTests` pro PGlite.
+  `lib/db.ts` zůstává kvůli ~100 existujícím call sites; nové a přepisované čtení jde přes `adminDb`.
+  Admin tabulky jsou v `public` bez RLS, `set_config` není potřeba.
+- Na jeden `batch`: `components/admin/project-detail-view.tsx` (12 dotazů / 5 vln, doplnit `LIMIT`
+  k pěti `SELECT *`), `/dashboard/calendar` (7), `/dashboard/calls` (5), `/dashboard/faktury`
+  (korelovaný `COUNT(*)` → jeden `GROUP BY`), `/hub/finance` (12 / 3 vlny), `lib/admin-counts.ts`.
+- `/dashboard/klienti`: 11 korelovaných podvýběrů + `ORDER BY GREATEST(5)` → `LEFT JOIN LATERAL … LIMIT 1`
+  + `LIMIT 50` + stránkování.
+- **Migrace 103 — indexy a `pg_trgm`:** `client_leads (created_at DESC)`, `(lead_status, next_action_date)`,
+  `(next_action_date) WHERE NOT NULL`; `projects (status, created_at DESC)`, `(updated_at DESC)`;
+  `calendar_events (starts_at)`, `(project_id)`, `(lead_id)`; `invoices (issued_on DESC)`,
+  `(project_id, issued_on)`; `finance_transactions (project_id)`, `(date)`;
+  `completed_projects`, `project_surveys`, `costs (project_id)`; `CREATE EXTENSION IF NOT EXISTS pg_trgm`
+  + GIN trgm na `client_leads.contact_name/company_name` a `projects.client_name/description`.
+- Streaming: `loadAdminCounts()` jako promise + `use()` v `<Suspense>`, `loading.tsx` se skeletony
+  ve tvaru obrazovky pro `/dashboard`, `/alteno`, `/hub`.
+- `next.config.mjs`: `experimental.staleTimes: { dynamic: 30, static: 180 }`.
+- `app/providers.tsx`: `SessionProvider` **jen pro admin** (nový `AdminProviders` s předanou session)
+  → zmizí `/api/auth/session` po každém mountu a landing i Workspace zhubnou. Projít `useSession()`.
+**Hotovo, když:** čítač ukazuje ≤ 2 kola na navigaci u Dnes, detailu zakázky, kalendáře a faktur;
+migrace 103 připravená; `EXPLAIN` v PGlite ukazuje index scan u dosud neindexovaných řazení.
+**Riziko:** střední; migrace je aditivní.
+
+### AD07 — Sdílená tabulka a výpisy (M–L, bez migrace)
+**Cíl:** jedna tabulka s řazením, filtry a stránkováním v URL místo pěti ručních.
+**Nový `components/admin/data-table.tsx`** — serverová komponenta, stav v URL, takže řazení i stránky
+jsou obyčejné `<Link>` (funguje Zpět, nic se nehydratuje):
+`AdminColumn<T> = { key, header, sortable?, align?, cell, mobile?: 'title'|'meta'|'badge'|'hidden' }`,
+`AdminTableProps<T> = { rows, columns, rowKey, href?, sort, page, empty, toolbar?, footer?, selection? }`.
+**Nový `lib/admin-table.ts`**: `parseTableParams(searchParams, { allowed, default, pageSize })`
+→ validované `{ sortKey, dir, limit, offset }` + whitelist `sortKey → SQL fragment`.
+**Uživatelský vstup se nikdy neinterpoluje do `ORDER BY`.** Řazení a stránkování serverově.
+Mobil: stejná komponenta, `<table>` od `sm:`, pod tím karty podle rolí `mobile`.
+Z Dílků: `PageShell`/`PageHeader`/`Toolbar`/`PillNav`, `EmptyState`, `Money`, `TimeRange`,
+`components/ui/{badge,button,input,select,checkbox,dropdown-menu,skeleton,tooltip}.tsx`.
+**Pořadí převodu (zisk/riziko):** 1. `CompletedProjectsTable` (jen čtení) · 2. `InvoiceRegistry`
+(filtry a součty z prohlížeče do SQL) · 3. `CostsManager` · 4. `WaitlistSection` · 5. grid výpisy
+(`/dashboard/klienti`, `/dashboard/pozadavky`, `/alteno`, `InvoiceArchive`) · 6. **`LeadsTable`
+naposled** (1181 ř., dvě tabulky, inline úpravy — potřebuje `selection` a `useOptimistic` z AD08).
+**Nepřevádět:** `ProjectCalculator` (formulář v tabulce), `HodnoceniDashboard`, `NotificationList`.
+`LIMIT` a stránkování k `getLeads`, `getCosts`, `getCompletedProjects`, `getSurveys`;
+**`getAllLeadNotes` zrušit** → `LEFT JOIN LATERAL (… LIMIT 3)` na náhled, plné poznámky až v panelu.
+`components/DashboardFilters.tsx` nahradit `Toolbar` + `PillNav`.
+**Hotovo, když:** pět tabulek a čtyři grid výpisy mají řazení kliknutím, stránkování a prázdný stav;
+`?sort=&dir=&page=` přežije reload i Zpět; žádný výpis není bez `LIMIT`; test, že neznámý `sort`
+spadne na výchozí a nedostane se do SQL.
+
+### AD08 — Rychlost II a opravy kalendáře (M, bez migrace)
+**Cíl:** akce odpovídají hned, těžké obrazovky se nenačítají dřív, než je potřeba.
+- **E-maily mimo akci:** `after()` z `next/server` v `app/actions.ts:154,237,387,404,502`
+  a `app/calls-actions.ts:209,227`. **Žádnou frontu pro admin nestavět** (`lib/ws/email/outbox.ts`
+  je per účet).
+- **Časové okno v kalendáři:** všechny 4 dotazy `/dashboard/calendar` dostanou
+  `starts_at >= $from AND starts_at < $to` (zobrazený měsíc ± týden); filtrování v JS zrušit.
+- **Finance přestanou zapisovat při čtení:** dva generátory opakovaných transakcí z renderu pryč.
+  **Nový cron nestavět** — `generateRecurringCostTransactionsInternal()` už se volá denně
+  z `app/api/cron/send-reminders/route.ts:258`; stačí tam přidat cash-flow šablony a zpětné
+  doplnění (AD13). V UI zůstane tlačítko „Vygenerovat opakované". Je to i oprava správnosti —
+  GET nesmí zapisovat a prefetch dnes generování spouští.
+- **`next/dynamic`** (dnes 0×) na `SmartCalendar`, `BookingModal`, `StartupProjectEditor`,
+  `TradingViewChart`, `AiAssistantModal`, `PerformanceOverview`; `framer-motion` → `LazyMotion` + `m`.
+  **Nový `components/admin/__tests__/admin-bundle-guard.test.ts`** podle `ws-bundle-guard.test.ts`.
+- **`useOptimistic`** na potvrzení leadu, „Zaplaceno", změnu stavu zakázky. Zároveň opravit, že akce
+  z `LeadsTable` revaliduje `/dashboard/calls` a tím zahodí vlastní lokální update.
+- `app/api/invoices/[id]/pdf/route.ts`: `runtime = 'nodejs'`, `maxDuration`, `bytea` streamovat místo
+  base64 → `Buffer`, `ETag` + `Cache-Control: private, must-revalidate`.
+- **Opravit kalendář — tři potvrzené chyby** (nahlášeno 2026-11-10 „zadám čas a ono se to nepromítne"):
+  1. **Klik na slot se do formuláře nepropíše.** `components/AdminEventModal.tsx:53–54` bere propy
+     jako `useState` inicializátor, ale `<AnimatePresence>` je **uvnitř** komponenty, takže se nikdy
+     neodmountuje a inicializátor se podruhé nespustí. Formulář navždy drží „dnes 10:00" z okamžiku,
+     kdy se načetla stránka. Oprava: `<AnimatePresence>` nahoru do `SmartCalendar` a modal
+     renderovat jen když je otevřený (stav tak vzniká vždy nový).
+  2. **`resetAndClose` zahazuje volbu.** `AdminEventModal.tsx:63–65` po uložení i po zavření nastaví
+     natvrdo „dnes 10:00" a propy ignoruje. Bez téhle opravy by druhá událost v sezení začínala
+     špatně i po opravě (1) — patří do jednoho commitu.
+  3. **Vykreslení zahazuje minuty.** `SmartCalendar.tsx:750–751` (týden) a `:856–857` (den) počítají
+     pozici z `getHours()`, takže událost 10:15 se nakreslí na linku 10:00, zatímco popisek vedle
+     říká správně 10:15. Počítat z minut.
+  Při tom zároveň: `SmartCalendar.tsx:725` dnes **úplně skryje** událost začínající před 8:00
+  (`DAY_START`) — ukázat ji na horní hraně; `getHours()`/`isSameDay()`/`eventsForDay()` pracují
+  v zóně prohlížeče, zatímco `formatTime` v `Europe/Prague` — sjednotit přes `lib/prague-time.ts`;
+  hlášku o překryvu (`AdminEventModal.tsx:247–251`) posunout nahoru k tlačítku, dole pod poznámkou
+  ji při zarolovaném formuláři nikdo nevidí a vypadá to, že se nic nestalo.
+  **Zápis do DB je v pořádku** — `lib/prague-time.ts` převádí správně včetně letního času
+  a `createCalendarEvent` ukládá oba konce. Na serveru se nesahá.
+**Hotovo, když:** uložení zakázky nečeká na SMTP (test, že `sendEmail` běží v `after`); kalendář
+načte ≤ 60 řádků; bundle guard drží strop; Finance v GET nezapisují (test); **klik na slot v 11:00
+otevře formulář s 11:00 a událost 10:15–12:00 se nakreslí na správné místo ve správné délce**
+(ověřeno v prohlížeči, ne jen testem).
+**Riziko:** střední — `after()` mění pořadí vedlejších efektů, projít každé místo zvlášť.
+
+### AD09 — Jedna entita kontaktu (M–L, **migrace 104**)
+**Cíl:** jeden člověk = jeden řádek; telefony a e-maily z 8 tabulek se dají spojit.
+**Migrace 104:** `contacts (id, display_name, company, email, phone CHECK E.164, ico, dic, note,
+source, last_seen_at, created_at, updated_at, merged_into REFERENCES contacts(id))`;
+částečné unique indexy `lower(email)` a `phone` **s `WHERE merged_into IS NULL`**, GIN trgm na jméno;
+`contact_id uuid REFERENCES contacts(id) ON DELETE SET NULL` na `client_leads`, `projects`,
+`consultation_slots`, `completed_projects`, `agent_leads` + index na každém.
+- **Normalizace** v novém `lib/contacts/normalize.ts`: `normalizePhone(raw, '+420')` → E.164 (řeší
+  `00420`, `0042`, mezery, vedoucí nulu, klapku), `normalizeEmail` → trim + lower. Čisté funkce s testy.
+- **Co zůstane kopií:** textové sloupce (`projects.client_*`, `invoices.client_*`) jsou **snímek
+  dokladu**. Pravidlo do `AGENTS-ADMIN.md`: `contact_id` = kdo to je, text = co bylo tehdy napsáno.
+- **Backfill není v migraci** → nový `scripts/admin-contacts-backfill.mjs` (dry-run výchozí, `--ano`):
+  seskupí podle normalizovaného telefonu, pak e-mailu, vytvoří kontakty, doplní `contact_id`, vypíše
+  konflikty. Sporné zůstane nepřiřazené a objeví se v UI jako „Možné duplicity".
+- **Sloučení v UI:** `/dashboard/kontakty` (na `data-table`) + detail „Objevuje se také jako…"
+  a **Sloučit**: nastaví `merged_into`, přesměruje `contact_id`. **Zpět = smazat `merged_into`**
+  (nic se nemazalo). Nikdy automaticky.
+- `convertLeadToProject` předá `contact_id` místo kopie textu. Zároveň se opraví, že dnes přenáší
+  **jen 6 polí**, poznámky z `lead_notes` nechá u leadu, termín z kalendáře neváže
+  (`calendar_events.project_id` zůstane NULL) a `redirect('/dashboard')` vyhodí na Dnes místo na
+  novou zakázku (`app/calls-actions.ts:150–190`).
+- **Proč denormalizace musí zůstat *plněná*, ne jen ležet:** `portal.sync_project` (migrace 095)
+  čte `NEW.client_name` jako název zakázky v klientském prostoru. Když se přestane plnit, klient
+  uvidí zakázku bez názvu. Snapshot drží trigger `BEFORE INSERT OR UPDATE OF contact_id`;
+  přejmenování kontaktu propadne do jeho zakázek, ale **jen při skutečné změně**
+  (`IS DISTINCT FROM` ve `WHERE`), jinak by se `updated_at` hýbal při každém uložení a klientovi
+  by lhalo „Naposledy upraveno".
+- **Vazba na klientský prostor:** `contacts.portal_client_id uuid UNIQUE REFERENCES portal.clients(id)
+  ON DELETE SET NULL`. Schémata zůstávají **oddělená** — `portal.clients` je přihlašovací nájemce,
+  `contacts` je protistrana; většina kontaktů prostor nikdy nedostane. Sloučit je nelze, aniž by se
+  přepsal grant model role `portal_app`, která nemá v `public` žádná práva (R-073), a FK v migracích
+  095/096/098, které už běží na produkci.
+- **Karta kontaktu jako pohled:** `client_overview` (zakázky celkem a zaplacené, příjem, zisk,
+  vystavené a nezaplacené faktury, počet hovorů, průměrné hodnocení, poslední aktivita). Jeden
+  `SELECT` místo osmi dotazů v komponentě. Závisí na pohledech z AD13.
+**Hotovo, když:** dry-run nad testovacími daty vypíše počet kontaktů a konfliktů; sloučení a jeho
+Zpět mají test; dva leady se stejným telefonem v jiném zápisu ukazují jeden kontakt.
+**Riziko:** střední. Částečné unique indexy zajistí, že duplicita nikdy nezablokuje zápis z formuláře.
+
+### AD10 — Propojení a volání jedním klikem (M, **migrace 105**)
+**Cíl:** telefon, e-mail a SMS jsou klikací všude a kalendář s hovory se nerozcházejí.
+- **Nový `components/admin/contact-actions.tsx`**: `tel:`, `sms:` (dnes 0×), `mailto:`, WhatsApp přes
+  `whatsappHref()`, plochy ≥ 44 px, „Zkopírovat" jako záloha. Nasadit na: **detail zakázky
+  `/dashboard/[id]`** (dnes tam není jediný klikací kontakt), **`/dashboard/pozadavky`** (dnes kontakt
+  vůbec nenačítá → změnit dotaz), `LeadsTable`, `SmartCalendar`, `/dashboard/klienti`,
+  `/dashboard/faktury/[id]`, Hub.
+- **Nový `lib/message-templates.ts`**: `{ id, channel: 'sms'|'email'|'whatsapp', label, subject?, body(ctx) }`,
+  ctx = kontakt + zakázka/lead/termín. Vzor `lib/portfolio-email.ts`. Šablony plní `href`, **neposílají samy**.
+- **Rozpad dvojice kalendář ↔ hovor:** nová funkce
+  `admin_lead_reschedule(p_lead uuid, p_starts_at timestamptz, p_ends_at timestamptz)` (migrace 105),
+  která přepíše čas v `client_leads` i `calendar_events` jedním příkazem (vzor `ws.money_issue`).
+  CTE, které zakládá lead z termínu VIZEON, doplnit o `phone`, `email`, `contact_name`, `contact_id`.
+- **Migrace 105** navíc: `consultation_slots.calendar_event_id` + `contact_id`; rezervace z portálu
+  zakládá událost v téže transakci → bude vidět v Hovorech i v kalendáři. Dotaz Hovorů rozšířit, aby
+  čtl `calendar_events` podle typu (blokace a ALTENO termíny se dnes nezrcadlí).
+**Hotovo, když:** z detailu zakázky zavoláš i napíšeš bez opisování; přesun termínu v kalendáři
+i v hovorech dá stejný čas (test); rezervace z portálu je vidět v Hovorech.
+**Riziko:** střední — zakládání událostí ke starým slotům musí být idempotentní.
+
+### AD11 — Zakázka jako jediná pravda: Dokončené a průvodka (M–L, **migrace 106**)
+**Cíl:** zakázka ve stavu hotovo/zaplaceno **je** dokončená. Konec kopie s vlastní cenou.
+
+**Problém dneška:** `completed_projects` je plná kopie zakázky (`title`, `client_name`, `amount`,
+`notes`) a `createCompletedProject` (`app/completed-actions.ts:43`) umí založit příjem **znovu**,
+nezávisle na tom, jestli zakázka svůj příjem už má. Dvě verze pravdy o ceně a riziko dvojího
+započtení. Stránky Dokončené a Hodnocení přitom čtou týž dataset a liší se jen filtrem.
+
+- **Migrace 106:** `projects.closed_at`, `projects.project_type` (`client` / `vlastni`);
+  `project_surveys` se přepojí na `project_id`; `completed_projects` se **přejmenuje** na
+  `completed_projects_archiv` — nemaže se, dokud daňové součty nesedí na korunu.
+- Dokončené bez `source_project_id` (ručně doplněná historie) → vznikne zakázka ve stavu `paid`,
+  aby se neztratil příjem ani hodnocení.
+- `/dashboard/dokoncene` a `/dashboard/hodnoceni` mizí z menu; obojí je v zakázce a na kartě
+  kontaktu (AD09). `PerformanceOverview` se přesune na Dnes.
+
+**Průvodka zakázky** — osa v detailu, která nečte nic nového, jen skládá, co v DB je:
+
+| Krok | Splněno, když |
+|---|---|
+| Poptávka | `lead_origin` + `source` z webu, nebo zakázka vznikla z leadu |
+| Hovor | existuje lead nebo kalendářní událost se zakázkou |
+| Nabídka | vyplněná `price` |
+| Záloha | `deposit_paid` |
+| Práce | `status = 'in_progress'` |
+| Předáno | `status = 'review'` nebo vystavený předávací dokument (AD16) |
+| Faktura | existuje vystavená faktura (AD12) |
+| Zaplaceno | `paid_on` na faktuře, nebo `projects.paid` |
+| Hodnocení | existuje `project_surveys` |
+
+Pod osou **jedno tlačítko na další krok** („Vystavit fakturu", „Poslat dotazník").
+
+> **Tím padá dluh z `AGENTS-ADMIN.md:355`** („změna stavu jedním klikem se Zpět nejde, protože
+> `updateProject` pošle klientovi e-mail a Zpět by ho poslal podruhé"): e-mail klientovi jde
+> přes `after()` s 60s odkladem a Zpět ho zruší — vzor R-050 z Workspace.
+
+**Ověření, bez kterého se nepokračuje:** součet příjmů za 2026 a 2025 **před migrací a po ní**
+musí být na korunu stejný. Když nesedí, migrace se vrací.
+**Riziko: vysoké** — sahá na daňová čísla. Proto až po AD09 (kontakty) a vždy nejdřív na větvi.
+
+### AD12 — Fakturace: vystavování v adminu (L, **migrace 107**)
+**Cíl:** fakturu vystavíš v adminu, archiv cizích PDF funguje dál.
+**Rozhodnutí: rozšířit `invoices`, ne nové tabulky.** Na `invoices` visí `finance_transaction_id`,
+unique index na číslo, `ai_extracted`, `pdf_data`, celé `invoice-actions.ts` a `/api/public/invoices`.
+Druhá tabulka = dvě evidence, dva výpočty „po splatnosti", migrace archivu.
+**Migrace 107:** `invoices` + `kind text NOT NULL DEFAULT 'archived' CHECK (kind IN ('archived','issued'))`,
+`items jsonb`, `issuer jsonb`, `supplied_on date`, `vat_total numeric`, `number_seq integer`;
+CHECK „vystavená musí mít `items` a `issuer`, 1–50 položek"; `UNIQUE (number_seq) WHERE kind='issued'`;
+tabulka `admin_settings (id boolean PK DEFAULT true CHECK (id), invoice_sequences jsonb, issuer_profile jsonb, updated_at)`.
+`DEFAULT 'archived'` je celý trik: **každý existující řádek zůstane archivem** a dnešní obrazovky se nemění.
+
+> **Upřesnění (2026-11-10):** „archiv" dnes neznamená přijatou fakturu. Dnešní řádky jsou
+> **Kryštofem vystavené faktury**, jen vyrobené jinde — `lib/invoice-ai.ts` čte z PDF *odběratele*
+> a `syncInvoiceTransaction` z nich dělá **příjem**. Potřebujeme proto dvě osy, ne jednu:
+> `direction ('issued' | 'received')` = kdo komu fakturuje (příjem × výdaj) a `pdf_generated boolean`
+> = jestli PDF vyrobil systém, nebo se nahrálo. Backfill: `direction='issued'`, `pdf_generated=false`.
+> Unikátnost čísla pak patří jen na `WHERE direction='issued'` — přijatá faktura nese číslo
+> dodavatele, které se s vlastní řadou klidně potká. Přijaté faktury (hosting, nástroje) se tím
+> konečně dají evidovat, aniž by se počítaly jako příjem.
+
+> **Formát čísla:** `YYYYNNN` (`2026001`) místo `YYYY-NNNNNN`. Důvod je variabilní symbol — ten smí
+> být jen číslice, max 10 znaků. Workspace si kvůli pomlčce musí z čísla nečíslice odstraňovat
+> (`lib/ws/money/pdf.ts:66`); `YYYYNNN` jde do VS přímo. 999 faktur ročně je pro jednoho člověka dost.
+
+> **Neměnnost patří do databáze, ne do UI.** Vystavenou fakturu dnes přepíše cokoli —
+> `/dashboard/faktury/[id]` i AI přepis. Trigger `BEFORE UPDATE`, který u `status IN ('issued','paid',
+> 'cancelled')` odmítne změnu čísla, částky, dat, položek, dodavatele a odběratele, to uzavře
+> i pro ruční `UPDATE` v konzoli. Měnit jde dál `status`, `paid_on`, poznámku, `sent_at` a storno.
+> Oprava se dělá **stornem a novou fakturou**, číslo se nikdy nerecykluje. (Repo samo dokládá, proč
+> kontrola v aplikaci nestačí: migrace 046 přidala UNIQUE právě proto, že kontrola v kódu byla TOCTOU.)
+- **Atomické číslo:** `admin_invoice_issue(p_data jsonb) RETURNS uuid` podle `ws.money_issue`:
+  `SELECT invoice_sequences … FOR UPDATE` → `GREATEST(uložené, MAX z invoice_number)+1` → `jsonb_set`
+  → `INSERT … RETURNING id`, vše v jedné transakci. Formát `YYYY-NNNNNN`.
+- **Profil dodavatele** v `admin_settings.issuer_profile`, na dokladu snímek v `issuer jsonb`.
+- **PDF sdílet, nekopírovat:** z `lib/ws/money/pdf.ts` vytáhnout `lib/invoice-pdf/render.ts` s úzkým
+  vstupem (issuer, odběratel, položky, součty, QR, logo); volají ho Workspace i admin. **Do
+  `next.config.mjs` přidat** `'/api/invoices/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*']`
+  — admin dnes Chromium v žádné funkci nemá a bez toho PDF spadne až na produkci. PDF jen v route
+  handleru, nikdy v server action stránky.
+- **QR:** `spaydPaymentString()` + balíček `qrcode` (už je v závislostech; R-064 — na serveru bez
+  React hooků). Potřebuje IBAN v profilu.
+- **ARES:** nový `lib/ares.ts`, serverový `fetch` na REST ARES podle IČO. **CSP se nemění** (volá
+  server, ne prohlížeč). Přesto zápis do `.claude/security/DECISIONS.md` + **R-086**: timeout 3 s,
+  bez redirectů, odpověď přes Zod, nikdy do `innerHTML`, cache 24 h, IČO ověřit kontrolní číslicí
+  mod 11 před voláním, selhání nikdy neblokuje formulář. **Endpoint ověřit, ne odhadnout.**
+- **Odběratel z historie:** poslední faktura téhož kontaktu + `contacts.ico/dic` z AD09.
+- **E-mail faktury:** `lib/email.ts` + `after()`, výslovné tlačítko, nikdy automaticky.
+**Hotovo, když:** fakturu vystavíš do 30 s, PDF s QR se vygeneruje, číslo je atomické (test souběhu
+nad PGlite), archiv cizích PDF a `syncInvoiceTransaction` mají beze změny chování vlastní test.
+**Riziko: vysoké** (peníze). Archiv se nedotkne, vystavování je oddělená cesta.
+
+### AD13 — Fakturace: náprava financí (M, **migrace 108**)
+**Cíl:** čísla ve financích se nesčítají přes měny a uložení je jedna transakce.
+**Opravit hned:** (1) `finance_transactions.currency` (migrace 108) + součty po měnách — dnes se
+**EUR faktura sčítá s korunami**, což je špatné číslo v daňovém základu; nejnebezpečnější položka
+celého seznamu. (2) Uložení faktury 4–6 dotazů bez transakce → jeden `adminDb.batch`.
+(3) Nový `lib/invoice-status.ts` — jeden výpočet „po splatnosti" místo tří. (4) 4× zkopírovaný
+18sloupcový SELECT → konstanta `invoiceSelect`. (5) Adopce příjmu podle přesné rovnosti částky
+→ výslovné „Je tohle ta platba?" + `payment_origin CHECK ('created','adopted')` podle migrace 088,
+aby Zpět bylo bezpečné. (6) Chybějící testy: `syncInvoiceTransaction`, `parseInvoiceForm`, dotazy
+v `invoice-actions.ts`, `costs-actions.ts`, `recurring-transactions.ts`, `/api/public/invoices`.
+**Opravit také (nalezeno 2026-11-10):**
+
+**(7) `updateCost` maže historii — ztráta dat, ne nepřesnost.** `app/costs-actions.ts` končí sync
+větví `DELETE FROM finance_transactions WHERE source_cost_id = …`, takže **jakákoli** editace
+fixního nákladu (i pouhé přejmenování) smaže **všechny** jeho vygenerované měsíční výdaje a cron
+pak dogeneruje jen ten aktuální. Historie nákladů tiše zmizí. Správně: změna částky platí **od
+aktuální periody dál** (`WHERE recurring_period >= to_char(CURRENT_DATE,'YYYY-MM')`), změna jména
+jen přepíše `note`. `deleteCost` u nákladu s historií nemaže, ale nastaví `ends_on` a `archived_at`.
+
+**(8) Pravidelné náklady: cron už existuje, chybí zpětné doplnění.**
+`generateRecurringCostTransactionsInternal()` se volá denně z `app/api/cron/send-reminders/route.ts:258`
+— nový cron **není potřeba** (`vercel.json` jich má 7). Chybí dvě věci: funkce zná jen `CURRENT_DATE`,
+takže **vynechaný měsíc se už nikdy nedoplní**, a cash-flow šablony se generují **výhradně při
+otevření `/hub/finance`**. Řešení: DB funkce `generate_recurring_costs(p_until, p_max_months)`
+s `generate_series` od `starts_on` do `ends_on` (strop 36 měsíců, idempotence na existujícím
+`UNIQUE (source_cost_id, recurring_period)`), volaná z téhož cronu. **Zápis při renderu stránky
+zrušit** — spouští se i při prefetchi, zpomaluje a schovává chyby; zůstane jako tlačítko „Dogenerovat".
+Náklad dostane `incurred_on` (kdy se to stalo), `starts_on`, `ends_on`, `archived_at`.
+
+**(9) Konec dvojího příjmu — podmínkou v databázi, ne heuristikou.** Dnes vede k příjmu pět cest
+a faktura se snaží příjem zakázky převzít **jen při přesné shodě částky** (`lib/invoices.ts:231`);
+při zaokrouhlení nebo částečné platbě leží peníze v ledgeru dvakrát a systém to jen označí jako
+`duplicate_risk`. Místo toho částečný `UNIQUE (source_project_id, COALESCE(deposit_transaction,false))
+WHERE type='income' AND user_id IS NULL`: jedna zakázka má nejvýš jeden zálohový a jeden doplatkový
+příjem. Faktura pak druhý **nemůže** vložit — jen převzít existující řádek podle vazby na zakázku.
+Přibude `income_origin ('project'|'invoice'|'completed'|'manual')` a `projects.paid_on` /
+`deposit_paid_on`, aby datum odpovídalo platbě, ne okamžiku uložení (dnes `now()::date` na 4 místech).
+**Index se nepodaří vytvořit, dokud se neuklidí existující duplicity** — detekční dotaz a ruční
+úklid jsou součástí sezení, ne až migrace.
+
+**Daňová pojistka:** převzetí příjmu nastavuje `declared = true`, což mění daňový základ. Když
+`date` spadne do uzavřeného roku, UI musí varovat a vyžádat potvrzení — paušál se počítá ze součtu
+přiznaných příjmů, takže tichá změna loňska je tiché přepsání přiznání.
+
+**Vědomě nechat:** `updateProject` přepisuje `declared` všem transakcím zakázky (chování, potřebuje
+rozhodnutí — neměnit potichu) · `declared` na 6 místech · dvě sady daňových sazeb ·
+`pdf_data bytea` v řádku.
+
+**Zisk na zakázku a karta kontaktu (pohledy, bez rizika):** `project_ledger` sjednotí čtyři cesty,
+kterými se dnes transakce váže k zakázce (`source_project_id`, přes fakturu, přes dokončený projekt,
+přes náklad); `project_profit` z něj dá příjmy − náklady na zakázku; `client_overview` je karta
+kontaktu z AD09 jedním `SELECT`em. Obyčejné `VIEW`, ne materializované — čísla musí být živá
+a provoz je jeden člověk.
+
+> **Do daně se tím nemění nic.** Vstupem je jen součet přiznaných příjmů, protože se uplatňuje
+> 60% paušál (R-011). Zisk na zakázku slouží rozhodování, ne přiznání — a UI to musí říct nahlas,
+> ať nevznikne dojem, že pečlivá evidence nákladů sníží daň.
+**Riziko: vysoké.** Každý krok samostatný commit, všechny s testem.
+
+### AD14 — AI asistent: navrhne, ty potvrdíš (M–L, **migrace 109**)
+**Cíl:** z věty vznikne návrh akce, který provedeš jedním klikem — a nic se neuloží samo.
+- **Vstup:** ⌘K (`components/admin/admin-search.tsx`) — když dotaz nic nenajde, nabídne „Zeptat se
+  asistenta"; a pravý panel `components/admin/assistant-panel.tsx` nad `detail-sheet.tsx`.
+- **Věta → návrh: strukturovaný výstup se Zodem** (`client.messages.parse()` + `zodOutputFormat`),
+  **ne tools** — vynucené `tool_choice: any|tool` na opus-5-5 a sonnet-5-5 vrací 400 a nechceme, aby
+  model *konal*; chceme typovaný návrh. Jedna `z.discriminatedUnion('kind', …)`: `create_lead`,
+  `schedule_call`, `update_project_status`, `create_invoice_draft`, `add_note`, `send_message`, `none`.
+  Každý návrh nese `confidence`, `assumptions: string[]`, `missing: string[]`.
+- **Migrace 109:** `ai_suggestions (id, created_at, author_email, source, input_text, model,
+  proposal jsonb, status CHECK ('pending','applied','rejected','expired'), applied_at,
+  applied_ref jsonb, tokens_in, tokens_out)`. Do DB, ne do stavu prohlížeče: potvrzení běží server
+  actionou, která **znovu** parsuje uložený návrh, vznikne audit a dataset na zlepšení promptů.
+  `pending` vyprší po 7 dnech (cron `admin-denne`).
+- **Potvrzení jedním klikem:** `applySuggestion(id)` → načte řádek → Zod re-parse → whitelist
+  executorů podle `kind`, které volají **existující** server actions se stejnou validací jako lidský
+  formulář. Žádná obecná cesta do SQL. Pak `status='applied'`, `applied_ref` a toast se Zpět.
+- **Nový `lib/ai/models.ts`** — jediné místo (dnes čtyři modely ve čtyřech souborech, dva natvrdo):
+  `fast: 'claude-haiku-5-5'` na věta→návrh, `smart: 'claude-sonnet-5-5'` při `kind:'none'`,
+  `confidence < 0.6` nebo práci s pamětí, `vision: 'claude-haiku-5-5'` pro `lib/invoice-ai.ts`
+  **místo dnešního `claude-opus-5'`** (~50× dražší; fallback na sonnet při selhání validace).
+  Řízení přes `output_config.effort`, ne `thinking.budget_tokens`.
+- **Prompt caching:** stabilní prefix = systémový prompt + schéma + katalog (stavy, zakázky, služby)
+  s `cache_control: ephemeral`; věta a svěží kontext až nakonec.
+- **Oprava `app/api/ai-assistant/route.ts`:** systémový prompt **jen ze serveru** (`lib/ai/prompts.ts`
+  podle validovaného `mode`), tělo přes Zod (`{ mode, text: max 2000, contextRef? }`), zprávy skládá
+  server, rate limit, `max_tokens` podle režimu, `runtime`/`maxDuration`, vstup protažený `redact()`
+  z `lib/project-activity.ts`, výstup nikdy jako HTML. Zápis do `.claude/security/` ve stejném commitu.
+- **Asistent nesmí:** zapsat do DB bez kliknutí · odeslat e-mail, SMS ani WhatsApp · nic mazat ·
+  sahat na peníze (`finance_transactions`, `declared`, `paid_on`) jinak než návrhem konceptu ·
+  číst `pdf_data`, přihlašovací tabulky, env a `.claude/` · brát text od klienta jako instrukce
+  (vstupy z `client_requests` a portálu jsou **data**, vzor `lib/client-request-ai.ts`) ·
+  být dostupný na veřejné routě.
+**Hotovo, když:** „zavolat Nováka ve čtvrtek ve dvě" vznikne `schedule_call` s předvyplněným
+kontaktem a jedním klikem termín; test, že `systemPrompt` z těla požadavku se ignoruje; test,
+že `applySuggestion` odmítne pozměněný `proposal`.
+
+### AD15 — Paměť projektu (M, **migrace 109** společně s AD14)
+**Cíl:** systém předvyplňuje z historie a pamatuje si kontext, ze kterého staví návrhy.
+**Dvě oddělené vrstvy:**
+1. **Deterministické předvyplnění** — nový `lib/admin/memory/facts.ts`, čistě SQL nad historií,
+   **bez AI**, nikdy se neukládá jako text: poslední cena u klienta, obvyklá hodinová sazba, průměrná
+   doba dokončení, typický zdroj leadu, poslední položky faktury, poslední kanál kontaktu, typická
+   délka termínu. **Tohle plní formuláře.**
+2. **AI shrnutí kontextu** — migrace 109: `project_memory (id, scope CHECK ('project','contact','global'),
+   ref_id uuid, kind CHECK ('summary','preference','risk','glossary'), text, source, model, created_at,
+   valid_until, confirmed_by text NULL)`. Zapisuje se jen (a) na kliknutí „Uložit do paměti", nebo
+   (b) cronem z nových řádků `project_activity`, ale pak `confirmed_by IS NULL` a v UI jako „Návrh
+   paměti"; nepotvrzené se používá, je označené a vyprší za 90 dnů.
+- **Použití:** prompt asistenta dostane `facts` (kompaktní deterministický JSON → cachovatelný prefix)
+  + nejvýš N řádků `project_memory` pro daný scope. Formuláře používají **jen `facts`**.
+- **Retence a GDPR (R-076, 3 roky od posledního pohybu):** `valid_until = last_seen_at + 3 roky`,
+  denní cron maže prošlé; smazání kontaktu maže jeho paměť (polymorfní `ref_id` nejde přes FK → úklid
+  ve funkci i v akci mazání); řádky paměti patří do exportu údajů.
+- **Ochrana:** každý ukládaný text projde `redact()` z `lib/project-activity.ts:86-93` (**použít,
+  nekopírovat**) a text s `REDACTION_MARK` se odmítne uložit. Test, že `sk-…`, connection string
+  a řádek z `.env` se do paměti nedostanou.
+**Riziko:** střední (osobní údaje) — proto redakce a retence ve stejném sezení, ne později.
+
+### AD16 — Hodnocení, reference a předávací dokument (M, **migrace 110**)
+**Cíl:** dotazník odejde sám a z odpovědí se dá udělat reference na web.
+
+**Dnes:** dotazník se pošle **jen jednou**, při ručním kliknutí „Přidat do dokončených", a když
+klient nereaguje, Kryštof musí odkaz ručně zkopírovat — v `HodnoceniDashboard.tsx:230–246` je to
+doslova napsané. Zakázka tak může být zaplacená a klient nikdy dotazník nedostane.
+
+- **Automaticky:** uzavření zakázky (`done` / `paid`) zařadí dotazník k odeslání. Jde přes `after()`
+  s odkladem, takže Zpět ho zruší.
+- **Jedna připomínka** po sedmi dnech, když klient nevyplnil. Pak už nic. Denní cron
+  `send-reminders` ji pošle spolu s ostatními — žádný nový cron.
+- **Migrace 110:** `project_surveys.reminded_at`, `requested_at`; `completed_projects_archiv`
+  se už nepoužívá (AD11).
+- **Reference pro web:** z hodnocení **se souhlasem** se jedním klikem vezme úryvek pro vizeon.cz
+  (jméno, firma, hvězdičky, text). Výstup je text ke zkopírování, ne automatická publikace.
+- **Předávací dokument:** „co bylo dodané" — stránky, funkce, přístupy, co je v ceně údržby a co ne.
+  Skládá se z položek zakázky, generuje se do PDF **stejnou cestou jako faktura** (`lib/invoice-pdf/`
+  z AD12, žádná nová závislost) a posílá se s ní. Zároveň je to krok „Předáno" v průvodce.
+- **AI leady zviditelnit:** `agent_leads` se dnes ukládají a **nikdo je nevidí** — grep najde jediný
+  výskyt, INSERT v route handleru. Tabulka má skóre, prioritu, shrnutí i doporučenou strategii.
+  Zobrazí se v Hovorech jako pruh seřazený podle skóre.
+
+**Hotovo, když:** uzavření zkušební zakázky pošle dotazník; po sedmi dnech odejde právě jedna
+připomínka (ověřeno posunutým časem v testu); reference se zkopíruje; předávací dokument se
+vygeneruje do PDF; `agent_leads` jsou v Hovorech vidět.
+**Riziko:** nízké — e-maily jdou přes existující frontu a odesílají se klientovi, takže text
+projde `zakaziq-ux-texty-cs`.
+
+### AD17 — Ruční překreslení denních obrazovek (L, bez migrace)
+`/dashboard` (Dnes) · `/dashboard/[id]` · `/dashboard/calls` · `/dashboard/calendar` ·
+`/dashboard/faktury` + detail · `/hub` a `/hub/finance`. Jedna hlavní akce na obrazovce, detail
+v pravém panelu, nejvýš 2 kliky z Dnes, `AccentHeading` / `SectionLabel` / `Money` / `TimeRange` /
+`LiveDot` / `TileGlyph`, kontakt z AD10 v záhlaví, asistent z AD14 v panelu.
+**Hotovo, když:** každá má `PageHeader`, `Toolbar`, prázdný stav a skeleton; strop `admin-classes`
+spadl; průchod s přihlášením na 390/768/1280/1440 px.
+**Riziko:** střední — běží v produkci, jedna obrazovka = jeden commit.
+
+### AD18 — Dokončení sjednocení a ověření (M, bez migrace)
+Doběh ve zbylých souborech: `text-muted-foreground` → `text-quiet` (1057×), `bg-white` → `bg-surface`
+(302×), `rounded-xl|2xl|lg` → `rounded-chip|box|panel` (710×), duhové `bg-{barva}-NNN` → tóny
+z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `fixed inset-0`** →
+`components/ui/dialog.tsx` / `sheet.tsx` (Radix řeší focus trap, Escape, `aria-modal`).
+`.brand-gradient` smazat. Klávesnice a přístupnost, `prefers-reduced-motion`, měření proti AD00,
+`AGENTS-ADMIN.md`, `memory/memory.md`.
+**Hotovo, když:** `admin-classes.test.ts` má strop 0 u `brand-`, `bg-white` a `muted-foreground`;
+žádný `fixed inset-0` modál; tabulka v sekci 11 má čísla po.
+
+---
+
+## 6. Sezení a stav
+
+| # | Sezení | Velikost | Migrace | Závisí na | Stav |
+|---|---|---|---|---|---|
+| AD00 | Příprava, větev, testovací data, měření | S | — | — | nezačato |
+| AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | nezačato |
+| AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | nezačato |
+| AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | nezačato |
+| AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | nezačato |
+| AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | nezačato |
+| AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | nezačato |
+| AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | nezačato |
+| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | nezačato |
+| AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | nezačato |
+| AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
+| AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
+| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | nezačato |
+| AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |
+| AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **109** | AD05, AD09 | nezačato |
+| AD15 | Paměť projektu (facts + project_memory) | M | 109 (s AD14) | AD14 | nezačato |
+| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **110** | AD11, AD12 | nezačato |
+| AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | nezačato |
+| AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | nezačato |
+
+**Úklid jde první a není to libovůle:** AD01 až AD03 smažou nebo sloučí to, co by AD04 jinak
+přepisoval a AD17 překresloval. Každá obrazovka smazaná v AD01 je obrazovka, kterou nikdo nemusí
+navrhovat. Proto se nezačíná vzhledem.
+
+**Nezávislé a prohoditelné:** po AD06 jsou AD07, AD08 a AD09 na sobě nezávislé.
+AD12+AD13 nezávisí na AD14+AD15. AD17 chce AD07, AD10 a AD14 hotové, jinak se obrazovka kreslí dvakrát.
+**Nejkratší cesta k „už to není pomalé":** AD00 → AD04 → AD06 → AD08 (čtyři sezení).
+**Nejkratší cesta k „volám jedním klikem":** AD00 → AD04 → AD09 → AD10.
+**Nejkratší cesta k „nestydím se za to":** AD00 → AD04 → AD05 → AD17.
+
+---
+
+## 7. Rychlost: seřazeno podle získaný čas / riziko
+
+| # | Oprava | Fáze | Očekávaný efekt | Jak změřit |
+|---|---|---|---|---|
+| 1 | `lib/admin/db.ts` s `batch()` + `no-store` | AD06 | detail zakázky 12 dotazů / 5 vln → 2 vlny; kalendář 7→1; `/hub/finance` 12/3→1. Při ~20–40 ms na kolo **200–450 ms** | čítač kol v testu + `Server-Timing` jen v dev |
+| 2 | Migrace 103 (indexy + `pg_trgm`) | AD06 | řazení a ⌘K z sekvenčního scanu na index | `EXPLAIN (ANALYZE)` v PGlite, poměr před/po |
+| 3 | E-maily do `after()` | AD08 | −300 až −1500 ms z každého uložení zakázky a hovoru | test, že `sendEmail` běží v `after`; p75 z Vercelu |
+| 4 | Časové okno v kalendáři | AD08 | z celé historie na ~40–60 řádků; největší úspora přenosu | počet řádků v testu + velikost odpovědi |
+| 5 | `LIMIT` a stránkování (5 dotazů bez limitu) | AD07 | `getAllLeadNotes` tahá všechny poznámky všech leadů | test, že žádný výpis není bez `LIMIT` |
+| 6 | Kostra streamem (`counts` jako promise + `loading.tsx`) | AD06 | kostra < 100 ms místo čekání na 3 dotazy | první bajt s uměle zpožděným promise |
+| 7 | `staleTimes: { dynamic: 30 }` | AD06 | Zpět/Vpřed okamžitě | DevTools: žádný request |
+| 8 | `SessionProvider` jen pro admin | AD06 | −1 request po každém mountu, menší landing bundle | DevTools + `route-bundle-stats.json` |
+| 9 | `next/dynamic` + `LazyMotion` + bundle guard | AD08 | odhad −10 až −15 % JS na admin trasách | `route-bundle-stats.json`, strop v testu |
+| 10 | Zápisy z renderu `/hub/finance` do cronu | AD08 | dva zápisy z každého GET pryč (i oprava správnosti) | test, že GET nezapisuje |
+| 11 | `useOptimistic` + cílený `revalidatePath` | AD08 | potvrzení vypadá okamžitě | ruční průchod + test revalidace |
+| 12 | PDF route: stream, ETag, `maxDuration` | AD08 | 5 MB se nestahuje při každém otevření detailu | DevTools: 304 místo 200 |
+| 13 | `unstable_cache` na neosobní čtení | až po měření | malý | jen pokud měření ukáže |
+
+**Čím měřit, když produkce i Preview mají jinou DB než lokál:** (a) **počet kol do DB** je nezávislý
+na prostředí — primární metrika, drží ji test; (b) **poměr před/po** z `EXPLAIN` v PGlite nad
+syntetickými daty produkční velikosti, s poznámkou „absolutní čísla jsou WASM"; (c) skutečné
+milisekundy jen z produkce po deployi (Vercel runtime logy, p75 per route).
+**Do sekce 11 nikdy nepsat číslo, které nevzniklo měřením.**
+
+---
+
+## 8. Rozhodnutí, která potřebuji od Kryštofa
+
+> **A a B rozhodnuty 2026-11-10 večer** (viz sekce 1, druhé kolo): **A = varianta A**
+> (`ws/redesign-app` → `main` fast-forwardem a deploy, pak `admin/modernizace` z `main`),
+> **B = smazat** `app/dashboard/projekty`. Otevřené zůstávají **C** a **D**.
+
+**A — Větev a cesta na produkci (rozhodnuto: varianta A).**
+Fakt: `main` není před `ws/redesign-app` v ničem (`main..ws/redesign-app` = 92 commitů, opačně 0),
+takže sloučení je **fast-forward** — technicky nejbezpečnější operace, bez konfliktů a bez merge
+commitu. Nová kostra adminu (R-071) leží nenasazená právě tam.
+
+- **Varianta A (doporučuji):** nejdřív `ws/redesign-app` → `main` fast-forwardem a deploy, pak
+  `admin/modernizace` z `main`; každé dokončené sezení merge do `main` + deploy. Výhoda:
+  modernizovanou kostru adminu máš v produkci **hned**, a pak po kouscích, ne jednou za měsíc.
+  Cena: nasadí se zároveň Workspace, landing page a klientský prostor (jsou za Clerkem a předplatným,
+  landing je hotová) — a to je rozhodnutí o spuštění, které můžeš chtít udělat jinak.
+- **Varianta B:** `admin/modernizace` z `ws/redesign-app`, admin se na produkci dostane až s launchem.
+  Přijatelné, ale „rychlejší admin" neuvidíš ani po pěti sezeních.
+- **Variantu C** (samostatná větev z `main` s přenesením kostry) nedělat — 45 souborů, +4028/−787
+  v konfliktu při každém pozdějším sloučení.
+
+Pravidlo v obou variantách: tyto soubory mění **jen admin větev** a Workspace si je bere rebasem —
+`app/globals.css`, `tailwind.config.ts`, `next.config.mjs`, `lib/security/csp.ts`, `app/layout.tsx`.
+
+**B — `app/dashboard/projekty` (559 ř., mrtvý duplikát): rozhodnuto — smazat.** Přesměrovat nebylo kam, protože `/hub` se ruší (AD03).
+
+**C — `updateProject` přepisuje `declared` všem transakcím zakázky** (AD13). Je to dnešní chování,
+které smete ruční `setTransactionDeclared`. Nechat, nebo změnit na „přepsat jen nepotvrzené"?
+
+**D — Vyčistit `.claude/worktrees/`?** 11 starých worktree, 7,5 GB, 0 souborů v gitu. Není součástí
+plánu, jen bych to nerad mazal bez tvého slova.
+
+---
+
+## 9. Co vědomě nedělat
+
+| Nedělat | Proč |
+|---|---|
+| **Tmavý režim adminu** | pracuje se ve dne; zdvojnásobí každou vizuální kontrolu a `admin-tokens.css` by potřeboval druhou sadu |
+| **Rozpad všech monolitů** (`LeadsTable` 1181, `SmartCalendar` 1166, `StartupProjectEditor` 978) | dělí se jen to, co sezení skutečně otevře; refaktor pro refaktor je riziko bez efektu |
+| **VoIP a nahrávání hovorů** | rozhodnutí Kryštofa: `tel:`/`sms:`/`mailto:` + šablony |
+| **Fronta e-mailů pro admin** | `after()` řeší 95 % problému jednou řádkou; `lib/ws/email/outbox.ts` je per účet |
+| **Sjednocení daňových sazeb s Workspace** | jiné režimy (R-011); sloučení ohrožuje už podané výpočty |
+| **Sjednocení `cn()` a přesun adminu do `components/ws/*`** | 153 souborů přejmenovaných importů za nulový přínos |
+| **`pdf_data` do Blob storage** | pod 4 MB funguje; samostatný projekt |
+| **next-auth → Clerk v adminu** | funguje, jeden uživatel, mimo rozsah |
+| **Screenshot / visual regression testy** | nová nástrojová vrstva; skutečné riziko (barva při přejmenování) pokrývá test rovnosti palety + ruční průchod |
+| **AI, která zapisuje sama** | rozhodnutí Kryštofa (R-084) |
+| **Jedna tabulka faktur pro admin i `ws`** | dvě evidence, dvě RLS politiky; sdílí se jen vykreslování PDF a výpočty |
+| **Dvoufázové ověření adminu, monitoring chyb, samostatná DB role** | otevřené položky čekající na Kryštofovo rozhodnutí, ne součást modernizace |
+
+---
+
+## 10. Rizika
+
+| Riziko | Kde | Co s tím |
+|---|---|---|
+| Přejmenování barev zneviditelní barvy v klientském portálu | AD04 | paleta do `:root` **před** codemodem; portál v kontrolním seznamu každého vizuálního sezení |
+| Změna `app/globals.css` prostřelí Workspace a landing | AD04 | `/w` a `/` porovnat před/po; čtyři oddělené commity |
+| 143 souborů najednou | AD04, AD18 | codemod přes `git grep`, po souborech, `git diff --stat` ke čtení |
+| Peníze: faktury, příjmy, daňový základ | AD12, AD13 | archiv se nedotkne (`kind='archived'`), nová cesta oddělená, testy nad PGlite, krok = commit |
+| Backfill kontaktů nad skutečnými daty | AD09 | skript s dry-run, pouští Kryštof; sporné nechat nepřiřazené; `merged_into` místo mazání |
+| Osobní údaje a klíče v paměti | AD15 | `redact()` z `lib/project-activity.ts`, odmítnout text s markerem, retence 3 roky |
+| AI dostane pokyn z textu klienta | AD14 | vstupy z portálu jsou data, ne instrukce; asistent nikdy nekoná sám |
+| Admin běží v produkci během přepisu | AD17 | jedna obrazovka = jeden commit; deploy po sezeních |
+
+---
+
+## 11. Naměřeno
+
+*Doplní AD00 (před) a AD06, AD08, AD18 (po). Nepsat číslo, které nevzniklo měřením.*
+
+| Obrazovka | Kol do DB před | Kol po | p75 před | p75 po |
+|---|---|---|---|---|
+| `/dashboard` (Dnes) | — | — | — | — |
+| `/dashboard/[id]` | 12 (5 vln) | — | — | — |
+| `/dashboard/calls` | 5 | — | — | — |
+| `/dashboard/calendar` | 7 | — | — | — |
+| `/dashboard/faktury` | 5 | — | — | — |
+| `/hub/finance` | ~12 (3 vlny) | — | — | — |
+
+Zakázané třídy (ukazatel z AD04 h): `muted-foreground` 1057 · `rounded-xl|2xl|lg` 710 ·
+`brand-*` 668 · `border-border` 536 · duhové `bg-{barva}-NNN` 477 · `bg-white` 302.
+
+## 12. Zápis do paměti
+
+**Zapsáno 2026-11-10:** **R-081** (Dílky i v adminu; přepisuje R-027, rozšiřuje R-071), **R-082**
+(paralelní postup vůči launchi; cesta na produkci zůstává otevřená — otázka A), **R-083**
+(vystavování faktur v adminu), **R-084** (AI navrhuje, člověk potvrzuje; kontakt odkazy, ne VoIP),
+**R-085** (paměť projektu: facts + AI shrnutí).
+**Zapsáno 2026-11-10 večer (druhé kolo zadání):** **R-087** (Hub se ruší, jedna navigace —
+mění R-081 v části „Hub v rozsahu"), **R-088** (Alteno není byznys, ale zdroj poptávky; tři weby
+do jednoho inboxu — mění R-008), **R-089** (Škola, Sport, Plány a Šablony se mažou včetně tabulek),
+**R-090** (Dokončené se slučují do zakázky, hodnocení automaticky, předávací dokument).
+**Zbývá:** **R-086** (ARES jako nová vnější závislost) se zapíše až v AD12.
+Technická fakta průběžně do `docs/admin/AGENTS-ADMIN.md`, changelog a stav po každém sezení.
