@@ -64,6 +64,12 @@ const nextConfig = {
     '/api/cron/ws-email': ['./node_modules/@sparticuz/chromium/bin/**/*'],
   },
   experimental: {
+    // Zpět a Vpřed v adminu po dobu 30 s nesahají do databáze (AD06). Dřív
+    // každý návrat na seznam pustil všechny dotazy znovu — a to i když se
+    // mezitím nic nestalo. Půl minuty je kompromis: data po akci se stejně
+    // obnovují cíleně přes `revalidatePath`, takže po vlastní akci se stará
+    // data neukážou — jen při prostém listování tam a zpět.
+    staleTimes: { dynamic: 30, static: 180 },
     serverActions: {
       // PDF faktury chodí server actionou jako FormData. Výchozí 1 MB by
       // propustilo jen ty nejmenší. Strop aplikace je 4 MB (MAX_PDF_BYTES

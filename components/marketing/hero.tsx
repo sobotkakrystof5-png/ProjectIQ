@@ -1,3 +1,5 @@
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { AccentHeading } from '@/components/ws/brand'
 import { CTA_LABEL, ROUTES, SUPPORT_FORM_HREF } from './content'
 import { HeroBackdrop } from './hero-backdrop'
@@ -8,14 +10,17 @@ import { LiveDemo } from './live-demo'
 const TRUST = ['14 dní zdarma', 'Kartu zadáte při registraci', 'Poté 249 Kč měsíčně', 'Zrušíte kdykoli'] as const
 
 /** Úvod Dílků s kalendářem a příběhem jedné ukázkové poptávky. */
-export function Hero() {
+export async function Hero() {
+  // Stav přihlášení se čte na serveru (AD06): landing page díky tomu
+  // nenačítá NextAuth v prohlížeči a nevolá /api/auth/session.
+  const signedIn = Boolean(await getServerSession(authOptions))
   return (
     <section aria-label="Úvod" className="relative">
       {/* Společná tmavá plocha drží úvod a příběh pohromadě. */}
       <HeroBackdrop />
 
       <div className="relative">
-        <Header variant="hero" />
+        <Header variant="hero" signedIn={signedIn} />
 
         <div className="mx-auto max-w-[1200px] px-5 pt-10 sm:px-7 md:pt-16">
           <div className="flex max-w-[860px] flex-col items-start gap-6">

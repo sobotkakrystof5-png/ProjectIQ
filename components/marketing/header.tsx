@@ -2,19 +2,22 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSession } from 'next-auth/react'
 import { Menu, X } from 'lucide-react'
 import { Logo } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
 import { NAV, ROUTES } from './content'
 
 /**
- * Přihlášený admin (NextAuth z kořenového SessionProvideru) uvidí místo „Přihlásit"
- * odkaz do administrace — dřív ho tam `/` přesměrovala sama (R-034).
+ * Přihlášený admin uvidí místo „Přihlásit" odkaz do administrace — dřív ho
+ * tam `/` přesměrovala sama (R-034).
+ *
+ * Stav přihlášení přichází ze serveru jako prop (AD06). Dřív ho zjišťoval
+ * `useSession()`, kvůli kterému musel `SessionProvider` obalovat celou
+ * aplikaci — a každý návštěvník landing page tak po načtení volal
+ * `/api/auth/session`, i když žádný admin není.
  */
-function SignInLink({ className }: { className?: string }) {
-  const { status } = useSession()
-  if (status === 'authenticated') {
+function SignInLink({ className, signedIn }: { className?: string; signedIn: boolean }) {
+  if (signedIn) {
     return (
       <a href={ROUTES.adminHome} className={className}>
         Do administrace
@@ -89,7 +92,7 @@ function NavLinks({ active, onDark, onNavigate }: { active: string | null; onDar
  * Hlavička landing page. `variant="hero"` = uvnitř tmavého úvodu; po odjetí z něj se nahoře
  * přichytí kompaktní tmavá pilulka. `variant="page"` = právní stránky (vždy tmavý pruh).
  */
-export function Header({ variant = 'hero' }: { variant?: 'hero' | 'page' }) {
+export function Header({ variant = 'hero', signedIn = false }: { variant?: 'hero' | 'page'; signedIn?: boolean }) {
   const sentinel = useRef<HTMLDivElement>(null)
   const pinnedBar = useRef<HTMLDivElement>(null)
   const [pinned, setPinned] = useState(false)
@@ -134,7 +137,7 @@ export function Header({ variant = 'hero' }: { variant?: 'hero' | 'page' }) {
       </nav>
 
       <div className="flex items-center gap-1.5">
-        <SignInLink className="hidden min-h-[44px] items-center rounded-full px-4 text-base text-navy-100 transition-colors hover:text-white sm:inline-flex" />
+        <SignInLink signedIn={signedIn} className="hidden min-h-[44px] items-center rounded-full px-4 text-base text-navy-100 transition-colors hover:text-white sm:inline-flex" />
         <a
           href={ROUTES.signUp}
           className="inline-flex min-h-[44px] items-center rounded-full bg-white px-5 text-base font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50"
@@ -190,7 +193,7 @@ export function Header({ variant = 'hero' }: { variant?: 'hero' | 'page' }) {
                 {item.label}
               </a>
             ))}
-            <SignInLink className="flex min-h-[48px] items-center rounded-chip px-4 text-lg text-navy-100 hover:bg-white/10" />
+            <SignInLink signedIn={signedIn} className="flex min-h-[48px] items-center rounded-chip px-4 text-lg text-navy-100 hover:bg-white/10" />
           </nav>
         </div>
       )}

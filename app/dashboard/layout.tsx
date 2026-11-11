@@ -11,7 +11,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
-  const counts = await loadAdminCounts()
+  // Příslib, ne await (AD06): kostra se pošle hned a odznaky doskočí samy.
+  const counts = loadAdminCounts()
   return (
     <AdminShell email={session.user?.email ?? ''} counts={counts}>
       {children}

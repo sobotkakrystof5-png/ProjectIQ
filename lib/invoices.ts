@@ -1,4 +1,6 @@
 import { sql } from '@/lib/db'
+import { projectPath } from '@/lib/lead-origins'
+import type { InvoiceListItem, InvoiceRegistryItem } from '@/app/dashboard/finance/invoice-actions'
 import type { Invoice, InvoiceAiExtract } from '@/lib/types'
 import {
   MAX_PDF_BYTES, MAX_PDF_LABEL, INVOICE_INCOME_CATEGORY,
@@ -32,6 +34,34 @@ export const INCOME_JOIN = `
 `
 
 export const OTHER_INCOME_COUNT = `GREATEST(COALESCE(inc.n, 0) - CASE WHEN own.id IS NULL THEN 0 ELSE 1 END, 0)::int AS other_income_count`
+
+/** Řádek výpisu faktur tak, jak ho vrací `INVOICE_COLUMNS` + `OTHER_INCOME_COUNT`. */
+export type InvoiceRow = Omit<InvoiceListItem, 'project_href' | 'duplicate_risk'> & {
+  project_lead_origin: string | null
+  other_income_count: number
+}
+
+/** Řádek evidence: navíc popis zakázky (AD07 ho používá i při hledání). */
+export type InvoiceRegistryRow = InvoiceRow & { project_description: string | null }
+
+/**
+ * „Kolik příjmů zakázky tahle faktura nezastupuje" — jediný signál dvojího
+ * započtení, který jde spočítat v DB. Příjmy se sečtou jednou (`GROUP BY`)
+ * a od součtu se odečte vlastní transakce faktury, když do téhož součtu patří.
+ */
+export function toInvoiceItem(row: InvoiceRow): InvoiceListItem {
+  const { project_lead_origin: _origin, other_income_count, ...rest } = row
+  return {
+    ...rest,
+    project_href: rest.project_id !== null ? projectPath(rest.project_id) : null,
+    duplicate_risk: rest.paid_on !== null && other_income_count > 0,
+  }
+}
+
+export function toInvoiceRegistryItem(row: InvoiceRegistryRow): InvoiceRegistryItem {
+  const { project_description, ...base } = row
+  return { ...toInvoiceItem(base), project_description }
+}
 
 /**
  * Sdílené jádro archivu faktur. Žije mimo `'use server'` soubor schválně —

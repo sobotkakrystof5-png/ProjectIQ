@@ -154,7 +154,7 @@ export function ClientsView({
           <PageLink href={`/dashboard/klienti?strana=${page - 1}`} disabled={page <= 1}>
             Předchozí
           </PageLink>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-quiet">
             Strana {page} z {pages}
           </p>
           <PageLink href={`/dashboard/klienti?strana=${page + 1}`} disabled={page >= pages}>
@@ -169,12 +169,12 @@ export function ClientsView({
 /** Odkaz na stránku seznamu; vypnutý se nevykreslí jako odkaz. */
 function PageLink({ href, disabled, children }: { href: string; disabled: boolean; children: React.ReactNode }) {
   const className =
-    "inline-flex min-h-11 items-center rounded-chip border border-border px-4 text-sm font-medium";
+    "inline-flex min-h-11 items-center rounded-chip border border-navy-100 px-4 text-sm font-medium";
   if (disabled) {
-    return <span className={cn(className, "text-muted-foreground/50")}>{children}</span>;
+    return <span className={cn(className, "text-quiet/60")}>{children}</span>;
   }
   return (
-    <Link href={href} className={cn(className, "text-foreground hover:border-navy-300")}>
+    <Link href={href} className={cn(className, "text-ink hover:border-navy-300")}>
       {children}
     </Link>
   );

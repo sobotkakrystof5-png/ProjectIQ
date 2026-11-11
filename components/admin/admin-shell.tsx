@@ -1,7 +1,8 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { Bell } from 'lucide-react'
 import { LogoutButton } from '@/app/dashboard/LogoutButton'
-import { formatBadge, type AdminCounts } from '@/lib/admin-nav'
+import { EMPTY_COUNTS, formatBadge, type AdminCounts } from '@/lib/admin-nav'
 import { cn } from '@/lib/utils'
 import { AdminMobileTabs, AdminNavList } from './admin-nav'
 import { AdminRoot } from './admin-root'
@@ -42,6 +43,22 @@ function BellLink({ count }: { count: number }) {
 }
 
 /**
+ * Kostra se nečeká na čísla u odznaků (AD06). `counts` je příslib, ne hodnota:
+ * menu, hledání i obsah se vykreslí hned a odznaky doskočí, až databáze
+ * odpoví. Dokud neodpoví, kreslí se menu s nulami — ne kostlivec, protože
+ * položky menu jsou známé a blikat by neměly.
+ */
+async function Badges({
+  counts,
+  render,
+}: {
+  counts: Promise<AdminCounts>
+  render: (counts: AdminCounts) => React.ReactNode
+}) {
+  return render(await counts)
+}
+
+/**
  * Společná kostra administrace (KP01, R-071) pro /dashboard: postranní
  * menu na počítači, horní lišta a spodní lišta na telefonu, hledání ⌘K. Chrome
  * i obsah používá Dílky (`data-app="admin"`, app/admin-tokens.css); písma nese
@@ -53,10 +70,15 @@ export function AdminShell({
   children,
 }: {
   email: string
-  counts: AdminCounts
+  counts: Promise<AdminCounts>
   children: React.ReactNode
 }) {
   const initials = email.slice(0, 2).toUpperCase()
+  const withCounts = (render: (c: AdminCounts) => React.ReactNode, fallback: React.ReactNode) => (
+    <Suspense fallback={fallback}>
+      <Badges counts={counts} render={render} />
+    </Suspense>
+  )
   return (
     <AdminRoot>
       <a
@@ -70,13 +92,13 @@ export function AdminShell({
       <aside className="hidden font-ws lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-64 lg:flex-col border-r border-navy-100 bg-surface">
         <div className="flex items-center justify-between gap-2 px-4 py-4">
           <Logo />
-          <BellLink count={counts.notifications} />
+          {withCounts((c) => <BellLink count={c.notifications} />, <BellLink count={0} />)}
         </div>
         <div className="px-3 pb-3">
           <AdminSearch className="w-full" />
         </div>
         <div className="flex-1 overflow-y-auto px-3 pb-4">
-          <AdminNavList counts={counts} />
+          {withCounts((c) => <AdminNavList counts={c} />, <AdminNavList counts={EMPTY_COUNTS} />)}
         </div>
         <div className="flex items-center justify-between gap-2 border-t border-navy-100 px-4 py-3">
           <Link href="/dashboard/profil" className="flex min-w-0 items-center gap-2" title="Profil a statistiky">
@@ -95,7 +117,7 @@ export function AdminShell({
           <Logo />
           <div className="flex items-center gap-1">
             <AdminSearch />
-            <BellLink count={counts.notifications} />
+            {withCounts((c) => <BellLink count={c.notifications} />, <BellLink count={0} />)}
           </div>
         </header>
 
@@ -107,7 +129,7 @@ export function AdminShell({
       </div>
 
       <div className="font-ws">
-        <AdminMobileTabs counts={counts} />
+        {withCounts((c) => <AdminMobileTabs counts={c} />, <AdminMobileTabs counts={EMPTY_COUNTS} />)}
       </div>
     </AdminRoot>
   )
