@@ -858,7 +858,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | **hotovo 2026-11-11** (migrace jen na testu) |
 | AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | **hotovo 2026-11-11** (migrace jen na testu) |
 | AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | **hotovo 2026-11-11** |
-| AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | nezačato |
+| AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | nezačato |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | nezačato |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | nezačato |
@@ -1006,6 +1006,27 @@ jako strop — když počet naroste, test padne.
 Obrazovky zjištěné jen průzkumem kódu načítají data uvnitř stránky nebo v komponentě,
 takže je čítač zatím nepokrývá; AD06 jim data stáhne do `lib/admin/db.ts` a tím je
 změřitelné udělá.
+
+### Staré třídy v adminu
+
+Ukazatel postupu místo screenshot testů. Počítá `components/admin/__tests__/admin-classes.test.ts`
+nad `app/dashboard`, `app/p`, `app/h`, `app/(auth)`, `app/globals.css`, `components/*.tsx`,
+`components/admin` a `lib/types.ts` (272 souborů) — tedy nad tím, co AD05 a AD17 překreslují.
+Test tvrdí „nejvýš strop", takže úklid nikdy neblokuje, ale návrat staré třídy ano.
+**Po každém sezení snížit na naměřenou hodnotu.**
+
+| Třída | Strop po AD04 (2026-11-11) | Po AD05 | Po AD17 |
+|---|---|---|---|
+| `muted-foreground` | 743 | — | — |
+| `rounded-lg\|xl\|2xl` | 463 | — | — |
+| `border-border` | 335 | — | — |
+| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | — | — |
+| `bg-white` | 211 | — | — |
+| `brand-*` | **0** | 0 | 0 |
+
+Čísla z plánu (1057 / 710 / 536 / 477 / 302) byla měřená před AD01, který smazal čtyři moduly,
+a nad jiným rozsahem souborů — nejsou s těmihle porovnatelná. `brand-*` je nula od AD04;
+zbývá jen `.brand-gradient` (44×) a `colors.brand` v `tailwind.config.ts`, obojí maže AD18.
 
 ### JavaScript na trase
 
