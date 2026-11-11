@@ -12,5 +12,8 @@ export default defineConfig({
   oxc: { jsx: { runtime: 'automatic' } },
   test: {
     environment: 'node',
+    // Staré worktree v .claude/worktrees/ nejsou v gitu, ale vitest by v nich
+    // posbíral stovky testů ze starších verzí repa (a desítky padajících).
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.claude/worktrees/**'],
   },
 })

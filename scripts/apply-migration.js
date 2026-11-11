@@ -4,7 +4,14 @@
 // Migrace v tomhle projektu jsou psané idempotentně (IF NOT EXISTS,
 // DO $$ ... $$ guard na constrainty), takže opakovaný běh je bezpečný.
 //
-// S --dry se příkazy jen vypíšou, nic se neprovede.
+// Přepínače:
+//   --dry     příkazy se jen vypíšou, nic se neprovede (ani evidence)
+//   --znovu   aplikuje i migraci, která už je v evidenci
+//
+// Evidence: tabulka public.schema_migrations (soubor, čas, hash, počet
+// příkazů). Běhoun ji sám založí a už aplikovanou migraci se stejným
+// hashem přeskočí. Změněný soubor se pustí znovu (migrace jsou
+// idempotentní) a hash v evidenci se přepíše.
 //
 // Neonový HTTP driver pošle jeden příkaz na request, proto se soubor
 // rozdělí po středníkách. Splitter respektuje dollar-quoted bloky
@@ -12,6 +19,7 @@
 
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 const { neon } = require('@neondatabase/serverless')
 
 // .env.local se čte ručně — dotenv není v závislostech projektu.
@@ -66,6 +74,13 @@ function splitStatements(raw) {
   return statements.filter(Boolean)
 }
 
+const EVIDENCE = `CREATE TABLE IF NOT EXISTS public.schema_migrations (
+  filename    text PRIMARY KEY,
+  applied_at  timestamptz NOT NULL DEFAULT now(),
+  sha256      text NOT NULL,
+  statements  integer NOT NULL
+)`
+
 async function main() {
   loadEnvLocal()
   if (!process.env.DATABASE_URL) {
@@ -75,22 +90,52 @@ async function main() {
 
   const args = process.argv.slice(2)
   const dry = args.includes('--dry')
-  const files = args.filter((a) => a !== '--dry')
+  const znovu = args.includes('--znovu')
+  const files = args.filter((a) => !a.startsWith('--'))
   if (files.length === 0) {
-    console.error('Použití: node scripts/apply-migration.js [--dry] <soubor.sql> [další.sql ...]')
+    console.error('Použití: node scripts/apply-migration.js [--dry] [--znovu] <soubor.sql> [další.sql ...]')
     process.exit(1)
   }
 
   const sql = neon(process.env.DATABASE_URL)
+  // Host se vypisuje vždy — ať je na první pohled vidět, do které databáze se píše.
+  let host = '(neznámý host)'
+  try { host = new URL(process.env.DATABASE_URL).host } catch {}
+  console.log(`Databáze: ${host}${dry ? '  (--dry, nic se nezapíše)' : ''}\n`)
+
+  let applied = 0
+  let skipped = 0
+
+  if (!dry) await sql.query(EVIDENCE)
+
+  const evidence = dry
+    ? new Map()
+    : new Map((await sql.query('SELECT filename, sha256 FROM public.schema_migrations')).map((r) => [r.filename, r.sha256]))
 
   for (const file of files) {
-    const filePath = path.join(__dirname, '..', 'migrations', path.basename(file))
+    const name = path.basename(file)
+    // Cesta se bere, jak je zadaná (funguje i scripts/admin-base-schema.sql);
+    // samotný název souboru se dohledá v migrations/.
+    const filePath = fs.existsSync(file) ? file : path.join(__dirname, '..', 'migrations', name)
     if (!fs.existsSync(filePath)) {
       console.error(`Migrace ${file} neexistuje (${filePath}).`)
       process.exit(1)
     }
-    const statements = splitStatements(fs.readFileSync(filePath, 'utf8'))
-    console.log(`▶ ${path.basename(file)} — ${statements.length} příkaz(ů)`)
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const hash = crypto.createHash('sha256').update(raw).digest('hex')
+    const statements = splitStatements(raw)
+
+    const known = evidence.get(name)
+    if (known && !znovu) {
+      if (known === hash) {
+        console.log(`· ${name} — už aplikována, přeskočeno`)
+        skipped++
+        continue
+      }
+      console.log(`! ${name} — soubor se od aplikace změnil, pouštím znovu`)
+    }
+
+    console.log(`▶ ${name} — ${statements.length} příkaz(ů)`)
     for (const stmt of statements) {
       if (dry) { console.log(`  · ${stmt.replace(/\s+/g, ' ').slice(0, 100)}`); continue }
       try {
@@ -101,10 +146,19 @@ async function main() {
         process.exit(1)
       }
     }
+    if (!dry) {
+      await sql.query(
+        `INSERT INTO public.schema_migrations (filename, sha256, statements)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (filename) DO UPDATE SET sha256 = EXCLUDED.sha256, statements = EXCLUDED.statements, applied_at = now()`,
+        [name, hash, statements.length],
+      )
+    }
     console.log('  ✓ hotovo')
+    applied++
   }
 
-  console.log('\nVšechny migrace aplikovány.')
+  console.log(`\n${dry ? 'Náhled hotov' : 'Hotovo'}: ${applied} aplikováno, ${skipped} přeskočeno.`)
 }
 
 main()
