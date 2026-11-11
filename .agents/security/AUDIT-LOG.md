@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-04 — incident: produkce bez databáze po výměně hesla `neondb_owner`
+Spouštěč: hlášení Kryštofa (na produkci „Application error: a server-side exception has occurred“, digest 1150213469).
+Rozsah: Vercel runtime errors za 3 dny, env proměnné projektu `project-iq` (jen metadata, hodnoty nedešifrované), `.env.local` (jen host a role, čtecí dotaz na existenci tabulek), produkční deploy.
+Výsledek: výpadek všeho nad `DATABASE_URL` na produkci. Příčina v konfiguraci, ne v kódu (produkce dál na `d948400` z 2026-09-19).
+Nálezy: (1) Heslo `neondb_owner` na produkčním Neonu (`projectiq`) bylo vyměněné (rotace po vložení connection stringu do chatu 2026-11-01), ale Production `DATABASE_URL` ve Vercelu zůstala z 2026-06-14 → `NeonDbError: password authentication failed for user 'neondb_owner'`. První zachycená chyba 2026-11-04 10:38 (09:38 UTC), do opravy 12× na `/hub`, 2 uživatelé. Postiženo i `/dashboard`, `/alteno`, portál `/p/[token]` a veřejné endpointy poptávek z vizeon.cz a alteno.cz. Přesný čas výměny hesla neznámý (Hobby drží runtime logy 1 h). (2) `.env.local` → `DATABASE_URL` míří na testovací Neon `ZakazIQ RD test` (bez `projects` a `client_leads`), jako zdroj pro Production se nehodí: chyba hesla by se změnila v chybějící tabulky. (3) Bez monitoringu se o výpadku ví jen z hlášení.
+Opraveno: Kryštof uložil nový connection string do Production `DATABASE_URL` (`vercel env update`, citlivá, 2026-11-04 14:31). Produkce znovu nasazená (`vercel redeploy`, stejný commit `d948400`, alias `www.zakaziq.cz`). Ověřeno: `/p/<neexistující token>` vrací 404 (dotaz do DB prošel, dřív 500), `/login` 200, 10 minut po nasazení žádný záznam v runtime logu. Výměna hesla `neondb_owner` je tím potvrzená.
+Zůstává: přihlášený `/hub` po opravě nikdo neotevřel; ověřit, jestli 2026-11-04 nepropadla poptávka z vizeon.cz nebo alteno.cz; monitoring chyb (STATE → Otevřené položky). Při příští rotaci hesla měnit Neon a Vercel Production v jednom kroku a hned znovu nasadit.
+
 ## 2026-11-03 — review celého kódu před spuštěním
 Spouštěč: žádost Kryštofa o kompletní revizi designu, frontendu a backendu před spuštěním.
 Rozsah: `proxy.ts`, `next.config.mjs`, `lib/security/*`, autorizace všech 53 souborů se server actions a všech API rout (admin, Workspace, veřejné, webhooky, crony), `lib/ws/db.ts`, `context.ts`, klíče, rate limit, příjem poptávek, `/r` a `/z` akce, kontaktní formulář, přepis hlasu, hlášení z Claude Code, pozvánky, předání do terminálu, e-mailové šablony, PDF (Puppeteer), Stripe/Resend webhooky, NextAuth, CI, design systém ve frontendu. `npm audit` (0), `tsc` (0 chyb), `npm test`.
