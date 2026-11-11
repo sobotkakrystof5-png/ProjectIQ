@@ -9,7 +9,7 @@ import { portalDb } from '@/lib/portal/db'
 import { pgErrorCode } from '@/lib/ws/db'
 import { sendBrandedEmail } from '@/lib/email'
 import { createNotification } from '@/lib/notifications'
-import { adminEmailFor, projectPath, toBusiness } from '@/lib/business'
+import { adminEmail, projectPath } from '@/lib/lead-origins'
 import { clientRequestSchema, REQUEST_KIND_LABELS } from '@/lib/client-requests'
 import { summarizeClientRequest } from '@/lib/client-request-ai'
 
@@ -42,11 +42,11 @@ function explain(err: unknown, limitMessage: string): string {
   }
 }
 
-interface ProjectInfo { client_name: string; description: string | null; focus: string | null; business: string }
+interface ProjectInfo { client_name: string; description: string | null; focus: string | null }
 
 /** Údaje o zakázce pro upozornění adminovi (lib/db, vlastník tabulek). */
 async function adminProjectInfo(projectId: string): Promise<ProjectInfo | null> {
-  const rows = await sql`SELECT client_name, description, focus, business FROM projects WHERE id = ${projectId} LIMIT 1`
+  const rows = await sql`SELECT client_name, description, focus FROM projects WHERE id = ${projectId} LIMIT 1`
   return (rows[0] as ProjectInfo | undefined) ?? null
 }
 
@@ -72,7 +72,6 @@ export async function sendRequest(projectId: string, raw: { text: string; source
   revalidatePath(`/klient/projekt/${id.data}`)
   revalidatePath('/dashboard/pozadavky')
   if (!info) return { success: true }
-  const business = toBusiness(info.business)
 
   void createNotification({
     type: 'client_request_received',
@@ -103,7 +102,7 @@ export async function sendRequest(projectId: string, raw: { text: string; source
     } catch (err) {
       console.error('[klient] uložení shrnutí selhalo:', err instanceof Error ? err.name : 'unknown')
     }
-    const to = adminEmailFor(business)
+    const to = adminEmail()
     if (to) {
       await sendBrandedEmail({
         to,
@@ -120,7 +119,6 @@ export async function sendRequest(projectId: string, raw: { text: string; source
             : [{ label: 'Text klienta', value: parsed.data.text }]),
         ],
         ctas: [{ label: 'Otevřít požadavky', href: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard/pozadavky` }],
-        business,
       })
     }
   })
@@ -148,7 +146,7 @@ export async function sendMessage(projectId: string, raw: { body: string }): Pro
       type: 'client_request_received',
       title: `Nová zpráva od klienta — ${info.client_name}`,
       body: parsed.data.body.slice(0, 200),
-      link: `${projectPath(toBusiness(info.business), id.data)}?zalozka=zpravy`,
+      link: `${projectPath(id.data)}?zalozka=zpravy`,
     })
   }
   revalidatePath(`/klient/projekt/${id.data}`)
@@ -177,7 +175,7 @@ export async function sendFeedback(projectId: string, raw: { nps: number; conten
       type: 'feedback_submitted',
       title: `Nové hodnocení od klienta — ${info.client_name}`,
       body: `NPS: ${parsed.data.nps}/10${parsed.data.content ? ' · ' + parsed.data.content : ''}`,
-      link: projectPath(toBusiness(info.business), id.data),
+      link: projectPath(id.data),
     })
   }
   revalidatePath(`/klient/projekt/${id.data}`)

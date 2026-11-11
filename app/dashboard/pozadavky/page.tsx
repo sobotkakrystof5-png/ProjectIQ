@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { sql } from '@/lib/db'
-import { BUSINESSES, projectPath, toBusiness } from '@/lib/business'
+import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { buildTerminalCommand } from '@/lib/claude-code-handoff'
 import { buildClaudeCodePrompt, type ClientRequestRow } from '@/lib/client-requests'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
@@ -15,30 +15,29 @@ type JoinedRow = ClientRequestRow & {
   description: string | null
   focus: string | null
   project_url: string | null
-  business: string | null
+  lead_origin: string | null
 }
 
-// Požadavky klientů z portálu napříč VIZEON i ALTENO (jedna fronta, jeden člověk).
+// Požadavky klientů z portálu — jedna fronta pro všechny zakázky.
 export default async function PozadavkyPage({ searchParams }: PageProps) {
   const { stav } = await searchParams
   const showClosed = stav === 'vyrizene'
 
   const rows = (showClosed
     ? await sql`
-        SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.business
+        SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.lead_origin
         FROM client_requests r JOIN projects p ON p.id = r.project_id
         WHERE r.status <> 'new'
         ORDER BY r.created_at DESC LIMIT 100
       `
     : await sql`
-        SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.business
+        SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.lead_origin
         FROM client_requests r JOIN projects p ON p.id = r.project_id
         WHERE r.status = 'new'
         ORDER BY r.created_at DESC LIMIT 100
       `) as unknown as JoinedRow[]
 
   const cards: ClientRequestCardData[] = rows.map(r => {
-    const business = toBusiness(r.business)
     const prompt = buildClaudeCodePrompt(r, {
       clientName: r.client_name,
       description: r.description,
@@ -48,8 +47,8 @@ export default async function PozadavkyPage({ searchParams }: PageProps) {
     return {
       id: r.id,
       clientName: r.client_name,
-      projectHref: projectPath(business, r.project_id),
-      businessLabel: BUSINESSES[business].label,
+      projectHref: projectPath(r.project_id),
+      originLabel: LEAD_ORIGINS[toLeadOrigin(r.lead_origin)].label,
       source: r.source,
       status: r.status,
       aiStatus: r.ai_status,

@@ -7,18 +7,16 @@ import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@
 import { sendBrandedEmail } from '@/lib/email'
 import { SURVEY_CATEGORIES } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
-import { projectPath, toBusiness, adminEmailFor, type Business } from '@/lib/business'
+import { projectPath, adminEmail } from '@/lib/lead-origins'
 import { clientRequestSchema, REQUEST_KIND_LABELS } from '@/lib/client-requests'
 import { summarizeClientRequest } from '@/lib/client-request-ai'
 
 type ActionResult = { success: boolean; error?: string }
 
-// Klientský portál je společný pro VIZEON i ALTENO, ale odkaz v notifikaci
-// i revalidace musí mířit do sekce, kam zakázka patří.
-async function getProjectByToken(token: string): Promise<{ id: string; business: Business } | null> {
-  const rows = await sql`SELECT id, business FROM projects WHERE public_token = ${token} LIMIT 1`
-  const row = rows[0] as { id: string; business: string | null } | undefined
-  return row ? { id: row.id, business: toBusiness(row.business) } : null
+async function getProjectByToken(token: string): Promise<{ id: string } | null> {
+  const rows = await sql`SELECT id FROM projects WHERE public_token = ${token} LIMIT 1`
+  const row = rows[0] as { id: string } | undefined
+  return row ? { id: row.id } : null
 }
 
 // Throttle abuse of public, unauthenticated endpoints (token-only protection).
@@ -60,7 +58,7 @@ export async function submitFeedback(
 
   const project = await getProjectByToken(token)
   if (!project) return { success: false, error: 'Projekt nenalezen.' }
-  const { id: projectId, business } = project
+  const { id: projectId } = project
 
   if (await isRateLimited('client_feedback', projectId, 10, 3)) {
     return { success: false, error: 'Příliš mnoho hodnocení v krátkém čase. Zkuste to prosím později.' }
@@ -74,19 +72,19 @@ export async function submitFeedback(
     VALUES (${projectId}, ${parsed.data.nps}, ${parsed.data.content ?? null})
   `
 
-  revalidatePath(projectPath(business, projectId))
+  revalidatePath(projectPath(projectId))
 
   void createNotification({
     type: 'feedback_submitted',
     title: `Nové hodnocení od klienta — ${clientName}`,
     body: `NPS: ${parsed.data.nps}/10${parsed.data.content ? ' · ' + parsed.data.content : ''}`,
-    link: projectPath(business, projectId),
+    link: projectPath(projectId),
   })
 
-  const adminEmail = adminEmailFor(business)
-  if (adminEmail) {
+  const to = adminEmail()
+  if (to) {
     await sendBrandedEmail({
-      to: adminEmail,
+      to,
       subject: `Nové hodnocení od klienta – ${clientName}`,
       heading: 'Nové hodnocení projektu',
       intro: `Klient ${clientName} právě odeslal hodnocení přes klientský portál.`,
@@ -95,7 +93,6 @@ export async function submitFeedback(
         { label: 'NPS hodnocení', value: `${parsed.data.nps} / 10` },
         ...(parsed.data.content ? [{ label: 'Komentář', value: parsed.data.content }] : []),
       ],
-      business,
     })
   }
 
@@ -142,7 +139,7 @@ export async function submitConsultation(
 
   const project = await getProjectByToken(token)
   if (!project) return { success: false, error: 'Projekt nenalezen.' }
-  const { id: projectId, business } = project
+  const { id: projectId } = project
 
   if (await isRateLimited('consultation_slots', projectId, 30, 3)) {
     return { success: false, error: 'Příliš mnoho rezervací v krátkém čase. Zkuste to prosím později.' }
@@ -166,7 +163,7 @@ export async function submitConsultation(
     return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
   }
 
-  const adminEmail = adminEmailFor(business)
+  const to = adminEmail()
   const formattedTime = new Intl.DateTimeFormat('cs-CZ', {
     timeZone: 'Europe/Prague',
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -180,15 +177,14 @@ export async function submitConsultation(
     { label: 'Komunikační kanál', value: channelName },
   ]
 
-  if (adminEmail) {
+  if (to) {
     await sendBrandedEmail({
-      to: adminEmail,
+      to,
       subject: 'Nová rezervace konzultace – ZakazIQ',
       heading: 'Nová rezervace konzultace',
       intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji. Níže najdete vše potřebné.',
       fields: [...fields, { label: 'Přání klienta', value: parsed.data.clientWish }],
       ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
-      business,
     })
   }
 
@@ -200,7 +196,6 @@ export async function submitConsultation(
       intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji.',
       fields: [...fields, { label: 'Vaše přání', value: parsed.data.clientWish }],
       ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
-      business,
     })
   }
 
@@ -208,7 +203,7 @@ export async function submitConsultation(
     type: 'consultation_booked',
     title: 'Nová rezervace konzultace',
     body: `${formattedTime} · ${channelName} — ${parsed.data.clientWish}`,
-    link: projectPath(business, projectId),
+    link: projectPath(projectId),
   })
 
   return { success: true }
@@ -263,12 +258,10 @@ export async function submitSurvey(
     link: `/dashboard/hodnoceni`,
   })
 
-  // Dotazník spokojenosti existuje jen u "Dokončené" — funkce dostupná
-  // výhradně ve VIZEON sekci (viz AGENTS.md), completed_projects nemá sloupec business.
-  const adminEmail = adminEmailFor('vizeon')
-  if (adminEmail) {
+  const to = adminEmail()
+  if (to) {
     await sendBrandedEmail({
-      to: adminEmail,
+      to,
       subject: `Nový vyplněný dotazník – ${cp.client_name ?? cp.title}`,
       heading: 'Nový vyplněný dotazník spokojenosti',
       intro: `Klient ${cp.client_name ?? cp.title} právě vyplnil dotazník spokojenosti k projektu „${cp.title}".`,
@@ -276,7 +269,6 @@ export async function submitSurvey(
         ...SURVEY_CATEGORIES.map(c => ({ label: c.label, value: `${d[c.key]} / 5` })),
         ...(d.reference_text?.trim() ? [{ label: 'Reference', value: d.reference_text.trim() }] : []),
       ],
-      business: 'vizeon',
     })
   }
 
@@ -294,7 +286,7 @@ export async function submitClientRequest(
 
   const project = await getProjectByToken(token)
   if (!project) return { success: false, error: 'Projekt nenalezen.' }
-  const { id: projectId, business } = project
+  const { id: projectId } = project
 
   if (await isRateLimited('client_requests', projectId, 30, 5)) {
     return { success: false, error: 'Poslali jste hodně požadavků v krátkém čase. Zkuste to prosím později.' }
@@ -352,10 +344,10 @@ export async function submitClientRequest(
       console.error('[ClientRequest] uložení shrnutí selhalo:', err)
     }
 
-    const adminEmail = adminEmailFor(business)
-    if (adminEmail) {
+    const to = adminEmail()
+    if (to) {
       await sendBrandedEmail({
-        to: adminEmail,
+        to,
         subject: `Nový požadavek od klienta – ${info.client_name}`,
         heading: 'Nový požadavek od klienta',
         intro: `Klient ${info.client_name} poslal požadavek přes klientský portál. Zadání pro Claude Code najdete v administraci.`,
@@ -369,7 +361,6 @@ export async function submitClientRequest(
             : [{ label: 'Text klienta', value: parsed.data.text }]),
         ],
         ctas: [{ label: 'Otevřít požadavky', href: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard/pozadavky` }],
-        business,
       })
     }
   })

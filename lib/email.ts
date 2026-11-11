@@ -1,37 +1,38 @@
 import type { Transporter } from 'nodemailer'
-import type { Business } from './business'
 
-// VIZEON má vlastní odesílací schránku (info@vizeon.cz), ALTENO a zbytek appky
-// (přihlášení, Hub) dál jedou přes sdílený GMAIL_USER. Držíme samostatný
-// transporter per účet, aby se nemíchala přihlašovací data mezi schránkami.
+// Jeden byznys = jedna odesílací schránka (AD02, R-088). Pošta jde z vlastní
+// schránky info@vizeon.cz (VIZEON_GMAIL_USER + VIZEON_GMAIL_APP_PASSWORD);
+// sdílený GMAIL_USER je záloha pro případ, že dvojice chybí. Dřív se účet
+// vybíral podle byznysu — poptávky z alteno.cz proto odcházely z jiné adresy
+// než z vizeon.cz. Transporter držíme per účet, aby se nemíchaly údaje.
 type EmailAccount = 'vizeon' | 'default'
 
 const transporters: Partial<Record<EmailAccount, Transporter>> = {}
 
-function credentialsFor(account: EmailAccount): { user: string; pass: string } | null {
-  // VIZEON přepíná účet jen když je nastavená CELÁ dvojice user+pass — dokud
-  // chybí VIZEON_GMAIL_APP_PASSWORD, radši spadneme zpět na výchozí funkční
-  // účet než zkoušet auth s nesedícím heslem (jistý fail u Gmailu).
-  if (account === 'vizeon' && process.env.VIZEON_GMAIL_USER && process.env.VIZEON_GMAIL_APP_PASSWORD) {
-    return { user: process.env.VIZEON_GMAIL_USER, pass: process.env.VIZEON_GMAIL_APP_PASSWORD }
+function credentials(): { account: EmailAccount; user: string; pass: string } | null {
+  // Vlastní schránka se použije jen když je nastavená CELÁ dvojice user+pass —
+  // dokud chybí VIZEON_GMAIL_APP_PASSWORD, radši spadneme zpět na výchozí
+  // funkční účet než zkoušet auth s nesedícím heslem (jistý fail u Gmailu).
+  if (process.env.VIZEON_GMAIL_USER && process.env.VIZEON_GMAIL_APP_PASSWORD) {
+    return { account: 'vizeon', user: process.env.VIZEON_GMAIL_USER, pass: process.env.VIZEON_GMAIL_APP_PASSWORD }
   }
   const user = process.env.GMAIL_USER
   const pass = process.env.GMAIL_APP_PASSWORD
   if (!user || !pass) return null
-  return { user, pass }
+  return { account: 'default', user, pass }
 }
 
-async function getTransporter(business?: Business): Promise<{ transporter: Transporter; from: string } | null> {
-  const account: EmailAccount = business === 'vizeon' ? 'vizeon' : 'default'
-  const creds = credentialsFor(account)
+async function getTransporter(): Promise<{ transporter: Transporter; from: string } | null> {
+  const creds = credentials()
   if (!creds) {
     // Bez tohohle logu je "chybí GMAIL_USER/GMAIL_APP_PASSWORD" k nerozeznání
     // od "Google odmítl přihlášení" (ten padá až v catch bloku níž) — obojí
     // se navenek projeví stejně, jako že email prostě nikdy nedorazil.
-    console.error(`[Email] Chybí přihlašovací údaje pro účet "${account}" — email se neodeslal.`)
+    console.error('[Email] Chybí přihlašovací údaje odesílací schránky — email se neodeslal.')
     return null
   }
 
+  const account = creds.account
   if (!transporters[account]) {
     const nodemailer = await import('nodemailer')
     transporters[account] = nodemailer.createTransport({
@@ -107,9 +108,8 @@ export async function sendBrandedEmail(opts: {
   intro: string
   fields: EmailField[]
   ctas?: EmailCta[]
-  business?: Business
 }): Promise<boolean> {
-  const mailer = await getTransporter(opts.business)
+  const mailer = await getTransporter()
   if (!mailer) return false
   try {
     await mailer.transporter.sendMail({
@@ -152,8 +152,8 @@ function buildPlainLayout(text: string): string {
 // Sends a plain, personal-letter-style email (no ZakazIQ branded header/CTA
 // card) — used when the message should read as coming directly from the
 // admin rather than as an automated notification.
-export async function sendPlainEmail(opts: { to: string; subject: string; text: string; business?: Business }): Promise<boolean> {
-  const mailer = await getTransporter(opts.business)
+export async function sendPlainEmail(opts: { to: string; subject: string; text: string }): Promise<boolean> {
+  const mailer = await getTransporter()
   if (!mailer) return false
   try {
     await mailer.transporter.sendMail({
@@ -182,7 +182,6 @@ export async function sendActivityDigestEmail(opts: {
   clientName: string
   items: { label: string; title: string }[]
   portalUrl: string
-  business?: Business
 }): Promise<boolean> {
   const shown = opts.items.slice(0, ACTIVITY_DIGEST_MAX_ITEMS)
   const rest = opts.items.length - shown.length
@@ -195,6 +194,5 @@ export async function sendActivityDigestEmail(opts: {
     intro: `Dobrý den, ${opts.clientName}, na vašem projektu je něco nového.`,
     fields,
     ctas: [{ label: 'Otevřít přehled projektu', href: opts.portalUrl }],
-    business: opts.business,
   })
 }

@@ -8,5 +8,5 @@ interface PageProps {
 // Detail zakázky VIZEON (KP02): záložky Přehled · Aktivita · Požadavky · Zprávy · Fakturace.
 export default async function ProjectDetailPage(props: PageProps) {
   const [{ id }, { zalozka }] = await Promise.all([props.params, props.searchParams])
-  return <ProjectDetailView projectId={id} expectedBusiness="vizeon" tabParam={zalozka} />
+  return <ProjectDetailView projectId={id} tabParam={zalozka} />
 }

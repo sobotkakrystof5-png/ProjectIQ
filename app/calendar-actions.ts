@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { isoToPragueDateAndTime } from '@/lib/prague-time'
-import type { Business } from '@/lib/business'
+import { DEFAULT_LEAD_ORIGIN } from '@/lib/lead-origins'
 import type { CalendarEventType } from '@/lib/types'
 
 type CalendarEventPayload = {
@@ -15,7 +15,7 @@ type CalendarEventPayload = {
   event_type: CalendarEventType
 }
 
-export async function createCalendarEvent(payload: CalendarEventPayload, business: Business = 'vizeon') {
+export async function createCalendarEvent(payload: CalendarEventPayload) {
   await requireAuth()
 
   if (!payload.title.trim()) throw new Error('Název je povinný.')
@@ -26,9 +26,10 @@ export async function createCalendarEvent(payload: CalendarEventPayload, busines
   const title = payload.title.trim()
   const description = payload.description?.trim() || null
 
-  // Hovory (client_leads) existují jen ve VIZEONu a blokace jsou soukromé
-  // (dovolená, nedostupnost) — nemá smysl je zrcadlit jako kontakt k obvolání.
-  const mirrorToLeads = business === 'vizeon' && payload.event_type !== 'block'
+  // Blokace jsou soukromé (dovolená, nedostupnost) — nemá smysl je zrcadlit
+  // do Hovorů jako kontakt k obvolání. Po sloučení byznysů (AD02) se zrcadlí
+  // všechno ostatní, dřív jen VIZEON.
+  const mirrorToLeads = payload.event_type !== 'block'
 
   try {
     if (mirrorToLeads) {
@@ -39,8 +40,8 @@ export async function createCalendarEvent(payload: CalendarEventPayload, busines
       // nechal osamocenou událost bez páru nebo naopak.
       await sql`
         WITH new_event AS (
-          INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, business)
-          VALUES (${title}, ${description}, ${payload.starts_at}, ${payload.ends_at}, ${payload.event_type}, ${business})
+          INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, lead_origin)
+          VALUES (${title}, ${description}, ${payload.starts_at}, ${payload.ends_at}, ${payload.event_type}, ${DEFAULT_LEAD_ORIGIN})
           RETURNING id
         ),
         new_lead AS (
@@ -55,8 +56,8 @@ export async function createCalendarEvent(payload: CalendarEventPayload, busines
       `
     } else {
       await sql`
-        INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, business)
-        VALUES (${title}, ${description}, ${payload.starts_at}, ${payload.ends_at}, ${payload.event_type}, ${business})
+        INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, lead_origin)
+        VALUES (${title}, ${description}, ${payload.starts_at}, ${payload.ends_at}, ${payload.event_type}, ${DEFAULT_LEAD_ORIGIN})
       `
     }
   } catch (err: unknown) {

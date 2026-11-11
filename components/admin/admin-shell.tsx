@@ -42,7 +42,7 @@ function BellLink({ count }: { count: number }) {
 }
 
 /**
- * Společná kostra administrace (KP01, R-071) pro /dashboard a /alteno: postranní
+ * Společná kostra administrace (KP01, R-071) pro /dashboard: postranní
  * menu na počítači, horní lišta a spodní lišta na telefonu, hledání ⌘K. Chrome
  * používá Dílky (`data-app="admin"`, app/admin-tokens.css); obsah stránek zůstává
  * na původním vzhledu (Inter, `brand-*`), dokud se nepřepne.

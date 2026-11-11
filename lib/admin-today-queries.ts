@@ -1,5 +1,5 @@
 import { sql } from '@/lib/db'
-import { projectPath, toBusiness } from '@/lib/business'
+import { projectPath } from '@/lib/lead-origins'
 import { STALE_AFTER_DAYS, type TodayData } from '@/lib/admin-today'
 
 const iso = (value: Date | string): string => new Date(value).toISOString()
@@ -21,17 +21,17 @@ const optional = <T,>(query: PromiseLike<T[]>): Promise<T[]> => Promise.resolve(
 export async function loadTodayData(): Promise<TodayData> {
   const [requests, drafts, invoices, slots, calls, stale] = await Promise.all([
     optional(sql`
-      SELECT r.id, r.ai_summary, r.created_at, p.id AS project_id, p.client_name, p.business
+      SELECT r.id, r.ai_summary, r.created_at, p.id AS project_id, p.client_name
       FROM client_requests r JOIN projects p ON p.id = r.project_id
       WHERE r.status = 'new'
       ORDER BY r.created_at ASC LIMIT 20
     `),
     optional(sql`
-      SELECT p.id AS project_id, p.client_name, p.business,
+      SELECT p.id AS project_id, p.client_name,
              count(*)::int AS count, count(*) FILTER (WHERE a.contains_sensitive)::int AS sensitive
       FROM project_activity a JOIN projects p ON p.id = a.project_id
       WHERE a.status = 'draft'
-      GROUP BY p.id, p.client_name, p.business
+      GROUP BY p.id, p.client_name
       ORDER BY min(a.created_at) ASC LIMIT 20
     `),
     optional(sql`
@@ -41,7 +41,7 @@ export async function loadTodayData(): Promise<TodayData> {
       ORDER BY due_on ASC LIMIT 10
     `),
     optional(sql`
-      SELECT cs.id, cs.scheduled_at AS at, p.client_name, p.id AS project_id, p.business
+      SELECT cs.id, cs.scheduled_at AS at, p.client_name, p.id AS project_id
       FROM consultation_slots cs JOIN projects p ON p.id = cs.project_id
       WHERE cs.scheduled_at > now()
       ORDER BY cs.scheduled_at LIMIT 5
@@ -54,12 +54,11 @@ export async function loadTodayData(): Promise<TodayData> {
       ORDER BY next_action_date, next_action_time NULLS LAST LIMIT 5
     `),
     optional(sql`
-      SELECT id, client_name, business, updated_at
+      SELECT id, client_name, updated_at
       FROM projects
       WHERE status IN ('new', 'in_progress', 'review')
         AND updated_at < now() - interval '1 day' * ${STALE_AFTER_DAYS}
-        AND NOT (business = 'vizeon' AND is_vizeon_pending(source, vizeon_confirmed))
-        AND NOT (business = 'alteno' AND is_alteno_pending(source, alteno_confirmed))
+        AND NOT lead_pending
       ORDER BY updated_at ASC LIMIT 5
     `),
   ])
@@ -72,12 +71,12 @@ export async function loadTodayData(): Promise<TodayData> {
       createdAt: iso(r.created_at),
       href: '/dashboard/pozadavky',
     })),
-    drafts: (drafts as { project_id: string; client_name: string; business: string; count: number; sensitive: number }[]).map((d) => ({
+    drafts: (drafts as { project_id: string; client_name: string; count: number; sensitive: number }[]).map((d) => ({
       projectId: d.project_id,
       clientName: d.client_name,
       count: d.count,
       sensitive: d.sensitive,
-      href: `${projectPath(toBusiness(d.business), d.project_id)}?zalozka=aktivita`,
+      href: `${projectPath(d.project_id)}?zalozka=aktivita`,
     })),
     overdueInvoices: (invoices as { id: string; invoice_number: string; client_name: string | null; due_on: string; amount: number; currency: string }[]).map((i) => ({
       id: i.id,
@@ -88,12 +87,12 @@ export async function loadTodayData(): Promise<TodayData> {
       currency: i.currency,
     })),
     upcoming: [
-      ...(slots as { id: string; at: string; client_name: string; project_id: string; business: string }[]).map((s) => ({
+      ...(slots as { id: string; at: string; client_name: string; project_id: string }[]).map((s) => ({
         id: `slot-${s.id}`,
         at: iso(s.at),
         label: `Konzultace: ${s.client_name}`,
         detail: null,
-        href: projectPath(toBusiness(s.business), s.project_id),
+        href: projectPath(s.project_id),
       })),
       ...(calls as { id: string; company_name: string; next_action: string | null; next_action_date: Date | string; next_action_time: string | null }[]).map((c) => ({
         id: `call-${c.id}`,
@@ -103,11 +102,11 @@ export async function loadTodayData(): Promise<TodayData> {
         href: '/dashboard/calls',
       })),
     ].sort((a, b) => a.at.localeCompare(b.at)),
-    stale: (stale as { id: string; client_name: string; business: string; updated_at: string }[]).map((s) => ({
+    stale: (stale as { id: string; client_name: string; updated_at: string }[]).map((s) => ({
       id: s.id,
       clientName: s.client_name,
       updatedAt: iso(s.updated_at),
-      href: projectPath(toBusiness(s.business), s.id),
+      href: projectPath(s.id),
     })),
   }
 }

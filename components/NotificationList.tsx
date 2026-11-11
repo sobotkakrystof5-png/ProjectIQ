@@ -15,8 +15,10 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   consultation_booked:   { icon: Calendar,         color: 'text-blue-600 bg-blue-50',    label: 'Nová rezervace' },
   feedback_submitted:    { icon: Star,              color: 'text-amber-600 bg-amber-50',  label: 'Hodnocení NPS' },
   survey_submitted:      { icon: ClipboardList,     color: 'text-purple-600 bg-purple-50', label: 'Dotazník' },
-  vizeon_booking:        { icon: Inbox,             color: 'text-green-600 bg-green-50',  label: 'Vizeon poptávka' },
-  alteno_booking:        { icon: Inbox,             color: 'text-amber-600 bg-amber-50',  label: 'Alteno poptávka' },
+  web_lead:              { icon: Inbox,             color: 'text-green-600 bg-green-50',  label: 'Poptávka z webu' },
+  // Staré řádky před sloučením inboxů (AD02) — nové se s těmito typy nezakládají.
+  vizeon_booking:        { icon: Inbox,             color: 'text-green-600 bg-green-50',  label: 'Poptávka z vizeon.cz' },
+  alteno_booking:        { icon: Inbox,             color: 'text-amber-600 bg-amber-50',  label: 'Poptávka z alteno.cz' },
   project_status_changed:{ icon: ArrowRightLeft,    color: 'text-indigo-600 bg-indigo-50', label: 'Stav zakázky' },
   reminder_upcoming:     { icon: Bell,              color: 'text-orange-600 bg-orange-50', label: 'Připomínka' },
   agent_lead_received:   { icon: Sparkles,          color: 'text-teal-600 bg-teal-50',    label: 'AI lead' },

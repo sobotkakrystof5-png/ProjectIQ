@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { sql } from '@/lib/db'
 import { ProjectForm } from '@/components/ProjectForm'
@@ -25,16 +25,20 @@ import { buildAgentEnvBlock, buildClaudeMdBlock } from '@/lib/agent-setup'
 import { loadProjectActivity } from '@/lib/project-activity-queries'
 import { buildTerminalCommand } from '@/lib/claude-code-handoff'
 import { buildClaudeCodePrompt, type ClientRequestRow } from '@/lib/client-requests'
-import { BUSINESSES, projectPath, toBusiness, type Business } from '@/lib/business'
+import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { formatDate, getPublicUrl, cn } from '@/lib/utils'
 import type {
   Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot, ProjectNote,
 } from '@/lib/types'
 
-// Detail zakázky jako centrum (KP02): jedno místo se záložkami pro VIZEON i ALTENO.
-// Záložka je v adrese (?zalozka=), takže jde sdílet a vrátit se tlačítkem Zpět;
-// načítají se jen data aktivní záložky. Logika ukládání je beze změny (ProjectForm,
+// Detail zakázky jako centrum (KP02): jedno místo se záložkami. Záložka je
+// v adrese (?zalozka=), takže jde sdílet a vrátit se tlačítkem Zpět; načítají
+// se jen data aktivní záložky. Logika ukládání je beze změny (ProjectForm,
 // app/actions.ts).
+//
+// Po sloučení byznysů (AD02, R-088) má každá zakázka všechny záložky —
+// i poptávky z alteno.cz mají Fakturaci, dokončení a poznámky ze schůzek.
+// `lead_origin` je už jen štítek „odkud přišla".
 
 export const DETAIL_TABS = ['prehled', 'aktivita', 'pozadavky', 'zpravy', 'fakturace'] as const
 export type DetailTab = (typeof DETAIL_TABS)[number]
@@ -47,10 +51,8 @@ const TAB_LABELS: Record<DetailTab, string> = {
   fakturace: 'Fakturace',
 }
 
-export function parseTab(value: string | undefined, business: Business): DetailTab {
-  const tab = DETAIL_TABS.find((t) => t === value) ?? 'prehled'
-  // Fakturace (faktury, náklady) je jen u VIZEON.
-  return tab === 'fakturace' && business !== 'vizeon' ? 'prehled' : tab
+export function parseTab(value: string | undefined): DetailTab {
+  return DETAIL_TABS.find((t) => t === value) ?? 'prehled'
 }
 
 const card = 'rounded-2xl border border-border bg-white p-6 shadow-sm'
@@ -64,11 +66,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function ProjectDetailView({
   projectId,
-  expectedBusiness,
   tabParam,
 }: {
   projectId: string
-  expectedBusiness: Business
   tabParam: string | undefined
 }) {
   // Adresa, která není UUID (třeba zrušená /dashboard/sablony), spadne sem jako
@@ -76,14 +76,12 @@ export async function ProjectDetailView({
   if (!UUID.test(projectId)) notFound()
   const rows = await sql`SELECT * FROM projects WHERE id = ${projectId} LIMIT 1`
   if (!rows.length) notFound()
-  const project = rows[0] as Project & { business?: string }
-  const business = toBusiness(project.business)
-  // Starší odkazy (notifikace, e-maily) mířily do druhé sekce: pošli uživatele tam, kam zakázka patří.
-  if (business !== expectedBusiness) redirect(projectPath(business, projectId))
+  const project = rows[0] as Project & { lead_origin?: string }
+  const origin = LEAD_ORIGINS[toLeadOrigin(project.lead_origin)]
 
-  const tab = parseTab(tabParam, business)
-  const base = projectPath(business, projectId)
-  const tabs = DETAIL_TABS.filter((t) => t !== 'fakturace' || business === 'vizeon')
+  const tab = parseTab(tabParam)
+  const base = projectPath(projectId)
+  const tabs = DETAIL_TABS
 
   const openRequests = await countOpenRequests(projectId)
 
@@ -102,8 +100,11 @@ export async function ProjectDetailView({
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">{project.client_name}</h1>
               <StatusBadge status={project.status as ProjectStatus} />
-              <span className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-semibold text-navy-700">
-                {BUSINESSES[business].label}
+              <span
+                className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-semibold text-navy-700"
+                title={origin.domain ? `Poptávka z ${origin.domain}` : 'Zadáno ručně'}
+              >
+                {origin.label}
               </span>
             </div>
             {project.description && <p className="mt-0.5 text-sm text-muted-foreground">{project.description}</p>}
@@ -149,10 +150,10 @@ export async function ProjectDetailView({
       </nav>
 
       <div className="max-w-2xl space-y-4">
-        {tab === 'prehled' && <OverviewTab project={project} business={business} />}
+        {tab === 'prehled' && <OverviewTab project={project} />}
         {tab === 'aktivita' && <ActivityTab project={project} />}
         {tab === 'pozadavky' && <RequestsTab project={project} />}
-        {tab === 'zpravy' && <MessagesTab project={project} business={business} />}
+        {tab === 'zpravy' && <MessagesTab project={project} />}
         {tab === 'fakturace' && <BillingTab project={project} />}
       </div>
     </div>
@@ -168,14 +169,14 @@ async function countOpenRequests(projectId: string): Promise<number> {
   }
 }
 
-async function OverviewTab({ project, business }: { project: Project; business: Business }) {
+async function OverviewTab({ project }: { project: Project }) {
   const publicUrl = getPublicUrl(project.public_token)
 
   return (
     <>
       <div className={card}>
         <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Editace zakázky</h2>
-        <ProjectForm project={project} business={business} />
+        <ProjectForm project={project} />
       </div>
 
       <div className={card}>
@@ -194,26 +195,22 @@ async function OverviewTab({ project, business }: { project: Project; business: 
         </div>
       </div>
 
-      {business === 'vizeon' && (
-        <>
-          <div className={card}>
-            <h2 className={h2}>Přidat do dokončených</h2>
-            <p className="mb-4 text-xs text-muted-foreground">
-              Přidá záznam do sekce Dokončené zakázky a zahrne ji do kalkulačky výdělků. Zakázka zůstane i v aktivním přehledu.
-            </p>
-            <MarkCompletedButton
-              projectId={project.id}
-              projectName={project.client_name}
-              hasEstimatedCosts={project.estimated_costs != null && Number(project.estimated_costs) > 0}
-            />
-          </div>
-        </>
-      )}
+      <div className={card}>
+        <h2 className={h2}>Přidat do dokončených</h2>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Přidá záznam do sekce Dokončené zakázky a zahrne ji do kalkulačky výdělků. Zakázka zůstane i v aktivním přehledu.
+        </p>
+        <MarkCompletedButton
+          projectId={project.id}
+          projectName={project.client_name}
+          hasEstimatedCosts={project.estimated_costs != null && Number(project.estimated_costs) > 0}
+        />
+      </div>
 
       <div className={card}>
         <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Nebezpečná zóna</h2>
         <p className="mb-4 text-xs text-muted-foreground">Smazání zakázky je nevratné.</p>
-        <DeleteButton projectId={project.id} business={business} />
+        <DeleteButton projectId={project.id} />
       </div>
     </>
   )
@@ -249,13 +246,13 @@ async function ActivityTab({ project }: { project: Project }) {
   )
 }
 
-type JoinedRequest = ClientRequestRow & { client_name: string; description: string | null; focus: string | null; project_url: string | null; business: string | null }
+type JoinedRequest = ClientRequestRow & { client_name: string; description: string | null; focus: string | null; project_url: string | null; lead_origin: string | null }
 
 async function RequestsTab({ project }: { project: Project }) {
   let rows: JoinedRequest[] = []
   try {
     rows = (await sql`
-      SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.business
+      SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.lead_origin
       FROM client_requests r JOIN projects p ON p.id = r.project_id
       WHERE r.project_id = ${project.id}
       ORDER BY (r.status = 'new') DESC, r.created_at DESC LIMIT 50
@@ -265,7 +262,6 @@ async function RequestsTab({ project }: { project: Project }) {
   }
 
   const cards: ClientRequestCardData[] = rows.map((r) => {
-    const business = toBusiness(r.business)
     const prompt = buildClaudeCodePrompt(r, {
       clientName: r.client_name,
       description: r.description,
@@ -275,8 +271,8 @@ async function RequestsTab({ project }: { project: Project }) {
     return {
       id: r.id,
       clientName: r.client_name,
-      projectHref: projectPath(business, project.id),
-      businessLabel: BUSINESSES[business].label,
+      projectHref: projectPath(project.id),
+      originLabel: LEAD_ORIGINS[toLeadOrigin(r.lead_origin)].label,
       source: r.source,
       status: r.status,
       aiStatus: r.ai_status,
@@ -309,13 +305,13 @@ async function RequestsTab({ project }: { project: Project }) {
   )
 }
 
-async function MessagesTab({ project, business }: { project: Project; business: Business }) {
+async function MessagesTab({ project }: { project: Project }) {
   const [msgRows, progressRows, feedbackRows, slotRows, noteRows] = await Promise.all([
     sql`SELECT * FROM client_messages WHERE project_id = ${project.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM progress_updates WHERE project_id = ${project.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM client_feedback WHERE project_id = ${project.id} ORDER BY created_at DESC`,
     sql`SELECT * FROM consultation_slots WHERE project_id = ${project.id} ORDER BY scheduled_at DESC`,
-    business === 'vizeon' ? sql`SELECT * FROM project_notes WHERE project_id = ${project.id} ORDER BY created_at DESC` : Promise.resolve([]),
+    sql`SELECT * FROM project_notes WHERE project_id = ${project.id} ORDER BY created_at DESC`,
   ])
   const messages = msgRows as ClientMessage[]
   const progressUpdates = progressRows as ProgressUpdate[]
@@ -345,7 +341,6 @@ async function MessagesTab({ project, business }: { project: Project; business: 
           projectId={project.id}
           publicToken={project.public_token}
           messages={messages}
-          business={business}
         />
       </div>
 
@@ -389,15 +384,13 @@ async function MessagesTab({ project, business }: { project: Project; business: 
         <ConsultationCalendar slots={slots} clientName={project.client_name} />
       </div>
 
-      {business === 'vizeon' && (
-        <div className={cn(card, 'max-w-none')}>
-          <h2 className={h2}>Poznámky ze schůzek a hovorů</h2>
-          <p className="mb-5 text-xs text-muted-foreground">
-            Jen pro vás, klient je nikdy neuvidí. Stav zakázky se sem jen zrcadlí, měníte ho v Editaci zakázky na záložce Přehled.
-          </p>
-          <ProjectNotesPanel projectId={project.id} initialNotes={notes} currentProgress={project.progress} />
-        </div>
-      )}
+      <div className={cn(card, 'max-w-none')}>
+        <h2 className={h2}>Poznámky ze schůzek a hovorů</h2>
+        <p className="mb-5 text-xs text-muted-foreground">
+          Jen pro vás, klient je nikdy neuvidí. Stav zakázky se sem jen zrcadlí, měníte ho v Editaci zakázky na záložce Přehled.
+        </p>
+        <ProjectNotesPanel projectId={project.id} initialNotes={notes} currentProgress={project.progress} />
+      </div>
     </>
   )
 }

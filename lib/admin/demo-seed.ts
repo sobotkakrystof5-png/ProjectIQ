@@ -103,25 +103,46 @@ export function demoSeedQueries({ today }: DemoScope): AdminQuery[] {
 function insertQueries(today: string): AdminQuery[] {
   const out: AdminQuery[] = []
 
-  // --- Zakázky: 2 VIZEON + 1 ALTENO -----------------------------------------
+  // --- Zakázky: potvrzené poptávky ze tří zdrojů (AD02) ---------------------
+  // `lead_confirmed = true` = poptávka už je potvrzená, takže zakázka není
+  // v inboxu. `lead_pending` je generovaný sloupec, do INSERTu nepatří.
   out.push(
     q`
       INSERT INTO projects (client_name, description, focus, status, progress, price, paid, deadline, notes,
                             client_email, client_phone, service_type, project_url, source, estimated_costs,
-                            deposit_amount, deposit_paid, vizeon_confirmed, business, invoiced_on_ico)
+                            deposit_amount, deposit_paid, lead_confirmed, lead_origin, invoiced_on_ico)
       VALUES
         (${'Kavárna Ukázková'}, ${'Jednostránkový web s menu a objednávkou dortů na míru.'},
          ${'web'}, ${'in_progress'}, 45, 24000, false, ${day(today, 12)}, ${mark('zakázka pro vyzkoušení obrazovek')},
-         ${'kavarna@example.cz'}, ${'+420000000201'}, ${'Web na míru'}, NULL, ${'web'}, 1200,
+         ${'kavarna@example.cz'}, ${'+420000000201'}, ${'Web na míru'}, NULL, ${'vizeon_web'}, 1200,
          8000, true, true, ${'vizeon'}, true),
         (${'Keramika Vzorová'}, ${'E-shop s ruční keramikou, platby kartou a výdejní místa.'},
          ${'eshop'}, ${'review'}, 80, 48000, false, ${day(today, 4)}, ${mark('zakázka pro vyzkoušení obrazovek')},
          ${'keramika@example.cz'}, ${'+420000000202'}, ${'E-shop'}, ${'https://example.cz/keramika'}, ${'manual'}, 2400,
-         12000, true, true, ${'vizeon'}, false),
+         12000, true, false, ${'vizeon'}, false),
         (${'Zámečnictví Zkušební'}, ${'Automatické odpovědi na poptávky a napojení na kalendář.'},
          ${'automatizace'}, ${'new'}, 0, 18000, false, ${day(today, 21)}, ${mark('zakázka pro vyzkoušení obrazovek')},
-         ${'zamecnictvi@example.cz'}, ${'+420000000203'}, ${'AI automatizace'}, NULL, ${'web'}, NULL,
-         NULL, false, false, ${'alteno'}, false)
+         ${'zamecnictvi@example.cz'}, ${'+420000000203'}, ${'AI automatizace'}, NULL, ${'alteno_web'}, NULL,
+         NULL, false, true, ${'alteno'}, false)
+    `,
+  )
+
+  // --- Poptávky čekající na potvrzení: jedna z každého webu ------------------
+  // Tohle plní inbox /dashboard/poptavky, ať je na čem vyzkoušet štítky zdrojů.
+  out.push(
+    q`
+      INSERT INTO projects (client_name, description, status, client_email, client_phone,
+                            service_type, source, lead_origin, lead_confirmed, notes)
+      VALUES
+        (${'Pekárna Nepotvrzená'}, ${'Chceme web s denní nabídkou a objednávkou chleba.'},
+         ${'new'}, ${'pekarna@example.cz'}, ${'+420000000211'}, ${'Web na míru'},
+         ${'vizeon_web'}, ${'vizeon'}, false, ${mark('poptávka pro vyzkoušení inboxu')}),
+        (${'Autoservis Ukázkový'}, ${'Potřebujeme automaticky odpovídat na poptávky z webu.'},
+         ${'new'}, ${'autoservis@example.cz'}, ${'+420000000212'}, ${'AI automatizace'},
+         ${'alteno_web'}, ${'alteno'}, false, ${mark('poptávka pro vyzkoušení inboxu')}),
+        (${'Studio Zkušební'}, ${'Zajímá nás, co Prvotka umí.'},
+         ${'new'}, ${'studio@example.cz'}, ${'+420000000213'}, ${'Poptávka z webu'},
+         ${'prvotka_web'}, ${'prvotka'}, false, ${mark('poptávka pro vyzkoušení inboxu')})
     `,
   )
 
@@ -191,7 +212,8 @@ function insertQueries(today: string): AdminQuery[] {
   )
 
   // --- Kalendář: 12 termínů kolem dneška, nepřekrývají se -------------------
-  // Guard check_calendar_overlap hlídá překryv napříč byznysy i s konzultacemi.
+  // Guard check_calendar_overlap hlídá překryv i s konzultacemi. `lead_origin`
+  // je po AD02 jen štítek „odkud poptávka přišla".
   const events: Array<[string, number, string, string, string, string]> = [
     ['Konzultace k webu kavárny', -3, '09:30', '10:30', 'manual', 'vizeon'],
     ['Předání e-shopu Keramika', -2, '13:00', '14:00', 'manual', 'vizeon'],
@@ -206,12 +228,12 @@ function insertQueries(today: string): AdminQuery[] {
     ['Dovolená', 5, '10:00', '11:00', 'block', 'vizeon'],
     ['Nasazení webu kavárny', 7, '09:00', '10:00', 'manual', 'vizeon'],
   ]
-  for (const [title, offset, from, to, kind, business] of events) {
+  for (const [title, offset, from, to, kind, leadOrigin] of events) {
     out.push(
       q`
-        INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, business)
+        INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, lead_origin)
         VALUES (${title}, ${mark('termín pro vyzkoušení kalendáře')},
-                ${at(today, offset, from)}, ${at(today, offset, to)}, ${kind}, ${business})
+                ${at(today, offset, from)}, ${at(today, offset, to)}, ${kind}, ${leadOrigin})
       `,
     )
   }

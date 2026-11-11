@@ -75,13 +75,13 @@ export async function POST(
   `
   await touchAgentKey(resolved.keyId)
 
-  const nameRows = await sql`SELECT client_name, business FROM projects WHERE id = ${resolved.projectId}`
-  const project = nameRows[0] as { client_name: string; business: string } | undefined
+  const nameRows = await sql`SELECT client_name FROM projects WHERE id = ${resolved.projectId}`
+  const project = nameRows[0] as { client_name: string } | undefined
   await createNotification({
     type: 'activity_draft',
     title: `Hlášení ke schválení: ${project?.client_name ?? 'zakázka'}`,
     body: prepared.containsSensitive ? 'Obsahuje zakryté údaje, před schválením je potřeba upravit.' : undefined,
-    link: project?.business === 'alteno' ? `/alteno/${resolved.projectId}` : `/dashboard/${resolved.projectId}`,
+    link: `/dashboard/${resolved.projectId}`,
   })
 
   return NextResponse.json({ ok: true, id: String((rows[0] as { id: string }).id) }, { status: 201 })

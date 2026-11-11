@@ -35,16 +35,15 @@ async function loadStats() {
         COALESCE(SUM(price) FILTER (WHERE paid = true), 0)::numeric AS paid_price,
         COALESCE(SUM(price) FILTER (WHERE status = 'done' AND paid = false), 0)::numeric AS unpaid_price
       FROM projects
-      WHERE NOT is_vizeon_pending(source, vizeon_confirmed)
-        AND NOT is_alteno_pending(source, alteno_confirmed)
+      WHERE NOT lead_pending
     `,
     sql`
       SELECT
         COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE vizeon_confirmed = true)::int AS confirmed,
-        COUNT(*) FILTER (WHERE is_vizeon_pending(source, vizeon_confirmed))::int AS pending
+        COUNT(*) FILTER (WHERE lead_confirmed)::int AS confirmed,
+        COUNT(*) FILTER (WHERE lead_pending)::int AS pending
       FROM projects
-      WHERE source = 'vizeon_web'
+      WHERE source IS NOT NULL AND source <> 'manual'
     `,
     sql`
       SELECT
@@ -75,8 +74,7 @@ async function loadStats() {
     sql`
       SELECT COUNT(DISTINCT client_name)::int AS total
       FROM projects
-      WHERE NOT is_vizeon_pending(source, vizeon_confirmed)
-        AND NOT is_alteno_pending(source, alteno_confirmed)
+      WHERE NOT lead_pending
         AND client_name IS NOT NULL
     `,
     sql`

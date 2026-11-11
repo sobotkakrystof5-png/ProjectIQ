@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import { projectPath, toBusiness } from '@/lib/business'
+import { projectPath } from '@/lib/lead-origins'
 import { AgentKeyConfigError, issueAgentKey, revokeAgentKey } from '@/lib/agent-keys'
 
 // Správa klíče projektu pro hlášení z Claude Code (KP04). Klíč se vrací jen
@@ -19,9 +19,7 @@ async function adminEmail(): Promise<string> {
 }
 
 async function revalidateProject(projectId: string): Promise<void> {
-  const rows = await sql`SELECT business FROM projects WHERE id = ${projectId} LIMIT 1`
-  const row = rows[0] as { business: string } | undefined
-  if (row) revalidatePath(projectPath(toBusiness(row.business), projectId))
+  revalidatePath(projectPath(projectId))
 }
 
 /** Vytvoří klíč, nebo ho otočí (dosavadní přestane platit). */

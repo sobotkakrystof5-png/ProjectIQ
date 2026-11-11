@@ -3,14 +3,12 @@
 import { useState, useTransition } from 'react'
 import { deleteProject } from '@/app/actions'
 import { Trash2, Loader2 } from 'lucide-react'
-import type { Business } from '@/lib/business'
 
 interface DeleteButtonProps {
   projectId: string
-  business?: Business
 }
 
-export function DeleteButton({ projectId, business = 'vizeon' }: DeleteButtonProps) {
+export function DeleteButton({ projectId }: DeleteButtonProps) {
   const [confirm, setConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -21,7 +19,7 @@ export function DeleteButton({ projectId, business = 'vizeon' }: DeleteButtonPro
       return
     }
     startTransition(async () => {
-      await deleteProject(projectId, business)
+      await deleteProject(projectId)
     })
   }
 

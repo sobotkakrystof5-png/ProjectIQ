@@ -3,7 +3,7 @@ import { sql } from '@/lib/db'
 import { verifyBearerApiKey, getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { createNotification } from '@/lib/notifications'
-import { toBusiness } from '@/lib/business'
+import { toLeadOrigin } from '@/lib/lead-origins'
 import { agentLeadPayloadSchema } from '@/types/agent-leads'
 
 // Příjem AI-scorovaných leadů z externího vizeon-lead-agent (Python/FastAPI).
@@ -42,25 +42,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return errorResponse(400, parsed.error.issues[0]?.message ?? 'Neplatná data')
   }
   const { lead_id, source, version, section, received_at, client, analysis } = parsed.data
-  const business = toBusiness(section)
+  const leadOrigin = toLeadOrigin(section)
 
   // ON CONFLICT na lead_id → idempotence: opakované doručení stejného leadu
   // (ruční retry, budoucí retry logika na straně agenta) přepíše záznam
   // místo vytvoření duplicity.
   const rows = await sql`
     INSERT INTO agent_leads (
-      lead_id, source, payload_version, business, received_at,
+      lead_id, source, payload_version, lead_origin, received_at,
       client_name, client_email, client_phone, client_company, client_service, client_budget, client_deadline, client_message,
       lead_score, priority, score_breakdown, company_type, industry, digital_maturity, project_complexity, clarity_of_request, summary, communication_strategy
     ) VALUES (
-      ${lead_id}, ${source}, ${version}, ${business}, ${received_at},
+      ${lead_id}, ${source}, ${version}, ${leadOrigin}, ${received_at},
       ${client.name}, ${client.email}, ${client.phone ?? null}, ${client.company ?? null}, ${client.service}, ${client.budget ?? null}, ${client.deadline ?? null}, ${client.message ?? null},
       ${analysis.lead_score}, ${analysis.priority}, ${JSON.stringify(analysis.score_breakdown)}::jsonb, ${analysis.company_type}, ${analysis.industry}, ${analysis.digital_maturity}, ${analysis.project_complexity}, ${analysis.clarity_of_request}, ${analysis.summary}, ${JSON.stringify(analysis.communication_strategy)}::jsonb
     )
     ON CONFLICT (lead_id) DO UPDATE SET
       source = EXCLUDED.source,
       payload_version = EXCLUDED.payload_version,
-      business = EXCLUDED.business,
+      lead_origin = EXCLUDED.lead_origin,
       received_at = EXCLUDED.received_at,
       client_name = EXCLUDED.client_name,
       client_email = EXCLUDED.client_email,

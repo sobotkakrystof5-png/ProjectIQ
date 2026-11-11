@@ -31,7 +31,7 @@ export interface PortalClientDetail {
   members: { id: string; name: string | null; email: string | null; role: string; created_at: string }[]
   invites: { id: string; email: string | null; role: string; created_at: string; expires_at: string; state: 'open' | 'used' | 'revoked' | 'expired' }[]
   projects: { id: string; name: string; status: string }[]
-  unlinked: { id: string; client_name: string; business: string }[]
+  unlinked: { id: string; client_name: string; lead_origin: string }[]
 }
 
 export async function loadPortalClient(id: string): Promise<PortalClientDetail | null> {
@@ -48,7 +48,7 @@ export async function loadPortalClient(id: string): Promise<PortalClientDetail |
     `,
     sql`SELECT id, name, status FROM portal.projects WHERE client_id = ${id} ORDER BY name`,
     sql`
-      SELECT p.id, p.client_name, p.business FROM public.projects p
+      SELECT p.id, p.client_name, p.lead_origin FROM public.projects p
       WHERE NOT EXISTS (SELECT 1 FROM portal.projects x WHERE x.id = p.id)
       ORDER BY p.client_name LIMIT 200
     `,

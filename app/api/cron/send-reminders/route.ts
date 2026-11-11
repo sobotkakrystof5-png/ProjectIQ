@@ -5,7 +5,7 @@ import { createNotification } from '@/lib/notifications'
 import { generateRecurringCostTransactionsInternal } from '@/lib/recurring-transactions'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
-import { adminEmailFor, toBusiness } from '@/lib/business'
+import { adminEmail } from '@/lib/lead-origins'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +33,6 @@ type SlotRow = {
   scheduled_at: string
   channel: ConsultationChannel
   meeting_link: string | null
-  business: string | null
 }
 
 type LeadRow = {
@@ -46,8 +45,7 @@ type LeadRow = {
 }
 
 async function sendConsultationReminder(slot: SlotRow, type: 'day_before' | '2h_before') {
-  const business = toBusiness(slot.business)
-  const adminEmail = adminEmailFor(business)
+  const to = adminEmail()
   const when = new Date(slot.scheduled_at)
   const formattedTime = formatPrague(when)
   const channelName = CHANNEL_LABELS[slot.channel]
@@ -72,14 +70,13 @@ async function sendConsultationReminder(slot: SlotRow, type: 'day_before' | '2h_
         { label: 'Způsob spojení', value: channelName },
       ],
       ...(link ? { ctas: [{ label: 'Připojit se ke konzultaci', href: link }] } : {}),
-      business,
     }))
   }
 
   // Email adminovi
-  if (adminEmail) {
+  if (to) {
     sends.push(sendBrandedEmail({
-      to: adminEmail,
+      to,
       subject: isDayBefore
         ? `Zítra máš hovor s ${slot.client_name} – ZakazIQ`
         : `Za 2 hodiny: hovor s ${slot.client_name} – ZakazIQ`,
@@ -93,7 +90,6 @@ async function sendConsultationReminder(slot: SlotRow, type: 'day_before' | '2h_
         { label: 'Způsob spojení', value: channelName },
       ],
       ...(link ? { ctas: [{ label: 'Připojit se', href: link }] } : {}),
-      business,
     }))
   }
 
@@ -102,8 +98,8 @@ async function sendConsultationReminder(slot: SlotRow, type: 'day_before' | '2h_
 
 // client_leads ("Hovory") je funkce jen ve VIZEON sekci — viz AGENTS.md.
 async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before') {
-  const adminEmail = adminEmailFor('vizeon')
-  if (!adminEmail) return
+  const to = adminEmail()
+  if (!to) return
 
   const when = new Date(lead.action_at)
   const formattedTime = formatPrague(when)
@@ -112,7 +108,7 @@ async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before')
   const isDayBefore = type === 'day_before'
 
   await sendBrandedEmail({
-    to: adminEmail,
+    to,
     subject: isDayBefore
       ? `Připomínka: zítřejší akce s klientem – ${lead.company_name}`
       : `Za 2 hodiny: ${actionLabel} s ${lead.company_name}`,
@@ -128,7 +124,6 @@ async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before')
       { label: 'Čas', value: formattedTime },
       ...(lead.next_action ? [{ label: 'Poznámka', value: lead.next_action }] : []),
     ],
-    business: 'vizeon',
   })
 }
 
@@ -152,7 +147,7 @@ export async function GET(req: NextRequest) {
         AND cs.reminder_day_before_sent = false
         AND cs.scheduled_at BETWEEN now() + interval '23 hours'
                                  AND now() + interval '25 hours'
-      RETURNING cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link, p.business
+      RETURNING cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
     `,
     // 2h-before: scheduled 1–3 h from now (target 2h, ±1h for hourly cron).
     sql`
@@ -163,7 +158,7 @@ export async function GET(req: NextRequest) {
         AND cs.reminder_2h_before_sent = false
         AND cs.scheduled_at BETWEEN now() + interval '1 hour'
                                  AND now() + interval '3 hours'
-      RETURNING cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link, p.business
+      RETURNING cs.id, cs.client_email, p.client_name, cs.scheduled_at, cs.channel, cs.meeting_link
     `,
     // Lead akce (připomínky pro admina) — kombinujeme date + time do timestamptz
     // přes Prague timezone. Okno ±1h kolem 24h / 2h, shodné s konzultacemi.

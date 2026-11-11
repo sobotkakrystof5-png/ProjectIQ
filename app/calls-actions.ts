@@ -180,8 +180,7 @@ export async function convertLeadToProject(leadId: string) {
   // klient by o novém projektu založeném přes Hovory jinak nikdy nezjistil.
   await notifyClientOfProjectChange(
     { client_name: clientName, client_email: lead.email, status: 'new', progress: 0, project_url: null, public_token: publicToken },
-    'created',
-    'vizeon'
+    'created'
   )
 
   revalidatePath('/dashboard/calls')
@@ -206,7 +205,7 @@ export async function sendPortfolioEmail(leadId: string): Promise<{ success: tru
     todayISO: getPragueTodayISO(),
     nextCallDateISO: lead.next_action_date,
   })
-  const ok = await sendPlainEmail({ to: lead.email, subject: PORTFOLIO_EMAIL_SUBJECT, text: body, business: 'vizeon' })
+  const ok = await sendPlainEmail({ to: lead.email, subject: PORTFOLIO_EMAIL_SUBJECT, text: body })
   if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
 
   await markPortfolioSent(leadId)
@@ -224,7 +223,7 @@ export async function sendCustomLeadEmail(
   if (!lead.email) return { error: 'Kontakt nemá vyplněný email.' }
   if (!opts.subject.trim() || !opts.body.trim()) return { error: 'Předmět i text zprávy musí být vyplněné.' }
 
-  const ok = await sendPlainEmail({ to: lead.email, subject: opts.subject, text: opts.body, business: 'vizeon' })
+  const ok = await sendPlainEmail({ to: lead.email, subject: opts.subject, text: opts.body })
   if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
 
   await markPortfolioSent(leadId)

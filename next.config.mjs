@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { LEGACY_REDIRECTS } from './lib/legacy-redirects.mjs'
 
 // Kořen projektu. V domovské složce leží cizí package-lock.json, podle kterého by
 // Next kořen odhadl špatně; Turbopack 16.2 navíc spadne na cestě s diakritikou
@@ -43,6 +44,10 @@ const notIndexed = '/:area(w|r|z|klient|embed|api|dashboard|alteno|hub|login|p|h
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // `next dev` jinak připisuje vlastní blok do AGENTS.md. Ten soubor je
+  // závazná pravidla projektu (R-047) — generovaný text by s nimi soupeřil
+  // a při každém spuštění dev serveru špinil `git status`.
+  agentRules: false,
   productionBrowserSourceMaps: false,
   turbopack: { root: projectRoot },
   outputFileTracingRoot: projectRoot,
@@ -65,6 +70,11 @@ const nextConfig = {
       // v lib/invoice-constants.ts), tady je rezerva na multipart overhead.
       bodySizeLimit: '5mb',
     },
+  },
+  // Staré adresy adminu (dva inboxy, sekce /alteno) — seznam v
+  // lib/legacy-redirects.mjs, aby šel otestovat. AD02, R-088.
+  async redirects() {
+    return LEGACY_REDIRECTS
   },
   async headers() {
     // Při shodě více pravidel vyhrává pozdější hodnota stejné hlavičky.

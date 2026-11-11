@@ -168,7 +168,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   revalidatePath('/hub/finance')
   if (data.project_id) {
     revalidatePath(`/dashboard/${data.project_id}`)
-    revalidatePath(`/alteno/${data.project_id}`)
   }
 
   // Nekritický vedlejší efekt — notifikace si chyby chytá sama.

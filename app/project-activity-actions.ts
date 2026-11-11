@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { sql } from '@/lib/db'
 import { authOptions, requireAuth } from '@/lib/auth'
-import { projectPath, toBusiness } from '@/lib/business'
+import { projectPath } from '@/lib/lead-origins'
 import { sendActivityDigestEmail } from '@/lib/email'
 import { getPublicUrl } from '@/lib/utils'
 import {
@@ -32,7 +32,6 @@ async function adminEmail(): Promise<string> {
 
 interface ProjectRef {
   id: string
-  business: string
   public_token: string
   client_name: string
   client_email: string | null
@@ -40,14 +39,14 @@ interface ProjectRef {
 
 async function loadProject(projectId: string): Promise<ProjectRef | null> {
   const rows = await sql`
-    SELECT id, business, public_token, client_name, client_email FROM projects WHERE id = ${projectId} LIMIT 1
+    SELECT id, public_token, client_name, client_email FROM projects WHERE id = ${projectId} LIMIT 1
   `
   return (rows[0] as ProjectRef | undefined) ?? null
 }
 
 async function projectOfActivity(activityId: string): Promise<ProjectRef | null> {
   const rows = await sql`
-    SELECT p.id, p.business, p.public_token, p.client_name, p.client_email
+    SELECT p.id, p.public_token, p.client_name, p.client_email
     FROM project_activity a JOIN projects p ON p.id = a.project_id
     WHERE a.id = ${activityId} LIMIT 1
   `
@@ -55,7 +54,7 @@ async function projectOfActivity(activityId: string): Promise<ProjectRef | null>
 }
 
 function revalidateProject(project: ProjectRef): void {
-  revalidatePath(projectPath(toBusiness(project.business), project.id))
+  revalidatePath(projectPath(project.id))
   revalidatePath(`/p/${project.public_token}`)
   revalidatePath('/dashboard')
 }
@@ -85,7 +84,6 @@ async function sendDigestIfDue(project: ProjectRef): Promise<void> {
       clientName: project.client_name,
       items: claimed.map((row) => ({ label: ACTIVITY_KIND_LABELS[row.kind], title: row.title })),
       portalUrl: getPublicUrl(project.public_token),
-      business: toBusiness(project.business),
     })
     if (!sent) await releaseClaim(claimed.map((row) => row.id))
   } catch (err) {

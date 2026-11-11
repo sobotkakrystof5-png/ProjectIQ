@@ -4,6 +4,13 @@ export type NotificationType =
   | 'consultation_booked'
   | 'feedback_submitted'
   | 'survey_submitted'
+  /** Poptávka z webu (AD02) — jeden typ pro všechny zdroje. */
+  | 'web_lead'
+  /**
+   * Historické typy před sloučením inboxů (AD02, R-088). Nové oznámení se
+   * s nimi už nezakládá, ale staré řádky v databázi je nesou, takže musí
+   * zůstat v unii i v TYPE_META v components/NotificationList.tsx.
+   */
   | 'vizeon_booking'
   | 'alteno_booking'
   | 'project_status_changed'

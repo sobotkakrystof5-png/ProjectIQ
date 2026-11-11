@@ -16,7 +16,7 @@ const seen: string[] = []
 function rowsFor(text: string): Record<string, unknown>[] {
   const flat = text.replace(/\s+/g, ' ').trim()
   // Dotazy na odznaky v menu čekají jeden řádek s čísly, výpisy snesou prázdno.
-  if (/AS vizeon/i.test(flat)) return [{ vizeon: 0, alteno: 0, notifications: 0 }]
+  if (/AS leads/i.test(flat)) return [{ leads: 0, notifications: 0 }]
   if (/^SELECT count\(\*\)::int AS count FROM/i.test(flat)) return [{ count: 0 }]
   return []
 }

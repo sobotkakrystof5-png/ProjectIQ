@@ -25,6 +25,9 @@ import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH, PORTAL_SIGN_UP_PATH } from '@
  * Stav a důvody: `.claude/security/STATE.md`.
  */
 
+// `/alteno` tu zůstává jako pojistka: sekce zanikla v AD02 a staré adresy
+// přesměrovává next.config.mjs, ale kdyby se pořadí routování změnilo,
+// nesmí se nepřihlášený člověk dostat dál než na /login.
 const ADMIN_PROTECTED = ['/dashboard', '/alteno', '/hub'] as const
 
 const CLERK_PATHS = ['/w', '/api/ws'] as const

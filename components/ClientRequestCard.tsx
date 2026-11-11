@@ -11,7 +11,8 @@ export interface ClientRequestCardData {
   id: string
   clientName: string
   projectHref: string
-  businessLabel: string
+  /** Odkud poptávka přišla (AD02) — štítek na kartě požadavku. */
+  originLabel: string
   source: 'text' | 'voice'
   status: 'new' | 'done' | 'dismissed'
   aiStatus: 'pending' | 'ready' | 'failed'
@@ -71,7 +72,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
           {request.clientName}
         </Link>
         <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
-          {request.businessLabel}
+          {request.originLabel}
         </span>
         {request.kind && (
           <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">

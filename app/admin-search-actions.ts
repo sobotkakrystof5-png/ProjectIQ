@@ -2,7 +2,7 @@
 
 import { sql } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
-import { projectPath, toBusiness } from '@/lib/business'
+import { projectPath } from '@/lib/lead-origins'
 import { SEARCH_LIMIT_PER_KIND, toLikePattern, type SearchHit } from '@/lib/admin-search'
 
 // Hledání v administraci (⌘K). Vrací jen název a odkaz, žádné poznámky ani ceny.
@@ -14,7 +14,7 @@ export async function searchAdmin(query: string): Promise<SearchHit[]> {
 
   const [projects, leads, invoices] = await Promise.all([
     sql`
-      SELECT id, client_name, business, description FROM projects
+      SELECT id, client_name, description FROM projects
       WHERE client_name ILIKE ${pattern} OR coalesce(description, '') ILIKE ${pattern}
       ORDER BY updated_at DESC LIMIT ${SEARCH_LIMIT_PER_KIND}
     `,
@@ -31,13 +31,13 @@ export async function searchAdmin(query: string): Promise<SearchHit[]> {
   ])
 
   const hits: SearchHit[] = []
-  for (const r of projects as { id: string; client_name: string; business: string; description: string | null }[]) {
+  for (const r of projects as { id: string; client_name: string; description: string | null }[]) {
     hits.push({
       kind: 'project',
       id: r.id,
       title: r.client_name,
       subtitle: r.description ?? undefined,
-      href: projectPath(toBusiness(r.business), r.id),
+      href: projectPath(r.id),
     })
   }
   for (const r of leads as { id: string; company_name: string; contact_name: string | null }[]) {

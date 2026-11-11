@@ -3,6 +3,8 @@ import { SmartCalendar } from '@/components/SmartCalendar'
 import type { RawConsultation, RawDeadline, RawCalendarEvent, RawLead } from '@/components/SmartCalendar'
 import type { LeadStatus } from '@/lib/types'
 
+// Po sloučení byznysů (AD02, R-088) kalendář ukazuje všechno — i historické
+// záznamy, které sem dřív nepouštěl filtr `business = 'vizeon'`.
 export const revalidate = 0
 
 export default async function CalendarPage() {
@@ -19,20 +21,17 @@ export default async function CalendarPage() {
         p.id AS project_id
       FROM consultation_slots cs
       JOIN projects p ON cs.project_id = p.id
-      WHERE p.business = 'vizeon'
       ORDER BY cs.scheduled_at
     `,
     sql`
       SELECT id, client_name, deadline
       FROM projects
       WHERE deadline IS NOT NULL
-        AND business = 'vizeon'
       ORDER BY deadline
     `,
     sql`
       SELECT id, title, description, starts_at, ends_at, event_type
       FROM calendar_events
-      WHERE business = 'vizeon'
       ORDER BY starts_at
     `,
     sql`

@@ -6,7 +6,7 @@ import { sql } from '@/lib/db'
 /**
  * Servírování PDF faktury.
  *
- * `proxy.ts` hlídá jen `/dashboard`, `/alteno` a `/hub` — na `/api`
+ * `proxy.ts` hlídá jen `/dashboard` a `/hub` — na `/api`
  * nesahá. Auth check tady proto není pojistka navíc, ale jediná ochrana:
  * faktura nese údaje klienta (IČO, DIČ, adresu) a nesmí uniknout ven.
  *

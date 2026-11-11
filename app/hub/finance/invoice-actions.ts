@@ -6,7 +6,7 @@ import { sql } from '@/lib/db'
 import {
   parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow,
 } from '@/lib/invoices'
-import { projectPath, toBusiness } from '@/lib/business'
+import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import type { InvoiceAiExtract } from '@/lib/types'
 
 /**
@@ -58,16 +58,15 @@ export interface InvoiceArchiveData {
 }
 
 type Row = Omit<InvoiceListItem, 'project_href' | 'duplicate_risk'> & {
-  project_business: string | null
+  project_lead_origin: string | null
   other_income_count: number
 }
 
 function toItem(row: Row): InvoiceListItem {
-  const { project_business, other_income_count, ...rest } = row
+  const { project_lead_origin: _origin, other_income_count, ...rest } = row
   return {
     ...rest,
-    project_href:
-      rest.project_id !== null ? projectPath(toBusiness(project_business), rest.project_id) : null,
+    project_href: rest.project_id !== null ? projectPath(rest.project_id) : null,
     duplicate_risk: rest.paid_on !== null && other_income_count > 0,
   }
 }
@@ -84,7 +83,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
         i.currency, i.note, i.pdf_filename, i.pdf_size,
         (i.pdf_data IS NOT NULL) AS has_pdf,
-        p.business AS project_business,
+        p.lead_origin AS project_lead_origin,
         p.client_name AS project_client_name,
         COALESCE((
           SELECT COUNT(*) FROM finance_transactions t
@@ -104,7 +103,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
         i.currency, i.note, i.pdf_filename, i.pdf_size,
         (i.pdf_data IS NOT NULL) AS has_pdf,
-        p.business AS project_business,
+        p.lead_origin AS project_lead_origin,
         p.client_name AS project_client_name,
         0 AS other_income_count
       FROM invoices i
@@ -152,7 +151,7 @@ export async function getProjectInvoices(projectId: string): Promise<InvoiceArch
       i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
       i.currency, i.note, i.pdf_filename, i.pdf_size,
       (i.pdf_data IS NOT NULL) AS has_pdf,
-      p.business AS project_business,
+      p.lead_origin AS project_lead_origin,
       p.client_name AS project_client_name,
       COALESCE((
         SELECT COUNT(*) FROM finance_transactions t
@@ -183,23 +182,32 @@ export async function getProjectInvoices(projectId: string): Promise<InvoiceArch
   }
 }
 
-/** Zakázky pro výběr ve formuláři — napříč byznysy, je to jedno IČO a jedno přiznání. */
+/** Zakázky pro výběr ve formuláři — ze všech zdrojů, je to jedno IČO a jedno přiznání. */
 export interface InvoiceProjectOption {
   id: string
   client_name: string
   description: string | null
-  business: string
+  /** Doména webu, odkud poptávka přišla; null u výchozího zdroje a ručních zakázek. */
+  origin_label: string | null
 }
 
 export async function getInvoiceProjectOptions(): Promise<InvoiceProjectOption[]> {
   await requireAuth()
   const rows = await sql`
-    SELECT id::text, client_name, description, business
+    SELECT id::text, client_name, description, lead_origin
     FROM projects
     ORDER BY created_at DESC
     LIMIT 200
   `
-  return rows as InvoiceProjectOption[]
+  return (rows as { id: string; client_name: string; description: string | null; lead_origin: string }[]).map((r) => {
+    const origin = toLeadOrigin(r.lead_origin)
+    return {
+      id: r.id,
+      client_name: r.client_name,
+      description: r.description,
+      origin_label: origin === DEFAULT_LEAD_ORIGIN ? null : LEAD_ORIGINS[origin].domain ?? LEAD_ORIGINS[origin].name,
+    }
+  })
 }
 
 function revalidateInvoicePaths(projectId: string | null) {
@@ -207,7 +215,6 @@ function revalidateInvoicePaths(projectId: string | null) {
   revalidatePath('/dashboard/faktury')
   if (projectId) {
     revalidatePath(`/dashboard/${projectId}`)
-    revalidatePath(`/alteno/${projectId}`)
   }
 }
 
@@ -295,7 +302,7 @@ export async function getAllInvoices(): Promise<InvoiceRegistryItem[]> {
       i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
       i.currency, i.note, i.pdf_filename, i.pdf_size,
       (i.pdf_data IS NOT NULL) AS has_pdf,
-      p.business AS project_business,
+      p.lead_origin AS project_lead_origin,
       p.client_name AS project_client_name,
       p.description AS project_description,
       COALESCE((
@@ -344,7 +351,7 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
       i.ai_extracted,
       i.created_at::text, i.updated_at::text,
       i.finance_transaction_id::text,
-      p.business AS project_business,
+      p.lead_origin AS project_lead_origin,
       p.client_name AS project_client_name,
       p.description AS project_description,
       COALESCE((

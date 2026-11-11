@@ -265,7 +265,7 @@ export function InvoiceFields({
               <option key={p.id} value={p.id}>
                 {p.client_name}
                 {p.description ? ` — ${p.description}` : ''}
-                {p.business === 'alteno' ? ' (ALTENO)' : ''}
+                {p.origin_label ? ` (${p.origin_label})` : ''}
               </option>
             ))}
           </select>

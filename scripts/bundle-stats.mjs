@@ -46,7 +46,7 @@ const MEASURED_PATHS = [
   '/dashboard/naklady',
   '/hub',
   '/hub/finance',
-  '/alteno',
+  '/dashboard/poptavky',
 ]
 
 function readJson(file) {

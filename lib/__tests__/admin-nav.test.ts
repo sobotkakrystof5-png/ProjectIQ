@@ -7,12 +7,14 @@ import {
 } from '@/lib/admin-nav'
 import { filterPages, normalizeQuery, toLikePattern } from '@/lib/admin-search'
 
-// Cesty ze starých horních lišt (dashboard, alteno) a z mobilního menu před KP01.
+// Cesty ze starých horních lišt a z mobilního menu před KP01. Adresy zrušené
+// v AD02 (`/dashboard/vizeon`, `/alteno*`) tu nejsou — ty řeší přesměrování,
+// které hlídá lib/__tests__/lead-origins.test.ts.
 const OLD_MENU_PATHS = [
   '/hub',
   '/dashboard',
   '/dashboard/pozadavky',
-  '/dashboard/vizeon',
+  '/dashboard/poptavky',
   '/dashboard/calendar',
   '/dashboard/calls',
   '/dashboard/dokoncene',
@@ -21,8 +23,6 @@ const OLD_MENU_PATHS = [
   '/dashboard/faktury',
   '/dashboard/klienti',
   '/dashboard/novinky',
-  '/alteno',
-  '/alteno/rezervace',
   '/dashboard/notifications',
   '/dashboard/profil',
 ]
@@ -44,12 +44,10 @@ describe('navigace administrace', () => {
     for (const href of ADMIN_MOBILE_TABS) expect(hrefs).toContain(href)
   })
 
-  it('detail zakázky VIZEON i ALTENO a nová zakázka svítí na Zakázkách', () => {
+  it('detail zakázky i nová zakázka svítí na Zakázkách', () => {
     expect(activeHref('/dashboard/11111111-1111-4111-8111-111111111111')).toBe('/dashboard/zakazky')
     expect(activeHref('/dashboard/zakazky')).toBe('/dashboard/zakazky')
     expect(activeHref('/dashboard/new')).toBe('/dashboard/zakazky')
-    expect(activeHref('/alteno/abc')).toBe('/dashboard/zakazky')
-    expect(activeHref('/alteno/new')).toBe('/dashboard/zakazky')
   })
 
   it('Dnes svítí jen na přesné adrese', () => {
@@ -57,8 +55,8 @@ describe('navigace administrace', () => {
     expect(activeHref('/dashboard/faktury')).toBe('/dashboard/faktury')
   })
 
-  it('vyhrává nejspecifičtější shoda (Rezervace ALTENO před Zakázkami)', () => {
-    expect(activeHref('/alteno/rezervace')).toBe('/alteno/rezervace')
+  it('vyhrává nejspecifičtější shoda', () => {
+    expect(activeHref('/dashboard/poptavky')).toBe('/dashboard/poptavky')
     expect(activeHref('/hub/finance')).toBe('/hub/finance')
     expect(activeHref('/hub/byznys')).toBe('/hub')
   })

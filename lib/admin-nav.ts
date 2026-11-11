@@ -6,7 +6,7 @@ export type NavIcon =
   | 'today' | 'projects' | 'requests' | 'inbox' | 'done' | 'rating'
   | 'calendar' | 'calls' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news' | 'hub' | 'bell' | 'profile'
 
-export type CountKey = 'requests' | 'vizeon' | 'alteno' | 'notifications' | 'drafts'
+export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts'
 
 export interface NavItem {
   href: string
@@ -35,10 +35,10 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: 'Zakázky',
     items: [
-      { href: '/dashboard/zakazky', label: 'Zakázky', icon: 'projects', also: ['/dashboard/new', '/alteno'], patterns: [/^\/dashboard\/[0-9a-f]{8}-[0-9a-f-]{27}(\/|$)/i] },
+      { href: '/dashboard/zakazky', label: 'Zakázky', icon: 'projects', also: ['/dashboard/new'], patterns: [/^\/dashboard\/[0-9a-f]{8}-[0-9a-f-]{27}(\/|$)/i] },
       { href: '/dashboard/pozadavky', label: 'Požadavky klientů', icon: 'requests', count: 'requests' },
-      { href: '/dashboard/vizeon', label: 'Poptávky VIZEON', icon: 'inbox', count: 'vizeon' },
-      { href: '/alteno/rezervace', label: 'Rezervace ALTENO', icon: 'inbox', count: 'alteno' },
+      // Jeden inbox pro všechny weby (AD02); staré adresy přesměrují, viz lib/legacy-redirects.mjs.
+      { href: '/dashboard/poptavky', label: 'Poptávky z webů', icon: 'inbox', count: 'leads' },
       { href: '/dashboard/dokoncene', label: 'Dokončené', icon: 'done' },
       { href: '/dashboard/hodnoceni', label: 'Hodnocení', icon: 'rating' },
     ],
@@ -106,4 +106,4 @@ export function activeHref(pathname: string): string | null {
 export const formatBadge = (n: number): string => (n > 99 ? '99+' : String(n))
 
 export type AdminCounts = Record<CountKey, number>
-export const EMPTY_COUNTS: AdminCounts = { requests: 0, vizeon: 0, alteno: 0, notifications: 0, drafts: 0 }
+export const EMPTY_COUNTS: AdminCounts = { requests: 0, leads: 0, notifications: 0, drafts: 0 }

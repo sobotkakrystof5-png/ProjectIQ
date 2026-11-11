@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
 import { loadPortalClient } from '@/lib/portal/admin-queries'
 import { isInviteConfigured } from '@/lib/portal/invite'
-import { BUSINESSES, toBusiness } from '@/lib/business'
+import { LEAD_ORIGINS, toLeadOrigin } from '@/lib/lead-origins'
 import {
   InviteForm,
   LinkProjectForm,
@@ -50,7 +50,7 @@ export default async function PortalClientPage({ params }: { params: Promise<{ i
         )}
         <LinkProjectForm
           clientId={detail.client.id}
-          options={detail.unlinked.map((p) => ({ id: p.id, label: `${p.client_name} (${BUSINESSES[toBusiness(p.business)].label})` }))}
+          options={detail.unlinked.map((p) => ({ id: p.id, label: `${p.client_name} (${LEAD_ORIGINS[toLeadOrigin(p.lead_origin)].label})` }))}
         />
       </section>
 

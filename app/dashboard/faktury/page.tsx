@@ -2,7 +2,7 @@ import { getAllInvoices, getInvoiceProjectOptions } from '@/app/hub/finance/invo
 import { InvoiceRegistry } from '@/components/InvoiceRegistry'
 
 /**
- * Evidence faktur. Záměrně ukazuje doklady napříč byznysy — VIZEON i ALTENO
+ * Evidence faktur. Záměrně ukazuje doklady ze všech zdrojů poptávek
  * fakturuje jedno IČO pod jedním přiznáním, takže rozdělený archiv by
  * znamenal, že by šlo fakturu hledat na špatném místě.
  */

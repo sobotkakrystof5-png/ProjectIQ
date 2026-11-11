@@ -53,28 +53,29 @@ export default async function ByznysPage() {
           </div>
         </Link>
 
-        {/* ALTENO */}
+        {/* Poptávky z webů — po sloučení byznysů (AD02) jeden inbox pro vizeon.cz,
+            alteno.cz i prvotka.cz. */}
         <Link
-          href="/alteno"
-          className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-amber-200 transition-all flex flex-col"
+          href="/dashboard/poptavky"
+          className="group bg-white border border-border rounded-2xl p-6 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
         >
           <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
+            <div className="w-12 h-12 brand-gradient rounded-xl flex items-center justify-center shadow-sm">
               <Bot size={22} strokeWidth={1.5} className="text-white" />
             </div>
             <ArrowUpRight
               size={16}
               strokeWidth={1.5}
-              className="text-muted-foreground/40 group-hover:text-amber-600 transition-colors mt-0.5"
+              className="text-muted-foreground/40 group-hover:text-brand-600 transition-colors mt-0.5"
             />
           </div>
-          <h2 className="font-semibold text-foreground text-[16px] mb-1.5">ALTENO — AI automatizace</h2>
+          <h2 className="font-semibold text-foreground text-[16px] mb-1.5">Poptávky z webů</h2>
           <p className="text-sm text-muted-foreground flex-1">
-            Správa zakázek na automatizace a AI agenty, poptávky z alteno.cz a konzultace.
+            Jeden inbox pro vizeon.cz, alteno.cz i prvotka.cz. Po potvrzení se poptávka přesune do zakázek.
           </p>
           <div className="mt-5 pt-3 border-t border-border">
-            <span className="text-xs font-semibold text-amber-600 group-hover:text-amber-700 transition-colors">
-              Otevřít ALTENO →
+            <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
+              Otevřít poptávky →
             </span>
           </div>
         </Link>

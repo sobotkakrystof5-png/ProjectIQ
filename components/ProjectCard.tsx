@@ -4,34 +4,26 @@ import { StatusBadge } from './StatusBadge'
 import { ProgressBar } from './ProgressBar'
 import { ShareButton } from './ShareButton'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { cn } from '@/lib/utils'
-import { BUSINESSES, projectPath, type Business } from '@/lib/business'
+import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import type { Project, ProjectStatus } from '@/lib/types'
 
 interface ProjectCardProps {
-  project: Project
-  business?: Business
+  /** `lead_origin` je štítek „odkud poptávka přišla" (AD02, R-088). */
+  project: Project & { lead_origin?: string | null }
 }
 
-export function ProjectCard({ project, business = 'vizeon' }: ProjectCardProps) {
-  const cfg = BUSINESSES[business]
-  const fromWeb = project.source === cfg.source
-  const isAlteno = business === 'alteno'
+export function ProjectCard({ project }: ProjectCardProps) {
+  const origin = LEAD_ORIGINS[toLeadOrigin(project.lead_origin)]
+  const fromWeb = project.source !== null && project.source !== 'manual'
 
   return (
     <Link
-      href={projectPath(business, project.id)}
-      className={cn(
-        'group block bg-white border border-border rounded-xl p-5 hover:shadow-md transition-all duration-200',
-        isAlteno ? 'hover:border-amber-200' : 'hover:border-brand-200',
-      )}
+      href={projectPath(project.id)}
+      className="group block bg-white border border-border rounded-xl p-5 hover:border-brand-200 hover:shadow-md transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <h3 className={cn(
-            'font-semibold text-foreground truncate transition-colors',
-            isAlteno ? 'group-hover:text-amber-800' : 'group-hover:text-brand-800',
-          )}>
+          <h3 className="font-semibold text-foreground truncate transition-colors group-hover:text-brand-800">
             {project.client_name}
           </h3>
           {project.description && (
@@ -39,15 +31,13 @@ export function ProjectCard({ project, business = 'vizeon' }: ProjectCardProps) 
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {fromWeb && (
-            <div className={cn(
-              'inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
-              isAlteno
-                ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                : 'bg-blue-50 text-blue-700 border border-blue-100'
-            )} title={`Poptávka z ${cfg.domain}`}>
+          {fromWeb && origin.domain && (
+            <div
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+              title={`Poptávka z ${origin.domain}`}
+            >
               <Globe size={11} strokeWidth={1.5} />
-              <span>{cfg.name}</span>
+              <span>{origin.name}</span>
             </div>
           )}
           <ShareButton token={project.public_token} variant="icon" />
