@@ -1,6 +1,8 @@
 import { sql } from '@/lib/db'
 import { projectPath } from '@/lib/lead-origins'
-import { STALE_AFTER_DAYS, type TodayData } from '@/lib/admin-today'
+import { getPragueTodayISO } from '@/lib/prague-time'
+import { calculateTax } from '@/lib/tax'
+import { STALE_AFTER_DAYS, type MonthMoney, type TodayData, type UnpaidInvoiceLine } from '@/lib/admin-today'
 
 const iso = (value: Date | string): string => new Date(value).toISOString()
 
@@ -108,5 +110,64 @@ export async function loadTodayData(): Promise<TodayData> {
       updatedAt: iso(s.updated_at),
       href: projectPath(s.id),
     })),
+  }
+}
+
+/**
+ * Peníze pro pravý sloupec Dnes (AD03). Stejné údaje jako Finance › Podnikání,
+ * jen na jeden pohled: příjem měsíce, z toho přiznaný, nezaplacené faktury,
+ * odhad daně a rezerva.
+ *
+ * Pravidla se nikde nevymýšlejí znovu — příjem má stejné podmínky jako
+ * `getBusinessIncome` (`user_id IS NULL`, `type = 'income'`, příznak `declared`),
+ * nezaplacená faktura stejné jako `getInvoices` (`paid_on IS NULL`) a daň počítá
+ * tatáž `calculateTax` jako kalkulačka. Dvě kola do databáze místo šesti: Dnes
+ * je první obrazovka adminu a nemá čekat na seznam faktur, který nikdo nevidí.
+ */
+export async function loadMonthMoney(todayIso: string = getPragueTodayISO()): Promise<MonthMoney> {
+  const month = todayIso.slice(0, 7)
+  const year = Number(todayIso.slice(0, 4))
+
+  const [incomeRows, invoiceRows] = await Promise.all([
+    optional(sql`
+      SELECT
+        COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = ${month}), 0)::float AS month_income,
+        COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = ${month} AND declared), 0)::float AS month_declared,
+        COALESCE(SUM(amount) FILTER (WHERE declared), 0)::float AS year_declared
+      FROM finance_transactions
+      WHERE user_id IS NULL AND type = 'income' AND EXTRACT(YEAR FROM date) = ${year}
+    `),
+    optional(sql`
+      SELECT currency,
+             COALESCE(SUM(amount), 0)::float AS amount,
+             COUNT(*)::int AS count,
+             COUNT(*) FILTER (WHERE due_on IS NOT NULL AND due_on < CURRENT_DATE)::int AS overdue
+      FROM invoices
+      WHERE paid_on IS NULL
+      GROUP BY currency
+      ORDER BY SUM(amount) DESC
+    `),
+  ])
+
+  const income = (incomeRows as { month_income: number; month_declared: number; year_declared: number }[])[0]
+  const yearDeclaredIncome = Number(income?.year_declared ?? 0)
+  const tax = calculateTax({ income: yearDeclaredIncome, year })
+
+  return {
+    month,
+    year,
+    income: Number(income?.month_income ?? 0),
+    declaredIncome: Number(income?.month_declared ?? 0),
+    yearDeclaredIncome,
+    unpaidInvoices: (invoiceRows as UnpaidInvoiceLine[]).map((i) => ({
+      currency: i.currency,
+      amount: Number(i.amount),
+      count: i.count,
+      overdue: i.overdue,
+    })),
+    levies: tax.totalLevies,
+    monthlyReserve: tax.monthlyReserve,
+    ratesYear: tax.ratesYear,
+    ratesMatchYear: tax.ratesMatchYear,
   }
 }

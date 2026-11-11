@@ -37,7 +37,7 @@ vi.mock('@/lib/db', () => {
   return { sql: Object.assign(sql, { query: (text: string, params?: unknown[]) => sql(text, params) }) }
 })
 
-const { loadTodayData } = await import('@/lib/admin-today-queries')
+const { loadTodayData, loadMonthMoney } = await import('@/lib/admin-today-queries')
 const { loadAdminCounts } = await import('@/lib/admin-counts')
 
 function reset() {
@@ -56,6 +56,20 @@ describe('kola do databáze — výchozí měření adminu', () => {
     expect(waves).toBe(1)
   })
 
+  it('peníze za měsíc (pravý sloupec Dnes) stojí 2 kola v jedné vlně', async () => {
+    // Stejná čísla přes getBusinessIncome + getInvoices by stála 6 kol a tahala
+    // by celý seznam faktur (AD03).
+    await loadMonthMoney('2026-11-11')
+    expect(rounds).toBeLessThanOrEqual(2)
+    expect(waves).toBe(1)
+  })
+
+  it('Dnes i s penězi zůstává jedna vlna', async () => {
+    await Promise.all([loadTodayData(), loadMonthMoney('2026-11-11')])
+    expect(rounds).toBeLessThanOrEqual(8)
+    expect(waves).toBe(1)
+  })
+
   it('odznaky v menu (kostra administrace) stojí nejvýš 3 kola v jedné vlně', async () => {
     await loadAdminCounts()
     expect(rounds).toBeLessThanOrEqual(3)
@@ -63,10 +77,11 @@ describe('kola do databáze — výchozí měření adminu', () => {
   })
 
   it('kostra + Dnes dohromady: menu a obsah se načítají odděleně, tedy ve dvou vlnách', async () => {
-    // Takhle to dnes běží ve stránce: layout si řekne o odznaky, stránka o data.
+    // Takhle to dnes běží ve stránce: layout si řekne o odznaky, stránka o data
+    // i o peníze (AD03) — ty jdou s daty v jedné vlně.
     await loadAdminCounts()
-    await loadTodayData()
-    expect(rounds).toBeLessThanOrEqual(9)
+    await Promise.all([loadTodayData(), loadMonthMoney('2026-11-11')])
+    expect(rounds).toBeLessThanOrEqual(11)
     expect(waves).toBe(2)
   })
 })

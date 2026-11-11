@@ -41,6 +41,41 @@ export interface TodayStaleProject {
   href: string
 }
 
+/** Nezaplacené faktury v jedné měně. Měny se nikdy nesčítají (R-011). */
+export interface UnpaidInvoiceLine {
+  currency: string
+  amount: number
+  count: number
+  /** Kolik z nich je po splatnosti. */
+  overdue: number
+}
+
+/**
+ * „Jak se daří tenhle měsíc" na Dnes (AD03). Příjem je za kalendářní měsíc,
+ * daň a rezerva za celý rok — daň se počítá z ročního příjmu, měsíční díl by
+ * byl vymyšlené číslo.
+ */
+export interface MonthMoney {
+  /** Měsíc v Praze, `YYYY-MM`. */
+  month: string
+  year: number
+  /** Příjem za tenhle měsíc, obě linie dohromady. */
+  income: number
+  /** Z toho fakturovaný na IČO, tedy ten, co jde do přiznání. */
+  declaredIncome: number
+  /** Přiznaný příjem za celý rok — vstup do odhadu daně. */
+  yearDeclaredIncome: number
+  unpaidInvoices: UnpaidInvoiceLine[]
+  /** Odhad daně a odvodů z ročního přiznaného příjmu (`calculateTax`). */
+  levies: number
+  /** Kolik si na ně měsíčně odkládat. */
+  monthlyReserve: number
+  /** Rok, pro který platí sazby v `lib/tax-constants.ts`. */
+  ratesYear: number
+  /** Sedí sazby na zobrazený rok? */
+  ratesMatchYear: boolean
+}
+
 export interface TodayData {
   requests: TodayRequest[]
   drafts: TodayDraftGroup[]
