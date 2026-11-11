@@ -1,0 +1,47 @@
+/* Design systém Dílky — paleta celého repa (R-081). Jediný zdroj hodnot; importuje se
+   z app/globals.css, takže tokeny platí i tam, kde není data-app: /login, /p/[token],
+   /h/[token] a chybové stránky. Dřív žily jen v [data-app="ws"] a [data-app="admin"],
+   takže třídy navy-*, text-ink nebo bg-surface v portálu nefungovaly (R-027).
+
+   Barvy jsou RGB trojice kvůli Tailwind <alpha-value> (lib/ws/tailwind-dilky.ts).
+   Přepisy si nechávají app/ws-tokens.css (shadcn proměnné Workspace + tmavý režim)
+   a app/admin-tokens.css (shadcn proměnné adminu). Shadcn proměnné jsou HSL, paleta
+   RGB — jiný jmenný prostor, nekolidují.
+
+   Zdroj: skill zakaziq-design-dilky → references/tokens.css. */
+
+:root {
+  --navy-950: 12 26 54;     /* #0c1a36 */
+  --navy-900: 19 40 80;     /* #132850 */
+  --navy-800: 27 56 104;    /* #1b3868 */
+  --navy-700: 35 71 139;    /* #23478b  hlavní akce */
+  --navy-600: 43 87 168;    /* #2b57a8 */
+  --navy-500: 58 110 196;   /* #3a6ec4  akcent na světlém (4.6:1) */
+  --navy-400: 92 141 211;   /* #5c8dd3 */
+  --navy-300: 138 174 227;  /* #8aaee3  kurzíva na tmavém */
+  --navy-200: 184 206 239;  /* #b8ceef  text na tmavém */
+  --navy-100: 220 231 247;  /* #dce7f7  okraje */
+  --navy-50: 238 242 251;   /* #eef2fb */
+
+  --ground: 244 246 251;    /* #f4f6fb */
+  --surface: 255 255 255;
+  --ink: 12 26 54;          /* = navy-950 */
+  --quiet: 74 88 120;       /* #4a5878  6.6:1 na ground */
+
+  --signal: 255 181 71;     /* #ffb547 */
+  --signal-bg: 255 247 232; /* #fff7e8 */
+  --signal-line: 225 154 44;/* #e19a2c */
+  --signal-ink: 107 67 0;   /* #6b4300 */
+  --reward: 255 210 138;    /* #ffd28a  „Odměna připravena" na tmavém */
+  --danger: 179 38 30;      /* #b3261e */
+  /* --danger-ink (text chyby na tmavém) má smysl jen v tmavém režimu Workspace,
+     proto zůstává v app/ws-tokens.css. Ve světlém ho nikdo nečte. */
+
+  /* barvy pracovníků v kalendáři (RD05): střídají se, když pracovník nemá vlastní barvu */
+  --staff-1: 35 71 139;     /* = navy-700 */
+  --staff-2: 13 124 117;    /* #0d7c75 */
+  --staff-3: 109 76 170;    /* #6d4caa */
+  --staff-4: 166 83 94;     /* #a6535e */
+  --staff-5: 115 120 40;    /* #737828 */
+  --staff-tint: 16%;
+}

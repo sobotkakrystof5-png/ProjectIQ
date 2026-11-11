@@ -1,30 +1,4 @@
-/* Kostra administrace (KP01, R-071): jen barevné tokeny Dílky, bez přepsání proměnných
-   shadcn (--background, --border…), takže obsah stránek adminu vypadá beze změny.
-   Platí jen uvnitř [data-app="admin"] (layouty app/dashboard a app/alteno). Hodnoty
-   jsou stejné jako v app/ws-tokens.css; změnit je tam znamená změnit i tady. */
-
-[data-app="admin"] {
-  --navy-950: 12 26 54;     /* #0c1a36 */
-  --navy-900: 19 40 80;     /* #132850 */
-  --navy-800: 27 56 104;    /* #1b3868 */
-  --navy-700: 35 71 139;    /* #23478b  hlavní akce */
-  --navy-600: 43 87 168;    /* #2b57a8 */
-  --navy-500: 58 110 196;   /* #3a6ec4  akcent na světlém (4.6:1) */
-  --navy-400: 92 141 211;   /* #5c8dd3 */
-  --navy-300: 138 174 227;  /* #8aaee3  kurzíva na tmavém */
-  --navy-200: 184 206 239;  /* #b8ceef  text na tmavém */
-  --navy-100: 220 231 247;  /* #dce7f7  okraje */
-  --navy-50: 238 242 251;   /* #eef2fb */
-
-  --ground: 244 246 251;    /* #f4f6fb */
-  --surface: 255 255 255;
-  --ink: 12 26 54;          /* = navy-950 */
-  --quiet: 74 88 120;       /* #4a5878  6.6:1 na ground */
-
-  --signal: 255 181 71;     /* #ffb547 */
-  --signal-bg: 255 247 232; /* #fff7e8 */
-  --signal-line: 225 154 44;/* #e19a2c */
-  --signal-ink: 107 67 0;   /* #6b4300 */
-  --reward: 255 210 138;    /* #ffd28a  „Odměna připravena" na tmavém */
-  --danger: 179 38 30;      /* #b3261e */
-}
+/* Kostra administrace (R-071, R-081): tokeny Dílků už nejsou tady, ale na :root
+   v app/tokens-dilky.css — platí pro celé repo včetně /login, /p a /h.
+   Tenhle soubor si nechává jen to, co se má lišit uvnitř [data-app="admin"]
+   (layout app/dashboard). Admin nemá tmavý režim. */

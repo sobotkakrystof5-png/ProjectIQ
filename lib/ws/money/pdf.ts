@@ -69,7 +69,9 @@ export function spaydPaymentString(invoice:Invoice):string|null {
 export async function invoiceHtml(invoice:Invoice,brand:{name:string;logo:string|null}) {
  let logo:string|null=null
  try {logo=await logoData(brand.logo)}catch {console.warn('[ws/money] Logo se do PDF nepodařilo načíst.')}
- const tokens=await readFile(path.join(process.cwd(),'app/ws-tokens.css'),'utf8')
+ // Paleta je od AD04 na :root v app/tokens-dilky.css, přepisy Workspace v app/ws-tokens.css.
+ const tokens=(await Promise.all(['app/tokens-dilky.css','app/ws-tokens.css']
+  .map(file=>readFile(path.join(process.cwd(),file),'utf8')))).join('\n')
 
  const text=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!))
  const party=(p:Invoice['counterparty'])=>'<strong>'+text(p.name)+'</strong><p>'+text(p.address)+'</p>'+(p.ico?'<p>IČO '+text(p.ico)+'</p>':'')+(p.dic?'<p>DIČ '+text(p.dic)+'</p>':'')

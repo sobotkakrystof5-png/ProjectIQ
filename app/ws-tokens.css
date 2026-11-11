@@ -1,41 +1,11 @@
-/* Design systém Dílky — tokeny (zdroj: skill zakaziq-design-dilky → references/tokens.css).
-   Importuje se jen v layoutech Workspace a landing page. Platí jen uvnitř [data-app="ws"],
-   aby se nedotkly admin konzole, která má vlastní :root v app/globals.css (R-027).
-   Barvy jsou RGB trojice kvůli Tailwind <alpha-value> (lib/ws/tailwind-dilky.ts). */
+/* Design systém Dílky — přepisy pro Workspace, landing page, portál a objednávací
+   stránku. Hodnoty palety (navy-*, ground, surface, ink, quiet, signal, reward,
+   danger, staff-*) jsou na :root v app/tokens-dilky.css; tady zůstávají jen
+   proměnné shadcn/ui, písmo a tmavý režim.
+
+   Importuje se v layoutech /w, /r, /z, /klient a landing page. */
 
 [data-app="ws"] {
-  --navy-950: 12 26 54;     /* #0c1a36 */
-  --navy-900: 19 40 80;     /* #132850 */
-  --navy-800: 27 56 104;    /* #1b3868 */
-  --navy-700: 35 71 139;    /* #23478b  hlavní akce */
-  --navy-600: 43 87 168;    /* #2b57a8 */
-  --navy-500: 58 110 196;   /* #3a6ec4  akcent na světlém (4.6:1) */
-  --navy-400: 92 141 211;   /* #5c8dd3 */
-  --navy-300: 138 174 227;  /* #8aaee3  kurzíva na tmavém */
-  --navy-200: 184 206 239;  /* #b8ceef  text na tmavém */
-  --navy-100: 220 231 247;  /* #dce7f7  okraje */
-  --navy-50: 238 242 251;   /* #eef2fb */
-
-  --ground: 244 246 251;    /* #f4f6fb */
-  --surface: 255 255 255;
-  --ink: 12 26 54;          /* = navy-950 */
-  --quiet: 74 88 120;       /* #4a5878  6.6:1 na ground */
-
-  --signal: 255 181 71;     /* #ffb547 */
-  --signal-bg: 255 247 232; /* #fff7e8 */
-  --signal-line: 225 154 44;/* #e19a2c */
-  --signal-ink: 107 67 0;   /* #6b4300 */
-  --reward: 255 210 138;    /* #ffd28a  „Odměna připravena" na tmavém */
-  --danger: 179 38 30;      /* #b3261e */
-
-  /* barvy pracovníků v kalendáři (RD05): střídají se, když pracovník nemá vlastní barvu */
-  --staff-1: 35 71 139;     /* = navy-700 */
-  --staff-2: 13 124 117;    /* #0d7c75 */
-  --staff-3: 109 76 170;    /* #6d4caa */
-  --staff-4: 166 83 94;     /* #a6535e */
-  --staff-5: 115 120 40;    /* #737828 */
-  --staff-tint: 16%;
-
   /* shadcn/ui čte hsl(var(--x)) — uvnitř Workspace jim dáme HSL hodnoty Dílků */
   --background: 223 47% 97%;
   --foreground: 220 64% 13%;
@@ -60,7 +30,6 @@
 
   color-scheme: light;
   font-family: var(--font-instrument-sans), system-ui, sans-serif;
-  /* body v app/globals.css zapíná znakové varianty Interu — na Instrument Sans nepatří */
   font-feature-settings: normal;
   background: rgb(var(--ground));
   color: rgb(var(--ink));
