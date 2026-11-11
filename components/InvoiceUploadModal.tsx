@@ -8,8 +8,8 @@ import {
   type InvoiceFormState,
 } from '@/components/InvoiceFields'
 import type { InvoiceAiExtract } from '@/lib/types'
-import { createInvoice, updateInvoice } from '@/app/hub/finance/invoice-actions'
-import type { InvoiceListItem, InvoiceProjectOption } from '@/app/hub/finance/invoice-actions'
+import { createInvoice, updateInvoice } from '@/app/dashboard/finance/invoice-actions'
+import type { InvoiceListItem, InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 
 /** Převede existující fakturu do stavu formuláře. */
 function invoiceToForm(invoice: InvoiceListItem): InvoiceFormState {

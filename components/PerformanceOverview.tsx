@@ -357,7 +357,7 @@ function ClientSatisfaction({ projects, surveys }: { projects: CompletedProject[
  * Výkonnost dokončených zakázek — odpovídá na otázku „jak dobře pracuju".
  *
  * Peníze a daně (celkové příjmy, náklady, čistý výdělek) žijí ve Financích
- * (/hub/finance?tab=podnikani) — tady se neopakují, aby nevznikla dvě různě
+ * (/dashboard/finance?tab=podnikani) — tady se neopakují, aby nevznikla dvě různě
  * počítaná čísla se stejným jménem. Hodinová sazba je výjimka: je to poměr
  * (příjem/čas), ne částka sama o sobě, takže zůstává jako výkonnostní metrika.
  */

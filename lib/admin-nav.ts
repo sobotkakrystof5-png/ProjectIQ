@@ -1,10 +1,14 @@
 // Navigace administrace (KP01, R-071): jedno místo pro menu, počty a hledání.
-// Čisté funkce a data bez React a DB, aby šly testovat. Hub má vlastní postranní
-// panel a v tomhle menu je jen odkaz.
+// Čisté funkce a data bez React a DB, aby šly testovat. Od AD03 (R-087) je menu
+// jedno pro celý admin — Hub zanikl a jeho obrazovky jsou pod /dashboard.
+//
+// Položka „Kontakty“ tu ještě není: kartu kontaktu staví AD09 a menu nesmí
+// slibovat obrazovku, která neexistuje.
 
 export type NavIcon =
   | 'today' | 'projects' | 'requests' | 'inbox' | 'done' | 'rating'
-  | 'calendar' | 'calls' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news' | 'hub' | 'bell' | 'profile'
+  | 'calendar' | 'calls' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
+  | 'personal' | 'startup' | 'bell' | 'profile'
 
 export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts'
 
@@ -29,25 +33,21 @@ export interface NavGroup {
 
 export const ADMIN_NAV: NavGroup[] = [
   {
-    label: 'Dnes',
+    label: 'Přehled',
     items: [{ href: '/dashboard', label: 'Dnes', icon: 'today', exact: true }],
   },
   {
-    label: 'Zakázky',
+    label: 'Práce',
     items: [
       { href: '/dashboard/zakazky', label: 'Zakázky', icon: 'projects', also: ['/dashboard/new'], patterns: [/^\/dashboard\/[0-9a-f]{8}-[0-9a-f-]{27}(\/|$)/i] },
-      { href: '/dashboard/pozadavky', label: 'Požadavky klientů', icon: 'requests', count: 'requests' },
       // Jeden inbox pro všechny weby (AD02); staré adresy přesměrují, viz lib/legacy-redirects.mjs.
       { href: '/dashboard/poptavky', label: 'Poptávky z webů', icon: 'inbox', count: 'leads' },
+      { href: '/dashboard/pozadavky', label: 'Požadavky klientů', icon: 'requests', count: 'requests' },
+      { href: '/dashboard/calls', label: 'Hovory', icon: 'calls' },
+      { href: '/dashboard/calendar', label: 'Kalendář', icon: 'calendar' },
+      // Dokončené a Hodnocení se do zakázky slijí až v AD11 a AD16 (R-090).
       { href: '/dashboard/dokoncene', label: 'Dokončené', icon: 'done' },
       { href: '/dashboard/hodnoceni', label: 'Hodnocení', icon: 'rating' },
-    ],
-  },
-  {
-    label: 'Kalendář a hovory',
-    items: [
-      { href: '/dashboard/calendar', label: 'Kalendář', icon: 'calendar' },
-      { href: '/dashboard/calls', label: 'Hovory', icon: 'calls' },
     ],
   },
   {
@@ -55,10 +55,11 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: '/dashboard/faktury', label: 'Faktury', icon: 'invoices' },
       { href: '/dashboard/naklady', label: 'Náklady', icon: 'costs' },
-      { href: '/hub/finance', label: 'Finance a daně', icon: 'finance' },
+      { href: '/dashboard/finance', label: 'Finance a daně', icon: 'finance' },
     ],
   },
   {
+    // ZakazIQ jako produkt pro cizí firmy — ne osobní systém, proto vlastní skupina.
     label: 'Klienti',
     items: [
       { href: '/dashboard/klientsky-prostor', label: 'Klientský prostor', icon: 'clients' },
@@ -68,7 +69,10 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     label: 'Osobní',
-    items: [{ href: '/hub', label: 'Hub', icon: 'hub' }],
+    items: [
+      { href: '/dashboard/projekty', label: 'Projekty', icon: 'personal' },
+      { href: '/dashboard/startup', label: 'Startup', icon: 'startup' },
+    ],
   },
 ]
 
@@ -78,8 +82,12 @@ export const ADMIN_UTILITY_NAV: NavItem[] = [
   { href: '/dashboard/profil', label: 'Profil a statistiky', icon: 'profile' },
 ]
 
-/** Čtyři nejčastější místa pro spodní lištu na telefonu; zbytek je v nabídce „Více“. */
-export const ADMIN_MOBILE_TABS: string[] = ['/dashboard', '/dashboard/zakazky', '/dashboard/pozadavky', '/dashboard/calendar']
+/**
+ * Čtyři nejčastější místa pro spodní lištu na telefonu; zbytek je v nabídce „Více“.
+ * Po AD02 je hlavní inbox jeden (Poptávky z webů), proto je na liště místo
+ * Požadavků klientů — ty mají odznak i v menu a hlásí se samy na Dnes.
+ */
+export const ADMIN_MOBILE_TABS: string[] = ['/dashboard', '/dashboard/zakazky', '/dashboard/poptavky', '/dashboard/calendar']
 
 export const allNavItems = (): NavItem[] => [...ADMIN_NAV.flatMap((g) => g.items), ...ADMIN_UTILITY_NAV]
 

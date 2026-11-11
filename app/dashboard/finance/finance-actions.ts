@@ -272,7 +272,7 @@ export async function createTransaction(data: {
       revalidatePath('/dashboard/dokoncene')
     }
 
-    revalidatePath('/hub/finance')
+    revalidatePath('/dashboard/finance')
     return {}
   } catch {
     return { error: 'Nepodařilo se uložit transakci' }
@@ -293,7 +293,7 @@ export async function setTransactionDeclared(id: string, declared: boolean): Pro
     SET declared = ${declared}
     WHERE id = ${id} AND user_id IS NULL AND type = 'income'
   `
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -306,7 +306,7 @@ export async function deleteTransaction(id: string): Promise<void> {
        OR (cost_type = 'one_time' AND id = (SELECT source_cost_id FROM finance_transactions WHERE id = ${id}::uuid))
   `
   await sql`DELETE FROM finance_transactions WHERE id = ${id} AND user_id IS NULL`
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
   revalidatePath('/dashboard/naklady')
   revalidatePath('/dashboard/dokoncene')
 }
@@ -356,7 +356,7 @@ export async function createRecurringCashFlow(data: {
       )
     `
 
-    revalidatePath('/hub/finance')
+    revalidatePath('/dashboard/finance')
     return {}
   } catch {
     return { error: 'Nepodařilo se uložit opakovanou transakci' }
@@ -367,7 +367,7 @@ export async function deleteRecurringCashFlow(id: string): Promise<void> {
   await requireAuth()
   // CASCADE na source_recurring_cash_flow_id → smaže všechny generované transakce
   await sql`DELETE FROM recurring_cash_flow WHERE id = ${id}`
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }
 
 // Generuje chybějící opakované cash-flow transakce pro aktuální měsíc/rok.

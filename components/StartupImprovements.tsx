@@ -7,7 +7,7 @@ import {
   addImprovement,
   updateImprovement,
   deleteImprovement,
-} from '@/app/hub/byznys/startup/startup-actions'
+} from '@/app/dashboard/startup/startup-actions'
 import {
   IMPROVEMENT_STATUS_LABELS,
   IMPROVEMENT_STATUS_STYLES,

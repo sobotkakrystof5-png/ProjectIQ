@@ -72,6 +72,11 @@ Změna: cesty `/klient` (klientský prostor, KP05) dostaly profil `workspace` (v
 Kvůli: přihlášení klientů přes Clerk, přehled zakázek a hlasový požadavek.
 Ověřeno: testy `lib/security/__tests__/csp.test.ts` (profil, Clerk zdroje jen na `/w` a `/klient`, `/klientela` nechytá). Skutečné přihlášení přes Clerk na `/klient` v prohlížeči neověřeno.
 
+## v7 — 2026-11-11
+Změna: žádná. Politika i zdroje zůstávají, jen se přesunula stránka, která TradingView potřebuje: graf je po zrušení Hubu (AD03, R-087) na `/dashboard/finance` místo `/hub/finance`. `frame-src https://www.tradingview-widget.com` platí pro celý profil `admin`, takže se nic nepřidávalo ani neubíralo; přepsaný je jen komentář v `lib/security/csp.ts` a řádek v tomhle záznamu. Adresy `/hub/*` teď trvale přesměrovávají (`lib/legacy-redirects.mjs`) a dál spadají do profilu `admin` i do `X-Robots-Tag: noindex` (vzor `notIndexed` v `next.config.mjs` je nechává v seznamu).
+Kvůli: přesun obrazovek Hubu do `/dashboard`.
+Ověřeno: testy `lib/security/__tests__/csp.test.ts` (profil `admin` pro `/dashboard/finance`, Clerk zdroje jen na `/w` a `/klient`). Graf TradingView na `/dashboard/finance` v prohlížeči neověřen — admin agent lokálně neotevře (chybí heslo).
+
 ## Čeká (zapsat jako vN při přidání)
 - Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.

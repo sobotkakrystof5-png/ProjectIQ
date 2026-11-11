@@ -19,7 +19,7 @@ export const ROUTES = {
   signUp: '/w/registrace',
   signIn: '/w/prihlaseni',
   admin: '/login',
-  adminHome: '/hub',
+  adminHome: '/dashboard',
   terms: '/podminky',
   privacy: '/ochrana-udaju',
   dpa: '/zpracovatelska-smlouva',

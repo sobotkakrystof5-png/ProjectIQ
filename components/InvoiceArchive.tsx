@@ -9,8 +9,8 @@ import {
 } from 'lucide-react'
 import { InvoiceUploadModal } from '@/components/InvoiceUploadModal'
 import { usePdfDrop } from '@/lib/use-pdf-drop'
-import { deleteInvoice } from '@/app/hub/finance/invoice-actions'
-import type { InvoiceArchiveData, InvoiceListItem, InvoiceProjectOption } from '@/app/hub/finance/invoice-actions'
+import { deleteInvoice } from '@/app/dashboard/finance/invoice-actions'
+import type { InvoiceArchiveData, InvoiceListItem, InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceFormState } from '@/components/InvoiceFields'
 
 function formatAmount(amount: number, currency: string) {

@@ -1,6 +1,6 @@
 import {
-  Bell, Building2, CalendarDays, CheckCircle2, FileText, Inbox, LayoutGrid, Megaphone,
-  MessageSquarePlus, PhoneCall, Receipt, Star, Sun, UserCircle, Wallet, FolderOpen,
+  Bell, Building2, CalendarDays, CheckCircle2, FileText, Inbox, Layers, Megaphone,
+  MessageSquarePlus, PhoneCall, Receipt, Rocket, Star, Sun, UserCircle, Wallet, FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
 import type { NavIcon } from '@/lib/admin-nav'
@@ -19,7 +19,8 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   finance: Wallet,
   clients: Building2,
   news: Megaphone,
-  hub: LayoutGrid,
+  personal: Layers,
+  startup: Rocket,
   bell: Bell,
   profile: UserCircle,
 }

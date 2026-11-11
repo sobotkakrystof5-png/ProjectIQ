@@ -80,7 +80,7 @@ export function BusinessCalculator({ overview }: Props) {
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">Výkonnost podnikání</h2>
-            <p className="text-xs text-muted-foreground">Zakázky + byznys příjmy z Hubu vs. reálné náklady</p>
+            <p className="text-xs text-muted-foreground">Zakázky a byznys příjmy vs. reálné náklady</p>
           </div>
         </div>
         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">

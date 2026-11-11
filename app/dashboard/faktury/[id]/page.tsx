@@ -3,8 +3,8 @@ import Link from 'next/link'
 import {
   ArrowLeft, FileText, ExternalLink, Sparkles, AlertTriangle, Clock, Landmark, Paperclip,
 } from 'lucide-react'
-import { getInvoiceDetail, getInvoiceProjectOptions } from '@/app/hub/finance/invoice-actions'
-import type { InvoiceDetail } from '@/app/hub/finance/invoice-actions'
+import { getInvoiceDetail, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
+import type { InvoiceDetail } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceDetailActions } from '@/components/InvoiceDetailActions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'

@@ -18,7 +18,7 @@ export interface BusinessOverview {
 }
 
 // Skutečná výkonnost byznysu, vycházející z reálně zaznamenaných transakcí (žádné odhady/projekce):
-// - Příjmy: zakázky (zálohy i doplatky), dokončené projekty a Hub byznys příjmy + zálohy u dokončených
+// - Příjmy: zakázky (zálohy i doplatky), dokončené projekty a byznys příjmy + zálohy u dokončených
 //   projektů, které (zatím) nemají vlastní finance_transactions řádek.
 // - Výdaje: reálné transakce tagované area='byznys' nebo napojené na náklad (`costs`), který NENÍ
 //   označen jako 'personal' — takže osobní útraty (i když omylem uložené do `costs`) se nepočítají.

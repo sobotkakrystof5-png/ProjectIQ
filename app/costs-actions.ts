@@ -17,7 +17,7 @@ export type CostPayload = {
 function revalidateCostPaths(projectId: string | null) {
   revalidatePath('/dashboard/naklady')
   revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
   if (projectId) revalidatePath(`/dashboard/${projectId}`)
 }
 
@@ -35,7 +35,7 @@ export async function getCosts(): Promise<Cost[]> {
 
 /**
  * Náklady jedné zakázky — pro panel na detailu zakázky. Zdroj pravdy pro
- * Hub/naklady u probíhajících zakázek (na rozdíl od `estimated_costs`, což
+ * Náklady u probíhajících zakázek (na rozdíl od `estimated_costs`, což
  * je jen orientační odhad při zakládání).
  */
 export async function getProjectCosts(projectId: string): Promise<Cost[]> {

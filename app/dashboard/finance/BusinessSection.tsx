@@ -122,7 +122,7 @@ export function BusinessSection({
           {summary.availableYears.map(y => (
             <Link
               key={y}
-              href={`/hub/finance?tab=podnikani&year=${y}`}
+              href={`/dashboard/finance?tab=podnikani&year=${y}`}
               scroll={false}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                 y === summary.year

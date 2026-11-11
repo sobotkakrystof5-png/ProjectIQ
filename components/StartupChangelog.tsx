@@ -6,7 +6,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
 import {
   addChangelogEntry,
   deleteChangelogEntry,
-} from '@/app/hub/byznys/startup/startup-actions'
+} from '@/app/dashboard/startup/startup-actions'
 import {
   CHANGE_TYPE_LABELS,
   CHANGE_TYPE_STYLES,

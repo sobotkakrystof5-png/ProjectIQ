@@ -330,7 +330,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
     const [y, m] = currentMonth.split('-').map(Number)
     const d = new Date(y, m - 1 + (dir === 'next' ? 1 : -1), 1)
     const newMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    router.push(`/hub/finance?month=${newMonth}`)
+    router.push(`/dashboard/finance?month=${newMonth}`)
   }
 
   function handleTypeChange(t: TransactionType) {

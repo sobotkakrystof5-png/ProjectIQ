@@ -14,7 +14,7 @@ export default async function ProjektyPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Tvoje osobní projekty ve vývoji</p>
         </div>
         <Link
-          href="/hub/projekty/new"
+          href="/dashboard/projekty/new"
           className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
         >
           <Plus size={15} strokeWidth={1.5} />
@@ -32,7 +32,7 @@ export default async function ProjektyPage() {
             Přidej svůj první osobní projekt — sleduj fázi, tech stack a nápady na jednom místě.
           </p>
           <Link
-            href="/hub/projekty/new"
+            href="/dashboard/projekty/new"
             className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
           >
             <Plus size={15} strokeWidth={1.5} />

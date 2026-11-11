@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, Plus, Rocket } from 'lucide-react'
+import { Plus, Rocket } from 'lucide-react'
 import { getStartupProjects } from './startup-actions'
 import { StartupProjectCard } from '@/components/StartupProjectCard'
 
@@ -17,18 +17,11 @@ export default async function StartupPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <Link
-            href="/hub/byznys"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-          >
-            <ArrowLeft size={14} strokeWidth={1.5} />
-            Business
-          </Link>
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">Startup projekty</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Tvoje osobní projekty, nápady a produkty</p>
         </div>
         <Link
-          href="/hub/byznys/startup/new"
+          href="/dashboard/startup/new"
           className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
         >
           <Plus size={15} strokeWidth={1.5} />
@@ -64,7 +57,7 @@ export default async function StartupPage() {
             Přidej svůj první startup projekt — sleduj fázi, finance a nápady na jednom místě.
           </p>
           <Link
-            href="/hub/byznys/startup/new"
+            href="/dashboard/startup/new"
             className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
           >
             <Plus size={15} strokeWidth={1.5} />

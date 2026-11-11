@@ -68,7 +68,7 @@ export async function createCompletedProject(payload: CompletedProjectPayload) {
     `
   }
   revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }
 
 export async function updateCompletedProject(id: string, payload: CompletedProjectPayload) {
@@ -109,7 +109,7 @@ export async function updateCompletedProject(id: string, payload: CompletedProje
     await sql`DELETE FROM finance_transactions WHERE source_completed_project_id = ${id}`
   }
   revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }
 
 export async function deleteCompletedProject(id: string) {
@@ -120,5 +120,5 @@ export async function deleteCompletedProject(id: string) {
   await sql`DELETE FROM finance_transactions WHERE source_completed_project_id = ${id}`
   await sql`DELETE FROM completed_projects WHERE id = ${id}`
   revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }

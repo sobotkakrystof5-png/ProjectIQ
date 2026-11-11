@@ -5,7 +5,7 @@ import { AlertCircle, FileText, Loader2, Paperclip, Sparkles, UploadCloud, X } f
 import { MAX_PDF_BYTES, MAX_PDF_LABEL, INVOICE_CURRENCIES } from '@/lib/invoice-constants'
 import { usePdfDrop } from '@/lib/use-pdf-drop'
 import type { InvoiceAiExtract } from '@/lib/types'
-import type { InvoiceProjectOption } from '@/app/hub/finance/invoice-actions'
+import type { InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 
 /**
  * Pole faktury sdílená formulářem ve Financích i blokem „Přiložit fakturu"

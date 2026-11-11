@@ -30,7 +30,7 @@ import {
   deletePersonalImprovement,
   addPersonalChangelogEntry,
   deletePersonalChangelogEntry,
-} from '@/app/hub/projekty/projekty-actions'
+} from '@/app/dashboard/projekty/projekty-actions'
 
 function numOrNull(v: string): number | null {
   const n = parseFloat(v.replace(',', '.'))
@@ -455,7 +455,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
       toast.error(result.error)
     } else {
       toast.success('Projekt přesunut do Startup sekce!')
-      router.push(`/hub/byznys/startup/${result.startupId}`)
+      router.push(`/dashboard/startup/${result.startupId}`)
     }
   }
 

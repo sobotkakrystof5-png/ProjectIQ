@@ -21,7 +21,7 @@ describe('cspProfileFor', () => {
       expect(cspProfileFor(path)).toEqual({ profile: 'workspace', mode: 'enforce' })
     }
     expect(cspProfileFor('/login')).toEqual({ profile: 'admin', mode: 'enforce' })
-    expect(cspProfileFor('/hub/finance')).toEqual({ profile: 'admin', mode: 'enforce' })
+    expect(cspProfileFor('/dashboard/finance')).toEqual({ profile: 'admin', mode: 'enforce' })
     expect(cspProfileFor('/podminky-stare')).toEqual({ profile: 'admin', mode: 'enforce' })
     expect(cspProfileFor('/h/abc')).toEqual({ profile: 'admin', mode: 'enforce' })
   })
@@ -30,7 +30,7 @@ describe('cspProfileFor', () => {
     expect(hasPrefix('/wiki', '/w')).toBe(false)
     expect(hasPrefix('/klientela', '/klient')).toBe(false)
     expect(cspProfileFor('/klientela').profile).toBe('admin')
-    expect(hasPrefix('/hubert', '/hub')).toBe(false)
+    expect(hasPrefix('/zakazky', '/z')).toBe(false)
     expect(cspProfileFor('/wiki').profile).toBe('admin')
   })
 })
@@ -66,7 +66,7 @@ describe('buildCsp', () => {
 
   it('Workspace nepouští Google Fonts ani TradingView, admin ano', () => {
     const ws = buildCsp({ nonce, pathname: '/w', profile: 'workspace', mode: 'enforce' })
-    const admin = buildCsp({ nonce, pathname: '/hub/finance', profile: 'admin', mode: 'report-only' })
+    const admin = buildCsp({ nonce, pathname: '/dashboard/finance', profile: 'admin', mode: 'report-only' })
     expect(ws).not.toContain('fonts.googleapis.com')
     expect(ws).not.toContain('tradingview')
     expect(directive(ws, 'frame-src')).toBe("frame-src 'none'")
@@ -134,7 +134,7 @@ describe('Clerk', () => {
     expect(klient).not.toContain('*')
 
     const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    const admin = buildCsp({ nonce, pathname: '/hub', profile: 'admin', mode: 'report-only', clerkHost: host })
+    const admin = buildCsp({ nonce, pathname: '/dashboard', profile: 'admin', mode: 'report-only', clerkHost: host })
     const portal = buildCsp({ nonce, pathname: '/z/abc', profile: 'workspace', mode: 'enforce', clerkHost: host })
     for (const csp of [landing, admin, portal]) expect(csp).not.toContain('clerk')
   })

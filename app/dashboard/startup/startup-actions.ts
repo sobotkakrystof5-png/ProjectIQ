@@ -85,7 +85,7 @@ export async function createStartupProject(data: {
       VALUES (${data.name.trim()}, ${data.segment.trim()}, ${data.problem.trim()}, ${data.monetization})
       RETURNING id::text
     `
-    revalidatePath('/hub/byznys/startup')
+    revalidatePath('/dashboard/startup')
     return { id: (rows[0] as { id: string }).id }
   } catch {
     return { error: 'Nepodařilo se vytvořit projekt' }
@@ -150,8 +150,8 @@ export async function updateStartupProject(
         updated_at = now()
       WHERE id = ${id}
     `
-    revalidatePath(`/hub/byznys/startup/${id}`)
-    revalidatePath('/hub/byznys/startup')
+    revalidatePath(`/dashboard/startup/${id}`)
+    revalidatePath('/dashboard/startup')
     return {}
   } catch {
     return { error: 'Nepodařilo se uložit projekt' }
@@ -161,15 +161,15 @@ export async function updateStartupProject(
 export async function archiveStartupProject(id: string): Promise<void> {
   await requireAuth()
   await sql`UPDATE startup_projects SET archived = true, updated_at = now() WHERE id = ${id}`
-  revalidatePath('/hub/byznys/startup')
-  redirect('/hub/byznys/startup')
+  revalidatePath('/dashboard/startup')
+  redirect('/dashboard/startup')
 }
 
 export async function deleteStartupProject(id: string): Promise<void> {
   await requireAuth()
   await sql`DELETE FROM startup_projects WHERE id = ${id}`
-  revalidatePath('/hub/byznys/startup')
-  redirect('/hub/byznys/startup')
+  revalidatePath('/dashboard/startup')
+  redirect('/dashboard/startup')
 }
 
 // ─── Improvements ─────────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ export async function addImprovement(
       RETURNING id::text, startup_project_id::text, content, status,
         created_at::text, updated_at::text
     `
-    revalidatePath(`/hub/byznys/startup/${projectId}`)
+    revalidatePath(`/dashboard/startup/${projectId}`)
     return { item: rows[0] as StartupImprovement }
   } catch {
     return { error: 'Nepodařilo se přidat nápad' }
@@ -220,7 +220,7 @@ export async function updateImprovement(
         updated_at = now()
       WHERE id = ${id}
     `
-    revalidatePath(`/hub/byznys/startup/${projectId}`)
+    revalidatePath(`/dashboard/startup/${projectId}`)
     return {}
   } catch {
     return { error: 'Nepodařilo se aktualizovat nápad' }
@@ -231,7 +231,7 @@ export async function deleteImprovement(id: string, projectId: string): Promise<
   try {
     await requireAuth()
     await sql`DELETE FROM startup_improvements WHERE id = ${id}`
-    revalidatePath(`/hub/byznys/startup/${projectId}`)
+    revalidatePath(`/dashboard/startup/${projectId}`)
     return {}
   } catch {
     return { error: 'Nepodařilo se smazat nápad' }
@@ -276,7 +276,7 @@ export async function addChangelogEntry(
       RETURNING id::text, startup_project_id::text, change_date::text, change_type,
         description, progress_from::int, progress_to::int, created_at::text
     `
-    revalidatePath(`/hub/byznys/startup/${projectId}`)
+    revalidatePath(`/dashboard/startup/${projectId}`)
     return { entry: rows[0] as StartupChangelogEntry }
   } catch {
     return { error: 'Nepodařilo se přidat záznam' }
@@ -290,7 +290,7 @@ export async function deleteChangelogEntry(
   try {
     await requireAuth()
     await sql`DELETE FROM startup_changelog WHERE id = ${id}`
-    revalidatePath(`/hub/byznys/startup/${projectId}`)
+    revalidatePath(`/dashboard/startup/${projectId}`)
     return {}
   } catch {
     return { error: 'Nepodařilo se smazat záznam' }
@@ -371,7 +371,7 @@ export async function sendLaunchEmailBlast(
 
     if (notifiedIds.length > 0) {
       await wsql`UPDATE waitlist SET launch_notified = TRUE WHERE id = ANY(${notifiedIds})`
-      revalidatePath(`/hub/byznys/startup/${projectId}`)
+      revalidatePath(`/dashboard/startup/${projectId}`)
     }
 
     return { sent, failed, total: entries.length }

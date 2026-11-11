@@ -167,7 +167,7 @@ export type CostType = 'fixed_monthly' | 'fixed_annual' | 'one_time'
 
 // 'client' | 'personal' | 'all' come from the business-costs UI (CostsManager,
 // /dashboard/naklady); the rest come from the personal-finance UI
-// (FixedCostsSection, /hub/finance) — both write into the same `costs` table
+// (FixedCostsSection, /dashboard/finance) — both write into the same `costs` table
 // (migrations/012_costs_category.sql), so this union has to cover every value
 // either UI can store or category badges looking up a narrower type render undefined.
 export type CostCategory = 'client' | 'personal' | 'all' | 'domény' | 'hosting' | 'software' | 'nástroje' | 'ostatní'
@@ -253,7 +253,7 @@ export interface Cost {
   // historii nákladů.
   project_id: string | null
   // Zpětný odkaz na finance_transactions, když náklad vznikl automaticky
-  // z byznys výdaje (viz app/hub/finance/finance-actions.ts createTransaction).
+  // z byznys výdaje (viz app/dashboard/finance/finance-actions.ts createTransaction).
   source_finance_transaction_id: string | null
   created_at: string | Date
 }

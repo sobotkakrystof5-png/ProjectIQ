@@ -6,6 +6,8 @@ import { IncomeExpenseSection } from './IncomeExpenseSection'
 import { FinanceHealthSection } from './FinanceHealthSection'
 import { ScenarioSection } from './ScenarioSection'
 import { BusinessSection } from './BusinessSection'
+import { BusinessCalculator } from './BusinessCalculator'
+import { getBusinessOverview } from './byznys-actions'
 import {
   getTransactions,
   generateRecurringCostTransactions, generateRecurringCashFlowTransactions,
@@ -55,12 +57,15 @@ export default async function FinancePage(
         ])
       : [null, null, null, null, null, null]
 
-  const [businessIncome, invoices, projectOptions, taxNews] =
+  // Výkonnost podnikání (dřív rozcestník /hub/byznys, AD03) patří k Podnikání:
+  // jsou to stejné peníze, jen celková a ne daňová optika.
+  const [businessIncome, invoices, projectOptions, taxNews, businessOverview] =
     tab === 'podnikani'
       ? await Promise.all([
           getBusinessIncome(year), getInvoices(year), getInvoiceProjectOptions(), getTaxNews(),
+          getBusinessOverview(),
         ])
-      : [null, null, null, null]
+      : [null, null, null, null, null]
 
   return (
     <div className="space-y-8">
@@ -86,7 +91,7 @@ export default async function FinancePage(
         {TABS.map(({ key, label, icon: Icon }) => (
           <Link
             key={key}
-            href={key === 'osobni' ? `/hub/finance?month=${currentMonth}` : `/hub/finance?tab=podnikani&year=${year}`}
+            href={key === 'osobni' ? `/dashboard/finance?month=${currentMonth}` : `/dashboard/finance?tab=podnikani&year=${year}`}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors border-b-2 -mb-px ${
               tab === key
                 ? 'border-emerald-600 text-foreground font-medium'
@@ -100,13 +105,18 @@ export default async function FinancePage(
       </div>
 
       {businessIncome && (
-        <BusinessSection
-          summary={businessIncome}
-          invoices={invoices!}
-          projectOptions={projectOptions!}
-          taxNews={taxNews!}
-          todayIso={getPragueTodayISO()}
-        />
+        <>
+          <BusinessSection
+            summary={businessIncome}
+            invoices={invoices!}
+            projectOptions={projectOptions!}
+            taxNews={taxNews!}
+            todayIso={getPragueTodayISO()}
+          />
+          <div className="border-t border-border pt-6">
+            <BusinessCalculator overview={businessOverview!} />
+          </div>
+        </>
       )}
 
       {tab === 'osobni' && (

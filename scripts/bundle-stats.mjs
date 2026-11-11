@@ -44,8 +44,7 @@ const MEASURED_PATHS = [
   '/dashboard/calendar',
   '/dashboard/faktury',
   '/dashboard/naklady',
-  '/hub',
-  '/hub/finance',
+  '/dashboard/finance',
   '/dashboard/poptavky',
 ]
 

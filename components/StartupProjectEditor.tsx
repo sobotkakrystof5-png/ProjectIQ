@@ -18,7 +18,7 @@ import {
   updateStartupProject,
   archiveStartupProject,
   deleteStartupProject,
-} from '@/app/hub/byznys/startup/startup-actions'
+} from '@/app/dashboard/startup/startup-actions'
 import { StartupImprovements } from '@/components/StartupImprovements'
 import { StartupChangelog } from '@/components/StartupChangelog'
 import { WaitlistSection } from '@/components/WaitlistSection'

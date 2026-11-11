@@ -26,7 +26,7 @@ export default async function PersonalProjectDetailPage(props: Props) {
     <div className="space-y-6">
       <div>
         <Link
-          href="/hub/projekty"
+          href="/dashboard/projekty"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft size={14} strokeWidth={1.5} />

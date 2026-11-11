@@ -9,7 +9,7 @@ import {
 import { InvoiceUploadModal } from '@/components/InvoiceUploadModal'
 import { usePdfDrop } from '@/lib/use-pdf-drop'
 import { cn } from '@/lib/utils'
-import type { InvoiceRegistryItem, InvoiceProjectOption } from '@/app/hub/finance/invoice-actions'
+import type { InvoiceRegistryItem, InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 
 /**
  * Evidence faktur — archiv všech vystavených dokladů napříč roky.

@@ -66,14 +66,14 @@ export async function markTaxNewsRead(id: string): Promise<void> {
   await requireAuth()
 
   await sql`UPDATE tax_news SET read = true WHERE id = ${id}`
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }
 
 export async function markAllTaxNewsRead(): Promise<void> {
   await requireAuth()
 
   await sql`UPDATE tax_news SET read = true WHERE read = false`
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }
 
 /**
@@ -87,7 +87,7 @@ export async function refreshTaxNews(): Promise<{ inserted: number; error?: stri
 
   try {
     const result = await syncTaxNews()
-    revalidatePath('/hub/finance')
+    revalidatePath('/dashboard/finance')
 
     return {
       inserted: result.inserted,

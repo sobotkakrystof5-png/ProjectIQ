@@ -110,7 +110,7 @@ function extras(profile: CspProfile, pathname: string, clerkHost: string | null)
       // Inter přes @import v app/globals.css
       'style-src': ['https://fonts.googleapis.com'],
       'font-src': ['https://fonts.gstatic.com'],
-      // TradingView graf v /hub/finance (components/TradingViewChart.tsx). Skript
+      // TradingView graf v /dashboard/finance (components/TradingViewChart.tsx). Skript
       // z s3.tradingview.com pouští strict-dynamic, iframe jde z tohohle hostu.
       'frame-src': ['https://www.tradingview-widget.com'],
       // Náhled PDF faktury přes <object> (/dashboard/faktury/[id]) — Chrome ho

@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Pencil, Trash2, Loader2 } from 'lucide-react'
 import { InvoiceUploadModal } from '@/components/InvoiceUploadModal'
-import { deleteInvoice } from '@/app/hub/finance/invoice-actions'
-import type { InvoiceDetail, InvoiceProjectOption } from '@/app/hub/finance/invoice-actions'
+import { deleteInvoice } from '@/app/dashboard/finance/invoice-actions'
+import type { InvoiceDetail, InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 
 /** Úprava a smazání faktury z jejího detailu. Formulář je tentýž jako v archivu Financí. */
 export function InvoiceDetailActions({

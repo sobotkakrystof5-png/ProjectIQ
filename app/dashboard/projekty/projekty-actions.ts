@@ -68,7 +68,7 @@ export async function createPersonalProject(data: {
       VALUES (${data.name.trim()}, ${data.segment.trim()}, ${data.problem.trim()}, ${data.monetization})
       RETURNING id::text
     `
-    revalidatePath('/hub/projekty')
+    revalidatePath('/dashboard/projekty')
     return { id: (rows[0] as { id: string }).id }
   } catch {
     return { error: 'Nepodařilo se vytvořit projekt' }
@@ -117,8 +117,8 @@ export async function updatePersonalProject(
         updated_at = now()
       WHERE id = ${id}
     `
-    revalidatePath(`/hub/projekty/${id}`)
-    revalidatePath('/hub/projekty')
+    revalidatePath(`/dashboard/projekty/${id}`)
+    revalidatePath('/dashboard/projekty')
     return {}
   } catch {
     return { error: 'Nepodařilo se uložit projekt' }
@@ -128,15 +128,15 @@ export async function updatePersonalProject(
 export async function archivePersonalProject(id: string): Promise<void> {
   await requireAuth()
   await sql`UPDATE personal_projects SET archived = true, updated_at = now() WHERE id = ${id}`
-  revalidatePath('/hub/projekty')
-  redirect('/hub/projekty')
+  revalidatePath('/dashboard/projekty')
+  redirect('/dashboard/projekty')
 }
 
 export async function deletePersonalProject(id: string): Promise<void> {
   await requireAuth()
   await sql`DELETE FROM personal_projects WHERE id = ${id}`
-  revalidatePath('/hub/projekty')
-  redirect('/hub/projekty')
+  revalidatePath('/dashboard/projekty')
+  redirect('/dashboard/projekty')
 }
 
 export async function publishToStartup(id: string): Promise<{ startupId?: string; error?: string }> {
@@ -171,8 +171,8 @@ export async function publishToStartup(id: string): Promise<{ startupId?: string
 
     await sql`UPDATE personal_projects SET archived = true, updated_at = now() WHERE id = ${id}`
 
-    revalidatePath('/hub/projekty')
-    revalidatePath('/hub/byznys/startup')
+    revalidatePath('/dashboard/projekty')
+    revalidatePath('/dashboard/startup')
     return { startupId }
   } catch {
     return { error: 'Nepodařilo se zveřejnit projekt' }
@@ -206,7 +206,7 @@ export async function addPersonalImprovement(
       RETURNING id::text, personal_project_id::text, content, status,
         created_at::text, updated_at::text
     `
-    revalidatePath(`/hub/projekty/${projectId}`)
+    revalidatePath(`/dashboard/projekty/${projectId}`)
     return { item: rows[0] as PersonalProjectImprovement }
   } catch {
     return { error: 'Nepodařilo se přidat nápad' }
@@ -227,7 +227,7 @@ export async function updatePersonalImprovement(
         updated_at = now()
       WHERE id = ${id}
     `
-    revalidatePath(`/hub/projekty/${projectId}`)
+    revalidatePath(`/dashboard/projekty/${projectId}`)
     return {}
   } catch {
     return { error: 'Nepodařilo se aktualizovat nápad' }
@@ -238,7 +238,7 @@ export async function deletePersonalImprovement(id: string, projectId: string): 
   try {
     await requireAuth()
     await sql`DELETE FROM personal_project_improvements WHERE id = ${id}`
-    revalidatePath(`/hub/projekty/${projectId}`)
+    revalidatePath(`/dashboard/projekty/${projectId}`)
     return {}
   } catch {
     return { error: 'Nepodařilo se smazat nápad' }
@@ -283,7 +283,7 @@ export async function addPersonalChangelogEntry(
       RETURNING id::text, personal_project_id::text, change_date::text, change_type,
         description, progress_from::int, progress_to::int, created_at::text
     `
-    revalidatePath(`/hub/projekty/${projectId}`)
+    revalidatePath(`/dashboard/projekty/${projectId}`)
     return { entry: rows[0] as PersonalProjectChangelogEntry }
   } catch {
     return { error: 'Nepodařilo se přidat záznam' }
@@ -297,7 +297,7 @@ export async function deletePersonalChangelogEntry(
   try {
     await requireAuth()
     await sql`DELETE FROM personal_project_changelog WHERE id = ${id}`
-    revalidatePath(`/hub/projekty/${projectId}`)
+    revalidatePath(`/dashboard/projekty/${projectId}`)
     return {}
   } catch {
     return { error: 'Nepodařilo se smazat záznam' }

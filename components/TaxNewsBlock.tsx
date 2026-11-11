@@ -4,8 +4,8 @@ import { useState, useTransition } from 'react'
 import {
   Newspaper, ExternalLink, Check, CheckCheck, RefreshCw, Loader2, AlertTriangle, Inbox,
 } from 'lucide-react'
-import { markTaxNewsRead, markAllTaxNewsRead, refreshTaxNews } from '@/app/hub/finance/tax-news-actions'
-import type { TaxNewsData, TaxNewsItem } from '@/app/hub/finance/tax-news-actions'
+import { markTaxNewsRead, markAllTaxNewsRead, refreshTaxNews } from '@/app/dashboard/finance/tax-news-actions'
+import type { TaxNewsData, TaxNewsItem } from '@/app/dashboard/finance/tax-news-actions'
 import { TAX_NEWS_SOURCE_LABELS } from '@/lib/types'
 
 function formatDate(value: string | null) {

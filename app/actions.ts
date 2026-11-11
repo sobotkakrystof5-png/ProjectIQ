@@ -185,7 +185,7 @@ export async function createProject(
   // může existující příjem převzít místo toho, aby založil druhý.
   if (invoice) {
     await insertInvoice({ ...invoice.data, project_id: newProjectId }, invoice.pdf)
-    revalidatePath('/hub/finance')
+    revalidatePath('/dashboard/finance')
   }
 
   revalidatePath(PROJECTS_PATH)
@@ -254,7 +254,7 @@ export async function updateProject(
       SET declared = ${payload.invoiced_on_ico}
       WHERE source_project_id = ${id} AND type = 'income'
     `
-    revalidatePath('/hub/finance')
+    revalidatePath('/dashboard/finance')
   }
 
   if (oldStatus && oldStatus !== payload.status) {
@@ -302,7 +302,7 @@ export async function updateProject(
 
   revalidatePath(PROJECTS_PATH)
   revalidatePath(projectPath(id))
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
 }
 
 export async function deleteProject(id: string) {
@@ -512,7 +512,7 @@ export async function markProjectAsCompleted(
         VALUES (${p.estimated_costs}, 'expense', 'náklady', ${costName}, ${extra.completed_at}, NULL, ${costId})
       `
       revalidatePath('/dashboard/naklady')
-      revalidatePath('/hub/finance')
+      revalidatePath('/dashboard/finance')
     }
   }
 

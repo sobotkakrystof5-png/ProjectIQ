@@ -165,7 +165,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return errorResponse(500, 'Nepodařilo se uložit fakturu', 'INSERT_FAILED')
   }
 
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
   if (data.project_id) {
     revalidatePath(`/dashboard/${data.project_id}`)
   }
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     body: `${data.client_name ?? 'Bez odběratele'} — ${data.amount} ${data.currency}${
       data.paid_on ? ` · zaplaceno ${data.paid_on}` : ' · pohledávka'
     }`,
-    link: '/hub/finance?tab=podnikani',
+    link: '/dashboard/finance?tab=podnikani',
   })
 
   return NextResponse.json(

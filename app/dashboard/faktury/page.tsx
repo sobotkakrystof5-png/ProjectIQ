@@ -1,4 +1,4 @@
-import { getAllInvoices, getInvoiceProjectOptions } from '@/app/hub/finance/invoice-actions'
+import { getAllInvoices, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceRegistry } from '@/components/InvoiceRegistry'
 
 /**

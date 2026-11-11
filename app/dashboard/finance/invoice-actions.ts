@@ -211,7 +211,7 @@ export async function getInvoiceProjectOptions(): Promise<InvoiceProjectOption[]
 }
 
 function revalidateInvoicePaths(projectId: string | null) {
-  revalidatePath('/hub/finance')
+  revalidatePath('/dashboard/finance')
   revalidatePath('/dashboard/faktury')
   if (projectId) {
     revalidatePath(`/dashboard/${projectId}`)

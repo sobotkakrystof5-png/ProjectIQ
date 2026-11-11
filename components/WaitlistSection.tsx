@@ -7,7 +7,7 @@ import {
   Mail, Search, Send, RefreshCw, Download,
   CheckCircle2, Clock, Users, Loader2, AlertTriangle,
 } from 'lucide-react'
-import { sendLaunchEmailBlast } from '@/app/hub/byznys/startup/startup-actions'
+import { sendLaunchEmailBlast } from '@/app/dashboard/startup/startup-actions'
 import type { WaitlistEntry } from '@/lib/types'
 
 interface Props {
