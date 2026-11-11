@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
+import { adminDb, q } from '@/lib/admin/db'
 import { sendPlainEmail } from '@/lib/email'
 import { notifyClientOfProjectChange } from '@/app/actions'
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
@@ -38,6 +39,27 @@ export async function getAllLeadNotes(): Promise<LeadNote[]> {
   const session = await getServerSession(authOptions)
   if (!session) return []
   return (await sql`SELECT * FROM lead_notes ORDER BY created_at DESC`) as unknown as LeadNote[]
+}
+
+/**
+ * Obrazovka Hovory jedním požadavkem (AD06): leady i jejich poznámky.
+ * Odděleně to byla dvě kola do databáze.
+ *
+ * `lead_notes` se zatím tahají celé — `LeadsTable` je páruje k leadům
+ * v prohlížeči. Náhled přes `LEFT JOIN LATERAL … LIMIT 3` a plné poznámky
+ * až v panelu dělá AD07.
+ */
+export async function getCallsScreen(): Promise<{ leads: ClientLead[]; notes: LeadNote[] }> {
+  const session = await getServerSession(authOptions)
+  if (!session) return { leads: [], notes: [] }
+  const [leadRows, noteRows] = await adminDb.batch([
+    q`SELECT *, next_action_date::text AS next_action_date FROM client_leads ORDER BY created_at DESC`,
+    q`SELECT * FROM lead_notes ORDER BY created_at DESC`,
+  ])
+  return {
+    leads: leadRows as unknown as ClientLead[],
+    notes: noteRows as unknown as LeadNote[],
+  }
 }
 
 export async function addLeadNote(leadId: string, content: string) {

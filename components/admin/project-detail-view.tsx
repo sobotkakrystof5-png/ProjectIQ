@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
-import { sql } from '@/lib/db'
+import { batchTolerant, q, type AdminQuery, type AdminRow } from '@/lib/admin/db'
 import { ProjectForm } from '@/components/ProjectForm'
 import { ShareButton } from '@/components/ShareButton'
 import { QRCodeDisplay } from '@/components/QRCodeDisplay'
@@ -76,16 +76,26 @@ export async function ProjectDetailView({
   // Adresa, která není UUID (třeba zrušená /dashboard/sablony), spadne sem jako
   // id zakázky. Bez téhle kontroly by dotaz skončil chybou typu a stránka 500.
   if (!UUID.test(projectId)) notFound()
-  const rows = await sql`SELECT * FROM projects WHERE id = ${projectId} LIMIT 1`
-  if (!rows.length) notFound()
-  const project = rows[0] as Project & { lead_origin?: string }
+  const tab = parseTab(tabParam)
+
+  // Jedna dávka na celou obrazovku (AD06): zakázka, odznak u Požadavků
+  // i data zobrazené záložky. Dřív to bylo 12 dotazů v pěti vlnách za sebou.
+  // Záložky Aktivita a Fakturace čtou přes sdílené funkce (faktury a náklady
+  // mají svoje mapování v `invoice-actions`/`costs-actions`), takže jim zbývá
+  // druhá vlna — přepisuje je AD12/AD13.
+  const [projectRows, requestCount, ...tabRows] = await batchTolerant([
+    q`SELECT * FROM projects WHERE id = ${projectId} LIMIT 1`,
+    q`SELECT count(*)::int AS count FROM client_requests WHERE project_id = ${projectId} AND status = 'new'`,
+    ...tabQueries(tab, projectId),
+  ])
+  if (!projectRows.length) notFound()
+  const project = projectRows[0] as unknown as Project & { lead_origin?: string }
   const origin = LEAD_ORIGINS[toLeadOrigin(project.lead_origin)]
 
-  const tab = parseTab(tabParam)
   const base = projectPath(projectId)
   const tabs = DETAIL_TABS
 
-  const openRequests = await countOpenRequests(projectId)
+  const openRequests = Number((requestCount[0] as { count?: number } | undefined)?.count ?? 0)
 
   return (
     <PageShell width={tab === 'fakturace' ? 'wide' : 'narrow'}>
@@ -153,21 +163,50 @@ export async function ProjectDetailView({
       <div className="space-y-4">
         {tab === 'prehled' && <OverviewTab project={project} />}
         {tab === 'aktivita' && <ActivityTab project={project} />}
-        {tab === 'pozadavky' && <RequestsTab project={project} />}
-        {tab === 'zpravy' && <MessagesTab project={project} />}
+        {tab === 'pozadavky' && <RequestsTab project={project} rows={tabRows[0] ?? []} />}
+        {tab === 'zpravy' && <MessagesTab project={project} rows={tabRows} />}
         {tab === 'fakturace' && <BillingTab project={project} />}
       </div>
     </PageShell>
   )
 }
 
-async function countOpenRequests(projectId: string): Promise<number> {
-  try {
-    const rows = await sql`SELECT count(*)::int AS count FROM client_requests WHERE project_id = ${projectId} AND status = 'new'`
-    return (rows[0] as { count: number }).count
-  } catch {
-    return 0
+/**
+ * Dotazy zobrazené záložky — jedou v téže dávce jako hlavička. Záložky, které
+ * si data berou přes sdílené funkce (Aktivita, Fakturace), tu nic nemají.
+ */
+function tabQueries(tab: DetailTab, projectId: string): AdminQuery[] {
+  if (tab === 'pozadavky') {
+    return [
+      q`
+        SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.lead_origin
+        FROM client_requests r JOIN projects p ON p.id = r.project_id
+        WHERE r.project_id = ${projectId}
+        ORDER BY (r.status = 'new') DESC, r.created_at DESC LIMIT 50
+      `,
+    ]
   }
+  if (tab === 'zpravy') {
+    return [
+      q`SELECT id, project_id, content, created_at FROM client_messages
+         WHERE project_id = ${projectId} ORDER BY created_at DESC LIMIT 100`,
+      q`SELECT id, project_id, progress_from, progress_to, description, created_at FROM progress_updates
+         WHERE project_id = ${projectId} ORDER BY created_at DESC LIMIT 100`,
+      q`SELECT id, project_id, nps, content, created_at FROM client_feedback
+         WHERE project_id = ${projectId} ORDER BY created_at DESC LIMIT 100`,
+      q`SELECT id, project_id, scheduled_at, channel, channel_other_text, client_wish, meeting_link, client_email, created_at
+         FROM consultation_slots WHERE project_id = ${projectId} ORDER BY scheduled_at DESC LIMIT 100`,
+      q`SELECT id, project_id, author, content, progress_snapshot, created_at FROM project_notes
+         WHERE project_id = ${projectId} ORDER BY created_at DESC LIMIT 200`,
+      // Vlákno z klientského prostoru. Žádný řádek = zakázka tam propojená
+      // není a panel se neukáže; propojená bez zpráv vrátí řádek s prázdným
+      // `id`. Schéma `portal` nemusí existovat — proto `batchTolerant`.
+      q`SELECT m.id, m.author, m.body, m.created_at
+         FROM portal.projects p LEFT JOIN portal.messages m ON m.project_id = p.id
+         WHERE p.id = ${projectId} ORDER BY m.created_at ASC LIMIT 200`,
+    ]
+  }
+  return []
 }
 
 async function OverviewTab({ project }: { project: Project }) {
@@ -249,18 +288,8 @@ async function ActivityTab({ project }: { project: Project }) {
 
 type JoinedRequest = ClientRequestRow & { client_name: string; description: string | null; focus: string | null; project_url: string | null; lead_origin: string | null }
 
-async function RequestsTab({ project }: { project: Project }) {
-  let rows: JoinedRequest[] = []
-  try {
-    rows = (await sql`
-      SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.lead_origin
-      FROM client_requests r JOIN projects p ON p.id = r.project_id
-      WHERE r.project_id = ${project.id}
-      ORDER BY (r.status = 'new') DESC, r.created_at DESC LIMIT 50
-    `) as unknown as JoinedRequest[]
-  } catch {
-    rows = []
-  }
+function RequestsTab({ project, rows: raw }: { project: Project; rows: AdminRow[] }) {
+  const rows = raw as unknown as JoinedRequest[]
 
   const cards: ClientRequestCardData[] = rows.map((r) => {
     const prompt = buildClaudeCodePrompt(r, {
@@ -306,20 +335,14 @@ async function RequestsTab({ project }: { project: Project }) {
   )
 }
 
-async function MessagesTab({ project }: { project: Project }) {
-  const [msgRows, progressRows, feedbackRows, slotRows, noteRows] = await Promise.all([
-    sql`SELECT * FROM client_messages WHERE project_id = ${project.id} ORDER BY created_at DESC`,
-    sql`SELECT * FROM progress_updates WHERE project_id = ${project.id} ORDER BY created_at DESC`,
-    sql`SELECT * FROM client_feedback WHERE project_id = ${project.id} ORDER BY created_at DESC`,
-    sql`SELECT * FROM consultation_slots WHERE project_id = ${project.id} ORDER BY scheduled_at DESC`,
-    sql`SELECT * FROM project_notes WHERE project_id = ${project.id} ORDER BY created_at DESC`,
-  ])
-  const messages = msgRows as ClientMessage[]
-  const progressUpdates = progressRows as ProgressUpdate[]
-  const feedbacks = feedbackRows as ClientFeedback[]
-  const slots = slotRows as ConsultationSlot[]
-  const notes = noteRows as ProjectNote[]
-  const portalThread = await loadPortalThread(project.id)
+function MessagesTab({ project, rows }: { project: Project; rows: AdminRow[][] }) {
+  const [msgRows = [], progressRows = [], feedbackRows = [], slotRows = [], noteRows = [], portalRows = []] = rows
+  const messages = msgRows as unknown as ClientMessage[]
+  const progressUpdates = progressRows as unknown as ProgressUpdate[]
+  const feedbacks = feedbackRows as unknown as ClientFeedback[]
+  const slots = slotRows as unknown as ConsultationSlot[]
+  const notes = noteRows as unknown as ProjectNote[]
+  const portalThread = portalMessages(portalRows)
 
   return (
     <>
@@ -396,24 +419,21 @@ async function MessagesTab({ project }: { project: Project }) {
   )
 }
 
-/** Vlákno zpráv, jen když je zakázka propojená s klientským prostorem (jinak null). */
-async function loadPortalThread(projectId: string): Promise<PortalThreadMessage[] | null> {
-  try {
-    const linked = await sql`SELECT 1 FROM portal.projects WHERE id = ${projectId}`
-    if (!linked.length) return null
-    const rows = await sql`
-      SELECT id, author, body, created_at FROM portal.messages
-      WHERE project_id = ${projectId} ORDER BY created_at ASC LIMIT 200
-    `
-    return (rows as { id: string; author: 'client' | 'admin'; body: string; created_at: string }[]).map((m) => ({
-      id: m.id,
+/**
+ * Vlákno zpráv z klientského prostoru. Prázdný výsledek = zakázka tam
+ * propojená není a panel se neukáže; propojená bez zpráv dá jeden řádek
+ * s prázdným `id` (LEFT JOIN), tedy prázdné vlákno.
+ */
+function portalMessages(rows: AdminRow[]): PortalThreadMessage[] | null {
+  if (!rows.length) return null
+  return (rows as unknown as { id: string | null; author: 'client' | 'admin'; body: string; created_at: string }[])
+    .filter((m) => m.id !== null)
+    .map((m) => ({
+      id: m.id as string,
       author: m.author,
       body: m.body,
       createdAt: new Date(m.created_at).toISOString(),
     }))
-  } catch {
-    return null
-  }
 }
 
 async function BillingTab({ project }: { project: Project }) {

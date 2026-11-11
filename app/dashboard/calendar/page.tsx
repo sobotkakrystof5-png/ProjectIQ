@@ -1,5 +1,5 @@
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
-import { sql } from '@/lib/db'
+import { adminDb, q } from '@/lib/admin/db'
 import { SmartCalendar } from '@/components/SmartCalendar'
 import type { RawConsultation, RawDeadline, RawCalendarEvent, RawLead } from '@/components/SmartCalendar'
 import type { LeadStatus } from '@/lib/types'
@@ -9,8 +9,10 @@ import type { LeadStatus } from '@/lib/types'
 export const revalidate = 0
 
 export default async function CalendarPage() {
-  const [consultationRows, deadlineRows, eventRows, leadRows] = await Promise.all([
-    sql`
+  // Čtyři dotazy jednou dávkou (AD06). Časové okno místo celé historie
+  // přidá AD08 spolu s opravami kalendáře.
+  const [consultationRows, deadlineRows, eventRows, leadRows] = await adminDb.batch([
+    q`
       SELECT
         cs.id,
         cs.scheduled_at,
@@ -24,18 +26,18 @@ export default async function CalendarPage() {
       JOIN projects p ON cs.project_id = p.id
       ORDER BY cs.scheduled_at
     `,
-    sql`
+    q`
       SELECT id, client_name, deadline
       FROM projects
       WHERE deadline IS NOT NULL
       ORDER BY deadline
     `,
-    sql`
+    q`
       SELECT id, title, description, starts_at, ends_at, event_type
       FROM calendar_events
       ORDER BY starts_at
     `,
-    sql`
+    q`
       SELECT
         id, company_name, contact_name, next_action, next_action_type,
         phone, email, lead_status, estimated_value, notes,
@@ -49,12 +51,12 @@ export default async function CalendarPage() {
     `,
   ])
 
-  const consultations = (consultationRows as RawConsultation[]).map(r => ({
+  const consultations = (consultationRows as unknown as RawConsultation[]).map(r => ({
     ...r,
     scheduled_at: new Date(r.scheduled_at).toISOString(),
   }))
 
-  const deadlines = (deadlineRows as { id: string; client_name: string; deadline: Date | string }[]).map(r => ({
+  const deadlines = (deadlineRows as unknown as { id: string; client_name: string; deadline: Date | string }[]).map(r => ({
     id: r.id,
     client_name: r.client_name,
     deadline: typeof r.deadline === 'string'
@@ -62,7 +64,7 @@ export default async function CalendarPage() {
       : r.deadline.toISOString().slice(0, 10),
   })) satisfies RawDeadline[]
 
-  const events = (eventRows as RawCalendarEvent[]).map(r => ({
+  const events = (eventRows as unknown as RawCalendarEvent[]).map(r => ({
     ...r,
     starts_at: new Date(r.starts_at).toISOString(),
     ends_at: new Date(r.ends_at).toISOString(),
@@ -83,7 +85,7 @@ export default async function CalendarPage() {
     action_at: Date | string
   }
 
-  const leads = (leadRows as LeadRowShape[]).map(r => ({
+  const leads = (leadRows as unknown as LeadRowShape[]).map(r => ({
     id: r.id,
     company_name: r.company_name,
     contact_name: r.contact_name,

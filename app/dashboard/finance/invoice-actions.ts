@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
+import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import {
   parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow,
 } from '@/lib/invoices'
@@ -62,6 +63,37 @@ type Row = Omit<InvoiceListItem, 'project_href' | 'duplicate_risk'> & {
   other_income_count: number
 }
 
+/**
+ * „Kolik příjmů zakázky tahle faktura nezastupuje" — jediný signál dvojího
+ * započtení, který jde spočítat v DB.
+ *
+ * Do AD06 to byl korelovaný `COUNT(*)` puštěný zvlášť pro **každý řádek**
+ * výpisu. Teď se příjmy sečtou jednou (`GROUP BY`) a od součtu se odečte
+ * vlastní transakce faktury, když do téhož součtu patří. Výsledek je stejný.
+ */
+const INVOICE_COLUMNS = `
+  i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
+  i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
+  i.currency, i.note, i.pdf_filename, i.pdf_size,
+  (i.pdf_data IS NOT NULL) AS has_pdf,
+  p.lead_origin AS project_lead_origin,
+  p.client_name AS project_client_name
+`
+
+const INCOME_JOIN = `
+  LEFT JOIN (
+    SELECT source_project_id AS project_id, count(*)::int AS n
+    FROM finance_transactions
+    WHERE type = 'income' AND user_id IS NULL AND source_project_id IS NOT NULL
+    GROUP BY source_project_id
+  ) inc ON inc.project_id = i.project_id
+  LEFT JOIN finance_transactions own
+    ON own.id = i.finance_transaction_id
+   AND own.type = 'income' AND own.user_id IS NULL AND own.source_project_id = i.project_id
+`
+
+const OTHER_INCOME_COUNT = `GREATEST(COALESCE(inc.n, 0) - CASE WHEN own.id IS NULL THEN 0 ELSE 1 END, 0)::int AS other_income_count`
+
 function toItem(row: Row): InvoiceListItem {
   const { project_lead_origin: _origin, other_income_count, ...rest } = row
   return {
@@ -74,58 +106,46 @@ function toItem(row: Row): InvoiceListItem {
 export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
   await requireAuth()
 
-  // `other_income_count` = příjmy zakázky, které tahle faktura v ledgeru
-  // nezastupuje. Jediný signál dvojího započtení, který jde spočítat v DB.
-  const [paidRows, outstandingRows, yearRows] = await Promise.all([
-    sql`
-      SELECT
-        i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
-        i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
-        i.currency, i.note, i.pdf_filename, i.pdf_size,
-        (i.pdf_data IS NOT NULL) AS has_pdf,
-        p.lead_origin AS project_lead_origin,
-        p.client_name AS project_client_name,
-        COALESCE((
-          SELECT COUNT(*) FROM finance_transactions t
-          WHERE t.source_project_id = i.project_id
-            AND t.type = 'income'
-            AND t.user_id IS NULL
-            AND (i.finance_transaction_id IS NULL OR t.id <> i.finance_transaction_id)
-        ), 0)::int AS other_income_count
-      FROM invoices i
-      LEFT JOIN projects p ON p.id = i.project_id
-      WHERE i.paid_on IS NOT NULL AND EXTRACT(YEAR FROM i.paid_on) = ${year}
-      ORDER BY i.paid_on DESC, i.created_at DESC
-    `,
-    sql`
-      SELECT
-        i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
-        i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
-        i.currency, i.note, i.pdf_filename, i.pdf_size,
-        (i.pdf_data IS NOT NULL) AS has_pdf,
-        p.lead_origin AS project_lead_origin,
-        p.client_name AS project_client_name,
-        0 AS other_income_count
-      FROM invoices i
-      LEFT JOIN projects p ON p.id = i.project_id
-      WHERE i.paid_on IS NULL
-      ORDER BY COALESCE(i.due_on, i.issued_on) ASC
-    `,
-    sql`
-      SELECT DISTINCT EXTRACT(YEAR FROM paid_on)::int AS year
-      FROM invoices WHERE paid_on IS NOT NULL
-      ORDER BY year DESC
-    `,
+  const [paidRows, outstandingRows, yearRows] = await adminDb.batch([
+    {
+      text: `
+        SELECT ${INVOICE_COLUMNS}, ${OTHER_INCOME_COUNT}
+        FROM invoices i
+        LEFT JOIN projects p ON p.id = i.project_id
+        ${INCOME_JOIN}
+        WHERE i.paid_on IS NOT NULL AND EXTRACT(YEAR FROM i.paid_on) = $1
+        ORDER BY i.paid_on DESC, i.created_at DESC
+      `,
+      params: [year],
+    },
+    {
+      text: `
+        SELECT ${INVOICE_COLUMNS}, 0 AS other_income_count
+        FROM invoices i
+        LEFT JOIN projects p ON p.id = i.project_id
+        WHERE i.paid_on IS NULL
+        ORDER BY COALESCE(i.due_on, i.issued_on) ASC
+      `,
+      params: [],
+    },
+    {
+      text: `
+        SELECT DISTINCT EXTRACT(YEAR FROM paid_on)::int AS year
+        FROM invoices WHERE paid_on IS NOT NULL
+        ORDER BY year DESC
+      `,
+      params: [],
+    },
   ])
 
-  const paid = (paidRows as Row[]).map(toItem)
-  const outstanding = (outstandingRows as Row[]).map(toItem)
+  const paid = (paidRows as unknown as Row[]).map(toItem)
+  const outstanding = (outstandingRows as unknown as Row[]).map(toItem)
 
   const today = new Date().toISOString().slice(0, 10)
   const overdueCount = outstanding.filter(i => i.due_on !== null && i.due_on < today).length
 
   const currentYear = new Date().getFullYear()
-  const years = (yearRows as { year: number }[]).map(r => r.year)
+  const years = (yearRows as unknown as { year: number }[]).map(r => r.year)
 
   return {
     year,
@@ -145,28 +165,21 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
 export async function getProjectInvoices(projectId: string): Promise<InvoiceArchiveData> {
   await requireAuth()
 
-  const rows = await sql`
-    SELECT
-      i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
-      i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
-      i.currency, i.note, i.pdf_filename, i.pdf_size,
-      (i.pdf_data IS NOT NULL) AS has_pdf,
-      p.lead_origin AS project_lead_origin,
-      p.client_name AS project_client_name,
-      COALESCE((
-        SELECT COUNT(*) FROM finance_transactions t
-        WHERE t.source_project_id = i.project_id
-          AND t.type = 'income'
-          AND t.user_id IS NULL
-          AND (i.finance_transaction_id IS NULL OR t.id <> i.finance_transaction_id)
-      ), 0)::int AS other_income_count
-    FROM invoices i
-    LEFT JOIN projects p ON p.id = i.project_id
-    WHERE i.project_id = ${projectId}
-    ORDER BY i.issued_on DESC, i.created_at DESC
-  `
+  const [rows] = await adminDb.batch([
+    {
+      text: `
+        SELECT ${INVOICE_COLUMNS}, ${OTHER_INCOME_COUNT}
+        FROM invoices i
+        LEFT JOIN projects p ON p.id = i.project_id
+        ${INCOME_JOIN}
+        WHERE i.project_id = $1
+        ORDER BY i.issued_on DESC, i.created_at DESC
+      `,
+      params: [projectId],
+    },
+  ])
 
-  const all = (rows as Row[]).map(toItem)
+  const all = (rows as unknown as Row[]).map(toItem)
   const paid = all.filter(i => i.paid_on !== null)
   const outstanding = all.filter(i => i.paid_on === null)
   const today = new Date().toISOString().slice(0, 10)
@@ -193,21 +206,24 @@ export interface InvoiceProjectOption {
 
 export async function getInvoiceProjectOptions(): Promise<InvoiceProjectOption[]> {
   await requireAuth()
-  const rows = await sql`
-    SELECT id::text, client_name, description, lead_origin
-    FROM projects
-    ORDER BY created_at DESC
-    LIMIT 200
-  `
-  return (rows as { id: string; client_name: string; description: string | null; lead_origin: string }[]).map((r) => {
-    const origin = toLeadOrigin(r.lead_origin)
-    return {
-      id: r.id,
-      client_name: r.client_name,
-      description: r.description,
-      origin_label: origin === DEFAULT_LEAD_ORIGIN ? null : LEAD_ORIGINS[origin].domain ?? LEAD_ORIGINS[origin].name,
-    }
-  })
+  const [rows] = await adminDb.batch([projectOptionsQuery()])
+  return (rows as unknown as Parameters<typeof toProjectOption>[0][]).map(toProjectOption)
+}
+
+/**
+ * Celá obrazovka Faktury (`/dashboard/faktury`) jedním požadavkem — evidence
+ * i zakázky do formuláře. Odděleně to byla dvě kola do databáze (AD06).
+ */
+export async function getInvoiceRegistryScreen(): Promise<{
+  invoices: InvoiceRegistryItem[]
+  projects: InvoiceProjectOption[]
+}> {
+  await requireAuth()
+  const [invoiceRows, projectRows] = await adminDb.batch([registryQuery(), projectOptionsQuery()])
+  return {
+    invoices: (invoiceRows as unknown as RegistryRow[]).map(toRegistryItem),
+    projects: (projectRows as unknown as Parameters<typeof toProjectOption>[0][]).map(toProjectOption),
+  }
 }
 
 function revalidateInvoicePaths(projectId: string | null) {
@@ -293,31 +309,51 @@ function toRegistryItem(row: RegistryRow): InvoiceRegistryItem {
  * Řadí se podle data vystavení (ne zaplacení) — v archivu hledáš doklad
  * podle toho, kdy vznikl.
  */
+/**
+ * Dotazy evidence faktur a výběru zakázek — jako hodnoty, aby šly poslat
+ * jednou dávkou (`getInvoiceRegistryScreen`).
+ *
+ * Výpis zatím nemá `LIMIT`: `InvoiceRegistry` filtruje a sčítá v prohlížeči,
+ * takže by useknutý seznam tiše změnil součty. Stránkování a součty v SQL
+ * dělá AD07.
+ */
+const registryQuery = (): AdminQuery => ({
+  text: `
+    SELECT ${INVOICE_COLUMNS}, p.description AS project_description, ${OTHER_INCOME_COUNT}
+    FROM invoices i
+    LEFT JOIN projects p ON p.id = i.project_id
+    ${INCOME_JOIN}
+    ORDER BY i.issued_on DESC, i.created_at DESC
+  `,
+  params: [],
+})
+
+const projectOptionsQuery = (): AdminQuery => ({
+  text: `
+    SELECT id::text, client_name, description, lead_origin
+    FROM projects
+    ORDER BY created_at DESC
+    LIMIT 200
+  `,
+  params: [],
+})
+
+const toProjectOption = (r: { id: string; client_name: string; description: string | null; lead_origin: string }): InvoiceProjectOption => {
+  const origin = toLeadOrigin(r.lead_origin)
+  return {
+    id: r.id,
+    client_name: r.client_name,
+    description: r.description,
+    origin_label: origin === DEFAULT_LEAD_ORIGIN ? null : LEAD_ORIGINS[origin].domain ?? LEAD_ORIGINS[origin].name,
+  }
+}
+
 export async function getAllInvoices(): Promise<InvoiceRegistryItem[]> {
   await requireAuth()
 
-  const rows = await sql`
-    SELECT
-      i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
-      i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
-      i.currency, i.note, i.pdf_filename, i.pdf_size,
-      (i.pdf_data IS NOT NULL) AS has_pdf,
-      p.lead_origin AS project_lead_origin,
-      p.client_name AS project_client_name,
-      p.description AS project_description,
-      COALESCE((
-        SELECT COUNT(*) FROM finance_transactions t
-        WHERE t.source_project_id = i.project_id
-          AND t.type = 'income'
-          AND t.user_id IS NULL
-          AND (i.finance_transaction_id IS NULL OR t.id <> i.finance_transaction_id)
-      ), 0)::int AS other_income_count
-    FROM invoices i
-    LEFT JOIN projects p ON p.id = i.project_id
-    ORDER BY i.issued_on DESC, i.created_at DESC
-  `
+  const [rows] = await adminDb.batch([registryQuery()])
 
-  return (rows as RegistryRow[]).map(toRegistryItem)
+  return (rows as unknown as RegistryRow[]).map(toRegistryItem)
 }
 
 /** Příjem v ledgeru, který fakturu zastupuje — na detailu ať je vidět, co doklad udělal s daněmi. */

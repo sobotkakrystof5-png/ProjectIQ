@@ -1,8 +1,7 @@
 import { PageShell } from '@/components/ws/app/page-header'
-import { getLeads, getAllLeadNotes } from '@/app/calls-actions'
+import { getCallsScreen } from '@/app/calls-actions'
 import LeadsTable from '@/components/LeadsTable'
 import ProjectCalculator from '@/components/ProjectCalculator'
-import type { ClientLead } from '@/lib/types'
 
 export default async function CallsPage(
   props: {
@@ -10,8 +9,7 @@ export default async function CallsPage(
   }
 ) {
   const searchParams = await props.searchParams
-  const [rows, notes] = await Promise.all([getLeads(), getAllLeadNotes()])
-  const leads = rows as unknown as ClientLead[]
+  const { leads, notes } = await getCallsScreen()
 
   return (
     <PageShell width="table" className="gap-10">

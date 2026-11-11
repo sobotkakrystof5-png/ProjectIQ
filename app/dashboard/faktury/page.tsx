@@ -1,5 +1,5 @@
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
-import { getAllInvoices, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
+import { getInvoiceRegistryScreen } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceRegistry } from '@/components/InvoiceRegistry'
 
 /**
@@ -8,7 +8,7 @@ import { InvoiceRegistry } from '@/components/InvoiceRegistry'
  * znamenal, že by šlo fakturu hledat na špatném místě.
  */
 export default async function FakturyPage() {
-  const [invoices, projects] = await Promise.all([getAllInvoices(), getInvoiceProjectOptions()])
+  const { invoices, projects } = await getInvoiceRegistryScreen()
 
   return (
     <PageShell width="wide">
