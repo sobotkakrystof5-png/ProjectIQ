@@ -12,7 +12,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Dílky platí pro celé repo (R-081); Inter se od AD04 nenačítá.
+        sans: ['var(--font-instrument-sans)', 'system-ui', 'sans-serif'],
         ...dilkyExtend.fontFamily,
       },
       colors: {

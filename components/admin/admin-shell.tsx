@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { Bell } from 'lucide-react'
 import { LogoutButton } from '@/app/dashboard/LogoutButton'
-import { wsFontVariables } from '@/lib/ws/fonts'
 import { formatBadge, type AdminCounts } from '@/lib/admin-nav'
 import { cn } from '@/lib/utils'
 import { AdminMobileTabs, AdminNavList } from './admin-nav'
@@ -44,8 +43,8 @@ function BellLink({ count }: { count: number }) {
 /**
  * Společná kostra administrace (KP01, R-071) pro /dashboard: postranní
  * menu na počítači, horní lišta a spodní lišta na telefonu, hledání ⌘K. Chrome
- * používá Dílky (`data-app="admin"`, app/admin-tokens.css); obsah stránek zůstává
- * na původním vzhledu (Inter, `brand-*`), dokud se nepřepne.
+ * i obsah používá Dílky (`data-app="admin"`, app/admin-tokens.css); písma nese
+ * <html> v kořenovém layoutu (R-081).
  */
 export function AdminShell({
   email,
@@ -58,7 +57,7 @@ export function AdminShell({
 }) {
   const initials = email.slice(0, 2).toUpperCase()
   return (
-    <div data-app="admin" className={cn(wsFontVariables, 'min-h-screen bg-background')}>
+    <div data-app="admin" className="min-h-screen bg-background">
       <a
         href="#obsah"
         className="sr-only z-50 rounded-chip bg-surface px-3 py-2 text-sm font-medium text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"

@@ -250,6 +250,13 @@ The 2×2 tile mark is the product signature. Loyalty stamps reuse its rounded sq
 - **Don't** add repeated icon-feature cards, generic dashboard tiles, stock photos, emoji, glass or decorative gradients.
 - **Don't** use warm amber as decoration or let staff colors imply a booking state.
 - **Don't** turn a pending request into a confirmed appointment or record income before payment is recorded.
-- **Don't** apply this design system to the separate VIZEON, ALTENO or Hub admin.
+- **Don't** give the admin console a dark mode — it is light only.
 
-The implementation sources are `app/ws-tokens.css`, `lib/ws/tailwind-dilky.ts`, `lib/ws/fonts.ts`, `components/ui/` and `components/ws/brand/`.
+Dílky are the design system of the whole repository, the admin console included (R-081, AD04). This
+replaces the earlier rule that the admin kept its own look (R-027). The palette lives on `:root`, so it
+also applies where there is no `data-app`: `/login`, `/p/[token]` and `/h/[token]` — those pages keep the
+older shadcn values (`--radius: 0.75rem`, paler `--background`) until they are redrawn.
+
+The implementation sources are `app/tokens-dilky.css` (palette), `app/ws-tokens.css` and
+`app/admin-tokens.css` (overrides), `lib/ws/tailwind-dilky.ts`, `lib/ws/fonts.ts`, `components/ui/` and
+`components/ws/brand/`.

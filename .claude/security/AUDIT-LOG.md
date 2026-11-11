@@ -16,6 +16,15 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-11 — review: zúžení CSP po sjednocení písma (AD04)
+Spouštěč: AD04 — Dílky jako výchozí vzhled celého repa (R-081), krok „písmo a CSP".
+Rozsah: `app/globals.css`, `app/layout.tsx`, `app/admin-tokens.css`, `tailwind.config.ts`, `lib/security/csp.ts`, hlavičky a servírované CSS z produkčního buildu.
+Výsledek: politika **zúžená**, nic nepřibylo. Žádný nový externí zdroj, žádné `unsafe-*`, žádný wildcard.
+Nálezy: výjimka `style-src fonts.googleapis.com` + `font-src fonts.gstatic.com` v profilu `admin` existovala jen kvůli `@import` Interu v `app/globals.css`. Ten je pryč, takže výjimka platila zbytečně i pro `/login`, `/p/[token]` a `/h/[token]`.
+Opraveno: obě hodnoty odebrané z `extras(profile === 'admin')`, CSP-LOG v8, řádek v STATE.md. Test `csp.test.ts` nově tvrdí opak (profil `admin` ani `/login` `fonts.*` neobsahuje), nový `lib/__tests__/fonts-dilky.test.ts` hlídá, že se Inter nevrátí.
+Ověřeno: produkční build + `next start` lokálně. `/login`, `/p/[token]` i 404 vracejí `style-src 'self' 'unsafe-inline'` a `font-src 'self' data:`; HTML `/login` a všechny tři servírované CSS soubory mají 0 výskytů `fonts.googleapis`; `<html>` nese třídy písem.
+Zůstává: průchod přihlášeného adminu v prohlížeči (agent nemá heslo) — konzole ověří AD04 krok „hotovo, když". Nesouvisející nález: `/p/<nesmyslný token>` vrací lokálně 500 (`22P02`, `public_token` je `uuid`), na produkci podle záznamu 2026-11-04 404 — zapsáno do otevřených problémů.
+
 ## 2026-11-04 — incident: produkce bez databáze po výměně hesla `neondb_owner`
 Spouštěč: hlášení Kryštofa (na produkci „Application error: a server-side exception has occurred“, digest 1150213469).
 Rozsah: Vercel runtime errors za 3 dny, env proměnné projektu `project-iq` (jen metadata, hodnoty nedešifrované), `.env.local` (jen host a role, čtecí dotaz na existenci tabulek), produkční deploy.

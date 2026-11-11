@@ -52,14 +52,14 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 
 ## CSP
 
-Verze: **v5** (CSP-LOG.md)
+Verze: **v8** (CSP-LOG.md)
 Režim: **vynucená pro všechny cesty**. Admin používá profil `admin`, Workspace a přesné cesty landing page profil `workspace`.
 Výběr profilu: `cspProfileFor()` v `lib/security/csp.ts`
 
 Společný základ: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'nonce-…' 'strict-dynamic' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; frame-src 'none'; worker-src 'self' blob:; manifest-src 'self'` (+ `upgrade-insecure-requests` jen vynucená). Dev navíc `'unsafe-eval'` a `ws:`/`wss:`.
 
 Třetí strany:
-- admin: Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`), TradingView (`frame-src www.tradingview-widget.com`), na `/dashboard/faktury/*` `object-src 'self'` + `frame-src 'self'` (náhled PDF)
+- admin: TradingView (`frame-src www.tradingview-widget.com`), na `/dashboard/faktury/*` `object-src 'self'` + `frame-src 'self'` (náhled PDF). **Google Fonts odebrané 2026-11-11** (CSP-LOG v8) — celé repo je na Instrument Sans přes `next/font`, písma jdou z vlastní domény
 - Workspace `/w/*`: Clerk — `connect-src` Frontend API (host z publishable key), `img-src img.clerk.com`, `frame-src challenges.cloudflare.com` (Turnstile). Skript clerk-js s nonce. S08 případně Stripe (`form-action`)
 - `/r/<slug>`: `frame-ancestors 'self'` + povolené domény byznysu z DB (S11, v4; chyba = jen `'self'`)
 

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Toaster } from 'sonner'
 import { Providers } from './providers'
+import { wsFontVariables } from '@/lib/ws/fonts'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -10,7 +11,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="cs">
+    // Písma Dílků definuje <html>, aby na ně dosáhl i `body` v app/globals.css (R-081).
+    <html lang="cs" className={wsFontVariables}>
       <body>
         <Providers>
           {children}

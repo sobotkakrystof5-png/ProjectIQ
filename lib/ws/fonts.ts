@@ -1,5 +1,5 @@
-// Písma systému Dílky. Načítají se jen v layoutech Workspace a landing page —
-// kořenový app/layout.tsx (admin) zůstává na Interu.
+// Písma systému Dílky. Od AD04 (R-081) je nese <html> v kořenovém app/layout.tsx,
+// takže platí pro celé repo včetně admin konzole, /login a portálu.
 import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from 'next/font/google'
 
 const instrumentSans = Instrument_Sans({

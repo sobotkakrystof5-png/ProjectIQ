@@ -107,9 +107,8 @@ function clerkSources(host: string): Directives {
 function extras(profile: CspProfile, pathname: string, clerkHost: string | null): Directives {
   if (profile === 'admin') {
     return {
-      // Inter přes @import v app/globals.css
-      'style-src': ['https://fonts.googleapis.com'],
-      'font-src': ['https://fonts.gstatic.com'],
+      // fonts.googleapis.com / fonts.gstatic.com odebrané v AD04 (CSP-LOG v8): Inter
+      // přes @import zmizel, Instrument Sans servíruje next/font z vlastní domény.
       // TradingView graf v /dashboard/finance (components/TradingViewChart.tsx). Skript
       // z s3.tradingview.com pouští strict-dynamic, iframe jde z tohohle hostu.
       'frame-src': ['https://www.tradingview-widget.com'],

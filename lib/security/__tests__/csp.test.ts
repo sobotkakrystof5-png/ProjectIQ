@@ -64,13 +64,18 @@ describe('buildCsp', () => {
     expect(directive(csp, 'upgrade-insecure-requests')).toBeDefined()
   })
 
-  it('Workspace nepouští Google Fonts ani TradingView, admin ano', () => {
+  it('Google Fonts nepouští nikdo (AD04), TradingView jen admin', () => {
     const ws = buildCsp({ nonce, pathname: '/w', profile: 'workspace', mode: 'enforce' })
     const admin = buildCsp({ nonce, pathname: '/dashboard/finance', profile: 'admin', mode: 'report-only' })
+    const login = buildCsp({ nonce, pathname: '/login', profile: 'admin', mode: 'report-only' })
     expect(ws).not.toContain('fonts.googleapis.com')
     expect(ws).not.toContain('tradingview')
     expect(directive(ws, 'frame-src')).toBe("frame-src 'none'")
-    expect(directive(admin, 'style-src')).toContain('https://fonts.googleapis.com')
+    // Inter přes @import zmizel, Instrument Sans jde z vlastní domény přes next/font.
+    for (const csp of [admin, login]) {
+      expect(csp).not.toContain('fonts.googleapis.com')
+      expect(csp).not.toContain('fonts.gstatic.com')
+    }
     expect(directive(admin, 'frame-src')).toBe('frame-src https://www.tradingview-widget.com')
   })
 

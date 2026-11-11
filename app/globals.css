@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&display=swap');
 /* Paleta Dílků na :root — platí i tam, kde není data-app (/login, /p, /h). */
 @import './tokens-dilky.css';
 @tailwind base;
@@ -27,14 +26,18 @@
     --radius: 0.75rem;
   }
 
+  /* Zůstává záměrně (AD04): --border se v adminu i Workspace vyhodnotí na hodnotu
+     Dílků, takže se pravidlo chová správně samo. Odstranění by změnilo každý prvek,
+     který má `border` bez vlastní barvy — tedy skoro celou admin konzoli. */
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Dílky platí pro celé repo včetně adminu (R-081). Proměnnou definuje třída
+       wsFontVariables na <html> v app/layout.tsx. */
+    font-family: var(--font-instrument-sans), system-ui, sans-serif;
   }
 
   input[type='range']::-webkit-slider-thumb {
@@ -43,8 +46,10 @@
 }
 
 @layer utilities {
+  /* Dočasný alias: stejné hexy jako dřív, jen z tokenů. Zbylé obrazovky ho používají
+     44×, smaže se v AD18 spolu s posledními `brand-*`. */
   .brand-gradient {
-    background: linear-gradient(135deg, #1b3868 0%, #23478b 100%);
+    background: linear-gradient(135deg, rgb(var(--navy-800)) 0%, rgb(var(--navy-700)) 100%);
   }
   .card-hover {
     @apply transition-all duration-200 hover:shadow-md hover:border-brand-200;

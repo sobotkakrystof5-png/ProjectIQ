@@ -1,4 +1,35 @@
 /* Kostra administrace (R-071, R-081): tokeny Dílků už nejsou tady, ale na :root
    v app/tokens-dilky.css — platí pro celé repo včetně /login, /p a /h.
-   Tenhle soubor si nechává jen to, co se má lišit uvnitř [data-app="admin"]
-   (layout app/dashboard). Admin nemá tmavý režim. */
+   Tenhle soubor drží jen proměnné shadcn/ui, aby komponenty components/ui/*
+   vypadaly v adminu podle Dílků. Hodnoty jsou stejné jako světlý režim
+   v app/ws-tokens.css; změnit je tam znamená změnit i tady.
+   Admin nemá tmavý režim. */
+
+[data-app="admin"] {
+  /* shadcn/ui čte hsl(var(--x)) — jemný posun oproti staršímu :root v app/globals.css:
+     mění se saturace o jednotky procent, ne světlost (záměr, R-081). */
+  --background: 223 47% 97%;
+  --foreground: 220 64% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 64% 13%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 64% 13%;
+  --primary: 219 60% 34%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 62% 96%;
+  --secondary-foreground: 220 64% 13%;
+  --muted: 222 62% 96%;
+  --muted-foreground: 222 24% 38%;
+  --accent: 216 63% 92%;
+  --accent-foreground: 220 64% 13%;
+  --destructive: 3 71% 41%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 216 63% 92%;
+  --input: 216 63% 92%;
+  --ring: 217 54% 50%;
+  --radius: 12px;
+
+  color-scheme: light;
+  font-family: var(--font-instrument-sans), system-ui, sans-serif;
+  font-feature-settings: normal;
+}

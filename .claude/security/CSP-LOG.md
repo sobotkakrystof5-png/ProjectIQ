@@ -77,9 +77,14 @@ Změna: žádná. Politika i zdroje zůstávají, jen se přesunula stránka, kt
 Kvůli: přesun obrazovek Hubu do `/dashboard`.
 Ověřeno: testy `lib/security/__tests__/csp.test.ts` (profil `admin` pro `/dashboard/finance`, Clerk zdroje jen na `/w` a `/klient`). Graf TradingView na `/dashboard/finance` v prohlížeči neověřen — admin agent lokálně neotevře (chybí heslo).
 
+## v8 — 2026-11-11
+Změna: **zúžení**. Z profilu `admin` odebrané `style-src https://fonts.googleapis.com` a `font-src https://fonts.gstatic.com`. Nic nepřibylo. Profil `admin` platí i pro `/login`, `/p/[token]` a `/h/[token]`, takže výjimka padá i tam.
+Kvůli: AD04 (R-081) smazal `@import url(fonts.googleapis.com … Inter)` z `app/globals.css`. Celé repo je na Instrument Sans přes `next/font/google`, který písmo servíruje z vlastní domény (`/_next/static/media/*`), takže na Google Fonts už nic nesahá.
+Ověřeno: produkční build + `next start` lokálně 2026-11-11. Hlavičky `/login`, `/p/[token]`, 404: `style-src 'self' 'unsafe-inline'`, `font-src 'self' data:` — bez `fonts.*`. HTML `/login` ani žádný ze tří servírovaných CSS souborů `fonts.googleapis` neobsahuje (0 výskytů), `<html>` nese třídy písem a paleta je v CSS na `:root`. Testy `lib/security/__tests__/csp.test.ts` (profil `admin` i `/login` bez `fonts.*`) a `lib/__tests__/fonts-dilky.test.ts`. V prohlížeči s přihlášeným adminem neověřeno (agent nemá heslo); blokovat ale nemá co — zdroj, který výjimku potřeboval, v kódu není.
+
 ## Čeká (zapsat jako vN při přidání)
 - Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.
 
 ## Odebrané
-(zatím nic)
+- `style-src https://fonts.googleapis.com`, `font-src https://fonts.gstatic.com` (profil `admin`) — odebráno 2026-11-11 ve v8, protože Inter se přes `@import` už nenačítá (AD04, R-081).
