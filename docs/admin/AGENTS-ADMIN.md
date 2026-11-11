@@ -2,7 +2,9 @@
 
 > Vyčleněno z `AGENTS.md` (část A) 2026-10-09, aby se popis adminu nenačítal do každého sezení (R-042). **Čti před každou změnou admin konzole.** Příkazy a env proměnné zůstaly v [`../../AGENTS.md`](../../AGENTS.md) → Část A. Pravidla a hranice v repu platí z `AGENTS.md`.
 
-> Kryštofův osobní produkční systém (VIZEON, ALTENO, Hub, klientský portál). Popis níže je popis **existujícího kódu** — platí pro údržbu adminu, ne jako vzor pro Workspace.
+> Kryštofův osobní produkční systém (VIZEON, Hub, klientský portál). Popis níže je popis **existujícího kódu** — platí pro údržbu adminu, ne jako vzor pro Workspace.
+>
+> **Od AD02 (R-088) je to jeden byznys se třemi zdroji poptávek** (vizeon.cz, alteno.cz, prvotka.cz). Sekce `/alteno` zanikla, sloupec `business` se přejmenoval na `lead_origin`.
 
 ## Vize a cíl
 
@@ -85,8 +87,12 @@ CREATE TABLE projects (
 | project_url | text | — | Link na živou verzi projektu (např. Vercel deploy) — zobrazí se klientovi i v emailu |
 | created_at | timestamptz | now() | Datum vytvoření |
 | updated_at | timestamptz | — | Datum poslední úpravy (nastavuje server action) |
-| business | text | `'vizeon'` | Do které sekce zakázka patří — `vizeon` / `alteno` (migrace 050) |
-| alteno_confirmed | boolean | false | Potvrzená poptávka z alteno.cz — obdoba `vizeon_confirmed` (migrace 050) |
+| lead_origin | text | `'vizeon'` | Odkud poptávka přišla — `vizeon` / `alteno` / `prvotka` / `jiny`, CHECK (migrace 050 jako `business`, přejmenováno 102) |
+| lead_confirmed | boolean | false | Potvrzená poptávka z webu — jeden příznak místo dvojice (migrace 102) |
+| lead_confirmed_at | timestamptz | — | Kdy se potvrdila; zapisuje trigger, u historie před 102 je NULL |
+| lead_pending | boolean | **generovaný** | `source IS NOT NULL AND source <> 'manual' AND NOT lead_confirmed` — jediné pravidlo pro inbox. **Do INSERTu nikdy nepatří** (migrace 102) |
+| vizeon_confirmed | boolean | false | Starý příznak; drží ho v souladu trigger, čte se už jen při revertu (zahodí samostatná migrace) |
+| alteno_confirmed | boolean | false | Starý příznak, dtto (migrace 050) |
 
 ### `client_messages`
 
@@ -148,7 +154,7 @@ Ruční admin události/blokace v globálním kalendáři (`/dashboard/calendar`
 | ends_at | timestamptz | Konec |
 | event_type | text | `manual` / `block` |
 | created_at | timestamptz | Datum vytvoření |
-| business | text | `vizeon` / `alteno`, default `'vizeon'` (migrace 050) — VIZEON kalendář zobrazuje jen své události |
+| lead_origin | text | `vizeon` / `alteno` / `prvotka` / `jiny`, default `'vizeon'` (migrace 050 jako `business`, přejmenováno 102) — kalendář od AD02 nefiltruje, je to jen štítek |
 | lead_id | uuid | FK → client_leads.id, ON DELETE SET NULL (migrace 051) — párový kontakt v Hovorech, viz níže |
 
 **Propojení s Hovory (migrace 051):** vytvoření kalendářní události automaticky založí odpovídající řádek v `client_leads` (company_name = název události, next_action = popis, next_action_date/time odvozeno z `starts_at` v Europe/Prague) a propojí obě strany přes `calendar_events.lead_id` / `client_leads.calendar_event_id`. Smazání jedné strany smaže i druhou (`deleteCalendarEvent` / `deleteLead` v `app/calendar-actions.ts` a `app/calls-actions.ts`). Kalendářová stránka proto z `client_leads` do zobrazení bere jen řádky s `calendar_event_id IS NULL` — jinak by se termín zdvojil (jednou jako reálná `calendar_events` událost, podruhé jako virtuální položka z `next_action`).
@@ -181,7 +187,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `project_agent_keys` | 094 | Klíče projektů pro hlášení z Claude Code (KP04): prefix + HMAC hash, jeden platný klíč na projekt, kdo a kdy vytvořil/zneplatnil |
 | schéma `portal` (`clients`, `members`, `invites`, `projects`, `activity`, `requests`, `messages`, `feedback`) | 095, 096, 098 | Klientský prostor (KP05–KP07), retence 3 roky (098): projekce schváleného, RLS podle `app.client_id`, role `portal_app` bez práv do `public`. Podrobně `docs/klientsky-prostor/PLAN.md` a `.claude/security/DECISIONS.md` #020 |
 
-**DB funkce/triggery:** `check_calendar_overlap`, `check_consultation_overlap` (overlap guard napříč tabulkami, migrace 008/043/044), `is_vizeon_pending()`, `is_alteno_pending()` (migrace 048/050).
+**DB funkce/triggery:** `check_calendar_overlap`, `check_consultation_overlap` (overlap guard napříč tabulkami, migrace 008/043/044), `projects_lead_confirmed_sync()` + trigger `trg_projects_lead_confirmed` (čas potvrzení a staré příznaky, migrace 102). Funkce `is_vizeon_pending()` a `is_alteno_pending()` (migrace 048/050) v DB zůstaly, ale kód je už nepoužívá — nahradil je generovaný sloupec `lead_pending`.
 
 ---
 
@@ -205,21 +211,15 @@ app/
 │   ├── faktury/page.tsx         ← Evidence všech vystavených faktur (napříč byznysy)
 │   ├── faktury/[id]/page.tsx    ← Detail faktury — kompletní přepsané údaje + PDF + vazba na ledger
 │   └── [id]/page.tsx           ← Detail + editace zakázky + FeedbackFeed + ConsultationCalendar
-├── alteno/                      ← Sekce ALTENO (AI automatizace) — jádro stejné jako VIZEON
-│   ├── layout.tsx               ← Auth + ALTENO nav (Zakázky | Rezervace), amber branding
-│   ├── page.tsx                 ← Přehled ALTENO zakázek
-│   ├── new/page.tsx             ← Nová ALTENO zakázka
-│   ├── rezervace/page.tsx       ← Inbox nepotvrzených poptávek z alteno.cz
-│   └── [id]/page.tsx           ← Detail + editace ALTENO zakázky
 ├── p/
 │   └── [token]/page.tsx        ← Klientský portál (public, bez auth) — FeedbackBlock + BookingCTA
 ├── layout.tsx
 └── globals.css
 
 components/
-├── ProjectCard.tsx              ← Karta zakázky v dashboardu (prop `business` řídí cestu i barvy)
-├── ProjectForm.tsx              ← Formulář (volá server actions, prop `business`)
-├── BookingCard.tsx              ← Admin: karta poptávky z webu + potvrzení/smazání (VIZEON i ALTENO)
+├── ProjectCard.tsx              ← Karta zakázky v seznamu (štítek zdroje podle `lead_origin`)
+├── ProjectForm.tsx              ← Formulář (volá server actions)
+├── LeadCard.tsx                 ← Admin: karta poptávky z webu + potvrzení/smazání (dřív BookingCard.tsx)
 ├── StatusBadge.tsx              ← Barevný badge stavu
 ├── ProgressBar.tsx              ← Vizuální progress bar
 ├── ShareButton.tsx              ← Kopírování klientského linku
@@ -237,7 +237,9 @@ components/
 
 lib/
 ├── db.ts                        ← Neon klient: sql tagged template
-├── business.ts                  ← VIZEON/ALTENO konfigurace: cesty, domény, source, branding
+├── lead-origins.ts              ← Zdroje poptávek: název, doména, `source`, klíče API, okno rate limitu (dřív business.ts)
+├── legacy-redirects.mjs         ← Staré adresy adminu → nové (čte next.config.mjs i test)
+├── web-leads.ts                 ← Příjem poptávek z webů: booking i kontaktní formulář, jeden inbox (dřív web-booking.ts)
 ├── web-booking.ts               ← Sdílená implementace veřejného booking endpointu (obě domény)
 ├── auth.ts                      ← NextAuth authOptions
 ├── email.ts                     ← Sdílený nodemailer transporter + branded HTML layout (sendBrandedEmail)
@@ -246,7 +248,7 @@ lib/
 ├── utils.ts
 └── types.ts
 
-proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard, /alteno, /hub (vč. podcest), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
+proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard, /hub (`/alteno` zůstal jako pojistka před přesměrováním), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -259,7 +261,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Soubor | Oblast |
 |--------|--------|
-| `app/actions.ts` | Zakázky: CRUD, vzkazy, potvrzení/smazání poptávek z webu (VIZEON/ALTENO), `markProjectAsCompleted`, `notifyClientOfProjectChange` |
+| `app/actions.ts` | Zakázky: CRUD, vzkazy, `confirmWebLead`/`deleteWebLead` (poptávka z kteréhokoli webu), `markProjectAsCompleted`, `notifyClientOfProjectChange` |
 | `app/portal-actions.ts` | Veřejné (token): `submitFeedback`, `submitConsultation`, `submitSurvey`, `submitClientRequest` (AI shrnutí běží v `after()`) |
 | `app/client-requests-actions.ts` | Admin: změna stavu požadavku klienta (`/dashboard/pozadavky`) |
 | `app/calendar-actions.ts` | Kalendářní události (+ párový lead v Hovorech) |
@@ -278,8 +280,8 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Sekce | Routy |
 |-------|-------|
-| VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/pozadavky` (požadavky klientů z portálu, napříč VIZEON i ALTENO), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
-| ALTENO (`/alteno`) | `/alteno`, `/new`, `/[id]`, `/rezervace` |
+| Admin (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/zakazky`, `/pozadavky` (požadavky klientů z portálu), `/poptavky` (jeden inbox poptávek ze všech webů), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
+| Zrušené adresy | `/alteno`, `/alteno/new`, `/alteno/[id]`, `/alteno/rezervace`, `/dashboard/vizeon` — trvale přesměrované (`lib/legacy-redirects.mjs`, AD02) |
 | Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/projekty` (+ `/new`, `/[id]`) |
 
 ### Veřejné stránky
@@ -297,6 +299,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/booking` | `x-api-key` = `VIZEON_API_KEY` | Rezervace z vizeon.cz (`lib/web-booking.ts`) |
 | `POST /api/public/booking/alteno` | `x-api-key` = `ALTENO_API_KEY` | Rezervace z alteno.cz |
 | `POST /api/public/alteno-leads` | `x-alteno-lead-signature` = `ALTENO_LEAD_WEBHOOK_SECRET` | Kontaktní formulář alteno.cz → nepotvrzená poptávka |
+| `POST /api/public/prvotka-leads` | `x-prvotka-lead-signature` = `PRVOTKA_LEAD_WEBHOOK_SECRET` | Kontaktní formulář prvotka.cz → nepotvrzená poptávka (AD02; web ještě napojený není) |
 | `POST /api/public/leads` | `N8N_API_KEY` | Leady z n8n chatbota → Hovory |
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
@@ -328,7 +331,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Čistý minimalistický design
 
 ### Kostra administrace (KP01, R-071)
-- `/dashboard/*` a `/alteno/*` sdílí `components/admin/admin-shell.tsx`: postranní menu na počítači, horní lišta a spodní lišta s nabídkou „Více“ na telefonu, hledání ⌘K (stránky, zakázky, hovory, faktury; `app/admin-search-actions.ts`). Hub (`/hub`) má dál vlastní postranní panel.
+- `/dashboard/*` používá `components/admin/admin-shell.tsx`: postranní menu na počítači, horní lišta a spodní lišta s nabídkou „Více“ na telefonu, hledání ⌘K (stránky, zakázky, hovory, faktury; `app/admin-search-actions.ts`). Hub (`/hub`) má dál vlastní postranní panel.
 - Menu a odznaky: `lib/admin-nav.ts` (skupiny Dnes · Zakázky · Kalendář a hovory · Peníze · Klienti · Osobní) a `lib/admin-counts.ts` (počty jedním dotazem). Nová stránka adminu = položka v `ADMIN_NAV`; test `lib/__tests__/admin-nav.test.ts` hlídá, že žádná dřívější cesta nezmizela.
 - Vzhled: kostra používá Dílky (`data-app="admin"`, `app/admin-tokens.css`, jen barevné tokeny, bez přepsání proměnných shadcn). Obsah stránek zůstává na původním vzhledu (Inter, `brand-*`), dokud se nepřepne.
 
@@ -336,15 +339,19 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Jedna hlavní věc nahoře (`lib/admin-today.ts` → `pickFocus`): požadavek klienta → hlášení ke schválení → faktura po splatnosti → schůzka do 24 h → zakázka bez pohybu 14 dní. Pod ní sekce se stejnými věcmi. Data `lib/admin-today-queries.ts` (každá sekce se načítá zvlášť, chybějící tabulka = prázdná sekce).
 
 ### `/dashboard/zakazky`
-- Seznam zakázek VIZEON i ALTENO s přepínačem firmy (`?firma=`), filtrem stavu (`?status=`), summary barem a počtem nevyřízených požadavků na kartě. `/alteno` zůstává seznamem ALTENO.
+- Seznam všech zakázek s filtrem zdroje poptávky (`?zdroj=`), filtrem stavu (`?status=`), summary barem a počtem nevyřízených požadavků na kartě. Čekající poptávky tu nejsou (`NOT lead_pending`), ty jsou v `/dashboard/poptavky`.
+
+### `/dashboard/poptavky` — jeden inbox poptávek (AD02)
+- Poptávky ze všech webů čekající na potvrzení (`WHERE lead_pending`, `lib/web-leads.ts` → `loadPendingLeads`). Filtr podle zdroje je v adrese (`?zdroj=vizeon|alteno|prvotka`), na kartě je štítek s doménou.
+- „Potvrdit jako zakázku“ = `confirmWebLead`: jeden atomický `UPDATE … WHERE id = … AND lead_pending`, takže dvojklik nepošle potvrzovací e-mail dvakrát. „Smazat“ = `deleteWebLead`, smaže jen dosud nepotvrzenou.
 
 ### `/dashboard/new`
 - Formulář: client_name, description, focus, project_url, status, progress, price, paid, deadline, notes, client_email
 - Po uložení redirect na `/dashboard`
 
-### `/dashboard/[id]` a `/alteno/[id]` — detail zakázky (KP02)
-- Jedna komponenta `components/admin/project-detail-view.tsx`, záložky v adrese `?zalozka=`: **Přehled** (editace, sdílení a QR, přidat do dokončených, smazat) · **Aktivita** (koncepty a schvalování, napojení Claude Code) · **Požadavky** (karty z `/dashboard/pozadavky` filtrované na zakázku) · **Zprávy** (vlákno v klientském prostoru, vzkazy, historie postupu, zpětná vazba, konzultace, poznámky) · **Fakturace** (jen VIZEON: faktury a náklady). Načítají se jen data aktivní záložky.
-- Špatná sekce (`/dashboard/[id]` pro ALTENO zakázku a naopak) přesměruje na správnou.
+### `/dashboard/[id]` — detail zakázky (KP02)
+- Jedna komponenta `components/admin/project-detail-view.tsx`, záložky v adrese `?zalozka=`: **Přehled** (editace, sdílení a QR, přidat do dokončených, smazat) · **Aktivita** (koncepty a schvalování, napojení Claude Code) · **Požadavky** (karty z `/dashboard/pozadavky` filtrované na zakázku) · **Zprávy** (vlákno v klientském prostoru, vzkazy, historie postupu, zpětná vazba, konzultace, poznámky) · **Fakturace** (faktury a náklady). Načítají se jen data aktivní záložky.
+- Od AD02 má **každá** zakázka všechny záložky — i poptávky z alteno.cz mají Fakturaci, dokončení a poznámky ze schůzek. V záhlaví je štítek zdroje (`lead_origin`).
 - Nepřevedeno z plánu: změna stavu a fáze jedním klikem se „Zpět“. `updateProject` posílá klientovi e-mail, takže „Zpět“ by ho poslal podruhé.
 
 ### `/dashboard/calendar`
@@ -366,23 +373,26 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - **Co z PDF přečetla AI** — surový `ai_extracted` pro dohledatelnost; pole, kde se uložená hodnota od přepisu liší, jsou označená jako ručně upravená. Platí vždy uložené údaje, ne přepis
 - Data z `getInvoiceDetail()`; akce v `InvoiceDetailActions.tsx`
 
-### `/alteno` — sekce ALTENO (AI automatizace)
-Druhý byznys vedle VIZEONu. **Stejný software jako jádro VIZEON dashboardu**, jen nad daty s `business = 'alteno'` a s vlastním brandingem (amber/orange místo brand-*). Rozsah je záměrně jen jádro:
+### Zdroje poptávek (AD02, R-088)
 
-| Stránka | Co dělá |
-|---------|---------|
-| `/alteno` | Přehled ALTENO zakázek — SummaryBar, nadcházející konzultace, filtry, karty |
-| `/alteno/new` | Nová ALTENO zakázka |
-| `/alteno/[id]` | Detail + editace, sdílení klientského linku, vzkazy, historie postupu, feedback, konzultace, smazání |
-| `/alteno/rezervace` | Inbox nepotvrzených poptávek z alteno.cz — potvrdit jako zakázku / smazat |
+VIZEON a ALTENO už nejsou dvě firmy. Je to **jeden byznys**, který přijímá poptávky z několika webů, a u zakázky, termínu i leadu se eviduje jen `lead_origin` — odkud poptávka přišla.
 
-Co ALTENO **nemá** (zůstává jen ve VIZEONu): Kalendář, Hovory, Dokončené, Hodnocení, Náklady, Faktury. Proto detail ALTENO zakázky nenabízí „Přidat do dokončených" a `ProjectForm` tam skrývá checkbox „Ihned přidat do dokončených".
+| Zdroj | Doména | `projects.source` | Endpointy |
+|---|---|---|---|
+| `vizeon` | vizeon.cz | `vizeon_web` | `POST /api/public/booking` (`VIZEON_API_KEY`) |
+| `alteno` | alteno.cz | `alteno_web` | `POST /api/public/booking/alteno` (`ALTENO_API_KEY`), `POST /api/public/alteno-leads` (`ALTENO_LEAD_WEBHOOK_SECRET`) |
+| `prvotka` | prvotka.cz | `prvotka_web` | `POST /api/public/prvotka-leads` (`PRVOTKA_LEAD_WEBHOOK_SECRET`) — web napojený ještě není |
+| `jiny` | — | — | jen štítek pro data bez webu |
 
-**Oddělení dat:** `projects.business` a `calendar_events.business` (`'vizeon' | 'alteno'`, default `'vizeon'`). VIZEON stránky filtrují `business = 'vizeon'`, ALTENO `= 'alteno'`. `consultation_slots` vlastní sloupec nemá — business se dohledá joinem přes `projects`.
+Všechno, co se u zdroje liší, je v `lib/lead-origins.ts`. **Přidání dalšího webu (estetik.cz) je jeden řádek v `LEAD_ORIGINS`** plus případně soubor routy s jedním řádkem; žádná nová logika. Každý zdroj má vlastní klíč a vlastní okno rate limitu (`<zdroj>_booking`, `<zdroj>_lead`), aby si weby limit nebraly navzájem a uniklý klíč nepustil poptávky za ostatní weby.
 
-**Sdílené napříč oběma:** klientský portál `/p/[token]`, notifikace (`/dashboard/notifications`), profil (`/dashboard/profil` — statistiky napříč byznysy), evidence faktur (`/dashboard/faktury` — jedno IČO, jedno přiznání), Hub finance a DB overlap guard na termínech (jeden člověk = jeden diář, dvě konzultace ve stejný čas nelze rezervovat ani napříč byznysy).
+**Payload, adresy a klíče volané cizími repozitáři se nemění** — formuláře na vizeon.cz i alteno.cz žijí v jiných repech. `types/booking.ts` a `types/web-lead.ts` jsou proto parametrizované funkcí podle zdroje, ne nová schémata.
 
-`/dashboard/[id]` a `/alteno/[id]` se navzájem přesměrovávají podle `business` — starší odkazy z notifikací a emailů tak nikdy nekončí na 404.
+**Čekající poptávka** je `lead_pending` (generovaný sloupec, migrace 102): `source IS NOT NULL AND source <> 'manual' AND NOT lead_confirmed`. Každý dotaz píše jen `WHERE lead_pending` nebo `WHERE NOT lead_pending`. Ruční zakázka má `source = 'manual'`, takže v inboxu nikdy není.
+
+**Co se tím sloučilo:** jeden inbox místo dvou (`/dashboard/poptavky`), jeden seznam zakázek, jedna navigace, jedna odesílací schránka. Staré ALTENO zakázky tím **získaly** fakturaci, dokončení a poznámky ze schůzek. Kalendář a Hovory dřív ALTENO filtrovaly pryč — od AD02 jsou tam i historické záznamy.
+
+**Sdílené odjakživa:** klientský portál `/p/[token]`, notifikace, profil, evidence faktur (jedno IČO, jedno přiznání), Hub finance a DB overlap guard na termínech (jeden člověk = jeden diář).
 
 ### `/p/[token]` — Klientský portál (PUBLIC)
 - **Bez přihlášení, bez registrace**
@@ -418,10 +428,9 @@ Zdroj pravdy je `lib/types.ts` — obsahuje `Project`, `ClientMessage`, `Progres
 
 Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`sendPlainEmail`) — branded HTML layout (gradient header, card, CTA tlačítka). Nikdy nepiš novou HTML šablonu inline v server action — rozšiř `sendBrandedEmail`/`buildLayout`, pokud potřebuješ nový vizuální prvek.
 
-**Dva odesílací účty:** VIZEON má vlastní Gmail schránku (`VIZEON_GMAIL_USER`/`VIZEON_GMAIL_APP_PASSWORD` = info@vizeon.cz), oddělenou od výchozího `GMAIL_USER` (přihlášení + ALTENO + Hub). `lib/email.ts` drží samostatný nodemailer transporter per účet a vybírá ho podle volitelného `business` parametru v `sendBrandedEmail`/`sendPlainEmail` — chybí-li VIZEON dvojice env proměnných kompletní, spadne zpět na výchozí účet (nikdy nezkouší auth s nesedícím heslem).
+**Jedna odesílací schránka (AD02):** všechna pošta odchází z `VIZEON_GMAIL_USER`/`VIZEON_GMAIL_APP_PASSWORD` (info@vizeon.cz) — včetně poptávek z alteno.cz a prvotka.cz. Chybí-li dvojice kompletní, `lib/email.ts` spadne zpět na výchozí `GMAIL_USER` (nikdy nezkouší auth s nesedícím heslem). `sendBrandedEmail`/`sendPlainEmail` už nemají parametr `business`.
 
-- **Nová volaná funkce, kde jde jasně určit byznys projektu/leadu → vždy pošli `business`.** Cíl admin notifikace se stejně tak odvozuje přes `adminEmailFor(business)` z `lib/business.ts` (VIZEON → `VIZEON_ADMIN_EMAIL`, jinak `ADMIN_EMAIL`) — nikdy nečti `process.env.ADMIN_EMAIL` přímo, pokud je byznys známý.
-- Funkce, které existují jen ve VIZEON sekci (Hovory/`client_leads`, Dokončené/`completed_projects`, dotazník spokojenosti) → volej s natvrdo `business: 'vizeon'`, protože v DB nemají sloupec `business` k odvození.
+- Cíl admin oznámení ber vždy z `adminEmail()` v `lib/lead-origins.ts` (`VIZEON_ADMIN_EMAIL`, záloha `ADMIN_EMAIL`) — nikdy nečti `process.env.ADMIN_EMAIL` přímo.
 - Selhání odeslání emailu **nikdy** nesmí shodit DB mutaci — `sendBrandedEmail`/`sendPlainEmail` interně chytají chyby a vrací `false`, voláno bez `await` na výsledek pokud na něm nic nezávisí.
 - Emaily se neodešlou, pokud chybí odpovídající dvojice `*_USER`/`*_APP_PASSWORD` — v dev prostředí appka funguje i bez nich, jen nechodí maily.
 - Trigger body: `notifyClientOfProjectChange` v `app/actions.ts` (vytvoření/update projektu → klient), `submitConsultation` v `app/portal-actions.ts` (rezervace → admin i klient).
@@ -465,10 +474,10 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - Výchozí chování na portálu: cena je **skrytá** (volitelné zapnutí)
 - Nová DB změna → nová idempotentní migrace v `migrations/`, ne přímá úprava základního schématu výše
 - Časové sloty/kalendářní logika → vždy přes `lib/prague-time.ts`, nepřepočítávej timezony znovu v komponentě
-- **Dva byznysy:** cesty, domény, `source` a názvy ber vždy z `BUSINESSES` v `lib/business.ts` — nikdy nehardcoduj `/dashboard`, `/alteno` ani `'vizeon_web'` v nové logice
-- Nový dotaz nad `projects` nebo `calendar_events` → rozmysli, jestli patří jen jednomu byznysu, a filtruj `business`. Bez filtru se ALTENO data objeví ve VIZEONu
-- Nová sdílená komponenta pro obě sekce → prop `business?: Business` s defaultem `'vizeon'`, ne duplikát souboru
-- Podmínka „nepotvrzená poptávka z webu" žije v DB jako `is_vizeon_pending()` / `is_alteno_pending()` — neon `sql` tag neumí skládat fragmenty, takže ji nelze sdílet jako JS konstantu
+- **Zdroje poptávek:** domény, `source`, názvy a klíče ber vždy z `LEAD_ORIGINS` v `lib/lead-origins.ts` — nikdy nehardcoduj `'vizeon_web'` ani doménu v nové logice. Cestu k zakázce dává `projectPath(id)`
+- **`lead_pending` je generovaný sloupec** — do žádného `INSERT INTO projects` nepatří, jinak Postgres celý zápis odmítne. Čekající poptávku poznáš `WHERE lead_pending`, ne porovnáváním `source` a příznaků
+- **Stará adresa se nesmí stát 404:** nová nebo přesunutá obrazovka = řádek v `lib/legacy-redirects.mjs` (odkazy leží v `notifications.link` a ve starých e-mailech)
+- Dotaz nad `projects` nebo `calendar_events` už **nefiltruje podle byznysu** — je jeden. `lead_origin` je štítek pro zobrazení a filtry v UI, ne hranice dat
 - Neon vrací `date`/`timestamptz` jako **`Date` objekt, ne string** — nikdy na tom nevolej `.split()` apod. (opakovaný zdroj pádů v historii)
 - Daně a odvody počítej **jen** přes `lib/tax.ts` + `lib/tax-constants.ts`; daňové termíny jsou pevný kalendář v `lib/tax-deadlines.ts`
 - AI přepis faktury **nikdy neblokuje** ruční uložení — bez `ANTHROPIC_API_KEY` musí appka fungovat dál

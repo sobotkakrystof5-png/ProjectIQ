@@ -53,18 +53,18 @@
 |-------|-----------|
 | Zjistit, na čem se naposledy pracovalo | `memory.md` → Aktuální stav, Changelog |
 | Pochopit, proč je něco udělané „divně" | `memory.md` → Rozhodnutí; pak komentář v kódu / migraci |
-| Upravit zakázky (VIZEON/ALTENO) | `app/actions.ts`, `components/ProjectForm.tsx`, `ProjectCard.tsx`, `lib/business.ts` |
+| Upravit zakázky | `app/actions.ts`, `components/ProjectForm.tsx`, `ProjectCard.tsx`, `lib/lead-origins.ts` |
 | Požadavky klientů z portálu (text/hlas → shrnutí → zadání pro Claude Code) | `lib/{client-requests,client-request-ai,transcribe}.ts`, `app/api/public/portal/[token]/transcribe/`, `app/portal-actions.ts` (`submitClientRequest`), `app/dashboard/pozadavky/`, `components/ClientRequest*.tsx`, migrace 092, R-069, `.claude/security/DECISIONS.md` #018 |
 | Klientský portál | `app/p/[token]/page.tsx`, `app/portal-actions.ts`, `components/Feedback*`, `Booking*` |
 | Rezervace / kalendář / sloty | `lib/prague-time.ts`, `components/SmartCalendar.tsx`, `BookingModal.tsx`, `app/calendar-actions.ts` |
-| Poptávky z webů (vizeon.cz, alteno.cz) | `lib/web-booking.ts`, `app/api/public/booking/**`, `app/api/public/alteno-leads`, `components/BookingCard.tsx` |
+| Poptávky z webů (vizeon.cz, alteno.cz, prvotka.cz) | `lib/lead-origins.ts`, `lib/web-leads.ts`, `app/api/public/booking/**`, `app/api/public/{alteno,prvotka}-leads`, `app/dashboard/poptavky/`, `components/LeadCard.tsx`, migrace 102, R-088 |
 | Hovory / leady | `app/calls-actions.ts`, `components/LeadsTable.tsx`, `lib/portfolio-email.ts`, `app/api/public/{leads,agent-leads}` |
 | Dokončené, dotazník, hodnocení | `app/completed-actions.ts`, `app/h/[token]`, `components/SurveyForm.tsx`, `HodnoceniDashboard.tsx` |
 | Faktury | `app/hub/finance/invoice-actions.ts`, `lib/invoices.ts`, `lib/invoice-ai.ts`, `components/Invoice*`, `docs/FINANCE_SYSTEM_PLAN.md` |
 | Daně | `lib/tax.ts`, `lib/tax-constants.ts`, `lib/tax-deadlines.ts`, `lib/tax-news.ts`, `components/Tax*` |
 | Náklady | `app/costs-actions.ts`, `components/CostsManager.tsx` |
 | Šablony webu | `app/block-templates-actions.ts`, `app/project-blocks-actions.ts`, `components/Block*`, `ProjectBlockList.tsx` |
-| Emaily | `lib/email.ts` (+ `adminEmailFor` v `lib/business.ts`) |
+| Emaily | `lib/email.ts` (+ `adminEmail()` v `lib/lead-origins.ts`) |
 | Veřejná API — auth, rate limit | `lib/api-auth.ts`, `lib/api-rate-limit.ts` |
 | Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `proxy.ts`, `lib/security/`, `.claude/security/` |
 | Crony | `vercel.json`, `app/api/cron/**` |

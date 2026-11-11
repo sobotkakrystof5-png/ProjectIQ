@@ -313,9 +313,12 @@ export do CSV leží mimo repo a Kryštof ho potvrdil.
 **Cíl:** Alteno přestává být druhá firma a stává se zdrojem poptávky. Web alteno.cz funguje dál
 beze změny, přidává se prvotka.cz.
 
-- **Nový `lib/sources.ts`** — jeden seznam zdrojů (`vizeon.cz`, `alteno.cz`, `prvotka.cz`) s klíčem
-  API, názvem, výchozím typem služby a vlastním oknem rate limitu. Přidání estetik.cz = jeden řádek.
+- **Nový `lib/lead-origins.ts`** (R-088 to upřesnil z původního `lib/sources.ts`) — jeden seznam
+  zdrojů (`vizeon.cz`, `alteno.cz`, `prvotka.cz`) s názvem, doménou, hodnotou `source`, výchozím
+  typem služby a vlastním oknem rate limitu. Přidání estetik.cz = jeden řádek.
   Nahrazuje `lib/business.ts` (`BUSINESSES`, `toBusiness`, `projectPath`, `adminEmailFor`).
+  Názvy env proměnných s klíči jsou odděleně v `LEAD_ORIGIN_KEYS` (jen server) — `LEAD_ORIGINS`
+  se importuje i do klientských komponent a názvy secretů nemají co dělat v bundlu prohlížeče.
 - Sekce `/alteno/**` (5 souborů) zaniká, `/alteno/*` trvale přesměruje na `/dashboard/*` —
   uložené odkazy v `notifications.link` a ve starých e-mailech musí dál fungovat.
 - Dva inboxy → **jeden** `/dashboard/poptavky` s filtrem podle zdroje. `is_vizeon_pending()`
@@ -325,8 +328,17 @@ beze změny, přidává se prvotka.cz.
   `app/api/cron/send-reminders/route.ts:146`) — po sloučení už nemají co obcházet.
 - Staré ALTENO zakázky tím **získají fakturaci, dokončení i poznámky schůzek** (dnes je nemají,
   `project-detail-view.tsx:50–53, 81, 196, 340, 414`).
-- **Migrace 102:** `projects.source` dostane hodnoty podle zdroje, `alteno_confirmed` se slije do
-  `vizeon_confirmed`, `business` zůstane (jen se přestane číst) — sloupec se nemaže, aby šlo couvnout.
+- **Migrace 102 (jak nakonec vypadá):** `business` → **`lead_origin`** v `projects`,
+  `calendar_events` a `agent_leads` (+ přejmenované indexy); dvojice `vizeon_confirmed`/
+  `alteno_confirmed` se slila do `lead_confirmed` + `lead_confirmed_at`; funkce
+  `is_vizeon_pending()`/`is_alteno_pending()` nahradil **generovaný sloupec** `lead_pending`
+  s částečným indexem; nové `CHECK` na `lead_origin`, `source` i `status` (ten dodnes žádný neměl)
+  jako `NOT VALID` s validací jen nad čistými daty. Trigger `trg_projects_lead_confirmed` drží čas
+  potvrzení a staré příznaky v souladu — vzniká **až po backfillu**, aby historii neorazítkoval
+  `now()`. Staré sloupce i funkce zůstávají, jejich `DROP` je samostatná migrace až po provozu.
+- ⚠️ **Přejmenování sloupce je jediná nekompatibilní změna celého plánu.** Starý build adminu
+  (produkce dnes běží na `d948400`) čte a zapisuje `business`, takže **102 se smí aplikovat na
+  produkci teprve spolu s nasazením větve** — dřív by rozbila `/dashboard` i veřejná booking API.
 
 **Na co si dát pozor:**
 1. `types/alteno-lead.ts:8` vyžaduje `section: z.literal('alteno')`, `types/booking.ts:22`
@@ -339,10 +351,15 @@ beze změny, přidává se prvotka.cz.
 5. Typ oznámení `alteno_booking` zůstane v `lib/notifications.ts` kvůli starým řádkům.
 6. ALTENO poptávky začnou chodit z `info@vizeon.cz` — ověřit `VIZEON_GMAIL_APP_PASSWORD`.
 
-**Hotovo, když:** testovací poptávka z každého ze tří zdrojů dorazí do jednoho inboxu se správným
-štítkem; stará ALTENO zakázka má záložku Fakturace; `/alteno/rezervace` přesměruje; odkaz ze starého
-oznámení funguje; `git grep 'business'` v adminu vrací jen migrace a `lib/sources.ts`.
-**Riziko:** střední — dotýká se veřejných API, která volají cizí repozitáře.
+**Hotovo 2026-11-11.** Ověřeno: živá poptávka ze všech tří zdrojů (`/api/public/booking`,
+`/api/public/booking/alteno`, `/api/public/alteno-leads`, `/api/public/prvotka-leads`) dorazila do
+jednoho inboxu se správným štítkem domény; stará ALTENO zakázka má Fakturaci, Dokončené i poznámky
+ze schůzek; `/alteno`, `/alteno/rezervace`, `/alteno/new`, `/alteno/[id]?zalozka=…` a
+`/dashboard/vizeon` vracejí 308 na nové adresy (i s dotazem v URL, bez odkazu mimo doménu);
+`npm test` (61 souborů, 739 testů), `npx tsc --noEmit` a `npm run build` zelené; migrace 102
+aplikovaná a dvakrát po sobě vyzkoušená na testovacím Neonu (větev `rd-test`).
+**Neověřeno:** produkce a Preview; obrazovky okem v prohlížeči (procházelo se přes HTTP
+s podepsanou session, heslo adminu agent nemá); skutečné doručení e-mailu z info@vizeon.cz.
 
 ### AD03 — Jedna navigace, jeden přehled (M, bez migrace)
 **Cíl:** konec dvou navigací a tří layoutů. Hub se ruší, jeho zbytek se vlije do hlavního menu.
@@ -816,7 +833,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 |---|---|---|---|---|---|
 | AD00 | Příprava, větev, testovací data, měření | S | — | — | **hotovo 2026-11-11** |
 | AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | **hotovo 2026-11-11** (migrace jen na testu) |
-| AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | nezačato |
+| AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | **hotovo 2026-11-11** (migrace jen na testu) |
 | AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | nezačato |
 | AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | nezačato |
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | nezačato |

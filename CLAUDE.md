@@ -17,7 +17,7 @@ Jedna Next.js aplikace se třemi částmi:
 
 | Část | Cesty | Přihlášení | Stav |
 |---|---|---|---|
-| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/alteno/*`, `/hub/*`, `/login`, `/p/[token]`, `/h/[token]` | NextAuth (jeden admin) | **beze změny**, dokumentace v `docs/admin/AGENTS-ADMIN.md` |
+| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/hub/*`, `/login`, `/p/[token]`, `/h/[token]` | NextAuth (jeden admin) | mění se jen v sezeních AD00–AD18 (R-082), dokumentace v `docs/admin/AGENTS-ADMIN.md` |
 | **ZakazIQ Workspace** (SaaS pro firmy) | `/w/*`, `/api/ws/*`, `/api/public/v1/*` | Clerk | ve výstavbě |
 | **Landing page** | `/` a marketingové stránky v `app/(marketing)/` | žádné | ve výstavbě |
 
@@ -31,7 +31,7 @@ Společná pravidla komunikace, schvalování a začátku/konce sezení jsou v `
 
 Nejdůležitější výtah — základy jsou v `AGENTS.md` → Hranice v repu; úplná pravidla v `docs/AGENTS-REFERENCE.md` → Část B (čti podle úlohy).
 
-- **Admin konzoli neměň.** Žádný soubor v `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/*-actions.ts`, `lib/business.ts` ani stávající `components/*.tsx`. Co se přebírá, zkopíruj do `lib/ws/` nebo `components/ws/` a uprav tam.
+- **Admin konzoli neměň** (mimo sezení modernizace AD00–AD18). Žádný soubor v `app/dashboard`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/*-actions.ts`, `lib/lead-origins.ts` ani stávající `components/*.tsx`. Co se přebírá, zkopíruj do `lib/ws/` nebo `components/ws/` a uprav tam.
 - **Data klientů jsou oddělená.** Každý přístup do schématu `ws` jde přes `requireWorkspace()` a filtruje `account_id`. `account_id` nikdy nečti z formuláře ani z URL.
 - **Vzhled jen podle design systému Dílky** (skill `zakaziq-design-dilky`). Žádné natvrdo zapsané barvy, žádná „AI šablona".
 - **Jednoduchost je tvrdé pravidlo.** Jedna hlavní akce na obrazovce, obyčejná čeština, nastavení volitelné. Texty pro lidi piš podle skillu `zakaziq-ux-texty-cs`.

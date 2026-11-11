@@ -89,7 +89,7 @@ Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin),
 
 | Oblast | Složky | Pravidlo |
 |---|---|---|
-| Admin konzole | `app/dashboard`, `app/alteno`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/api/*` mimo `public/v1`, `ws`, `stripe`, `clerk`, `app/*-actions.ts`, `components/*.tsx` (kořen), `lib/*.ts` (kořen) | **neměnit**. Výjimky jen s výslovným souhlasem v zadání sezení (např. nová stránka `/dashboard/klienti`). |
+| Admin konzole | `app/dashboard`, `app/hub`, `app/(auth)`, `app/p`, `app/h`, `app/api/*` mimo `public/v1`, `ws`, `stripe`, `clerk`, `app/*-actions.ts`, `components/*.tsx` (kořen), `lib/*.ts` (kořen) | **neměnit**. Výjimky jen s výslovným souhlasem v zadání sezení — celý admin se modernizuje v sezeních AD00–AD18 (R-082). Sekce `/alteno` zanikla v AD02. |
 | Landing page | `app/(marketing)/`, `components/marketing/`, `app/robots.ts`, `app/sitemap.ts` | nová (`app/page.tsx` smazán, R-034). SEO (S05, R-055): `components/marketing/seo.ts` (adresa webu, metadata, JSON-LD), OG obrázek `app/(marketing)/opengraph-image.tsx` + písma `_og/`, ikony `icon.svg`/`apple-icon.png` (Next jim v route group přidá koncovku, pro schéma je `public/zakaziq-logo.png`), noindex hlavičkou `X-Robots-Tag` v `next.config.mjs`. Nová veřejná stránka = canonical + řádek v `app/sitemap.ts` |
 | Workspace | `app/w/`, `components/ws/`, `lib/ws/` | nová |
 | Veřejné části Workspace | `app/r/` (objednávací stránka `/r/[slug]`), `app/embed/` (widget `/embed/[slug].js`), `app/z/` (klientský portál `/z/[token]`) | nové (R-016) |
@@ -172,6 +172,7 @@ TEAMS_MEETING_LINK=        # Teams meeting link
 
 VIZEON_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/booking (vizeon.cz)
 ALTENO_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/booking/alteno (alteno.cz)
+PRVOTKA_LEAD_WEBHOOK_SECRET= # Podpis pro /api/public/prvotka-leads (prvotka.cz, AD02)
 ```
 
 Přidáváš novou env proměnnou → zapiš ji do `.env.example` **i** do tabulky výše a připomeň uživateli, že ji musí nastavit ve Vercelu.
@@ -582,7 +583,7 @@ Jak je systém v kódu (S01, R-027):
 
 1. `npm run build` a `npm test` prochází. Když běží `next dev`, build přes `npm run build:check` (Next 16 má výstup dev serveru zvlášť v `.next/dev`).
 2. Nové pravidlo (oddělení účtů, razítka, segmenty, webhooky) má test ve Vitestu.
-3. Admin stránky `/login`, `/dashboard`, `/alteno`, `/hub`, `/p/[token]` fungují jako předtím.
+3. Admin stránky `/login`, `/dashboard`, `/hub`, `/p/[token]` fungují jako předtím.
 4. UI změna: porovnat s mockupem a s pravidly Dílky, zkontrolovat šířku telefonu.
 5. CI (`.github/workflows/ci.yml`) pouští na `main`, `workspace`, `ws/**` a v PR `npx tsc --noEmit` a `npm test` (Node 24, bez secrets a DB); build dělá Vercel u každého pushe. `security.yml` běží na stejných větvích.
 6. Testy nemíchají pevná data s `now()`: termín „teď + pár dní“ narazí na pevný termín, až ten den přijde (2026-11-03 tak spadl `ws-email.test.ts`). Pevná data, nebo `now()` daleko od nich; úklid nastavení v `finally`.
