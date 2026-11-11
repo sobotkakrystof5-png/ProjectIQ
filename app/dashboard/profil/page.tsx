@@ -236,8 +236,8 @@ export default async function ProfilPage() {
         <SectionHeader icon={<BarChart3 size={14} strokeWidth={1.5} />} title="Klíčové metriky" />
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatCard
-            icon={<Briefcase size={16} strokeWidth={1.5} className="text-brand-600" />}
-            iconBg="bg-brand-50"
+            icon={<Briefcase size={16} strokeWidth={1.5} className="text-navy-600" />}
+            iconBg="bg-navy-50"
             label="Aktivní zakázky"
             value={String(activeCount)}
             sub={`z ${projects.total} celkem`}
@@ -388,7 +388,7 @@ export default async function ProfilPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Nadcházející</span>
-              <span className="text-sm font-semibold tabular-nums text-brand-700">{consultations.upcoming}</span>
+              <span className="text-sm font-semibold tabular-nums text-navy-700">{consultations.upcoming}</span>
             </div>
           </div>
         </div>
@@ -449,7 +449,7 @@ export default async function ProfilPage() {
             <a
               key={href}
               href={href}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-brand-50 hover:border-brand-200 transition-colors"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-navy-50 hover:border-navy-200 transition-colors"
             >
               {icon}
               <span className="truncate">{label}</span>

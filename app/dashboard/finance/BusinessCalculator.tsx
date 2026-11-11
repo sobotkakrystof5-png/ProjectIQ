@@ -75,8 +75,8 @@ export function BusinessCalculator({ overview }: Props) {
     <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center">
-            <Calculator size={15} className="text-brand-600" strokeWidth={1.5} />
+          <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+            <Calculator size={15} className="text-navy-600" strokeWidth={1.5} />
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">Výkonnost podnikání</h2>
@@ -120,7 +120,7 @@ export function BusinessCalculator({ overview }: Props) {
       {/* Co kdyby simulace */}
       <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <TrendingUp size={14} strokeWidth={1.5} className="text-brand-600" />
+          <TrendingUp size={14} strokeWidth={1.5} className="text-navy-600" />
           <h3 className="text-sm font-semibold text-foreground">Co kdybych vydělal navíc...</h3>
         </div>
 
@@ -134,7 +134,7 @@ export function BusinessCalculator({ overview }: Props) {
               value={extraAmount}
               onChange={e => setExtraAmount(e.target.value)}
               placeholder="0"
-              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500"
             />
           </div>
           <div className="flex gap-1.5 items-end">
@@ -145,7 +145,7 @@ export function BusinessCalculator({ overview }: Props) {
                 onClick={() => setExtraType(t)}
                 className={`h-[38px] px-3 text-xs font-medium rounded-lg border transition-colors ${
                   extraType === t
-                    ? 'bg-brand-700 text-white border-brand-700'
+                    ? 'bg-navy-700 text-white border-navy-700'
                     : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
                 }`}
               >

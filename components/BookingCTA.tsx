@@ -17,7 +17,7 @@ export function BookingCTA({ token, bookedSlots }: BookingCTAProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-2 border border-brand-300 text-brand-800 text-sm font-semibold py-2.5 rounded-xl hover:bg-brand-50 transition-colors"
+        className="w-full flex items-center justify-center gap-2 border border-navy-300 text-navy-800 text-sm font-semibold py-2.5 rounded-xl hover:bg-navy-50 transition-colors"
       >
         <CalendarDays size={15} strokeWidth={1.5} />
         Konzultace o aktuálním stavu projektu

@@ -11,9 +11,9 @@ export function ProgressBar({ value, className, showLabel = true }: ProgressBarP
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <div className="flex-1 h-1.5 bg-brand-100 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-navy-100 rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full bg-brand-700 transition-all duration-500"
+          className="h-full rounded-full bg-navy-700 transition-all duration-500"
           style={{ width: `${clamped}%` }}
         />
       </div>

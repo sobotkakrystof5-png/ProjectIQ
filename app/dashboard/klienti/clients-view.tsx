@@ -63,8 +63,8 @@ export function ClientsView({
         </div>
       ) : clients.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center bg-white border border-border rounded-2xl">
-          <div className="w-14 h-14 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
-            <Building2 size={24} strokeWidth={1.5} className="text-brand-500" />
+          <div className="w-14 h-14 bg-navy-50 rounded-2xl flex items-center justify-center mb-4">
+            <Building2 size={24} strokeWidth={1.5} className="text-navy-500" />
           </div>
           <p className="font-medium text-foreground mb-1">Zatím žádný klient</p>
           <p className="text-sm text-muted-foreground max-w-xs">

@@ -39,7 +39,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
       }}
-      className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-100 px-2.5 py-1.5 rounded-lg hover:bg-brand-100 transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-navy-700 bg-navy-50 border border-navy-100 px-2.5 py-1.5 rounded-lg hover:bg-navy-100 transition-colors"
     >
       {copied ? <Check size={13} strokeWidth={1.5} /> : <Copy size={13} strokeWidth={1.5} />}
       {copied ? 'Zkopírováno' : label}
@@ -79,7 +79,7 @@ function SurveyResult({
     <div className="space-y-4 bg-slate-50/60 border-t border-border px-5 py-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-brand-800">{avg.toFixed(1)}</span>
+          <span className="text-2xl font-bold text-navy-800">{avg.toFixed(1)}</span>
           <span className="text-sm text-muted-foreground">/ 5 průměr</span>
         </div>
         <div className="flex items-center gap-2">
@@ -112,7 +112,7 @@ function SurveyResult({
         <div className="bg-white border border-border rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <Quote size={13} strokeWidth={1.5} className="text-brand-500" />
+              <Quote size={13} strokeWidth={1.5} className="text-navy-500" />
               Reference
             </div>
             <CopyButton text={survey.reference_text} label="Kopírovat" />
@@ -162,8 +162,8 @@ export function HodnoceniDashboard({ projects, surveys }: Props) {
   if (projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-14 h-14 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
-          <Inbox size={24} strokeWidth={1.5} className="text-brand-400" />
+        <div className="w-14 h-14 bg-navy-50 rounded-2xl flex items-center justify-center mb-4">
+          <Inbox size={24} strokeWidth={1.5} className="text-navy-400" />
         </div>
         <p className="font-medium text-foreground mb-1">Zatím žádné dokončené zakázky</p>
         <p className="text-sm text-muted-foreground max-w-xs">
@@ -238,7 +238,7 @@ export function HodnoceniDashboard({ projects, surveys }: Props) {
                         href={getSurveyUrl(project.survey_token)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-brand-800 px-2.5 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-navy-800 px-2.5 py-1.5 rounded-lg hover:bg-navy-50 transition-colors"
                       >
                         <Link2 size={13} strokeWidth={1.5} />
                         Otevřít

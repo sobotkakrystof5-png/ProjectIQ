@@ -28,7 +28,7 @@ export default async function PortalClientPage({ params }: { params: Promise<{ i
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Link href="/dashboard/klientsky-prostor" aria-label="Zpět na klienty" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-brand-50">
+        <Link href="/dashboard/klientsky-prostor" aria-label="Zpět na klienty" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-navy-50">
           <ArrowLeft size={18} strokeWidth={1.5} />
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{detail.client.name}</h1>

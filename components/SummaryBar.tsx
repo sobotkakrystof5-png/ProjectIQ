@@ -21,8 +21,8 @@ export function SummaryBar({ projects }: SummaryBarProps) {
   return (
     <div className="grid grid-cols-3 gap-3">
       <StatCard
-        icon={<Briefcase size={17} strokeWidth={1.5} className="text-brand-600" />}
-        iconBg="bg-brand-50"
+        icon={<Briefcase size={17} strokeWidth={1.5} className="text-navy-600" />}
+        iconBg="bg-navy-50"
         label="Aktivní zakázky"
         value={String(active)}
       />

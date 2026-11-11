@@ -117,8 +117,8 @@ export function TaxNewsBlock({ data }: { data: TaxNewsData }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center">
-            <Newspaper size={15} className="text-brand-600" strokeWidth={1.5} />
+          <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+            <Newspaper size={15} className="text-navy-600" strokeWidth={1.5} />
           </div>
           <div>
             <h3 className="text-base font-semibold text-foreground flex items-center gap-2">

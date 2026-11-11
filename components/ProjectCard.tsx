@@ -19,11 +19,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <Link
       href={projectPath(project.id)}
-      className="group block bg-white border border-border rounded-xl p-5 hover:border-brand-200 hover:shadow-md transition-all duration-200"
+      className="group block bg-white border border-border rounded-xl p-5 hover:border-navy-200 hover:shadow-md transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <h3 className="font-semibold text-foreground truncate transition-colors group-hover:text-brand-800">
+          <h3 className="font-semibold text-foreground truncate transition-colors group-hover:text-navy-800">
             {project.client_name}
           </h3>
           {project.description && (

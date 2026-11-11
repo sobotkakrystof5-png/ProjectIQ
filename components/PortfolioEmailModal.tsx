@@ -57,7 +57,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
 
   const inputCls =
     'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground ' +
-    'focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow bg-white'
+    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white'
 
   return (
     <AnimatePresence>
@@ -87,7 +87,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
             >
               <div className="brand-gradient px-5 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <MessageSquareText size={16} strokeWidth={1.5} className="text-brand-200" />
+                  <MessageSquareText size={16} strokeWidth={1.5} className="text-navy-200" />
                   <span className="text-white font-semibold text-sm">
                     {step === 'edit' ? 'Napsat jinou zprávu' : 'Náhled zprávy'}
                   </span>
@@ -95,7 +95,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="p-1.5 rounded-lg text-brand-200 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
                   aria-label="Zavřít"
                 >
                   <X size={15} strokeWidth={1.5} />

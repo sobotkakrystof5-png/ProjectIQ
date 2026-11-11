@@ -121,7 +121,7 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(item.id); if (e.key === 'Escape') setEditingId(null) }}
                   autoFocus
-                  className="flex-1 px-2.5 py-1.5 text-sm border border-brand-400 rounded-lg bg-white focus:outline-none"
+                  className="flex-1 px-2.5 py-1.5 text-sm border border-navy-400 rounded-lg bg-white focus:outline-none"
                 />
                 <button type="button" onClick={() => handleSaveEdit(item.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
                   <Check size={14} strokeWidth={1.5} />
@@ -175,13 +175,13 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
           onChange={e => setNewText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
           placeholder="Přidat nápad na zlepšení…"
-          className="flex-1 px-3.5 py-2 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+          className="flex-1 px-3.5 py-2 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={adding || !newText.trim()}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-40 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-40 transition-colors"
         >
           <Plus size={14} strokeWidth={1.5} />
           Přidat

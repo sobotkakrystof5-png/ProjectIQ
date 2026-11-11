@@ -80,10 +80,10 @@ function NotificationItem({ n, onRead }: { n: Notification; onRead: (id: string)
       onClick={handleClick}
       className={cn(
         'flex items-start gap-3 px-4 py-3.5 rounded-xl border transition-colors',
-        n.link ? 'cursor-pointer hover:bg-brand-50/50' : 'cursor-default',
+        n.link ? 'cursor-pointer hover:bg-navy-50/50' : 'cursor-default',
         n.read
           ? 'bg-white border-border'
-          : 'bg-brand-50/30 border-brand-200',
+          : 'bg-navy-50/30 border-navy-200',
       )}
     >
       <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5', meta.color)}>
@@ -96,7 +96,7 @@ function NotificationItem({ n, onRead }: { n: Notification; onRead: (id: string)
             {n.title}
           </p>
           <div className="flex items-center gap-1.5 shrink-0">
-            {!n.read && <span className="w-2 h-2 rounded-full bg-brand-500 shrink-0" />}
+            {!n.read && <span className="w-2 h-2 rounded-full bg-navy-500 shrink-0" />}
             <span className="text-[11px] text-muted-foreground whitespace-nowrap">{timeAgo(n.created_at)}</span>
           </div>
         </div>
@@ -143,8 +143,8 @@ export function NotificationList({ notifications }: { notifications: Notificatio
   if (notifications.length === 0) {
     return (
       <div className="bg-white border border-border rounded-2xl p-12 text-center">
-        <div className="w-12 h-12 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-          <Bell size={20} strokeWidth={1.5} className="text-brand-400" />
+        <div className="w-12 h-12 bg-navy-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <Bell size={20} strokeWidth={1.5} className="text-navy-400" />
         </div>
         <p className="font-medium text-foreground">Zatím žádná oznámení</p>
         <p className="text-sm text-muted-foreground mt-1">Aktivity klientů se zobrazí zde</p>
@@ -163,7 +163,7 @@ export function NotificationList({ notifications }: { notifications: Notificatio
             type="button"
             onClick={handleMarkAllRead}
             disabled={isPending}
-            className="flex items-center gap-1.5 text-sm font-medium text-brand-800 hover:text-brand-600 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 text-sm font-medium text-navy-800 hover:text-navy-600 disabled:opacity-50 transition-colors"
           >
             <CheckCheck size={15} strokeWidth={1.5} />
             Označit vše jako přečtené

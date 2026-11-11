@@ -50,6 +50,9 @@ const config: Config = {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
         },
+        // Dočasný alias (AD04): žádná třída `brand-*` v repu nezbyla, paleta drží jen
+        // kvůli pojistce lib/__tests__/palette-equality.test.ts. Maže se v AD18
+        // spolu s `.brand-gradient`.
         brand: {
           50:  '#eef2fb',
           100: '#dce7f7',

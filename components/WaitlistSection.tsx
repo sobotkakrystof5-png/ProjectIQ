@@ -93,10 +93,10 @@ export function WaitlistSection({ projectId, entries, appUrl, dbUrl }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <StatCard
-          icon={<Users size={15} strokeWidth={1.5} className="text-brand-600" />}
+          icon={<Users size={15} strokeWidth={1.5} className="text-navy-600" />}
           label="Celkem"
           value={total}
-          color="bg-brand-50 border-brand-100"
+          color="bg-navy-50 border-navy-100"
         />
         <StatCard
           icon={<Clock size={15} strokeWidth={1.5} className="text-amber-600" />}
@@ -181,7 +181,7 @@ export function WaitlistSection({ projectId, entries, appUrl, dbUrl }: Props) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Hledat email nebo jméno…"
-            className="w-full pl-8 pr-3 py-2 text-sm border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
           />
         </div>
         <div className="flex items-center gap-2">

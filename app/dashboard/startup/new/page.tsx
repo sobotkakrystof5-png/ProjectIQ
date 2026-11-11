@@ -67,7 +67,7 @@ export default function NewStartupPage() {
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="např. TaskFlow AI"
-            className="w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+            className="w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
             autoFocus
           />
         </div>
@@ -80,7 +80,7 @@ export default function NewStartupPage() {
           <select
             value={segment}
             onChange={e => setSegment(e.target.value)}
-            className="w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+            className="w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
           >
             <option value="">— Vyber kategorii —</option>
             {STARTUP_SEGMENTS.map(s => (
@@ -94,7 +94,7 @@ export default function NewStartupPage() {
               value={customSegment}
               onChange={e => setCustomSegment(e.target.value)}
               placeholder="Zadej vlastní kategorii"
-              className="mt-2 w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+              className="mt-2 w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               autoFocus
             />
           )}
@@ -110,7 +110,7 @@ export default function NewStartupPage() {
             onChange={e => setProblem(e.target.value)}
             rows={4}
             placeholder="Popiš konkrétní problém nebo potřebu, na kterou projekt reaguje…"
-            className="w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors resize-none"
+            className="w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors resize-none"
           />
         </div>
 
@@ -124,7 +124,7 @@ export default function NewStartupPage() {
             type="button"
             onClick={() => setMonetization(v => !v)}
             className={`relative w-11 h-6 rounded-full transition-colors ${
-              monetization ? 'bg-brand-600' : 'bg-muted-foreground/20'
+              monetization ? 'bg-navy-600' : 'bg-muted-foreground/20'
             }`}
           >
             <span
@@ -145,7 +145,7 @@ export default function NewStartupPage() {
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             {pending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
             {pending ? 'Vytváří se…' : 'Vytvořit projekt'}

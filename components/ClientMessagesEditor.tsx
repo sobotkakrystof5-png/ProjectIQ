@@ -42,8 +42,8 @@ export function ClientMessagesEditor({ projectId, publicToken, messages }: Props
       {/* Existing messages */}
       {messages.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-3">
-            <MessageSquarePlus size={18} strokeWidth={1.5} className="text-brand-500" />
+          <div className="w-10 h-10 rounded-full bg-navy-50 flex items-center justify-center mb-3">
+            <MessageSquarePlus size={18} strokeWidth={1.5} className="text-navy-500" />
           </div>
           <p className="text-sm text-muted-foreground">Zatím žádné zprávy.</p>
           <p className="text-xs text-muted-foreground mt-0.5">Napiš první vzkaz klientovi níže.</p>
@@ -53,7 +53,7 @@ export function ClientMessagesEditor({ projectId, publicToken, messages }: Props
           {messages.map(msg => (
             <li
               key={msg.id}
-              className="group flex items-start gap-3 bg-brand-50 border border-brand-100 rounded-xl px-4 py-3"
+              className="group flex items-start gap-3 bg-navy-50 border border-navy-100 rounded-xl px-4 py-3"
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{msg.content}</p>
@@ -87,7 +87,7 @@ export function ClientMessagesEditor({ projectId, publicToken, messages }: Props
           rows={3}
           className={cn(
             'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground',
-            'focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow bg-white resize-none'
+            'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white resize-none'
           )}
         />
         <div className="flex justify-end">

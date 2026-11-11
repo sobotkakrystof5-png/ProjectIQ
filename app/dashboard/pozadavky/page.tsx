@@ -81,7 +81,7 @@ export default async function PozadavkyPage({ searchParams }: PageProps) {
             href={tab.href}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab.active ? 'bg-brand-50 text-brand-800' : 'text-muted-foreground hover:bg-brand-50',
+              tab.active ? 'bg-navy-50 text-navy-800' : 'text-muted-foreground hover:bg-navy-50',
             )}
           >
             {tab.label}

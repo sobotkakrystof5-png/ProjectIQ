@@ -106,7 +106,7 @@ export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: A
 
   const inputCls =
     'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground ' +
-    'focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow bg-white'
+    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white'
 
   return (
     <AnimatePresence>
@@ -137,13 +137,13 @@ export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: A
               {/* Header */}
               <div className="brand-gradient px-5 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <CalendarPlus size={16} strokeWidth={1.5} className="text-brand-200" />
+                  <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-200" />
                   <span className="text-white font-semibold text-sm">Přidat do kalendáře</span>
                 </div>
                 <button
                   type="button"
                   onClick={resetAndClose}
-                  className="p-1.5 rounded-lg text-brand-200 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
                   aria-label="Zavřít"
                 >
                   <X size={15} strokeWidth={1.5} />
@@ -162,19 +162,19 @@ export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: A
                       className={cn(
                         'flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all duration-150',
                         eventType === id
-                          ? 'border-brand-400 bg-brand-50'
-                          : 'border-border bg-white hover:border-brand-200 hover:bg-brand-50/50',
+                          ? 'border-navy-400 bg-navy-50'
+                          : 'border-border bg-white hover:border-navy-200 hover:bg-navy-50/50',
                       )}
                     >
                       <div className="flex items-center gap-1.5">
                         <Icon
                           size={13}
                           strokeWidth={1.5}
-                          className={eventType === id ? 'text-brand-700' : 'text-muted-foreground'}
+                          className={eventType === id ? 'text-navy-700' : 'text-muted-foreground'}
                         />
                         <span className={cn(
                           'text-xs font-semibold',
-                          eventType === id ? 'text-brand-800' : 'text-foreground',
+                          eventType === id ? 'text-navy-800' : 'text-foreground',
                         )}>
                           {label}
                         </span>

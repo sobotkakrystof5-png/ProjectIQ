@@ -42,7 +42,7 @@ function SlotDetailModal({ slot, clientName, onClose }: { slot: ConsultationSlot
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-brand-200 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
             >
               <X size={15} strokeWidth={1.5} />
             </button>
@@ -95,8 +95,8 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
   if (slots.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
-        <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-3">
-          <CalendarDays size={18} strokeWidth={1.5} className="text-brand-400" />
+        <div className="w-10 h-10 rounded-full bg-navy-50 flex items-center justify-center mb-3">
+          <CalendarDays size={18} strokeWidth={1.5} className="text-navy-400" />
         </div>
         <p className="text-sm text-muted-foreground">Žádné rezervované konzultace.</p>
       </div>
@@ -134,14 +134,14 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
           type="button"
           onClick={prevMonth}
           disabled={!canPrev}
-          className="p-1.5 rounded-lg text-muted-foreground hover:bg-brand-50 hover:text-brand-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft size={16} strokeWidth={1.5} />
         </button>
         <span className="text-sm font-semibold text-foreground">
           {MONTHS_CZ[viewMonth - 1]} {viewYear}
         </span>
-        <button type="button" onClick={nextMonth} className="p-1.5 rounded-lg text-muted-foreground hover:bg-brand-50 hover:text-brand-800 transition-colors">
+        <button type="button" onClick={nextMonth} className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 transition-colors">
           <ChevronRight size={16} strokeWidth={1.5} />
         </button>
       </div>
@@ -171,13 +171,13 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
               key={i}
               className={cn(
                 'min-h-[52px] p-1 rounded-lg border transition-colors',
-                daySlots.length > 0 ? 'border-brand-200 bg-brand-50' : 'border-transparent bg-transparent',
-                isToday && 'ring-1 ring-brand-300',
+                daySlots.length > 0 ? 'border-navy-200 bg-navy-50' : 'border-transparent bg-transparent',
+                isToday && 'ring-1 ring-navy-300',
               )}
             >
               <span className={cn(
                 'block text-xs font-medium text-center mb-0.5',
-                isToday ? 'text-brand-700' : 'text-muted-foreground',
+                isToday ? 'text-navy-700' : 'text-muted-foreground',
               )}>
                 {dayNum}
               </span>
@@ -188,7 +188,7 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
                     key={slot.id}
                     type="button"
                     onClick={() => setDetailSlot(slot)}
-                    className="w-full text-left text-[10px] font-semibold bg-brand-700 text-white rounded px-1 py-0.5 mb-0.5 truncate hover:bg-brand-800 transition-colors"
+                    className="w-full text-left text-[10px] font-semibold bg-navy-700 text-white rounded px-1 py-0.5 mb-0.5 truncate hover:bg-navy-800 transition-colors"
                     title={`${p.hour}:00 — ${CHANNEL_LABELS[slot.channel as ConsultationChannel] ?? slot.channel}`}
                   >
                     {p.hour}:00
@@ -212,7 +212,7 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
               key={slot.id}
               type="button"
               onClick={() => setDetailSlot(slot)}
-              className="w-full text-left flex items-start gap-3 bg-white border border-border rounded-xl px-4 py-3 hover:border-brand-200 hover:bg-brand-50 transition-colors"
+              className="w-full text-left flex items-start gap-3 bg-white border border-border rounded-xl px-4 py-3 hover:border-navy-200 hover:bg-navy-50 transition-colors"
             >
               <div className="w-9 h-9 rounded-lg brand-gradient flex flex-col items-center justify-center shrink-0">
                 {(() => {

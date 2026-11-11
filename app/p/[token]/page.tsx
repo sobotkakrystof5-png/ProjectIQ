@@ -85,16 +85,16 @@ export default async function ClientPortalPage(props: PageProps) {
             <div className="brand-gradient px-4 pt-6 pb-5 sm:px-6 sm:pt-7 sm:pb-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-medium text-brand-200 uppercase tracking-wider mb-1.5">Projekt pro</p>
+                  <p className="text-xs font-medium text-navy-200 uppercase tracking-wider mb-1.5">Projekt pro</p>
                   <h1 className="text-2xl font-semibold text-white">{project.client_name}</h1>
                   {project.description && (
-                    <p className="text-sm text-brand-100 mt-1.5 leading-relaxed">{project.description}</p>
+                    <p className="text-sm text-navy-100 mt-1.5 leading-relaxed">{project.description}</p>
                   )}
                 </div>
                 <div className="shrink-0 mt-0.5">
                   <StatusBadge
                     status={project.status as ProjectStatus}
-                    className="bg-white/95 text-brand-800 ring-white/60 font-semibold text-sm px-3 py-1 shadow-sm"
+                    className="bg-white/95 text-navy-800 ring-white/60 font-semibold text-sm px-3 py-1 shadow-sm"
                   />
                 </div>
               </div>
@@ -106,9 +106,9 @@ export default async function ClientPortalPage(props: PageProps) {
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Proces projektu</span>
-                  <span className="text-sm font-bold text-brand-800">{project.progress}%</span>
+                  <span className="text-sm font-bold text-navy-800">{project.progress}%</span>
                 </div>
-                <div className="h-2.5 bg-brand-50 rounded-full overflow-hidden border border-brand-100">
+                <div className="h-2.5 bg-navy-50 rounded-full overflow-hidden border border-navy-100">
                   <div
                     className="h-full rounded-full brand-gradient transition-all duration-700"
                     style={{ width: `${project.progress}%` }}
@@ -141,7 +141,7 @@ export default async function ClientPortalPage(props: PageProps) {
               {timeline.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp size={13} strokeWidth={1.5} className="text-brand-500" />
+                    <TrendingUp size={13} strokeWidth={1.5} className="text-navy-500" />
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       {activityRows.length > 0 ? 'Co se dělo' : 'Historie postupu'}
                     </p>
@@ -150,15 +150,15 @@ export default async function ClientPortalPage(props: PageProps) {
                     {timeline.map((entry, i) => (
                       <li key={`${entry.type}-${entry.id}`} className="relative flex gap-3">
                         <div className="flex flex-col items-center">
-                          <div className="w-2 h-2 rounded-full bg-brand-600 mt-1.5 shrink-0" />
+                          <div className="w-2 h-2 rounded-full bg-navy-600 mt-1.5 shrink-0" />
                           {i < timeline.length - 1 && (
-                            <div className="w-px flex-1 bg-brand-100 mt-1" />
+                            <div className="w-px flex-1 bg-navy-100 mt-1" />
                           )}
                         </div>
                         {entry.type === 'progress' ? (
                           <div className="pb-3 flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
+                              <span className="text-xs font-semibold text-navy-700 bg-navy-50 border border-navy-100 rounded-full px-2 py-0.5">
                                 {entry.progress.progress_from}% → {entry.progress.progress_to}%
                               </span>
                               <span className="text-xs text-muted-foreground">{formatDate(entry.progress.created_at)}</span>
@@ -168,7 +168,7 @@ export default async function ClientPortalPage(props: PageProps) {
                         ) : (
                           <div className="pb-3 flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 rounded-full px-2 py-0.5">
+                              <span className="text-xs font-semibold text-navy-700 bg-navy-50 border border-navy-100 rounded-full px-2 py-0.5">
                                 {ACTIVITY_KIND_LABELS[entry.activity.kind]}
                               </span>
                               <span className="text-xs text-muted-foreground">{formatDate(entry.activity.published_at)}</span>
@@ -187,12 +187,12 @@ export default async function ClientPortalPage(props: PageProps) {
               {messages.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare size={13} strokeWidth={1.5} className="text-brand-500" />
+                    <MessageSquare size={13} strokeWidth={1.5} className="text-navy-500" />
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vzkazy od manažera</p>
                   </div>
                   <ul className="space-y-2.5">
                     {messages.map(msg => (
-                      <li key={msg.id} className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
+                      <li key={msg.id} className="bg-navy-50 border border-navy-100 rounded-xl px-4 py-3">
                         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                         <p className="text-xs text-muted-foreground mt-1.5">
                           {formatDate(msg.created_at)}
@@ -207,13 +207,13 @@ export default async function ClientPortalPage(props: PageProps) {
               <div className="flex flex-wrap gap-4 pt-4 border-t border-border">
                 {project.deadline && (
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Calendar size={14} strokeWidth={1.5} className="text-brand-500" />
+                    <Calendar size={14} strokeWidth={1.5} className="text-navy-500" />
                     <span>Deadline: <strong className="text-foreground font-medium">{formatDate(project.deadline)}</strong></span>
                   </div>
                 )}
                 {project.updated_at && (
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <RefreshCw size={14} strokeWidth={1.5} className="text-brand-500" />
+                    <RefreshCw size={14} strokeWidth={1.5} className="text-navy-500" />
                     <span>Aktualizováno: <strong className="text-foreground font-medium">{formatDate(project.updated_at)}</strong></span>
                   </div>
                 )}
@@ -227,7 +227,7 @@ export default async function ClientPortalPage(props: PageProps) {
                 {/* Feedback */}
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center gap-2 mb-3">
-                    <Star size={13} strokeWidth={1.5} className="text-brand-500" />
+                    <Star size={13} strokeWidth={1.5} className="text-navy-500" />
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vaše zpětná vazba</p>
                   </div>
                   <FeedbackBlock token={params.token} />
@@ -251,7 +251,7 @@ export default async function ClientPortalPage(props: PageProps) {
             </div>
             <div className="flex flex-col leading-tight">
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Powered by</span>
-              <span className="text-sm font-bold text-brand-800 leading-none">ZakazIQ</span>
+              <span className="text-sm font-bold text-navy-800 leading-none">ZakazIQ</span>
             </div>
           </div>
         </div>

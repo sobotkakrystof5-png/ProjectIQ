@@ -377,13 +377,13 @@ function EventDetailModal({
                   </div>
 
                   {lead.phone && (
-                    <a href={`tel:${lead.phone}`} className="flex items-center gap-2.5 text-brand-700 hover:underline">
+                    <a href={`tel:${lead.phone}`} className="flex items-center gap-2.5 text-navy-700 hover:underline">
                       <Phone size={14} strokeWidth={1.5} className="shrink-0" />
                       {lead.phone}
                     </a>
                   )}
                   {lead.email && (
-                    <a href={`mailto:${lead.email}`} className="flex items-center gap-2.5 text-brand-700 hover:underline break-all">
+                    <a href={`mailto:${lead.email}`} className="flex items-center gap-2.5 text-navy-700 hover:underline break-all">
                       <Mail size={14} strokeWidth={1.5} className="shrink-0" />
                       {lead.email}
                     </a>
@@ -448,7 +448,7 @@ function EventDetailModal({
               {event.meta.clientEmail && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">E-mail klienta</p>
-                  <a href={`mailto:${event.meta.clientEmail}`} className="text-brand-700 hover:underline">
+                  <a href={`mailto:${event.meta.clientEmail}`} className="text-navy-700 hover:underline">
                     {event.meta.clientEmail}
                   </a>
                 </div>
@@ -482,7 +482,7 @@ function EventDetailModal({
               {event.meta.projectId && event.kind === 'consultation' && (
                 <a
                   href={`/dashboard/${event.meta.projectId}`}
-                  className="flex-1 flex items-center justify-center text-sm font-semibold text-brand-800 border border-brand-200 py-2.5 rounded-xl hover:bg-brand-50 transition-colors"
+                  className="flex-1 flex items-center justify-center text-sm font-semibold text-navy-800 border border-navy-200 py-2.5 rounded-xl hover:bg-navy-50 transition-colors"
                 >
                   Detail zakázky
                 </a>
@@ -491,7 +491,7 @@ function EventDetailModal({
               {event.kind === 'call' && (
                 <a
                   href={lead ? `/dashboard/calls?lead=${lead.id}` : '/dashboard/calls'}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-800 border border-brand-200 py-2.5 rounded-xl hover:bg-brand-50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-navy-800 border border-navy-200 py-2.5 rounded-xl hover:bg-navy-50 transition-colors"
                 >
                   <ExternalLink size={13} strokeWidth={1.5} />
                   Otevřít hovory
@@ -569,7 +569,7 @@ function MonthView({
             <div
               key={i}
               className={cn(
-                'bg-white min-h-[60px] sm:min-h-[90px] p-1 sm:p-1.5 flex flex-col cursor-pointer hover:bg-brand-50/40 transition-colors group',
+                'bg-white min-h-[60px] sm:min-h-[90px] p-1 sm:p-1.5 flex flex-col cursor-pointer hover:bg-navy-50/40 transition-colors group',
                 isWeekend && 'bg-gray-50/30',
               )}
               onClick={() => onSelectDay(year, month, dayNum)}
@@ -579,8 +579,8 @@ function MonthView({
                 'text-xs font-semibold self-end w-6 h-6 flex items-center justify-center rounded-full mb-1 transition-colors',
                 isToday
                   ? 'brand-gradient text-white shadow-sm'
-                  : 'text-foreground group-hover:text-brand-800',
-                isWeekend && !isToday && 'text-brand-500',
+                  : 'text-foreground group-hover:text-navy-800',
+                isWeekend && !isToday && 'text-navy-500',
               )}>
                 {dayNum}
               </span>
@@ -659,7 +659,7 @@ function WeekView({
             return (
               <div key={i} className={cn(
                 'text-center py-2 border-l border-border',
-                isToday && 'bg-brand-50',
+                isToday && 'bg-navy-50',
               )}>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase">
                   {WEEKDAYS_SHORT_CZ[toMondayFirst(d.getDay())]}
@@ -730,14 +730,14 @@ function WeekView({
               return (
                 <div
                   key={di}
-                  className={cn('border-l border-border relative', isToday && 'bg-brand-50/30')}
+                  className={cn('border-l border-border relative', isToday && 'bg-navy-50/30')}
                   style={{ height: `${HOUR_PX * hours.length}px` }}
                 >
                   {/* Hour grid lines + click zones */}
                   {hours.map((h, hi) => (
                     <div
                       key={h}
-                      className="absolute w-full border-t border-gray-100 hover:bg-brand-50/60 cursor-pointer transition-colors"
+                      className="absolute w-full border-t border-gray-100 hover:bg-navy-50/60 cursor-pointer transition-colors"
                       style={{ top: `${hi * HOUR_PX}px`, height: `${HOUR_PX}px` }}
                       onClick={() => onClickSlot(dateStr, h)}
                       title={`Přidat ${h}:00`}
@@ -840,7 +840,7 @@ function DayView({
             {hours.map((h, hi) => (
               <div
                 key={h}
-                className="absolute w-full flex items-start border-t border-gray-100 hover:bg-brand-50/40 cursor-pointer transition-colors"
+                className="absolute w-full flex items-start border-t border-gray-100 hover:bg-navy-50/40 cursor-pointer transition-colors"
                 style={{ top: `${hi * HOUR_PX}px`, height: `${HOUR_PX}px` }}
                 onClick={() => onClickSlot(dateStr, h)}
               >
@@ -1045,21 +1045,21 @@ export function SmartCalendar({
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-brand-50 hover:text-brand-800 hover:border-brand-200 transition-colors"
+            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-navy-50 hover:text-navy-800 hover:border-navy-200 transition-colors"
           >
             <ChevronLeft size={16} strokeWidth={1.5} />
           </button>
           <button
             type="button"
             onClick={() => navigate(1)}
-            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-brand-50 hover:text-brand-800 hover:border-brand-200 transition-colors"
+            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-navy-50 hover:text-navy-800 hover:border-navy-200 transition-colors"
           >
             <ChevronRight size={16} strokeWidth={1.5} />
           </button>
           <button
             type="button"
             onClick={goToToday}
-            className="text-xs font-semibold text-brand-800 border border-brand-200 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+            className="text-xs font-semibold text-navy-800 border border-navy-200 px-3 py-1.5 rounded-lg hover:bg-navy-50 transition-colors"
           >
             Dnes
           </button>
@@ -1077,7 +1077,7 @@ export function SmartCalendar({
                 className={cn(
                   'text-xs font-semibold px-3 py-1.5 rounded-md transition-all',
                   view === v
-                    ? 'bg-white text-brand-800 shadow-sm'
+                    ? 'bg-white text-navy-800 shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >

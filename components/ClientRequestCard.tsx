@@ -71,7 +71,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
         <Link href={request.projectHref} className="text-sm font-semibold text-foreground hover:underline">
           {request.clientName}
         </Link>
-        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+        <span className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-medium text-navy-700">
           {request.originLabel}
         </span>
         {request.kind && (
@@ -141,7 +141,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
             type="button"
             onClick={copyCommand}
             title="Spusťte v repozitáři projektu. Zadání si nejdřív přečtěte."
-            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium text-foreground hover:bg-brand-50"
+            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium text-foreground hover:bg-navy-50"
           >
             {copiedCommand ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
             {copiedCommand ? 'Zkopírováno' : 'Příkaz pro terminál'}
@@ -153,7 +153,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
               type="button"
               disabled={isPending}
               onClick={() => changeStatus('done')}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-brand-50 disabled:opacity-60"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-60"
             >
               <Check size={14} strokeWidth={1.5} /> Hotovo
             </button>
@@ -171,7 +171,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
             type="button"
             disabled={isPending}
             onClick={() => changeStatus('new')}
-            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-brand-50 disabled:opacity-60"
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-60"
           >
             <RotateCcw size={14} strokeWidth={1.5} /> Vrátit mezi nové
           </button>

@@ -61,11 +61,11 @@ function CostForm({
     setForm(prev => ({ ...prev, [field]: value === '' ? null : value }))
 
   return (
-    <tr className="bg-brand-50/40">
+    <tr className="bg-navy-50/40">
       <td className="px-3 py-2">
         <input
           autoFocus
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Název nákladu *"
           value={form.name}
           onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
@@ -75,7 +75,7 @@ function CostForm({
         <input
           type="number"
           min="0"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Kč"
           value={form.amount || ''}
           onChange={e => setForm(prev => ({ ...prev, amount: Number(e.target.value) || 0 }))}
@@ -84,7 +84,7 @@ function CostForm({
       <td className="px-3 py-2">
         <div className="relative">
           <select
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-6 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-6 focus:outline-none focus:ring-2 focus:ring-navy-500 appearance-none bg-white"
             value={form.cost_type}
             onChange={e => setForm(prev => ({ ...prev, cost_type: e.target.value as CostType }))}
           >
@@ -98,7 +98,7 @@ function CostForm({
       <td className="px-3 py-2">
         <div className="relative">
           <select
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-6 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-6 focus:outline-none focus:ring-2 focus:ring-navy-500 appearance-none bg-white"
             value={form.category}
             onChange={e => setForm(prev => ({ ...prev, category: e.target.value as CostCategory }))}
           >
@@ -111,7 +111,7 @@ function CostForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Popis (volitelný)"
           value={form.description ?? ''}
           onChange={e => set('description', e.target.value)}
@@ -122,7 +122,7 @@ function CostForm({
           <button
             disabled={!form.name.trim() || isPending}
             onClick={() => form.name.trim() && onSave(form)}
-            className="p-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Check size={14} />
           </button>
@@ -177,7 +177,7 @@ function CostRow({
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={onEdit}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors"
           >
             <Pencil size={13} strokeWidth={1.5} />
           </button>

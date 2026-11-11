@@ -12,7 +12,7 @@ export function StartupProjectCard({ project }: Props) {
   return (
     <Link
       href={`/dashboard/startup/${project.id}`}
-      className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-brand-200 transition-all flex flex-col"
+      className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-navy-200 transition-all flex flex-col"
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
@@ -22,7 +22,7 @@ export function StartupProjectCard({ project }: Props) {
         <ArrowUpRight
           size={15}
           strokeWidth={1.5}
-          className="text-muted-foreground/40 group-hover:text-brand-600 transition-colors shrink-0"
+          className="text-muted-foreground/40 group-hover:text-navy-600 transition-colors shrink-0"
         />
       </div>
 
@@ -59,7 +59,7 @@ export function StartupProjectCard({ project }: Props) {
             'Bez monetizace'
           )}
         </span>
-        <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
+        <span className="text-xs font-semibold text-navy-600 group-hover:text-navy-700 transition-colors">
           Otevřít →
         </span>
       </div>

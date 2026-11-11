@@ -289,7 +289,7 @@ export function InvoiceRegistry({
             className={cn(
               'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
               status === value
-                ? 'bg-brand-800 text-white'
+                ? 'bg-navy-800 text-white'
                 : 'bg-white border border-border text-muted-foreground hover:text-foreground',
             )}
           >

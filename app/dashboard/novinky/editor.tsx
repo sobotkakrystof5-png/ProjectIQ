@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { saveNewsAction } from './actions'
 import '@/app/ws-tokens.css'
 
-const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500'
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 // V náhledu e-mailu se obrázek ještě nemusí dát stáhnout z webu — adresu pak
 // nahradí data: z prohlížeče (jen v iframe náhledu, nikdy v odeslaném e-mailu).
@@ -102,7 +102,7 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
               onClick={() => setTag(t)}
               className={cn(
                 'px-3 py-1.5 text-sm rounded-full border transition-colors',
-                tag === t ? 'bg-brand-800 text-white border-brand-800' : 'bg-white text-muted-foreground border-border hover:bg-muted',
+                tag === t ? 'bg-navy-800 text-white border-navy-800' : 'bg-white text-muted-foreground border-border hover:bg-muted',
               )}
             >
               {NEWS_TAG_LABELS[t]}
@@ -151,7 +151,7 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
         </div>
 
         <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
-          <button type="button" onClick={() => setGuide((g) => !g)} className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-800">
+          <button type="button" onClick={() => setGuide((g) => !g)} className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-800">
             <Sparkles size={14} strokeWidth={1.5} />
             Učesat text
             {hints.length > 0 && (

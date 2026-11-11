@@ -55,8 +55,8 @@ export default async function LeadsPage(props: PageProps) {
 
       {shown.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-14 h-14 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
-            <Inbox size={24} strokeWidth={1.5} className="text-brand-400" aria-hidden="true" />
+          <div className="w-14 h-14 bg-navy-50 rounded-2xl flex items-center justify-center mb-4">
+            <Inbox size={24} strokeWidth={1.5} className="text-navy-400" aria-hidden="true" />
           </div>
           <p className="font-medium text-foreground mb-1">
             {filter === 'vse' ? 'Žádné čekající poptávky' : 'Z tohohle webu teď nic nečeká'}

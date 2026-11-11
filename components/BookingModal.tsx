@@ -81,7 +81,7 @@ function MonthCalendar({
           type="button"
           onClick={onPrevMonth}
           disabled={!canPrev}
-          className="p-1.5 rounded-lg text-muted-foreground hover:bg-brand-50 hover:text-brand-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           aria-label="Předchozí měsíc"
         >
           <ChevronLeft size={16} strokeWidth={1.5} />
@@ -92,7 +92,7 @@ function MonthCalendar({
         <button
           type="button"
           onClick={onNextMonth}
-          className="p-1.5 rounded-lg text-muted-foreground hover:bg-brand-50 hover:text-brand-800 transition-colors"
+          className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 transition-colors"
           aria-label="Následující měsíc"
         >
           <ChevronRight size={16} strokeWidth={1.5} />
@@ -133,9 +133,9 @@ function MonthCalendar({
               className={cn(
                 'aspect-square flex items-center justify-center text-sm rounded-lg transition-all duration-150 font-medium',
                 isPast && 'text-gray-300 cursor-not-allowed',
-                !isPast && isWeekend && !isSelected && 'text-brand-600 hover:bg-brand-50',
-                !isPast && !isWeekend && !isSelected && 'text-foreground hover:bg-brand-50 hover:text-brand-800',
-                isToday && !isSelected && 'ring-1 ring-brand-300',
+                !isPast && isWeekend && !isSelected && 'text-navy-600 hover:bg-navy-50',
+                !isPast && !isWeekend && !isSelected && 'text-foreground hover:bg-navy-50 hover:text-navy-800',
+                isToday && !isSelected && 'ring-1 ring-navy-300',
                 isSelected && 'brand-gradient text-white shadow-sm scale-110',
               )}
               aria-label={`${dayNum}. ${viewMonth}. ${viewYear}`}
@@ -184,7 +184,7 @@ function TimeSlotPicker({
               className={cn(
                 'py-2 text-xs font-semibold rounded-lg border transition-all duration-150',
                 disabled && 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed line-through',
-                !disabled && !isSelected && 'border-brand-100 bg-brand-50 text-brand-700 hover:border-brand-400 hover:bg-brand-100',
+                !disabled && !isSelected && 'border-navy-100 bg-navy-50 text-navy-700 hover:border-navy-400 hover:bg-navy-100',
                 isSelected && 'brand-gradient text-white border-transparent shadow-sm',
               )}
               title={booked ? 'Obsazeno' : past ? 'Uplynulý čas' : `${h}:00`}
@@ -343,13 +343,13 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
               {/* Header */}
               <div className="brand-gradient px-5 py-4 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <CalendarDays size={17} strokeWidth={1.5} className="text-brand-200" />
+                  <CalendarDays size={17} strokeWidth={1.5} className="text-navy-200" />
                   <span className="text-white font-semibold text-sm">Rezervovat konzultaci</span>
                 </div>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="p-1.5 rounded-lg text-brand-200 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
                   aria-label="Zavřít"
                 >
                   <X size={16} strokeWidth={1.5} />
@@ -371,7 +371,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                       className="p-5 space-y-5"
                     >
                       {/* Calendar */}
-                      <div className="bg-brand-50 border border-brand-100 rounded-xl p-4">
+                      <div className="bg-navy-50 border border-navy-100 rounded-xl p-4">
                         <MonthCalendar
                           viewYear={viewYear}
                           viewMonth={viewMonth}
@@ -421,7 +421,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                           className={cn(
                             'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
                             'placeholder-muted-foreground bg-white resize-none',
-                            'focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow',
+                            'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
                             errors.clientWish && 'border-red-300 ring-1 ring-red-200',
                           )}
                         />
@@ -442,7 +442,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                           className={cn(
                             'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
                             'placeholder-muted-foreground bg-white',
-                            'focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow',
+                            'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
                             errors.clientEmail && 'border-red-300 ring-1 ring-red-200',
                           )}
                         />
@@ -467,8 +467,8 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                                   'flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer',
                                   'transition-all duration-150 select-none',
                                   isActive
-                                    ? 'border-brand-400 bg-brand-50 text-brand-800'
-                                    : 'border-border bg-white text-muted-foreground hover:border-brand-200 hover:bg-brand-50',
+                                    ? 'border-navy-400 bg-navy-50 text-navy-800'
+                                    : 'border-border bg-white text-muted-foreground hover:border-navy-200 hover:bg-navy-50',
                                 )}
                               >
                                 <input
@@ -480,7 +480,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                                 <Icon
                                   size={16}
                                   strokeWidth={1.5}
-                                  className={isActive ? 'text-brand-600' : 'text-muted-foreground'}
+                                  className={isActive ? 'text-navy-600' : 'text-muted-foreground'}
                                 />
                                 <span className="text-sm font-medium">{ch.label}</span>
                               </label>
@@ -496,7 +496,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                               type="text"
                               placeholder="Napište, co vám vyhovuje…"
                               {...register('channelOtherText')}
-                              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-white placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-white placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-navy-300"
                             />
                             {errors.channelOtherText && (
                               <p className="text-xs text-red-600 mt-1">{errors.channelOtherText.message}</p>

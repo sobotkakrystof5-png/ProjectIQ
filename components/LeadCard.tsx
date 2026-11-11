@@ -65,8 +65,8 @@ export function LeadCard({ lead }: { lead: WebLead }) {
     }
   }
 
-  const iconCls = 'shrink-0 text-brand-400'
-  const linkCls = 'hover:text-brand-800 transition-colors'
+  const iconCls = 'shrink-0 text-navy-400'
+  const linkCls = 'hover:text-navy-800 transition-colors'
 
   return (
     <div className="bg-white border border-border rounded-xl p-5 space-y-4">

@@ -72,8 +72,8 @@ export default function TaxCalculator({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center">
-            <Calculator size={15} className="text-brand-600" strokeWidth={1.5} />
+          <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+            <Calculator size={15} className="text-navy-600" strokeWidth={1.5} />
           </div>
           <div>
             <h3 className="text-base font-semibold text-foreground">Daně a odvody</h3>
@@ -96,7 +96,7 @@ export default function TaxCalculator({
               inputMode="numeric"
               value={raw}
               onChange={e => setRaw(e.target.value)}
-              className="w-36 text-sm border border-border rounded-md px-2 py-1.5 pr-8 text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-36 text-sm border border-border rounded-md px-2 py-1.5 pr-8 text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-navy-500"
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
               Kč
@@ -161,14 +161,14 @@ export default function TaxCalculator({
           </p>
           <p className="text-xs text-muted-foreground mt-1">příjem po odvodech</p>
         </div>
-        <div className="bg-brand-50 border border-brand-100 rounded-xl p-4 shadow-sm">
-          <p className="text-xs text-brand-700 font-medium uppercase tracking-wide mb-1.5">
+        <div className="bg-navy-50 border border-navy-100 rounded-xl p-4 shadow-sm">
+          <p className="text-xs text-navy-700 font-medium uppercase tracking-wide mb-1.5">
             Měsíční rezerva
           </p>
-          <p className="text-2xl font-bold text-brand-700 leading-none tabular-nums">
+          <p className="text-2xl font-bold text-navy-700 leading-none tabular-nums">
             {fmt(r.monthlyReserve)} Kč
           </p>
-          <p className="text-xs text-brand-600/80 mt-1">abys na odvody měl odloženo</p>
+          <p className="text-xs text-navy-600/80 mt-1">abys na odvody měl odloženo</p>
         </div>
       </div>
 

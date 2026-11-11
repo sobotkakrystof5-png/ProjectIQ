@@ -66,14 +66,14 @@ export function ProjectNotesPanel({
           <div className="relative sm:w-56 shrink-0">
             <User size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
-              className="w-full text-sm border border-border rounded-md pl-8 pr-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+              className="w-full text-sm border border-border rounded-md pl-8 pr-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500 bg-white"
               placeholder="Kdo zapisuje"
               value={author}
               onChange={e => setAuthor(e.target.value)}
             />
           </div>
           <textarea
-            className="flex-1 text-sm border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none bg-white"
+            className="flex-1 text-sm border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none bg-white"
             placeholder="Co se řešilo na schůzce / hovoru s klientem… (Ctrl/Cmd+Enter pro rychlé uložení)"
             rows={3}
             value={content}
@@ -89,12 +89,12 @@ export function ProjectNotesPanel({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>Uloží se se stavem zakázky:</span>
-            <span className="font-semibold text-brand-700 tabular-nums">{currentProgress}%</span>
+            <span className="font-semibold text-navy-700 tabular-nums">{currentProgress}%</span>
           </div>
           <button
             onClick={handleSubmit}
             disabled={isPending || !content.trim() || !author.trim()}
-            className="shrink-0 text-xs font-medium px-4 py-2 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="shrink-0 text-xs font-medium px-4 py-2 rounded-md bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Uložit poznámku
           </button>

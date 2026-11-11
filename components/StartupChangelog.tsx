@@ -75,7 +75,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-xl transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-navy-600 bg-navy-50 hover:bg-navy-100 border border-navy-200 rounded-xl transition-colors"
         >
           <Plus size={14} strokeWidth={1.5} />
           Zaznamenat změnu
@@ -100,7 +100,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               />
             </div>
             <div>
@@ -108,7 +108,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
               <select
                 value={type}
                 onChange={e => setType(e.target.value as ChangeType)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               >
                 {CHANGE_TYPES.map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
@@ -124,7 +124,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
               onChange={e => setDescription(e.target.value)}
               rows={3}
               placeholder="Co konkrétně bylo uděláno?"
-              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors resize-none"
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors resize-none"
             />
           </div>
 
@@ -141,7 +141,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                 placeholder="Bylo %"
                 min={0}
                 max={100}
-                className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               />
               <ArrowRight size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
               <input
@@ -151,7 +151,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                 placeholder="Nyní %"
                 min={0}
                 max={100}
-                className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               />
               {progressDiff !== null && (
                 <span className={`text-sm font-semibold ${progressDiff > 0 ? 'text-emerald-600' : progressDiff < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
@@ -165,7 +165,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
             type="button"
             onClick={handleAdd}
             disabled={submitting || !description.trim()}
-            className="w-full py-2.5 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-40 transition-colors"
+            className="w-full py-2.5 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-40 transition-colors"
           >
             {submitting ? 'Ukládá se…' : 'Uložit záznam'}
           </button>
@@ -189,7 +189,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
               return (
                 <div key={entry.id} className="relative group">
                   {/* Dot */}
-                  <div className="absolute -left-6 top-2 w-3.5 h-3.5 rounded-full border-2 border-white bg-brand-400 shadow-sm" />
+                  <div className="absolute -left-6 top-2 w-3.5 h-3.5 rounded-full border-2 border-white bg-navy-400 shadow-sm" />
 
                   <div className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
                     <div className="flex items-start justify-between mb-1.5">

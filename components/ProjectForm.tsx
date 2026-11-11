@@ -327,7 +327,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
                 set('progress', Number(e.target.value))
                 if (Number(e.target.value) === originalProgress) set('progressNote', '')
               }}
-              className="flex-1 accent-brand-800"
+              className="flex-1 accent-navy-800"
             />
           </div>
           {progressChanged && (
@@ -394,7 +394,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
               id="paid"
               checked={form.paid}
               onChange={e => set('paid', e.target.checked)}
-              className="w-4 h-4 accent-brand-800"
+              className="w-4 h-4 accent-navy-800"
             />
             <label htmlFor="paid" className="text-sm text-foreground cursor-pointer">
               Zakázka zaplacena
@@ -603,7 +603,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
 }
 
 const inputCls =
-  'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow bg-white'
+  'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white'
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (

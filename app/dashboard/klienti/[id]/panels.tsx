@@ -6,7 +6,7 @@ import { Copy, KeyRound, Mail } from 'lucide-react'
 import { generateWebKeysAction, resendInviteAction } from '../actions'
 import type { WebKeysResult } from '@/lib/ws/admin/web-keys'
 
-const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500'
 const BUTTON = 'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-border rounded-lg bg-white hover:bg-muted transition-colors disabled:opacity-60'
 
 function CopyField({ label, value, multiline = false, secret = false }: { label: string; value: string; multiline?: boolean; secret?: boolean }) {
@@ -20,7 +20,7 @@ function CopyField({ label, value, multiline = false, secret = false }: { label:
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
-        <button type="button" onClick={copy} className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-700 hover:underline">
+        <button type="button" onClick={copy} className="inline-flex items-center gap-1 text-[12px] font-medium text-navy-700 hover:underline">
           <Copy size={12} strokeWidth={1.5} />
           Kopírovat
         </button>

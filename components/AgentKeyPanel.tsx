@@ -58,7 +58,7 @@ export function AgentKeyPanel({ projectId, active, envBlock, claudeMdBlock, conf
   }
 
   const btn =
-    'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-brand-50 disabled:opacity-50'
+    'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-50'
 
   return (
     <div className="space-y-4">

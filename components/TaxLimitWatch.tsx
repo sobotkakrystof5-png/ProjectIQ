@@ -17,7 +17,7 @@ export default function TaxLimitWatch({ income }: { income: number }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Gauge size={15} className="text-brand-600" strokeWidth={1.5} />
+        <Gauge size={15} className="text-navy-600" strokeWidth={1.5} />
         <h4 className="text-sm font-semibold text-foreground">Hlídač limitů</h4>
       </div>
 

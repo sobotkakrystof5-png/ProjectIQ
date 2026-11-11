@@ -85,15 +85,15 @@ export function AiAssistantsSection({ project, changelog, improvements }: Props)
               key={assistant.name}
               type="button"
               onClick={() => setActiveAssistant(assistant)}
-              className="group text-left bg-white border border-border rounded-2xl p-4 hover:shadow-md hover:border-brand-200 transition-all"
+              className="group text-left bg-white border border-border rounded-2xl p-4 hover:shadow-md hover:border-navy-200 transition-all"
             >
               <div className="text-2xl mb-2">{assistant.icon}</div>
-              <h3 className="font-medium text-foreground text-sm mb-1 group-hover:text-brand-700 transition-colors">
+              <h3 className="font-medium text-foreground text-sm mb-1 group-hover:text-navy-700 transition-colors">
                 {assistant.name}
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">{assistant.description}</p>
               <div className="mt-3 pt-3 border-t border-border">
-                <span className="text-xs font-semibold text-brand-600 group-hover:text-brand-700 transition-colors">
+                <span className="text-xs font-semibold text-navy-600 group-hover:text-navy-700 transition-colors">
                   Konzultovat →
                 </span>
               </div>

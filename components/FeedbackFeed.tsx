@@ -18,8 +18,8 @@ export function FeedbackFeed({ feedbacks, clientName }: FeedbackFeedProps) {
   if (feedbacks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
-        <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center mb-3">
-          <MessageSquareQuote size={18} strokeWidth={1.5} className="text-brand-400" />
+        <div className="w-10 h-10 rounded-full bg-navy-50 flex items-center justify-center mb-3">
+          <MessageSquareQuote size={18} strokeWidth={1.5} className="text-navy-400" />
         </div>
         <p className="text-sm text-muted-foreground">Zatím žádná zpětná vazba.</p>
         <p className="text-xs text-muted-foreground mt-0.5">

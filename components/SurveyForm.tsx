@@ -138,7 +138,7 @@ export function SurveyForm({ token }: SurveyFormProps) {
           className={cn(
             'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
             'placeholder-muted-foreground bg-white resize-none',
-            'focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent transition-shadow',
+            'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
             isPending && 'opacity-50',
           )}
         />
@@ -150,7 +150,7 @@ export function SurveyForm({ token }: SurveyFormProps) {
           checked={consent}
           onChange={e => { setConsent(e.target.checked); setError(null) }}
           disabled={isPending}
-          className="w-4 h-4 mt-0.5 accent-brand-700 shrink-0"
+          className="w-4 h-4 mt-0.5 accent-navy-700 shrink-0"
         />
         <span className="text-xs text-muted-foreground leading-relaxed">
           Souhlasím, že mé odpovědi mohou být využity pro zkvalitňování služeb a zveřejněny

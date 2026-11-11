@@ -177,7 +177,7 @@ export function AiAssistantModal({ assistant, project, changelog, improvements, 
                   <div
                     className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-brand-600 text-white rounded-br-sm'
+                        ? 'bg-navy-600 text-white rounded-br-sm'
                         : 'bg-muted text-foreground rounded-bl-sm'
                     }`}
                   >
@@ -206,13 +206,13 @@ export function AiAssistantModal({ assistant, project, changelog, improvements, 
                   onKeyDown={handleKeyDown}
                   placeholder="Napiš zprávu… (Enter = odeslat, Shift+Enter = nový řádek)"
                   rows={2}
-                  className="flex-1 px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors resize-none"
+                  className="flex-1 px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors resize-none"
                 />
                 <button
                   type="button"
                   onClick={handleSend}
                   disabled={loading || !input.trim()}
-                  className="p-2.5 bg-brand-600 text-white rounded-xl hover:bg-brand-700 disabled:opacity-40 transition-colors shrink-0"
+                  className="p-2.5 bg-navy-600 text-white rounded-xl hover:bg-navy-700 disabled:opacity-40 transition-colors shrink-0"
                 >
                   <Send size={16} strokeWidth={1.5} />
                 </button>

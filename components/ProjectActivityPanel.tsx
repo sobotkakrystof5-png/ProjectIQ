@@ -39,7 +39,7 @@ const SOURCE_LABELS: Record<ActivityItem['source'], string> = {
 }
 
 const fieldClass =
-  'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100'
+  'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-100'
 
 /** Koncepty ke schválení a publikovaná osa. Klient vidí jen publikované. */
 export function ProjectActivityPanel({ projectId, items }: { projectId: string; items: ActivityItem[] }) {
@@ -75,7 +75,7 @@ export function ProjectActivityPanel({ projectId, items }: { projectId: string; 
                 type="button"
                 onClick={approveAll}
                 disabled={isPending}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-brand-700 px-3 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-navy-700 px-3 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-50"
               >
                 <Check size={14} strokeWidth={1.5} />
                 Schválit vše
@@ -96,7 +96,7 @@ export function ProjectActivityPanel({ projectId, items }: { projectId: string; 
         <button
           type="button"
           onClick={() => setComposing(true)}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-brand-700 hover:bg-brand-50"
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-navy-700 hover:bg-navy-50"
         >
           <Plus size={14} strokeWidth={1.5} />
           Napsat zprávu pro klienta
@@ -114,7 +114,7 @@ export function ProjectActivityPanel({ projectId, items }: { projectId: string; 
             {published.map((item) => (
               <li key={item.id} className="rounded-xl border border-border bg-white p-4">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-brand-100 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                  <span className="rounded-full border border-navy-100 bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
                     {ACTIVITY_KIND_LABELS[item.kind]}
                   </span>
                   <span className="text-xs text-muted-foreground">{formatDate(item.publishedAt ?? item.createdAt)}</span>
@@ -171,7 +171,7 @@ function DraftCard({ item }: { item: ActivityItem }) {
   return (
     <li className={cn('rounded-xl border bg-white p-4', item.containsSensitive ? 'border-amber-300' : 'border-border')}>
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-brand-100 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+        <span className="rounded-full border border-navy-100 bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
           {ACTIVITY_KIND_LABELS[item.kind]}
         </span>
         <span className="text-xs text-muted-foreground">
@@ -192,7 +192,7 @@ function DraftCard({ item }: { item: ActivityItem }) {
           type="button"
           onClick={approve}
           disabled={isPending || item.containsSensitive}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-brand-700 px-3 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-40"
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-navy-700 px-3 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-40"
         >
           <Check size={14} strokeWidth={1.5} />
           Schválit
@@ -201,7 +201,7 @@ function DraftCard({ item }: { item: ActivityItem }) {
           type="button"
           onClick={() => setEditing(true)}
           disabled={isPending}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-brand-50 disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-50"
         >
           <Pencil size={14} strokeWidth={1.5} />
           Upravit
@@ -244,7 +244,7 @@ function ComposeForm({ projectId, item, onDone }: { projectId?: string; item?: A
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border border-border bg-brand-50/40 p-4">
+    <form onSubmit={submit} className="space-y-3 rounded-xl border border-border bg-navy-50/40 p-4">
       <div>
         <label htmlFor={`act-kind-${item?.id ?? 'new'}`} className="mb-1 block text-xs font-medium text-muted-foreground">
           Druh
@@ -294,14 +294,14 @@ function ComposeForm({ projectId, item, onDone }: { projectId?: string; item?: A
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex min-h-[44px] items-center rounded-lg bg-brand-700 px-4 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center rounded-lg bg-navy-700 px-4 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-50"
         >
           {item ? 'Uložit' : 'Uložit jako koncept'}
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="inline-flex min-h-[44px] items-center rounded-lg px-4 text-sm font-medium text-muted-foreground hover:bg-brand-50"
+          className="inline-flex min-h-[44px] items-center rounded-lg px-4 text-sm font-medium text-muted-foreground hover:bg-navy-50"
         >
           Zrušit
         </button>

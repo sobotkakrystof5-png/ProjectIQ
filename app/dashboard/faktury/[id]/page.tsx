@@ -203,7 +203,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
         </div>
 
         <div className="space-y-5">
-          <Card title="Zakázka" icon={<ExternalLink size={14} strokeWidth={1.5} className="text-brand-600" />}>
+          <Card title="Zakázka" icon={<ExternalLink size={14} strokeWidth={1.5} className="text-navy-600" />}>
             {invoice.project_href ? (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">{invoice.project_client_name}</p>
@@ -212,7 +212,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
                 )}
                 <Link
                   href={invoice.project_href}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-navy-700 hover:text-navy-800 transition-colors"
                 >
                   Otevřít zakázku
                   <ExternalLink size={11} strokeWidth={1.5} />

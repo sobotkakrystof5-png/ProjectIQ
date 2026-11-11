@@ -29,11 +29,11 @@ export default async function SurveyPage(props: PageProps) {
           <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
             {/* Brand header */}
             <div className="brand-gradient px-6 pt-7 pb-6">
-              <p className="text-xs font-medium text-brand-200 uppercase tracking-wider mb-1.5">
+              <p className="text-xs font-medium text-navy-200 uppercase tracking-wider mb-1.5">
                 Dotazník spokojenosti
               </p>
               <h1 className="text-2xl font-semibold text-white">{cp.title}</h1>
-              <p className="text-sm text-brand-100 mt-1.5 leading-relaxed">
+              <p className="text-sm text-navy-100 mt-1.5 leading-relaxed">
                 Vaše hodnocení mi pomáhá zlepšovat mé služby. Děkuji za pár minut vašeho času.
               </p>
             </div>
@@ -53,7 +53,7 @@ export default async function SurveyPage(props: PageProps) {
               ) : (
                 <>
                   <div className="flex items-center gap-2 mb-5">
-                    <ClipboardList size={14} strokeWidth={1.5} className="text-brand-500" />
+                    <ClipboardList size={14} strokeWidth={1.5} className="text-navy-500" />
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Ohodnoťte spolupráci (1–5 hvězdiček)
                     </p>
@@ -76,7 +76,7 @@ export default async function SurveyPage(props: PageProps) {
             </div>
             <div className="flex flex-col leading-tight">
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Powered by</span>
-              <span className="text-sm font-bold text-brand-800 leading-none">ZakazIQ</span>
+              <span className="text-sm font-bold text-navy-800 leading-none">ZakazIQ</span>
             </div>
           </div>
         </div>

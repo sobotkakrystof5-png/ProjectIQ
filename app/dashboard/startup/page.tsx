@@ -22,7 +22,7 @@ export default async function StartupPage() {
         </div>
         <Link
           href="/dashboard/startup/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
         >
           <Plus size={15} strokeWidth={1.5} />
           Nový projekt
@@ -42,7 +42,7 @@ export default async function StartupPage() {
           </div>
           <div className="bg-white border border-border rounded-2xl p-4">
             <p className="text-xs text-muted-foreground mb-1">Průměrný postup</p>
-            <p className="text-2xl font-bold text-brand-600 tabular-nums">{avgProgress} %</p>
+            <p className="text-2xl font-bold text-navy-600 tabular-nums">{avgProgress} %</p>
           </div>
         </div>
       )}
@@ -58,7 +58,7 @@ export default async function StartupPage() {
           </p>
           <Link
             href="/dashboard/startup/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
           >
             <Plus size={15} strokeWidth={1.5} />
             Přidat projekt

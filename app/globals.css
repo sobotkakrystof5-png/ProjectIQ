@@ -41,7 +41,7 @@
   }
 
   input[type='range']::-webkit-slider-thumb {
-    @apply bg-brand-800;
+    @apply bg-navy-800;
   }
 }
 
@@ -52,7 +52,7 @@
     background: linear-gradient(135deg, rgb(var(--navy-800)) 0%, rgb(var(--navy-700)) 100%);
   }
   .card-hover {
-    @apply transition-all duration-200 hover:shadow-md hover:border-brand-200;
+    @apply transition-all duration-200 hover:shadow-md hover:border-navy-200;
   }
   /* Vodorovně posuvná navigace bez pruhu scrollbaru pod položkami */
   .no-scrollbar {

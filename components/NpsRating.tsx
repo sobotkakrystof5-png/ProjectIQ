@@ -35,7 +35,7 @@ export function NpsRating({ value, onChange, disabled }: NpsRatingProps) {
                 'flex-1 h-9 text-sm font-semibold border rounded-lg',
                 'transition-all duration-150 select-none',
                 scoreClass(n, isActive),
-                !isActive && 'hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700',
+                !isActive && 'hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700',
                 isSelected && 'scale-110 shadow-sm',
                 disabled && 'opacity-50 cursor-not-allowed',
               )}

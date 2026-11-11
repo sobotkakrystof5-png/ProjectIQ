@@ -81,7 +81,7 @@ function Section({
 
 // ─── Field primitives ─────────────────────────────────────────────────────────
 
-const inputCls = 'w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors'
+const inputCls = 'w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors'
 const textareaCls = `${inputCls} resize-none`
 const labelCls = 'block text-sm font-medium text-foreground mb-1.5'
 
@@ -351,7 +351,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {saving
                   ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
@@ -424,7 +424,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <button
                 type="button"
                 onClick={() => setMonetization(v => !v)}
-                className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-brand-600' : 'bg-muted-foreground/20'}`}
+                className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-navy-600' : 'bg-muted-foreground/20'}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${monetization ? 'translate-x-5' : ''}`} />
               </button>
@@ -460,7 +460,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               className={`text-left px-3 py-2.5 rounded-xl border text-xs font-medium transition-all ${
                 phase === p.value
                   ? `${p.color} border-current shadow-sm`
-                  : 'border-border text-muted-foreground hover:border-brand-300 hover:text-foreground'
+                  : 'border-border text-muted-foreground hover:border-navy-300 hover:text-foreground'
               }`}
             >
               <span className="mr-1">{p.emoji}</span>
@@ -472,7 +472,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-foreground">Celkový postup projektu</label>
-            <span className="text-sm font-semibold text-brand-700 tabular-nums">{progress} %</span>
+            <span className="text-sm font-semibold text-navy-700 tabular-nums">{progress} %</span>
           </div>
           <input
             type="range"
@@ -480,7 +480,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
             max={100}
             value={progress}
             onChange={e => setProgress(Number(e.target.value))}
-            className="w-full accent-brand-600"
+            className="w-full accent-navy-600"
           />
           <div className="mt-1.5 h-2 bg-muted rounded-full overflow-hidden">
             <div
@@ -536,7 +536,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <select
                 value={currency}
                 onChange={e => setCurrency(e.target.value)}
-                className="px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                className="px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               >
                 {STARTUP_CURRENCIES.map(c => <option key={c}>{c}</option>)}
               </select>
@@ -573,7 +573,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
             </div>
             {payingUsers > 0
-              ? <p className="text-xs text-brand-600 font-medium mt-1">= {payingUsers} platících zákazníků</p>
+              ? <p className="text-xs text-navy-600 font-medium mt-1">= {payingUsers} platících zákazníků</p>
               : <p className="text-xs text-muted-foreground mt-1">Typicky 2–10 % uživatelů platí</p>
             }
           </div>
@@ -593,11 +593,11 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 onClick={() => setMonetizationModel(m.key)}
                 className={`px-4 py-3.5 rounded-xl border text-left transition-all ${
                   monetizationModel === m.key
-                    ? 'border-brand-500 bg-brand-50 shadow-sm'
-                    : 'border-border hover:border-brand-200 hover:bg-muted/30'
+                    ? 'border-navy-500 bg-navy-50 shadow-sm'
+                    : 'border-border hover:border-navy-200 hover:bg-muted/30'
                 }`}
               >
-                <p className={`text-sm font-medium ${monetizationModel === m.key ? 'text-brand-700' : 'text-foreground'}`}>
+                <p className={`text-sm font-medium ${monetizationModel === m.key ? 'text-navy-700' : 'text-foreground'}`}>
                   {m.emoji} {m.title}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">{m.sub}</p>
@@ -614,7 +614,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <button
                 type="button"
                 onClick={addTier}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-navy-600 bg-navy-50 hover:bg-navy-100 rounded-lg transition-colors"
               >
                 <Plus size={12} strokeWidth={2} />
                 Přidat plán
@@ -661,7 +661,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                         placeholder="0"
                         min={0}
                         step="0.01"
-                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                       />
                     </div>
                     <div>
@@ -673,7 +673,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                         placeholder="0"
                         min={0}
                         step="0.01"
-                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                       />
                     </div>
                     <div>
@@ -684,7 +684,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                         onChange={e => updateTier(tier.id, { users: parseInt(e.target.value) || 0 })}
                         placeholder="0"
                         min={0}
-                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                       />
                     </div>
                   </div>
@@ -696,7 +696,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                       <button
                         type="button"
                         onClick={() => addBenefit(tier.id)}
-                        className="text-xs text-brand-600 hover:text-brand-700 transition-colors"
+                        className="text-xs text-navy-600 hover:text-navy-700 transition-colors"
                       >
                         + Přidat výhodu
                       </button>
@@ -713,7 +713,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                             value={benefit}
                             onChange={e => updateBenefit(tier.id, bIdx, e.target.value)}
                             placeholder="Výhoda (např. Neomezené projekty)"
-                            className="flex-1 px-2.5 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                            className="flex-1 px-2.5 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                           />
                           <button
                             type="button"
@@ -729,7 +729,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
 
                   {/* Tier MRR preview */}
                   {tier.monthlyPrice > 0 && tier.users > 0 && (
-                    <p className="text-xs text-brand-600 font-medium">
+                    <p className="text-xs text-navy-600 font-medium">
                       → {tier.users} zákazníků × {formatCurrency(tier.monthlyPrice, currency)}/měs = <strong>{formatCurrency(tier.monthlyPrice * tier.users, currency)}/měs</strong>
                     </p>
                   )}
@@ -756,8 +756,8 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         {/* ── Výsledky: Opakované platby ── */}
         {calcResults.type === 'saas' && calcResults.mrr > 0 && (
           <div className="space-y-3 pt-1">
-            <div className="bg-gradient-to-br from-brand-50 to-violet-50 border border-brand-100 rounded-xl p-4">
-              <p className="text-sm text-brand-800 leading-relaxed">
+            <div className="bg-gradient-to-br from-navy-50 to-violet-50 border border-navy-100 rounded-xl p-4">
+              <p className="text-sm text-navy-800 leading-relaxed">
                 💡 S <strong>{calcResults.totalPayingUsers} platícími zákazníky</strong> budeš vydělávat{' '}
                 <strong>{formatCurrency(calcResults.mrr, currency)} každý měsíc</strong>.
                 {calcResults.breakEven !== null && (
@@ -804,10 +804,10 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           <div className="space-y-3 pt-1">
             <div className={`border rounded-xl p-4 ${
               calcResults.netProfit >= 0
-                ? 'bg-gradient-to-br from-brand-50 to-violet-50 border-brand-100'
+                ? 'bg-gradient-to-br from-navy-50 to-violet-50 border-navy-100'
                 : 'bg-red-50 border-red-100'
             }`}>
-              <p className={`text-sm leading-relaxed ${calcResults.netProfit >= 0 ? 'text-brand-800' : 'text-red-700'}`}>
+              <p className={`text-sm leading-relaxed ${calcResults.netProfit >= 0 ? 'text-navy-800' : 'text-red-700'}`}>
                 {calcResults.netProfit >= 0
                   ? <>💡 Prodáš-li <strong>{payingUsers} zákazníkům</strong>, celkem vyděláš <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>. Po odečtení investice ti zbyde čistý zisk <strong>{formatCurrency(calcResults.netProfit, currency)}</strong>.</>
                   : <>⚠️ Při <strong>{payingUsers} zákaznících</strong> vydělá projekt <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>, ale investice ještě není pokryta — budeš ve ztrátě <strong>{formatCurrency(Math.abs(calcResults.netProfit), currency)}</strong>. Zkus zvýšit cenu nebo počet zákazníků.</>
@@ -896,7 +896,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               href={liveUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 mt-2 text-sm text-brand-600 hover:text-brand-700 transition-colors"
+              className="inline-flex items-center gap-1.5 mt-2 text-sm text-navy-600 hover:text-navy-700 transition-colors"
             >
               <ExternalLink size={13} strokeWidth={1.5} />
               Otevřít projekt
@@ -964,7 +964,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm"
         >
           {saving
             ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />

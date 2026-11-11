@@ -73,7 +73,7 @@ function Section({
   )
 }
 
-const inputCls = 'w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors'
+const inputCls = 'w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors'
 const textareaCls = `${inputCls} resize-none`
 const labelCls = 'block text-sm font-medium text-foreground mb-1.5'
 
@@ -167,7 +167,7 @@ function PersonalImprovements({
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(item.id); if (e.key === 'Escape') setEditingId(null) }}
                   autoFocus
-                  className="flex-1 px-2.5 py-1.5 text-sm border border-brand-400 rounded-lg bg-white focus:outline-none"
+                  className="flex-1 px-2.5 py-1.5 text-sm border border-navy-400 rounded-lg bg-white focus:outline-none"
                 />
                 <button type="button" onClick={() => handleSaveEdit(item.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
                   <Check size={14} strokeWidth={1.5} />
@@ -201,13 +201,13 @@ function PersonalImprovements({
           onChange={e => setNewText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
           placeholder="Přidat nápad na zlepšení…"
-          className="flex-1 px-3.5 py-2 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+          className="flex-1 px-3.5 py-2 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={adding || !newText.trim()}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-40 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-40 transition-colors"
         >
           <Plus size={14} strokeWidth={1.5} />
           Přidat
@@ -276,7 +276,7 @@ function PersonalChangelog({
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-xl transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-navy-600 bg-navy-50 hover:bg-navy-100 border border-navy-200 rounded-xl transition-colors"
         >
           <Plus size={14} strokeWidth={1.5} />
           Zaznamenat změnu
@@ -290,25 +290,25 @@ function PersonalChangelog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Datum</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors" />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Typ změny</label>
-              <select value={type} onChange={e => setType(e.target.value as ChangeType)} className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors">
+              <select value={type} onChange={e => setType(e.target.value as ChangeType)} className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors">
                 {CHANGE_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Popis změny</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Co konkrétně bylo uděláno?" className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors resize-none" />
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Co konkrétně bylo uděláno?" className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors resize-none" />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Posun v postupu projektu (volitelné)</label>
             <div className="flex items-center gap-2">
-              <input type="number" value={progressFrom} onChange={e => setProgressFrom(e.target.value)} placeholder="Bylo %" min={0} max={100} className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
+              <input type="number" value={progressFrom} onChange={e => setProgressFrom(e.target.value)} placeholder="Bylo %" min={0} max={100} className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors" />
               <ArrowRight size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
-              <input type="number" value={progressTo} onChange={e => setProgressTo(e.target.value)} placeholder="Nyní %" min={0} max={100} className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors" />
+              <input type="number" value={progressTo} onChange={e => setProgressTo(e.target.value)} placeholder="Nyní %" min={0} max={100} className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors" />
               {progressDiff !== null && (
                 <span className={`text-sm font-semibold ${progressDiff > 0 ? 'text-emerald-600' : progressDiff < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
                   {progressDiff > 0 ? '+' : ''}{progressDiff} %
@@ -316,7 +316,7 @@ function PersonalChangelog({
               )}
             </div>
           </div>
-          <button type="button" onClick={handleAdd} disabled={submitting || !description.trim()} className="w-full py-2.5 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-40 transition-colors">
+          <button type="button" onClick={handleAdd} disabled={submitting || !description.trim()} className="w-full py-2.5 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-40 transition-colors">
             {submitting ? 'Ukládá se…' : 'Uložit záznam'}
           </button>
         </div>
@@ -334,7 +334,7 @@ function PersonalChangelog({
                 : null
               return (
                 <div key={entry.id} className="relative group">
-                  <div className="absolute -left-6 top-2 w-3.5 h-3.5 rounded-full border-2 border-white bg-brand-400 shadow-sm" />
+                  <div className="absolute -left-6 top-2 w-3.5 h-3.5 rounded-full border-2 border-white bg-navy-400 shadow-sm" />
                   <div className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -464,7 +464,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
   return (
     <div className="space-y-3">
       {/* Publish to Startup CTA */}
-      <div className="flex items-center justify-between py-4 px-5 bg-gradient-to-r from-violet-50 to-brand-50 border border-violet-200 rounded-2xl">
+      <div className="flex items-center justify-between py-4 px-5 bg-gradient-to-r from-violet-50 to-navy-50 border border-violet-200 rounded-2xl">
         <div>
           <p className="text-sm font-medium text-foreground">Hotov na spuštění?</p>
           <p className="text-xs text-muted-foreground mt-0.5">Přesuň projekt do Startup sekce — přenese se celý obsah včetně changelogu a nápadů.</p>
@@ -473,7 +473,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
           type="button"
           onClick={handlePublish}
           disabled={publishing}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-brand-600 text-white text-sm font-medium rounded-xl hover:opacity-90 disabled:opacity-50 transition-all shadow-sm shrink-0 ml-4"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-navy-600 text-white text-sm font-medium rounded-xl hover:opacity-90 disabled:opacity-50 transition-all shadow-sm shrink-0 ml-4"
         >
           {publishing
             ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
@@ -503,7 +503,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
               <button type="button" onClick={handleArchive} disabled={archiving} className="p-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Archivovat projekt">
                 {archiving ? <Loader2 size={15} strokeWidth={1.5} className="animate-spin" /> : <Archive size={15} strokeWidth={1.5} />}
               </button>
-              <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-sm">
+              <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm">
                 {saving ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" /> : <Save size={13} strokeWidth={1.5} />}
                 {saving ? 'Ukládá se…' : 'Uložit'}
               </button>
@@ -542,7 +542,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
             <label className={labelCls}>Monetizace</label>
             <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/40 rounded-xl">
               <span className="text-sm text-foreground">{monetization ? 'Ano' : 'Ne'}</span>
-              <button type="button" onClick={() => setMonetization(v => !v)} className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-brand-600' : 'bg-muted-foreground/20'}`}>
+              <button type="button" onClick={() => setMonetization(v => !v)} className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-navy-600' : 'bg-muted-foreground/20'}`}>
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${monetization ? 'translate-x-5' : ''}`} />
               </button>
             </div>
@@ -576,7 +576,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
             <input type="url" value={githubUrl} onChange={e => setGithubUrl(e.target.value)} placeholder="https://github.com/username/repo" className={`${inputCls} flex-1`} />
           </div>
           {githubUrl && (
-            <a href={githubUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-sm text-brand-600 hover:text-brand-700 transition-colors">
+            <a href={githubUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-sm text-navy-600 hover:text-navy-700 transition-colors">
               <ExternalLink size={13} strokeWidth={1.5} />
               Otevřít GitHub
             </a>
@@ -586,7 +586,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
           <label className={labelCls}>Live URL projektu</label>
           <input type="url" value={liveUrl} onChange={e => setLiveUrl(e.target.value)} placeholder="https://mujprojekt.cz" className={inputCls} />
           {liveUrl && (
-            <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-sm text-brand-600 hover:text-brand-700 transition-colors">
+            <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-sm text-navy-600 hover:text-navy-700 transition-colors">
               <ExternalLink size={13} strokeWidth={1.5} />
               Otevřít projekt
             </a>
@@ -596,7 +596,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
           <label className={labelCls}>Plánovaná investice ({currency})</label>
           <div className="flex items-center gap-2">
             <input type="number" value={plannedInvestment} onChange={e => setPlannedInvestment(e.target.value)} placeholder="0" min={0} className={`${inputCls} flex-1`} />
-            <select value={currency} onChange={e => setCurrency(e.target.value)} className="px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors">
+            <select value={currency} onChange={e => setCurrency(e.target.value)} className="px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors">
               {STARTUP_CURRENCIES.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
@@ -614,7 +614,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
               className={`text-left px-3 py-2.5 rounded-xl border text-xs font-medium transition-all ${
                 phase === p.value
                   ? `${p.color} border-current shadow-sm`
-                  : 'border-border text-muted-foreground hover:border-brand-300 hover:text-foreground'
+                  : 'border-border text-muted-foreground hover:border-navy-300 hover:text-foreground'
               }`}
             >
               <span className="mr-1">{p.emoji}</span>
@@ -625,9 +625,9 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-foreground">Celkový postup projektu</label>
-            <span className="text-sm font-semibold text-brand-700 tabular-nums">{progress} %</span>
+            <span className="text-sm font-semibold text-navy-700 tabular-nums">{progress} %</span>
           </div>
-          <input type="range" min={0} max={100} value={progress} onChange={e => setProgress(Number(e.target.value))} className="w-full accent-brand-600" />
+          <input type="range" min={0} max={100} value={progress} onChange={e => setProgress(Number(e.target.value))} className="w-full accent-navy-600" />
           <div className="mt-1.5 h-2 bg-muted rounded-full overflow-hidden">
             <div className="h-full brand-gradient rounded-full transition-all" style={{ width: `${progress}%` }} />
           </div>
@@ -651,7 +651,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
 
       {/* Bottom save */}
       <div className="flex justify-end pb-4">
-        <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-sm">
+        <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm">
           {saving ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> : <Save size={14} strokeWidth={1.5} />}
           {saving ? 'Ukládá se…' : 'Uložit projekt'}
         </button>

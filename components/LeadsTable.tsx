@@ -140,11 +140,11 @@ function LeadForm({
   }
 
   return (
-    <tr className="bg-brand-50/40">
+    <tr className="bg-navy-50/40">
       <td className="px-3 py-2">
         <input
           autoFocus
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Název firmy *"
           value={form.company_name}
           onChange={e => setForm(prev => ({ ...prev, company_name: e.target.value }))}
@@ -152,7 +152,7 @@ function LeadForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Jméno"
           value={form.contact_name ?? ''}
           onChange={e => set('contact_name', e.target.value)}
@@ -160,7 +160,7 @@ function LeadForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="+420…"
           value={form.phone ?? ''}
           onChange={e => set('phone', e.target.value)}
@@ -171,7 +171,7 @@ function LeadForm({
       <td className="px-3 py-2">
         <input
           type="email"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="email@firma.cz"
           value={form.email ?? ''}
           onChange={e => set('email', e.target.value)}
@@ -180,7 +180,7 @@ function LeadForm({
       <td className="px-3 py-2">
         <div className="relative">
           <select
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-navy-500 appearance-none bg-white"
             value={form.lead_status}
             onChange={e => setForm(prev => ({ ...prev, lead_status: e.target.value as LeadStatus }))}
           >
@@ -194,7 +194,7 @@ function LeadForm({
       <td className="px-3 py-2">
         <div className="relative">
           <select
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-navy-500 appearance-none bg-white"
             value={form.next_action_type ?? ''}
             onChange={e => set('next_action_type', e.target.value || null)}
           >
@@ -208,7 +208,7 @@ function LeadForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Zavolat zítra, poslat email…"
           value={form.next_action ?? ''}
           onChange={e => set('next_action', e.target.value)}
@@ -218,13 +218,13 @@ function LeadForm({
         <div className="flex flex-col gap-1">
           <input
             type="date"
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
             value={form.next_action_date ?? ''}
             onChange={e => set('next_action_date', e.target.value)}
           />
           <input
             type="time"
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
             value={form.next_action_time ?? ''}
             onChange={e => set('next_action_time', e.target.value)}
           />
@@ -234,13 +234,13 @@ function LeadForm({
         <div className="flex flex-col gap-1">
           <input
             type="number"
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
             placeholder="Kč"
             value={form.estimated_value ?? ''}
             onChange={e => set('estimated_value', e.target.value ? Number(e.target.value) : null)}
           />
           <textarea
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
             placeholder="Shrnutí (kontext leadu)…"
             value={form.notes ?? ''}
             rows={2}
@@ -253,7 +253,7 @@ function LeadForm({
           <button
             disabled={!form.company_name.trim() || isPending}
             onClick={() => form.company_name.trim() && onSave(form)}
-            className="p-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Check size={14} />
           </button>
@@ -291,7 +291,7 @@ function CompanyCell({
             onClick={onToggleExpand}
             title={expanded ? 'Sbalit detail' : 'Rozbalit detail'}
             aria-expanded={expanded}
-            className="p-0.5 -ml-1 rounded text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors shrink-0"
+            className="p-0.5 -ml-1 rounded text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors shrink-0"
           >
             {expanded
               ? <ChevronDown size={13} strokeWidth={1.5} />
@@ -303,7 +303,7 @@ function CompanyCell({
         )}
         <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
         {lead.calendar_event_id && (
-          <span title="Založeno z kalendáře" className="shrink-0 text-brand-500">
+          <span title="Založeno z kalendáře" className="shrink-0 text-navy-500">
             <CalendarDays size={12} strokeWidth={1.5} />
           </span>
         )}
@@ -338,7 +338,7 @@ function PhoneCell({ lead }: { lead: ClientLead }) {
   return (
     <td className="px-3 py-2.5">
       {lead.phone && (
-        <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline">
+        <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline">
           <Phone size={12} strokeWidth={1.5} />
           {lead.phone}
         </a>
@@ -352,7 +352,7 @@ function EmailCell({ lead }: { lead: ClientLead }) {
     <td className="px-3 py-2.5">
       {lead.email && (
         <div className="flex flex-col gap-0.5">
-          <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-brand-700 hover:underline truncate max-w-[160px]">
+          <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline truncate max-w-[160px]">
             <Mail size={12} strokeWidth={1.5} />
             {lead.email}
           </a>
@@ -432,7 +432,7 @@ function LeadRow({
     <tr
       id={`lead-${lead.id}`}
       className={`border-t border-border transition-colors group ${
-        highlighted ? 'bg-brand-50 ring-2 ring-inset ring-brand-300' : 'hover:bg-slate-50/60'
+        highlighted ? 'bg-navy-50 ring-2 ring-inset ring-navy-300' : 'hover:bg-slate-50/60'
       }`}
     >
       <CompanyCell lead={lead} expanded={expanded} onToggleExpand={onToggleExpand} notes={notes} />
@@ -488,7 +488,7 @@ function LeadRow({
               onClick={onOpenCustomMessage}
               disabled={isPending}
               title="Napsat jinou zprávu"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors disabled:opacity-40"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors disabled:opacity-40"
             >
               <MessageSquareText size={13} strokeWidth={1.5} />
             </button>
@@ -512,7 +512,7 @@ function LeadRow({
             </button>
             <button
               onClick={onEdit}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors"
             >
               <Pencil size={13} strokeWidth={1.5} />
             </button>
@@ -570,7 +570,7 @@ function LeadDetailRow({
 
             <div className="flex flex-col gap-1.5">
               <textarea
-                className="w-full text-sm border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none bg-white"
+                className="w-full text-sm border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none bg-white"
                 placeholder="Nový zápisek z hovoru…"
                 rows={2}
                 value={draft}
@@ -579,7 +579,7 @@ function LeadDetailRow({
               <button
                 onClick={submit}
                 disabled={!draft.trim() || isPending}
-                className="self-start flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="self-start flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <Plus size={12} strokeWidth={1.5} />
                 Přidat poznámku
@@ -591,8 +591,8 @@ function LeadDetailRow({
                 {notes.map((note, i) => (
                   <li key={note.id} className="relative flex gap-2.5 group/note">
                     <div className="flex flex-col items-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand-600 mt-1.5 shrink-0" />
-                      {i < notes.length - 1 && <div className="w-px flex-1 bg-brand-100 mt-1" />}
+                      <div className="w-1.5 h-1.5 rounded-full bg-navy-600 mt-1.5 shrink-0" />
+                      {i < notes.length - 1 && <div className="w-px flex-1 bg-navy-100 mt-1" />}
                     </div>
                     <div className="pb-2.5 flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -999,7 +999,7 @@ export default function LeadsTable({
           <button
             onClick={() => { setAddingNew(true); setEditingId(null) }}
             disabled={addingNew}
-            className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-50 transition-colors"
           >
             <Plus size={14} />
             Přidat kontakt

@@ -6,7 +6,7 @@ import { toast } from '@/components/ui/toast'
 import { UserPlus, X } from 'lucide-react'
 import { inviteClientAction } from './actions'
 
-const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500'
 
 /**
  * Pozvat klienta (S17): Clerk organizace + účet a byznys ze šablony oboru +

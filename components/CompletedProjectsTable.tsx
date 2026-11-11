@@ -58,11 +58,11 @@ function ProjectForm({
     setForm(prev => ({ ...prev, [field]: value === '' ? null : value }))
 
   return (
-    <tr className="bg-brand-50/40">
+    <tr className="bg-navy-50/40">
       <td className="px-3 py-2">
         <input
           autoFocus
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Název zakázky *"
           value={form.title}
           onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
@@ -70,7 +70,7 @@ function ProjectForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Klient"
           value={form.client_name ?? ''}
           onChange={e => set('client_name', e.target.value)}
@@ -78,7 +78,7 @@ function ProjectForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Firma"
           value={form.company ?? ''}
           onChange={e => set('company', e.target.value)}
@@ -87,7 +87,7 @@ function ProjectForm({
       <td className="px-3 py-2">
         <input
           type="date"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           value={form.completed_at}
           onChange={e => set('completed_at', e.target.value)}
         />
@@ -96,7 +96,7 @@ function ProjectForm({
         <input
           type="number"
           min="0"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Kč"
           value={form.amount || ''}
           onChange={e => setForm(prev => ({ ...prev, amount: Number(e.target.value) || 0 }))}
@@ -106,7 +106,7 @@ function ProjectForm({
         <input
           type="number"
           min="0"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Záloha Kč"
           value={form.deposit_amount ?? ''}
           onChange={e => set('deposit_amount', e.target.value ? Number(e.target.value) : null)}
@@ -115,7 +115,7 @@ function ProjectForm({
       <td className="px-3 py-2">
         <div className="relative">
           <select
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-6 focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-6 focus:outline-none focus:ring-2 focus:ring-navy-500 appearance-none bg-white"
             value={form.difficulty}
             onChange={e => setForm(prev => ({ ...prev, difficulty: Number(e.target.value) }))}
           >
@@ -131,7 +131,7 @@ function ProjectForm({
           type="number"
           min="0"
           step="0.5"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="hod."
           value={form.time_invested ?? ''}
           onChange={e => set('time_invested', e.target.value ? Number(e.target.value) : null)}
@@ -142,7 +142,7 @@ function ProjectForm({
           type="number"
           min="0"
           step="0.5"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="odhad hod."
           value={form.estimated_hours ?? ''}
           onChange={e => set('estimated_hours', e.target.value ? Number(e.target.value) : null)}
@@ -150,7 +150,7 @@ function ProjectForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
           placeholder="Poznámka"
           value={form.notes ?? ''}
           onChange={e => set('notes', e.target.value)}
@@ -161,7 +161,7 @@ function ProjectForm({
           <button
             disabled={!form.title.trim() || isPending}
             onClick={() => form.title.trim() && onSave(form)}
-            className="p-1.5 rounded-md bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Check size={14} />
           </button>
@@ -244,7 +244,7 @@ function ProjectRow({
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={onEdit}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-brand-700 hover:bg-brand-50 transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors"
           >
             <Pencil size={13} strokeWidth={1.5} />
           </button>
@@ -313,7 +313,7 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
         <button
           onClick={() => { setAddingNew(true); setEditingId(null) }}
           disabled={addingNew}
-          className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-50 transition-colors"
         >
           <Plus size={14} />
           Přidat zakázku
@@ -325,8 +325,8 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
           onClick={() => { setTab('client'); setAddingNew(false); setEditingId(null) }}
           className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
             tab === 'client'
-              ? 'bg-brand-600 text-white shadow-sm'
-              : 'text-muted-foreground hover:text-brand-800 hover:bg-brand-50'
+              ? 'bg-navy-600 text-white shadow-sm'
+              : 'text-muted-foreground hover:text-navy-800 hover:bg-navy-50'
           }`}
         >
           Zakázky pro klienty
@@ -340,8 +340,8 @@ export default function CompletedProjectsTable({ initialProjects }: { initialPro
           onClick={() => { setTab('personal'); setAddingNew(false); setEditingId(null) }}
           className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
             tab === 'personal'
-              ? 'bg-brand-600 text-white shadow-sm'
-              : 'text-muted-foreground hover:text-brand-800 hover:bg-brand-50'
+              ? 'bg-navy-600 text-white shadow-sm'
+              : 'text-muted-foreground hover:text-navy-800 hover:bg-navy-50'
           }`}
         >
           Osobní projekty

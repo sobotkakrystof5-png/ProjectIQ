@@ -37,7 +37,7 @@ function StatCard({
       : accent === 'red'
         ? 'text-red-600'
         : accent === 'blue'
-          ? 'text-brand-700'
+          ? 'text-navy-700'
           : accent === 'amber'
             ? 'text-amber-600'
             : 'text-foreground'
@@ -79,7 +79,7 @@ function DifficultyVsTime({ projects }: { projects: CompletedProject[] }) {
   if (rows.length === 0) {
     return (
       <div>
-        <SectionHeader icon={<Gauge size={14} className="text-brand-500" strokeWidth={1.5} />} title="Náročnost vs. skutečný čas" />
+        <SectionHeader icon={<Gauge size={14} className="text-navy-500" strokeWidth={1.5} />} title="Náročnost vs. skutečný čas" />
         <p className="text-sm text-muted-foreground">
           Zatím žádná zakázka nemá vyplněný odpracovaný čas — nemá se s čím porovnávat.
         </p>
@@ -104,7 +104,7 @@ function DifficultyVsTime({ projects }: { projects: CompletedProject[] }) {
   return (
     <div>
       <SectionHeader
-        icon={<Gauge size={14} className="text-brand-500" strokeWidth={1.5} />}
+        icon={<Gauge size={14} className="text-navy-500" strokeWidth={1.5} />}
         title="Náročnost vs. skutečný čas"
         sub="Rostou hodiny s vnímanou náročností, nebo je to nezávislé?"
       />
@@ -133,7 +133,7 @@ function DifficultyVsTime({ projects }: { projects: CompletedProject[] }) {
             <span className="text-xs text-muted-foreground truncate w-32 shrink-0" title={r.title}>{r.title}</span>
             <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-brand-400 rounded-full"
+                className="h-full bg-navy-400 rounded-full"
                 style={{ width: `${Math.max(4, (r.hours / maxHours) * 100)}%` }}
               />
             </div>
@@ -171,7 +171,7 @@ function EstimateVsReality({ projects }: { projects: CompletedProject[] }) {
   if (rows.length === 0) {
     return (
       <div>
-        <SectionHeader icon={<Target size={14} className="text-brand-500" strokeWidth={1.5} />} title="Odhad vs. realita" />
+        <SectionHeader icon={<Target size={14} className="text-navy-500" strokeWidth={1.5} />} title="Odhad vs. realita" />
         <p className="text-sm text-muted-foreground">
           Zatím žádná zakázka nemá vyplněný odhad z doby zadání. Přidej ho příště v okně „Dokončit zakázku&rdquo;
           nebo rovnou tady v tabulce — příští odchylka se ukáže zde.
@@ -185,7 +185,7 @@ function EstimateVsReality({ projects }: { projects: CompletedProject[] }) {
   return (
     <div>
       <SectionHeader
-        icon={<Target size={14} className="text-brand-500" strokeWidth={1.5} />}
+        icon={<Target size={14} className="text-navy-500" strokeWidth={1.5} />}
         title="Odhad vs. realita"
         sub={`${rows.length} ${rows.length === 1 ? 'zakázka s odhadem' : rows.length < 5 ? 'zakázky s odhadem' : 'zakázek s odhadem'}`}
       />
@@ -235,7 +235,7 @@ function TrendOverTime({ projects }: { projects: CompletedProject[] }) {
   if (rows.length < 2) {
     return (
       <div>
-        <SectionHeader icon={<Sparkles size={14} className="text-brand-500" strokeWidth={1.5} />} title="Vývoj v čase" />
+        <SectionHeader icon={<Sparkles size={14} className="text-navy-500" strokeWidth={1.5} />} title="Vývoj v čase" />
         <p className="text-sm text-muted-foreground">
           Potřebuješ aspoň dvě zakázky s vyplněnou částkou i časem, aby se dal ukázat trend hodinové sazby.
         </p>
@@ -266,16 +266,16 @@ function TrendOverTime({ projects }: { projects: CompletedProject[] }) {
   return (
     <div>
       <SectionHeader
-        icon={<Sparkles size={14} className="text-brand-500" strokeWidth={1.5} />}
+        icon={<Sparkles size={14} className="text-navy-500" strokeWidth={1.5} />}
         title="Vývoj v čase"
         sub="Hodinová sazba klientských zakázek chronologicky"
       />
 
       <div className="bg-slate-50 border border-border rounded-lg p-3">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-28" preserveAspectRatio="none">
-          <polyline points={polyline} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-brand-500" vectorEffect="non-scaling-stroke" />
+          <polyline points={polyline} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-navy-500" vectorEffect="non-scaling-stroke" />
           {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r="1.8" className="fill-brand-600">
+            <circle key={i} cx={p.x} cy={p.y} r="1.8" className="fill-navy-600">
               <title>{`${p.title}: ${fmt(p.rate)} Kč/h`}</title>
             </circle>
           ))}
@@ -310,7 +310,7 @@ function ClientSatisfaction({ projects, surveys }: { projects: CompletedProject[
         <SectionHeader icon={<Star size={14} className="text-amber-500" strokeWidth={1.5} />} title="Spokojenost klientů" />
         <p className="text-sm text-muted-foreground">
           Zatím žádný klient nevyplnil dotazník spokojenosti.{' '}
-          <Link href="/dashboard/hodnoceni" className="text-brand-700 hover:underline">Zobrazit v Hodnocení →</Link>
+          <Link href="/dashboard/hodnoceni" className="text-navy-700 hover:underline">Zobrazit v Hodnocení →</Link>
         </p>
       </div>
     )
@@ -344,7 +344,7 @@ function ClientSatisfaction({ projects, surveys }: { projects: CompletedProject[
         ))}
       </div>
 
-      <Link href="/dashboard/hodnoceni" className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
+      <Link href="/dashboard/hodnoceni" className="inline-flex items-center gap-1 text-xs text-navy-700 hover:underline">
         Zobrazit všechna hodnocení <ChevronRight size={12} strokeWidth={1.5} />
       </Link>
     </div>
@@ -380,8 +380,8 @@ export default function PerformanceOverview({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center">
-          <TrendingUp size={15} className="text-brand-600" strokeWidth={1.5} />
+        <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+          <TrendingUp size={15} className="text-navy-600" strokeWidth={1.5} />
         </div>
         <div>
           <h3 className="text-base font-semibold text-foreground">Výkonnost</h3>
@@ -405,12 +405,12 @@ export default function PerformanceOverview({
           value={clientHours > 0 ? `${fmt(grossHourlyRate)} Kč/h` : '—'}
           sub="klientské příjmy / čas klientů"
           accent="blue"
-          icon={<TrendingUp size={12} className="text-brand-500" strokeWidth={1.5} />}
+          icon={<TrendingUp size={12} className="text-navy-500" strokeWidth={1.5} />}
         />
         <StatCard
           label="Průměrná náročnost"
           value={avgDifficulty > 0 ? `${avgDifficulty.toFixed(1)}/10` : '—'}
-          icon={<Gauge size={12} className="text-brand-500" strokeWidth={1.5} />}
+          icon={<Gauge size={12} className="text-navy-500" strokeWidth={1.5} />}
         />
         <StatCard
           label="Celkový čas"

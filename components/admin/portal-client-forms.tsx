@@ -15,11 +15,11 @@ import {
 import { formatDateTime } from '@/lib/utils'
 
 const field =
-  'min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100'
+  'min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-100'
 const btn =
   'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-4 text-sm font-medium disabled:opacity-50'
-const primary = `${btn} bg-brand-700 text-white hover:bg-brand-800`
-const quiet = `${btn} border border-border text-foreground hover:bg-brand-50`
+const primary = `${btn} bg-navy-700 text-white hover:bg-navy-800`
+const quiet = `${btn} border border-border text-foreground hover:bg-navy-50`
 
 export function CreateClientForm() {
   const router = useRouter()

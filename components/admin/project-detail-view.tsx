@@ -92,7 +92,7 @@ export async function ProjectDetailView({
           <Link
             href="/dashboard/zakazky"
             aria-label="Zpět na zakázky"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-brand-50 hover:text-brand-800"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-navy-50 hover:text-navy-800"
           >
             <ArrowLeft size={18} strokeWidth={1.5} />
           </Link>
@@ -115,7 +115,7 @@ export async function ProjectDetailView({
             href={project.project_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm text-brand-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
+            className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm text-navy-700 transition-colors hover:bg-navy-50 hover:text-navy-800"
           >
             <ExternalLink size={14} strokeWidth={1.5} />
             Živá verze
@@ -187,8 +187,8 @@ async function OverviewTab({ project }: { project: Project }) {
             <p className="mb-3 text-sm text-muted-foreground">
               Pošlete klientovi odkaz. Bez registrace uvidí aktuální stav zakázky.
             </p>
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2">
-              <span className="flex-1 truncate font-mono text-xs text-brand-600">{publicUrl}</span>
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2">
+              <span className="flex-1 truncate font-mono text-xs text-navy-600">{publicUrl}</span>
             </div>
             <ShareButton token={project.public_token} />
           </div>
@@ -352,12 +352,12 @@ async function MessagesTab({ project }: { project: Project }) {
             {progressUpdates.map((u, i) => (
               <li key={u.id} className="relative flex gap-3">
                 <div className="flex flex-col items-center">
-                  <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" />
-                  {i < progressUpdates.length - 1 && <div className="mt-1 w-px flex-1 bg-brand-100" />}
+                  <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-navy-600" />
+                  {i < progressUpdates.length - 1 && <div className="mt-1 w-px flex-1 bg-navy-100" />}
                 </div>
                 <div className="flex-1 pb-3">
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="rounded-full border border-brand-100 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                    <span className="rounded-full border border-navy-100 bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
                       {u.progress_from}% → {u.progress_to}%
                     </span>
                     <span className="text-xs text-muted-foreground">{formatDate(u.created_at)}</span>

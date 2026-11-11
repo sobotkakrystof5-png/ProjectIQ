@@ -87,7 +87,7 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
                   href={`/r/${b.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-700 hover:underline"
+                  className="inline-flex items-center gap-1 text-[12px] font-medium text-navy-700 hover:underline"
                 >
                   Objednávací stránka
                   <ExternalLink size={12} strokeWidth={1.5} />

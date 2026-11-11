@@ -42,7 +42,7 @@ export const STATUS_STYLES: Record<ProjectStatus, string> = {
   in_progress: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   review: 'bg-purple-50 text-purple-700 ring-1 ring-purple-200',
   done: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-  paid: 'bg-brand-800 text-white',
+  paid: 'bg-navy-800 text-white',
 }
 
 export const STATUS_ORDER: ProjectStatus[] = ['new', 'in_progress', 'review', 'done', 'paid']

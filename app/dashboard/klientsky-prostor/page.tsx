@@ -36,7 +36,7 @@ export default async function PortalClientsPage() {
                 <li key={c.id}>
                   <Link
                     href={`/dashboard/klientsky-prostor/${c.id}`}
-                    className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3 hover:border-brand-300"
+                    className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3 hover:border-navy-300"
                   >
                     <span className="font-medium text-foreground">{c.name}</span>
                     <span className="text-xs text-muted-foreground">

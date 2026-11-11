@@ -147,7 +147,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
             setFromVoice(false)
             setSubmitted(false)
           }}
-          className="text-xs font-medium text-brand-700 hover:underline"
+          className="text-xs font-medium text-navy-700 hover:underline"
         >
           Poslat další požadavek
         </button>
@@ -160,7 +160,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="flex items-center gap-2">
-        <MessageSquarePlus size={13} strokeWidth={1.5} className="text-brand-500" />
+        <MessageSquarePlus size={13} strokeWidth={1.5} className="text-navy-500" />
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Máte požadavek nebo změnu?</p>
       </div>
 
@@ -174,7 +174,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
         rows={4}
         disabled={voice !== 'idle'}
         placeholder="Napište, co byste chtěli změnit nebo doplnit…"
-        className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-brand-300 disabled:opacity-60"
+        className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-navy-300 disabled:opacity-60"
       />
 
       {fromVoice && voice === 'idle' && (
@@ -197,7 +197,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
               'inline-flex min-h-[44px] items-center gap-2 rounded-lg border px-3.5 text-sm font-medium transition-colors disabled:opacity-60',
               voice === 'recording'
                 ? 'border-red-300 bg-red-50 text-red-700'
-                : 'border-border bg-white text-foreground hover:bg-brand-50',
+                : 'border-border bg-white text-foreground hover:bg-navy-50',
             )}
           >
             {voice === 'recording' ? (

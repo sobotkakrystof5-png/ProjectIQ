@@ -15,7 +15,7 @@ export default async function ProjektyPage() {
         </div>
         <Link
           href="/dashboard/projekty/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
         >
           <Plus size={15} strokeWidth={1.5} />
           Nový projekt
@@ -33,7 +33,7 @@ export default async function ProjektyPage() {
           </p>
           <Link
             href="/dashboard/projekty/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
           >
             <Plus size={15} strokeWidth={1.5} />
             Přidat projekt

@@ -40,7 +40,7 @@ export function PortalReplyPanel({ projectId, messages }: { projectId: string; m
         <ul className="space-y-2">
           {messages.map((m) => (
             <li key={m.id} className={cn('flex', m.author === 'admin' ? 'justify-end' : 'justify-start')}>
-              <div className={cn('max-w-[85%] rounded-xl px-4 py-2.5', m.author === 'admin' ? 'bg-brand-50' : 'border border-border bg-white')}>
+              <div className={cn('max-w-[85%] rounded-xl px-4 py-2.5', m.author === 'admin' ? 'bg-navy-50' : 'border border-border bg-white')}>
                 <p className="whitespace-pre-wrap text-sm text-foreground">{m.body}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {m.author === 'admin' ? 'Vy' : 'Klient'} · {formatDateTime(m.createdAt)}
@@ -59,10 +59,10 @@ export function PortalReplyPanel({ projectId, messages }: { projectId: string; m
           maxLength={2000}
           rows={3}
           placeholder="Odpověď klientovi…"
-          className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-100"
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={pending || !body.trim()} className="inline-flex min-h-[44px] items-center rounded-lg bg-brand-700 px-4 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
+        <button type="submit" disabled={pending || !body.trim()} className="inline-flex min-h-[44px] items-center rounded-lg bg-navy-700 px-4 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-50">
           Odeslat do klientského prostoru
         </button>
       </form>
