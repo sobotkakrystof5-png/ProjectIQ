@@ -483,6 +483,33 @@ Workspace (`GuideTopicKey`, `NavKey`), takže adminu nejsou k ničemu. Převzaly
 migrace 103 připravená; `EXPLAIN` v PGlite ukazuje index scan u dosud neindexovaných řazení.
 **Riziko:** střední; migrace je aditivní.
 
+**Provedeno 2026-11-11**, se čtyřmi odchylkami:
+1. **„Kolo" nově znamená požadavek, ne dotaz.** Dávka je po síti jedno volání, i když je
+   v ní osm dotazů — a právě o to tu jde. Čísla v sekci 11 proto nejsou přímo porovnatelná
+   s výchozím měřením z AD00 (tam kolo = jedno zavolání `sql`); u každého řádku je původní
+   počet dotazů v závorce.
+2. **`batchTolerant`.** Transakce padá celá, když jeden dotaz narazí na chybějící tabulku —
+   a `client_requests` (092) i `project_activity` (093) na některé databázi být nemusí.
+   Dávka se proto při chybě rozpadne na jednotlivé dotazy a chybějící sekce vrátí prázdno.
+   Bez toho by menu i Dnes spadly tam, kde dnes jen chybí jedna sekce.
+3. **Fakturaci a Aktivitě v detailu zakázky zbývá druhá vlna.** Čtou přes sdílené funkce
+   (`getProjectInvoices`, `getProjectCosts`, `loadProjectActivity`, `getActiveAgentKey`),
+   jejichž mapování žije v `'use server'` souborech — vytáhnout z nich dotazy jako hodnoty
+   znamená sáhnout do fakturace, což je AD12/AD13. Přehled, Požadavky a Zprávy jedou
+   v jedné dávce s hlavičkou.
+4. **`/dashboard/finance` není na jednom kole.** Osobní záložka stojí 7 požadavků, Podnikání 5,
+   plus dva zápisové generátory před čtením (ty ruší AD08). Sloučit je znamená rozebrat
+   jedenáct funkcí ve finance-actions, každou s vlastním mapováním — to patří k nápravě
+   financí v AD13. Dávka se použila tam, kde funkce dělala víc dotazů najednou.
+
+Navíc proti zadání: evidence faktur počítala „jiné příjmy zakázky" korelovaným `COUNT(*)`
+pro **každý řádek** výpisu; test v PGlite porovnává přepis (`GROUP BY` + odečtení vlastní
+transakce) s původním dotazem nad stejnými daty — jsou to peníze, ne jen rychlost.
+`/dashboard/klienti` kromě laterálů dostalo stránkování po padesáti (`?strana=`); čísla
+v hlavičce se počítají přes všechny účty, aby nezávisela na otevřené stránce.
+`pg_trgm` a čtyři trigramové indexy jsou **příprava pro AD07** — ⌘K dnes do databáze
+nesahá, takže zatím nic nezrychlují; je to napsané v hlavičce migrace.
+
 ### AD07 — Sdílená tabulka a výpisy (M–L, bez migrace)
 **Cíl:** jedna tabulka s řazením, filtry a stránkováním v URL místo pěti ručních.
 **Nový `components/admin/data-table.tsx`** — serverová komponenta, stav v URL, takže řazení i stránky
@@ -878,7 +905,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | **hotovo 2026-11-11** |
 | AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | nezačato |
+| AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | nezačato |
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | nezačato |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | nezačato |
@@ -1005,25 +1032,56 @@ Nepsat číslo, které nevzniklo měřením.*
 
 ### Kola do databáze
 
-Kolo = jedno zavolání `sql`. Vlna = kola, která odstartovala společně (`Promise.all`);
-další vlna znamená čekání na odpověď předchozí. Čítač žije v testu
-`lib/__tests__/admin-db-rounds.test.ts` (v aplikačním kódu nezůstává) a slouží zároveň
-jako strop — když počet naroste, test padne.
+Kolo = **jeden požadavek do databáze**. Do AD06 to bylo totéž co jedno zavolání
+`sql`; od AD06 je dávka (`adminDb.batch`) jedno volání po síti, i když je v ní
+osm dotazů — a platí se právě ta volání. Ve sloupci „po" je proto v závorce
+i počet dotazů, aby bylo vidět, že se jich nikam neztratil. Vlna = kola, která
+odstartovala společně (`Promise.all`); další vlna znamená čekání na odpověď
+předchozí. Čítač žije v testu `lib/__tests__/admin-db-rounds.test.ts`
+(v aplikačním kódu nezůstává) a slouží zároveň jako strop — když počet naroste,
+test padne.
 
-| Obrazovka | Kol do DB před | Kol po | Jak zjištěno |
+| Obrazovka | Kol do DB před | Kol po (AD06) | Jak zjištěno |
 |---|---|---|---|
-| kostra administrace (odznaky v menu) | 3 (1 vlna) | — | čítač v testu |
-| `/dashboard` (Dnes) | 6 (1 vlna) | 8 (1 vlna, s penězi z AD03) | čítač v testu |
-| kostra + Dnes dohromady | 9 (2 vlny) | 11 (2 vlny, AD03) | čítač v testu |
-| `/dashboard/[id]` | 12 (5 vln) | — | průzkum kódu 2026-11-10 |
-| `/dashboard/calls` | 5 | — | průzkum kódu 2026-11-10 |
-| `/dashboard/calendar` | 7 | — | průzkum kódu 2026-11-10 |
-| `/dashboard/faktury` | 5 | — | průzkum kódu 2026-11-10 |
-| `/dashboard/finance` (dřív `/hub/finance`) | ~12 (3 vlny) | +4 kola na záložce Podnikání | průzkum kódu 2026-11-10; AD03 přidal `getBusinessOverview` (4 dotazy v téže vlně) |
+| kostra administrace (odznaky v menu) | 3 (1 vlna) | **1** (3 dotazy), navíc streamem — obsah na ni nečeká | čítač v testu |
+| `/dashboard` (Dnes) | 8 (1 vlna) | **1** (8 dotazů) | čítač v testu |
+| kostra + Dnes dohromady | 11 (2 vlny) | **2** (11 dotazů, 2 vlny) | čítač v testu |
+| `/dashboard/[id]` — Přehled | 12 (5 vln) | **1** (2 dotazy) | čtení kódu + smoke test |
+| `/dashboard/[id]` — Zprávy | 12 (5 vln) | **1** (8 dotazů) | čtení kódu + smoke test |
+| `/dashboard/[id]` — Požadavky | 12 (5 vln) | **1** (3 dotazy) | čtení kódu + smoke test |
+| `/dashboard/[id]` — Aktivita / Fakturace | 12 (5 vln) | **3** (2 vlny) | zbývá AD12/AD13 |
+| `/dashboard/calls` | 5 | **1** (2 dotazy) | čtení kódu |
+| `/dashboard/calendar` | 7 | **1** (4 dotazy) | čtení kódu |
+| `/dashboard/faktury` | 5 | **1** (2 dotazy) | čtení kódu |
+| `/dashboard/klienti` | 1 kolo, 11 korelovaných podvýběrů na účet | **1** (3 dotazy, 8 laterálů, LIMIT 50) | čtení kódu + test v PGlite |
+| `/dashboard/finance` — Osobní | ~12 (3 vlny) | **9** (2 vlny: 2 zápisy + 7 čtení) | čtení kódu |
+| `/dashboard/finance` — Podnikání | ~16 (3 vlny) | **7** (2 vlny: 2 zápisy + 5 čtení) | čtení kódu |
 
-Obrazovky zjištěné jen průzkumem kódu načítají data uvnitř stránky nebo v komponentě,
-takže je čítač zatím nepokrývá; AD06 jim data stáhne do `lib/admin/db.ts` a tím je
-změřitelné udělá.
+Finance zůstávají nejdražší obrazovkou adminu: dva zápisové generátory běží při
+každém GET (ruší AD08) a jedenáct čtecích funkcí má každá vlastní mapování
+(slučuje AD13).
+
+### Co udělaly indexy (migrace 103)
+
+`EXPLAIN` v PGlite nad syntetickými daty produkční velikosti (4 000 leadů,
+2 000 zakázek, 3 000 událostí, 2 000 faktur), měří `lib/__tests__/admin-indexy.test.ts`.
+**Čísla jsou odhad ceny od plánovače, ne milisekundy** — PGlite je Postgres ve WASM
+a jeho časy o Neonu nic neříkají (sekce 7). Co platí bez výhrad: před migrací čte
+všech sedm dotazů celou tabulku, po ní ani jeden.
+
+| Dotaz | Plán před | Plán po | Cena |
+|---|---|---|---|
+| Hovory: `client_leads ORDER BY created_at DESC LIMIT 50` | Seq Scan + Sort | Index Scan | 217,0 → 2,3 |
+| Dnes: zakázky bez pohybu | Seq Scan + Sort | Index Scan | 88,0 → 0,6 |
+| Faktury: `ORDER BY issued_on DESC LIMIT 50` | Seq Scan + Sort | Index Scan | 105,6 → 3,6 |
+| Dnes: faktury po splatnosti | Seq Scan + Sort | Index Scan | 63,1 → 1,8 |
+| Kalendář: události podle `starts_at` | Seq Scan + Sort | Index Scan | 239,8 → 121,3 |
+| Kalendář: naplánované hovory | Seq Scan | Bitmap Index Scan | 99,8 → 64,4 |
+| Kalendář: termíny zakázek | Seq Scan | Bitmap Index Scan | 61,3 → 53,8 |
+
+Dotazy, které filtrují `EXTRACT(YEAR FROM date)` nebo `to_char(date, 'YYYY-MM')`
+(roční příjem, peníze za měsíc na Dnes), index použít **nemůžou** — funkce nad
+sloupcem to znemožní. Přepsat je na rozsah patří k AD13.
 
 ### Staré třídy v adminu
 
@@ -1059,19 +1117,33 @@ součet skriptů, které jsou v HTML stránky, gzip spočítaný z souborů na d
 (`node scripts/bundle-stats.mjs --server http://localhost:3000 --cookie …`).
 Společné pro každou stránku: **168,6 kB gzip** (7 souborů).
 
-| Trasa | JS před (gzip) | JS po |
+| Trasa | JS před (AD00) | JS po (AD06) |
 |---|---|---|
-| `/login` | 226,2 kB | — |
-| `/` (landing) | 267,0 kB | — |
-| `/dashboard` (Dnes) | 234,4 kB | — |
-| `/dashboard/zakazky` | 237,0 kB | — |
-| `/dashboard/calls` | 278,1 kB | — |
-| `/dashboard/calendar` | 274,4 kB | — |
-| `/dashboard/faktury` | 241,4 kB | — |
-| `/dashboard/naklady` | 239,3 kB | — |
-| `/hub` | 230,3 kB | — |
-| `/hub/finance` | 255,6 kB | — |
-| `/alteno` | 238,0 kB | — |
+| `/login` | 226,2 kB | 226,2 kB |
+| `/` (landing) | 267,0 kB | **251,5 kB** |
+| `/dashboard` (Dnes) | 234,4 kB | 245,2 kB |
+| `/dashboard/zakazky` | 237,0 kB | 249,9 kB |
+| `/dashboard/calls` | 278,1 kB | 291,5 kB |
+| `/dashboard/calendar` | 274,4 kB | 287,6 kB |
+| `/dashboard/faktury` | 241,4 kB | 254,4 kB |
+| `/dashboard/naklady` | 239,3 kB | 252,7 kB |
+| `/dashboard/finance` (dřív `/hub/finance`) | 255,6 kB | 273,9 kB |
+| `/hub`, `/alteno` | 230,3 / 238,0 kB | zrušeno (AD02, AD03) |
+
+**Takhle se to čte:** sloupec „po" není přínos AD06, ale stav po AD03–AD06 dohromady.
+Admin od AD00 vyrostl o 11–18 kB, protože AD04 a AD05 mu přidaly `components/ui/*`
+(portály, toasty, odznaky) a jednu kostru. Zhubnutí adminu má v plánu AD08
+(`next/dynamic`, `LazyMotion`, strop v testu), ne tohle sezení.
+
+Jediné číslo, které patří AD06, je **landing: −15,5 kB**. Je to `SessionProvider`
+z kořenového layoutu: landing na něm nic nestavěla, jen kvůli jedné podmínce
+v hlavičce načítala NextAuth a po načtení volala `/api/auth/session`. V HTML
+produkčního buildu po změně `/api/auth/session` není ani jednou.
+
+Čistý rozdíl „před AD06 / po AD06" změřit nešlo: v pracovní kopii leží cizí
+rozpracované soubory (`lib/admin/costs.ts`, `components/admin/costs/`,
+změněná `app/dashboard/naklady/page.tsx`), se kterými se starší commit nepřeloží,
+a cizí práce se nepřepisuje ani neuklízí.
 
 Turbopack v Next 16 per-route klientské chunky v manifestech `.next` neuvádí (všechny
 trasy by vyšly stejně, jen společné soubory), proto se měří z vykresleného HTML.

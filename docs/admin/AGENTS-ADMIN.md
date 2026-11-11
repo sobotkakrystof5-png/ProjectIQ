@@ -24,7 +24,7 @@
 | Styling | Tailwind CSS (+ `clsx`, `tailwind-merge`) | Vlastní komponenty, brand-* barvy — shadcn/ui admin nepoužívá |
 | Animace | Framer Motion | Booking modal, success states |
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
-| Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL` |
+| Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL`. Čtení obrazovek jde od AD06 přes `lib/admin/db.ts` (dávky), starší volání přes `lib/db.ts` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
 | Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session s platností 12 h (`lib/auth.ts`, od 2026-11-03), zámek 5 chybných pokusů za 15 min na IP, chráněno i přes `proxy.ts` |
 | Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
@@ -41,6 +41,25 @@
 ## Databázový model
 
 Základní schéma je v tomto souboru níže. Inkrementální změny (nové tabulky/sloupce, opravy constraintů) jsou v `migrations/*.sql` — čísluj sekvenčně a pište idempotentně (`IF NOT EXISTS`, `DO $$ ... $$` guard na constrainty).
+
+### Jak admin čte z databáze (AD06)
+
+- **`lib/admin/db.ts`** je datová vrstva obrazovek adminu: tag `q`, `adminDb\`…\`` pro
+  jeden dotaz a **`adminDb.batch([...])`** pro víc dotazů **jedním požadavkem** (Neon HTTP
+  pošle celou transakci najednou). `fetchOptions: { cache: 'no-store' }`, jinak by Next
+  odpovědi uložil do data cache a admin ukazoval stará data. `setAdminDbForTests` podstrčí
+  ovladač v testech.
+- **`batchTolerant([...])`** je dávka, která snese chybějící tabulku: transakce padá celá,
+  když jeden dotaz narazí na `client_requests` (092) nebo `project_activity` (093) tam, kde
+  ještě nejsou. Při chybě se dotazy zkusí jednotlivě a ten rozbitý vrátí prázdno. Používá
+  ho `lib/admin-counts.ts` a `lib/admin-today-queries.ts`.
+- **`lib/db.ts` zůstává** kvůli zhruba padesáti souborům, hlavně zápisům a server actions.
+  Pravidlo: **nové a přepisované čtení obrazovky jde přes `adminDb`**, zápisy se nepřepisují,
+  dokud k tomu není důvod.
+- Nezaměňovat s **`lib/ws/admin/db.ts`** — ten je o tom, jak admin čte schéma `ws`
+  (data klientů Workspace, R-052). `lib/admin/db.ts` se schématu `ws` nedotkne.
+- Kolik požadavků stojí která obrazovka hlídá `lib/__tests__/admin-db-rounds.test.ts`
+  jako strop; naměřené hodnoty jsou v plánu modernizace, sekce 11.
 
 **Tabulky `projects`, `client_messages` a `progress_updates` žádná migrace nezakládá** — vznikly ručně v Neon konzoli před migrací 001. Na čistou databázi je dostane `node scripts/apply-migration.js scripts/admin-base-schema.sql`, pak teprve jdou migrace 001+ (AD00).
 
@@ -202,9 +221,9 @@ app/
 ├── actions.ts                   ← Server Actions: createProject, updateProject, deleteProject, client messages
 ├── portal-actions.ts            ← Public Server Actions: submitFeedback, submitConsultation (token-only auth, rate-limited)
 ├── calendar-actions.ts          ← Server Actions: createCalendarEvent, deleteCalendarEvent
-├── providers.tsx                ← SessionProvider wrapper (client)
 ├── dashboard/
-│   ├── layout.tsx               ← Ochrana routy (getServerSession) + nav
+│   ├── layout.tsx               ← Ochrana routy (getServerSession) + kostra; počty posílá jako příslib (AD06)
+│   ├── loading.tsx              ← Kostlivec Dnes (další u calls, calendar, faktury, zakazky, klienti…)
 │   ├── page.tsx                 ← Přehled zakázek
 │   ├── new/page.tsx             ← Nová zakázka
 │   ├── calendar/page.tsx        ← Globální kalendář (všechny projekty)
@@ -333,12 +352,15 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 
 ### Kostra administrace (KP01, R-071)
 - `/dashboard/*` používá `components/admin/admin-shell.tsx`: postranní menu na počítači, horní lišta a spodní lišta s nabídkou „Více“ na telefonu, hledání ⌘K (stránky, zakázky, hovory, faktury; `app/admin-search-actions.ts`). Od AD03 je menu jedno pro celý admin (skupiny Přehled · Práce · Peníze · Klienti · Osobní v `lib/admin-nav.ts`); Hub zanikl.
-- Menu a odznaky: `lib/admin-nav.ts` (skupiny Přehled · Práce · Peníze · Klienti · Osobní) a `lib/admin-counts.ts` (počty jedním dotazem). Nová stránka adminu = položka v `ADMIN_NAV`; test `lib/__tests__/admin-nav.test.ts` hlídá, že žádná dřívější cesta nezmizela.
+- Menu a odznaky: `lib/admin-nav.ts` (skupiny Přehled · Práce · Peníze · Klienti · Osobní) a `lib/admin-counts.ts` (počty jedním požadavkem). **Kostra na čísla nečeká (AD06):** layout předává `AdminShell` **příslib**, ne hodnotu, a odznaky se dokreslují v `<Suspense>`; dokud databáze neodpoví, kreslí se menu s nulami (ne kostlivec — položky menu jsou známé a blikat nemají). Nová stránka adminu = položka v `ADMIN_NAV`; test `lib/__tests__/admin-nav.test.ts` hlídá, že žádná dřívější cesta nezmizela.
 - Vzhled: Dílky jsou od AD04 (R-081) design systém celého repa. Paleta je na `:root` (`app/tokens-dilky.css`), takže platí i tam, kde není `data-app` — `/login`, `/p/[token]`, `/h/[token]`. `app/admin-tokens.css` přidává uvnitř `[data-app="admin"]` proměnné shadcn a `--radius: 12px`; admin **nemá tmavý režim**. Písma nese `<html>` v `app/layout.tsx`, Inter se nenačítá.
 - Kořen `components/admin/admin-root.tsx` (`AdminShell` ho obaluje) drží `data-app="admin"` a `PortalContainerProvider` — bez něj by Radix portáloval dialogy, menu a tooltipy do `<body>` mimo přepisy. Je to admin obdoba `components/ws/ws-root.tsx`.
 - Toasty: admin používá `@/components/ui/toast` (ne `sonner` přímo). Modul si nese vlastní kořen s `data-app`, který nastavuje `AdminRoot` / `WsRoot`. Místo potvrzovacích dialogů se nabízí `undo` („Zpět"). `toast.warning` a `toast.info` existují kvůli převzatým voláním adminu.
 - **`cn()` se záměrně nesjednocuje.** `@/lib/utils` (admin) a `@/lib/ws/utils` (Workspace) jsou dvě identické implementace; přejmenovat import ve 153 souborech nic nepřinese a jen by zvětšilo diff každého dalšího sezení.
 - **Šířka a hlavička patří stránce (AD05).** `<main>` v `AdminShell` nemá šířku ani okraje, jen místo pro spodní lištu telefonu. Každá obrazovka `/dashboard` se obaluje `<PageShell>` z `components/ws/app/page-header.tsx` a volí si šířku: `narrow` 960 · `default` 1280 · `wide` 1440 · `table` 1600 (jedenáctisloupcové tabulky Dokončených a Hovorů). Nadpis dělá `<PageHeader>` (admin posílá `subtitleFont="sans"`, protože podnadpis je věta, ne čísla), řádek filtrů `<Toolbar>` / `<PillNav>`, prázdný stav `<EmptyState>`. Jsou to komponenty Workspace, ale závisí jen na `AccentHeading` a `cn` — žádná data `ws`. **Nová obrazovka adminu začíná `<PageShell>`, ne vlastním `max-w-*`.**
+- **Kostlivci obrazovek (AD06).** `components/admin/page-skeleton.tsx` (`TodaySkeleton`, `TableSkeleton`, `CalendarSkeleton`) a `loading.tsx` u `/dashboard` a devíti podstránek. Kostlivec má **stejnou šířku a rozvržení** jako hotová obrazovka, aby se po načtení nic nepřeskládalo, a nekreslí žádné číslo ani text, co by se dal splést se skutečným údajem. `loading.tsx` u `/dashboard` platí i pro podstránky, které si vlastní nezaložily.
+- **`experimental.staleTimes: { dynamic: 30, static: 180 }`** (`next.config.mjs`, AD06): Zpět a Vpřed po dobu 30 s nesahají do databáze. Data po vlastní akci se obnovují cíleně přes `revalidatePath`, takže se stará data ukážou jen při prostém listování tam a zpět.
+- **Kořenový layout nemá `SessionProvider` (AD06).** `useSession()` v repu nikdo nepoužívá; admin si session čte na serveru (`getServerSession`) a hlavička landing page dostává `signedIn` jako prop z `Hero` / `LegalPage`. Dřív provider obaloval celou aplikaci, takže NextAuth načítal i Workspace a landing a každý návštěvník po načtení volal `/api/auth/session`. `signIn()` a `signOut()` z `next-auth/react` provider nepotřebují.
 - **Odznaky mají jeden systém (AD05, R-091).** `lib/admin-status.ts` má pět tónů `neutral | info | signal | success | danger` a mapy pro stav zakázky, hovoru, typ akce, druh změny, vylepšení, fázi projektu, předplatné klienta a stav faktury. Vykresluje se přes `components/ui/badge.tsx` (`toneVariant(tón)`). **Obrazovka si vlastní barvu odznaku nedefinuje**; nový stav = nový řádek v `lib/admin-status.ts`. Kategorie (typ akce, druh změny, oblast, kategorie nákladu) jsou vždy `neutral`.
 
 ### `/dashboard` — Dnes (KP02, AD03)
