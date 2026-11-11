@@ -41,6 +41,10 @@
 
 Základní schéma je v tomto souboru níže. Inkrementální změny (nové tabulky/sloupce, opravy constraintů) jsou v `migrations/*.sql` — čísluj sekvenčně a pište idempotentně (`IF NOT EXISTS`, `DO $$ ... $$` guard na constrainty).
 
+**Tabulky `projects`, `client_messages` a `progress_updates` žádná migrace nezakládá** — vznikly ručně v Neon konzoli před migrací 001. Na čistou databázi je dostane `node scripts/apply-migration.js scripts/admin-base-schema.sql`, pak teprve jdou migrace 001+ (AD00).
+
+**Evidence aplikovaných migrací:** `public.schema_migrations` (soubor, čas, hash, počet příkazů) — vede ji `scripts/apply-migration.js`, který už aplikovanou migraci přeskočí a změněný soubor pustí znovu.
+
 ### `projects`
 
 ```sql
@@ -284,7 +288,6 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | VIZEON (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/pozadavky` (požadavky klientů z portálu, napříč VIZEON i ALTENO), `/[id]/sablona` (šablona webu zakázky), `/vizeon` (inbox poptávek z vizeon.cz), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/sablony` (knihovna bloků), `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
 | ALTENO (`/alteno`) | `/alteno`, `/new`, `/[id]`, `/rezervace` |
 | Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/plany` (+ `/skola`, `/projekty`, `/byznys`, `/byznys/[id]`, `/sport`, `/finance`), `/projekty` (+ `/new`, `/[id]`), `/school`, `/sport` |
-| Legacy | `/dashboard/projekty/**` — z navigace odstraněno (přesunuto do Hubu), soubory zůstaly, viz `memory/memory.md` |
 
 ### Veřejné stránky
 

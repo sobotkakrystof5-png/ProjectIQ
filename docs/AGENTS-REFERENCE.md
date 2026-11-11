@@ -117,6 +117,12 @@ npm run build:check   # build při běžícím `next dev` (Next 16: dev má `.ne
 npm test         # vitest run
 npm run lint     # není nastavený (Next 16 `next lint` odstranil), kontrolu dělá tsc
 node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace migrace na DATABASE_URL z .env.local
+                                 # eviduje se v public.schema_migrations (soubor, čas, hash); už aplikovanou přeskočí
+                                 # --dry jen vypíše, --znovu pustí i evidovanou, vždy vypíše host DB
+node scripts/apply-migration.js scripts/admin-base-schema.sql   # čistá DB: projects, client_messages, progress_updates (migrace 001+ je nezakládají)
+node scripts/admin-seed.mjs --ano   # admin: ukázková data (--smazat --ano je smaže, bez --ano jen vypíše)
+                                 # zastaví se, když v DB leží skutečné řádky (přebití --i-s-daty)
+node scripts/bundle-stats.mjs --server http://localhost:3000 --cookie "<session>"   # kolik JS stáhne prohlížeč na trase
 node scripts/ws-create-role.js   # Workspace: role ws_app + práva + DATABASE_URL_WS do .env.local (docs/workspace/SETUP.md)
 node scripts/ws-seed.mjs <slug> --ano   # Workspace: ukázková data pro obrazovku Dnes (--smazat --ano je smaže)
 ```

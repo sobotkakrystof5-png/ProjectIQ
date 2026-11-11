@@ -814,7 +814,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 
 | # | Sezení | Velikost | Migrace | Závisí na | Stav |
 |---|---|---|---|---|---|
-| AD00 | Příprava, větev, testovací data, měření | S | — | — | nezačato |
+| AD00 | Příprava, větev, testovací data, měření | S | — | — | **hotovo 2026-11-11** |
 | AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | nezačato |
 | AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | nezačato |
 | AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | nezačato |
@@ -942,16 +942,60 @@ plánu, jen bych to nerad mazal bez tvého slova.
 
 ## 11. Naměřeno
 
-*Doplní AD00 (před) a AD06, AD08, AD18 (po). Nepsat číslo, které nevzniklo měřením.*
+*Výchozí stav doplnil AD00 (2026-11-11), po opravách doplní AD06, AD08 a AD18.
+Nepsat číslo, které nevzniklo měřením.*
 
-| Obrazovka | Kol do DB před | Kol po | p75 před | p75 po |
-|---|---|---|---|---|
-| `/dashboard` (Dnes) | — | — | — | — |
-| `/dashboard/[id]` | 12 (5 vln) | — | — | — |
-| `/dashboard/calls` | 5 | — | — | — |
-| `/dashboard/calendar` | 7 | — | — | — |
-| `/dashboard/faktury` | 5 | — | — | — |
-| `/hub/finance` | ~12 (3 vlny) | — | — | — |
+### Kola do databáze
+
+Kolo = jedno zavolání `sql`. Vlna = kola, která odstartovala společně (`Promise.all`);
+další vlna znamená čekání na odpověď předchozí. Čítač žije v testu
+`lib/__tests__/admin-db-rounds.test.ts` (v aplikačním kódu nezůstává) a slouží zároveň
+jako strop — když počet naroste, test padne.
+
+| Obrazovka | Kol do DB před | Kol po | Jak zjištěno |
+|---|---|---|---|
+| kostra administrace (odznaky v menu) | 3 (1 vlna) | — | čítač v testu |
+| `/dashboard` (Dnes) | 6 (1 vlna) | — | čítač v testu |
+| kostra + Dnes dohromady | 9 (2 vlny) | — | čítač v testu |
+| `/dashboard/[id]` | 12 (5 vln) | — | průzkum kódu 2026-11-10 |
+| `/dashboard/calls` | 5 | — | průzkum kódu 2026-11-10 |
+| `/dashboard/calendar` | 7 | — | průzkum kódu 2026-11-10 |
+| `/dashboard/faktury` | 5 | — | průzkum kódu 2026-11-10 |
+| `/hub/finance` | ~12 (3 vlny) | — | průzkum kódu 2026-11-10 |
+
+Obrazovky zjištěné jen průzkumem kódu načítají data uvnitř stránky nebo v komponentě,
+takže je čítač zatím nepokrývá; AD06 jim data stáhne do `lib/admin/db.ts` a tím je
+změřitelné udělá.
+
+### JavaScript na trase
+
+Měřeno z HTML produkčního buildu (`npm run build` + `npm run start`, 2026-11-11):
+součet skriptů, které jsou v HTML stránky, gzip spočítaný z souborů na disku
+(`node scripts/bundle-stats.mjs --server http://localhost:3000 --cookie …`).
+Společné pro každou stránku: **168,6 kB gzip** (7 souborů).
+
+| Trasa | JS před (gzip) | JS po |
+|---|---|---|
+| `/login` | 226,2 kB | — |
+| `/` (landing) | 267,0 kB | — |
+| `/dashboard` (Dnes) | 234,4 kB | — |
+| `/dashboard/zakazky` | 237,0 kB | — |
+| `/dashboard/calls` | 278,1 kB | — |
+| `/dashboard/calendar` | 274,4 kB | — |
+| `/dashboard/faktury` | 241,4 kB | — |
+| `/dashboard/naklady` | 239,3 kB | — |
+| `/hub` | 230,3 kB | — |
+| `/hub/finance` | 255,6 kB | — |
+| `/alteno` | 238,0 kB | — |
+
+Turbopack v Next 16 per-route klientské chunky v manifestech `.next` neuvádí (všechny
+trasy by vyšly stejně, jen společné soubory), proto se měří z vykresleného HTML.
+`route-bundle-stats.json` je generovaný a není ve gitu.
+
+### p75 z produkce
+
+Nic. Admin na produkci běží ze starého buildu (`d948400`) a nová kostra nasazená není —
+p75 per route má smysl měřit až po nasazení (Vercel runtime logy).
 
 Zakázané třídy (ukazatel z AD04 h): `muted-foreground` 1057 · `rounded-xl|2xl|lg` 710 ·
 `brand-*` 668 · `border-border` 536 · duhové `bg-{barva}-NNN` 477 · `bg-white` 302.

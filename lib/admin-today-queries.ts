@@ -4,6 +4,16 @@ import { STALE_AFTER_DAYS, type TodayData } from '@/lib/admin-today'
 
 const iso = (value: Date | string): string => new Date(value).toISOString()
 
+/**
+ * Datum z Postgresu jako YYYY-MM-DD. Sloupec `date` vrací Neon jako Date
+ * (místní půlnoc), takže `String(date)` dá „Thu Nov 12 2026…" a složený
+ * ISO řetězec by byl neplatný — Dnes na tom padalo s chybou 500.
+ */
+const dateOnly = (value: Date | string): string =>
+  value instanceof Date
+    ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+    : String(value).slice(0, 10)
+
 /** Dotaz na tabulku, která vzniká pozdější migrací: bez ní vrátí prázdný seznam. */
 const optional = <T,>(query: PromiseLike<T[]>): Promise<T[]> => Promise.resolve(query).catch(() => [])
 
@@ -85,9 +95,9 @@ export async function loadTodayData(): Promise<TodayData> {
         detail: null,
         href: projectPath(toBusiness(s.business), s.project_id),
       })),
-      ...(calls as { id: string; company_name: string; next_action: string | null; next_action_date: string; next_action_time: string | null }[]).map((c) => ({
+      ...(calls as { id: string; company_name: string; next_action: string | null; next_action_date: Date | string; next_action_time: string | null }[]).map((c) => ({
         id: `call-${c.id}`,
-        at: iso(`${String(c.next_action_date).slice(0, 10)}T${(c.next_action_time ?? '09:00').slice(0, 5)}:00`),
+        at: iso(`${dateOnly(c.next_action_date)}T${(c.next_action_time ?? '09:00').slice(0, 5)}:00`),
         label: c.company_name,
         detail: c.next_action,
         href: '/dashboard/calls',

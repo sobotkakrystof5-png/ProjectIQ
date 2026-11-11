@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Lokální konfigurace náhledu Claude Code
 .claude/launch.json
+
+# Měření velikosti balíčků (scripts/bundle-stats.mjs) — generované, nepatří do gitu
+route-bundle-stats.json
