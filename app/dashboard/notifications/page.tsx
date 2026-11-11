@@ -1,3 +1,4 @@
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { sql } from '@/lib/db'
 import { NotificationList } from '@/components/NotificationList'
 import type { NotificationType } from '@/lib/notifications'
@@ -28,12 +29,9 @@ export default async function NotificationsPage() {
   })) satisfies Notification[]
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Oznámení</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Veškeré aktivity klientů a připomínky</p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader title="Oznámení" subtitle="Aktivity klientů a připomínky." subtitleFont="sans" />
       <NotificationList notifications={notifications} />
-    </div>
+    </PageShell>
   )
 }

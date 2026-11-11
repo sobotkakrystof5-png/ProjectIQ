@@ -1,3 +1,4 @@
+import { PageShell } from '@/components/ws/app/page-header'
 import { getCompletedProjects, getProjectSurveys } from '@/app/completed-actions'
 import CompletedProjectsTable from '@/components/CompletedProjectsTable'
 import PerformanceOverview from '@/components/PerformanceOverview'
@@ -12,11 +13,11 @@ export default async function DokoncenePage() {
   const surveys = surveyRows as unknown as ProjectSurvey[]
 
   return (
-    <div className="space-y-10">
+    <PageShell width="table" className="gap-10">
       <CompletedProjectsTable initialProjects={projects} />
-      <div className="border-t border-border pt-10">
+      <div className="border-t border-navy-100 pt-10">
         <PerformanceOverview projects={projects} surveys={surveys} />
       </div>
-    </div>
+    </PageShell>
   )
 }

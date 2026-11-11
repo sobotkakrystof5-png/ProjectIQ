@@ -6,6 +6,8 @@ import { ProjectForm } from '@/components/ProjectForm'
 import { ShareButton } from '@/components/ShareButton'
 import { QRCodeDisplay } from '@/components/QRCodeDisplay'
 import { StatusBadge } from '@/components/StatusBadge'
+import { Badge } from '@/components/ui/badge'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
@@ -86,45 +88,44 @@ export async function ProjectDetailView({
   const openRequests = await countOpenRequests(projectId)
 
   return (
-    <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/zakazky"
-            aria-label="Zpět na zakázky"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-navy-50 hover:text-navy-800"
-          >
-            <ArrowLeft size={18} strokeWidth={1.5} />
-          </Link>
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{project.client_name}</h1>
+    <PageShell width={tab === 'fakturace' ? 'wide' : 'narrow'}>
+      <div>
+        <Link
+          href="/dashboard/zakazky"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-quiet transition-colors hover:text-ink"
+        >
+          <ArrowLeft size={14} strokeWidth={1.5} aria-hidden="true" />
+          Zpět na zakázky
+        </Link>
+        <PageHeader
+          className="mt-4"
+          title={project.client_name}
+          subtitle={project.description ?? undefined}
+          subtitleFont="sans"
+          action={
+            <>
               <StatusBadge status={project.status as ProjectStatus} />
-              <span
-                className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-semibold text-navy-700"
-                title={origin.domain ? `Poptávka z ${origin.domain}` : 'Zadáno ručně'}
-              >
+              <Badge variant="neutral" title={origin.domain ? `Poptávka z ${origin.domain}` : 'Zadáno ručně'}>
                 {origin.label}
-              </span>
-            </div>
-            {project.description && <p className="mt-0.5 text-sm text-muted-foreground">{project.description}</p>}
-          </div>
-        </div>
-        {project.project_url && (
-          <a
-            href={project.project_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm text-navy-700 transition-colors hover:bg-navy-50 hover:text-navy-800"
-          >
-            <ExternalLink size={14} strokeWidth={1.5} />
-            Živá verze
-          </a>
-        )}
+              </Badge>
+              {project.project_url && (
+                <a
+                  href={project.project_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-chip px-3 text-sm text-navy-700 transition-colors hover:bg-navy-50 hover:text-navy-800"
+                >
+                  <ExternalLink size={14} strokeWidth={1.5} aria-hidden="true" />
+                  Živá verze
+                </a>
+              )}
+            </>
+          }
+        />
       </div>
 
-      <nav aria-label="Části zakázky" className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <ul className="flex min-w-max gap-1 border-b border-border">
+      <nav aria-label="Části zakázky" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <ul className="flex min-w-max gap-1 border-b border-navy-100">
           {tabs.map((t) => (
             <li key={t}>
               <Link
@@ -134,7 +135,7 @@ export async function ProjectDetailView({
                   '-mb-px inline-flex min-h-[44px] items-center gap-1.5 border-b-2 px-4 text-sm font-medium transition-colors',
                   tab === t
                     ? 'border-navy-700 text-navy-700'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                    : 'border-transparent text-quiet hover:text-ink',
                 )}
               >
                 {TAB_LABELS[t]}
@@ -149,14 +150,14 @@ export async function ProjectDetailView({
         </ul>
       </nav>
 
-      <div className="max-w-2xl space-y-4">
+      <div className="space-y-4">
         {tab === 'prehled' && <OverviewTab project={project} />}
         {tab === 'aktivita' && <ActivityTab project={project} />}
         {tab === 'pozadavky' && <RequestsTab project={project} />}
         {tab === 'zpravy' && <MessagesTab project={project} />}
         {tab === 'fakturace' && <BillingTab project={project} />}
       </div>
-    </div>
+    </PageShell>
   )
 }
 

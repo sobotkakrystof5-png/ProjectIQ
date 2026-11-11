@@ -1,3 +1,4 @@
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { z } from 'zod'
 import { getNewsItem, listNews } from '@/lib/ws/admin/news'
 import { wsFontVariables } from '@/lib/ws/fonts'
@@ -24,13 +25,12 @@ export default async function NovinkyPage(props: { searchParams: Promise<{ uprav
   ])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Novinky</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Co je nového v ZakazIQ. Klienti ji uvidí ve zvonku po zveřejnění, e-mail odejde jen po potvrzení.
-        </p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Novinky"
+        subtitle="Co je nového v ZakazIQ. Klienti novinku uvidí ve zvonku po zveřejnění, e-mail odejde jen po potvrzení."
+        subtitleFont="sans"
+      />
 
       <NewsEditor
         key={editing?.id ?? 'nova'}
@@ -39,9 +39,9 @@ export default async function NovinkyPage(props: { searchParams: Promise<{ uprav
       />
 
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-foreground">Všechny novinky</h2>
+        <h2 className="text-sm font-semibold text-ink">Všechny novinky</h2>
         {failed ? (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+          <div className="rounded-chip border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
             Novinky se nepodařilo načíst. Je aplikovaná migrace 083?
           </div>
         ) : (
@@ -57,6 +57,6 @@ export default async function NovinkyPage(props: { searchParams: Promise<{ uprav
           />
         )}
       </div>
-    </div>
+    </PageShell>
   )
 }

@@ -1,10 +1,11 @@
-import Link from 'next/link'
 import { sql } from '@/lib/db'
 import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { buildTerminalCommand } from '@/lib/claude-code-handoff'
 import { buildClaudeCodePrompt, type ClientRequestRow } from '@/lib/client-requests'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
-import { cn } from '@/lib/utils'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { PillNav } from '@/components/ws/app/toolbar'
+import { EmptyState } from '@/components/ws/brand'
 
 interface PageProps {
   searchParams: Promise<{ stav?: string }>
@@ -63,41 +64,31 @@ export default async function PozadavkyPage({ searchParams }: PageProps) {
   })
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Požadavky klientů</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Co klienti napsali nebo nadiktovali v portálu. Zadání zkontrolujte a vložte do Claude Code ručně.
-        </p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Požadavky klientů"
+        subtitle="Co klienti napsali nebo nadiktovali v portálu. Zadání zkontrolujte a vložte do Claude Code ručně."
+        subtitleFont="sans"
+      />
 
-      <div className="flex gap-1.5">
-        {[
-          { href: '/dashboard/pozadavky', label: 'Nové', active: !showClosed },
-          { href: '/dashboard/pozadavky?stav=vyrizene', label: 'Vyřízené', active: showClosed },
-        ].map(tab => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-              tab.active ? 'bg-navy-50 text-navy-800' : 'text-muted-foreground hover:bg-navy-50',
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </div>
+      <PillNav
+        label="Stav požadavku"
+        variant="segmented"
+        items={[
+          { key: 'nove', label: 'Nové', href: '/dashboard/pozadavky', active: !showClosed },
+          { key: 'vyrizene', label: 'Vyřízené', href: '/dashboard/pozadavky?stav=vyrizene', active: showClosed },
+        ]}
+      />
 
       {cards.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-white px-6 py-14 text-center">
-          <p className="font-medium text-foreground">{showClosed ? 'Zatím nic vyřízeného' : 'Žádné nové požadavky'}</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            {showClosed
+        <EmptyState
+          title={showClosed ? 'Zatím nic vyřízeného' : 'Žádné nové požadavky'}
+          description={
+            showClosed
               ? 'Až označíte požadavek jako hotový, najdete ho tady.'
-              : 'Až klient pošle požadavek z portálu, objeví se tady a přijde vám upozornění.'}
-          </p>
-        </div>
+              : 'Až klient pošle požadavek z portálu, objeví se tady a přijde vám upozornění.'
+          }
+        />
       ) : (
         <div className="space-y-3">
           {cards.map(card => (
@@ -105,6 +96,6 @@ export default async function PozadavkyPage({ searchParams }: PageProps) {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

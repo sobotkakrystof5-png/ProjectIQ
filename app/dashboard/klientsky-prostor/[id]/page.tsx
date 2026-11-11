@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { loadPortalClient } from '@/lib/portal/admin-queries'
 import { isInviteConfigured } from '@/lib/portal/invite'
 import { LEAD_ORIGINS, toLeadOrigin } from '@/lib/lead-origins'
@@ -26,13 +27,19 @@ export default async function PortalClientPage({ params }: { params: Promise<{ i
   if (!detail) notFound()
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard/klientsky-prostor" aria-label="Zpět na klienty" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-navy-50">
-          <ArrowLeft size={18} strokeWidth={1.5} />
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{detail.client.name}</h1>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title={detail.client.name}
+        action={
+          <Link
+            href="/dashboard/klientsky-prostor"
+            className="inline-flex min-h-11 items-center gap-2 rounded-chip px-3 text-sm text-quiet transition-colors hover:bg-navy-50 hover:text-ink"
+          >
+            <ArrowLeft size={16} strokeWidth={1.5} aria-hidden="true" />
+            Zpět na klienty
+          </Link>
+        }
+      />
 
       <section className={card}>
         <h2 className="mb-3 text-sm font-semibold text-foreground">Zakázky v prostoru klienta</h2>
@@ -99,6 +106,6 @@ export default async function PortalClientPage({ params }: { params: Promise<{ i
           </ul>
         )}
       </section>
-    </div>
+    </PageShell>
   )
 }

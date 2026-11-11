@@ -1,3 +1,4 @@
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { sql } from '@/lib/db'
 import { SmartCalendar } from '@/components/SmartCalendar'
 import type { RawConsultation, RawDeadline, RawCalendarEvent, RawLead } from '@/components/SmartCalendar'
@@ -97,13 +98,12 @@ export default async function CalendarPage() {
   })) satisfies RawLead[]
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Smart Kalendář</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Konzultace, plánované hovory, deadliny a vlastní události na jednom místě
-        </p>
-      </div>
+    <PageShell width="wide">
+      <PageHeader
+        title="Kalendář"
+        subtitle="Konzultace, plánované hovory, termíny a vlastní události na jednom místě."
+        subtitleFont="sans"
+      />
 
       <SmartCalendar
         consultations={consultations}
@@ -111,6 +111,6 @@ export default async function CalendarPage() {
         events={events}
         leads={leads}
       />
-    </div>
+    </PageShell>
   )
 }

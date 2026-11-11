@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import { Plus, Layers } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { EmptyState } from '@/components/ws/brand'
 import { getPersonalProjects } from './projekty-actions'
 import { PersonalProjectCard } from '@/components/PersonalProjectCard'
 
@@ -7,38 +9,36 @@ export default async function ProjektyPage() {
   const projects = await getPersonalProjects()
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Projekty</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Tvoje osobní projekty ve vývoji</p>
-        </div>
-        <Link
-          href="/dashboard/projekty/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
-        >
-          <Plus size={15} strokeWidth={1.5} />
-          Nový projekt
-        </Link>
-      </div>
-
-      {projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
-            <Layers size={24} strokeWidth={1.5} className="text-slate-400" />
-          </div>
-          <h2 className="text-base font-medium text-foreground mb-1.5">Zatím žádné projekty</h2>
-          <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-            Přidej svůj první osobní projekt — sleduj fázi, tech stack a nápady na jednom místě.
-          </p>
+    <PageShell>
+      <PageHeader
+        title="Projekty"
+        subtitle="Osobní projekty ve vývoji."
+        subtitleFont="sans"
+        action={
           <Link
             href="/dashboard/projekty/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
           >
-            <Plus size={15} strokeWidth={1.5} />
-            Přidat projekt
+            <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+            Nový projekt
           </Link>
-        </div>
+        }
+      />
+
+      {projects.length === 0 ? (
+        <EmptyState
+          title="Zatím žádné projekty"
+          description="Přidejte první projekt — fáze, technologie a nápady budou na jednom místě."
+          action={
+            <Link
+              href="/dashboard/projekty/new"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+            >
+              <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+              Přidat projekt
+            </Link>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map(p => (
@@ -46,6 +46,6 @@ export default async function ProjektyPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

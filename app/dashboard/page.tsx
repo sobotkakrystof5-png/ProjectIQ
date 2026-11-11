@@ -1,3 +1,4 @@
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import Link from 'next/link'
 import { ArrowRight, CalendarClock, FileWarning, MessageSquarePlus, PauseCircle, ClipboardCheck, Wallet } from 'lucide-react'
 import { loadMonthMoney, loadTodayData } from '@/lib/admin-today-queries'
@@ -104,11 +105,8 @@ export default async function TodayPage() {
   const empty = isTodayEmpty(data)
 
   return (
-    <div className="space-y-6 font-ws">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Dnes</h1>
-        <p className="mt-0.5 text-sm text-quiet">{formatDate(now.toISOString())}</p>
-      </header>
+    <PageShell width="wide">
+      <PageHeader title="Dnes" subtitle={formatDate(now.toISOString())} />
 
       {focus ? (
         <Link
@@ -231,6 +229,6 @@ export default async function TodayPage() {
 
         <MonthMoneyPanel money={money} now={now} />
       </div>
-    </div>
+    </PageShell>
   )
 }

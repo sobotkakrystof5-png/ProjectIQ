@@ -6,8 +6,9 @@ import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectCardSkeleton } from '@/components/ProjectCardSkeleton'
 import { SummaryBar } from '@/components/SummaryBar'
 import { DashboardFilters } from '@/components/DashboardFilters'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { PillNav } from '@/components/ws/app/toolbar'
 import { WEB_LEAD_ORIGINS, toLeadOrigin, type LeadOrigin } from '@/lib/lead-origins'
-import { cn } from '@/lib/utils'
 import type { Project } from '@/lib/types'
 
 // Seznam zakázek — jeden byznys, zakázky ze všech webů (AD02, R-088).
@@ -102,38 +103,33 @@ export default async function ProjectsPage(props: PageProps) {
   const origin: OriginFilter = ORIGIN_FILTERS.some((f) => f.value === zdroj) ? (zdroj as OriginFilter) : 'all'
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Zakázky</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Zakázky ze všech webů na jednom místě</p>
-        </div>
-        <Link
-          href="/dashboard/new"
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-chip bg-navy-700 px-4 text-sm font-medium text-white hover:bg-navy-800"
-        >
-          <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
-          Nová zakázka
-        </Link>
-      </div>
-
-      <div role="group" aria-label="Zdroj poptávky" className="flex flex-wrap gap-1.5">
-        {ORIGIN_FILTERS.map((f) => (
+    <PageShell width="wide">
+      <PageHeader
+        title="Zakázky"
+        subtitle="Zakázky ze všech webů na jednom místě."
+        subtitleFont="sans"
+        action={
           <Link
-            key={f.value}
-            href={originHref(f.value, status)}
-            aria-current={origin === f.value ? 'true' : undefined}
-            className={cn(
-              'inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-medium transition-colors',
-              origin === f.value ? 'bg-navy-700 text-white' : 'bg-surface text-quiet ring-1 ring-navy-100 hover:text-ink',
-            )}
+            href="/dashboard/new"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
           >
-            {f.label}
+            <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+            Nová zakázka
           </Link>
-        ))}
-      </div>
+        }
+      />
 
-      <Suspense fallback={<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl border border-border bg-white" />)}</div>}>
+      <PillNav
+        label="Zdroj poptávky"
+        items={ORIGIN_FILTERS.map((f) => ({
+          key: f.value,
+          label: f.label,
+          href: originHref(f.value, status),
+          active: origin === f.value,
+        }))}
+      />
+
+      <Suspense fallback={<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-24 animate-pulse rounded-box border border-navy-100 bg-surface" />)}</div>}>
         <SummarySection origin={origin} />
       </Suspense>
 
@@ -144,6 +140,6 @@ export default async function ProjectsPage(props: PageProps) {
       <Suspense fallback={<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((i) => <ProjectCardSkeleton key={i} />)}</div>}>
         <ProjectGrid origin={origin} status={status} />
       </Suspense>
-    </div>
+    </PageShell>
   )
 }

@@ -1,3 +1,4 @@
+import { PageShell } from '@/components/ws/app/page-header'
 import { getLeads, getAllLeadNotes } from '@/app/calls-actions'
 import LeadsTable from '@/components/LeadsTable'
 import ProjectCalculator from '@/components/ProjectCalculator'
@@ -13,11 +14,11 @@ export default async function CallsPage(
   const leads = rows as unknown as ClientLead[]
 
   return (
-    <div className="space-y-10">
+    <PageShell width="table" className="gap-10">
       <LeadsTable initialLeads={leads} initialNotes={notes} focusLeadId={searchParams.lead} />
-      <div className="border-t border-border pt-10">
+      <div className="border-t border-navy-100 pt-10">
         <ProjectCalculator />
       </div>
-    </div>
+    </PageShell>
   )
 }

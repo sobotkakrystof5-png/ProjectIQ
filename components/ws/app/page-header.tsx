@@ -8,6 +8,8 @@ const WIDTH = {
   default: 'max-w-[1280px]',
   /** Kalendář a Dnes. */
   wide: 'max-w-[1440px]',
+  /** Široká tabulka (admin: Dokončené má 11 sloupců). */
+  table: 'max-w-[1600px]',
 } as const
 
 /**
@@ -38,6 +40,7 @@ export function PageHeader({
   title,
   accent,
   subtitle,
+  subtitleFont = 'num',
   action,
   help,
   className,
@@ -46,6 +49,8 @@ export function PageHeader({
   /** Druhá půlka nadpisu v serifové kurzívě, max. jednou na obrazovce. */
   accent?: string
   subtitle?: React.ReactNode
+  /** `num` = monospace (čísla, časy), `sans` = věta. Admin používá `sans`. */
+  subtitleFont?: 'num' | 'sans'
   /** Jedna hlavní akce obrazovky (tlačítko nebo odkaz). */
   action?: React.ReactNode
   help?: React.ReactNode
@@ -58,7 +63,7 @@ export function PageHeader({
           <AccentHeading accent={accent}>{title}</AccentHeading>
           {help}
         </div>
-        {subtitle && <p className="font-num text-sm text-quiet">{subtitle}</p>}
+        {subtitle && <p className={cn('text-sm text-quiet', subtitleFont === 'num' && 'font-num')}>{subtitle}</p>}
       </div>
       {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
     </header>

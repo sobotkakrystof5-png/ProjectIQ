@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import { Plus, Rocket } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { EmptyState } from '@/components/ws/brand'
 import { getStartupProjects } from './startup-actions'
 import { StartupProjectCard } from '@/components/StartupProjectCard'
 
@@ -14,56 +16,51 @@ export default async function StartupPage() {
     : 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Startup projekty</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Tvoje osobní projekty, nápady a produkty</p>
-        </div>
-        <Link
-          href="/dashboard/startup/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
-        >
-          <Plus size={15} strokeWidth={1.5} />
-          Nový projekt
-        </Link>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Startup projekty"
+        subtitle="Vlastní nápady a produkty."
+        subtitleFont="sans"
+        action={
+          <Link
+            href="/dashboard/startup/new"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+          >
+            <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+            Nový projekt
+          </Link>
+        }
+      />
 
-      {/* Dashboard */}
       {projects.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Celkem projektů</p>
-            <p className="text-2xl font-bold text-foreground tabular-nums">{projects.length}</p>
-          </div>
-          <div className="bg-white border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Spuštěno</p>
-            <p className="text-2xl font-bold text-emerald-600 tabular-nums">{launched}</p>
-          </div>
-          <div className="bg-white border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">Průměrný postup</p>
-            <p className="text-2xl font-bold text-navy-600 tabular-nums">{avgProgress} %</p>
-          </div>
+          {[
+            { label: 'Celkem projektů', value: String(projects.length) },
+            { label: 'Spuštěno', value: String(launched) },
+            { label: 'Průměrný postup', value: `${avgProgress} %` },
+          ].map((tile) => (
+            <div key={tile.label} className="rounded-box border border-navy-100 bg-surface p-4">
+              <p className="mb-1 text-xs text-quiet">{tile.label}</p>
+              <p className="font-num text-2xl font-semibold text-ink">{tile.value}</p>
+            </div>
+          ))}
         </div>
       )}
 
       {projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
-            <Rocket size={24} strokeWidth={1.5} className="text-slate-400" />
-          </div>
-          <h2 className="text-base font-medium text-foreground mb-1.5">Zatím žádné projekty</h2>
-          <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-            Přidej svůj první startup projekt — sleduj fázi, finance a nápady na jednom místě.
-          </p>
-          <Link
-            href="/dashboard/startup/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 transition-colors shadow-sm"
-          >
-            <Plus size={15} strokeWidth={1.5} />
-            Přidat projekt
-          </Link>
-        </div>
+        <EmptyState
+          title="Zatím žádné projekty"
+          description="Přidejte první projekt — fáze, finance a nápady budou na jednom místě."
+          action={
+            <Link
+              href="/dashboard/startup/new"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+            >
+              <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+              Přidat projekt
+            </Link>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map(p => (
@@ -71,6 +68,6 @@ export default async function StartupPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

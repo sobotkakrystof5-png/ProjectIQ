@@ -1,3 +1,6 @@
+import { Badge } from '@/components/ui/badge'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { invoiceTone, toneVariant } from '@/lib/admin-status'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -91,52 +94,37 @@ export default async function InvoiceDetailPage(props: PageProps) {
   const pdfHref = `/api/invoices/${invoice.id}/pdf`
 
   return (
-    <div className="space-y-6">
+    <PageShell width="wide">
       <div>
         <Link
           href="/dashboard/faktury"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-quiet transition-colors hover:text-ink"
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
+          <ArrowLeft size={14} strokeWidth={1.5} aria-hidden="true" />
           Zpět na faktury
         </Link>
 
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-                Faktura {invoice.invoice_number}
-              </h1>
-              {invoice.paid_on ? (
-                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
-                  Zaplaceno
-                </span>
-              ) : overdue ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">
-                  <Clock size={10} strokeWidth={1.5} />
-                  Po splatnosti
-                </span>
-              ) : (
-                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-                  Pohledávka
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {formatAmount(invoice.amount, invoice.currency)} · vystaveno {formatDate(invoice.issued_on)}
-            </p>
-          </div>
-
-          <InvoiceDetailActions invoice={invoice} projects={projects} />
-        </div>
+        <PageHeader
+          className="mt-4"
+          title={`Faktura ${invoice.invoice_number}`}
+          subtitle={`${formatAmount(invoice.amount, invoice.currency)} · vystaveno ${formatDate(invoice.issued_on)}`}
+          action={
+            <>
+              <Badge variant={toneVariant(invoiceTone(Boolean(invoice.paid_on), overdue))}>
+                {invoice.paid_on ? 'Zaplaceno' : overdue ? <><Clock size={10} strokeWidth={1.5} aria-hidden="true" />Po splatnosti</> : 'Pohledávka'}
+              </Badge>
+              <InvoiceDetailActions invoice={invoice} projects={projects} />
+            </>
+          }
+        />
       </div>
 
       {invoice.duplicate_risk && (
-        <div className="flex items-start gap-2.5 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <AlertTriangle size={15} strokeWidth={1.5} className="shrink-0 mt-0.5" />
+        <div className="flex items-start gap-2.5 rounded-chip border border-signal-line bg-signal-bg px-4 py-3 text-sm text-signal-ink">
+          <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>
             Zakázka má v přiznané linii i vlastní příjem, který tahle faktura nezastupuje (typicky
-            záloha a doplatek). Zkontroluj, že se stejné peníze nezapočítaly dvakrát.
+            záloha a doplatek). Zkontrolujte, že se stejné peníze nezapočítaly dvakrát.
           </span>
         </div>
       )}
@@ -285,6 +273,6 @@ export default async function InvoiceDetailPage(props: PageProps) {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

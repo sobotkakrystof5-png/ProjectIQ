@@ -3,7 +3,10 @@ import { ChevronRight, Globe, Building2 } from "lucide-react";
 import type { ClientRow } from "@/lib/ws/admin/clients";
 import { cn } from "@/lib/utils";
 import { InviteClientForm } from "./invite-form";
-import { ACCESS_CLASS, ACCESS_LABEL, ago, plural } from "./labels";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader, PageShell } from "@/components/ws/app/page-header";
+import { BILLING_ACCESS_TONE, toneVariant } from "@/lib/admin-status";
+import { ACCESS_LABEL, ago, plural } from "./labels";
 
 // Vykreslení /dashboard/klienti (S17) — bez načítání dat, aby šlo ukázat i s ukázkovými daty.
 
@@ -33,18 +36,13 @@ export function ClientsView({
     clients.filter((c) => c.access === access).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-            Klienti
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Účty ZakazIQ Workspace — stav předplatného, aktivita a napojený web.
-          </p>
-        </div>
-        <InviteClientForm industries={industries} />
-      </div>
+    <PageShell width="wide">
+      <PageHeader
+        title="Klienti"
+        subtitle="Účty ZakazIQ Workspace: stav předplatného, aktivita a napojený web."
+        subtitleFont="sans"
+        action={<InviteClientForm industries={industries} />}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Účtů" value={clients.length} />
@@ -105,14 +103,9 @@ export function ClientsView({
                   {c.industries.join(", ") || "—"}
                 </span>
                 <span>
-                  <span
-                    className={cn(
-                      "inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full ring-1",
-                      ACCESS_CLASS[c.access],
-                    )}
-                  >
+                  <Badge variant={toneVariant(BILLING_ACCESS_TONE[c.access])}>
                     {ACCESS_LABEL[c.access]}
-                  </span>
+                  </Badge>
                 </span>
                 <span className="text-[12px] md:text-sm text-muted-foreground">
                   {ago(c.lastActivity)}
@@ -146,6 +139,6 @@ export function ClientsView({
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

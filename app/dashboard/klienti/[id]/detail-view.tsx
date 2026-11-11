@@ -2,7 +2,10 @@ import Link from 'next/link'
 import { ChevronLeft, ExternalLink, Globe } from 'lucide-react'
 import type { ClientDetail } from '@/lib/ws/admin/clients'
 import { cn } from '@/lib/utils'
-import { ACCESS_CLASS, ACCESS_LABEL, AUDIT_LABEL, ago, formatDate, formatDateTime } from '../labels'
+import { Badge } from '@/components/ui/badge'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { BILLING_ACCESS_TONE, toneVariant } from '@/lib/admin-status'
+import { ACCESS_LABEL, AUDIT_LABEL, ago, formatDate, formatDateTime } from '../labels'
 import { ResendInviteForm, WebKeysPanel } from './panels'
 
 // Vykreslení detailu účtu Workspace (S17) — bez načítání dat.
@@ -30,27 +33,29 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function ClientDetailView({ client }: { client: ClientDetail }) {
   return (
-    <div className="space-y-6">
-      <Link href="/dashboard/klienti" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft size={16} strokeWidth={1.5} />
+    <PageShell width="wide">
+      <Link href="/dashboard/klienti" className="inline-flex items-center gap-1 text-sm text-quiet hover:text-ink">
+        <ChevronLeft size={16} strokeWidth={1.5} aria-hidden="true" />
         Klienti
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight truncate">{client.name}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+      <PageHeader
+        title={client.name}
+        subtitle={
+          <>
             Účet od {formatDate(client.createdAt)}
-            {client.ico ? ` · IČO ${client.ico}` : ''} · <span className="font-mono text-[12px]">{client.clerkOrgId}</span>
-          </p>
-        </div>
-        <span className={cn('inline-flex text-[12px] font-medium px-2.5 py-1 rounded-full ring-1', ACCESS_CLASS[client.access])}>
-          {ACCESS_LABEL[client.access]}
-          {client.periodEnd && (client.access === 'trialing' || client.access === 'active')
-            ? ` · ${client.cancelAtPeriodEnd ? 'končí' : 'další platba'} ${formatDate(client.periodEnd)}`
-            : ''}
-        </span>
-      </div>
+            {client.ico ? ` · IČO ${client.ico}` : ''} · {client.clerkOrgId}
+          </>
+        }
+        action={
+          <Badge variant={toneVariant(BILLING_ACCESS_TONE[client.access])}>
+            {ACCESS_LABEL[client.access]}
+            {client.periodEnd && (client.access === 'trialing' || client.access === 'active')
+              ? ` · ${client.cancelAtPeriodEnd ? 'končí' : 'další platba'} ${formatDate(client.periodEnd)}`
+              : ''}
+          </Badge>
+        }
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Fact label="Poptávky 30 dní" value={client.requests30d} />
@@ -132,6 +137,6 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
           </ul>
         )}
       </Section>
-    </div>
+    </PageShell>
   )
 }

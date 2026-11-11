@@ -1,3 +1,4 @@
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { getAllInvoices, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceRegistry } from '@/components/InvoiceRegistry'
 
@@ -10,15 +11,13 @@ export default async function FakturyPage() {
   const [invoices, projects] = await Promise.all([getAllInvoices(), getInvoiceProjectOptions()])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Faktury</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Evidence všech vystavených faktur — klikni na fakturu pro kompletní údaje a PDF.
-        </p>
-      </div>
-
+    <PageShell width="wide">
+      <PageHeader
+        title="Faktury"
+        subtitle="Evidence všech faktur. Klikněte na fakturu pro údaje a PDF."
+        subtitleFont="sans"
+      />
       <InvoiceRegistry invoices={invoices} projects={projects} />
-    </div>
+    </PageShell>
   )
 }

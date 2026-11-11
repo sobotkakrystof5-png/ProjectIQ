@@ -1,6 +1,7 @@
 import type { BillingAccess } from '@/lib/ws/billing'
 
-// Popisky stavů pro /dashboard/klienti (vzhled adminu, ne Dílky).
+// Popisky stavů pro /dashboard/klienti. Barvu stavu nese BILLING_ACCESS_TONE
+// v lib/admin-status.ts (AD05) — obrazovka si vlastní paletu nedělá.
 
 export const ACCESS_LABEL: Record<BillingAccess, string> = {
   none: 'Bez předplatného',
@@ -8,14 +9,6 @@ export const ACCESS_LABEL: Record<BillingAccess, string> = {
   active: 'Platí',
   grace: 'Nezaplaceno (lhůta)',
   read_only: 'Jen čtení',
-}
-
-export const ACCESS_CLASS: Record<BillingAccess, string> = {
-  none: 'bg-muted text-muted-foreground ring-border',
-  trialing: 'bg-blue-50 text-blue-700 ring-blue-200',
-  active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  grace: 'bg-amber-50 text-amber-700 ring-amber-200',
-  read_only: 'bg-red-50 text-red-700 ring-red-200',
 }
 
 export const AUDIT_LABEL: Record<string, string> = {

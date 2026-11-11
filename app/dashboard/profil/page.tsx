@@ -1,3 +1,4 @@
+import { PageShell } from '@/components/ws/app/page-header'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import {
@@ -188,19 +189,19 @@ export default async function ProfilPage() {
   const overallStars = overallRating !== null ? Math.round(overallRating) : 0
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <PageShell width="narrow" className="gap-8">
 
       {/* Profil header */}
-      <div className="bg-white border border-border rounded-2xl p-6 shadow-sm flex items-start gap-5">
+      <div className="flex items-start gap-5 rounded-panel border border-navy-100 bg-surface p-6">
         {/* Fotka */}
         <ProfileAvatar initials={initials} />
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-semibold text-foreground tracking-tight">Tvůj přehled</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{email}</p>
+          <h1 className="text-xl font-semibold tracking-tight text-ink">Váš přehled</h1>
+          <p className="mt-0.5 font-num text-sm text-quiet">{email}</p>
           {memberSince && (
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="mt-0.5 text-xs text-quiet">
               Aktivní od {memberSince} · {projects.total} zakázek celkem
             </p>
           )}
@@ -457,6 +458,6 @@ export default async function ProfilPage() {
           ))}
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

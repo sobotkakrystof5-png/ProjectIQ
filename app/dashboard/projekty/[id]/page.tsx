@@ -1,3 +1,4 @@
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -23,17 +24,16 @@ export default async function PersonalProjectDetailPage(props: Props) {
   if (!project) notFound()
 
   return (
-    <div className="space-y-6">
+    <PageShell>
       <div>
         <Link
           href="/dashboard/projekty"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-quiet transition-colors hover:text-ink"
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
+          <ArrowLeft size={14} strokeWidth={1.5} aria-hidden="true" />
           Projekty
         </Link>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">{project.name}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{project.segment}</p>
+        <PageHeader title={project.name} subtitle={project.segment} subtitleFont="sans" className="mt-4" />
       </div>
 
       <PersonalProjectEditor
@@ -41,6 +41,6 @@ export default async function PersonalProjectDetailPage(props: Props) {
         improvements={improvements}
         changelog={changelog}
       />
-    </div>
+    </PageShell>
   )
 }

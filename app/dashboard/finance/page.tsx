@@ -1,5 +1,7 @@
-import Link from 'next/link'
-import { TrendingUp, Calculator, BarChart3, Info, User, Briefcase } from 'lucide-react'
+import { Calculator, BarChart3, Info } from 'lucide-react'
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { PillNav } from '@/components/ws/app/toolbar'
+import { TileGlyph } from '@/components/ws/brand'
 import { TradingViewChart } from '@/components/TradingViewChart'
 import { CompoundCalculator } from '@/components/CompoundCalculator'
 import { IncomeExpenseSection } from './IncomeExpenseSection'
@@ -21,9 +23,9 @@ import { getPragueTodayISO } from '@/lib/prague-time'
 
 type Tab = 'osobni' | 'podnikani'
 
-const TABS: { key: Tab; label: string; icon: typeof User }[] = [
-  { key: 'osobni', label: 'Osobní', icon: User },
-  { key: 'podnikani', label: 'Podnikání', icon: Briefcase },
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'osobni', label: 'Osobní' },
+  { key: 'podnikani', label: 'Podnikání' },
 ]
 
 export default async function FinancePage(
@@ -68,41 +70,28 @@ export default async function FinancePage(
       : [null, null, null, null, null]
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-sm">
-              <TrendingUp size={16} strokeWidth={1.5} className="text-white" />
-            </div>
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">Finance</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {tab === 'osobni'
-              ? 'ETF tracker, cash flow a investiční kalkulačky'
-              : 'Přiznané a nepřiznané příjmy, daně a odvody'}
-          </p>
-        </div>
-      </div>
+    <PageShell width="wide" className="gap-8">
+      <PageHeader
+        title="Finance"
+        subtitle={
+          tab === 'osobni'
+            ? 'Přehled majetku, cash flow a investiční kalkulačky.'
+            : 'Přiznané a nepřiznané příjmy, daně a odvody.'
+        }
+        subtitleFont="sans"
+      />
 
-      {/* Záložky */}
-      <div className="flex gap-1 border-b border-border">
-        {TABS.map(({ key, label, icon: Icon }) => (
-          <Link
-            key={key}
-            href={key === 'osobni' ? `/dashboard/finance?month=${currentMonth}` : `/dashboard/finance?tab=podnikani&year=${year}`}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors border-b-2 -mb-px ${
-              tab === key
-                ? 'border-emerald-600 text-foreground font-medium'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Icon size={14} strokeWidth={1.5} />
-            {label}
-          </Link>
-        ))}
-      </div>
+      <PillNav
+        label="Část financí"
+        variant="segmented"
+        items={TABS.map(({ key, label }) => ({
+          key,
+          label,
+          href: key === 'osobni' ? `/dashboard/finance?month=${currentMonth}` : `/dashboard/finance?tab=podnikani&year=${year}`,
+          active: tab === key,
+        }))}
+        className="self-start"
+      />
 
       {businessIncome && (
         <>
@@ -113,7 +102,7 @@ export default async function FinancePage(
             taxNews={taxNews!}
             todayIso={getPragueTodayISO()}
           />
-          <div className="border-t border-border pt-6">
+          <div className="border-t border-navy-100 pt-6">
             <BusinessCalculator overview={businessOverview!} />
           </div>
         </>
@@ -131,10 +120,11 @@ export default async function FinancePage(
         ].map(etf => (
           <div
             key={etf.symbol}
-            className="flex items-center gap-1.5 bg-white border border-border rounded-full px-3 py-1.5 text-sm"
+            className="flex items-center gap-1.5 rounded-full border border-navy-100 bg-surface px-3 py-1.5 text-sm"
           >
-            <span className="font-semibold text-emerald-700">{etf.name}</span>
-            <span className="text-muted-foreground text-xs">{etf.desc}</span>
+            <TileGlyph size={5} />
+            <span className="font-semibold text-ink">{etf.name}</span>
+            <span className="text-xs text-quiet">{etf.desc}</span>
           </div>
         ))}
       </div>
@@ -142,13 +132,13 @@ export default async function FinancePage(
       {/* TradingView Chart */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <BarChart3 size={16} strokeWidth={1.5} className="text-emerald-600" />
-            ETF Graf
+          <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+            <BarChart3 size={16} strokeWidth={1.5} className="text-navy-500" aria-hidden="true" />
+            Graf ETF
           </h2>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <Info size={12} strokeWidth={1.5} />
-            Powered by TradingView
+          <p className="flex items-center gap-1 text-xs text-quiet">
+            <Info size={12} strokeWidth={1.5} aria-hidden="true" />
+            Data z TradingView
           </p>
         </div>
         <TradingViewChart symbol="XETR:VWCE" interval="W" height={460} />
@@ -171,14 +161,14 @@ export default async function FinancePage(
 
       {/* Investice (mimo cash flow) */}
       <div className="space-y-2">
-        <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Calculator size={16} strokeWidth={1.5} className="text-emerald-600" />
+        <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+          <Calculator size={16} strokeWidth={1.5} className="text-navy-500" aria-hidden="true" />
           Investice (mimo cash flow)
         </h2>
         <CompoundCalculator />
       </div>
         </>
       )}
-    </div>
+    </PageShell>
   )
 }

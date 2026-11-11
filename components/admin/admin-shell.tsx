@@ -99,7 +99,9 @@ export function AdminShell({
           </div>
         </header>
 
-        <main id="obsah" className="mx-auto max-w-5xl px-4 py-6 pb-28 sm:px-6 lg:py-8 lg:pb-8">
+        {/* Šířku a okraje si volí stránka přes <PageShell> (AD05); kostra drží
+            jen místo pro spodní lištu telefonu. */}
+        <main id="obsah" className="pb-24 lg:pb-6">
           {children}
         </main>
       </div>

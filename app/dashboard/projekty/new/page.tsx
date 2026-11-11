@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -43,20 +44,19 @@ export default function NewPersonalProjectPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <PageShell width="narrow">
       <div>
         <Link
           href="/dashboard/projekty"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-quiet transition-colors hover:text-ink"
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
+          <ArrowLeft size={14} strokeWidth={1.5} aria-hidden="true" />
           Zpět na projekty
         </Link>
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Nový projekt</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Vyplň základní informace — zbytek doplníš v editoru</p>
+        <PageHeader title="Nový projekt" subtitle="Vyplňte základní informace. Zbytek doplníte v editoru." subtitleFont="sans" className="mt-4" />
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white border border-border rounded-2xl p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5 rounded-panel border border-navy-100 bg-surface p-6">
         {/* Název */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -152,6 +152,6 @@ export default function NewPersonalProjectPage() {
           </button>
         </div>
       </form>
-    </div>
+    </PageShell>
   )
 }
