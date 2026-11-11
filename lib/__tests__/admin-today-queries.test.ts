@@ -1,4 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { setAdminDbForTests } from '@/lib/admin/db'
+import { fakeAdminDriver } from './helpers/admin-driver'
+import { loadTodayData, loadMonthMoney, loadTodayScreen } from '@/lib/admin-today-queries'
+import { calculateTax } from '@/lib/tax'
 
 // Dnes (/dashboard) skládá čas „další akce" z data a hodiny z Hovorů.
 // Sloupec `next_action_date` je v Postgresu typ `date` a Neon ho vrací jako
@@ -20,22 +24,20 @@ let unpaidRows: Record<string, unknown>[] = []
 /** Tabulka, kterou dotaz nenajde (migrace ještě neproběhla). */
 let missingTable: string | null = null
 
-vi.mock('@/lib/db', () => {
-  const sql = (strings: TemplateStringsArray | string, ...values: unknown[]) => {
-    const text = (typeof strings === 'string' ? strings : strings.join(' ? ')).replace(/\s+/g, ' ')
-    if (missingTable && text.includes(missingTable)) {
-      return Promise.reject(new Error(`relation "${missingTable}" does not exist`))
-    }
-    if (text.includes('FROM client_leads')) return Promise.resolve(leadRows)
-    if (text.includes('FROM finance_transactions')) return Promise.resolve(incomeRows)
-    if (text.includes('FROM invoices')) return Promise.resolve(unpaidRows)
-    return Promise.resolve([])
+// Od AD06 čte Dnes přes dávkovaný `lib/admin/db.ts`, takže se podstrčí
+// ovladač, ne modul `@/lib/db`. Chyba jednoho dotazu shodí celou dávku —
+// `batchTolerant` pak dotazy zkusí jednotlivě a tohle to ověřuje.
+const probe = fakeAdminDriver((text) => {
+  if (missingTable && text.includes(missingTable)) {
+    throw new Error(`relation "${missingTable}" does not exist`)
   }
-  return { sql: Object.assign(sql, { query: (text: string, params?: unknown[]) => sql(text, params) }) }
+  if (text.includes('FROM client_leads')) return leadRows as unknown as Record<string, unknown>[]
+  if (text.includes('FROM finance_transactions')) return incomeRows
+  if (text.includes('FROM invoices')) return unpaidRows
+  return []
 })
+setAdminDbForTests(probe.driver)
 
-const { loadTodayData, loadMonthMoney } = await import('@/lib/admin-today-queries')
-const { calculateTax } = await import('@/lib/tax')
 
 describe('loadTodayData — čas další akce z Hovorů', () => {
   it('zvládne datum jako Date z Postgresu', async () => {
@@ -111,5 +113,29 @@ describe('loadMonthMoney — peníze za tenhle měsíc', () => {
     const empty = await loadMonthMoney('2026-11-11')
     expect(empty.income).toBe(0)
     expect(empty.unpaidInvoices).toEqual([])
+  })
+})
+
+// Měření AD06: Dnes stálo šest kol do databáze a peníze další dvě. Dávka
+// z toho dělá jeden požadavek — tenhle test je zároveň strop.
+describe('kola do databáze — Dnes', () => {
+  beforeEach(() => {
+    missingTable = null
+    probe.reset()
+  })
+
+  it('celá obrazovka Dnes stojí jeden požadavek', async () => {
+    await loadTodayScreen('2026-11-11')
+    expect(probe.rounds()).toBe(1)
+    expect(probe.waves()).toBe(1)
+    expect(probe.queries()).toHaveLength(8)
+  })
+
+  it('chybějící tabulka shodí dávku, ale ne obrazovku — zbytek se dotáhne jednotlivě', async () => {
+    missingTable = 'client_requests'
+    const { data } = await loadTodayScreen('2026-11-11')
+    expect(data.requests).toEqual([])
+    // 1 neúspěšná dávka + 8 jednotlivých pokusů
+    expect(probe.rounds()).toBe(9)
   })
 })

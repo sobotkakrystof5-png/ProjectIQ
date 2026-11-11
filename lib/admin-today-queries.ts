@@ -1,4 +1,4 @@
-import { sql } from '@/lib/db'
+import { batchTolerant, q, type AdminQuery, type AdminRow } from '@/lib/admin/db'
 import { projectPath } from '@/lib/lead-origins'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { calculateTax } from '@/lib/tax'
@@ -16,55 +16,61 @@ const dateOnly = (value: Date | string): string =>
     ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
     : String(value).slice(0, 10)
 
-/** Dotaz na tabulku, která vzniká pozdější migrací: bez ní vrátí prázdný seznam. */
-const optional = <T,>(query: PromiseLike<T[]>): Promise<T[]> => Promise.resolve(query).catch(() => [])
-
-/** Data pro Dnes: každá sekce se načítá samostatně a jedna chyba nesmí shodit celou stránku. */
+/**
+ * Data pro Dnes. Od AD06 jedním požadavkem místo šesti (`batchTolerant`:
+ * `client_requests` a `project_activity` vznikají migracemi 092 a 093, takže
+ * na databázi bez nich se dotazy zkusí jednotlivě a chybějící sekce zůstane
+ * prázdná, místo aby shodila celou obrazovku).
+ */
 export async function loadTodayData(): Promise<TodayData> {
-  const [requests, drafts, invoices, slots, calls, stale] = await Promise.all([
-    optional(sql`
+  return mapToday(await batchTolerant(todayQueries()))
+}
+
+const todayQueries = (): AdminQuery[] => [
+    q`
       SELECT r.id, r.ai_summary, r.created_at, p.id AS project_id, p.client_name
       FROM client_requests r JOIN projects p ON p.id = r.project_id
       WHERE r.status = 'new'
       ORDER BY r.created_at ASC LIMIT 20
-    `),
-    optional(sql`
+    `,
+    q`
       SELECT p.id AS project_id, p.client_name,
              count(*)::int AS count, count(*) FILTER (WHERE a.contains_sensitive)::int AS sensitive
       FROM project_activity a JOIN projects p ON p.id = a.project_id
       WHERE a.status = 'draft'
       GROUP BY p.id, p.client_name
       ORDER BY min(a.created_at) ASC LIMIT 20
-    `),
-    optional(sql`
+    `,
+    q`
       SELECT id, invoice_number, client_name, due_on, amount, currency
       FROM invoices
       WHERE paid_on IS NULL AND due_on IS NOT NULL AND due_on < CURRENT_DATE
       ORDER BY due_on ASC LIMIT 10
-    `),
-    optional(sql`
+    `,
+    q`
       SELECT cs.id, cs.scheduled_at AS at, p.client_name, p.id AS project_id
       FROM consultation_slots cs JOIN projects p ON p.id = cs.project_id
       WHERE cs.scheduled_at > now()
       ORDER BY cs.scheduled_at LIMIT 5
-    `),
-    optional(sql`
+    `,
+    q`
       SELECT id, company_name, next_action, next_action_date, next_action_time
       FROM client_leads
       WHERE next_action_date IS NOT NULL AND next_action_date >= CURRENT_DATE
         AND lead_status NOT IN ('converted', 'lost')
       ORDER BY next_action_date, next_action_time NULLS LAST LIMIT 5
-    `),
-    optional(sql`
+    `,
+    q`
       SELECT id, client_name, updated_at
       FROM projects
       WHERE status IN ('new', 'in_progress', 'review')
         AND updated_at < now() - interval '1 day' * ${STALE_AFTER_DAYS}
         AND NOT lead_pending
       ORDER BY updated_at ASC LIMIT 5
-    `),
-  ])
+    `,
+]
 
+function mapToday([requests, drafts, invoices, slots, calls, stale]: AdminRow[][]): TodayData {
   return {
     requests: (requests as { id: string; ai_summary: string | null; created_at: string; client_name: string }[]).map((r) => ({
       id: r.id,
@@ -121,23 +127,26 @@ export async function loadTodayData(): Promise<TodayData> {
  * Pravidla se nikde nevymýšlejí znovu — příjem má stejné podmínky jako
  * `getBusinessIncome` (`user_id IS NULL`, `type = 'income'`, příznak `declared`),
  * nezaplacená faktura stejné jako `getInvoices` (`paid_on IS NULL`) a daň počítá
- * tatáž `calculateTax` jako kalkulačka. Dvě kola do databáze místo šesti: Dnes
- * je první obrazovka adminu a nemá čekat na seznam faktur, který nikdo nevidí.
+ * tatáž `calculateTax` jako kalkulačka. Dva dotazy místo šesti: Dnes je první
+ * obrazovka adminu a nemá čekat na seznam faktur, který nikdo nevidí.
  */
 export async function loadMonthMoney(todayIso: string = getPragueTodayISO()): Promise<MonthMoney> {
   const month = todayIso.slice(0, 7)
   const year = Number(todayIso.slice(0, 4))
 
-  const [incomeRows, invoiceRows] = await Promise.all([
-    optional(sql`
+  return mapMoney(await batchTolerant(moneyQueries(month, year)), month, year)
+}
+
+const moneyQueries = (month: string, year: number): AdminQuery[] => [
+    q`
       SELECT
         COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = ${month}), 0)::float AS month_income,
         COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = ${month} AND declared), 0)::float AS month_declared,
         COALESCE(SUM(amount) FILTER (WHERE declared), 0)::float AS year_declared
       FROM finance_transactions
       WHERE user_id IS NULL AND type = 'income' AND EXTRACT(YEAR FROM date) = ${year}
-    `),
-    optional(sql`
+    `,
+    q`
       SELECT currency,
              COALESCE(SUM(amount), 0)::float AS amount,
              COUNT(*)::int AS count,
@@ -146,9 +155,10 @@ export async function loadMonthMoney(todayIso: string = getPragueTodayISO()): Pr
       WHERE paid_on IS NULL
       GROUP BY currency
       ORDER BY SUM(amount) DESC
-    `),
-  ])
+    `,
+]
 
+function mapMoney([incomeRows, invoiceRows]: AdminRow[][], month: string, year: number): MonthMoney {
   const income = (incomeRows as { month_income: number; month_declared: number; year_declared: number }[])[0]
   const yearDeclaredIncome = Number(income?.year_declared ?? 0)
   const tax = calculateTax({ income: yearDeclaredIncome, year })
@@ -159,7 +169,7 @@ export async function loadMonthMoney(todayIso: string = getPragueTodayISO()): Pr
     income: Number(income?.month_income ?? 0),
     declaredIncome: Number(income?.month_declared ?? 0),
     yearDeclaredIncome,
-    unpaidInvoices: (invoiceRows as UnpaidInvoiceLine[]).map((i) => ({
+    unpaidInvoices: (invoiceRows as unknown as UnpaidInvoiceLine[]).map((i) => ({
       currency: i.currency,
       amount: Number(i.amount),
       count: i.count,
@@ -169,5 +179,23 @@ export async function loadMonthMoney(todayIso: string = getPragueTodayISO()): Pr
     monthlyReserve: tax.monthlyReserve,
     ratesYear: tax.ratesYear,
     ratesMatchYear: tax.ratesMatchYear,
+  }
+}
+
+/**
+ * Celá obrazovka Dnes jedním požadavkem: věci k vyřízení (6 dotazů) i peníze
+ * za měsíc (2) jdou v jedné dávce. Odděleně by to byla dvě kola v jedné vlně
+ * a navigace na Dnes by stála tři (menu + dvě) místo dvou.
+ */
+export async function loadTodayScreen(
+  todayIso: string = getPragueTodayISO(),
+): Promise<{ data: TodayData; money: MonthMoney }> {
+  const month = todayIso.slice(0, 7)
+  const year = Number(todayIso.slice(0, 4))
+  const today = todayQueries()
+  const rows = await batchTolerant([...today, ...moneyQueries(month, year)])
+  return {
+    data: mapToday(rows.slice(0, today.length)),
+    money: mapMoney(rows.slice(today.length), month, year),
   }
 }

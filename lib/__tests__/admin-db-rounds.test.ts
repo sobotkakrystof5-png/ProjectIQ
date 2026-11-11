@@ -1,87 +1,64 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { setAdminDbForTests } from '@/lib/admin/db'
+import { fakeAdminDriver } from './helpers/admin-driver'
+import { loadTodayData, loadMonthMoney, loadTodayScreen } from '@/lib/admin-today-queries'
+import { loadAdminCounts } from '@/lib/admin-counts'
 
-// Měření rychlosti adminu (AD00): kolik kol do databáze stojí načtení obrazovky
-// a kolik z nich jde za sebou (vlny). Čítač je záměrně jen tady, v aplikačním
-// kódu nezůstává. Počty jsou stropy — AD06 a AD08 je mají snižovat, tenhle test
-// hlídá, aby zase nenarostly.
+// Měření rychlosti adminu (AD00, snížené v AD06): kolik požadavků do databáze
+// stojí načtení obrazovky a kolik z nich jde za sebou. Čítač je záměrně jen
+// tady, v aplikačním kódu nezůstává. Počty jsou stropy — když zase narostou,
+// test padne.
 //
-// Kolo = jedno zavolání `sql`. Vlna = skupina kol, která odstartovala společně
-// (Promise.all); každá další vlna znamená čekání na odpověď předchozí.
+// Kolo = jeden požadavek do databáze. Dávka (`adminDb.batch`) je jeden
+// požadavek, i když je v ní osm dotazů — po síti je to jedno volání a o to tu
+// jde. Vlna = kola, která odstartovala společně; další vlna znamená čekání na
+// odpověď té předchozí.
 
-let rounds = 0
-let waves = 0
-let inFlight = 0
-const seen: string[] = []
-
-function rowsFor(text: string): Record<string, unknown>[] {
-  const flat = text.replace(/\s+/g, ' ').trim()
+const probe = fakeAdminDriver((text) => {
   // Dotazy na odznaky v menu čekají jeden řádek s čísly, výpisy snesou prázdno.
-  if (/AS leads/i.test(flat)) return [{ leads: 0, notifications: 0 }]
-  if (/^SELECT count\(\*\)::int AS count FROM/i.test(flat)) return [{ count: 0 }]
+  if (/AS leads/i.test(text)) return [{ leads: 0, notifications: 0 }]
+  if (/^SELECT count\(\*\)::int AS count FROM/i.test(text)) return [{ count: 0 }]
   return []
-}
-
-vi.mock('@/lib/db', () => {
-  const sql = (strings: TemplateStringsArray | string, ...values: unknown[]) => {
-    const text = typeof strings === 'string' ? strings : strings.join(' ? ')
-    rounds++
-    seen.push(text.replace(/\s+/g, ' ').trim().slice(0, 60))
-    if (inFlight === 0) waves++
-    inFlight++
-    return (async () => {
-      await Promise.resolve()
-      inFlight--
-      return rowsFor(text)
-    })()
-  }
-  return { sql: Object.assign(sql, { query: (text: string, params?: unknown[]) => sql(text, params) }) }
 })
+setAdminDbForTests(probe.driver)
 
-const { loadTodayData, loadMonthMoney } = await import('@/lib/admin-today-queries')
-const { loadAdminCounts } = await import('@/lib/admin-counts')
+describe('kola do databáze — admin po AD06', () => {
+  beforeEach(() => probe.reset())
 
-function reset() {
-  rounds = 0
-  waves = 0
-  inFlight = 0
-  seen.length = 0
-}
-
-describe('kola do databáze — výchozí měření adminu', () => {
-  beforeEach(reset)
-
-  it('Dnes (/dashboard) načte data v jedné vlně', async () => {
+  it('Dnes (/dashboard) stojí jeden požadavek — šest dotazů v jedné dávce', async () => {
     await loadTodayData()
-    expect(rounds).toBeLessThanOrEqual(6)
-    expect(waves).toBe(1)
+    expect(probe.rounds()).toBe(1)
+    expect(probe.waves()).toBe(1)
+    expect(probe.queries()).toHaveLength(6)
   })
 
-  it('peníze za měsíc (pravý sloupec Dnes) stojí 2 kola v jedné vlně', async () => {
-    // Stejná čísla přes getBusinessIncome + getInvoices by stála 6 kol a tahala
-    // by celý seznam faktur (AD03).
+  it('peníze za měsíc (pravý sloupec Dnes) stojí jeden požadavek', async () => {
     await loadMonthMoney('2026-11-11')
-    expect(rounds).toBeLessThanOrEqual(2)
-    expect(waves).toBe(1)
+    expect(probe.rounds()).toBe(1)
+    expect(probe.queries()).toHaveLength(2)
   })
 
-  it('Dnes i s penězi zůstává jedna vlna', async () => {
-    await Promise.all([loadTodayData(), loadMonthMoney('2026-11-11')])
-    expect(rounds).toBeLessThanOrEqual(8)
-    expect(waves).toBe(1)
+  it('Dnes i s penězi je jeden požadavek — jedna dávka pro celou obrazovku', async () => {
+    await loadTodayScreen('2026-11-11')
+    expect(probe.rounds()).toBe(1)
+    expect(probe.waves()).toBe(1)
+    expect(probe.queries()).toHaveLength(8)
   })
 
-  it('odznaky v menu (kostra administrace) stojí nejvýš 3 kola v jedné vlně', async () => {
+  it('odznaky v menu (kostra administrace) stojí jeden požadavek', async () => {
     await loadAdminCounts()
-    expect(rounds).toBeLessThanOrEqual(3)
-    expect(waves).toBe(1)
+    expect(probe.rounds()).toBe(1)
+    expect(probe.waves()).toBe(1)
+    expect(probe.queries()).toHaveLength(3)
   })
 
-  it('kostra + Dnes dohromady: menu a obsah se načítají odděleně, tedy ve dvou vlnách', async () => {
-    // Takhle to dnes běží ve stránce: layout si řekne o odznaky, stránka o data
-    // i o peníze (AD03) — ty jdou s daty v jedné vlně.
+  it('kostra + Dnes dohromady: dvě kola ve dvou vlnách', async () => {
+    // Takhle to běží ve stránce: layout si řekne o odznaky, stránka o obsah.
+    // Dvě vlny proto, že menu se kreslí dřív než obsah — ale každá je jedna
+    // dávka, ne tři a osm dotazů jako před AD06.
     await loadAdminCounts()
-    await Promise.all([loadTodayData(), loadMonthMoney('2026-11-11')])
-    expect(rounds).toBeLessThanOrEqual(11)
-    expect(waves).toBe(2)
+    await loadTodayScreen('2026-11-11')
+    expect(probe.rounds()).toBe(2)
+    expect(probe.waves()).toBe(2)
   })
 })

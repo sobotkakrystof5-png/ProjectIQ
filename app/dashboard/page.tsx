@@ -1,7 +1,7 @@
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import Link from 'next/link'
 import { ArrowRight, CalendarClock, FileWarning, MessageSquarePlus, PauseCircle, ClipboardCheck, Wallet } from 'lucide-react'
-import { loadMonthMoney, loadTodayData } from '@/lib/admin-today-queries'
+import { loadTodayScreen } from '@/lib/admin-today-queries'
 import { isTodayEmpty, pickFocus, daysBetween, type MonthMoney } from '@/lib/admin-today'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 
@@ -98,8 +98,8 @@ function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
 }
 
 export default async function TodayPage() {
-  // Jedna vlna dotazů: věci k vyřízení i peníze odstartují spolu.
-  const [data, money] = await Promise.all([loadTodayData(), loadMonthMoney()])
+  // Jedno kolo do databáze: věci k vyřízení i peníze jedou v jedné dávce.
+  const { data, money } = await loadTodayScreen()
   const now = new Date()
   const focus = pickFocus(data, now)
   const empty = isTodayEmpty(data)
