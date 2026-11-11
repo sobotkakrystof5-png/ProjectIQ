@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { ImagePlus, Sparkles, Trash2 } from 'lucide-react'
 import { NewsEntry } from '@/components/ws/app/news-entry'
 import { renderNewsEmail } from '@/lib/ws/email/news-email'

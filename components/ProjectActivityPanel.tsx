@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { Check, Pencil, Plus, ShieldAlert, X } from 'lucide-react'
 import {
   approveActivity,
@@ -149,15 +149,12 @@ function DraftCard({ item }: { item: ActivityItem }) {
         toast.error(res.error)
         return
       }
-      toast('Zpráva zamítnuta.', {
+      toast.message('Zpráva zamítnuta.', {
         duration: 8000,
-        action: {
-          label: 'Zpět',
-          onClick: () => {
-            void reopenActivity(item.id).then((undo) => {
-              if (!undo.success) toast.error(undo.error)
-            })
-          },
+        undo: () => {
+          void reopenActivity(item.id).then((undo) => {
+            if (!undo.success) toast.error(undo.error)
+          })
         },
       })
     })

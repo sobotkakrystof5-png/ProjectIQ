@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import {
   ChevronDown, ChevronUp, Loader2, Archive, Trash2,
   ExternalLink, Save, Info, BookOpen, Lightbulb,

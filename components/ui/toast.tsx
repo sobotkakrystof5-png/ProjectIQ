@@ -3,11 +3,10 @@
 import { toast as sonner } from 'sonner'
 import { AlertCircle, Check } from 'lucide-react'
 import { cn } from '@/lib/ws/utils'
-import { wsFontVariables } from '@/lib/ws/fonts'
 
-// Toasty Workspace jdou přes jediný <Toaster> v kořenovém app/layout.tsx (sonner 1.x neumí
-// víc toasterů). Ten leží mimo [data-app="ws"], proto si toast nese vlastní kořen s tokeny
-// a písmy (R-027). Téma nastavuje WsRoot.
+// Toasty jdou přes jediný <Toaster> v kořenovém app/layout.tsx (sonner 1.x neumí víc
+// toasterů). Ten leží mimo [data-app], proto si toast nese vlastní kořen s tokeny.
+// Písma dědí z <html> (R-081). Téma nastavuje WsRoot, aplikaci WsRoot / AdminRoot.
 
 type Theme = 'light' | 'dark'
 let currentTheme: Theme = 'light'
@@ -16,7 +15,15 @@ export function setToastTheme(theme: Theme) {
   currentTheme = theme
 }
 
-type Tone = 'neutral' | 'success' | 'error'
+/** Admin nemá tmavý režim a jiné hodnoty shadcn; toast musí vědět, kde stojí. */
+type App = 'ws' | 'admin'
+let currentApp: App = 'ws'
+
+export function setToastApp(app: App) {
+  currentApp = app
+}
+
+type Tone = 'neutral' | 'success' | 'error' | 'warning'
 
 export type ToastOptions = {
   description?: string
@@ -30,9 +37,9 @@ function show(tone: Tone, title: string, opts: ToastOptions = {}) {
   return sonner.custom(
     (id) => (
       <div
-        data-app="ws"
-        data-theme={currentTheme}
-        className={cn(wsFontVariables, 'rounded-chip')}
+        data-app={currentApp}
+        {...(currentApp === 'ws' ? { 'data-theme': currentTheme } : {})}
+        className="rounded-chip"
         style={{ background: 'transparent' }}
       >
         <div
@@ -43,7 +50,9 @@ function show(tone: Tone, title: string, opts: ToastOptions = {}) {
             <span
               className={cn(
                 'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full',
-                tone === 'success' ? 'bg-navy-700 text-white' : 'bg-danger text-white',
+                tone === 'success' && 'bg-navy-700 text-white',
+                tone === 'error' && 'bg-danger text-white',
+                tone === 'warning' && 'bg-signal text-signal-ink',
               )}
               aria-hidden
             >
@@ -77,5 +86,9 @@ export const toast = {
   message: (title: string, opts?: ToastOptions) => show('neutral', title, opts),
   success: (title: string, opts?: ToastOptions) => show('success', title, opts),
   error: (title: string, opts?: ToastOptions) => show('error', title, opts),
+  /** Povedlo se, ale něco zbývá dořešit (např. účet je založený, pozvánka neodešla). */
+  warning: (title: string, opts?: ToastOptions) => show('warning', title, opts),
+  /** Sdělení bez stavu — vypadá stejně jako `message`, jen se jinak čte v kódu. */
+  info: (title: string, opts?: ToastOptions) => show('neutral', title, opts),
   dismiss: (id?: string | number) => sonner.dismiss(id),
 }

@@ -4,6 +4,7 @@ import { LogoutButton } from '@/app/dashboard/LogoutButton'
 import { formatBadge, type AdminCounts } from '@/lib/admin-nav'
 import { cn } from '@/lib/utils'
 import { AdminMobileTabs, AdminNavList } from './admin-nav'
+import { AdminRoot } from './admin-root'
 import { AdminSearch } from './admin-search'
 
 function Logo() {
@@ -57,7 +58,7 @@ export function AdminShell({
 }) {
   const initials = email.slice(0, 2).toUpperCase()
   return (
-    <div data-app="admin" className="min-h-screen bg-background">
+    <AdminRoot>
       <a
         href="#obsah"
         className="sr-only z-50 rounded-chip bg-surface px-3 py-2 text-sm font-medium text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
@@ -106,6 +107,6 @@ export function AdminShell({
       <div className="font-ws">
         <AdminMobileTabs counts={counts} />
       </div>
-    </div>
+    </AdminRoot>
   )
 }

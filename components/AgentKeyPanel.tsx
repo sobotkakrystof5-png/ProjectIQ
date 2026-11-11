@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { Copy, KeyRound } from 'lucide-react'
 import { createOrRotateAgentKey, revokeProjectAgentKey } from '@/app/project-agent-key-actions'
 import { formatDate } from '@/lib/utils'

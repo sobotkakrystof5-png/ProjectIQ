@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { Eye, EyeOff, Mail, Pencil, Trash2 } from 'lucide-react'
 import { NEWS_TAG_LABELS, type NewsTag } from '@/lib/ws/news-format'
 import { cn } from '@/lib/utils'

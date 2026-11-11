@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { LazyMotion, MotionConfig } from 'framer-motion'
 import { PortalContainerProvider } from '@/components/ui/portal'
-import { setToastTheme } from '@/components/ui/toast'
+import { setToastApp, setToastTheme } from '@/components/ui/toast'
 import { SYSTEM_THEME_SCRIPT, themeCookie, type Theme, type ThemePref } from '@/lib/ws/theme'
 import { setPrivacyModeAction } from '@/app/w/privacy-actions'
 import type { Result } from '@/lib/ws/result'
@@ -78,6 +78,10 @@ export function WsRoot({
   }, [privateMode])
   const value = useMemo(() => ({ theme, pref, setPref }), [theme, pref, setPref])
   const privacy = useMemo(() => ({ enabled: privateMode, setEnabled }), [privateMode, setEnabled])
+
+  useEffect(() => {
+    setToastApp('ws')
+  }, [])
 
   useEffect(() => {
     setToastTheme(theme)

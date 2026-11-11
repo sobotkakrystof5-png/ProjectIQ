@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Trash2, User } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { addProjectNote, deleteProjectNote } from '@/app/project-notes-actions'
 import { formatDateTime } from '@/lib/utils'
 import { ProgressBar } from '@/components/ProgressBar'

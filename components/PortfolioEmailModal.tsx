@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, MessageSquareText, ArrowLeft, Send } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { sendCustomLeadEmail } from '@/app/calls-actions'
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
 import { getPragueTodayISO } from '@/lib/prague-time'

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { Copy } from 'lucide-react'
 import {
   createInvite,
@@ -176,7 +176,7 @@ export function RemoveMemberButton({ clientId, memberId }: { clientId: string; m
   const router = useRouter()
   const [pending, start] = useTransition()
   return (
-    <button type="button" disabled={pending} onClick={() => start(async () => { await removeMember(clientId, memberId); toast('Člen odebrán.'); router.refresh() })} className={quiet}>
+    <button type="button" disabled={pending} onClick={() => start(async () => { await removeMember(clientId, memberId); toast.message('Člen odebrán.'); router.refresh() })} className={quiet}>
       Odebrat
     </button>
   )

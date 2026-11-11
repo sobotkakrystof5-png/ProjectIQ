@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast'
 import { Pencil, Trash2, Loader2 } from 'lucide-react'
 import { InvoiceUploadModal } from '@/components/InvoiceUploadModal'
 import { deleteInvoice } from '@/app/dashboard/finance/invoice-actions'
