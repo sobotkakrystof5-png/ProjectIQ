@@ -388,6 +388,29 @@ s podepsanou session, heslo adminu agent nemá); skutečné doručení e-mailu z
 počítači i na telefonu; Dnes ukazuje měsíční čísla na testovacích datech.
 **Riziko:** nízké — přesuny a přesměrování, žádná změna dat.
 
+**Hotovo 2026-11-11.** Odchylky a rozhodnutí sezení:
+1. **Kalkulačka „Výkonnost podnikání" z `/hub/byznys` se nemazala** — přesunula se do
+   Finance › Podnikání (`app/dashboard/finance/{BusinessCalculator.tsx,byznys-actions.ts}`).
+   Rozcestník s dlaždicemi byl duplicitní s menu, ale kalkulačka počítá z reálných dat.
+2. **Kontakty v menu nejsou.** Obrazovku staví AD09; menu nemá slibovat, co neexistuje.
+   Dokončené a Hodnocení v Práci zůstávají, slijí se do zakázky až v AD11/AD16 (R-090).
+3. Skupiny: **Přehled · Práce · Peníze · Klienti · Osobní** (Klienti = SaaS část, zůstává zvlášť).
+   Spodní lišta na telefonu: Dnes · Zakázky · **Poptávky** · Kalendář (dřív Požadavky klientů).
+4. Měsíční čísla na Dnes bere `loadMonthMoney` dvěma vlastními dotazy se **stejnými podmínkami**
+   jako `getBusinessIncome` a `getInvoices` + `calculateTax`; přes ty funkce by to stálo 6 kol
+   a tahalo celý seznam faktur. Měny se nesčítají (R-011), daň je roční, ne dvanáctina.
+5. CSP se nemění (TradingView platí pro celý profil `admin`) — zapsáno jako v7 v `CSP-LOG.md`.
+
+Ověřeno: `npm test` (61 souborů, 749 testů), `npx tsc --noEmit`, `npm run build`; přes HTTP
+s podepsanou session vrací 200 `/dashboard`, `/dashboard/finance` (i `?tab=podnikani`),
+`/dashboard/projekty`, `/dashboard/startup`, `/dashboard/zakazky`, `/dashboard/poptavky`,
+`/dashboard/faktury`; 308 vrací `/hub`, `/hub/finance` (i s dotazem), `/hub/projekty`,
+`/hub/projekty/new`, `/hub/byznys`, `/hub/byznys/startup`, `/hub/plany`, `/hub/school`,
+`/hub/sport` i hlubší cesta `/hub/school/rozvrh/2026`. Dnes ukazuje na ukázkových datech
+nezaplacené faktury odděleně v Kč a €, daň 540 Kč a rezervu 45 Kč (sedí na `calculateTax`).
+**Neověřeno:** vzhled okem v prohlížeči (390/768/1280/1440 px) — heslo adminu agent nemá
+a Chrome není připojený; grafy TradingView a tisk PDF na nové adrese.
+
 ### AD04 — Vizuální základ (M, bez migrace)
 **Cíl:** Dílky jsou výchozí vzhled adminu a `components/ui/*` v něm fungují.
 Vše ze sekce 4 (a–h). Soubory: `app/globals.css`, nový `app/tokens-dilky.css`, `app/ws-tokens.css`,
@@ -834,7 +857,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD00 | Příprava, větev, testovací data, měření | S | — | — | **hotovo 2026-11-11** |
 | AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | **hotovo 2026-11-11** (migrace jen na testu) |
 | AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | **hotovo 2026-11-11** (migrace jen na testu) |
-| AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | nezačato |
+| AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | **hotovo 2026-11-11** |
 | AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | nezačato |
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | nezačato |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | nezačato |
@@ -972,13 +995,13 @@ jako strop — když počet naroste, test padne.
 | Obrazovka | Kol do DB před | Kol po | Jak zjištěno |
 |---|---|---|---|
 | kostra administrace (odznaky v menu) | 3 (1 vlna) | — | čítač v testu |
-| `/dashboard` (Dnes) | 6 (1 vlna) | — | čítač v testu |
-| kostra + Dnes dohromady | 9 (2 vlny) | — | čítač v testu |
+| `/dashboard` (Dnes) | 6 (1 vlna) | 8 (1 vlna, s penězi z AD03) | čítač v testu |
+| kostra + Dnes dohromady | 9 (2 vlny) | 11 (2 vlny, AD03) | čítač v testu |
 | `/dashboard/[id]` | 12 (5 vln) | — | průzkum kódu 2026-11-10 |
 | `/dashboard/calls` | 5 | — | průzkum kódu 2026-11-10 |
 | `/dashboard/calendar` | 7 | — | průzkum kódu 2026-11-10 |
 | `/dashboard/faktury` | 5 | — | průzkum kódu 2026-11-10 |
-| `/hub/finance` | ~12 (3 vlny) | — | průzkum kódu 2026-11-10 |
+| `/dashboard/finance` (dřív `/hub/finance`) | ~12 (3 vlny) | +4 kola na záložce Podnikání | průzkum kódu 2026-11-10; AD03 přidal `getBusinessOverview` (4 dotazy v téže vlně) |
 
 Obrazovky zjištěné jen průzkumem kódu načítají data uvnitř stránky nebo v komponentě,
 takže je čítač zatím nepokrývá; AD06 jim data stáhne do `lib/admin/db.ts` a tím je

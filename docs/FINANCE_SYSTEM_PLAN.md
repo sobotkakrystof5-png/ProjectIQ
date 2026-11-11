@@ -2,6 +2,10 @@
 
 > Realizační plán rozdělený do fází. Každá fáze je samostatně dokončitelná a nasaditelná — dá se na tom pracovat napříč více sessions, aniž by zůstal rozbitý mezistav.
 
+> **Cesty v textu jsou původní.** Finance se 2026-11-11 přesunuly z `/hub/finance`
+> do `/dashboard/finance` (AD03, R-087), takže `app/hub/finance/*` je dnes
+> `app/dashboard/finance/*`. Logika se nemění.
+
 **Stav dokumentu:** Fáze 0–8 hotové — celý plán je hotový.
 **Poslední aktualizace:** 2026-09-11
 

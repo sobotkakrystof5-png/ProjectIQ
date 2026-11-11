@@ -2,6 +2,7 @@
 
 > **Část „Šablony webu" už neplatí.** Knihovna bloků i bloky u zakázky byly 2026-11-11
 > smazány z kódu i z databáze (AD01, R-089, migrace 101). Poznámky a náklady platí dál.
+> Cesty `app/hub/finance/*` jsou od 2026-11-11 `app/dashboard/finance/*` (AD03, R-087).
 
 ## Kontext
 

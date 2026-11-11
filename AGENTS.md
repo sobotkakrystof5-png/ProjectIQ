@@ -44,7 +44,7 @@ Neoslabuj CSP (žádné nové `unsafe-inline`/`unsafe-eval` ve skriptech, wildca
 
 ## B12. Ověření a Git
 
-Větší změna: `npm test`, `npm run build` (při běžícím dev výhradně `npm run build:check`), regresní kontrola `/login`, `/dashboard`, `/hub`, `/p/[token]`. Nová byznysová pravidla testuj Vitestem; UI porovnej s Dílky/mockupem i na telefonu. Typy: `npx tsc --noEmit`; `npm run lint` není nastavený (Next 16 `next lint` odstranil). Nevydávej neprovedené kontroly za hotové.
+Větší změna: `npm test`, `npm run build` (při běžícím dev výhradně `npm run build:check`), regresní kontrola `/login`, `/dashboard`, `/dashboard/finance`, `/p/[token]`. Nová byznysová pravidla testuj Vitestem; UI porovnej s Dílky/mockupem i na telefonu. Typy: `npx tsc --noEmit`; `npm run lint` není nastavený (Next 16 `next lint` odstranil). Nevydávej neprovedené kontroly za hotové.
 
 Workspace/landing: větev `workspace` nebo worktree z ní, commit po uceleném kroku, česky `ws/oblast: co a proč`. Admin: `main`, commit jen na požádání, `feat:`/`fix:`/`chore:`/`docs:`. Push na `main` pouze se souhlasem (produkční deploy); žádný force, `--no-verify` ani přepis historie.
 

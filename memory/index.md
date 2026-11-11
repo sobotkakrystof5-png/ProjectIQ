@@ -60,7 +60,7 @@
 | Poptávky z webů (vizeon.cz, alteno.cz, prvotka.cz) | `lib/lead-origins.ts`, `lib/web-leads.ts`, `app/api/public/booking/**`, `app/api/public/{alteno,prvotka}-leads`, `app/dashboard/poptavky/`, `components/LeadCard.tsx`, migrace 102, R-088 |
 | Hovory / leady | `app/calls-actions.ts`, `components/LeadsTable.tsx`, `lib/portfolio-email.ts`, `app/api/public/{leads,agent-leads}` |
 | Dokončené, dotazník, hodnocení | `app/completed-actions.ts`, `app/h/[token]`, `components/SurveyForm.tsx`, `HodnoceniDashboard.tsx` |
-| Faktury | `app/hub/finance/invoice-actions.ts`, `lib/invoices.ts`, `lib/invoice-ai.ts`, `components/Invoice*`, `docs/FINANCE_SYSTEM_PLAN.md` |
+| Faktury | `app/dashboard/finance/invoice-actions.ts`, `lib/invoices.ts`, `lib/invoice-ai.ts`, `components/Invoice*`, `docs/FINANCE_SYSTEM_PLAN.md` |
 | Daně | `lib/tax.ts`, `lib/tax-constants.ts`, `lib/tax-deadlines.ts`, `lib/tax-news.ts`, `components/Tax*` |
 | Náklady | `app/costs-actions.ts`, `components/CostsManager.tsx` |
 | Šablony webu | `app/block-templates-actions.ts`, `app/project-blocks-actions.ts`, `components/Block*`, `ProjectBlockList.tsx` |
@@ -68,7 +68,7 @@
 | Veřejná API — auth, rate limit | `lib/api-auth.ts`, `lib/api-rate-limit.ts` |
 | Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `proxy.ts`, `lib/security/`, `.claude/security/` |
 | Crony | `vercel.json`, `app/api/cron/**` |
-| Hub (osobní moduly) | `app/hub/**`, `components/HubSidebarNav.tsx` |
+| Osobní část adminu (dřív Hub) | `app/dashboard/{finance,projekty,startup}/**`, menu `lib/admin-nav.ts` |
 | Landing page | `../docs/landing/PROJECT-BRIEF.md`, `app/(marketing)/` |
 | Workspace (SaaS) — rozsah, stav sezení | `../docs/workspace/PLAN.md`, `memory.md` → Aktuální stav (tabulka S00–S19), `docs/AGENTS-REFERENCE.md` → Část B |
 | Workspace — přihlášení, registrace, nový byznys (Clerk) | `docs/AGENTS-REFERENCE.md` → B4 „Jak je to v kódu“, `proxy.ts`, `app/w/layout.tsx`, `app/w/novy/`, `lib/ws/{onboarding,clerk-orgs,clerk-webhook,paths}.ts`, `app/api/clerk/webhook`, R-037 |

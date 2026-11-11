@@ -2,7 +2,7 @@
 
 > Vyčleněno z `AGENTS.md` (část A) 2026-10-09, aby se popis adminu nenačítal do každého sezení (R-042). **Čti před každou změnou admin konzole.** Příkazy a env proměnné zůstaly v [`../../AGENTS.md`](../../AGENTS.md) → Část A. Pravidla a hranice v repu platí z `AGENTS.md`.
 
-> Kryštofův osobní produkční systém (VIZEON, Hub, klientský portál). Popis níže je popis **existujícího kódu** — platí pro údržbu adminu, ne jako vzor pro Workspace.
+> Kryštofův osobní produkční systém (zakázky, peníze, klientský portál). Popis níže je popis **existujícího kódu** — platí pro údržbu adminu, ne jako vzor pro Workspace.
 >
 > **Od AD02 (R-088) je to jeden byznys se třemi zdroji poptávek** (vizeon.cz, alteno.cz, prvotka.cz). Sekce `/alteno` zanikla, sloupec `business` se přejmenoval na `lead_origin`.
 
@@ -171,17 +171,17 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
 | `agent_leads` | 052 | AI-scorované leady z externího `vizeon-lead-agent` |
 | `completed_projects` | 011, 029, 047, 057 | **Dokončené** zakázky (záloha, vazba na zdrojový projekt, odhad) |
-| `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/hub/finance`), volitelná vazba na projekt |
+| `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/dashboard/finance`), volitelná vazba na projekt |
 | `project_surveys` | 016, 046 | Dotazník spokojenosti (`/h/[token]`, `completed_projects.survey_token`) — max 1 na zakázku |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
 | `invoices` | 053, 056 | Archiv faktur (PDF, AI přepis, vazba na transakci) |
 | `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
 | `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
-| `finance_transactions` | 019, 026, 027, 054 | Hub › Finance — transakce; `declared` = přiznaná linie (fakturováno na IČO) |
+| `finance_transactions` | 019, 026, 027, 054 | Finance a daně — transakce; `declared` = přiznaná linie (fakturováno na IČO) |
 | `finance_goals`, `recurring_cash_flow` | 019, 031 | Finanční cíle, opakované cash-flow položky |
-| `startup_projects` (+ `_improvements`, `_changelog`) | 032, 034, 035 | Hub › Byznys › Startup (waitlist DB URL, cenové tiery) |
-| `personal_projects` (+ `_improvements`, `_changelog`) | 033 | Hub › Projekty |
+| `startup_projects` (+ `_improvements`, `_changelog`) | 032, 034, 035 | Startup (waitlist DB URL, cenové tiery) |
+| `personal_projects` (+ `_improvements`, `_changelog`) | 033 | Projekty |
 | `plans_legacy_archived` | 042 | Stará plochá tabulka plánů — jen archiv, nepoužívat |
 | `project_activity` | 093 | Aktivita zakázky (KP03): koncepty a schválené zprávy, `status` draft/published/rejected, `source` manual/claude_code/system, `contains_sensitive`, `client_emailed_at` (souhrnný e-mail max. 1× za den) |
 | `project_agent_keys` | 094 | Klíče projektů pro hlášení z Claude Code (KP04): prefix + HMAC hash, jeden platný klíč na projekt, kdo a kdy vytvořil/zneplatnil |
@@ -248,7 +248,7 @@ lib/
 ├── utils.ts
 └── types.ts
 
-proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard, /hub (`/alteno` zůstal jako pojistka před přesměrováním), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
+proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard (`/alteno` a `/hub` zůstaly jako pojistka před přesměrováním), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -270,19 +270,20 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `app/costs-actions.ts` | Náklady — jediný zdroj pravdy pro firemní i osobní náklady |
 | `app/notification-actions.ts` | Notifikace (přečteno) |
 | `app/project-notes-actions.ts` | Log schůzek u zakázky |
-| `app/hub/finance/finance-actions.ts` | Transakce, měsíční agregace, opakované cash-flow, příjmy z byznysu |
-| `app/hub/finance/invoice-actions.ts` | **Veškerá logika faktur** (sdílené jádro v `lib/invoices.ts`) |
-| `app/hub/finance/tax-news-actions.ts` | Novinky z legislativy |
-| `app/hub/byznys/…` | Přehled byznysu, Startup projekty (+ waitlist, launch email přes Resend) |
-| `app/hub/projekty/projekty-actions.ts` | Osobní projekty |
+| `app/dashboard/finance/finance-actions.ts` | Transakce, měsíční agregace, opakované cash-flow, příjmy z byznysu |
+| `app/dashboard/finance/invoice-actions.ts` | **Veškerá logika faktur** (sdílené jádro v `lib/invoices.ts`) |
+| `app/dashboard/finance/tax-news-actions.ts` | Novinky z legislativy |
+| `app/dashboard/finance/byznys-actions.ts` | Výkonnost podnikání (příjmy, výdaje, zisk, marže) pro kalkulačku ve Financích |
+| `app/dashboard/startup/startup-actions.ts` | Startup projekty (+ waitlist, launch email přes Resend) |
+| `app/dashboard/projekty/projekty-actions.ts` | Osobní projekty |
 
 ### Mapa rout (admin)
 
 | Sekce | Routy |
 |-------|-------|
 | Admin (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/zakazky`, `/pozadavky` (požadavky klientů z portálu), `/poptavky` (jeden inbox poptávek ze všech webů), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
-| Zrušené adresy | `/alteno`, `/alteno/new`, `/alteno/[id]`, `/alteno/rezervace`, `/dashboard/vizeon` — trvale přesměrované (`lib/legacy-redirects.mjs`, AD02) |
-| Hub (`/hub`) | `/hub`, `/byznys` (+ `/startup`, `/startup/new`, `/startup/[id]`), `/finance`, `/projekty` (+ `/new`, `/[id]`) |
+| Osobní část (dřív Hub) | `/dashboard/finance`, `/dashboard/projekty` (+ `/new`, `/[id]`), `/dashboard/startup` (+ `/new`, `/[id]`) |
+| Zrušené adresy | `/alteno`, `/alteno/new`, `/alteno/[id]`, `/alteno/rezervace`, `/dashboard/vizeon` (AD02) a všechny `/hub/*` včetně rozcestníku `/hub/byznys` (AD03) — trvale přesměrované (`lib/legacy-redirects.mjs`) |
 
 ### Veřejné stránky
 
@@ -331,12 +332,13 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Čistý minimalistický design
 
 ### Kostra administrace (KP01, R-071)
-- `/dashboard/*` používá `components/admin/admin-shell.tsx`: postranní menu na počítači, horní lišta a spodní lišta s nabídkou „Více“ na telefonu, hledání ⌘K (stránky, zakázky, hovory, faktury; `app/admin-search-actions.ts`). Hub (`/hub`) má dál vlastní postranní panel.
-- Menu a odznaky: `lib/admin-nav.ts` (skupiny Dnes · Zakázky · Kalendář a hovory · Peníze · Klienti · Osobní) a `lib/admin-counts.ts` (počty jedním dotazem). Nová stránka adminu = položka v `ADMIN_NAV`; test `lib/__tests__/admin-nav.test.ts` hlídá, že žádná dřívější cesta nezmizela.
+- `/dashboard/*` používá `components/admin/admin-shell.tsx`: postranní menu na počítači, horní lišta a spodní lišta s nabídkou „Více“ na telefonu, hledání ⌘K (stránky, zakázky, hovory, faktury; `app/admin-search-actions.ts`). Od AD03 je menu jedno pro celý admin (skupiny Přehled · Práce · Peníze · Klienti · Osobní v `lib/admin-nav.ts`); Hub zanikl.
+- Menu a odznaky: `lib/admin-nav.ts` (skupiny Přehled · Práce · Peníze · Klienti · Osobní) a `lib/admin-counts.ts` (počty jedním dotazem). Nová stránka adminu = položka v `ADMIN_NAV`; test `lib/__tests__/admin-nav.test.ts` hlídá, že žádná dřívější cesta nezmizela.
 - Vzhled: kostra používá Dílky (`data-app="admin"`, `app/admin-tokens.css`, jen barevné tokeny, bez přepsání proměnných shadcn). Obsah stránek zůstává na původním vzhledu (Inter, `brand-*`), dokud se nepřepne.
 
-### `/dashboard` — Dnes (KP02)
+### `/dashboard` — Dnes (KP02, AD03)
 - Jedna hlavní věc nahoře (`lib/admin-today.ts` → `pickFocus`): požadavek klienta → hlášení ke schválení → faktura po splatnosti → schůzka do 24 h → zakázka bez pohybu 14 dní. Pod ní sekce se stejnými věcmi. Data `lib/admin-today-queries.ts` (každá sekce se načítá zvlášť, chybějící tabulka = prázdná sekce).
+- Vpravo (na telefonu pod tím) „Jak se daří tenhle měsíc“ (`loadMonthMoney`): příjem měsíce a z toho přiznaný, nezaplacené faktury **po měnách** (měny se nesčítají, R-011), odhad daně a odvodů za rok a měsíční rezerva. Podmínky jsou stejné jako v `getBusinessIncome` a `getInvoices`, daň počítá `calculateTax` z `lib/tax.ts` — nic se nepočítá podruhé jinak. Dva dotazy, jedna vlna; strop hlídá `lib/__tests__/admin-db-rounds.test.ts`.
 
 ### `/dashboard/zakazky`
 - Seznam všech zakázek s filtrem zdroje poptávky (`?zdroj=`), filtrem stavu (`?status=`), summary barem a počtem nevyřízených požadavků na kartě. Čekající poptávky tu nejsou (`NOT lead_pending`), ty jsou v `/dashboard/poptavky`.
@@ -364,7 +366,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Souhrn nad filtrovaným výběrem: počet, vyfakturováno, zaplaceno, nezaplaceno — **sčítá se po měnách**, CZK a EUR se nikdy neslučují do jednoho čísla
 - Nová faktura přes tlačítko nebo přetažením PDF na stránku (AI přepis přes `InvoiceUploadModal`)
 - **Záměrně napříč byznysy** — VIZEON i ALTENO fakturuje jedno IČO pod jedním přiznáním, rozdělený archiv by znamenal hledat doklad na špatném místě
-- Komponenta `InvoiceRegistry.tsx`; data z `getAllInvoices()` v `app/hub/finance/invoice-actions.ts` (veškerá logika faktur žije tam, tahle sekce je jen další pohled)
+- Komponenta `InvoiceRegistry.tsx`; data z `getAllInvoices()` v `app/dashboard/finance/invoice-actions.ts` (veškerá logika faktur žije tam, tahle sekce je jen další pohled)
 
 ### `/dashboard/faktury/[id]`
 - Kompletní přepis jedné faktury: číslo, částka/měna, vystaveno/splatnost/zaplaceno, odběratel + IČO + DIČ, poznámka
@@ -392,7 +394,7 @@ Všechno, co se u zdroje liší, je v `lib/lead-origins.ts`. **Přidání dalš�
 
 **Co se tím sloučilo:** jeden inbox místo dvou (`/dashboard/poptavky`), jeden seznam zakázek, jedna navigace, jedna odesílací schránka. Staré ALTENO zakázky tím **získaly** fakturaci, dokončení a poznámky ze schůzek. Kalendář a Hovory dřív ALTENO filtrovaly pryč — od AD02 jsou tam i historické záznamy.
 
-**Sdílené odjakživa:** klientský portál `/p/[token]`, notifikace, profil, evidence faktur (jedno IČO, jedno přiznání), Hub finance a DB overlap guard na termínech (jeden člověk = jeden diář).
+**Sdílené odjakživa:** klientský portál `/p/[token]`, notifikace, profil, evidence faktur (jedno IČO, jedno přiznání), Finance a daně a DB overlap guard na termínech (jeden člověk = jeden diář).
 
 ### `/p/[token]` — Klientský portál (PUBLIC)
 - **Bez přihlášení, bez registrace**
@@ -439,7 +441,7 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 ## Bezpečnost
 
-- **NextAuth JWT session** — admin chráněn `proxy.ts` (matcher `/dashboard`, `/alteno`, `/hub` vč. podcest) + `getServerSession` v layoutu. `/api/*` proxy **nehlídá** — každá neveřejná API routa si session kontroluje sama
+- **NextAuth JWT session** — admin chráněn `proxy.ts` (matcher `/dashboard`, plus `/alteno` a `/hub` jako pojistka, vč. podcest) + `getServerSession` v layoutu. `/api/*` proxy **nehlídá** — každá neveřejná API routa si session kontroluje sama
 - **Security hlavičky** v `next.config.mjs`, CSP s nonce v `proxy.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
