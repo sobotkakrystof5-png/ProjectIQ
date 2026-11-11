@@ -56,7 +56,28 @@ Projektové skilly:
 | `zakaziq-ux-texty-cs` | každý text aplikace, který uvidí uživatel nebo zákazník |
 | `zakaziq-memory` | navázání na stav projektu a zápis dokončené práce |
 
-Bezpečnostní skilly viz B13; marketing a SEO používají také `humanize-text-cs`, `frontend-design`, `seo` a `seo-quality-principles` podle úlohy. Dostupnost globálních skillů vždy ověř.
+Bezpečnostní skilly viz B13. Vedle projektových jsou k ruce **řemeslné skilly třetích stran**: `impeccable` (4.8.2) je v repu a synchronizuje se do `.agents/`, ostatní jsou uživatelské v `~/.claude/skills/` a `~/.agents/skills/`, **nejsou součástí repa** a na jiný počítač ani do worktree se nepřenesou — dostupnost vždy ověř (R-080).
+
+| Oblast | Skilly | Kdy |
+|---|---|---|
+| Vzhled a kvalita UI | `impeccable` (v repu), `design-taste-frontend` (tasteskill 2.5.1), `web-design-guidelines`, `frontend-a11y`, `frontend-design` | kompozice, hierarchie, hustota, kontrast, přístupnost; `impeccable detect <cesta\|URL>` a `design-taste-frontend/scripts/gate.mjs` kontrolují postavenou stránku v prohlížeči na 1440/390/320 px |
+| Pohyb | `animate`, `review-animations`, `choreograph`, `animation-performance`, `gestures` | nová animace, revize pohybu, sladění více prvků, zadrhávání, tažení a swipe (kalendář, panely, toasty) |
+| Telefon a odolnost UI | `mobile-native`, `break-ui`, `ask-sonner` | PWA a chování na telefonu, zátěž nejhoršími daty (dlouhá jména, prázdné stavy), toasty |
+| Kód a výkon | `react-best-practices`, `composition-patterns`, `typescript-patterns`, `nextjs-turbopack`, `emil-design-eng` | server components a data, návrh rozhraní komponent, typy, Turbopack, drobnosti dojmu |
+| Data a testy | `database-migrations`, `e2e-testing` | technika bezpečné migrace, vzory Playwrightu |
+| Provoz a proces | `vercel-optimize`, `grill-me` (volá `grilling`), `session-handoff` | náklady a výkon nasazeného projektu, výslech plánu po kolech, předání sezení |
+| Marketing a SEO | `web-project-brief`, `humanize-text-cs`, `seo` + `seo-quality-principles` | brief webu, polidštění českého textu, SEO landing page (R-022, R-055) |
+
+Žádný z nich nepřebíjí pravidla projektu. Platí nad nimi:
+
+- **Vzhled:** jediný platný systém je Dílky (B8, `DESIGN.md`, R-021, R-067, R-068, R-078). Nepřebírej cizí palety, kit, gradienty, serifovou kurzívu v nadpisech landing page ani štítky verzálkami.
+- **Texty:** česky podle `zakaziq-ux-texty-cs`, marketing a e-maily přes `humanize-text-cs`. Anglické kontroly copy (`copy-lint.mjs` v tasteskill, `writing-guidelines`) na české texty neplatí.
+- **Hranice repa:** ani návrh z těchto skillů nesmí měnit admin konzoli bez výslovného zadání; převzatý vzor kopíruj do `lib/ws/` nebo `components/ws/`.
+- **Migrace:** `database-migrations` je jen technika. Závazné je nové sekvenční idempotentní číslo (B3), žádné ORM, skutečná migrace jen se souhlasem.
+- **Testy:** `e2e-testing` předpokládá Playwright, který v projektu není. Nová závislost potřebuje rozhodnutí v paměti; do té doby platí Vitest a PGlite (B12, R-036).
+- **Provoz:** `vercel-optimize` smí metriky jen číst. Změna projektu, regionu nebo plánu a jakýkoli deploy jen se souhlasem (B12, R-058 D-6).
+- **Rozhodnutí a commity:** výsledek `grill-me` zapiš jako `R-xxx` do `memory/memory.md`, ne do `docs/adr/`. Commity zůstávají `ws/oblast: co a proč`, respektive `feat:`/`fix:` v adminu.
+- **Bezpečnost:** B13 a `.claude/security/` mají přednost. CSP neoslabuj kvůli animaci, fontu ani skriptu třetí strany; `design-taste-frontend` má Stop hook odstraněný, gate se pouští ručně.
 
 Soubor má dvě části: **[A — Admin konzole](#část-a--admin-konzole)** (běžící osobní systém, popis kódu) a **[B — ZakazIQ Workspace](#část-b--zakaziq-workspace)** (SaaS ve výstavbě, pravidla pro nový kód). Společné jsou hranice v repu níže a sekce na konci (git, paměť, nikdy).
 
