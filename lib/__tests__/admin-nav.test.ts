@@ -62,7 +62,7 @@ describe('navigace administrace', () => {
   it('vyhrává nejspecifičtější shoda (Rezervace ALTENO před Zakázkami)', () => {
     expect(activeHref('/alteno/rezervace')).toBe('/alteno/rezervace')
     expect(activeHref('/hub/finance')).toBe('/hub/finance')
-    expect(activeHref('/hub/sport')).toBe('/hub')
+    expect(activeHref('/hub/byznys')).toBe('/hub')
   })
 
   it('neznámá adresa nesvítí nikde', () => {
