@@ -5,12 +5,15 @@
 //   node scripts/export-before-drop.mjs                      jen vypíše, co by vyvezl
 //   node scripts/export-before-drop.mjs --ano                vyveze do ~/Desktop/zakaziq-export-<datum>/
 //   node scripts/export-before-drop.mjs --ano --kam /cesta   vyveze jinam
+//   node scripts/export-before-drop.mjs --env .env.production.local --ano   proti produkci
 //
 // Jeden CSV soubor na tabulku (hlavička + řádky, UTF-8 s BOM, aby Excel
 // nerozbil diakritiku), plus prehled.txt s počty řádků. Cílová složka nesmí
 // být v repu — jinak by se záloha omylem commitla.
 //
-// Čte DATABASE_URL z .env.local (nebo z prostředí) a jen čte, nic nemaže.
+// Čte DATABASE_URL z .env.local (nebo ze souboru za --env, nebo z prostředí)
+// a jen čte, nic nemaže. Produkční připojení se bere z Vercelu:
+//   vercel env pull .env.production.local --environment=production
 
 import fs from 'node:fs'
 import os from 'node:os'
@@ -54,9 +57,16 @@ export const TABLES_TO_DROP = [
   'project_blocks',
 ]
 
-function loadEnvLocal() {
-  const file = path.join(ROOT, '.env.local')
-  if (!fs.existsSync(file)) return
+function loadEnvLocal(name = '.env.local') {
+  const file = path.isAbsolute(name) ? name : path.join(ROOT, name)
+  if (!fs.existsSync(file)) {
+    if (name !== '.env.local') {
+      console.error(`Soubor ${name} neexistuje. Produkční připojení stáhnete takhle:`)
+      console.error('  vercel env pull .env.production.local --environment=production')
+      process.exit(1)
+    }
+    return
+  }
   for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '')
@@ -82,10 +92,12 @@ function toCsv(rows) {
 }
 
 async function main() {
-  loadEnvLocal()
   const args = process.argv.slice(2)
+  const envIndex = args.indexOf('--env')
+  loadEnvLocal(envIndex === -1 ? '.env.local' : args[envIndex + 1])
   const confirmed = args.includes('--ano')
   const whereIndex = args.indexOf('--kam')
+  if (envIndex !== -1) console.log(`Env: ${args[envIndex + 1]}`)
   const today = new Date().toISOString().slice(0, 10)
   const target = path.resolve(
     whereIndex === -1 ? path.join(os.homedir(), 'Desktop', `zakaziq-export-${today}`) : args[whereIndex + 1],

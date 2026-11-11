@@ -7,6 +7,9 @@
 // Přepínače:
 //   --dry     příkazy se jen vypíšou, nic se neprovede (ani evidence)
 //   --znovu   aplikuje i migraci, která už je v evidenci
+//   --env <soubor>  vezme DATABASE_URL odjinud než z .env.local; produkční
+//                   připojení se stahuje z Vercelu:
+//                   vercel env pull .env.production.local --environment=production
 //
 // Evidence: tabulka public.schema_migrations (soubor, čas, hash, počet
 // příkazů). Běhoun ji sám založí a už aplikovanou migraci se stejným
@@ -23,9 +26,17 @@ const crypto = require('crypto')
 const { neon } = require('@neondatabase/serverless')
 
 // .env.local se čte ručně — dotenv není v závislostech projektu.
-function loadEnvLocal() {
-  const file = path.join(__dirname, '..', '.env.local')
-  if (!fs.existsSync(file)) return
+function loadEnvLocal(name) {
+  const which = name || '.env.local'
+  const file = path.isAbsolute(which) ? which : path.join(__dirname, '..', which)
+  if (!fs.existsSync(file)) {
+    if (name) {
+      console.error(`Soubor ${name} neexistuje. Produkční připojení stáhnete takhle:`)
+      console.error('  vercel env pull .env.production.local --environment=production')
+      process.exit(1)
+    }
+    return
+  }
   for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
     if (!m) continue
@@ -82,7 +93,8 @@ const EVIDENCE = `CREATE TABLE IF NOT EXISTS public.schema_migrations (
 )`
 
 async function main() {
-  loadEnvLocal()
+  const envArg = process.argv.indexOf('--env')
+  loadEnvLocal(envArg === -1 ? null : process.argv[envArg + 1])
   if (!process.env.DATABASE_URL) {
     console.error('Chybí DATABASE_URL (.env.local nebo prostředí).')
     process.exit(1)
@@ -91,9 +103,10 @@ async function main() {
   const args = process.argv.slice(2)
   const dry = args.includes('--dry')
   const znovu = args.includes('--znovu')
-  const files = args.filter((a) => !a.startsWith('--'))
+  // Za --env následuje cesta k souboru, ne migrace.
+  const files = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--env')
   if (files.length === 0) {
-    console.error('Použití: node scripts/apply-migration.js [--dry] [--znovu] <soubor.sql> [další.sql ...]')
+    console.error('Použití: node scripts/apply-migration.js [--dry] [--znovu] [--env <soubor>] <soubor.sql> [další.sql ...]')
     process.exit(1)
   }
 
