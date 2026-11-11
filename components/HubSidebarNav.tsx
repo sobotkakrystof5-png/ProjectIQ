@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, GraduationCap, TrendingUp, Dumbbell, Briefcase, Layers, Target } from 'lucide-react'
+import { LayoutGrid, TrendingUp, Briefcase, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const OVERVIEW = {
@@ -22,28 +22,6 @@ const PILLARS = [
     hoverText: 'hover:text-emerald-700',
     dot: 'bg-emerald-500',
     mobileDot: 'border-b-2 border-emerald-500 text-emerald-700',
-  },
-  {
-    href: '/hub/school',
-    label: 'Škola',
-    icon: GraduationCap,
-    activeText: 'text-violet-700',
-    activeBg: 'bg-violet-50',
-    hoverBg: 'hover:bg-violet-50/60',
-    hoverText: 'hover:text-violet-700',
-    dot: 'bg-violet-500',
-    mobileDot: 'border-b-2 border-violet-500 text-violet-700',
-  },
-  {
-    href: '/hub/sport',
-    label: 'Sport',
-    icon: Dumbbell,
-    activeText: 'text-rose-700',
-    activeBg: 'bg-rose-50',
-    hoverBg: 'hover:bg-rose-50/60',
-    hoverText: 'hover:text-rose-700',
-    dot: 'bg-rose-500',
-    mobileDot: 'border-b-2 border-rose-500 text-rose-700',
   },
   {
     href: '/hub/projekty',
@@ -66,17 +44,6 @@ const PILLARS = [
     hoverText: 'hover:text-brand-800',
     dot: 'bg-brand-600',
     mobileDot: 'border-b-2 border-brand-600 text-brand-800',
-  },
-  {
-    href: '/hub/plany',
-    label: 'Plány',
-    icon: Target,
-    activeText: 'text-amber-700',
-    activeBg: 'bg-amber-50',
-    hoverBg: 'hover:bg-amber-50/60',
-    hoverText: 'hover:text-amber-700',
-    dot: 'bg-amber-500',
-    mobileDot: 'border-b-2 border-amber-500 text-amber-700',
   },
 ]
 

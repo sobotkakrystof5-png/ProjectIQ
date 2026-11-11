@@ -90,15 +90,6 @@ export const CHANNEL_LABELS: Record<ConsultationChannel, string> = {
   other: 'Jiné',
 }
 
-export type DeadlineType = 'klassenarbeit' | 'homework' | 'presentation' | 'other'
-
-export const DEADLINE_TYPE_LABEL: Record<DeadlineType, string> = {
-  klassenarbeit: 'KA',
-  homework: 'Úkol',
-  presentation: 'Referát',
-  other: 'Jiné',
-}
-
 export interface ConsultationSlot {
   id: string
   project_id: string

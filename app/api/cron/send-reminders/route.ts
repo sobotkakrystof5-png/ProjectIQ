@@ -9,13 +9,6 @@ import { adminEmailFor, toBusiness } from '@/lib/business'
 
 export const dynamic = 'force-dynamic'
 
-const DEADLINE_EMAIL_LABEL: Record<string, string> = {
-  klassenarbeit: 'Klassenarbeit (KA)',
-  homework:      'Domácí úkol',
-  presentation:  'Referát / Prezentace',
-  other:         'Jiné',
-}
-
 const LEAD_ACTION_LABEL: Record<string, string> = {
   call:     'Telefonní hovor',
   meeting:  'Osobní setkání',
@@ -41,14 +34,6 @@ type SlotRow = {
   channel: ConsultationChannel
   meeting_link: string | null
   business: string | null
-}
-
-type DeadlineRow = {
-  id: string
-  title: string
-  subject: string | null
-  type: string
-  due_date: string
 }
 
 type LeadRow = {
@@ -147,45 +132,17 @@ async function sendLeadReminder(lead: LeadRow, type: 'day_before' | '2h_before')
   })
 }
 
-async function sendSchoolDeadlineReminder(deadlines: DeadlineRow[], dayOf = false) {
-  const adminEmail = process.env.ADMIN_EMAIL
-  if (!adminEmail || deadlines.length === 0) return
-
-  const fields = deadlines.map(d => ({
-    label: DEADLINE_EMAIL_LABEL[d.type] ?? d.type,
-    value: d.title + (d.subject ? ` (${d.subject})` : ''),
-  }))
-
-  if (dayOf) {
-    await sendBrandedEmail({
-      to: adminEmail,
-      subject: `Dnes ${deadlines.length === 1 ? 'máš školní termín' : `máš ${deadlines.length} školní termíny`} – ZakazIQ`,
-      heading: 'Dnes ve škole',
-      intro: 'Ranní připomínka dnešních školních termínů.',
-      fields,
-    })
-  } else {
-    await sendBrandedEmail({
-      to: adminEmail,
-      subject: `Zítra máš ${deadlines.length === 1 ? 'školní termín' : `${deadlines.length} školní termíny`} – ZakazIQ`,
-      heading: 'Zítra ve škole',
-      intro: 'Připomínám ti termíny na zítra.',
-      fields,
-    })
-  }
-}
-
 export async function GET(req: NextRequest) {
   if (!verifyCronSecret(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // ── Konzultační sloty (pro klienty) + lead akce + školní termíny ─────────
-  // 6 nezávislých atomických UPDATE...RETURNING — spouštíme paralelně, ne sekvenčně.
+  // ── Konzultační sloty (pro klienty) + lead akce ──────────────────────────
+  // 4 nezávislé atomické UPDATE...RETURNING — spouštíme paralelně, ne sekvenčně.
   // Řádek se "claimne" (sent = true) ve stejném dotazu, který ho vybere, takže
   // souběžná/duplicitní volání cronu (externí cron-job.org) nemůžou stejný
   // řádek vyzvednout dvakrát — stejný princip jako UNIQUE constraint u rezervací.
-  const [dayBeforeSlots, twoHourSlots, leadDayBefore, leadTwoHour, schoolDeadlines, schoolDeadlinesToday] = await Promise.all([
+  const [dayBeforeSlots, twoHourSlots, leadDayBefore, leadTwoHour] = await Promise.all([
     // Day-before: scheduled 23–25 h from now (target 24h, ±1h for hourly cron).
     sql`
       UPDATE consultation_slots cs
@@ -232,32 +189,12 @@ export async function GET(req: NextRequest) {
       RETURNING id, company_name, contact_name, next_action, next_action_type,
                 (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague' AS action_at
     `,
-    // Školní termíny (den před). CURRENT_DATE je na Neon spojení bez SET timezone
-    // vždy UTC — porovnáváme proto proti "dnešku" spočítanému v Europe/Prague,
-    // stejně jako u leadů výše.
-    sql`
-      UPDATE school_deadlines_manual
-      SET reminder_day_before_sent = true
-      WHERE done = false
-        AND reminder_day_before_sent = false
-        AND due_date = (now() AT TIME ZONE 'Europe/Prague')::date + 1
-      RETURNING id, title, subject, type, due_date::text AS due_date
-    `,
-    // Školní termíny (ranní připomínka — ve stejný den)
-    sql`
-      UPDATE school_deadlines_manual
-      SET reminder_day_of_sent = true
-      WHERE done = false
-        AND reminder_day_of_sent = false
-        AND due_date = (now() AT TIME ZONE 'Europe/Prague')::date
-      RETURNING id, title, subject, type, due_date::text AS due_date
-    `,
-  ]) as [SlotRow[], SlotRow[], LeadRow[], LeadRow[], DeadlineRow[], DeadlineRow[]]
+  ]) as [SlotRow[], SlotRow[], LeadRow[], LeadRow[]]
 
   // Generate recurring cost transactions (monthly/annual) — idempotent
   await generateRecurringCostTransactionsInternal().catch(() => {})
 
-  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, school_deadlines: 0, school_deadlines_today: 0, errors: 0 }
+  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, errors: 0 }
 
   const dayBeforeResults = await Promise.allSettled(dayBeforeSlots.map(async (slot) => {
     await sendConsultationReminder(slot, 'day_before')
@@ -304,36 +241,6 @@ export async function GET(req: NextRequest) {
   }))
   results.lead_two_hours = leadTwoHourResults.filter(r => r.status === 'fulfilled').length
   results.errors += leadTwoHourResults.filter(r => r.status === 'rejected').length
-
-  if (schoolDeadlines.length > 0) {
-    try {
-      await sendSchoolDeadlineReminder(schoolDeadlines)
-      void createNotification({
-        type: 'reminder_upcoming',
-        title: `Zítra ${schoolDeadlines.length === 1 ? 'školní termín' : `${schoolDeadlines.length} školní termíny`}`,
-        body: schoolDeadlines.map(d => `${DEADLINE_EMAIL_LABEL[d.type] ?? d.type}: ${d.title}`).join(' · '),
-        link: '/hub/school',
-      })
-      results.school_deadlines = schoolDeadlines.length
-    } catch {
-      results.errors++
-    }
-  }
-
-  if (schoolDeadlinesToday.length > 0) {
-    try {
-      await sendSchoolDeadlineReminder(schoolDeadlinesToday, true)
-      void createNotification({
-        type: 'reminder_upcoming',
-        title: `Dnes ${schoolDeadlinesToday.length === 1 ? 'školní termín' : `${schoolDeadlinesToday.length} školní termíny`}`,
-        body: schoolDeadlinesToday.map(d => `${DEADLINE_EMAIL_LABEL[d.type] ?? d.type}: ${d.title}`).join(' · '),
-        link: '/hub/school',
-      })
-      results.school_deadlines_today = schoolDeadlinesToday.length
-    } catch {
-      results.errors++
-    }
-  }
 
   return NextResponse.json({ ok: true, ...results })
 }

@@ -1,27 +1,15 @@
 import Link from 'next/link'
 import { sql } from '@/lib/db'
-import { formatDate } from '@/lib/utils'
 import {
   Briefcase,
-  GraduationCap,
   TrendingUp,
-  Dumbbell,
   ArrowUpRight,
   Clock,
   CreditCard,
   FolderOpen,
   CalendarDays,
-  Activity,
-  Scale,
-  Flame,
-  BookOpen,
-  AlertCircle,
   Layers,
-  Target,
-  Gauge,
-  Wallet,
 } from 'lucide-react'
-import { DEADLINE_TYPE_LABEL, type DeadlineType } from '@/lib/types'
 
 function formatCZK(amount: number) {
   return new Intl.NumberFormat('cs-CZ', {
@@ -83,93 +71,8 @@ async function getBusinessStats() {
   return { ...stats, nextConsult }
 }
 
-async function getSportStats() {
-  const today = new Date().toLocaleDateString('sv-SE') // YYYY-MM-DD in local time
-  const [scoreRows, calRows, wkRows, weightRows] = await Promise.all([
-    sql`
-      SELECT score::float AS score, scored_date::text AS score_date
-      FROM health_scores
-      WHERE user_id IS NULL
-      ORDER BY scored_date DESC
-      LIMIT 1
-    `,
-    sql`
-      SELECT COALESCE(SUM(calories), 0)::int AS kcal
-      FROM nutrition_logs
-      WHERE user_id IS NULL AND logged_date = ${today}
-    `,
-    sql`
-      SELECT COUNT(*)::int AS cnt
-      FROM workout_logs
-      WHERE user_id IS NULL
-        AND logged_date >= CURRENT_DATE - INTERVAL '30 days'
-    `,
-    sql`
-      SELECT weight_kg::float AS weight_kg
-      FROM weight_logs
-      WHERE user_id IS NULL
-      ORDER BY created_at DESC
-      LIMIT 1
-    `,
-  ])
-  return {
-    latestScore: (scoreRows[0] as { score: number; score_date: string } | undefined)?.score ?? null,
-    todayKcal: (calRows[0] as { kcal: number }).kcal,
-    workoutsLast30: (wkRows[0] as { cnt: number }).cnt,
-    latestWeight: (weightRows[0] as { weight_kg: number } | undefined)?.weight_kg ?? null,
-  }
-}
-
-async function getSchoolStats() {
-  const [upcomingRows, nextRows] = await Promise.all([
-    sql`
-      SELECT COUNT(*)::int AS cnt
-      FROM school_deadlines_manual
-      WHERE done = false AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 7
-    `,
-    sql`
-      SELECT title, type, due_date::text AS due_date
-      FROM school_deadlines_manual
-      WHERE done = false AND due_date >= CURRENT_DATE
-      ORDER BY due_date ASC
-      LIMIT 1
-    `,
-  ])
-  const next = nextRows[0] as { title: string; type: DeadlineType; due_date: string } | undefined
-  return {
-    upcomingCount: (upcomingRows[0] as { cnt: number }).cnt,
-    nextDeadline: next ?? null,
-  }
-}
-
-async function getPlanyStats() {
-  const rows = await sql`
-    SELECT
-      (SELECT COUNT(*)::int FROM plan_school_goals WHERE archived = false AND status = 'aktivni') +
-      (SELECT COUNT(*)::int FROM plan_health_goals WHERE archived = false AND status = 'aktivni') +
-      (SELECT COUNT(*)::int FROM plan_projects WHERE archived = false AND status = 'validace') +
-      (SELECT COUNT(*)::int FROM plan_businesses WHERE archived = false AND status IN ('planovani', 'pripraveno_k_exportu'))
-      AS active_count,
-      (SELECT MIN(target_date) FROM (
-        SELECT target_date FROM plan_school_goals WHERE archived = false AND target_date IS NOT NULL AND target_date >= CURRENT_DATE
-        UNION ALL
-        SELECT target_date FROM plan_health_goals WHERE archived = false AND target_date IS NOT NULL AND target_date >= CURRENT_DATE
-        UNION ALL
-        SELECT target_date FROM plan_finance_goals WHERE archived = false AND target_date IS NOT NULL AND target_date >= CURRENT_DATE
-      ) t)::text AS nearest_date
-  `
-  const stats = rows[0] as { active_count: number; nearest_date: string | null }
-  return stats
-}
-
 export default async function HubPage() {
-  const [business, sport, school, plany] = await Promise.all([
-    getBusinessStats(),
-    getSportStats(),
-    getSchoolStats(),
-    getPlanyStats(),
-  ])
-  const { active_count, pending_revenue, review_count, nextConsult } = business
+  const { active_count, pending_revenue, review_count, nextConsult } = await getBusinessStats()
 
   return (
     <div className="space-y-6">
@@ -276,126 +179,6 @@ export default async function HubPage() {
           </div>
         </Link>
 
-        {/* Škola */}
-        <Link
-          href="/hub/school"
-          className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-violet-200 transition-all flex flex-col"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-purple-700 rounded-xl flex items-center justify-center shadow-sm">
-              <GraduationCap size={18} strokeWidth={1.5} className="text-white" />
-            </div>
-            <ArrowUpRight
-              size={16}
-              strokeWidth={1.5}
-              className="text-muted-foreground/40 group-hover:text-violet-600 transition-colors mt-0.5"
-            />
-          </div>
-          <h2 className="font-semibold text-foreground text-[15px] mb-4">Škola</h2>
-
-          <div className="space-y-2.5 flex-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <AlertCircle size={13} strokeWidth={1.5} />
-                Termíny tento týden
-              </span>
-              <span className={`font-semibold tabular-nums ${school.upcomingCount > 0 ? 'text-violet-700' : 'text-foreground'}`}>
-                {school.upcomingCount}
-              </span>
-            </div>
-            {school.nextDeadline ? (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <BookOpen size={13} strokeWidth={1.5} />
-                  Příště
-                </span>
-                <span className="font-semibold text-foreground tabular-nums text-right max-w-[140px] truncate" title={school.nextDeadline.title}>
-                  {DEADLINE_TYPE_LABEL[school.nextDeadline.type] ?? school.nextDeadline.type}
-                  {' '}·{' '}
-                  {new Date(school.nextDeadline.due_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center text-sm text-muted-foreground gap-1.5">
-                <BookOpen size={13} strokeWidth={1.5} />
-                Žádné nadcházející termíny
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-border">
-            <span className="text-xs font-semibold text-violet-600 group-hover:text-violet-700 transition-colors">
-              Otevřít Školu →
-            </span>
-          </div>
-        </Link>
-
-        {/* Sport & Zdraví */}
-        <Link
-          href="/hub/sport"
-          className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-rose-200 transition-all flex flex-col"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-sm">
-              <Dumbbell size={18} strokeWidth={1.5} className="text-white" />
-            </div>
-            <ArrowUpRight
-              size={16}
-              strokeWidth={1.5}
-              className="text-muted-foreground/40 group-hover:text-rose-600 transition-colors mt-0.5"
-            />
-          </div>
-          <h2 className="font-semibold text-foreground text-[15px] mb-4">Sport & Zdraví</h2>
-
-          <div className="space-y-2.5 flex-1">
-            {sport.latestScore !== null && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Activity size={13} strokeWidth={1.5} />
-                  Health Score
-                </span>
-                <span className={`font-semibold tabular-nums ${sport.latestScore >= 75 ? 'text-emerald-600' : sport.latestScore >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
-                  {sport.latestScore.toFixed(0)} / 100
-                </span>
-              </div>
-            )}
-            {sport.todayKcal > 0 && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Flame size={13} strokeWidth={1.5} />
-                  Dnes kcal
-                </span>
-                <span className="font-semibold text-foreground tabular-nums">{sport.todayKcal} kcal</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <Dumbbell size={13} strokeWidth={1.5} />
-                Tréninky (30 d.)
-              </span>
-              <span className="font-semibold text-foreground tabular-nums">{sport.workoutsLast30}</span>
-            </div>
-            {sport.latestWeight !== null && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Scale size={13} strokeWidth={1.5} />
-                  Váha
-                </span>
-                <span className="font-semibold text-foreground tabular-nums">{sport.latestWeight} kg</span>
-              </div>
-            )}
-            {sport.latestScore === null && sport.todayKcal === 0 && sport.workoutsLast30 === 0 && sport.latestWeight === null && (
-              <p className="text-sm text-muted-foreground">Zatím žádná data — začni logovat!</p>
-            )}
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-border">
-            <span className="text-xs font-semibold text-rose-600 group-hover:text-rose-700 transition-colors">
-              Otevřít Sport & Zdraví →
-            </span>
-          </div>
-        </Link>
-
         {/* Projekty */}
         <Link
           href="/hub/projekty"
@@ -428,49 +211,6 @@ export default async function HubPage() {
           <div className="mt-4 pt-3 border-t border-border">
             <span className="text-xs font-semibold text-indigo-600 group-hover:text-indigo-700 transition-colors">
               Otevřít Projekty →
-            </span>
-          </div>
-        </Link>
-
-        {/* Plány */}
-        <Link
-          href="/hub/plany"
-          className="group bg-white border border-border rounded-2xl p-5 hover:shadow-md hover:border-amber-200 transition-all flex flex-col"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
-              <Target size={18} strokeWidth={1.5} className="text-white" />
-            </div>
-            <ArrowUpRight
-              size={16}
-              strokeWidth={1.5}
-              className="text-muted-foreground/40 group-hover:text-amber-600 transition-colors mt-0.5"
-            />
-          </div>
-          <h2 className="font-semibold text-foreground text-[15px] mb-4">Plány</h2>
-
-          <div className="space-y-2.5 flex-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <Gauge size={13} strokeWidth={1.5} />
-                Aktivních cílů
-              </span>
-              <span className="font-semibold text-foreground tabular-nums">{plany.active_count}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <Wallet size={13} strokeWidth={1.5} />
-                Nejbližší termín
-              </span>
-              <span className="font-semibold text-foreground tabular-nums">
-                {plany.nearest_date ? formatDate(plany.nearest_date) : '—'}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-border">
-            <span className="text-xs font-semibold text-amber-600 group-hover:text-amber-700 transition-colors">
-              Otevřít Plány →
             </span>
           </div>
         </Link>
