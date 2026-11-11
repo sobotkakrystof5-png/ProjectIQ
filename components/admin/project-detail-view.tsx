@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, ArrowRight, ExternalLink, Layers } from 'lucide-react'
+import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { sql } from '@/lib/db'
 import { ProjectForm } from '@/components/ProjectForm'
 import { ShareButton } from '@/components/ShareButton'
@@ -165,10 +165,6 @@ async function countOpenRequests(projectId: string): Promise<number> {
 
 async function OverviewTab({ project, business }: { project: Project; business: Business }) {
   const publicUrl = getPublicUrl(project.public_token)
-  const blockCount =
-    business === 'vizeon'
-      ? ((await sql`SELECT count(*)::int AS count FROM project_blocks WHERE project_id = ${project.id}`)[0] as { count: number }).count
-      : 0
 
   return (
     <>
@@ -195,29 +191,6 @@ async function OverviewTab({ project, business }: { project: Project; business: 
 
       {business === 'vizeon' && (
         <>
-          <Link
-            href={`/dashboard/${project.id}/sablona`}
-            className="group flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-6 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50/40"
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50">
-                <Layers size={16} strokeWidth={1.5} className="text-brand-700" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-foreground">Šablona webu</h2>
-                <p className="text-xs text-muted-foreground">
-                  {blockCount > 0
-                    ? `${blockCount} ${blockCount === 1 ? 'blok' : blockCount < 5 ? 'bloky' : 'bloků'}`
-                    : 'Zatím žádné bloky'}
-                </p>
-              </div>
-            </div>
-            <span className="flex shrink-0 items-center gap-1 text-sm font-medium text-brand-700 group-hover:text-brand-800">
-              Otevřít
-              <ArrowRight size={14} strokeWidth={1.5} />
-            </span>
-          </Link>
-
           <div className={card}>
             <h2 className={h2}>Přidat do dokončených</h2>
             <p className="mb-4 text-xs text-muted-foreground">

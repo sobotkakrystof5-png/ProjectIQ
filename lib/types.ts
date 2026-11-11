@@ -516,47 +516,6 @@ export type InvoiceInsert = Omit<
 >
 export type InvoiceUpdate = Partial<InvoiceInsert>
 
-// ─── Šablony webu (migrace 061–062) ───────────────────────────────────────────
-
-/** Uživatelova osobní knihovna typů bloků webu. Spravuje se přes /dashboard/sablony. */
-export interface BlockTemplate {
-  id: string
-  name: string
-  description: string | null
-  color: string | null
-  position: number
-  created_at: string | Date
-  updated_at: string | Date | null
-}
-
-/**
- * Konkrétní blok použitý u konkrétní zakázky. `name`/`color` se při přidání
- * ze šablony zkopírují (denormalizace) — pozdější úprava šablony nebo bloku
- * na jedné zakázce neovlivní knihovnu ani jiné zakázky.
- */
-export interface ProjectBlock {
-  id: string
-  project_id: string
-  source_template_id: string | null
-  title: string
-  color: string | null
-  content: string | null
-  position: number
-  created_at: string | Date
-  updated_at: string | Date | null
-}
-
-export const BLOCK_COLOR_PALETTE = [
-  '#3b82f6', // blue
-  '#f59e0b', // amber
-  '#a855f7', // purple
-  '#10b981', // emerald
-  '#ef4444', // red
-  '#64748b', // slate
-  '#ec4899', // pink
-  '#f97316', // orange
-]
-
 export type TaxNewsSource = 'financni_sprava' | 'cssz'
 
 export const TAX_NEWS_SOURCE_LABELS: Record<TaxNewsSource, string> = {

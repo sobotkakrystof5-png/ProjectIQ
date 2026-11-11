@@ -1,5 +1,5 @@
 import {
-  Bell, Building2, CalendarDays, CheckCircle2, FileText, Inbox, Layers, LayoutGrid, Megaphone,
+  Bell, Building2, CalendarDays, CheckCircle2, FileText, Inbox, LayoutGrid, Megaphone,
   MessageSquarePlus, PhoneCall, Receipt, Star, Sun, UserCircle, Wallet, FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
@@ -10,7 +10,6 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   projects: FolderOpen,
   requests: MessageSquarePlus,
   inbox: Inbox,
-  templates: Layers,
   done: CheckCircle2,
   rating: Star,
   calendar: CalendarDays,

@@ -19,7 +19,6 @@ const OLD_MENU_PATHS = [
   '/dashboard/hodnoceni',
   '/dashboard/naklady',
   '/dashboard/faktury',
-  '/dashboard/sablony',
   '/dashboard/klienti',
   '/dashboard/novinky',
   '/alteno',
@@ -47,7 +46,6 @@ describe('navigace administrace', () => {
 
   it('detail zakázky VIZEON i ALTENO a nová zakázka svítí na Zakázkách', () => {
     expect(activeHref('/dashboard/11111111-1111-4111-8111-111111111111')).toBe('/dashboard/zakazky')
-    expect(activeHref('/dashboard/11111111-1111-4111-8111-111111111111/sablona')).toBe('/dashboard/zakazky')
     expect(activeHref('/dashboard/zakazky')).toBe('/dashboard/zakazky')
     expect(activeHref('/dashboard/new')).toBe('/dashboard/zakazky')
     expect(activeHref('/alteno/abc')).toBe('/dashboard/zakazky')

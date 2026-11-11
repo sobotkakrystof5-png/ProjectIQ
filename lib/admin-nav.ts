@@ -3,7 +3,7 @@
 // panel a v tomhle menu je jen odkaz.
 
 export type NavIcon =
-  | 'today' | 'projects' | 'requests' | 'inbox' | 'templates' | 'done' | 'rating'
+  | 'today' | 'projects' | 'requests' | 'inbox' | 'done' | 'rating'
   | 'calendar' | 'calls' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news' | 'hub' | 'bell' | 'profile'
 
 export type CountKey = 'requests' | 'vizeon' | 'alteno' | 'notifications' | 'drafts'
@@ -39,7 +39,6 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: '/dashboard/pozadavky', label: 'Požadavky klientů', icon: 'requests', count: 'requests' },
       { href: '/dashboard/vizeon', label: 'Poptávky VIZEON', icon: 'inbox', count: 'vizeon' },
       { href: '/alteno/rezervace', label: 'Rezervace ALTENO', icon: 'inbox', count: 'alteno' },
-      { href: '/dashboard/sablony', label: 'Šablony webu', icon: 'templates' },
       { href: '/dashboard/dokoncene', label: 'Dokončené', icon: 'done' },
       { href: '/dashboard/hodnoceni', label: 'Hodnocení', icon: 'rating' },
     ],
