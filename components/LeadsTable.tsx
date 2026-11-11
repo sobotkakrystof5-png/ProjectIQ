@@ -1,12 +1,14 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState, useTransition } from 'react'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote } from 'lucide-react'
+import { Fragment, useEffect, useState, useTransition } from 'react'
+import Link from 'next/link'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toast'
 import { LEAD_ACTION_TONE, LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
-import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote } from '@/app/calls-actions'
+import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote, getLeadNotes } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
+import type { SortDir } from '@/lib/admin-table'
 import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
 import { whatsappHref, formatDate } from '@/lib/utils'
 import {
@@ -822,17 +824,86 @@ function WaitingRow({
   )
 }
 
+/**
+ * Kontakt ve výpisu: k leadu patří náhled posledních poznámek a jejich počet
+ * (`LEFT JOIN LATERAL`, AD07). Celé poznámky se dotáhnou po rozbalení řádku.
+ */
+export type LeadWithNotes = ClientLead & { note_preview: LeadNote[]; notes_count: number }
+
+/** Hlavička, která se dá seřadit. Je to odkaz — stav řazení je v adrese. */
+function SortHeader({
+  label,
+  columnKey,
+  sortKey,
+  dir,
+  sortLinks,
+  className,
+}: {
+  label: string
+  columnKey: string
+  sortKey: string
+  dir: SortDir
+  /** Hotové odkazy ze serveru — funkce se do klientské komponenty poslat nedá. */
+  sortLinks: Record<string, string>
+  className?: string
+}) {
+  const active = sortKey === columnKey
+  const href = sortLinks[columnKey]
+  if (!href) return <PlainHeader label={label} className={className} />
+  return (
+    <th
+      className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-quiet ${className ?? ''}`}
+      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <Link
+        href={href}
+        scroll={false}
+        className={`group -mx-1 inline-flex items-center gap-1.5 rounded-tiny px-1 py-1 uppercase transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'text-ink' : ''}`}
+      >
+        {label}
+        {active ? (
+          dir === 'asc' ? <ArrowUp size={13} strokeWidth={1.5} /> : <ArrowDown size={13} strokeWidth={1.5} />
+        ) : (
+          <ChevronsUpDown size={13} strokeWidth={1.5} className="opacity-0 transition-opacity group-hover:opacity-60" />
+        )}
+      </Link>
+    </th>
+  )
+}
+
+const PlainHeader = ({ label, className }: { label: string; className?: string }) => (
+  <th className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-quiet ${className ?? ''}`}>{label}</th>
+)
+
+/**
+ * Hovory a Čekání na odpověď (AD07).
+ *
+ * Řádky chodí ze serveru po stránkách a seřazené; komponenta si je drží
+ * jen kvůli okamžité odezvě po úpravě. Poznámky má každý řádek v náhledu
+ * a celé se načtou, až se kontakt rozbalí.
+ */
 export default function LeadsTable({
   initialLeads,
-  initialNotes,
+  waiting,
+  sortKey,
+  dir,
+  sortLinks,
   focusLeadId,
 }: {
-  initialLeads: ClientLead[]
-  initialNotes: LeadNote[]
+  initialLeads: LeadWithNotes[]
+  /** `true` = pohled „Čekání na odpověď". */
+  waiting: boolean
+  sortKey: string
+  dir: SortDir
+  /** Odkaz na řazení pro každý sloupec, spočítaný na serveru. */
+  sortLinks: Record<string, string>
   focusLeadId?: string
 }) {
-  const [leads, setLeads] = useState<ClientLead[]>(initialLeads)
-  const [notes, setNotes] = useState<LeadNote[]>(initialNotes)
+  const [leads, setLeads] = useState<LeadWithNotes[]>(initialLeads)
+  const [notes, setNotes] = useState<Record<string, LeadNote[]>>(() =>
+    Object.fromEntries(initialLeads.map((lead) => [lead.id, lead.note_preview ?? []])),
+  )
+  const [fullyLoaded, setFullyLoaded] = useState<string[]>([])
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
@@ -841,28 +912,19 @@ export default function LeadsTable({
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const notesByLead = useMemo(() => {
-    const map = new Map<string, LeadNote[]>()
-    for (const note of notes) {
-      const list = map.get(note.lead_id)
-      if (list) list.push(note)
-      else map.set(note.lead_id, [note])
-    }
-    return map
-  }, [notes])
+  const notesOf = (leadId: string) => notes[leadId] ?? []
 
   // Příchod z kalendáře (`?lead=ID`): kontakt rozbalit, odscrollovat na něj
   // a na chvíli zvýraznit, ať je v široké tabulce vidět, o který řádek jde.
   useEffect(() => {
     if (!focusLeadId) return
-    if (!initialLeads.some(l => l.id === focusLeadId)) return
+    if (!initialLeads.some((l) => l.id === focusLeadId)) return
 
     setExpandedId(focusLeadId)
     setHighlightedId(focusLeadId)
 
     const scroll = requestAnimationFrame(() => {
-      document.getElementById(`lead-${focusLeadId}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      document.getElementById(`lead-${focusLeadId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     })
     const fade = setTimeout(() => setHighlightedId(null), 4000)
 
@@ -872,13 +934,21 @@ export default function LeadsTable({
     }
   }, [focusLeadId, initialLeads])
 
-  const activeLeads = leads.filter(l => l.lead_status !== 'waiting')
-  const waitingLeads = leads.filter(l => l.lead_status === 'waiting')
+  /** Rozbalení kontaktu dotáhne celé poznámky; náhled zůstane, než dojdou. */
+  const toggleExpand = (leadId: string) => {
+    setExpandedId((prev) => (prev === leadId ? null : leadId))
+    if (fullyLoaded.includes(leadId)) return
+    startTransition(async () => {
+      const full = await getLeadNotes(leadId)
+      setNotes((prev) => ({ ...prev, [leadId]: full }))
+      setFullyLoaded((prev) => [...prev, leadId])
+    })
+  }
 
   const handleCreate = (data: LeadPayload) => {
     startTransition(async () => {
       const created = await createLead(data)
-      const newLead: ClientLead = {
+      const newLead: LeadWithNotes = {
         ...data,
         id: created.id,
         call_answered: null,
@@ -888,8 +958,10 @@ export default function LeadsTable({
         calendar_event_id: null,
         created_at: created.created_at,
         updated_at: null,
+        note_preview: [],
+        notes_count: 0,
       }
-      setLeads(prev => [newLead, ...prev])
+      setLeads((prev) => [newLead, ...prev])
       setAddingNew(false)
     })
   }
@@ -897,9 +969,7 @@ export default function LeadsTable({
   const handleUpdate = (id: string, data: LeadPayload) => {
     startTransition(async () => {
       const result = await updateLead(id, data)
-      setLeads(prev =>
-        prev.map(l => l.id === id ? { ...l, ...data, ...result } : l)
-      )
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...data, ...result } : l)))
       setEditingId(null)
       setEditingWaitingId(null)
     })
@@ -909,7 +979,7 @@ export default function LeadsTable({
     if (!confirm('Opravdu smazat tento kontakt?')) return
     startTransition(async () => {
       await deleteLead(id)
-      setLeads(prev => prev.filter(l => l.id !== id))
+      setLeads((prev) => prev.filter((l) => l.id !== id))
     })
   }
 
@@ -920,29 +990,30 @@ export default function LeadsTable({
     })
   }
 
+  // Přesun mezi pohledy řádek z téhle stránky odebere — je teď v tom druhém.
   const handleMoveToWaiting = (id: string) => {
     startTransition(async () => {
       await moveLeadToWaiting(id)
-      setLeads(prev => prev.map(l => l.id === id ? { ...l, lead_status: 'waiting' as const, updated_at: new Date() } : l))
+      setLeads((prev) => prev.filter((l) => l.id !== id))
     })
   }
 
   const handleMoveFromWaiting = (id: string) => {
     startTransition(async () => {
       await moveLeadFromWaiting(id)
-      setLeads(prev => prev.map(l => l.id === id ? { ...l, lead_status: 'cold' as const, updated_at: new Date() } : l))
+      setLeads((prev) => prev.filter((l) => l.id !== id))
     })
   }
 
   const handleToggleAnswered = (id: string, val: boolean | null) => {
     startTransition(async () => {
       await setCallAnswered(id, val)
-      setLeads(prev => prev.map(l => l.id === id ? { ...l, call_answered: val, updated_at: new Date() } : l))
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, call_answered: val, updated_at: new Date() } : l)))
     })
   }
 
   const handlePortfolioSent = (id: string) => {
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, portfolio_sent_at: new Date() } : l))
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, portfolio_sent_at: new Date() } : l)))
   }
 
   const handleSendPortfolio = (id: string) => {
@@ -961,183 +1032,71 @@ export default function LeadsTable({
     startTransition(async () => {
       const created = await addLeadNote(leadId, content)
       const newNote: LeadNote = { id: created.id, lead_id: leadId, content, created_at: created.created_at }
-      setNotes(prev => [newNote, ...prev])
+      setNotes((prev) => ({ ...prev, [leadId]: [newNote, ...(prev[leadId] ?? [])] }))
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, notes_count: l.notes_count + 1 } : l)))
     })
   }
 
   const handleDeleteNote = (id: string) => {
     startTransition(async () => {
       await deleteLeadNote(id)
-      setNotes(prev => prev.filter(n => n.id !== id))
+      setNotes((prev) => {
+        const next: Record<string, LeadNote[]> = {}
+        for (const [leadId, list] of Object.entries(prev)) next[leadId] = list.filter((n) => n.id !== id)
+        return next
+      })
     })
   }
 
-  return (
-    <div className="space-y-8">
-      {/* Hovory */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Hovory s klienty</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {activeLeads.length} {activeLeads.length === 1 ? 'kontakt' : activeLeads.length < 5 ? 'kontakty' : 'kontaktů'}
-              {activeLeads.filter(l => l.next_action_date && new Date(l.next_action_date) < new Date(new Date().toDateString())).length > 0 && (
-                <span className="ml-2 text-red-600 font-medium">
-                  · {activeLeads.filter(l => l.next_action_date && new Date(l.next_action_date) < new Date(new Date().toDateString())).length} po termínu
-                </span>
-              )}
-            </p>
-          </div>
-          <button
-            onClick={() => { setAddingNew(true); setEditingId(null) }}
-            disabled={addingNew}
-            className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-50 transition-colors"
-          >
-            <Plus size={14} />
-            Přidat kontakt
-          </button>
-        </div>
+  const formOf = (lead: ClientLead): LeadPayload => ({
+    company_name: lead.company_name,
+    contact_name: lead.contact_name,
+    phone: lead.phone,
+    email: lead.email,
+    lead_status: lead.lead_status,
+    next_action: lead.next_action,
+    next_action_date: lead.next_action_date,
+    next_action_time: lead.next_action_time,
+    next_action_type: lead.next_action_type,
+    notes: lead.notes,
+    estimated_value: lead.estimated_value,
+    call_answered: lead.call_answered,
+  })
 
-        <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
+  const sortProps = { sortKey, dir, sortLinks }
+
+  if (waiting) {
+    return (
+      <div>
+        <p className="mb-4 text-sm text-quiet">Podniky, kde čekáte, jestli se ozvou.</p>
+
+        <div className="overflow-hidden rounded-box border border-navy-100 bg-surface">
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[1100px]">
+            <table className="w-full min-w-[700px] text-left">
               <thead>
                 <tr className="border-b border-navy-100 bg-navy-50">
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kontakt</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefon</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Zvedl?</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Zájem</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Typ akce</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Příští akce</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Datum & čas</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Odhad hodnoty</th>
-                  <th className="px-3 py-2.5 w-24" />
+                  <SortHeader label="Firma" columnKey="firma" {...sortProps} />
+                  <SortHeader label="Kontakt" columnKey="kontakt" {...sortProps} />
+                  <PlainHeader label="Telefon" />
+                  <PlainHeader label="E-mail" />
+                  <PlainHeader label="Poznámka" />
+                  <SortHeader label="Odhad hodnoty" columnKey="hodnota" {...sortProps} />
+                  <th className="w-24 px-3 py-2.5" />
                 </tr>
               </thead>
               <tbody>
-                {addingNew && (
-                  <LeadForm
-                    initial={EMPTY_FORM}
-                    onSave={handleCreate}
-                    onCancel={() => setAddingNew(false)}
-                    isPending={isPending}
-                  />
-                )}
-                {activeLeads.length === 0 && !addingNew && (
+                {leads.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                      Zatím žádné kontakty. Klikni na&nbsp;<strong>Přidat kontakt</strong>&nbsp;a začni evidovat hovory.
+                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-quiet">
+                      Nikdo nečeká na odpověď. Kontakt sem přesunete z Hovorů ikonkou hodin.
                     </td>
                   </tr>
                 )}
-                {activeLeads.map(lead =>
-                  editingId === lead.id ? (
-                    <LeadForm
-                      key={lead.id}
-                      initial={{
-                        company_name: lead.company_name,
-                        contact_name: lead.contact_name,
-                        phone: lead.phone,
-                        email: lead.email,
-                        lead_status: lead.lead_status,
-                        next_action: lead.next_action,
-                        next_action_date: lead.next_action_date,
-                        next_action_time: lead.next_action_time,
-                        next_action_type: lead.next_action_type,
-                        notes: lead.notes,
-                        estimated_value: lead.estimated_value,
-                        call_answered: lead.call_answered,
-                      }}
-                      onSave={(data) => handleUpdate(lead.id, data)}
-                      onCancel={() => setEditingId(null)}
-                      isPending={isPending}
-                    />
-                  ) : (
-                    <LeadRow
-                      key={lead.id}
-                      lead={lead}
-                      notes={notesByLead.get(lead.id) ?? []}
-                      onEdit={() => { setEditingId(lead.id); setAddingNew(false) }}
-                      onDelete={() => handleDelete(lead.id)}
-                      onConvert={() => handleConvert(lead.id)}
-                      onMoveToWaiting={() => handleMoveToWaiting(lead.id)}
-                      onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
-                      onSendPortfolio={() => handleSendPortfolio(lead.id)}
-                      onOpenCustomMessage={() => setPortfolioModalLead(lead)}
-                      onAddNote={(content) => handleAddNote(lead.id, content)}
-                      onDeleteNote={handleDeleteNote}
-                      isPending={isPending}
-                      expanded={expandedId === lead.id}
-                      onToggleExpand={() => setExpandedId(prev => prev === lead.id ? null : lead.id)}
-                      highlighted={highlightedId === lead.id}
-                    />
-                  )
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Čekání */}
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Clock size={16} className="text-sky-600" strokeWidth={1.5} />
-            <h2 className="text-lg font-semibold text-foreground">Čekání na odpověď</h2>
-          </div>
-          {waitingLeads.length > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 ring-1 ring-sky-200">
-              {waitingLeads.length}
-            </span>
-          )}
-          <p className="text-sm text-muted-foreground">
-            — podniky, kde čekáš jestli se ozví
-          </p>
-        </div>
-
-        <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[700px]">
-              <thead>
-                <tr className="bg-sky-50/60 border-b border-border">
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kontakt</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Telefon</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Poznámka</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Odhad hodnoty</th>
-                  <th className="px-3 py-2.5 w-24" />
-                </tr>
-              </thead>
-              <tbody>
-                {waitingLeads.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                      Žádné podniky nečekají na odpověď. Přesuň kontakt z&nbsp;Hovorů kliknutím na&nbsp;<Clock size={12} className="inline" strokeWidth={1.5} />&nbsp;ikonku.
-                    </td>
-                  </tr>
-                )}
-                {waitingLeads.map(lead =>
+                {leads.map((lead) =>
                   editingWaitingId === lead.id ? (
                     <WaitingLeadForm
                       key={lead.id}
-                      initial={{
-                        company_name: lead.company_name,
-                        contact_name: lead.contact_name,
-                        phone: lead.phone,
-                        email: lead.email,
-                        lead_status: lead.lead_status,
-                        next_action: lead.next_action,
-                        next_action_date: lead.next_action_date,
-                        next_action_time: lead.next_action_time,
-                        next_action_type: lead.next_action_type,
-                        notes: lead.notes,
-                        estimated_value: lead.estimated_value,
-                        call_answered: lead.call_answered,
-                      }}
+                      initial={formOf(lead)}
                       onSave={(data) => handleUpdate(lead.id, data)}
                       onCancel={() => setEditingWaitingId(null)}
                       isPending={isPending}
@@ -1146,19 +1105,109 @@ export default function LeadsTable({
                     <WaitingRow
                       key={lead.id}
                       lead={lead}
-                      notes={notesByLead.get(lead.id) ?? []}
-                      onEdit={() => { setEditingWaitingId(lead.id); setEditingId(null) }}
+                      notes={notesOf(lead.id)}
+                      onEdit={() => setEditingWaitingId(lead.id)}
                       onConvert={() => handleConvert(lead.id)}
                       onMoveBack={() => handleMoveFromWaiting(lead.id)}
                       onDelete={() => handleDelete(lead.id)}
                       isPending={isPending}
                       highlighted={highlightedId === lead.id}
                     />
-                  )
+                  ),
                 )}
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-end">
+        <button
+          onClick={() => {
+            setAddingNew(true)
+            setEditingId(null)
+          }}
+          disabled={addingNew}
+          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-50"
+        >
+          <Plus size={15} strokeWidth={1.5} />
+          Přidat kontakt
+        </button>
+      </div>
+
+      <div className="overflow-hidden rounded-box border border-navy-100 bg-surface">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] text-left">
+            <thead>
+              <tr className="border-b border-navy-100 bg-navy-50">
+                <SortHeader label="Firma" columnKey="firma" {...sortProps} />
+                <SortHeader label="Kontakt" columnKey="kontakt" {...sortProps} />
+                <PlainHeader label="Telefon" />
+                <PlainHeader label="Zvedl?" />
+                <PlainHeader label="E-mail" />
+                <SortHeader label="Zájem" columnKey="zajem" {...sortProps} />
+                <PlainHeader label="Typ akce" />
+                <PlainHeader label="Příští akce" />
+                <SortHeader label="Datum a čas" columnKey="akce" {...sortProps} />
+                <SortHeader label="Odhad hodnoty" columnKey="hodnota" {...sortProps} />
+                <th className="w-24 px-3 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {addingNew && (
+                <LeadForm
+                  initial={EMPTY_FORM}
+                  onSave={handleCreate}
+                  onCancel={() => setAddingNew(false)}
+                  isPending={isPending}
+                />
+              )}
+              {leads.length === 0 && !addingNew && (
+                <tr>
+                  <td colSpan={11} className="px-4 py-12 text-center text-sm text-quiet">
+                    Zatím žádné kontakty. Tlačítkem „Přidat kontakt" si poznamenáte, s kým jste mluvili a co dál.
+                  </td>
+                </tr>
+              )}
+              {leads.map((lead) =>
+                editingId === lead.id ? (
+                  <LeadForm
+                    key={lead.id}
+                    initial={formOf(lead)}
+                    onSave={(data) => handleUpdate(lead.id, data)}
+                    onCancel={() => setEditingId(null)}
+                    isPending={isPending}
+                  />
+                ) : (
+                  <LeadRow
+                    key={lead.id}
+                    lead={lead}
+                    notes={notesOf(lead.id)}
+                    onEdit={() => {
+                      setEditingId(lead.id)
+                      setAddingNew(false)
+                    }}
+                    onDelete={() => handleDelete(lead.id)}
+                    onConvert={() => handleConvert(lead.id)}
+                    onMoveToWaiting={() => handleMoveToWaiting(lead.id)}
+                    onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
+                    onSendPortfolio={() => handleSendPortfolio(lead.id)}
+                    onOpenCustomMessage={() => setPortfolioModalLead(lead)}
+                    onAddNote={(content) => handleAddNote(lead.id, content)}
+                    onDeleteNote={handleDeleteNote}
+                    isPending={isPending}
+                    expanded={expandedId === lead.id}
+                    onToggleExpand={() => toggleExpand(lead.id)}
+                    highlighted={highlightedId === lead.id}
+                  />
+                ),
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

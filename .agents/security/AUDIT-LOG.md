@@ -16,6 +16,19 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-11 — review: sdílená tabulka a výpisy adminu (AD07)
+Spouštěč: AD07 — řazení, filtry a stránkování výpisů adminu ze serveru, před commitem.
+Rozsah: vstupy z adresy na devíti obrazovkách `/dashboard`, skládání SQL v `lib/admin-table.ts` a `lib/admin/{completed,invoices,costs,leads,projects,waitlist}.ts`, nové a změněné server actions, export CSV.
+Výsledek: 3 nálezy, všechny opravené ve stejném commitu. Žádný secret, žádné nové vykreslování nedůvěryhodného HTML, CSP beze změny.
+Nálezy:
+1. **`getCallsScreen(params, waiting)` brala `TableParams` jako argument server action** — a `TableParams.orderBy` je hotový kus SQL, který se vkládá do textu dotazu. Server action je veřejný endpoint, takže přihlášený admin (jediný účet, ale pravidlo platí) mohl poslat libovolné `ORDER BY`. Porušení B13 „každý vstup validovat na serveru" a vlastního pravidla AD07, že do `ORDER BY` jde jen whitelist.
+2. **`exportWaitlistCsv(dbUrl)` a `sendLaunchEmailBlast(projectId, { dbUrl, appUrl })` braly connection string z prohlížeče** (`exportWaitlistCsv` nová, druhá existovala dřív). Server by se tak připojil na libovolnou adresu, kterou mu klient podstrčí, a poslal e-maily s libovolným odkazem.
+3. **CSV export bez ochrany proti vzorcům** — jméno začínající `=`, `+`, `-` nebo `@` je v Excelu vzorec, ne text (platilo i pro původní export v prohlížeči).
+Opraveno: (1) `getCallsScreen` zrušená, stránka volá `loadCallsScreen` z `lib/admin/leads.ts` (server-only modul, není to endpoint); řazení si každá stránka ověří sama přes `parseTableParams`. (2) obě akce berou **id projektu**, adresu databáze i webu si dohledají v `startup_projects`; `dbUrl` se do prohlížeče vůbec neposílá. (3) hodnota začínající `=+-@` dostane v CSV apostrof.
+Navíc: zrušeno sedm server actions, které tahaly celé tabulky (`getLeads`, `getAllLeadNotes`, `getCompletedProjects`, `getProjectSurveys`, `getAllInvoices`, `getInvoiceRegistryScreen`, `getWaitlistEntries`) — o tolik méně endpointů, které umí vrátit všechna data najednou.
+Ověřeno: `npx tsc`, 802 testů (nový `lib/__tests__/admin-table.test.ts` zkouší i `sort=x';DROP TABLE costs--` a vlastnosti prototypu), produkční build a smoke test přes HTTP s podepsanou session — 23 adres včetně pokusu o injekci vrací 200 a server nehlásí chybu.
+Zůstává: hledání ve Fakturách neescapuje `%` a `_` v `ILIKE` (jen širší výsledky, ne bezpečnostní problém). Průchod v prohlížeči okem.
+
 ## 2026-11-11 — review: zúžení CSP po sjednocení písma (AD04)
 Spouštěč: AD04 — Dílky jako výchozí vzhled celého repa (R-081), krok „písmo a CSP".
 Rozsah: `app/globals.css`, `app/layout.tsx`, `app/admin-tokens.css`, `tailwind.config.ts`, `lib/security/csp.ts`, hlavičky a servírované CSS z produkčního buildu.

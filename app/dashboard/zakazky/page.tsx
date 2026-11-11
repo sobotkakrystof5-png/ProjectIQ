@@ -1,106 +1,46 @@
-import { cache, Suspense } from 'react'
 import Link from 'next/link'
-import { FolderOpen, Plus } from 'lucide-react'
-import { sql } from '@/lib/db'
+import { Plus } from 'lucide-react'
 import { ProjectCard } from '@/components/ProjectCard'
-import { ProjectCardSkeleton } from '@/components/ProjectCardSkeleton'
 import { SummaryBar } from '@/components/SummaryBar'
-import { DashboardFilters } from '@/components/DashboardFilters'
+import { Pagination } from '@/components/admin/pagination'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
-import { PillNav } from '@/components/ws/app/toolbar'
-import { WEB_LEAD_ORIGINS, toLeadOrigin, type LeadOrigin } from '@/lib/lead-origins'
-import type { Project } from '@/lib/types'
+import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
+import { EmptyState } from '@/components/ws/brand'
+import { loadProjectsScreen, PROJECT_SORT } from '@/lib/admin/projects'
+import { parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
+import { WEB_LEAD_ORIGINS, type LeadOrigin } from '@/lib/lead-origins'
+import { STATUS_LABELS, STATUS_ORDER } from '@/lib/types'
 
 // Seznam zakázek — jeden byznys, zakázky ze všech webů (AD02, R-088).
 // Filtr „Zdroj" dřív přepínal firmu (VIZEON / ALTENO); dnes říká jen to,
 // odkud poptávka přišla. Nepotvrzené poptávky tady nejsou, ty jsou
 // v /dashboard/poptavky.
+//
+// Od AD07 filtruje a stránkuje databáze. Adresy filtrů se nemění
+// (`?status=`, `?zdroj=`), takže uložené odkazy fungují dál.
 
-interface PageProps {
-  searchParams: Promise<{ status?: string; zdroj?: string }>
-}
+const PATH = '/dashboard/zakazky'
 
-type OriginFilter = 'all' | LeadOrigin
-const ORIGIN_FILTERS: { value: OriginFilter; label: string }[] = [
-  { value: 'all', label: 'Všechny zdroje' },
-  ...WEB_LEAD_ORIGINS.map((o) => ({ value: o.key as OriginFilter, label: o.name })),
-]
+export default async function ProjectsPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const searchParams = await props.searchParams
+  const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)
 
-const loadProjects = cache(async () => {
-  const rows = await sql`
-    SELECT * FROM projects
-    WHERE NOT lead_pending
-    ORDER BY created_at DESC
-  `
-  return rows as (Project & { lead_origin?: string })[]
-})
+  const rawOrigin = one(searchParams.zdroj)
+  const origin: LeadOrigin | null = WEB_LEAD_ORIGINS.some((o) => o.key === rawOrigin) ? (rawOrigin as LeadOrigin) : null
+  const rawStatus = one(searchParams.status)
+  const status = STATUS_ORDER.includes(rawStatus as (typeof STATUS_ORDER)[number]) ? (rawStatus as string) : null
 
-/** Počet nevyřízených požadavků na zakázku; bez migrace 092 prázdná mapa. */
-const loadOpenRequests = cache(async (): Promise<Record<string, number>> => {
-  try {
-    const rows = await sql`SELECT project_id, count(*)::int AS count FROM client_requests WHERE status = 'new' GROUP BY project_id`
-    return Object.fromEntries((rows as { project_id: string; count: number }[]).map((r) => [r.project_id, r.count]))
-  } catch {
-    return {}
-  }
-})
-
-function originHref(origin: OriginFilter, status?: string): string {
-  const params = new URLSearchParams()
-  if (origin !== 'all') params.set('zdroj', origin)
-  if (status && status !== 'all') params.set('status', status)
-  const qs = params.toString()
-  return qs ? `/dashboard/zakazky?${qs}` : '/dashboard/zakazky'
-}
-
-async function ProjectGrid({ origin, status }: { origin: OriginFilter; status?: string }) {
-  const [all, requests] = await Promise.all([loadProjects(), loadOpenRequests()])
-  const projects = all
-    .filter((p) => origin === 'all' || toLeadOrigin(p.lead_origin) === origin)
-    .filter((p) => !status || status === 'all' || p.status === status)
-
-  if (projects.length === 0) {
-    const filtered = origin !== 'all' || (status && status !== 'all')
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-box bg-navy-50">
-          <FolderOpen size={24} strokeWidth={1.5} className="text-navy-400" aria-hidden="true" />
-        </div>
-        <p className="mb-1 font-medium text-ink">{filtered ? 'Tady nic není' : 'Zatím žádné zakázky'}</p>
-        <p className="max-w-xs text-sm text-quiet">
-          {filtered ? 'Zkuste jiný filtr, nebo přidejte novou zakázku.' : 'Přidejte první zakázku a začněte sledovat projekty.'}
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {projects.map((p) => {
-        const open = requests[p.id] ?? 0
-        return (
-          <div key={p.id} className="relative">
-            <ProjectCard project={p} />
-            {open > 0 && (
-              <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-signal px-2 py-0.5 text-[11px] font-semibold text-signal-ink">
-                {open === 1 ? '1 požadavek' : `${open} požadavky`}
-              </span>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-async function SummarySection({ origin }: { origin: OriginFilter }) {
-  const all = await loadProjects()
-  return <SummaryBar projects={all.filter((p) => origin === 'all' || toLeadOrigin(p.lead_origin) === origin)} />
-}
-
-export default async function ProjectsPage(props: PageProps) {
-  const { status, zdroj } = await props.searchParams
-  const origin: OriginFilter = ORIGIN_FILTERS.some((f) => f.value === zdroj) ? (zdroj as OriginFilter) : 'all'
+  const params = parseTableParams(searchParams, {
+    allowed: PROJECT_SORT,
+    defaultSort: 'pridano',
+    pageSize: 24,
+    tiebreak: 'created_at',
+  })
+  const screen = await loadProjectsScreen(params, origin, status)
+  const links = tableLinks(PATH, searchParams)
+  const filtered = origin !== null || status !== null
 
   return (
     <PageShell width="wide">
@@ -121,25 +61,84 @@ export default async function ProjectsPage(props: PageProps) {
 
       <PillNav
         label="Zdroj poptávky"
-        items={ORIGIN_FILTERS.map((f) => ({
-          key: f.value,
-          label: f.label,
-          href: originHref(f.value, status),
-          active: origin === f.value,
-        }))}
+        items={[
+          {
+            key: 'all',
+            label: 'Všechny zdroje',
+            href: tableHref(PATH, searchParams, { zdroj: null, page: null }),
+            active: origin === null,
+          },
+          ...WEB_LEAD_ORIGINS.map((o) => ({
+            key: o.key,
+            label: o.name,
+            href: tableHref(PATH, searchParams, { zdroj: o.key, page: null }),
+            active: origin === o.key,
+          })),
+        ]}
       />
 
-      <Suspense fallback={<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-24 animate-pulse rounded-box border border-navy-100 bg-surface" />)}</div>}>
-        <SummarySection origin={origin} />
-      </Suspense>
+      <SummaryBar projects={screen.summary} />
 
-      <Suspense fallback={null}>
-        <DashboardFilters />
-      </Suspense>
+      <Toolbar>
+        <PillNav
+          label="Stav zakázky"
+          items={[
+            {
+              key: 'all',
+              label: 'Vše',
+              href: tableHref(PATH, searchParams, { status: null, page: null }),
+              active: status === null,
+              count: screen.counts.all ?? 0,
+            },
+            ...STATUS_ORDER.map((value) => ({
+              key: value,
+              label: STATUS_LABELS[value],
+              href: tableHref(PATH, searchParams, { status: value, page: null }),
+              active: status === value,
+              count: screen.counts[value] ?? 0,
+            })),
+          ]}
+        />
+      </Toolbar>
 
-      <Suspense fallback={<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((i) => <ProjectCardSkeleton key={i} />)}</div>}>
-        <ProjectGrid origin={origin} status={status} />
-      </Suspense>
+      {screen.rows.length === 0 ? (
+        <EmptyState
+          title={filtered ? 'Tady nic není' : 'Zatím žádné zakázky'}
+          description={
+            filtered
+              ? 'Zkuste jiný filtr, nebo přidejte novou zakázku.'
+              : 'Přidejte první zakázku a uvidíte, co se na ní děje.'
+          }
+          action={
+            <Link
+              href="/dashboard/new"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+            >
+              <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+              Nová zakázka
+            </Link>
+          }
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {screen.rows.map((project) => {
+              const open = screen.openRequests[project.id] ?? 0
+              return (
+                <div key={project.id} className="relative">
+                  <ProjectCard project={project} />
+                  {open > 0 && (
+                    <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-signal px-2 py-0.5 text-[11px] font-semibold text-signal-ink">
+                      {open === 1 ? '1 požadavek' : `${open} požadavky`}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <Pagination params={params} total={screen.total} links={links} />
+        </>
+      )}
     </PageShell>
   )
 }

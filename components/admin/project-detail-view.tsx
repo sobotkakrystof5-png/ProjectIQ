@@ -15,7 +15,7 @@ import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 import { DeleteButton } from '@/components/DeleteButton'
 import { MarkCompletedButton } from '@/components/MarkCompletedButton'
 import { InvoiceArchive } from '@/components/InvoiceArchive'
-import CostsManager from '@/components/CostsManager'
+import { ProjectCosts } from '@/components/admin/costs/project-costs'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
 import { ProjectActivityPanel } from '@/components/ProjectActivityPanel'
 import { AgentKeyPanel } from '@/components/AgentKeyPanel'
@@ -459,7 +459,7 @@ async function BillingTab({ project }: { project: Project }) {
         <p className="mb-5 text-xs text-muted-foreground">
           Skutečné náklady se promítají do cash flow ve Financích. Odhad v editaci zakázky je jen orientační.
         </p>
-        <CostsManager initialCosts={costs} projectId={project.id} />
+        <ProjectCosts costs={costs} projectId={project.id} />
       </div>
     </>
   )

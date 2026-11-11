@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import { adminDb } from '@/lib/admin/db'
+import type { TableParams } from '@/lib/admin-table'
 import { verifyApiKey, getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { bookingSchemaFor } from '@/types/booking'
@@ -9,7 +11,7 @@ import { sendBrandedEmail } from '@/lib/email'
 import { createNotification } from '@/lib/notifications'
 import {
   LEAD_ORIGINS, LEAD_ORIGIN_KEYS, LEADS_INBOX_PATH, bookingRateLimitKey, leadRateLimitKey, adminEmail,
-  type LeadOrigin,
+  toLeadOrigin, type LeadOrigin,
 } from '@/lib/lead-origins'
 import type { WebLead } from '@/components/LeadCard'
 
@@ -234,16 +236,51 @@ export function webLeadPostHandler(origin: LeadOrigin) {
  * Jeden inbox nepotvrzených poptávek ze všech webů (/dashboard/poptavky).
  * Dřív to byly dva dotazy nad dvěma funkcemi; dnes stačí `lead_pending`.
  */
-export async function loadPendingLeads(): Promise<WebLead[]> {
-  const rows = await sql`
-    SELECT
-      p.id, p.client_name, p.client_email, p.client_phone, p.service_type, p.description,
-      p.created_at, p.lead_origin,
-      ce.starts_at AS consultation_at
-    FROM projects p
-    LEFT JOIN calendar_events ce ON ce.project_id = p.id
-    WHERE p.lead_pending
-    ORDER BY p.created_at DESC
-  `
-  return rows as WebLead[]
+/**
+ * Čekající poptávky pro inbox `/dashboard/poptavky` (AD07).
+ *
+ * Filtr zdroje i stránkování řeší databáze; dřív se stáhly všechny čekající
+ * poptávky a filtrovalo se v prohlížeči. Počty u pilulek jdou stejným
+ * požadavkem, aby nezávisely na otevřené stránce.
+ */
+export async function loadPendingLeads(
+  params: TableParams,
+  origin: LeadOrigin | 'vse' = 'vse',
+): Promise<{ rows: WebLead[]; total: number; counts: Record<string, number>; all: number }> {
+  const filter = origin === 'vse' ? '' : 'AND p.lead_origin = $3'
+  const [rows, counts] = await adminDb.batch([
+    {
+      text: `
+        SELECT
+          p.id, p.client_name, p.client_email, p.client_phone, p.service_type, p.description,
+          p.created_at, p.lead_origin,
+          ce.starts_at AS consultation_at
+        FROM projects p
+        LEFT JOIN calendar_events ce ON ce.project_id = p.id
+        WHERE p.lead_pending ${filter}
+        ORDER BY p.created_at DESC
+        LIMIT $1 OFFSET $2
+      `,
+      params: origin === 'vse' ? [params.limit, params.offset] : [params.limit, params.offset, origin],
+    },
+    {
+      text: `SELECT lead_origin, count(*)::int AS pocet FROM projects WHERE lead_pending GROUP BY lead_origin`,
+      params: [],
+    },
+  ])
+
+  const byOrigin: Record<string, number> = {}
+  let all = 0
+  for (const row of counts) {
+    const key = toLeadOrigin(row.lead_origin as string | null)
+    byOrigin[key] = (byOrigin[key] ?? 0) + Number(row.pocet)
+    all += Number(row.pocet)
+  }
+
+  return {
+    rows: rows as unknown as WebLead[],
+    total: origin === 'vse' ? all : (byOrigin[origin] ?? 0),
+    counts: byOrigin,
+    all,
+  }
 }

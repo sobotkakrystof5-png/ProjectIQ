@@ -21,6 +21,11 @@ function revalidateCostPaths(projectId: string | null) {
   if (projectId) revalidatePath(`/dashboard/${projectId}`)
 }
 
+/**
+ * Náklady pro přehled ve Financích. Strop 500 je v praxi „všechno" (nákladů
+ * jsou desítky) — jen aby v adminu nezůstal výpis, který roste bez konce (AD07).
+ * Obrazovka Náklady si bere stránky přes `lib/admin/costs.ts`.
+ */
 export async function getCosts(): Promise<Cost[]> {
   await requireAuth()
   const rows = await sql`
@@ -29,6 +34,7 @@ export async function getCosts(): Promise<Cost[]> {
       project_id::text, source_finance_transaction_id::text, created_at::text
     FROM costs
     ORDER BY cost_type, created_at DESC
+    LIMIT 500
   `
   return rows as Cost[]
 }

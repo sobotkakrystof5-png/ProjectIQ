@@ -14,7 +14,7 @@ import {
 import {
   STARTUP_PHASES, STARTUP_SEGMENTS, STARTUP_CURRENCIES,
   type StartupProject, type StartupImprovement, type StartupChangelogEntry,
-  type StartupPhase, type MonetizationModel, type PricingTier, type WaitlistEntry,
+  type StartupPhase, type MonetizationModel, type PricingTier,
 } from '@/lib/types'
 import {
   updateStartupProject,
@@ -23,7 +23,6 @@ import {
 } from '@/app/dashboard/startup/startup-actions'
 import { StartupImprovements } from '@/components/StartupImprovements'
 import { StartupChangelog } from '@/components/StartupChangelog'
-import { WaitlistSection } from '@/components/WaitlistSection'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -142,12 +141,16 @@ interface Props {
   project: StartupProject
   improvements: StartupImprovement[]
   changelog: StartupChangelogEntry[]
-  waitlistEntries?: WaitlistEntry[]
+  /**
+   * Waitlist vykreslený na serveru (AD07). Editor je klientský, takže
+   * tabulku dostává hotovou — do prohlížeče tím nejdou všechny zápisy.
+   */
+  waitlist?: React.ReactNode
 }
 
 type SectionId = 'basic' | 'plan' | 'calc' | 'know_how' | 'notes' | 'url' | 'phase' | 'improvements' | 'changelog' | 'waitlist'
 
-export function StartupProjectEditor({ project, improvements, changelog, waitlistEntries }: Props) {
+export function StartupProjectEditor({ project, improvements, changelog, waitlist }: Props) {
   const router = useRouter()
 
   // ── Form state ──
@@ -941,20 +944,15 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
       </Section>
 
       {/* ── SECTION: Waitlist ── */}
-      {waitlistEntries !== undefined && (
+      {waitlist !== undefined && (
         <Section
           id="waitlist"
-          title={`Waitlist${waitlistEntries.length > 0 ? ` (${waitlistEntries.length})` : ''}`}
+          title="Waitlist"
           icon={<Users size={15} strokeWidth={1.5} />}
           open={open.has('waitlist')}
           onToggle={() => toggle('waitlist')}
         >
-          <WaitlistSection
-            projectId={project.id}
-            entries={waitlistEntries}
-            appUrl={liveUrl || 'https://estatiq.cz'}
-            dbUrl={waitlistDbUrl}
-          />
+          {waitlist}
         </Section>
       )}
 

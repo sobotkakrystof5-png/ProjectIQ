@@ -534,6 +534,34 @@ naposled** (1181 ř., dvě tabulky, inline úpravy — potřebuje `selection` a 
 `?sort=&dir=&page=` přežije reload i Zpět; žádný výpis není bez `LIMIT`; test, že neznámý `sort`
 spadne na výchozí a nedostane se do SQL.
 
+**Provedeno 2026-11-11**, se šesti odchylkami:
+1. **`CompletedProjectsTable` nebyl „jen čtení".** Měl v řádku formulář na přidání i úpravu
+   a mazání. Serverová tabulka formulář v řádku neunese (řádek se po uložení stejně překreslí
+   ze serveru), takže z něj je dialog `components/admin/completed/completed-dialog.tsx`.
+   Stejně dopadly Náklady.
+2. **`InvoiceArchive` se nepřevedl.** Není to obecný výpis, ale daňový pohled (zaplacené
+   vybraného roku × pohledávky napříč roky) a sedí uvnitř klientských sekcí Financí a detailu
+   zakázky. Dostal jen strop (`ARCHIVE_LIMIT = 500`); překresluje ho AD12/AD13, které fakturaci
+   stejně přestavují. Evidence `/dashboard/faktury` převedená je včetně filtrů a součtů v SQL.
+3. **Waitlist jde do klientského editoru jako hotový kus stránky.** `StartupProjectEditor`
+   je klientská komponenta o 950 řádcích; tabulka se proto vykreslí na serveru
+   (`components/admin/startup/waitlist-panel.tsx`) a předá se jako prop `waitlist`. Jinak by
+   se celý waitlist musel poslat do prohlížeče. Export CSV přešel na server action se stropem.
+4. **`LeadsTable` zůstává klientskou tabulkou.** Převedla se **data** (stránka kontaktů místo
+   všech, náhled poznámek z `LEFT JOIN LATERAL`, `getAllLeadNotes` zrušené) a přibylo řazení
+   v hlavičce, stránkování a pohled Hovory/Čekání v adrese. Inline formuláře, rozbalovací
+   poznámky a `selection` zůstaly na AD08, jak počítal i původní plán.
+5. **Grid výpis `/alteno` neexistuje** (zrušil ho AD02). Místo něj se stránkují **Poptávky**
+   a **Požadavky klientů**; obojí zůstává kartami, protože karta nese shrnutí a akce, které
+   do řádku tabulky nepatří. Počty u pilulek počítá databáze.
+6. **Navíc proti zadání:** `/dashboard/zakazky` filtruje a stránkuje na serveru (`DashboardFilters`
+   zrušené, adresy `?status=`/`?zdroj=` se nezměnily), `PerformanceOverview` a `HodnoceniDashboard`
+   dostaly strop 1000 a mapování řádku faktury se sjednotilo v `lib/invoices.ts`.
+
+**Past, kterou odhalil smoke test:** `sortHref` jako funkce se do klientské komponenty poslat
+nedá („Functions cannot be passed directly to Client Components"). Stránka vrátí 200, jen se
+tabulka nevykreslí na serveru. `LeadsTable` proto dostává hotové odkazy (`sortLinks`), ne funkci.
+
 ### AD08 — Rychlost II a opravy kalendáře (M, bez migrace)
 **Cíl:** akce odpovídají hned, těžké obrazovky se nenačítají dřív, než je potřeba.
 - **E-maily mimo akci:** `after()` z `next/server` v `app/actions.ts:154,237,387,404,502`
@@ -906,7 +934,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
-| AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | nezačato |
+| AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | nezačato |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | nezačato |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
@@ -1091,14 +1119,19 @@ nad `app/dashboard`, `app/p`, `app/h`, `app/(auth)`, `app/globals.css`, `compone
 Test tvrdí „nejvýš strop", takže úklid nikdy neblokuje, ale návrat staré třídy ano.
 **Po každém sezení snížit na naměřenou hodnotu.**
 
-| Třída | Strop po AD04 (2026-11-11) | Po AD05 (2026-11-11) | Po AD17 |
-|---|---|---|---|
-| `muted-foreground` | 743 | 691 | — |
-| `rounded-lg\|xl\|2xl` | 463 | 434 | — |
-| `border-border` | 335 | 314 | — |
-| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | 755 | — |
-| `bg-white` | 211 | 199 | — |
-| `brand-*` | **0** | 0 | 0 |
+| Třída | Strop po AD04 (2026-11-11) | Po AD05 | Po AD07 (2026-11-11) | Po AD17 |
+|---|---|---|---|---|
+| `muted-foreground` | 743 | 691 | 589 | — |
+| `rounded-lg\|xl\|2xl` | 463 | 434 | 396 | — |
+| `border-border` | 335 | 314 | 269 | — |
+| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | 755 | 677 | — |
+| `bg-white` | 211 | 199 | 176 | — |
+| `brand-*` | **0** | 0 | 0 | 0 |
+
+Z AD07 ubylo 78 duhových tříd a asi stovka šedých: zmizely celé soubory
+`CompletedProjectsTable`, `InvoiceRegistry`, `CostsManager`, `WaitlistSection`
+a `DashboardFilters` (emerald v evidenci faktur, sky/violet u nákladů, amber
+a emerald u waitlistu) a nahradila je sdílená tabulka v Dílcích.
 
 Z AD05 ubylo hlavně 172 duhových tříd v odznacích. Zbytek duhy je jinde než na odznacích:
 zelená a červená u částek ve Financích (`IncomeExpenseSection` 52, `ScenarioSection` 42,

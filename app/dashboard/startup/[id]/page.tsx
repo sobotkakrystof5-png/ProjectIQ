@@ -6,17 +6,18 @@ import {
   getStartupProject,
   getStartupImprovements,
   getStartupChangelog,
-  getWaitlistEntries,
 } from '../startup-actions'
 import { StartupProjectEditor } from '@/components/StartupProjectEditor'
+import { WaitlistPanel } from '@/components/admin/startup/waitlist-panel'
 import { AiAssistantsSection } from '@/components/AiAssistantsSection'
 
 interface Props {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 export default async function StartupDetailPage(props: Props) {
-  const params = await props.params
+  const [params, searchParams] = await Promise.all([props.params, props.searchParams])
   const [project, improvements, changelog] = await Promise.all([
     getStartupProject(params.id),
     getStartupImprovements(params.id),
@@ -25,9 +26,16 @@ export default async function StartupDetailPage(props: Props) {
 
   if (!project) notFound()
 
-  const waitlistEntries = project.waitlist_db_url
-    ? await getWaitlistEntries(project.waitlist_db_url)
-    : undefined
+  // Waitlist se vykreslí na serveru a do klientského editoru jde jako hotový
+  // kus stránky — jinak by se celá tabulka musela poslat do prohlížeče (AD07).
+  const waitlist = project.waitlist_db_url ? (
+    <WaitlistPanel
+      projectId={project.id}
+      dbUrl={project.waitlist_db_url}
+      basePath={`/dashboard/startup/${project.id}`}
+      searchParams={searchParams}
+    />
+  ) : undefined
 
   return (
     <PageShell>
@@ -46,7 +54,7 @@ export default async function StartupDetailPage(props: Props) {
         project={project}
         improvements={improvements}
         changelog={changelog}
-        waitlistEntries={waitlistEntries}
+        waitlist={waitlist}
       />
 
       <AiAssistantsSection

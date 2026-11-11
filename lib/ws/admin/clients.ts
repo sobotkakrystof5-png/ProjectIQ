@@ -1,4 +1,5 @@
 import 'server-only'
+import type { TableParams } from '@/lib/admin-table'
 import { q } from '../db'
 import { billingStateFrom, type BillingAccess, type SubscriptionRow } from '../billing'
 import { getIndustryTemplate } from '../templates'
@@ -99,8 +100,23 @@ function mapClient(r: Record<string, unknown>): ClientRow {
   }
 }
 
-/** Kolik účtů se vejde na stránku. Stránkování v URL staví AD07. */
+/** Kolik účtů se vejde na stránku. */
 export const CLIENTS_PAGE_SIZE = 50
+
+/**
+ * Povolené řazení seznamu klientů (AD07). Klíč z adresy se jen vybírá
+ * ze seznamu, do SQL se nikdy nevkládá.
+ *
+ * Stav předplatného se neřadí: počítá se až v `billingStateFrom`, v databázi
+ * pro něj sloupec není.
+ */
+export const CLIENT_SORT = {
+  ucet: { sql: 'a.name', dir: 'asc' as const },
+  aktivita: { sql: 'last_activity', dir: 'desc' as const },
+  poptavky: { sql: 'r.requests_30d', dir: 'desc' as const },
+  clenove: { sql: 'm.members', dir: 'desc' as const },
+  zalozeno: { sql: 'a.created_at', dir: 'desc' as const },
+}
 
 export type ClientList = {
   rows: ClientRow[]
@@ -112,16 +128,16 @@ export type ClientList = {
 }
 
 /**
- * Stránka seznamu účtů, nejnovější aktivita nahoře. Jeden požadavek: řádky
+ * Stránka seznamu účtů podle zvoleného řazení. Jeden požadavek: řádky
  * stránky (drahé laterály jen pro ně), lehký dotaz na stav předplatného všech
  * účtů kvůli číslům v hlavičce a celkový počet.
  */
-export async function listClients(page = 1): Promise<ClientList> {
-  const offset = Math.max(0, (Math.max(1, page) - 1) * CLIENTS_PAGE_SIZE)
+export async function listClients(params: TableParams): Promise<ClientList> {
   const [rows, states, totals] = await adminDb.batch([
     {
-      text: `${LIST_SQL} ORDER BY last_activity DESC NULLS LAST, a.created_at DESC LIMIT ${CLIENTS_PAGE_SIZE} OFFSET $1`,
-      params: [offset],
+      // `params.orderBy` je složené z `CLIENT_SORT`, ne ze vstupu uživatele.
+      text: `${LIST_SQL} ${params.orderBy} LIMIT $1 OFFSET $2`,
+      params: [params.limit, params.offset],
     },
     q`SELECT coalesce(json_agg(json_build_object('status', s.status, 'current_period_end', s.current_period_end,
          'cancel_at_period_end', s.cancel_at_period_end, 'past_due_since', s.past_due_since, 'created_at', s.created_at)), '[]') AS subscriptions

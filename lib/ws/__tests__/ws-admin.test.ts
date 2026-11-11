@@ -3,7 +3,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { setWsDriverForTests, type WsDriver, type WsRow } from '../db'
 import { setAdminAuthForTests } from '../admin/auth'
 import { setAdminDriverForTests } from '../admin/db'
-import { getClientDetail, listClients } from '../admin/clients'
+import { CLIENT_SORT, getClientDetail, listClients } from '../admin/clients'
+import { parseTableParams } from '@/lib/admin-table'
 import { InviteSetupError, inviteClient, setInviteClerkForTests, type InviteClerk } from '../admin/invite'
 import { generateWebKeys } from '../admin/web-keys'
 import { deleteNewsDraft, newsRecipients, parseNewsImage, publishNews, saveNews, sendNewsEmail, unpublishNews } from '../admin/news'
@@ -111,9 +112,12 @@ describe('bez admina nic', () => {
   })
 })
 
+/** Výchozí řazení a stránka, jak je po ověření vrátí `parseTableParams` (AD07). */
+const clientParams = () => parseTableParams({}, { allowed: CLIENT_SORT, defaultSort: 'aktivita', pageSize: 50, tiebreak: 'a.created_at' })
+
 describe('přehled klientů', () => {
   it('ukáže oba účty se stavem, poptávkami za 30 dní a napojením webu', async () => {
-    const list = (await listClients()).rows
+    const list = (await listClients(clientParams())).rows
     const a = list.find((c) => c.id === A.account)
     expect(a).toMatchObject({ name: 'Firma a', businesses: 1, access: 'trialing', requests30d: 1, web: 'ready', members: 1 })
     expect(a?.lastActivity).toBeInstanceOf(Date)
@@ -124,7 +128,7 @@ describe('přehled klientů', () => {
     await db.query(`INSERT INTO ws.requests (account_id, business_id, source, is_test) VALUES ($1, $2, 'web', true)`, [B.account, B.business])
     await db.query(`INSERT INTO ws.requests (account_id, business_id, source, created_at) VALUES ($1, $2, 'web', now() - interval '40 days')`, [B.account, B.business])
     await db.query(`UPDATE ws.web_integrations SET last_used_at = now() WHERE account_id = $1`, [B.account])
-    const b = (await listClients()).rows.find((c) => c.id === B.account)
+    const b = (await listClients(clientParams())).rows.find((c) => c.id === B.account)
     expect(b).toMatchObject({ requests30d: 1, web: 'used' })
   })
 

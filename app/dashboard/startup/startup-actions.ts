@@ -1,6 +1,7 @@
 'use server'
 
 import { sql } from '@/lib/db'
+import { loadWaitlistForExport } from '@/lib/admin/waitlist'
 import { neon } from '@neondatabase/serverless'
 import { Resend } from 'resend'
 import { revalidatePath } from 'next/cache'
@@ -299,35 +300,59 @@ export async function deleteChangelogEntry(
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────
 
-export async function getWaitlistEntries(dbUrl: string): Promise<WaitlistEntry[]> {
+/**
+ * Waitlist do CSV. Výpis na obrazovce chodí po stránkách
+ * (`lib/admin/waitlist.ts`), export je jediné místo, kde se berou všechny
+ * zápisy najednou — a i ten má strop (AD07).
+ */
+export async function exportWaitlistCsv(projectId: string): Promise<string> {
   await requireAuth()
-  try {
-    const wsql = neon(dbUrl)
-    const rows = await wsql`
-      SELECT id, email, name, locale, created_at::text, launch_notified
-      FROM waitlist
-      ORDER BY created_at DESC
-    `
-    return rows as WaitlistEntry[]
-  } catch {
-    return []
+  // Adresa databáze waitlistu se dohledá na serveru — z prohlížeče chodí
+  // jen id projektu, ne connection string.
+  const project = await sql`SELECT waitlist_db_url FROM startup_projects WHERE id = ${projectId}`
+  const dbUrl = (project[0] as { waitlist_db_url: string | null } | undefined)?.waitlist_db_url
+  if (!dbUrl) return ''
+  const entries = await loadWaitlistForExport(dbUrl)
+  const rows: string[][] = [
+    ['Jméno', 'E-mail', 'Jazyk', 'Datum zápisu', 'E-mail odešel'],
+    ...entries.map((entry) => [
+      entry.name ?? '',
+      entry.email,
+      entry.locale,
+      new Date(entry.created_at).toLocaleDateString('cs-CZ'),
+      entry.launch_notified ? 'Ano' : 'Ne',
+    ]),
+  ]
+  // Hodnota začínající =, +, - nebo @ je v Excelu vzorec, ne text — apostrof ji udrží textem.
+  const cell = (value: string) => {
+    const text = /^[=+\-@]/.test(value) ? `'${value}` : value
+    return `"${text.replace(/"/g, '""')}"`
   }
+  return rows.map((row) => row.map(cell).join(',')).join('\n')
 }
 
 export async function sendLaunchEmailBlast(
   projectId: string,
-  opts: { dbUrl: string; appUrl: string; fromEmail?: string }
+  opts: { fromEmail?: string } = {}
 ): Promise<{ sent: number; failed: number; total: number; error?: string }> {
   await requireAuth()
 
   const resendKey = process.env.RESEND_API_KEY
   if (!resendKey) return { sent: 0, failed: 0, total: 0, error: 'RESEND_API_KEY není nastaven' }
 
+  // Adresa databáze waitlistu i webu se čtou ze zakázky na serveru — z prohlížeče
+  // chodí jen id projektu, ne connection string (AD07).
+  const project = await sql`SELECT waitlist_db_url, live_url FROM startup_projects WHERE id = ${projectId}`
+  const row = project[0] as { waitlist_db_url: string | null; live_url: string | null } | undefined
+  if (!row?.waitlist_db_url) return { sent: 0, failed: 0, total: 0, error: 'Projekt nemá nastavenou databázi waitlistu' }
+  const dbUrl = row.waitlist_db_url
+  const appUrl = row.live_url || 'https://estatiq.cz'
+
   const from = opts.fromEmail ?? 'EstatIQ <onboarding@resend.dev>'
   const resend = new Resend(resendKey)
 
   try {
-    const wsql = neon(opts.dbUrl)
+    const wsql = neon(dbUrl)
     const entries = await wsql`
       SELECT id, email, name FROM waitlist
       WHERE launch_notified = FALSE
@@ -350,7 +375,7 @@ export async function sendLaunchEmailBlast(
             from,
             to: email,
             subject: 'EstatIQ spouštíme — 2 měsíce zdarma pro první uživatele 🚀',
-            html: launchEmailHtml(opts.appUrl, name),
+            html: launchEmailHtml(appUrl, name),
           })
           if (result.error) {
             console.error(`Resend error for ${email}:`, result.error)

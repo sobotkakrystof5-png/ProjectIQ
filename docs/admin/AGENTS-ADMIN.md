@@ -61,6 +61,31 @@ Základní schéma je v tomto souboru níže. Inkrementální změny (nové tabu
 - Kolik požadavků stojí která obrazovka hlídá `lib/__tests__/admin-db-rounds.test.ts`
   jako strop; naměřené hodnoty jsou v plánu modernizace, sekce 11.
 
+### Výpisy: sdílená tabulka a stav v adrese (AD07)
+
+- **`lib/admin-table.ts`** je jediné místo, kde se čte řazení a stránkování z adresy.
+  `parseTableParams(searchParams, { allowed, defaultSort, pageSize, prefix?, tiebreak? })`
+  vrátí ověřené `{ sortKey, dir, page, limit, offset, orderBy }`. **`ORDER BY` se nedá
+  parametrizovat, proto se klíč z adresy jen *vybírá* ze seznamu `allowed`** (`klíč → SQL
+  výraz`); co v seznamu není, spadne na výchozí řazení. Prázdné hodnoty jsou vždy na konci
+  (`NULLS LAST`), `tiebreak` drží pořadí mezi stránkami. `tableLinks(path, searchParams)`
+  dává odkazy na řazení a stránku, `tableHref` mění jeden parametr a ostatní nechá být.
+- **`components/admin/data-table.tsx`** je **serverová** komponenta: řazení i stránkování
+  jsou `<Link>`, takže se nic nehydratuje, funguje tlačítko Zpět a seřazený seznam jde poslat
+  odkazem. Sloupec je `AdminColumn<T> = { key, header, sortable?, align?, cell, mobile? }`;
+  role `mobile` říká, co se pod 640 px stane titulkem karty, štítkem nebo údajem. Interaktivní
+  části (úpravy, zatržítka) si volající vkládá jako hotové uzly přes `cell` a `selection`.
+- **`components/admin/pagination.tsx`** používá tabulka i seznamy karet (Poptávky, Požadavky),
+  **`components/admin/table-search.tsx`** je `method="get"` formulář — hledání bez JavaScriptu.
+- **Dotazy obrazovek** jsou v `lib/admin/{completed,invoices,costs,leads,projects,waitlist}.ts`
+  a `lib/ws/admin/clients.ts`: filtry, řazení, stránkování i součty dělá databáze, vždy jednou
+  dávkou. Součty a počty u filtrů se počítají přes celý filtr, ne přes zobrazenou stránku.
+- **Žádný výpis nesmí být bez `LIMIT`.** Kde se stránkovat nedá (přehled výkonnosti, archiv
+  faktur, export waitlistu), má dotaz pevný strop a v kódu důvod.
+- **Funkci nelze poslat do klientské komponenty.** `LeadsTable` proto dostává hotové odkazy
+  na řazení (`sortLinks`), ne `sortHref`. Projeví se to tak, že stránka vrátí 200, ale tabulka
+  se nevykreslí na serveru.
+
 **Tabulky `projects`, `client_messages` a `progress_updates` žádná migrace nezakládá** — vznikly ručně v Neon konzoli před migrací 001. Na čistou databázi je dostane `node scripts/apply-migration.js scripts/admin-base-schema.sql`, pak teprve jdou migrace 001+ (AD00).
 
 **Smazané moduly (AD01, R-089):** Škola, Sport a zdraví, Plány a Šablony webu odešly z kódu i z databáze — 24 tabulek maže migrace 100, `project_blocks` a `block_templates` migrace 101. Obsah se před spuštěním vyveze `node scripts/export-before-drop.mjs --ano`.

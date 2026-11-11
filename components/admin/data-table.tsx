@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import { Pagination } from '@/components/admin/pagination'
 import { EmptyState } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
-import { flipDir, pageCount, rangeLabel, type SortDir, type TableLinks, type TableParams } from '@/lib/admin-table'
+import { flipDir, rangeLabel, type SortDir, type TableLinks, type TableParams } from '@/lib/admin-table'
 
 /**
  * Jedna tabulka pro celý admin (AD07).
@@ -96,49 +97,6 @@ function HeaderCell<T>({ column, sort }: { column: AdminColumn<T>; sort?: { para
         <SortIcon active={active} dir={sort.params.dir} />
       </Link>
     </th>
-  )
-}
-
-function Pagination({ page }: { page: AdminTablePage }) {
-  const { params, total, links } = page
-  const pages = pageCount(total, params.pageSize)
-  if (pages <= 1) return null
-  const prev = params.page > 1
-  const next = params.page < pages
-  const step = cn(
-    'inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors',
-    'text-navy-900 hover:bg-navy-100',
-  )
-  return (
-    <nav aria-label="Stránkování" className="flex items-center justify-between gap-3 border-t border-navy-100 px-3 py-2">
-      <p className="font-num text-xs text-quiet">
-        {params.page}. stránka z {pages}
-      </p>
-      <div className="flex items-center gap-1">
-        {prev ? (
-          <Link href={links.pageHref(params.page - 1)} className={step}>
-            <ChevronLeft size={15} strokeWidth={1.5} />
-            Předchozí
-          </Link>
-        ) : (
-          <span className={cn(step, 'text-quiet opacity-40')} aria-hidden>
-            <ChevronLeft size={15} strokeWidth={1.5} />
-            Předchozí
-          </span>
-        )}
-        {next ? (
-          <Link href={links.pageHref(params.page + 1)} className={step}>
-            Další
-            <ChevronRight size={15} strokeWidth={1.5} />
-          </Link>
-        ) : (
-          <span className={cn(step, 'text-quiet opacity-40')} aria-hidden>
-            Další
-            <ChevronRight size={15} strokeWidth={1.5} />
-          </span>
-        )}
-      </div>
-    </nav>
   )
 }
 
@@ -276,7 +234,9 @@ export function DataTable<T>({
           </ul>
 
           {footer}
-          {page && <Pagination page={page} />}
+          {page && (
+            <Pagination params={page.params} total={page.total} links={page.links} className="border-t border-navy-100 px-3 py-2" />
+          )}
         </div>
       )}
     </div>

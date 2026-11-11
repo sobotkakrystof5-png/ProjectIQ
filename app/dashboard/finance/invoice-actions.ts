@@ -7,6 +7,8 @@ import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import {
   parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow,
   INVOICE_COLUMNS, INCOME_JOIN, OTHER_INCOME_COUNT,
+  toInvoiceItem, toInvoiceRegistryItem,
+  type InvoiceRow, type InvoiceRegistryRow,
 } from '@/lib/invoices'
 import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import type { InvoiceAiExtract } from '@/lib/types'
@@ -59,27 +61,17 @@ export interface InvoiceArchiveData {
   overdueCount: number
 }
 
-type Row = Omit<InvoiceListItem, 'project_href' | 'duplicate_risk'> & {
-  project_lead_origin: string | null
-  other_income_count: number
-}
+// Mapování řádku faktury žije v `lib/invoices.ts` — používá ho i evidence (AD07).
+type Row = InvoiceRow
+const toItem = toInvoiceItem
 
 /**
- * „Kolik příjmů zakázky tahle faktura nezastupuje" — jediný signál dvojího
- * započtení, který jde spočítat v DB.
- *
- * Do AD06 to byl korelovaný `COUNT(*)` puštěný zvlášť pro **každý řádek**
- * výpisu. Teď se příjmy sečtou jednou (`GROUP BY`) a od součtu se odečte
- * vlastní transakce faktury, když do téhož součtu patří. Výsledek je stejný.
+ * Strop archivu faktur ve Financích a na zakázce. Je to daňový pohled na
+ * jeden rok (nebo jednu zakázku), takže se v praxi nenaplní — ale žádný
+ * výpis v adminu nesmí růst bez konce (AD07). Evidence s vlastním
+ * stránkováním je `lib/admin/invoices.ts`.
  */
-function toItem(row: Row): InvoiceListItem {
-  const { project_lead_origin: _origin, other_income_count, ...rest } = row
-  return {
-    ...rest,
-    project_href: rest.project_id !== null ? projectPath(rest.project_id) : null,
-    duplicate_risk: rest.paid_on !== null && other_income_count > 0,
-  }
-}
+const ARCHIVE_LIMIT = 500
 
 export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
   await requireAuth()
@@ -93,6 +85,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         ${INCOME_JOIN}
         WHERE i.paid_on IS NOT NULL AND EXTRACT(YEAR FROM i.paid_on) = $1
         ORDER BY i.paid_on DESC, i.created_at DESC
+        LIMIT ${ARCHIVE_LIMIT}
       `,
       params: [year],
     },
@@ -103,6 +96,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         LEFT JOIN projects p ON p.id = i.project_id
         WHERE i.paid_on IS NULL
         ORDER BY COALESCE(i.due_on, i.issued_on) ASC
+        LIMIT ${ARCHIVE_LIMIT}
       `,
       params: [],
     },
@@ -152,6 +146,7 @@ export async function getProjectInvoices(projectId: string): Promise<InvoiceArch
         ${INCOME_JOIN}
         WHERE i.project_id = $1
         ORDER BY i.issued_on DESC, i.created_at DESC
+        LIMIT ${ARCHIVE_LIMIT}
       `,
       params: [projectId],
     },
@@ -186,22 +181,6 @@ export async function getInvoiceProjectOptions(): Promise<InvoiceProjectOption[]
   await requireAuth()
   const [rows] = await adminDb.batch([projectOptionsQuery()])
   return (rows as unknown as Parameters<typeof toProjectOption>[0][]).map(toProjectOption)
-}
-
-/**
- * Celá obrazovka Faktury (`/dashboard/faktury`) jedním požadavkem — evidence
- * i zakázky do formuláře. Odděleně to byla dvě kola do databáze (AD06).
- */
-export async function getInvoiceRegistryScreen(): Promise<{
-  invoices: InvoiceRegistryItem[]
-  projects: InvoiceProjectOption[]
-}> {
-  await requireAuth()
-  const [invoiceRows, projectRows] = await adminDb.batch([registryQuery(), projectOptionsQuery()])
-  return {
-    invoices: (invoiceRows as unknown as RegistryRow[]).map(toRegistryItem),
-    projects: (projectRows as unknown as Parameters<typeof toProjectOption>[0][]).map(toProjectOption),
-  }
 }
 
 function revalidateInvoicePaths(projectId: string | null) {
@@ -272,39 +251,8 @@ export interface InvoiceRegistryItem extends InvoiceListItem {
   project_description: string | null
 }
 
-type RegistryRow = Row & { project_description: string | null }
-
-function toRegistryItem(row: RegistryRow): InvoiceRegistryItem {
-  const { project_description, ...base } = row
-  return { ...toItem(base), project_description }
-}
-
-/**
- * Všechny faktury, co kdy vznikly — bez filtru roku a bez dělení na
- * zaplacené/pohledávky. Evidence je archiv dokladů: filtrování si řídí
- * uživatel v UI, server vrací kompletní pravdu.
- *
- * Řadí se podle data vystavení (ne zaplacení) — v archivu hledáš doklad
- * podle toho, kdy vznikl.
- */
-/**
- * Dotazy evidence faktur a výběru zakázek — jako hodnoty, aby šly poslat
- * jednou dávkou (`getInvoiceRegistryScreen`).
- *
- * Výpis zatím nemá `LIMIT`: `InvoiceRegistry` filtruje a sčítá v prohlížeči,
- * takže by useknutý seznam tiše změnil součty. Stránkování a součty v SQL
- * dělá AD07.
- */
-const registryQuery = (): AdminQuery => ({
-  text: `
-    SELECT ${INVOICE_COLUMNS}, p.description AS project_description, ${OTHER_INCOME_COUNT}
-    FROM invoices i
-    LEFT JOIN projects p ON p.id = i.project_id
-    ${INCOME_JOIN}
-    ORDER BY i.issued_on DESC, i.created_at DESC
-  `,
-  params: [],
-})
+type RegistryRow = InvoiceRegistryRow
+const toRegistryItem = toInvoiceRegistryItem
 
 const projectOptionsQuery = (): AdminQuery => ({
   text: `
@@ -324,14 +272,6 @@ const toProjectOption = (r: { id: string; client_name: string; description: stri
     description: r.description,
     origin_label: origin === DEFAULT_LEAD_ORIGIN ? null : LEAD_ORIGINS[origin].domain ?? LEAD_ORIGINS[origin].name,
   }
-}
-
-export async function getAllInvoices(): Promise<InvoiceRegistryItem[]> {
-  await requireAuth()
-
-  const [rows] = await adminDb.batch([registryQuery()])
-
-  return (rows as unknown as RegistryRow[]).map(toRegistryItem)
 }
 
 /** Příjem v ledgeru, který fakturu zastupuje — na detailu ať je vidět, co doklad udělal s daněmi. */
