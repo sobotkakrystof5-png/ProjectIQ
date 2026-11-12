@@ -6,7 +6,6 @@ import https from 'https'
 import { isIP } from 'net'
 import { itemTotals } from '@/lib/ws/money/calculations'
 import { formatMoney } from '@/lib/ws/money'
-import { formatDayShort } from '@/lib/ws/time'
 
 /**
  * Vzhled a tisk faktury — **jeden** pro celé repo (AD12).
@@ -68,6 +67,17 @@ export type InvoicePdfBrand = { name: string; logo: string | null }
 
 const ASSET_DIR = 'lib/ws/money/assets'
 
+/**
+ * Datum na dokladu: `12. 11. 2026`. Krátký tvar „čt 12. 11." z aplikace se
+ * na fakturu nehodí — doklad se schovává na deset let a den v týdnu mu nic
+ * neříká, zato chybějící rok ano.
+ */
+export function formatInvoiceDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return iso
+  return `${d}. ${m}. ${y}`
+}
+
 /** Variabilní symbol: jen číslice, nejvýš 10 znaků (pravidlo banky). */
 export function variableSymbol(number: string): string {
   return number.replace(/\D/g, '').slice(0, 10)
@@ -110,7 +120,7 @@ async function fontCss() {
   return css
 }
 
-const CSS = '@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:InvoiceSans,sans-serif;font-size:13px;color:rgb(var(--ink));background:rgb(var(--surface))}h1{font-size:32px;letter-spacing:-.03em;margin:0}p{margin:5px 0;white-space:pre-line;overflow-wrap:anywhere}.brand{display:flex;align-items:center;gap:16px;border-bottom:2px solid rgb(var(--navy-100));padding-bottom:20px}.brand img{max-width:100px;max-height:60px}.tiles{display:grid;grid-template-columns:12px 12px;gap:4px}.tiles i{height:12px;border-radius:3px;background:rgb(var(--navy-700))}.parties{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:30px 0}small{color:rgb(var(--quiet))}.numbers{font-family:InvoiceMono,monospace}table{border-collapse:collapse;width:100%;margin:24px 0}th{text-align:left;color:rgb(var(--quiet));font-weight:500}td,th{padding:12px 6px;border-bottom:1px solid rgb(var(--navy-100))}tr{break-inside:avoid}td:last-child{text-align:right}.total{border-radius:20px;padding:20px;background:rgb(var(--navy-50));text-align:right;font-size:22px}.foot{margin-top:25px;font-size:12px}.payment-qr{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:24px;padding:18px;border:1px solid rgb(var(--navy-100));border-radius:16px;break-inside:avoid}.payment-qr svg{width:148px;height:148px;flex:none}.payment-qr h2{font-size:16px;margin:0 0 8px}'
+const CSS = ':root{--font-instrument-sans:InvoiceSans;--font-instrument-serif:InvoiceSans;--font-jetbrains-mono:InvoiceMono}@page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:InvoiceSans,sans-serif;font-size:13px;color:rgb(var(--ink));background:rgb(var(--surface))}h1{font-size:32px;letter-spacing:-.03em;margin:0}p{margin:5px 0;white-space:pre-line;overflow-wrap:anywhere}.brand{display:flex;align-items:center;gap:16px;border-bottom:2px solid rgb(var(--navy-100));padding-bottom:20px}.brand img{max-width:100px;max-height:60px}.tiles{display:grid;grid-template-columns:12px 12px;gap:4px}.tiles i{height:12px;border-radius:3px;background:rgb(var(--navy-700))}.parties{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:30px 0}small{display:block;margin-bottom:4px;color:rgb(var(--quiet))}.numbers{font-family:InvoiceMono,monospace}table{border-collapse:collapse;width:100%;margin:24px 0}th{text-align:left;color:rgb(var(--quiet));font-weight:500}td,th{padding:12px 6px;border-bottom:1px solid rgb(var(--navy-100))}tr{break-inside:avoid}td:last-child{text-align:right}.total{border-radius:20px;padding:20px;background:rgb(var(--navy-50));text-align:right;font-size:22px}.foot{margin-top:25px;font-size:12px}.payment-qr{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:24px;padding:18px;border:1px solid rgb(var(--navy-100));border-radius:16px;break-inside:avoid}.payment-qr svg{width:148px;height:148px;flex:none}.payment-qr h2{font-size:16px;margin:0 0 8px}'
 
 /**
  * Platební řetězec SPAYD pro QR kód. Vrací `null`, kdykoli si nejsme jistí —
@@ -134,9 +144,11 @@ export function spaydPaymentString(invoice: InvoicePdfDoc): string | null {
 export async function invoiceHtml(invoice: InvoicePdfDoc, brand: InvoicePdfBrand) {
   let logo: string | null = null
   try { logo = await logoData(brand.logo) } catch { console.warn('[faktura] Logo se do PDF nepodařilo načíst.') }
-  // Paleta je od AD04 na :root v app/tokens-dilky.css, přepisy Workspace v app/ws-tokens.css.
-  const tokens = (await Promise.all(['app/tokens-dilky.css', 'app/ws-tokens.css']
-    .map(file => readFile(path.join(process.cwd(), file), 'utf8')))).join('\n')
+  // Paleta je od AD04 na `:root` v app/tokens-dilky.css, takže doklad nepotřebuje
+  // nic dalšího. Přepisy Workspace (app/ws-tokens.css) se sem **záměrně nenačítají**:
+  // jsou vázané na `[data-app="ws"]`, přebíjely by svou specificitou písmo i pozadí
+  // dokladu a sahají po proměnných z `next/font`, které v PDF neexistují.
+  const tokens = await readFile(path.join(process.cwd(), 'app/tokens-dilky.css'), 'utf8')
 
   const text = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
   const party = (p: InvoicePdfParty) => '<strong>' + text(p.name) + '</strong><p>' + text(p.address) + '</p>' + (p.ico ? '<p>IČO ' + text(p.ico) + '</p>' : '') + (p.dic ? '<p>DIČ ' + text(p.dic) + '</p>' : '')
@@ -156,19 +168,19 @@ export async function invoiceHtml(invoice: InvoicePdfDoc, brand: InvoicePdfBrand
   // Uživatelské hodnoty se serializují pouze jako escapovaný text, nikdy HTML.
   return '<!doctype html><html lang="cs"><head><meta charset="utf-8">' +
     '<meta http-equiv="Content-Security-Policy" content="default-src ' + text("'none'") + "; img-src data:; font-src data:; style-src " + text("'unsafe-inline'") + '">' +
-    '<style>' + tokens + await fontCss() + CSS + '</style></head><body data-app="ws">' +
+    '<style>' + tokens + await fontCss() + CSS + '</style></head><body>' +
     '<div class="brand">' + (logo ? '<img alt="' + text(brand.name) + '" src="' + logo + '">' : '<div class="tiles"><i></i><i></i><i></i><i></i></div>') +
     '<div><small>' + text(brand.name) + '</small><h1>Faktura ' + num(invoice.number) + '</h1></div></div>' +
     '<div class="parties"><section><small>Dodavatel</small>' + party(invoice.issuer) + '</section><section><small>Odběratel</small>' + party(invoice.counterparty) + '</section></div>' +
-    '<p>Vystaveno ' + num(formatDayShort(invoice.issuedOn)) + ' · Splatnost ' + num(formatDayShort(invoice.dueOn)) + '</p>' +
-    (invoice.issuer.vatPayer ? '<p>Datum uskutečnění plnění ' + num(formatDayShort(invoice.suppliedOn)) + '</p>' : '') +
+    '<p>Vystaveno ' + num(formatInvoiceDay(invoice.issuedOn)) + ' · Splatnost ' + num(formatInvoiceDay(invoice.dueOn)) + '</p>' +
+    (invoice.issuer.vatPayer ? '<p>Datum uskutečnění plnění ' + num(formatInvoiceDay(invoice.suppliedOn)) + '</p>' : '') +
     '<table><thead><tr><th>Položka</th><th>Počet</th><th>Cena bez DPH</th>' + (invoice.issuer.vatPayer ? '<th>DPH</th>' : '') + '<th>Celkem</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     (invoice.issuer.vatPayer ? '<p>Základ daně ' + amount(invoice.items.reduce((sum, i) => sum + itemTotals(i).net, 0)) + ' · DPH ' + amount(invoice.items.reduce((sum, i) => sum + itemTotals(i).vat, 0)) + '</p>' : '') +
     '<div class="total">Celkem k úhradě <strong class="numbers">' + amount(invoice.amount) + '</strong></div>' +
     (invoice.issuer.bank ? '<p>Účet: ' + num(invoice.issuer.bank) + '</p>' : '') +
     (vs ? '<p>Variabilní symbol: ' + num(vs) + '</p>' : '') +
     (qr ? '<section class="payment-qr"><div><h2>Zaplatit QR kódem</h2><p>Částka ' + amount(invoice.amount) + '</p><p>Účet ' + num(invoice.issuer.bank ?? '') + '</p><p>Variabilní symbol ' + num(vs) + '</p></div>' + qr + '</section>' : '') +
-    (invoice.paidOn ? '<p>Zaplaceno ' + text(formatDayShort(invoice.paidOn)) + '</p>' : '') +
+    (invoice.paidOn ? '<p>Zaplaceno ' + text(formatInvoiceDay(invoice.paidOn)) + '</p>' : '') +
     '<p class="foot">' + text(invoice.note) + '</p>' + (!invoice.issuer.vatPayer ? '<p class="foot">Dodavatel není plátce DPH.</p>' : '') + '</body></html>'
 }
 

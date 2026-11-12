@@ -10,7 +10,7 @@ import {
 } from '@/lib/admin/invoicing'
 import { loadInvoiceRegistry } from '@/lib/admin/invoices'
 import { parseTableParams } from '@/lib/admin-table'
-import { spaydPaymentString } from '@/lib/invoice-pdf/render'
+import { invoiceHtml, renderInvoicePdf, spaydPaymentString } from '@/lib/invoice-pdf/render'
 import { isValidIco } from '@/lib/ares'
 
 /**
@@ -210,6 +210,52 @@ describe('doklad pro PDF', () => {
     const id = (await one<{ id: string }>(`SELECT id FROM invoices WHERE invoice_number = 'CIZI-1'`)).id
     expect(await loadInvoiceDoc(id)).toBeNull()
   })
+})
+
+describe('PDF vystavené faktury', () => {
+  it('doklad nese QR, částku, variabilní symbol a větu o neplátci; vstup od uživatele je escapovaný', async () => {
+    const { id } = await issueInvoice({
+      ...vstup('2026-10-10', 'Klient s.r.o.', 12000),
+      note: '<script>alert(1)</script>',
+    }, PROFILE)
+    const doc = await loadInvoiceDoc(id)
+    const html = await invoiceHtml(doc!, { name: PROFILE.name, logo: null })
+
+    // Částky formátuje `Intl` s pevnou mezerou — porovnává se po jejím sjednocení.
+    const text = html.replace(/\u00a0/g, ' ')
+
+    expect(text).toContain('Zaplatit QR kódem')
+    expect(text).toContain('<svg')
+    expect(text).toContain('Variabilní symbol')
+    // Celá částka se tiskne bez haléřů (`formatMoney`).
+    expect(text).toContain('Celkem k úhradě <strong class="numbers">12 000 Kč</strong>')
+    // Doklad se sází písmem Dílků a na bílém papíře. Dřív si bral `[data-app="ws"]`
+    // z tokenů Workspace, které sahají po proměnných z `next/font` — ty v PDF
+    // neexistují, takže se celá faktura tiskla v Times na šedém podkladu.
+    expect(text).toContain('<body>')
+    expect(text).not.toContain('<body data-app')
+    expect(text).toContain('font-family:InvoiceSans')
+    // Datum na dokladu musí nést rok (ne „čt 12. 11." z aplikace).
+    expect(text).toContain('10. 10. 2026')
+    expect(text).toContain('Dodavatel není plátce DPH.')
+    expect(text).toContain('&lt;script&gt;')
+    expect(text).not.toContain('<script>alert(1)</script>')
+  })
+
+  // Skutečný tisk přes Chromium — pouští se jen s ADMIN_PDF_SMOKE=1
+  // (v CI Chrome není a 30 s na každý běh by bylo zbytečné zdržení).
+  it.runIf(process.env.ADMIN_PDF_SMOKE === '1')('se skutečně vykreslí', async () => {
+    const { id } = await issueInvoice(vstup('2026-10-11', 'Tiskový klient', 24200), PROFILE)
+    const doc = await loadInvoiceDoc(id)
+    const pdf = await renderInvoicePdf(doc!, { name: PROFILE.name, logo: null })
+
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-')
+    expect(pdf.length).toBeGreaterThan(10000)
+    if (process.env.ADMIN_PDF_OUT) {
+      const fsp = await import('fs/promises')
+      await fsp.writeFile(process.env.ADMIN_PDF_OUT, pdf)
+    }
+  }, 60000)
 })
 
 describe('storno', () => {
