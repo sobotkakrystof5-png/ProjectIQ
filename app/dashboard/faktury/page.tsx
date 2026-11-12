@@ -1,10 +1,11 @@
-import { AlertTriangle, Clock, Paperclip } from 'lucide-react'
+import { AlertTriangle, Paperclip } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
 import { DataTable, type AdminColumn } from '@/components/admin/data-table'
 import { InvoiceDropZone, NewInvoiceButton } from '@/components/admin/invoices/invoice-drop-zone'
 import { TableSearch } from '@/components/admin/table-search'
 import { Badge } from '@/components/ui/badge'
+import { PaidCell } from '@/components/admin/invoices/mark-paid'
 import { invoiceTone, toneVariant } from '@/lib/admin-status'
 import {
   INVOICE_SORT,
@@ -14,6 +15,7 @@ import {
   type CurrencyTotal,
 } from '@/lib/admin/invoices'
 import { parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import type { InvoiceRegistryItem } from '@/app/dashboard/finance/invoice-actions'
 
 /**
@@ -81,18 +83,13 @@ function columns(today: string): AdminColumn<InvoiceRegistryItem>[] {
         const overdue = isOverdue(invoice, today)
         return (
           <span className="inline-flex flex-wrap items-center gap-1.5">
-            <Badge variant={toneVariant(invoiceTone(Boolean(invoice.paid_on), overdue))}>
-              {invoice.paid_on ? (
-                'Zaplaceno'
-              ) : overdue ? (
-                <>
-                  <Clock size={10} strokeWidth={1.5} aria-hidden />
-                  Po splatnosti
-                </>
-              ) : (
-                'Pohledávka'
-              )}
-            </Badge>
+            {/* Stav i tlačítko „Zaplaceno" sdílejí optimistický stav (AD08). */}
+            <PaidCell
+              invoiceId={invoice.id}
+              paidOn={invoice.paid_on}
+              overdue={overdue}
+              todayIso={today}
+            />
             {invoice.duplicate_risk && (
               <Badge
                 variant="signal"
@@ -162,7 +159,9 @@ export default async function FakturyPage(props: {
   })
   const screen = await loadInvoiceRegistry(params, { year, status, query })
   const links = tableLinks(PATH, searchParams)
-  const today = new Date().toISOString().slice(0, 10)
+  // Pražský den, ne UTC: `toISOString()` je mezi 23:00 a půlnocí o den vedle
+  // a tohle datum se od AD08 zapisuje jako datum zaplacení faktury.
+  const today = getPragueTodayISO()
   const overdue = screen.totals.reduce((sum, t) => sum + t.overdueCount, 0)
   const outstandingCount = screen.totals.reduce((sum, t) => sum + t.outstandingCount, 0)
   const paidCount = screen.totals.reduce((sum, t) => sum + t.paidCount, 0)

@@ -5,12 +5,13 @@ import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import {
-  parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow,
+  parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow, syncInvoiceTransaction,
   INVOICE_COLUMNS, INCOME_JOIN, OTHER_INCOME_COUNT,
   toInvoiceItem, toInvoiceRegistryItem,
   type InvoiceRow, type InvoiceRegistryRow,
 } from '@/lib/invoices'
 import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
+import { isIsoDate } from '@/lib/prague-time'
 import type { InvoiceAiExtract } from '@/lib/types'
 
 /**
@@ -218,6 +219,41 @@ export async function updateInvoice(id: string, formData: FormData): Promise<{ e
     return { error: invoiceErrorMessage(err) }
   }
 }
+
+/**
+ * Označení faktury za zaplacenou (nebo vrácení zpět) jedním kliknutím — AD08.
+ *
+ * Nepřidává **žádnou** peněžní logiku: nastaví `paid_on` a pustí tutéž
+ * `syncInvoiceTransaction`, kterou volá i formulář. Ochrana proti dvojímu
+ * započtení (převzetí existujícího příjmu zakázky místo založení druhého)
+ * sedí uvnitř té funkce, takže se tady nemá co rozejít.
+ *
+ * `paidOn = null` fakturu vrátí mezi pohledávky a `syncInvoiceTransaction`
+ * přitom smaže jen transakci, kterou sama založila — převzatý příjem zakázky
+ * zůstane.
+ */
+export async function setInvoicePaid(id: string, paidOn: string | null): Promise<{ error?: string }> {
+  try {
+    await requireAuth()
+    if (!UUID_RE.test(id)) return { error: 'Faktura nenalezena' }
+    if (paidOn !== null && !isIsoDate(paidOn)) return { error: 'Neplatné datum zaplacení' }
+
+    const rows = await sql`
+      UPDATE invoices SET paid_on = ${paidOn}
+      WHERE id = ${id}
+      RETURNING project_id::text
+    `
+    if (!rows.length) return { error: 'Faktura nenalezena' }
+
+    await syncInvoiceTransaction(id)
+    revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
+    return {}
+  } catch (err) {
+    return { error: invoiceErrorMessage(err) }
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function deleteInvoice(id: string): Promise<{ error?: string }> {
   try {

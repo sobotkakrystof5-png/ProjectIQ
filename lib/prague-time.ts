@@ -152,6 +152,22 @@ export function addIsoMonths(iso: string, months: number): string {
   return `${year}-${pad(month)}-${pad(day)}`
 }
 
+/**
+ * Je `value` skutečný den ve tvaru 'YYYY-MM-DD'? Nestačí ověřit tvar:
+ * `2026-99-99` projde regulárním výrazem, ale měsíc 99 se v `Date` přetočí
+ * do jiného roku a do SQL by šlo neplatné datum (Postgres pak odpoví chybou,
+ * ne vysvětlením). Proto se datum musí vrátit zpátky stejné, jak přišlo.
+ *
+ * Používá se všude, kde datum přichází z prohlížeče — kotva kalendáře
+ * i datum zaplacení faktury.
+ */
+export function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) === value
+}
+
 // Day of week of a 'YYYY-MM-DD' date, JS style (0=Sun … 6=Sat). Čistá
 // kalendářní aritmetika — nezávisí na zóně prohlížeče.
 export function isoWeekday(iso: string): number {
