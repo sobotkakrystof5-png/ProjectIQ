@@ -22,7 +22,7 @@
 |--------|-------------|----------|
 | Frontend | Next.js 16 (App Router) + TypeScript | SSR, App Router — nikdy Pages Router |
 | Styling | Tailwind CSS (+ `clsx`, `tailwind-merge`) | Vlastní komponenty, brand-* barvy — shadcn/ui admin nepoužívá |
-| Animace | Framer Motion | Booking modal, success states |
+| Animace | Framer Motion přes `m` + `LazyMotion` v `AdminRoot` (AD08) | Kalendář a čtyři modaly. **Nikdy `motion`** — stáhlo by celý balíček předem; výjimka je `BookingModal` na portálu `/p`, který kořen adminu nemá. Hlídá `components/admin/__tests__/admin-bundle-guard.test.ts`. |
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
 | Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL`. Čtení obrazovek jde od AD06 přes `lib/admin/db.ts` (dávky), starší volání přes `lib/db.ts` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
@@ -60,6 +60,14 @@ Základní schéma je v tomto souboru níže. Inkrementální změny (nové tabu
   (data klientů Workspace, R-052). `lib/admin/db.ts` se schématu `ws` nedotkne.
 - Kolik požadavků stojí která obrazovka hlídá `lib/__tests__/admin-db-rounds.test.ts`
   jako strop; naměřené hodnoty jsou v plánu modernizace, sekce 11.
+- **GET nezapisuje (AD08).** Vykreslení obrazovky nesmí nic ukládat — prefetch odkazu
+  v menu by zápis spustil, i když stránku nikdo neotevře, a kdo se na obrazovku
+  nepodívá, o zápis přijde. Stránka Finance takhle zakládala opakované transakce;
+  dnes to dělá denní cron a tlačítko „Doplnit opakované". Hlídá
+  `lib/__tests__/admin-render-nezapisuje.test.ts`.
+- **Výpisy, které rostou s časem, potřebují okno nebo `LIMIT`.** Kalendář posílal do
+  prohlížeče celou historii (AD08), výpisy před AD07 celé tabulky. Nový dotaz nad
+  `calendar_events`, `consultation_slots` nebo `client_leads` se ptá na rozsah, ne na vše.
 
 ### Výpisy: sdílená tabulka a stav v adrese (AD07)
 
@@ -350,7 +358,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
-| `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury |
+| `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury. `ETag` z `md5(pdf_data)`, při shodě 304 **bez čtení bajtů** (AD08). `Cache-Control: private, max-age=0, must-revalidate` — `private` nikdy neruš (DECISIONS #022). `X-Frame-Options: SAMEORIGIN` z `next.config.mjs` neměň (DECISIONS #004). |
 | `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
 | `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
@@ -362,7 +370,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 
 | Endpoint | Kdy (UTC) | Co |
 |----------|-----------|----|
-| `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací, lead akcí, školních termínů (idempotentní příznaky proti duplicitám) |
+| `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací a lead akcí (idempotentní příznaky proti duplicitám). **Od AD08 tu vznikají i opakované transakce** — fixní náklady i cash-flow šablony (`lib/recurring-transactions.ts`). Dřív je zakládal render stránky Finance. |
 | `/api/cron/tax-news` | pondělí 5:00 | Stažení legislativních novinek (`ON CONFLICT DO NOTHING`) |
 | `/api/cron/client-retention` | denně 3:30 | Retence D-K10 (R-076, migrace 098): `public.purge_client_retention(3)` — dokončená zakázka (`done`/`paid`) bez pohybu 3 roky přijde o aktivitu, požadavky (`client_requests`, `portal.requests`), zprávy a slovní hodnocení; zakázka, cena a číselné hodnocení zůstávají. Pozvánky 90 dní po použití/zrušení/vypršení. `lib/client-retention.ts` |
 
@@ -409,8 +417,25 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Nepřevedeno z plánu: změna stavu a fáze jedním klikem se „Zpět“. `updateProject` posílá klientovi e-mail, takže „Zpět“ by ho poslal podruhé.
 
 ### `/dashboard/calendar`
-- Globální kalendář (Month/Week/Day) napříč VIZEON projekty — konzultace + manuální události/blokace
-- Admin může vytvořit ruční událost nebo blokaci přes `AdminEventModal`
+- Globální kalendář (Měsíc / Týden / Den) — konzultace, deadliny, plánované hovory z Hovorů
+  a ruční události i blokace. Po AD02 bez filtru zdroje.
+- Ruční událost nebo blokaci zakládá `AdminEventModal`.
+- **Čte jen okno, ne historii (AD08).** Stránka pošle měsíc kotvy ± 7 dní
+  (`windowFor` v `lib/admin/calendar-window.ts`), dotazy jsou v `lib/admin/calendar.ts`
+  jednou dávkou. Proklik mimo načtené okno dotáhne server action `loadCalendarMonth`
+  (`app/calendar-actions.ts`) a `replaceRange` v `SmartCalendar` vymění, co do okna padá.
+  Nový dotaz kalendáře **musí** mít podmínku okna — hlídá to
+  `components/admin/__tests__/admin-bundle-guard.test.ts`.
+- Dotazy nad `timestamptz` porovnávají **okamžiky** (`starts_at >= $1 AND starts_at < $2`),
+  ne `AT TIME ZONE 'Europe/Prague'::date` — jinak se zahodí index z migrace 103.
+- **Vykreslování počítá v pražské zóně nad `'YYYY-MM-DD'`** (`pragueDayOf`,
+  `pragueMinutesOf`, `isoWeekday`, `addIsoMonths`), ne nad `Date` v zóně prohlížeče.
+  `UnifiedEvent` nese `day`, `startMin` a `endMin`; pozice bloku je `blockGeometry`.
+  `getHours()` v kalendáři nepoužívej — zahazuje minuty i zónu (AD08 to byla jedna
+  ze tří nahlášených chyb).
+- `AdminEventModal` se **mountuje až při otevření**; `<AnimatePresence>` je nad ním
+  v `SmartCalendar`. Dokud byl uvnitř modalu, komponenta se neodmountovala a formulář
+  navždy držel „dnes 10:00".
 
 ### `/dashboard/faktury`
 - **Evidence všech vystavených faktur** — archiv dokladů, řazený podle data vystavení a seskupený po rocích
@@ -486,6 +511,13 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 - Cíl admin oznámení ber vždy z `adminEmail()` v `lib/lead-origins.ts` (`VIZEON_ADMIN_EMAIL`, záloha `ADMIN_EMAIL`) — nikdy nečti `process.env.ADMIN_EMAIL` přímo.
 - Selhání odeslání emailu **nikdy** nesmí shodit DB mutaci — `sendBrandedEmail`/`sendPlainEmail` interně chytají chyby a vrací `false`, voláno bez `await` na výsledek pokud na něm nic nezávisí.
+- **Oznámení posílej z `after()`, ne uprostřed akce (AD08).** Gmail SMTP trvá stovky
+  milisekund až sekundy a uložení na něj nemá čekat: `import { after } from 'next/server'`
+  a odeslání dovnitř. Platí to i pro `createNotification` — plovoucí `void promise` může
+  skončit s odpovědí dřív, než se zápis dokončí. Výjimka jsou akce, **jejichž smyslem je
+  ten e-mail** (`sendPortfolioEmail`, `sendCustomLeadEmail`): tam UI hlásí, jestli odešel,
+  a po odpovědi už by se to uživatel nedozvěděl. Strop drží
+  `lib/__tests__/admin-after-emails.test.ts`.
 - Emaily se neodešlou, pokud chybí odpovídající dvojice `*_USER`/`*_APP_PASSWORD` — v dev prostředí appka funguje i bez nich, jen nechodí maily.
 - Trigger body: `notifyClientOfProjectChange` v `app/actions.ts` (vytvoření/update projektu → klient), `submitConsultation` v `app/portal-actions.ts` (rezervace → admin i klient).
 

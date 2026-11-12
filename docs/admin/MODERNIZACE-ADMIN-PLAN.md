@@ -606,6 +606,61 @@ otevře formulář s 11:00 a událost 10:15–12:00 se nakreslí na správné m�
 (ověřeno v prohlížeči, ne jen testem).
 **Riziko:** střední — `after()` mění pořadí vedlejších efektů, projít každé místo zvlášť.
 
+**Provedeno 2026-11-12**, v šesti commitech, se čtyřmi odchylkami od zadání:
+
+1. **E-maily mimo akci** — hotovo přes `after()` v `app/actions.ts`
+   (`notifyClientOfProjectChange`, `confirmWebLead`, `markProjectAsCompleted`) a navíc
+   v `lib/web-leads.ts` (veřejný příjem poptávek z webů, v zadání nebyl). Zmizely dvě
+   plovoucí `void createNotification(…)` promisy, které mohly skončit s odpovědí dřív,
+   než se zápis dokončil. **Odchylka:** `sendPortfolioEmail` a `sendCustomLeadEmail`
+   v `calls-actions.ts` zůstávají awaitované — tam je e-mail celá ta akce a UI hlásí
+   „Nepodařilo se odeslat"; po odpovědi by se to uživatel nedozvěděl.
+   Test: `lib/__tests__/admin-after-emails.test.ts`.
+2. **Časové okno kalendáře** — `lib/admin/calendar.ts` (dotazy, `server-only`) a
+   `lib/admin/calendar-window.ts` (čistá matematika nad `'YYYY-MM-DD'`, importuje ji
+   i prohlížeč). Okno je **měsíc kotvy ± 7 dní**; další období dotáhne server action
+   `loadCalendarMonth`, ne přenačtení stránky. Stav zobrazení zůstal v kliencké paměti
+   (ne v adrese), protože `loading.tsx` by při každém kroku o měsíc problikl kostlivcem.
+   `starts_at >= $1 AND starts_at < $2` nad okamžiky, ne `AT TIME ZONE … ::date` —
+   jinak by se zahodil index z migrace 103. Test v PGlite: tři roky dat = 4 380 řádků,
+   okno vrátí 176.
+3. **Finance nezapisují při čtení** — generátory z renderu pryč, cash-flow šablony
+   přidané do denního cronu `send-reminders` (nový cron se nestaví, jak plán chtěl).
+   Dvě server actions se slily do `generateRecurringTransactions()`; v UI je tlačítko
+   **„Doplnit opakované"** (ne „Vygenerovat opakované" — obyčejná čeština).
+   Test: `lib/__tests__/admin-render-nezapisuje.test.ts` hlídá i to, že žádná obrazovka
+   `/dashboard` nepíše `INSERT`/`UPDATE`/`DELETE`.
+4. **Bundle** — **`next/dynamic` se neujal a v kódu není.** Zkusil jsem ho na šesti
+   místech (AdminEventModal, PortfolioEmailModal, AiAssistantModal, ConsultationCalendar,
+   TradingViewChart, PerformanceOverview, BookingModal) a měření neukázalo úsporu:
+   komponenta se vykresluje na serveru, takže její chunk v HTML zůstává. Na Financích
+   dokonce +1,4 kB. Co zabralo, je `m` + `LazyMotion` v `AdminRoot` jako ve Workspace
+   (RD03): **Hovory −28,3 kB, Kalendář −28,4 kB** upfront, ostatní trasy +0,4 kB za
+   samotnou `LazyMotion`. `BookingModal` má výjimku (`motion`), protože portál `/p`
+   není uvnitř `AdminRoot`. Strop drží `components/admin/__tests__/admin-bundle-guard.test.ts`.
+5. **Optimistika** — `useOptimistic` (v repu dosud 0×) na potvrzení a odmítnutí poptávky
+   (`LeadCard`) a na dovoláno / přesun do čekání / smazání kontaktu (`LeadsTable`).
+   **Odchylka:** `revalidatePath('/dashboard/calls')` **zůstává**. Premisa zadání
+   („revalidace zahodí vlastní lokální update") neplatí — `useState` nové propy ignoruje,
+   takže lokální úprava přežije; revalidace je naopak potřeba pro počty u pilulek,
+   odznaky v menu a titulek obrazovky, které se počítají na serveru. „Zaplaceno" a změna
+   stavu zakázky optimistické nejsou: v adminu dnes na jedno kliknutí neexistují
+   (R-071 je nepřevzal kvůli e-mailu), přidává je AD11/AD12.
+6. **PDF route** — `runtime`, `maxDuration`, `ETag` z `md5(pdf_data)` a 304 bez čtení
+   bajtů z databáze. **Odchylka:** `bytea` se nestreamuje — Neon HTTP driver vrací celou
+   odpověď jedním JSONem, takže by „stream" byl jen jiný obal nad stejným bufferem.
+   Uvolnění `no-store` je zapsané jako `.claude/security/DECISIONS.md` #022.
+7. **Tři chyby kalendáře** — všechny opravené (`<AnimatePresence>` nad modal, zrušený
+   `resetAndClose`, pozice z minut). Při tom: celý kalendář počítá v pražské zóně nad
+   `'YYYY-MM-DD'` místo `Date` v zóně prohlížeče, událost před 8:00 se neschová
+   a formulář má na telefonu `max-h-[90vh]` s rolováním (`overflow-hidden` samotné
+   odřezávalo tlačítko Uložit). Hláška o překryvu se **nepřesouvala** — v současném
+   kódu už je přímo nad tlačítky.
+
+**Co se neověřilo:** nic z AD08 nikdo neviděl v prohlížeči. PDF 200 → 304 ověřil jen
+unit test, na testovací databázi žádná faktura PDF nemá (`demo-seed` ho nepřikládá,
+route správně vrací 404).
+
 ### AD09 — Jedna entita kontaktu (M–L, **migrace 104**)
 **Cíl:** jeden člověk = jeden řádek; telefony a e-maily z 8 tabulek se dají spojit.
 **Migrace 104:** `contacts (id, display_name, company, email, phone CHECK E.164, ico, dic, note,
@@ -935,7 +990,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | nezačato |
+| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** (v prohlížeči neověřeno) |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | nezačato |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
@@ -965,16 +1020,16 @@ AD12+AD13 nezávisí na AD14+AD15. AD17 chce AD07, AD10 a AD14 hotové, jinak se
 |---|---|---|---|---|
 | 1 | `lib/admin/db.ts` s `batch()` + `no-store` | AD06 | detail zakázky 12 dotazů / 5 vln → 2 vlny; kalendář 7→1; `/hub/finance` 12/3→1. Při ~20–40 ms na kolo **200–450 ms** | čítač kol v testu + `Server-Timing` jen v dev |
 | 2 | Migrace 103 (indexy + `pg_trgm`) | AD06 | řazení a ⌘K z sekvenčního scanu na index | `EXPLAIN (ANALYZE)` v PGlite, poměr před/po |
-| 3 | E-maily do `after()` | AD08 | −300 až −1500 ms z každého uložení zakázky a hovoru | test, že `sendEmail` běží v `after`; p75 z Vercelu |
-| 4 | Časové okno v kalendáři | AD08 | z celé historie na ~40–60 řádků; největší úspora přenosu | počet řádků v testu + velikost odpovědi |
+| 3 | E-maily do `after()` | AD08 | **hotovo** — uložení už na SMTP nečeká (test); kolik to je v ms, řekne až p75 z produkce | test, že `sendEmail` běží v `after`; p75 z Vercelu |
+| 4 | Časové okno v kalendáři | AD08 | **hotovo** — tři roky dat: 4 380 → 176 řádků (PGlite) | počet řádků v testu + velikost odpovědi |
 | 5 | `LIMIT` a stránkování (5 dotazů bez limitu) | AD07 | `getAllLeadNotes` tahá všechny poznámky všech leadů | test, že žádný výpis není bez `LIMIT` |
 | 6 | Kostra streamem (`counts` jako promise + `loading.tsx`) | AD06 | kostra < 100 ms místo čekání na 3 dotazy | první bajt s uměle zpožděným promise |
 | 7 | `staleTimes: { dynamic: 30 }` | AD06 | Zpět/Vpřed okamžitě | DevTools: žádný request |
 | 8 | `SessionProvider` jen pro admin | AD06 | −1 request po každém mountu, menší landing bundle | DevTools + `route-bundle-stats.json` |
-| 9 | `next/dynamic` + `LazyMotion` + bundle guard | AD08 | odhad −10 až −15 % JS na admin trasách | `route-bundle-stats.json`, strop v testu |
-| 10 | Zápisy z renderu `/hub/finance` do cronu | AD08 | dva zápisy z každého GET pryč (i oprava správnosti) | test, že GET nezapisuje |
-| 11 | `useOptimistic` + cílený `revalidatePath` | AD08 | potvrzení vypadá okamžitě | ruční průchod + test revalidace |
-| 12 | PDF route: stream, ETag, `maxDuration` | AD08 | 5 MB se nestahuje při každém otevření detailu | DevTools: 304 místo 200 |
+| 9 | `next/dynamic` + `LazyMotion` + bundle guard | AD08 | **hotovo jen `LazyMotion`** — Hovory −9,7 %, Kalendář −9,8 %, ostatní +0,2 %. `next/dynamic` neušetřil nic (vykresluje se na serveru) a v kódu není | `route-bundle-stats.json`, strop v testu |
+| 10 | Zápisy z renderu Financí do cronu | AD08 | **hotovo** — dva zápisy z každého GET pryč | test, že GET nezapisuje |
+| 11 | `useOptimistic` | AD08 | **hotovo** — potvrzení poptávky a akce v Hovorech vypadají okamžitě. Cílený `revalidatePath` se nedělal: revalidace je potřeba pro počty na serveru | reducer v testu, ruční průchod zbývá |
+| 12 | PDF route: ETag, `maxDuration` | AD08 | **hotovo** — druhé otevření je 304 a obsah se z databáze nečte. Stream `bytea` nejde (HTTP driver) | unit test; v DevTools zbývá |
 | 13 | `unstable_cache` na neosobní čtení | až po měření | malý | jen pokud měření ukáže |
 
 **Čím měřit, když produkce i Preview mají jinou DB než lokál:** (a) **počet kol do DB** je nezávislý
@@ -1089,6 +1144,18 @@ Finance zůstávají nejdražší obrazovkou adminu: dva zápisové generátory 
 každém GET (ruší AD08) a jedenáct čtecích funkcí má každá vlastní mapování
 (slučuje AD13).
 
+### Kolik řádků stáhne kalendář (AD08)
+
+| | před AD08 | po AD08 |
+|---|---|---|
+| konzultace, události, termíny a plánované hovory | celá historie | okno měsíc ± 7 dní |
+| tři roky provozu v PGlite (`admin-calendar.test.ts`) | 4 380 řádků | **176 řádků** |
+| kol do databáze | 1 (dávka ze AD06) | 1 (dávka), + 1 při prokliku mimo okno |
+
+Čísla jsou z testu nad syntetickými daty (jedna konzultace, událost, deadline a hovor
+na každý den od 2025-01-01), ne z produkce — tam dnes tolik záznamů není. Jde o to, že
+objem **přestal růst s délkou provozu**.
+
 ### Co udělaly indexy (migrace 103)
 
 `EXPLAIN` v PGlite nad syntetickými daty produkční velikosti (4 000 leadů,
@@ -1150,20 +1217,35 @@ součet skriptů, které jsou v HTML stránky, gzip spočítaný z souborů na d
 (`node scripts/bundle-stats.mjs --server http://localhost:3000 --cookie …`).
 Společné pro každou stránku: **168,6 kB gzip** (7 souborů).
 
-| Trasa | JS před (AD00) | JS po (AD06) |
-|---|---|---|
-| `/login` | 226,2 kB | 226,2 kB |
-| `/` (landing) | 267,0 kB | **251,5 kB** |
-| `/dashboard` (Dnes) | 234,4 kB | 245,2 kB |
-| `/dashboard/zakazky` | 237,0 kB | 249,9 kB |
-| `/dashboard/calls` | 278,1 kB | 291,5 kB |
-| `/dashboard/calendar` | 274,4 kB | 287,6 kB |
-| `/dashboard/faktury` | 241,4 kB | 254,4 kB |
-| `/dashboard/naklady` | 239,3 kB | 252,7 kB |
-| `/dashboard/finance` (dřív `/hub/finance`) | 255,6 kB | 273,9 kB |
-| `/hub`, `/alteno` | 230,3 / 238,0 kB | zrušeno (AD02, AD03) |
+| Trasa | JS před (AD00) | JS po (AD06) | JS po (AD08) |
+|---|---|---|---|
+| `/login` | 226,2 kB | 226,2 kB | 226,2 kB |
+| `/` (landing) | 267,0 kB | **251,5 kB** | 251,3 kB |
+| `/dashboard` (Dnes) | 234,4 kB | 245,2 kB | 245,7 kB |
+| `/dashboard/zakazky` | 237,0 kB | 249,9 kB | 249,1 kB |
+| `/dashboard/calls` | 278,1 kB | 291,5 kB | **263,8 kB** |
+| `/dashboard/calendar` | 274,4 kB | 287,6 kB | **260,6 kB** |
+| `/dashboard/faktury` | 241,4 kB | 254,4 kB | 254,8 kB |
+| `/dashboard/naklady` | 239,3 kB | 252,7 kB | 267,5 kB |
+| `/dashboard/finance` (dřív `/hub/finance`) | 255,6 kB | 273,9 kB | 274,7 kB |
+| `/dashboard/poptavky` | — | 250,1 kB | 250,6 kB |
+| `/hub`, `/alteno` | 230,3 / 238,0 kB | zrušeno (AD02, AD03) | — |
 
-**Takhle se to čte:** sloupec „po" není přínos AD06, ale stav po AD03–AD06 dohromady.
+**Sloupec AD08** (měřeno 2026-11-12, `build:check` + `npm start` + `bundle-stats`):
+Framer Motion se přestal stahovat předem (`m` + `LazyMotion` v `AdminRoot`), což sebralo
+**28,3 kB z Hovorů a 28,4 kB z Kalendáře** — jen tyhle dvě trasy ho totiž nesly. Ostatní
+obrazovky zaplatily +0,4 kB za samotnou `LazyMotion`; `/dashboard/naklady` vyskočilo
+o 14,8 kB proti AD06, což **není AD08** (sahalo se jen na Framer Motion a tahle trasa ho
+nenesla) — číslo z AD06 bylo naměřené před AD07, který Náklady přepsal na dialogy.
+
+`next/dynamic` v tabulce není, protože ho nakonec nikde nepoužíváme: na šesti místech
+nezměnil nic (komponenta se vykresluje na serveru, chunk v HTML zůstává) a na Financích
+přidal +1,4 kB. První „po" měření AD08, které slibovalo −18 až −27 %, bylo **neplatné** —
+běželo proti starému `next start`, kterému mezitím build přepsal statické soubory, takže
+tři chunky chyběly a počítaly se jako nula. Proto je v postupu měření nově kontrola,
+že žádný skript z HTML na disku nechybí.
+
+**Takhle se to čte:** sloupec „po AD06" není přínos AD06, ale stav po AD03–AD06 dohromady.
 Admin od AD00 vyrostl o 11–18 kB, protože AD04 a AD05 mu přidaly `components/ui/*`
 (portály, toasty, odznaky) a jednu kostru. Zhubnutí adminu má v plánu AD08
 (`next/dynamic`, `LazyMotion`, strop v testu), ne tohle sezení.
