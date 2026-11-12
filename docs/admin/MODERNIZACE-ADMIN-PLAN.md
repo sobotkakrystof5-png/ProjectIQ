@@ -668,9 +668,29 @@ jakéhokoli zisku na rychlosti.
    odřezávalo tlačítko Uložit). Hláška o překryvu se **nepřesouvala** — v současném
    kódu už je přímo nad tlačítky.
 
-**Co se neověřilo:** nic z AD08 nikdo neviděl v prohlížeči. PDF 200 → 304 ověřil jen
-unit test, na testovací databázi žádná faktura PDF nemá (`demo-seed` ho nepřikládá,
-route správně vrací 404).
+**Ověřeno v prohlížeči 2026-11-12** (produkční build, dočasná stránka s fiktivními daty
+mimo `/dashboard`, po ověření smazaná — stejný postup jako RD04/RD05):
+- **Klik na volný slot v 17:00** otevře formulář se `začátek 12.11.2026 17:00`
+  a `konec 18:00`. Druhé otevření v témže sezení na 15:00 ukáže **15:00**, ne „dnes 10:00".
+  Tím jsou ověřené chyby 1 i 2 — ta druhá se projevila právě až při druhém otevření.
+- **Událost 10:15–12:00** začíná viditelně **pod** linkou 10:00 (asi čtvrtina mezi 10:00
+  a 11:00) a končí na 12:00. Chyba 3 ověřená.
+- **Událost 7:00–9:00** (před `DAY_START`) je vidět přilepená na horní hraně a končí v 9:00;
+  dřív zmizela úplně.
+- Modal má `max-height: 631,8 px` při výšce okna 702 px (= 90 vh) a `overflow-y: auto`;
+  po umělém zkrácení na 260 px je rolovatelný a tlačítko „Uložit událost" zůstane dosažitelné.
+  **Skutečných 390 px se ověřit nepodařilo** — okno Chrome se pod minimální šířku nezmenší.
+- Konzole při načtení i po proklikání **bez jediné zprávy** (žádná hydratace, žádná blokace
+  CSP, žádná stížnost na `m` bez `LazyMotion`).
+- **Našla se čtvrtá chyba, opravená hned:** přepnutí **Měsíc → Den** skákalo na prvního
+  v měsíci, ne na dnešek (kotva měsíčního zobrazení je jeho první den). Platilo to i před
+  AD08. `switchView` teď jde na dnešek, pokud je v zobrazeném měsíci.
+
+**Co se neověřilo:** PDF 200 → 304 ověřil jen unit test, na testovací databázi žádná faktura
+PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404). S přihlášením na skutečných
+datech neověřeno nic — session se do prohlížeče nepodařilo dostat (bezpečnostní pojistka
+nepustila ani výpis tokenu, ani lokální pomocník) a Kryštof 2026-11-12 řekl, že si průchod
+adminu projde sám. Telefonní šířka 390 px taky zbývá.
 
 ### AD09 — Jedna entita kontaktu (M–L, **migrace 104**)
 **Cíl:** jeden člověk = jeden řádek; telefony a e-maily z 8 tabulek se dají spojit.

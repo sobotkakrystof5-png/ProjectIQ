@@ -1016,7 +1016,12 @@ export function SmartCalendar({
   function switchView(v: ViewMode) {
     // Měsíc se kotví na první den, aby krok vpřed nepřeskakoval kvůli
     // různě dlouhým měsícům.
-    goTo(v, v === 'month' ? startOfMonthIso(anchor) : anchor)
+    if (v === 'month') return goTo(v, startOfMonthIso(anchor))
+    // Z měsíce na týden nebo den se jde na **dnešek**, pokud je v zobrazeném
+    // měsíci. Kotva měsíce je jeho první den, takže bez tohohle by Den vždy
+    // otevřel prvního — i když se člověk dívá na dnešek (ověřeno v prohlížeči).
+    const sameMonth = anchor.slice(0, 7) === today.slice(0, 7)
+    goTo(v, view === 'month' && sameMonth ? today : anchor)
   }
 
   // Header title
