@@ -747,9 +747,11 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 - [ ] **AD12 — zbytek obrazovek v prohlížeči neověřený.** Ověřené je PDF (skutečné vykreslení
   přes Chrome, prohlédnuté okem) a **formulář nové faktury** na dočasné stránce s fiktivními daty:
   390 / 768 / 1280 / 1440 px bez vodorovného přetečení, všechny plochy ≥ 44 px, živý součet,
-  desetinná čísla s čárkou, mazání pole. Neověřené zůstávají věci, které potřebují přihlášení
-  a databázi se 107: načtení odběratele z ARES, **vystavení** (uložení a číslo), detail vystavené
-  faktury, odeslání e-mailem, storno a hlavní akce na `/dashboard/faktury` · od 2026-11-12
+  desetinná čísla s čárkou, mazání pole. Vystavení, storno a e-mail jsou ověřené **testy proti
+  skutečnému SQL** (server action → řádek → PDF; route e-mailu s mocky pošty), ale **ne klikáním**:
+  k tomu je potřeba přihlášení a databáze se 107. Projít pak: načtení odběratele z ARES, vystavení
+  od začátku do konce, detail vystavené faktury s PDF, odeslání e-mailem, storno a hlavní akce
+  na `/dashboard/faktury` · od 2026-11-12
 - [ ] **Souběžné vystavení dvou faktur nikdo nezkusil naživo (AD12):** PGlite má jedno spojení,
   lokálně je jen klient Postgresu. Skutečný test chce buď 107 na testovacím Neonu a dvě spojení
   přes `Pool` (WebSocket), nebo lokální server. Co je ověřené: `GREATEST` z uložené řady i
@@ -938,8 +940,11 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
   závislost, CSP se nemění) a **#024** (neměnnost v databázi, ne v UI).
 - **chore** Ověření AD12: `npx tsc --noEmit`, `npm run build` (bez varování — sdílený renderer
   přestal skládat cesty za běhu, build kvůli tomu dřív balil do funkce celý projekt) a nové testy
-  `admin-fakturace` (27 nad PGlite: migrace 107, řada čísel, počítaná částka, neměnnost, storno,
-  příjem až zaplacením, archiv beze změny), `ares` (9), `invoice-pdf` (9), `pdf-route` (13).
+  `admin-fakturace` (33 nad PGlite: migrace 107, řada čísel, počítaná částka, neměnnost, storno,
+  příjem až zaplacením, archiv beze změny a **celá cesta vystavení** — server action s přihlášením
+  a Zodem → řádek v databázi → PDF z uloženého dokladu, se skutečným vykreslením přes Chrome za
+  `PDF_SMOKE=1`), `ares` (9), `invoice-pdf` (9), `pdf-route` (13), `email-route` (9: přihlášení,
+  cizí `Origin`, neplatná adresa, storno, strop, selhání pošty i Chromia).
   **Souběh otestovaný není a tady ani nejde**: PGlite má jedno spojení, lokálně není server
   Postgresu (jen klient) a na Neonu by to chtělo nejdřív pustit 107. Ověřené je to, co souběh
   musí přežít — `GREATEST` z uložené řady i z tabulky, unikátní index na `number_seq` a pořadí

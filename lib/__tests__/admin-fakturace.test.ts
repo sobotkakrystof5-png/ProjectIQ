@@ -21,6 +21,9 @@ const read = (file: string) => fs.readFileSync(path.join(ROOT, 'migrations', fil
 
 let db: PGlite
 
+vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
+
 // `lib/db.ts` jede na Neonu; tady se jeho tag přesměruje na PGlite, aby
 // `issueInvoice` a spol. pouštěly úplně tentýž SQL jako v produkci.
 vi.mock('@/lib/db', () => ({
@@ -43,6 +46,8 @@ import {
   saveIssuerProfile,
 } from '@/lib/admin/invoice-issue'
 import type { IssuerProfile } from '@/lib/admin/invoice-issue-schema'
+import { cancelIssuedInvoice, issueNewInvoice } from '@/app/dashboard/finance/invoice-actions'
+import { invoiceHtml } from '@/lib/invoice-pdf/render'
 import { invoiceTotal } from '@/lib/invoice-pdf/totals'
 import { syncInvoiceTransaction } from '@/lib/invoices'
 import { pgliteAdminDriver } from './helpers/admin-pglite'
@@ -432,6 +437,124 @@ describe('příjem vzniká až zaplacením (archiv se nemění)', () => {
     await syncInvoiceTransaction(id)
     expect(await count(`finance_transactions WHERE source_invoice_id = '${id}'`)).toBe(0)
   })
+})
+
+describe('celá cesta vystavení: akce → doklad → PDF', () => {
+  // Tohle je nejbližší možný ekvivalent „vystavím fakturu a otevřu PDF" bez
+  // prohlížeče: jde se přes **server action** (tedy i přes přihlášení, Zod
+  // a kontrolu profilu dodavatele), doklad se přečte zpátky z databáze
+  // a vykreslí se z něj dokument.
+  it('server action uloží doklad a z uloženého řádku vznikne hotové PDF', async () => {
+    await saveIssuerProfile(ISSUER)
+    const result = await issueNewInvoice({
+      projectId: null,
+      counterparty: { name: 'Konec s.r.o.', address: 'Krátká 2, Brno', ico: '27074358', dic: '' },
+      issuedOn: '2026-12-01',
+      suppliedOn: '2026-12-01',
+      dueOn: '2026-12-15',
+      currency: 'CZK',
+      items: [
+        { description: 'Web na míru', quantity: 1, unitPrice: 45000, vatRate: 0 },
+        { description: 'Školení', quantity: 1.5, unitPrice: 1200.5, vatRate: 0 },
+      ],
+      note: 'Děkuju za spolupráci.',
+    })
+    expect(result.error).toBeUndefined()
+    expect(result.number).toMatch(/^2026\d{3}$/)
+
+    const loaded = await loadIssuedInvoiceForPdf(result.id!)
+    expect(loaded).not.toBeNull()
+    // 45 000 + 1,5 × 1 200,50 = 46 800,75
+    expect(loaded!.invoice.amount).toBeCloseTo(46800.75, 2)
+
+    const html = await invoiceHtml(loaded!.invoice, { name: 'VIZEON', logo: null })
+    expect(html).toContain(result.number!)
+    expect(html).toContain('Školení')
+    expect(html).toContain('Zaplatit QR kódem')
+    expect(html).toContain('Dodavatel není plátce DPH.')
+  })
+
+  it('bez vyplněného dodavatele se faktura nevystaví', async () => {
+    await db.query(`UPDATE admin_settings SET issuer_profile = NULL WHERE id = true`)
+    const result = await issueNewInvoice({
+      projectId: null,
+      counterparty: { name: 'Nikdo', address: '', ico: '', dic: '' },
+      issuedOn: '2026-12-01',
+      suppliedOn: '2026-12-01',
+      dueOn: '2026-12-15',
+      currency: 'CZK',
+      items: [{ description: 'X', quantity: 1, unitPrice: 100, vatRate: 0 }],
+      note: '',
+    })
+    expect(result.id).toBeUndefined()
+    expect(result.error).toContain('dodavatele')
+    await saveIssuerProfile(ISSUER)
+  })
+
+  it('neplátce DPH nevystaví fakturu s DPH', async () => {
+    const result = await issueNewInvoice({
+      projectId: null,
+      counterparty: { name: 'Plátce', address: '', ico: '', dic: '' },
+      issuedOn: '2026-12-01',
+      suppliedOn: '2026-12-01',
+      dueOn: '2026-12-15',
+      currency: 'CZK',
+      items: [{ description: 'X', quantity: 1, unitPrice: 100, vatRate: 21 }],
+      note: '',
+    })
+    expect(result.error).toContain('plátce DPH')
+  })
+
+  it('storno přes akci doklad zruší a příjem po něm nezůstane', async () => {
+    const issued = await issueNewInvoice({
+      projectId: null,
+      counterparty: { name: 'Storno s.r.o.', address: '', ico: '', dic: '' },
+      issuedOn: '2026-12-02',
+      suppliedOn: '2026-12-02',
+      dueOn: '2026-12-16',
+      currency: 'CZK',
+      items: [{ description: 'Omyl', quantity: 1, unitPrice: 5000, vatRate: 0 }],
+      note: '',
+    })
+    await db.query(`UPDATE invoices SET paid_on = '2026-12-03' WHERE id = $1`, [issued.id!])
+    await syncInvoiceTransaction(issued.id!)
+    expect(await count(`finance_transactions WHERE source_invoice_id = '${issued.id}'`)).toBe(1)
+
+    const result = await cancelIssuedInvoice(issued.id!)
+    expect(result.error).toBeUndefined()
+    expect(await count(`finance_transactions WHERE source_invoice_id = '${issued.id}'`)).toBe(0)
+
+    const loaded = await loadIssuedInvoiceForPdf(issued.id!)
+    expect(loaded!.invoice.cancelled).toBe(true)
+    expect(loaded!.invoice.payable).toBe(false)
+  })
+
+  it('archiv cizího PDF stornovat nejde', async () => {
+    const row = await db.query<{ id: string }>(
+      `INSERT INTO invoices (invoice_number, issued_on, amount) VALUES ('cizi-2026-777', '2026-08-08', 100) RETURNING id::text`,
+    )
+    const result = await cancelIssuedInvoice(row.rows[0].id)
+    expect(result.error).toContain('vystavenou tady')
+  })
+
+  // Skutečné vykreslení přes Chrome: `PDF_SMOKE=1 npx vitest run lib/__tests__/admin-fakturace.test.ts`
+  it.runIf(process.env.PDF_SMOKE === '1')('a vykreslí se do skutečného PDF', async () => {
+    const { renderInvoicePdf } = await import('@/lib/invoice-pdf/render')
+    const issued = await issueNewInvoice({
+      projectId: null,
+      counterparty: { name: 'Žluťoučký kůň, s.r.o.', address: 'Dlouhá 1, Praha', ico: '27074358', dic: '' },
+      issuedOn: '2026-12-04',
+      suppliedOn: '2026-12-04',
+      dueOn: '2026-12-18',
+      currency: 'CZK',
+      items: [{ description: 'Web na míru', quantity: 1, unitPrice: 45000, vatRate: 0 }],
+      note: '',
+    })
+    const loaded = await loadIssuedInvoiceForPdf(issued.id!)
+    const pdf = await renderInvoicePdf(loaded!.invoice, { name: 'VIZEON', logo: null })
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-')
+    expect(pdf.length).toBeGreaterThan(10000)
+  }, 60000)
 })
 
 describe('podklad pro PDF', () => {
