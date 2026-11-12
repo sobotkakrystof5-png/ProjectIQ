@@ -19,9 +19,23 @@ import type { CalendarEventType } from '@/lib/types'
  */
 export async function loadCalendarMonth(anchor: string): Promise<{ range: DayRange; data: CalendarData }> {
   await requireAuth()
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(anchor)) throw new Error('Neplatné datum.')
+  if (!isCalendarDay(anchor)) throw new Error('Neplatné datum.')
   const range = windowFor(anchor)
   return { range, data: await loadCalendarWindow(range) }
+}
+
+/**
+ * Nestačí ověřit tvar: `2026-99-99` projde regulárním výrazem, ale měsíc
+ * 99 se v `Date` přetočí do jiného roku a do SQL by šlo neplatné datum
+ * (Postgres pak odpoví chybou, ne vysvětlením). Proto se datum musí vrátit
+ * zpátky stejné, jak přišlo.
+ */
+export function isCalendarDay(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  return parsed.toISOString().slice(0, 10) === value
 }
 
 type CalendarEventPayload = {

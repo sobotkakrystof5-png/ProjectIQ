@@ -29,12 +29,21 @@ export const maxDuration = 30
 
 type Meta = { etag: string; size: number; pdf_filename: string | null; invoice_number: string }
 
+/**
+ * `id` jde do dotazu jako `uuid`, takže cokoli jiného skončí chybou `22P02`
+ * a odpovědí 500. Pro cizí adresu je správná odpověď 404 — a navíc se tím
+ * do databáze vůbec nechodí.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) {
     return new NextResponse('Neautorizovaný přístup', { status: 401 })
   }
+
+  if (!UUID.test(params.id)) return new NextResponse('Faktura nebo PDF neexistuje', { status: 404 })
 
   const metaRows = await adminDb<Meta>`
     SELECT md5(pdf_data) AS etag, octet_length(pdf_data) AS size, pdf_filename, invoice_number

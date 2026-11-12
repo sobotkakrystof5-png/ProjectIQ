@@ -4,6 +4,7 @@ import {
   viewRange, windowFor, WINDOW_MARGIN_DAYS,
 } from '@/lib/admin/calendar-window'
 import { addIsoMonths, isoWeekday, pragueDayOf, pragueMinutesOf } from '@/lib/prague-time'
+import { isCalendarDay } from '@/app/calendar-actions'
 
 // AD08: kalendář načítá okno kolem zobrazeného měsíce, ne celou historii,
 // a kreslí z pražských minut, ne z `getHours()` v zóně prohlížeče.
@@ -65,6 +66,22 @@ describe('okno kalendáře', () => {
   it('dva sousední dotažené měsíce pokryjí měsíc mezi nimi', () => {
     const loaded = mergeRanges([windowFor('2026-11-01'), windowFor('2026-12-01')])
     expect(covers(loaded, viewRange('month', '2026-12-15'))).toBe(true)
+  })
+})
+
+describe('vstup z prohlížeče', () => {
+  it('kotva musí být skutečné datum, ne jen správný tvar', () => {
+    expect(isCalendarDay('2026-11-12')).toBe(true)
+    expect(isCalendarDay('2028-02-29')).toBe(true)
+    // tvar projde regulárním výrazem, datum neexistuje
+    expect(isCalendarDay('2026-99-99')).toBe(false)
+    expect(isCalendarDay('2026-13-01')).toBe(false)
+    expect(isCalendarDay('2026-02-30')).toBe(false)
+    expect(isCalendarDay('2026-00-10')).toBe(false)
+    // cokoli jiného
+    expect(isCalendarDay('2026-11-12T00:00')).toBe(false)
+    expect(isCalendarDay("2026-11-12'; DROP TABLE projects--")).toBe(false)
+    expect(isCalendarDay('')).toBe(false)
   })
 })
 

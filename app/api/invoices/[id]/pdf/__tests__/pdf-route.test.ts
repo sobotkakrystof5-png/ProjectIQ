@@ -95,6 +95,13 @@ describe('PDF faktury', () => {
     expect(queries).toHaveLength(2)
   })
 
+  it('adresa, která není UUID, je 404 a do databáze se nejde', async () => {
+    const queries = queue()
+    const res = await GET(request(), { params: Promise.resolve({ id: 'neco-jineho' }) })
+    expect(res.status).toBe(404)
+    expect(queries).toEqual([])
+  })
+
   it('faktura bez PDF je 404', async () => {
     queue({ meta: false })
     expect((await GET(request(), { params })).status).toBe(404)
