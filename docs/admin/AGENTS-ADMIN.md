@@ -316,7 +316,8 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `project_surveys` | 016, 046 | Dotazník spokojenosti (`/h/[token]`, `completed_projects.survey_token`) — max 1 na zakázku |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
-| `invoices` | 053, 056 | Archiv faktur (PDF, AI přepis, vazba na transakci) |
+| `invoices` | 053, 056, **107** | Faktury. Archiv cizích PDF (AI přepis, vazba na transakci) **i doklady vystavené tady** (AD12): `direction` (`issued`/`received`), `pdf_generated`, `items`, `issuer` (snímek dodavatele), `client_address`, `supplied_on`, `vat_total`, `number_seq`, `cancelled_at`, `sent_at`. Vystavená tady = `number_seq IS NOT NULL`. Unikátnost čísla je částečná (`WHERE direction='issued'`), aby přijatá faktura mohla nést číslo dodavatele |
+| `admin_settings` | **107** | Jeden řádek pro celý admin (`id boolean PK CHECK (id)`): `invoice_sequences` (řada čísel po letech) a `issuer_profile` (údaje dodavatele) |
 | `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
 | `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
 | `finance_transactions` | 019, 026, 027, 054 | Finance a daně — transakce; `declared` = přiznaná linie (fakturováno na IČO) |
@@ -413,7 +414,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `app/notification-actions.ts` | Notifikace (přečteno) |
 | `app/project-notes-actions.ts` | Log schůzek u zakázky |
 | `app/dashboard/finance/finance-actions.ts` | Transakce, měsíční agregace, opakované cash-flow, příjmy z byznysu |
-| `app/dashboard/finance/invoice-actions.ts` | **Veškerá logika faktur** (sdílené jádro v `lib/invoices.ts`) |
+| `app/dashboard/finance/invoice-actions.ts` | **Veškerá logika faktur** (archiv: sdílené jádro v `lib/invoices.ts`; vystavování AD12: `lib/admin/invoice-issue.ts`) |
 | `app/dashboard/finance/tax-news-actions.ts` | Novinky z legislativy |
 | `app/dashboard/finance/byznys-actions.ts` | Výkonnost podnikání (příjmy, výdaje, zisk, marže) pro kalkulačku ve Financích |
 | `app/dashboard/startup/startup-actions.ts` | Startup projekty (+ waitlist, launch email přes Resend) |
@@ -448,7 +449,8 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
-| `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury. `ETag` z `md5(pdf_data)`, při shodě 304 **bez čtení bajtů** (AD08). `Cache-Control: private, max-age=0, must-revalidate` — `private` nikdy neruš (DECISIONS #022). `X-Frame-Options: SAMEORIGIN` z `next.config.mjs` neměň (DECISIONS #004). |
+| `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury. Archiv: bajty z `pdf_data`, `ETag` z `md5(pdf_data)`, při shodě 304 **bez čtení bajtů** (AD08). Vystavená tady (AD12): PDF se **vyrobí teď** sdíleným rendererem, ETag nese obsah dokladu, takže opakované otevření nespouští Chromium. `Cache-Control: private, max-age=0, must-revalidate` — `private` nikdy neruš (DECISIONS #022). `X-Frame-Options: SAMEORIGIN` z `next.config.mjs` neměň (DECISIONS #004). |
+| `POST /api/invoices/[id]/email` | session **+ shodný `Origin`** + limit 10/10 min na IP | Odeslání vystavené faktury klientovi s PDF v příloze (AD12). Jen na kliknutí, nikdy automaticky; stornovanou neodešle. Úspěch zapíše `invoices.sent_at` |
 | `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
 | `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
@@ -593,7 +595,36 @@ je verze bez popisků do tabulek a karet.
 - Náhled přiloženého PDF (`<object>` + odkaz na `/api/invoices/[id]/pdf`), vazba na zakázku, úprava a smazání
 - **Přiznaná linie** — jestli faktura v ledgeru příjem založila, nebo jen převzala ten od zakázky (`owned_by_invoice`); bez `paid_on` žádný nemá
 - **Co z PDF přečetla AI** — surový `ai_extracted` pro dohledatelnost; pole, kde se uložená hodnota od přepisu liší, jsou označená jako ručně upravená. Platí vždy uložené údaje, ne přepis
-- Data z `getInvoiceDetail()`; akce v `InvoiceDetailActions.tsx`
+- Data z `getInvoiceDetail()`; akce v `InvoiceDetailActions.tsx`. **Faktura vystavená v adminu**
+  (AD12) má místo nich `IssuedInvoiceActions` (Poslat e-mailem, Storno) a kartu Položky —
+  neupravuje se ani nemaže
+
+### Vystavování faktur (AD12, R-097)
+
+Admin fakturu **vystaví**, ne jen zaarchivuje cizí PDF. Dvě cesty v jedné tabulce `invoices`:
+archiv (`number_seq IS NULL`, chová se přesně jako dřív) a doklad vystavený tady.
+
+| Kde | Co dělá |
+|---|---|
+| `/dashboard/faktury/nova` | Formulář: odběratel (IČO → ARES), položky s živým součtem, data, měna, zakázka, poznámka. `?zakazka=<id>` předvyplní odběratele z poslední faktury téhož kontaktu a částku `price − zaplacená záloha` |
+| `/dashboard/faktury/dodavatel` | Údaje dodavatele (jméno, adresa, IČO, DIČ, IBAN pro QR, plátce DPH). Na doklad se ukládá **snímek**, pozdější změna starší faktury nepřepíše |
+| `lib/admin/invoice-issue.ts` | Serverové jádro: `issueInvoice`, `cancelInvoice`, `loadIssueDraft`, `loadIssuedInvoiceForPdf`, profil dodavatele, `isIssuingReady()` |
+| `lib/admin/invoice-issue-schema.ts` | Zod schémata; bez `server-only`, protože podle nich počítá i formulář |
+| `lib/invoice-pdf/{render,totals}.ts` | **Sdílené s Workspace**: HTML a PDF dokladu, QR (SPAYD), součty v haléřích. `lib/ws/money/pdf.ts` je jen adaptér |
+| `lib/ares.ts` | Odběratel podle IČO (R-086, DECISIONS #023) |
+
+Pravidla, která drží databáze (migrace 107), ne aplikace:
+- **Číslo** přiděluje `admin_invoice_issue(jsonb)` pod zámkem řádku `admin_settings`, formát
+  `YYYYNNN` (`2026001`) — jde rovnou do variabilního symbolu. `GREATEST(uložená řada, nejvyšší
+  v tabulce)` přežije i ruční zásah do `invoice_sequences`.
+- **Částku a DPH počítá SQL z položek** stejným zaokrouhlením jako `lib/invoice-pdf/totals.ts`
+  a poslanou hodnotu jen ověří (`admin_invoice_amount_mismatch`).
+- **Vystavený doklad je neměnný** (trigger `admin_invoice_locked`): měnit jde zaplacení, storno,
+  poznámku, odeslání a vazby, nic z náležitostí. Oprava = storno a nová faktura.
+- **Příjem vzniká až zaplacením** přes nezměněnou `syncInvoiceTransaction` (R-011).
+- **PDF se neukládá**, vyrábí se při otevření; `pdf_generated` říká, že bajty v `pdf_data` nejsou.
+
+Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a admin se chová jako dřív.
 
 ### Zdroje poptávek (AD02, R-088)
 

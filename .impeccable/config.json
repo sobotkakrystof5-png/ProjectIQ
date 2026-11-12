@@ -2,6 +2,19 @@
   "detector": {
     "ignoreRules": [],
     "ignoreFiles": [],
-    "ignoreValues": []
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "invoicesans",
+        "createdAt": "2026-11-12T20:16:52.492Z",
+        "reason": "PDF: vnitřní název pro Instrument Sans vloženou jako woff2 (lib/invoice-pdf/assets/fonts.css + OFL-Instrument-Sans.txt); Chromium v PDF nemá síť, takže se písmo nesmí jmenovat jako webfont"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "invoicemono",
+        "createdAt": "2026-11-12T20:16:52.513Z",
+        "reason": "PDF: vnitřní název pro JetBrains Mono vloženou jako woff2 (lib/invoice-pdf/assets/OFL-JetBrains-Mono.txt); převzato beze změny z lib/ws/money/pdf.ts"
+      }
+    ]
   }
 }

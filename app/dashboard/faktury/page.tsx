@@ -1,4 +1,5 @@
-import { AlertTriangle, Paperclip } from 'lucide-react'
+import Link from 'next/link'
+import { AlertTriangle, FilePlus2, Paperclip } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
 import { DataTable, type AdminColumn } from '@/components/admin/data-table'
@@ -173,7 +174,19 @@ export default async function FakturyPage(props: {
         title="Faktury"
         subtitle="Evidence všech faktur. Klikněte na fakturu pro údaje a PDF."
         subtitleFont="sans"
-        action={<NewInvoiceButton projects={screen.projects} />}
+        action={
+          <>
+            {/* Hlavní akce je od AD12 vystavení; nahrání cizího PDF zůstává vedle (a dál jde i přetažením). */}
+            <Link
+              href="/dashboard/faktury/nova"
+              className="inline-flex h-11 items-center gap-2 rounded-chip bg-navy-700 px-5 text-[15px] font-medium text-white transition-colors hover:bg-navy-800"
+            >
+              <FilePlus2 size={16} strokeWidth={1.75} />
+              Vystavit fakturu
+            </Link>
+            <NewInvoiceButton projects={screen.projects} />
+          </>
+        }
       />
 
       <InvoiceDropZone projects={screen.projects}>
