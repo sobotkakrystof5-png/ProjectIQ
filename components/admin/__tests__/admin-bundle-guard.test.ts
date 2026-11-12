@@ -90,3 +90,17 @@ describe('velikost balíčku adminu', () => {
     }
   })
 })
+
+describe('server actions', () => {
+  it("v souboru s 'use server' je každý export async funkce", () => {
+    // Build na tom spadne, `tsc` ani vitest ne (AD08 si tím prošel).
+    const files = tracked('app/**/*actions.ts').filter((f) => read(f).startsWith("'use server'"))
+    expect(files.length).toBeGreaterThan(5)
+    for (const file of files) {
+      const bad = read(file)
+        .split('\n')
+        .filter((line) => /^export (?!async |type |interface |const |default )/.test(line))
+      expect(bad, `${file}: ${bad.join(' | ')}`).toEqual([])
+    }
+  })
+})

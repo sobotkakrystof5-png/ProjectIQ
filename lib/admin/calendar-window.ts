@@ -18,6 +18,22 @@ export type CalendarView = 'month' | 'week' | 'day'
 /** O kolik dní okno přesahuje za hranice zobrazeného období. */
 export const WINDOW_MARGIN_DAYS = 7
 
+/**
+ * Je to skutečný den, ne jen správný tvar? `2026-99-99` projde regulárním
+ * výrazem, ale měsíc 99 se v `Date` přetočí do jiného roku a do SQL by šlo
+ * neplatné datum (Postgres pak odpoví chybou, ne vysvětlením). Proto se datum
+ * musí vrátit zpátky stejné, jak přišlo.
+ *
+ * Žije tady, ne v `app/calendar-actions.ts`: v souboru s `'use server'` musí
+ * být každý export async funkce, jinak build spadne.
+ */
+export function isCalendarDay(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) === value
+}
+
 /** Pondělí toho týdne, do kterého `iso` patří. */
 export function startOfWeekIso(iso: string): string {
   return addIsoDays(iso, -((isoWeekday(iso) + 6) % 7))

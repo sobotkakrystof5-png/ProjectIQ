@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  covers, endOfMonthIso, mergeRanges, neighbourAnchor, startOfMonthIso, startOfWeekIso,
-  viewRange, windowFor, WINDOW_MARGIN_DAYS,
+  covers, endOfMonthIso, isCalendarDay, mergeRanges, neighbourAnchor, startOfMonthIso,
+  startOfWeekIso, viewRange, windowFor, WINDOW_MARGIN_DAYS,
 } from '@/lib/admin/calendar-window'
 import { addIsoMonths, isoWeekday, pragueDayOf, pragueMinutesOf } from '@/lib/prague-time'
-import { isCalendarDay } from '@/app/calendar-actions'
 
 // AD08: kalendář načítá okno kolem zobrazeného měsíce, ne celou historii,
 // a kreslí z pražských minut, ne z `getHours()` v zóně prohlížeče.
