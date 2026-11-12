@@ -605,16 +605,11 @@ načte ≤ 60 řádků; bundle guard drží strop; Finance v GET nezapisují (te
 otevře formulář s 11:00 a událost 10:15–12:00 se nakreslí na správné místo ve správné délce**
 (ověřeno v prohlížeči, ne jen testem).
 
-**Opraveno v zadání 2026-11-12:** podmínka „potvrzení leadu **a „Zaplaceno"** vypadají okamžitě"
-platí jen pro potvrzení leadu. **„Zaplaceno" v adminu jako akce na jedno kliknutí neexistuje** —
-ověřeno v kódu: stav faktury se mění formulářem (`InvoiceFields` → `updateInvoice`) a `paid`
-na zakázce taky (`ProjectForm` → `updateProject`); `ProjectCard` je jen zobrazení a jediné
-jednoklikové „Zaplaceno" v repu je ve Workspace (`components/ws/money/invoice-list.tsx`).
-Udělat ho teď by znamenalo napsat novou peněžní akci, která musí správně projít
-`syncInvoiceTransaction` — a to je přesně to, co má v rukou **AD12/AD13** (R-083: dnešní
-fakturace umí založit příjem dvakrát). Optimistické „Zaplaceno" proto patří k AD12, až ta akce
-vznikne; dělat ji na konci sezení o rychlosti by bylo riziko dvojího započtení příjmu bez
-jakéhokoli zisku na rychlosti.
+**„Zaplaceno" nakonec v AD08 je.** Nejdřív jsem ho odložil do AD12 s odůvodněním, že je to
+nová peněžní akce — ten odhad byl špatný, udělaný bez přečtení `syncInvoiceTransaction`.
+Ta funkce je idempotentní a ochranu proti dvojímu započtení (převzetí existujícího příjmu
+zakázky místo založení druhého) má **v sobě**, ne ve formuláři. Akce `setInvoicePaid` proto
+jen nastaví `paid_on` a pustí ji — tatáž cesta, kterou chodí formulář, o čtyři kroky kratší.
 **Riziko:** střední — `after()` mění pořadí vedlejších efektů, projít každé místo zvlášť.
 
 **Provedeno 2026-11-12**, v šesti commitech, se čtyřmi odchylkami od zadání:
@@ -697,7 +692,7 @@ mimo `/dashboard`, po ověření smazaná — stejný postup jako RD04/RD05):
 | událost 10:15–12:00 na správném místě **v prohlížeči** | ✅ ověřeno očima |
 | klik na slot **v 11:00** otevře formulář s 11:00 | ⚠️ ověřeno v **15:00 a 17:00** (týž kód, hodina je parametr `defaultHour`); doslova v 11:00 se doklikat nestihlo — rozšíření Chrome se mezitím odpojilo |
 | potvrzení leadu vypadá okamžitě | ✅ `useOptimistic`, reducer v testu |
-| **„Zaplaceno“ vypadá okamžitě** | ❌ nedělá se — v adminu žádné jednoklikové „Zaplaceno“ není, přesunuto do AD12 |
+| **„Zaplaceno“ vypadá okamžitě** | ✅ `setInvoicePaid` + `PaidCell` ve výpisu faktur, `admin-faktura-zaplaceno.test.ts` |
 
 **Co do kritérií AD08 nepatří, i když to zůstává otevřené:** průchod adminu s přihlášením na
 skutečných datech a telefonní šířka 390 px. Ani jedno není v „Hotovo, když“ — je to diligence
@@ -847,10 +842,9 @@ musí být na korunu stejný. Když nesedí, migrace se vrací.
 
 ### AD12 — Fakturace: vystavování v adminu (L, **migrace 107**)
 **Cíl:** fakturu vystavíš v adminu, archiv cizích PDF funguje dál.
-**Přibylo z AD08:** s peněžní akcí „Zaplaceno" vznikne i její **jednoklikové tlačítko
-s `useOptimistic`** (vzor: `handleConfirm` v `components/LeadCard.tsx`). AD08 ho udělat nemohl —
-v adminu dnes žádné jednoklikové „Zaplaceno" není a napsat novou peněžní akci na konci sezení
-o rychlosti by riskovalo dvojí započtení příjmu (R-083).
+**Hotovo už v AD08:** jednoklikové „Zaplaceno" ve výpisu faktur (`setInvoicePaid` +
+`components/admin/invoices/mark-paid.tsx`). Staví na `syncInvoiceTransaction`, takže AD12
+na ni může navázat beze změny.
 **Rozhodnutí: rozšířit `invoices`, ne nové tabulky.** Na `invoices` visí `finance_transaction_id`,
 unique index na číslo, `ai_extracted`, `pdf_data`, celé `invoice-actions.ts` a `/api/public/invoices`.
 Druhá tabulka = dvě evidence, dva výpočty „po splatnosti", migrace archivu.
@@ -1079,7 +1073,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **uzavřeno 2026-11-12** — ze seznamu „Hotovo, když“ splněné čtyři testovatelné body i vykreslení události 10:15–12:00 v prohlížeči; klik na slot ověřen v 15:00 a 17:00, ne doslova v 11:00. Nesplněné: **„Zaplaceno“** (→ AD12, v adminu neexistuje). |
+| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno; klik na slot ověřen v prohlížeči v 15:00 a 17:00 (hodina je parametr), ne doslova v 11:00. |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
