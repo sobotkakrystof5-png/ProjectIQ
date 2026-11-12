@@ -39,6 +39,10 @@ export interface InvoiceListItem {
   pdf_filename: string | null
   pdf_size: number | null
   has_pdf: boolean
+  /** Doklad vystavila tahle aplikace (AD12) — má položky, dodavatele a PDF generujeme my. */
+  pdf_generated: boolean
+  /** Storno: doklad zůstává i s číslem, ale neplatí a nepočítá se mezi pohledávky. */
+  cancelled_at: string | null
   /** Odkaz na zakázku v adminu — null u faktury bez zakázky */
   project_href: string | null
   project_client_name: string | null
@@ -95,7 +99,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         SELECT ${INVOICE_COLUMNS}, 0 AS other_income_count
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
-        WHERE i.paid_on IS NULL
+        WHERE i.paid_on IS NULL AND i.cancelled_at IS NULL
         ORDER BY COALESCE(i.due_on, i.issued_on) ASC
         LIMIT ${ARCHIVE_LIMIT}
       `,
@@ -238,12 +242,16 @@ export async function setInvoicePaid(id: string, paidOn: string | null): Promise
     if (!UUID_RE.test(id)) return { error: 'Faktura nenalezena' }
     if (paidOn !== null && !isIsoDate(paidOn)) return { error: 'Neplatné datum zaplacení' }
 
+    // Stornovaný doklad (AD12) nesmí založit příjem — platí se jen to, co platí.
     const rows = await sql`
       UPDATE invoices SET paid_on = ${paidOn}
-      WHERE id = ${id}
+      WHERE id = ${id} AND cancelled_at IS NULL
       RETURNING project_id::text
     `
-    if (!rows.length) return { error: 'Faktura nenalezena' }
+    if (!rows.length) {
+      const exists = await sql`SELECT cancelled_at FROM invoices WHERE id = ${id} LIMIT 1`
+      return { error: exists.length ? 'Stornovaná faktura se nedá označit jako zaplacená.' : 'Faktura nenalezena' }
+    }
 
     await syncInvoiceTransaction(id)
     revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
@@ -264,15 +272,29 @@ export async function deleteInvoice(id: string): Promise<{ error?: string }> {
     await deleteInvoiceRow(id)
     revalidateInvoicePaths(projectId)
     return {}
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ''
+    if (message.includes('admin_invoice_no_delete')) {
+      return { error: 'Vystavenou fakturu nemažeme — číslo by v řadě chybělo. Použijte storno.' }
+    }
     return { error: 'Nepodařilo se smazat fakturu' }
   }
 }
 
-/** Unikátní index na `invoice_number` je jediná chyba, kterou má smysl přeložit do češtiny. */
+/**
+ * Chyby z databáze, které mají pro člověka smysl přeložit: duplicitní číslo
+ * a dvě pojistky z migrace 107 — vystavený doklad se nemění a nemaže.
+ */
 function invoiceErrorMessage(err: unknown): string {
   const code = (err as { code?: string })?.code
+  const message = err instanceof Error ? err.message : String(err ?? '')
   if (code === '23505') return 'Faktura s tímhle číslem už v archivu je'
+  if (message.includes('admin_invoice_immutable')) {
+    return 'Vystavenou fakturu už měnit nejde. Stornujte ji a vystavte novou.'
+  }
+  if (message.includes('admin_invoice_no_delete')) {
+    return 'Vystavenou fakturu nemažeme — číslo by v řadě chybělo. Použijte storno.'
+  }
   return 'Nepodařilo se uložit fakturu'
 }
 
@@ -321,8 +343,24 @@ export interface InvoiceLedgerEntry {
   owned_by_invoice: boolean
 }
 
+/** Položka vystavené faktury. */
+export interface InvoiceLineItem {
+  description: string
+  quantity: number
+  unitPrice: number
+  vatRate: number
+}
+
 /** Faktura se vším, co je o ní uloženo — včetně surového AI přepisu a vazby na ledger. */
 export interface InvoiceDetail extends InvoiceRegistryItem {
+  /** Dodavatel tak, jak byl v den vystavení (snímek, ne živý profil). */
+  issuer: { name: string; address: string; ico: string; dic: string; bank: string; vatPayer: boolean } | null
+  items: InvoiceLineItem[] | null
+  client_address: string | null
+  client_email: string | null
+  supplied_on: string | null
+  vat_total: number | null
+  sent_at: string | null
   ai_extracted: InvoiceAiExtract | null
   created_at: string
   updated_at: string | null
@@ -341,6 +379,9 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
       i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
       i.currency, i.note, i.pdf_filename, i.pdf_size,
       (i.pdf_data IS NOT NULL) AS has_pdf,
+      i.pdf_generated, i.cancelled_at::text,
+      i.client_address, i.client_email, i.supplied_on::text, i.vat_total::float AS vat_total,
+      i.items, i.issuer, i.sent_at::text,
       i.ai_extracted,
       i.created_at::text, i.updated_at::text,
       i.finance_transaction_id::text,
@@ -370,13 +411,22 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
         finance_transaction_id: string | null
         project_client_phone: string | null
         project_client_email: string | null
+        issuer: InvoiceDetail['issuer']
+        items: InvoiceLineItem[] | null
+        client_address: string | null
+        client_email: string | null
+        supplied_on: string | null
+        vat_total: number | null
+        sent_at: string | null
       })
     | undefined
   if (!row) return null
 
   const {
     ai_extracted, created_at, updated_at, finance_transaction_id,
-    project_client_phone, project_client_email, ...registryRow
+    project_client_phone, project_client_email,
+    issuer, items, client_address, client_email, supplied_on, vat_total, sent_at,
+    ...registryRow
   } = row
 
   let ledger: InvoiceLedgerEntry | null = null
@@ -395,5 +445,6 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
     ...toRegistryItem(registryRow),
     ai_extracted, created_at, updated_at, ledger,
     project_client_phone, project_client_email,
+    issuer, items, client_address, client_email, supplied_on, vat_total, sent_at,
   }
 }

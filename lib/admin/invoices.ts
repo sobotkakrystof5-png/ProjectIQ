@@ -24,13 +24,14 @@ export const INVOICE_SORT = {
   castka: { sql: 'i.amount', dir: 'desc' as const },
 }
 
-export type InvoiceStatusFilter = 'vse' | 'zaplacene' | 'nezaplacene' | 'po-splatnosti'
+export type InvoiceStatusFilter = 'vse' | 'zaplacene' | 'nezaplacene' | 'po-splatnosti' | 'storno'
 
 export const INVOICE_STATUS_FILTERS: { value: InvoiceStatusFilter; label: string }[] = [
   { value: 'vse', label: 'Všechny' },
   { value: 'zaplacene', label: 'Zaplacené' },
   { value: 'nezaplacene', label: 'Nezaplacené' },
   { value: 'po-splatnosti', label: 'Po splatnosti' },
+  { value: 'storno', label: 'Storno' },
 ]
 
 export function toInvoiceStatus(value: unknown): InvoiceStatusFilter {
@@ -81,9 +82,12 @@ function where(filters: InvoiceFilters): { sql: string; params: unknown[] } {
     parts.push(`i.issued_on >= make_date($${params.length}, 1, 1) AND i.issued_on < make_date($${params.length} + 1, 1, 1)`)
   }
 
+  // Stornovaný doklad (AD12) zůstává v evidenci kvůli souvislé číselné řadě,
+  // ale není to pohledávka — nikdo ho už nevymáhá.
   if (filters.status === 'zaplacene') parts.push('i.paid_on IS NOT NULL')
-  if (filters.status === 'nezaplacene') parts.push('i.paid_on IS NULL')
-  if (filters.status === 'po-splatnosti') parts.push('i.paid_on IS NULL AND i.due_on IS NOT NULL AND i.due_on < current_date')
+  if (filters.status === 'nezaplacene') parts.push('i.paid_on IS NULL AND i.cancelled_at IS NULL')
+  if (filters.status === 'po-splatnosti') parts.push('i.paid_on IS NULL AND i.cancelled_at IS NULL AND i.due_on IS NOT NULL AND i.due_on < current_date')
+  if (filters.status === 'storno') parts.push('i.cancelled_at IS NOT NULL')
 
   const query = filters.query.trim()
   if (query) {
@@ -124,9 +128,9 @@ export async function loadInvoiceRegistry(params: TableParams, filters: InvoiceF
              coalesce(sum(i.amount), 0)::float AS celkem,
              coalesce(sum(i.amount) FILTER (WHERE i.paid_on IS NOT NULL), 0)::float AS zaplaceno,
              count(*) FILTER (WHERE i.paid_on IS NOT NULL)::int AS zaplaceno_pocet,
-             coalesce(sum(i.amount) FILTER (WHERE i.paid_on IS NULL), 0)::float AS nezaplaceno,
-             count(*) FILTER (WHERE i.paid_on IS NULL)::int AS nezaplaceno_pocet,
-             count(*) FILTER (WHERE i.paid_on IS NULL AND i.due_on IS NOT NULL AND i.due_on < current_date)::int AS po_splatnosti
+             coalesce(sum(i.amount) FILTER (WHERE i.paid_on IS NULL AND i.cancelled_at IS NULL), 0)::float AS nezaplaceno,
+             count(*) FILTER (WHERE i.paid_on IS NULL AND i.cancelled_at IS NULL)::int AS nezaplaceno_pocet,
+             count(*) FILTER (WHERE i.paid_on IS NULL AND i.cancelled_at IS NULL AND i.due_on IS NOT NULL AND i.due_on < current_date)::int AS po_splatnosti
            ${base}
            ${filter.sql}
            GROUP BY i.currency

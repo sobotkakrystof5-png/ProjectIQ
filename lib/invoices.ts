@@ -17,6 +17,7 @@ export const INVOICE_COLUMNS = `
   i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
   i.currency, i.note, i.pdf_filename, i.pdf_size,
   (i.pdf_data IS NOT NULL) AS has_pdf,
+  i.pdf_generated, i.cancelled_at::text,
   p.lead_origin AS project_lead_origin,
   p.client_name AS project_client_name
 `

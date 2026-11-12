@@ -16,6 +16,7 @@ type Zakazka = Parameters<typeof buildJourney>[0]
 const prazdne: JourneyFacts = { schuzka: false, faktura: false, fakturaZaplacena: false, hodnoceni: false }
 
 const zakazka = (over: Partial<Project> = {}): Zakazka => ({
+  id: '11111111-1111-4111-8111-111111111111',
   source: 'manual',
   status: 'new',
   price: null,
@@ -100,6 +101,14 @@ describe('průvodka zakázky', () => {
       { ...prazdne, schuzka: true },
     )
     expect(nextStep(steps, 'new')?.action).toEqual({ label: 'Začít pracovat', status: 'in_progress' })
+  })
+
+  it('krok Faktura vede od AD12 rovnou na vystavení s předvyplněnou zakázkou', () => {
+    const faktura = buildJourney(zakazka({ status: 'done' }), prazdne).find((s) => s.key === 'faktura')
+    expect(faktura?.action).toEqual({
+      label: 'Vystavit fakturu',
+      href: '/dashboard/faktury/nova?zakazka=11111111-1111-4111-8111-111111111111',
+    })
   })
 
   it('hodnocení čeká na klienta a říká to jinak před uzavřením a po něm', () => {

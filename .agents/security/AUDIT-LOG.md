@@ -499,3 +499,15 @@ Výsledek: bez nálezu, nic otevřeného.
 - Větev `42883` v `updateLead` nic neobchází: `requireAuth()` běží před dávkou a záložní cesta pouští **týž** parametrizovaný UPDATE, jen bez volání funkce z migrace 105. Kolize `23P01` se dál překládá do češtiny. Stejný vzor, jaký má rezervace z portálu.
 - CSP, hlavičky, závislosti, env ani role se neměnily. Žádná migrace; 105 zůstává nepuštěná.
 Ověřeno: `npx tsc --noEmit`, `npm test` (79 souborů, 915 prošlo, 1 přeskočený), `npm run build:check` a průchod headless Chromem s podepsanou session — osm obrazovek adminu na 390 / 768 / 1280 / 1440 px, v konzoli jen 404 na `/favicon.ico`.
+
+## 2026-11-12 — review AD12 (vystavování faktur, ARES, PDF a odeslání e-mailem)
+Spouštěč: dokončení sezení AD12 před commitem; skill `web-security-review`.
+Rozsah: `lib/ares.ts`, `lib/ico.ts`, `lib/admin/{invoicing,invoice-schema}.ts`, `lib/invoice-pdf/render.ts`, `app/dashboard/faktury/{actions.ts,nova,nastaveni}`, `app/api/invoices/[id]/{pdf,odeslat}`, migrace 107, úpravy `lib/{invoices,email}.ts` a `lib/admin/invoices.ts`.
+Výsledek: jeden nález opravený v sezení, nic otevřeného.
+- **Opraveno:** `POST /api/invoices/:id/odeslat` odesílá poštu ven a jedinou ochranou bylo přihlášení. Session NextAuth je `SameSite=Lax`, takže cizí formulář cookie neposílá, ale jako druhá pojistka route odmítá požadavek, jehož `Sec-Fetch-Site` není `same-origin` (403). Chybějící hlavička se propouští kvůli starším klientům.
+- Vstup do ARESu je osm číslic po kontrole mod 11, adresa je pevná, bez redirectů, s timeoutem 3 s a Zodem na odpovědi (DECISIONS #023). CSP se nemění — volá server.
+- Všechny nové server actions začínají `requireAuth()` a vstup parsují Zodem včetně délek; `cancelInvoiceAction` ověří tvar id, takže cizí adresa nekončí chybou `22P02` a stavem 500.
+- PDF se skládá v `lib/invoice-pdf/render.ts` (vytaženo z Workspace beze změny chování): každá hodnota prochází escapováním, dokument má vlastní `default-src 'none'`, JavaScript je vypnutý a Chromium propouští jen `data:` URL. Admin logo nepoužívá, takže stahování loga (připnutá veřejná IPv4) se tu vůbec nespustí.
+- Neměnnost dokladu je v databázi, ne v aplikaci: trigger `admin_invoice_freeze` odmítne změnu čísla, částky, dat, položek, dodavatele i odběratele u vystavené faktury a `admin_invoice_no_delete` zakáže její smazání. Obě hlášky se v adminu překládají do češtiny. Funkce 107 nejsou `SECURITY DEFINER`.
+- Žádná nová env proměnná, žádný nový npm balíček, žádný nový `dangerouslySetInnerHTML`. Hlavičky a CSP beze změny; `next.config.mjs` jen přibaluje Chromium ke dvěma novým routám.
+Ověřeno: `npx tsc --noEmit`, `npm test` (84 souborů, 974 prošlo, 1 přeskočený), `npm run build:check` a průchod headless Chromem po dočasné stránce s fiktivními daty na 390 / 768 / 1280 / 1440 px (bez vodorovného přetečení, v konzoli jen 404 na `/favicon.ico`). Skutečné vystavení faktury na datech ověřené není — migrace 107 není puštěná nikde.

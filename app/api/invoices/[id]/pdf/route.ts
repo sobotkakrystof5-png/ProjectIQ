@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { createHash } from 'crypto'
 import { adminDb } from '@/lib/admin/db'
+import { loadInvoiceDoc, loadIssuerProfile } from '@/lib/admin/invoicing'
+import { renderInvoicePdf } from '@/lib/invoice-pdf/render'
 
 /**
  * Servírování PDF faktury.
@@ -15,6 +18,13 @@ import { adminDb } from '@/lib/admin/db'
  * z databáze vůbec netahají**. Detail zakázky i evidence faktur odkaz
  * otevírají opakovaně a dokument může mít megabajty.
  *
+ * Od AD12 tudy chodí dvě různé věci. Archivní doklad má PDF nahrané od
+ * začátku. Fakturu vystavenou tady vyrobí až první otevření: vygeneruje se
+ * (Chromium), uloží do `pdf_data` a dál se servíruje jako každý jiný soubor,
+ * takže druhé otevření stojí jeden dotaz a třetí 304. Generuje se schválně
+ * v route handleru, ne v server action stránky — jinak by Chromium viselo
+ * u každé obrazovky, která fakturu jen zmiňuje.
+ *
  * `bytea` se čte jako base64 — neonový HTTP driver vrací binární sloupce
  * jako escapovaný text, přes `encode()` je výsledek jednoznačný. Streamovat
  * ho nejde: HTTP driver vrací celou odpověď jedním JSONem, takže by „stream"
@@ -27,7 +37,13 @@ export const runtime = 'nodejs'
 // na pomalé lince nesmí spadnout na výchozím limitu.
 export const maxDuration = 30
 
-type Meta = { etag: string; size: number; pdf_filename: string | null; invoice_number: string }
+type Meta = {
+  etag: string | null
+  size: number | null
+  pdf_filename: string | null
+  invoice_number: string
+  pdf_generated: boolean
+}
 
 /**
  * `id` jde do dotazu jako `uuid`, takže cokoli jiného skončí chybou `22P02`
@@ -46,13 +62,19 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   if (!UUID.test(params.id)) return new NextResponse('Faktura nebo PDF neexistuje', { status: 404 })
 
   const metaRows = await adminDb<Meta>`
-    SELECT md5(pdf_data) AS etag, octet_length(pdf_data) AS size, pdf_filename, invoice_number
+    SELECT md5(pdf_data) AS etag, octet_length(pdf_data) AS size, pdf_filename, invoice_number, pdf_generated
     FROM invoices
-    WHERE id = ${params.id} AND pdf_data IS NOT NULL
+    WHERE id = ${params.id}
     LIMIT 1
   `
   const meta = metaRows[0]
   if (!meta) return new NextResponse('Faktura nebo PDF neexistuje', { status: 404 })
+
+  // Vystavená faktura, která se ještě nikdy netiskla: vyrobit a uložit.
+  if (meta.etag === null) {
+    if (!meta.pdf_generated) return new NextResponse('Faktura nebo PDF neexistuje', { status: 404 })
+    return generate(params.id, meta.invoice_number)
+  }
 
   const filename = meta.pdf_filename || `faktura-${meta.invoice_number}.pdf`
   const etag = `"${meta.etag}"`
@@ -96,4 +118,46 @@ function matchesEtag(header: string | null, etag: string): boolean {
     .split(',')
     .map((value) => value.trim().replace(/^W\//, ''))
     .includes(etag)
+}
+
+/**
+ * Vyrobí PDF vystavené faktury, uloží ho k dokladu a rovnou pošle.
+ * Uložení je jen cache: když selže, dokument se stejně odešle a příště
+ * se vygeneruje znovu.
+ */
+async function generate(id: string, invoiceNumber: string): Promise<NextResponse> {
+  const doc = await loadInvoiceDoc(id)
+  if (!doc) return new NextResponse('Faktura nebo PDF neexistuje', { status: 404 })
+
+  const profile = await loadIssuerProfile()
+  let pdf: Buffer
+  try {
+    pdf = await renderInvoicePdf(doc, { name: profile.name || 'ZakazIQ', logo: null })
+  } catch (err) {
+    console.error('[faktury] PDF se nepodařilo vyrobit:', err)
+    return new NextResponse('PDF se teď nepodařilo vyrobit. Zkuste to prosím znovu.', { status: 503 })
+  }
+
+  const filename = `faktura-${invoiceNumber}.pdf`
+  try {
+    await adminDb`
+      UPDATE invoices
+      SET pdf_data = decode(${pdf.toString('base64')}::text, 'base64'),
+          pdf_filename = ${filename},
+          pdf_size = ${pdf.byteLength}
+      WHERE id = ${id}
+    `
+  } catch (err) {
+    console.error('[faktury] PDF se nepodařilo uložit k dokladu:', err)
+  }
+
+  return new NextResponse(new Uint8Array(pdf), {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      ETag: `"${createHash('md5').update(pdf).digest('hex')}"`,
+      'Cache-Control': 'private, max-age=0, must-revalidate',
+      'Content-Length': String(pdf.byteLength),
+    },
+  })
 }

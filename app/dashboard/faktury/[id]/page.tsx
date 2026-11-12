@@ -4,11 +4,12 @@ import { invoiceTone, toneVariant } from '@/lib/admin-status'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ArrowLeft, FileText, ExternalLink, Sparkles, AlertTriangle, Clock, Landmark, Paperclip,
+  ArrowLeft, FileText, ExternalLink, Sparkles, AlertTriangle, Ban, Clock, Landmark, Paperclip, ListOrdered,
 } from 'lucide-react'
 import { getInvoiceDetail, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceDetail } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceDetailActions } from '@/components/InvoiceDetailActions'
+import { IssuedInvoiceActions } from '@/components/admin/invoices/issued-actions'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'
@@ -111,14 +112,38 @@ export default async function InvoiceDetailPage(props: PageProps) {
           subtitle={`${formatAmount(invoice.amount, invoice.currency)} · vystaveno ${formatDate(invoice.issued_on)}`}
           action={
             <>
-              <Badge variant={toneVariant(invoiceTone(Boolean(invoice.paid_on), overdue))}>
-                {invoice.paid_on ? 'Zaplaceno' : overdue ? <><Clock size={10} strokeWidth={1.5} aria-hidden="true" />Po splatnosti</> : 'Pohledávka'}
-              </Badge>
-              <InvoiceDetailActions invoice={invoice} projects={projects} />
+              {invoice.cancelled_at ? (
+                <Badge variant="neutral">Storno</Badge>
+              ) : (
+                <Badge variant={toneVariant(invoiceTone(Boolean(invoice.paid_on), overdue))}>
+                  {invoice.paid_on ? 'Zaplaceno' : overdue ? <><Clock size={10} strokeWidth={1.5} aria-hidden="true" />Po splatnosti</> : 'Pohledávka'}
+                </Badge>
+              )}
+              {/* Vystavený doklad se neupravuje ani nemaže (AD12) — jen tiskne, posílá a stornuje. */}
+              {invoice.pdf_generated ? (
+                <IssuedInvoiceActions
+                  invoiceId={invoice.id}
+                  invoiceNumber={invoice.invoice_number}
+                  clientEmail={invoice.client_email}
+                  cancelled={invoice.cancelled_at !== null}
+                />
+              ) : (
+                <InvoiceDetailActions invoice={invoice} projects={projects} />
+              )}
             </>
           }
         />
       </div>
+
+      {invoice.cancelled_at && (
+        <div className="flex items-start gap-2.5 rounded-chip border border-navy-100 bg-navy-50 px-4 py-3 text-sm text-quiet">
+          <Ban size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>
+            Faktura je stornovaná od {formatDateTime(invoice.cancelled_at)}. V evidenci zůstává kvůli
+            souvislé číselné řadě, ale nepočítá se mezi pohledávky. Opravený doklad vystavte znovu.
+          </span>
+        </div>
+      )}
 
       {invoice.duplicate_risk && (
         <div className="flex items-start gap-2.5 rounded-chip border border-signal-line bg-signal-bg px-4 py-3 text-sm text-signal-ink">
@@ -143,11 +168,62 @@ export default async function InvoiceDetailPage(props: PageProps) {
               <Field label="Odběratel" value={invoice.client_name} />
               <Field label="IČO" value={invoice.client_ico} mono />
               <Field label="DIČ" value={invoice.client_dic} mono />
+              {invoice.pdf_generated && <Field label="Adresa odběratele" value={invoice.client_address} />}
+              {invoice.pdf_generated && invoice.issuer?.vatPayer && (
+                <Field label="Datum plnění" value={invoice.supplied_on ? formatDate(invoice.supplied_on) : null} />
+              )}
+              {invoice.pdf_generated && (
+                <Field label="Odesláno e-mailem" value={invoice.sent_at ? formatDateTime(invoice.sent_at) : null} />
+              )}
             </dl>
             <div className="mt-4 pt-4 border-t border-border">
               <Field label="Poznámka" value={invoice.note} />
             </div>
           </Card>
+
+          {invoice.items && invoice.items.length > 0 && (
+            <Card title="Položky" icon={<ListOrdered size={14} strokeWidth={1.5} className="text-navy-600" />}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-quiet">
+                    <th className="pb-2 font-medium">Co</th>
+                    <th className="pb-2 font-medium">Počet</th>
+                    <th className="pb-2 text-right font-medium">Cena</th>
+                    {invoice.issuer?.vatPayer && <th className="pb-2 text-right font-medium">DPH</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.items.map((item, index) => (
+                    <tr key={index} className="border-t border-navy-100">
+                      <td className="py-2 pr-3">{item.description}</td>
+                      <td className="py-2 pr-3 font-num tabular-nums">{item.quantity}</td>
+                      <td className="py-2 text-right font-num tabular-nums">
+                        {formatAmount(item.unitPrice, invoice.currency)}
+                      </td>
+                      {invoice.issuer?.vatPayer && (
+                        <td className="py-2 text-right font-num tabular-nums">{item.vatRate} %</td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-4 border-t border-navy-100 pt-3 text-right font-num text-[17px] font-semibold tabular-nums text-ink">
+                Celkem {formatAmount(invoice.amount, invoice.currency)}
+                {invoice.vat_total !== null && invoice.vat_total > 0 && (
+                  <span className="ml-2 text-sm font-normal text-quiet">
+                    z toho DPH {formatAmount(invoice.vat_total, invoice.currency)}
+                  </span>
+                )}
+              </p>
+              {invoice.issuer && (
+                <p className="mt-3 text-xs text-quiet">
+                  Dodavatel na dokladu: {invoice.issuer.name}
+                  {invoice.issuer.ico ? `, IČO ${invoice.issuer.ico}` : ''}
+                  {invoice.issuer.vatPayer ? '' : ' · neplátce DPH'}
+                </p>
+              )}
+            </Card>
+          )}
 
           {invoice.has_pdf ? (
             <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-emerald-600" />}>
@@ -184,8 +260,9 @@ export default async function InvoiceDetailPage(props: PageProps) {
           ) : (
             <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-muted-foreground" />}>
               <p className="text-sm text-muted-foreground">
-                K faktuře není přiložené PDF. Přes „Upravit" ho jde doplnit — AI z něj rovnou
-                přečte údaje.
+                {invoice.pdf_generated
+                  ? 'PDF se vyrobí při prvním otevření — klikněte na „Stáhnout PDF" nahoře.'
+                  : 'K faktuře není přiložené PDF. Přes „Upravit" ho jde doplnit — AI z něj rovnou přečte údaje.'}
               </p>
             </Card>
           )}

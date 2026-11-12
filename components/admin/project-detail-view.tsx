@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ExternalLink, FilePlus2 } from 'lucide-react'
 import { batchTolerant, q, type AdminQuery, type AdminRow } from '@/lib/admin/db'
 import { ProjectForm } from '@/components/ProjectForm'
 import { ShareButton } from '@/components/ShareButton'
 import { QRCodeDisplay } from '@/components/QRCodeDisplay'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
@@ -489,6 +490,15 @@ async function BillingTab({ project }: { project: Project }) {
   return (
     <>
       <div className={card}>
+        {/* Faktura ze zakázky je jeden klik: odběratel i částka se předvyplní (AD12). */}
+        <div className="mb-4 flex justify-end">
+          <Button asChild>
+            <Link href={`/dashboard/faktury/nova?zakazka=${project.id}`}>
+              <FilePlus2 size={15} strokeWidth={1.75} aria-hidden />
+              Vystavit fakturu
+            </Link>
+          </Button>
+        </div>
         <InvoiceArchive
           data={invoices}
           defaults={{
