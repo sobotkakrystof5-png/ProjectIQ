@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { Badge } from '@/components/ui/badge'
+import { ContactActions } from '@/components/admin/contact-actions'
 import { ContactForm } from '@/components/admin/contacts/contact-form'
 import { MergeButton, UnmergeButton } from '@/components/admin/contacts/merge-actions'
 import { loadContactDetail, type ContactOccurrence } from '@/lib/admin/contacts'
@@ -87,6 +88,17 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
         subtitleFont="sans"
       />
 
+      {/*
+        Zavolat a napsat rovnou z karty (AD10). Karta kontaktu je jediná
+        obrazovka, která je o člověku celá — a jako jediná to do AD10 neuměla.
+      */}
+      <ContactActions
+        phone={contact.phone}
+        email={contact.email}
+        context={{ projectName: contact.company ?? contact.display_name }}
+        emptyHint="Kontakt nemá telefon ani e-mail. Doplňte je v Údajích a zavoláte jedním klikem."
+      />
+
       {contact.merged_into !== null && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-box border border-navy-100 bg-navy-50 px-4 py-3">
           <p className="text-sm text-ink">
@@ -111,7 +123,13 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/*
+        `grid-cols-1` tu není navíc: bez něj má jediný sloupec šířku `auto`,
+        takže ho nejširší vnitřek (datum u položky, pole formuláře) roztáhne
+        přes okno — na 390 px stránka přetékala o 71 px. `minmax(0,…)` to
+        podlahou na nule zaručí v obou rozvrženích.
+      */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-8">
           <Section
             title="Kde se objevuje"

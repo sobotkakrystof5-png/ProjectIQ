@@ -137,7 +137,10 @@ beforeAll(async () => {
       starts_at timestamptz NOT NULL,
       ends_at timestamptz NOT NULL,
       event_type text NOT NULL DEFAULT 'manual',
-      project_id uuid REFERENCES projects(id)
+      project_id uuid REFERENCES projects(id),
+      -- Dvojice z migrace 051: kontakt zrcadlený v Hovorech. Kalendář z něj
+      -- od AD10 bere telefon a e-mail do detailu události.
+      lead_id uuid
     );
     CREATE TABLE client_leads (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -233,6 +236,29 @@ describe('co přijde ze databáze', () => {
     expect(data.events.filter((e) => e.title === 'Konzultace: Dvojník')).toHaveLength(0)
     // Cizí události ten den zůstávají.
     expect(data.events.length).toBeGreaterThan(0)
+  })
+
+  it('událost přinese kontakt ze zrcadleného hovoru, aby z ní šlo zavolat', async () => {
+    const lead = await db.query<{ id: string }>(
+      `INSERT INTO client_leads (company_name, contact_name, phone, email)
+       VALUES ('Pekárna', 'Jana Nováková', '+420000000111', 'jana@example.cz')
+       RETURNING id::text AS id`,
+    )
+    const at = '2026-11-09T08:00:00Z'
+    await db.query(
+      `INSERT INTO calendar_events (title, starts_at, ends_at, lead_id)
+       VALUES ('Schůzka v pekárně', $2, $2::timestamptz + interval '1 hour', $1)`,
+      [lead.rows[0].id, at],
+    )
+
+    const data = await loadCalendarWindow({ from: '2026-11-09', to: '2026-11-09' })
+    const event = data.events.find((e) => e.title === 'Schůzka v pekárně')
+    expect(event?.contact_name).toBe('Jana Nováková')
+    expect(event?.contact_phone).toBe('+420000000111')
+    expect(event?.contact_email).toBe('jana@example.cz')
+    // Událost bez zrcadleného hovoru žádný kontakt nepředstírá.
+    const cizi = data.events.find((e) => e.title !== 'Schůzka v pekárně')
+    expect(cizi?.contact_phone).toBeNull()
   })
 
   it('události mimo okno nejsou v odpovědi vůbec', async () => {

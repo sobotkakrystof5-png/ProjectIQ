@@ -125,10 +125,19 @@ export async function updateLead(id: string, payload: LeadPayload) {
     )
     rows = results[0]
   } catch (err: unknown) {
-    if ((err as { code?: string })?.code === '23P01') {
+    const code = (err as { code?: string })?.code
+    if (code === '23P01') {
       throw new Error('Tento termín se překrývá s jinou událostí v kalendáři. Vyberte prosím jiný čas.')
     }
-    throw err
+    // Databáze bez migrace 105 (`42883` = funkce neexistuje) nesmí shodit
+    // uložení kontaktu. Dávka je transakce, takže by se jinak nezapsalo nic
+    // a úprava hovoru by na produkci přestala fungovat v okně mezi nasazením
+    // větve a aplikací migrace. Termín v kalendáři se pak jen neposune —
+    // přesně jak se admin choval před AD10. Stejná úvaha jako u rezervace
+    // z portálu v `app/portal-actions.ts`.
+    if (code !== '42883' || instant === null) throw err
+    console.error('[Hovory] migrace 105 chybí, termín v kalendáři se neposunul')
+    rows = (await adminDb.batch([update]))[0]
   }
 
   revalidatePath('/dashboard/calls')

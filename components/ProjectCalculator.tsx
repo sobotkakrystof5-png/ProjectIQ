@@ -250,9 +250,13 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
           </div>
 
           {/* Custom item */}
-          <div className="flex gap-2">
+          {/*
+            `flex-wrap` a `min-w-0`: pole mají vlastní nejmenší šířku, takže
+            se na telefonu nesmrskla a řádek přetékal stránku o 30 px.
+          */}
+          <div className="flex flex-wrap gap-2">
             <input
-              className="flex-1 text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
+              className="min-w-0 flex-1 text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
               placeholder="Vlastní položka…"
               value={customName}
               onChange={e => setCustomName(e.target.value)}

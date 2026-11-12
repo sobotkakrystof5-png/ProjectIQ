@@ -204,6 +204,32 @@ describe('přesun termínu v Hovorech', () => {
     expect(lead.dve).toBe(false)
   })
 
+  it('uložení hovoru přežije databázi bez migrace 105', async () => {
+    // Produkce dostane novou větev dřív, než se pustí migrace 105 — a dávka
+    // je transakce, takže bez ošetření by selhal i samotný UPDATE a úprava
+    // hovoru by v tom okně přestala fungovat úplně. Termín v kalendáři se
+    // tehdy neposune, přesně jak se admin choval před AD10.
+    const { leadId, eventId } = await leadWithEvent()
+    await db.exec('DROP FUNCTION admin_lead_reschedule(uuid, timestamptz, timestamptz)')
+    try {
+      await updateLead(leadId, payload({ next_action_date: '2026-11-22', next_action_time: '16:00' }))
+
+      const lead = await one<{ next_action_date: string; next_action_time: string }>(`
+        SELECT next_action_date::text, next_action_time::text FROM client_leads WHERE id = $1
+      `, [leadId])
+      expect(lead.next_action_date).toBe('2026-11-22')
+      expect(lead.next_action_time).toBe('16:00:00')
+
+      const event = await one<{ starts_at: string }>(`
+        SELECT to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS starts_at
+        FROM calendar_events WHERE id = $1
+      `, [eventId])
+      expect(event.starts_at).toBe('2026-11-20 08:00')
+    } finally {
+      await db.exec(MIGRATION)
+    }
+  })
+
   it('beze změny času nechá připomínky i termín na pokoji', async () => {
     const { leadId, eventId } = await leadWithEvent()
 

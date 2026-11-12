@@ -230,7 +230,11 @@ přepíše kontakt i párovou událost, `ends_at => NULL` nechá termín stejně
 nuluje **jen při skutečné změně času**. Okamžik skládá `pragueDateTimeToISO` v
 `lib/prague-time.ts` (R-093), funkce ho zpátky na `date` + `time` rozpadá projekcí
 `AT TIME ZONE 'Europe/Prague'` — ne podmínkou, takže žádný index nepadá. Překryv vrací `23P01`
-a `updateLead` ho překládá na českou větu.
+a `updateLead` ho překládá na českou větu. Na databázi **bez** migrace 105 (`42883`) se uložení
+hovoru nezahodí: dávka je transakce, takže by jinak selhal i samotný UPDATE — `updateLead` chybu
+odchytí a pustí UPDATE samotný, termín v kalendáři se pak jen neposune. Stejné ošetření má
+rezervace z portálu v `app/portal-actions.ts`. Díky tomu smí větev na produkci předběhnout
+migraci.
 
 **Kontakt ve zrcadleném řádku.** CTE v `createCalendarEvent` zakládalo lead jen s titulkem
 a popisem; od AD10 nese `contact_name`, `phone`, `email` i `contact_id` z `ensureContact`
@@ -519,6 +523,12 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
   `UnifiedEvent` nese `day`, `startMin` a `endMin`; pozice bloku je `blockGeometry`.
   `getHours()` v kalendáři nepoužívej — zahazuje minuty i zónu (AD08 to byla jedna
   ze tří nahlášených chyb).
+- **Z detailu události jde zavolat (AD10).** Dotaz okna přibírá kontakt zrcadlený v Hovorech
+  (`LEFT JOIN client_leads l ON l.id = e.lead_id` → `contact_name/phone/email`
+  v `RawCalendarEvent`) a `SmartCalendar` ho dá do `meta.contact`. Detail vykreslí tentýž
+  `ContactActions` jako zbytek adminu. U řádků druhu `call` se dál používá `meta.lead`
+  (nese navíc stav a hodnotu), u blokace se kontakt nehledá vůbec. Nová časová tabulka, která
+  se bude kreslit v kalendáři, si kontakt musí dotáhnout stejně — detail si ho sám nedohledá.
 - **Rezervace z portálu se kreslí jednou (AD10).** Má od migrace 105 vlastní kalendářní
   událost (aby byla vidět v Hovorech), ale v kalendáři zůstává karta konzultace — ví o kanálu,
   odkazu na schůzku i zakázce. Párová událost se v `loadCalendarWindow` vynechá podle
@@ -536,7 +546,9 @@ v adrese (`?pohled=duplicity&sort=jmeno&q=…`). Tři pohledy — **Kontakty**
 Hledá se podle jména, firmy, e-mailu i telefonu zapsaného jakkoli
 (`777 123 456` najde `+420777123456`).
 
-`/dashboard/kontakty/[id]` je karta člověka: údaje (jediný klientský kus
+`/dashboard/kontakty/[id]` je karta člověka: hned pod hlavičkou `ContactActions`
+(zavolat, SMS, WhatsApp, e-mail, šablony, zkopírovat — doplněno při uzavírání
+AD10, dotud karta jako jediná klikací kontakt neměla), údaje (jediný klientský kus
 obrazovky), „Objevuje se také jako…" (jiné zápisy jména z řádků), „Kde se
 objevuje" (zakázky, hovory, dokončená práce, konzultace, poptávky — vše
 s odkazem) a „Možné duplicity" s tlačítkem **Sloučit sem**. Sloučení se provede

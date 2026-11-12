@@ -231,7 +231,12 @@ async function OverviewTab({ project }: { project: Project }) {
         <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Sdílet s klientem</h2>
         <div className="flex flex-col items-start gap-6 sm:flex-row">
           <QRCodeDisplay url={publicUrl} />
-          <div className="min-w-0 flex-1">
+          {/*
+            `w-full` kvůli telefonu: `items-start` dává v sloupcovém směru
+            šířku podle obsahu, takže věta o odkazu roztáhla stránku o 110 px
+            přes okno. Ve `sm:` řádku šířku dál určuje `flex-1`.
+          */}
+          <div className="w-full min-w-0 flex-1">
             <p className="mb-3 text-sm text-muted-foreground">
               Pošlete klientovi odkaz. Bez registrace uvidí aktuální stav zakázky.
             </p>

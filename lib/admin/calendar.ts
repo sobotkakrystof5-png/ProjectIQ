@@ -40,6 +40,14 @@ export type RawCalendarEvent = {
   event_type: CalendarEventType
   /** Zakázka termínu — kvůli párování s rezervacemi (AD10). */
   project_id: string | null
+  /**
+   * Kontakt zrcadlený v Hovorech (dvojice z migrace 051). Bez něj by z detailu
+   * události nešlo zavolat, i když telefon v databázi je — okno „Přidat do
+   * kalendáře" ho od AD10 ukládá.
+   */
+  contact_name: string | null
+  contact_phone: string | null
+  contact_email: string | null
 }
 
 export type RawLead = {
@@ -108,10 +116,15 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
       ORDER BY deadline
     `,
     q`
-      SELECT id, title, description, starts_at, ends_at, event_type, project_id
-      FROM calendar_events
-      WHERE starts_at >= ${fromInstant} AND starts_at < ${toInstant}
-      ORDER BY starts_at
+      SELECT
+        e.id, e.title, e.description, e.starts_at, e.ends_at, e.event_type, e.project_id,
+        COALESCE(NULLIF(l.contact_name, ''), NULLIF(l.company_name, '')) AS contact_name,
+        l.phone AS contact_phone,
+        l.email AS contact_email
+      FROM calendar_events e
+      LEFT JOIN client_leads l ON l.id = e.lead_id
+      WHERE e.starts_at >= ${fromInstant} AND e.starts_at < ${toInstant}
+      ORDER BY e.starts_at
     `,
     q`
       SELECT

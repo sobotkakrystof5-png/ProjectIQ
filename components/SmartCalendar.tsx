@@ -75,6 +75,16 @@ interface UnifiedEvent {
       estimatedValue: number | null
       notes: string | null
     }
+    /**
+     * Kontakt u ručně zapsané události — zrcadlený lead z migrace 051.
+     * Je tu jen tehdy, když má telefon nebo e-mail; jinak by detail nabízel
+     * akce, které nemají kam vést.
+     */
+    contact?: {
+      name: string | null
+      phone: string | null
+      email: string | null
+    }
   }
 }
 
@@ -177,7 +187,15 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
       allDay: false,
       label: e.title,
       sublabel: e.event_type === 'block' ? 'Blokovaný čas' : 'Událost',
-      meta: { description: e.description },
+      meta: {
+        description: e.description,
+        // Volat se dá jen tam, kde je na co. Blokace je soukromá
+        // nedostupnost bez kontaktu, takže u ní kontakt nehledáme.
+        contact:
+          e.event_type !== 'block' && (e.contact_phone !== null || e.contact_email !== null)
+            ? { name: e.contact_name, phone: e.contact_phone, email: e.contact_email }
+            : undefined,
+      },
     })
   }
 
@@ -253,6 +271,10 @@ function EventDetailModal({
   const style = getEventStyle(event)
   const isManualEvent = event.kind === 'manual' || event.kind === 'block'
   const lead = event.kind === 'call' ? event.meta.lead : undefined
+  // Ručně zapsaná událost má kontakt zrcadlený v Hovorech, ne `lead` z mřížky
+  // (ten kalendář pro spárované řádky záměrně nekreslí, R-010). Bez tohohle
+  // řádku šlo z detailu volat jen u plánovaných hovorů.
+  const contact = lead === undefined ? event.meta.contact : undefined
 
   async function handleDelete() {
     if (!confirm('Smazat tuto událost?')) return
@@ -324,6 +346,23 @@ function EventDetailModal({
                   </p>
                 </div>
               </div>
+
+              {/* Kontakt u ručně zapsané události (AD10) */}
+              {contact && (
+                <div className="space-y-2.5 rounded-xl bg-slate-50 border border-border p-3">
+                  {contact.name !== null && contact.name !== '' && (
+                    <div className="flex items-center gap-2.5">
+                      <Building2 size={14} strokeWidth={1.5} className="shrink-0 text-quiet" />
+                      <span className="text-foreground">{contact.name}</span>
+                    </div>
+                  )}
+                  <ContactActions
+                    phone={contact.phone}
+                    email={contact.email}
+                    context={{ at: event.startsAt, projectName: event.label }}
+                  />
+                </div>
+              )}
 
               {/* Kontakt z Hovorů */}
               {lead && (

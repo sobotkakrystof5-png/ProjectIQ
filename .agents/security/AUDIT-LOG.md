@@ -462,3 +462,14 @@ Výsledek: dva nálezy opravené v rámci review, jeden vědomě přijatý kompr
 - `generateRecurringTransactions` má `requireAuth()`; `useOptimistic` je čistě v prohlížeči a o oprávnění nerozhoduje — skutečnou změnu dělá dál server action.
 - Žádný nový `dangerouslySetInnerHTML`, žádná nová závislost, žádná nová env, CSP ani hlavičky se mimo výše uvedený `Cache-Control` neměnily. ETag je md5 obsahu PDF a vidí ho jen přihlášený admin.
 Ověřeno: `npx tsc --noEmit`, `npm test` (73 souborů, 845 prošlo, 1 přeskočený), `npm run build:check`, smoke test přes podepsanou session (22 adres adminu + pět záložek detailu = 200, log serveru bez chyb). 200 → 304 u PDF ověřeno jen unit testem — na testovací databázi žádná faktura `pdf_data` nemá.
+
+## 2026-11-12 — review AD10 (dokončení: karta kontaktu, kalendář, odolnost bez migrace 105)
+Spouštěč: dokončení sezení AD10 po ověření v prohlížeči — kontakt na kartě kontaktu, kontakt v detailu kalendářní události a záchrana `updateLead` na databázi bez migrace 105; skill `web-security-review`.
+Rozsah: `lib/admin/calendar.ts` (LEFT JOIN na `client_leads`), `components/SmartCalendar.tsx`, `app/dashboard/kontakty/[id]/page.tsx`, `app/calls-actions.ts` (větev `42883`), `components/{ProjectCalculator,admin/project-detail-view}.tsx` (jen třídy), testy.
+Výsledek: bez nálezu, nic otevřeného.
+- Nový `LEFT JOIN client_leads l ON l.id = e.lead_id` nepřijímá nic z prohlížeče — spojuje se přes vnitřní cizí klíč a hranice okna dál počítá server (`windowFor`, R-093). Dotaz zůstal parametrizovaný tagem `q`, kvalifikace sloupců (`e.`, `l.`) nic nerozšířila.
+- Kalendář posílá do prohlížeče telefon a e-mail i u ručně zapsané události. **Není to nová kategorie údajů**: tytéž sloupce `client_leads.phone/email` už nesl pro řádky druhu `call`. Je to obrazovka jen pro přihlášeného admina, bez CORS a bez veřejné cesty.
+- Odkazy na kartě kontaktu staví `lib/contacts/href.ts` — telefon jen jako E.164, adresa přes whitelist `MAILTO_SAFE`, předmět i text přes `encodeURIComponent`. Žádný nový `dangerouslySetInnerHTML`.
+- Větev `42883` v `updateLead` nic neobchází: `requireAuth()` běží před dávkou a záložní cesta pouští **týž** parametrizovaný UPDATE, jen bez volání funkce z migrace 105. Kolize `23P01` se dál překládá do češtiny. Stejný vzor, jaký má rezervace z portálu.
+- CSP, hlavičky, závislosti, env ani role se neměnily. Žádná migrace; 105 zůstává nepuštěná.
+Ověřeno: `npx tsc --noEmit`, `npm test` (79 souborů, 915 prošlo, 1 přeskočený), `npm run build:check` a průchod headless Chromem s podepsanou session — osm obrazovek adminu na 390 / 768 / 1280 / 1440 px, v konzoli jen 404 na `/favicon.ico`.

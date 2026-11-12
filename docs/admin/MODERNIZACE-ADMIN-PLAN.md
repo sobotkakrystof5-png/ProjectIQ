@@ -869,10 +869,30 @@ i v hovorech dá stejný čas (test); rezervace z portálu je vidět v Hovorech.
    obrazovka tak funguje i na databázi, kde 105 ještě neproběhla. Páruje se podle zakázky
    a okamžiku.
 
-**Co se neověřilo:** nic z AD10 nikdo neviděl v prohlížeči (ověřeno smoke testem přes HTTP
-s podepsanou session: 9 výpisů + 5 detailů vrací 200, kontaktní akce jsou v HTML u Poptávek,
-Požadavků i detailu zakázky). Migrace 105 **není aplikovaná nikde**. Rezervaci z portálu nikdo
-neposlal naživo — párování je ověřené jen v PGlite. V Hovorech jsou plné kontaktní akce až
+**Ověřeno v prohlížeči (2026-11-12, druhá část sezení).** Headless Chrome s podepsanou session,
+osm obrazovek × 390 / 768 / 1280 / 1440 px. Z detailu zakázky se volá, píše SMS, WhatsApp
+i e-mail (všechny plochy 44 px) a šablony plní odkaz předepsaným textem; rozbalený kontakt
+v Hovorech a detail události v kalendáři taky. Na žádné z osmi obrazovek už není vodorovné
+přetečení, v konzoli zůstává jediná zpráva — 404 na `/favicon.ico`.
+
+Průchod našel čtyři věci, všechny opravené ještě v AD10:
+1. **Karta kontaktu neuměla zavolat vůbec.** `/dashboard/kontakty/[id]` je jediná obrazovka
+   celá o člověku a jako jediná `ContactActions` neměla. Doplněno pod hlavičku.
+2. **Karta kontaktu přetékala na telefonu o 71 px.** Jediný sloupec mřížky měl šířku `auto`,
+   takže ho nejširší vnitřek roztáhl přes okno; `grid-cols-1` dá podlahu na nulu.
+3. **Kalendář neuměl zavolat z ručně zapsané události.** Kontakt se kreslil jen u řádků druhu
+   `call`; událost s kontaktem zrcadleným v Hovorech (dvojice z 051 — a právě tu AD10 nově
+   zakládá s telefonem) ho neukázala. Dotaz okna ho teď dotáhne `LEFT JOIN`em.
+4. **`updateLead` nesnesl databázi bez migrace 105.** Dávka je transakce, takže by v okně mezi
+   nasazením větve a spuštěním 105 selhalo i samotné uložení hovoru. Nově se `42883` odchytí
+   a pustí se samotný UPDATE — stejně jako to od začátku dělala rezervace z portálu.
+
+Mimo AD10 se při tom opravila dvě přetečení na 390 px, která tam byla i předtím: blok s odkazem
+na portál v detailu zakázky (110 px) a řádek vlastní položky v kalkulačce na Hovorech (30 px).
+
+**Co se neověřilo:** migrace 105 **není aplikovaná nikde** (spuštění i na testu zamítnuto —
+pouští ji Kryštof). Rezervaci z portálu proto nikdo neposlal naživo; párování je ověřené
+jen v PGlite a živě půjde ověřit až na databázi se 105. V Hovorech jsou plné kontaktní akce až
 v rozbaleném řádku; v samotné tabulce zůstávají prosté odkazy na telefon a e-mail.
 
 ### AD11 — Zakázka jako jediná pravda: Dokončené a průvodka (M–L, **migrace 106**)
@@ -1150,7 +1170,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno a ověřeno. |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
-| AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (migrace nikde neaplikovaná, v prohlížeči neověřeno) |
+| AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | nezačato |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |
