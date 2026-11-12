@@ -664,10 +664,18 @@ jen nastaví `paid_on` a pustí ji — tatáž cesta, kterou chodí formulář, 
    kódu už je přímo nad tlačítky.
 
 **Ověřeno v prohlížeči 2026-11-12** (produkční build, dočasná stránka s fiktivními daty
-mimo `/dashboard`, po ověření smazaná — stejný postup jako RD04/RD05):
-- **Klik na volný slot v 17:00** otevře formulář se `začátek 12.11.2026 17:00`
-  a `konec 18:00`. Druhé otevření v témže sezení na 15:00 ukáže **15:00**, ne „dnes 10:00".
-  Tím jsou ověřené chyby 1 i 2 — ta druhá se projevila právě až při druhém otevření.
+mimo `/dashboard`, po ověření smazaná — stejný postup jako RD04/RD05). Část očima přes
+rozšíření Chrome, zbytek headless Chromem přes `puppeteer-core`, který repo už má kvůli
+PDF faktur — ten umí i odečíst skutečné pixely, takže se místo „vypadá to dobře" dá
+porovnat naměřená pozice s vypočítanou:
+- **Klik na volný slot v 11:00** otevře formulář se `začátek 2026-11-12T11:00` a `konec 12:00`
+  — doslova to, co kritérium žádá. Ověřeno i v 17:00 a 15:00, přičemž **druhé** otevření
+  v témže sezení ukázalo 15:00, ne „dnes 10:00"; tím jsou pokryté chyby 1 i 2, protože ta
+  druhá se projevovala právě až napodruhé.
+- **Geometrie sedí na pixel** (headless Chrome, `offsetTop`/`offsetHeight`): hodinová mřížka
+  má 10:00 na 104 px (2 × `HOUR_PX` 52), událost **10:15**–10:45 začíná na **118 px**
+  (= 135 min / 60 × 52 + 1) a je vysoká 24 px (30 min); událost 13:15–15:00 na 274 px,
+  vysoká 89 px. Stará chybná verze by první z nich nakreslila na 104 px, tedy na linku 10:00.
 - **Událost 10:15–12:00** začíná viditelně **pod** linkou 10:00 (asi čtvrtina mezi 10:00
   a 11:00) a končí na 12:00. Chyba 3 ověřená.
 - **Událost 7:00–9:00** (před `DAY_START`) je vidět přilepená na horní hraně a končí v 9:00;
@@ -690,7 +698,7 @@ mimo `/dashboard`, po ověření smazaná — stejný postup jako RD04/RD05):
 | bundle guard drží strop | ✅ `admin-bundle-guard.test.ts` |
 | Finance v GET nezapisují | ✅ `admin-render-nezapisuje.test.ts` |
 | událost 10:15–12:00 na správném místě **v prohlížeči** | ✅ ověřeno očima |
-| klik na slot **v 11:00** otevře formulář s 11:00 | ⚠️ ověřeno v **15:00 a 17:00** (týž kód, hodina je parametr `defaultHour`); doslova v 11:00 se doklikat nestihlo — rozšíření Chrome se mezitím odpojilo |
+| klik na slot **v 11:00** otevře formulář s 11:00 | ✅ ověřeno doslova — klik na volný pruh 11:00 otevřel formulář `2026-11-12T11:00` – `12:00` |
 | potvrzení leadu vypadá okamžitě | ✅ `useOptimistic`, reducer v testu |
 | **„Zaplaceno“ vypadá okamžitě** | ✅ `setInvoicePaid` + `PaidCell` ve výpisu faktur, `admin-faktura-zaplaceno.test.ts` |
 
@@ -1073,7 +1081,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno; klik na slot ověřen v prohlížeči v 15:00 a 17:00 (hodina je parametr), ne doslova v 11:00. |
+| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno a ověřeno. |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
