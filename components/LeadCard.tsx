@@ -61,10 +61,12 @@ export function LeadCard({ lead }: { lead: WebLead }) {
       setPending('confirming')
       try {
         await confirmWebLead(lead.id)
-      } catch (err) {
-        // Nejčastěji souběh: poptávku už potvrdil někdo jinde. Stav se sám
-        // vrátí na výchozí, jen je potřeba říct, proč karta zůstala.
-        toast.error(err instanceof Error ? err.message : 'Poptávku se nepodařilo potvrdit')
+      } catch {
+        // `err.message` se tu schválně neukazuje: u síťové chyby je to
+        // anglické „Failed to fetch" a u serverové ji produkční build Nextu
+        // stejně zahodí (ověřeno v prohlížeči, AD08). Stav se sám vrátí
+        // na výchozí, uživateli stačí česky říct, že se to nepovedlo.
+        toast.error('Poptávku se nepodařilo potvrdit, zkuste to prosím znovu')
       }
     })
   }

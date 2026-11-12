@@ -994,11 +994,8 @@ export default function LeadsTable({
 
   const handleDelete = (id: string) => {
     if (!confirm('Opravdu smazat tento kontakt?')) return
-    startTransition(async () => {
-      applyOptimistic({ type: 'remove', id })
-      await deleteLead(id)
-      setLeads((prev) => prev.filter((l) => l.id !== id))
-    })
+    optimisticky({ type: 'remove', id }, () => deleteLead(id), () =>
+      setLeads((prev) => prev.filter((l) => l.id !== id)))
   }
 
   const handleConvert = (id: string) => {
@@ -1009,29 +1006,35 @@ export default function LeadsTable({
   }
 
   // Přesun mezi pohledy řádek z téhle stránky odebere — je teď v tom druhém.
-  const handleMoveToWaiting = (id: string) => {
+  /**
+   * Výpadek sítě vyhodí z volání akce a odmítnutá promise uvnitř transition
+   * shodí obrazovku do chybové hranice — ověřeno v prohlížeči přerušeným
+   * požadavkem (AD08). Optimistický stav se vrátí sám, uživateli stačí říct,
+   * že se to neuložilo.
+   */
+  const optimisticky = (zmena: OptimisticChange, akce: () => Promise<void>, potvrd: () => void) => {
     startTransition(async () => {
-      applyOptimistic({ type: 'remove', id })
-      await moveLeadToWaiting(id)
-      setLeads((prev) => prev.filter((l) => l.id !== id))
+      applyOptimistic(zmena)
+      try {
+        await akce()
+        potvrd()
+      } catch {
+        toast.error('Nepodařilo se uložit, zkuste to prosím znovu')
+      }
     })
   }
 
-  const handleMoveFromWaiting = (id: string) => {
-    startTransition(async () => {
-      applyOptimistic({ type: 'remove', id })
-      await moveLeadFromWaiting(id)
-      setLeads((prev) => prev.filter((l) => l.id !== id))
-    })
-  }
+  const handleMoveToWaiting = (id: string) =>
+    optimisticky({ type: 'remove', id }, () => moveLeadToWaiting(id), () =>
+      setLeads((prev) => prev.filter((l) => l.id !== id)))
 
-  const handleToggleAnswered = (id: string, val: boolean | null) => {
-    startTransition(async () => {
-      applyOptimistic({ type: 'answered', id, value: val })
-      await setCallAnswered(id, val)
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, call_answered: val, updated_at: new Date() } : l)))
-    })
-  }
+  const handleMoveFromWaiting = (id: string) =>
+    optimisticky({ type: 'remove', id }, () => moveLeadFromWaiting(id), () =>
+      setLeads((prev) => prev.filter((l) => l.id !== id)))
+
+  const handleToggleAnswered = (id: string, val: boolean | null) =>
+    optimisticky({ type: 'answered', id, value: val }, () => setCallAnswered(id, val), () =>
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, call_answered: val, updated_at: new Date() } : l))))
 
   const handlePortfolioSent = (id: string) => {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, portfolio_sent_at: new Date() } : l)))

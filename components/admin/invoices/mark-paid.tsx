@@ -39,12 +39,20 @@ export function PaidCell({
     startTransition(async () => {
       const next = isPaid ? null : todayIso
       setOptimisticPaidOn(next)
-      const result = await setInvoicePaid(invoiceId, next)
-      if (result.error) {
-        toast.error(result.error)
-        return
+      try {
+        const result = await setInvoicePaid(invoiceId, next)
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
+        toast.success(next ? 'Označeno jako zaplacené' : 'Vráceno mezi pohledávky')
+      } catch {
+        // Výpadek sítě vyhodí z volání akce. Bez `catch` odmítnutá promise
+        // uvnitř transition shodí obrazovku do chybové hranice — ověřeno
+        // v prohlížeči přerušeným požadavkem (AD08). Optimistický stav se
+        // vrátí sám, jakmile transition skončí.
+        toast.error('Nepodařilo se uložit, zkuste to prosím znovu')
       }
-      toast.success(next ? 'Označeno jako zaplacené' : 'Vráceno mezi pohledávky')
     })
   }
 

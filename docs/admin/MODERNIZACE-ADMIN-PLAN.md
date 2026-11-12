@@ -702,8 +702,8 @@ porovnat naměřená pozice s vypočítanou:
 | Finance v GET nezapisují | ✅ `admin-render-nezapisuje.test.ts` |
 | událost 10:15–12:00 na správném místě **v prohlížeči** | ✅ ověřeno očima |
 | klik na slot **v 11:00** otevře formulář s 11:00 | ✅ ověřeno doslova — klik na volný pruh 11:00 otevřel formulář `2026-11-12T11:00` – `12:00` |
-| potvrzení leadu vypadá okamžitě | ✅ `useOptimistic`, reducer v testu |
-| **„Zaplaceno“ vypadá okamžitě** | ✅ `setInvoicePaid` + `PaidCell` ve výpisu faktur, `admin-faktura-zaplaceno.test.ts` |
+| potvrzení leadu vypadá okamžitě **a při kolizi se vrátí** | ✅ ověřeno v prohlížeči zpomaleným a přerušeným požadavkem |
+| **„Zaplaceno“ vypadá okamžitě a při kolizi se vrátí** | ✅ ověřeno v prohlížeči zpomaleným a přerušeným požadavkem |
 
 **Co do kritérií AD08 nepatří, i když to zůstává otevřené:** průchod adminu s přihlášením na
 skutečných datech a telefonní šířka 390 px. Ani jedno není v „Hotovo, když“ — je to diligence
@@ -726,9 +726,29 @@ cookie, testovací Neon `rd-test` s ukázkovými daty; Kryštof k tomu povolil `
 - **Faktury:** 6 řádků, **12 tlačítek „Zaplaceno"/„Vrátit"** (desktop i mobilní karty), tedy
   jednoklikové „Zaplaceno" z AD08 je tam na skutečných datech.
 - **Finance:** tlačítko „Doplnit opakované" je na obrazovce.
-- **Vědomě se neklikalo** na potvrzení poptávky ani na „Zaplaceno": zapsalo by to do databáze
-  a potvrzení poptávky by přes `after()` poslalo **skutečný e-mail** z produkční schránky.
-  Optimistické chování těch dvou akcí je ověřené reducerem a testy, ne klikem na ostro.
+**Optimistické akce ověřené klikem (2026-11-12)**, se serverem spuštěným **bez poštovních
+údajů** (`VIZEON_GMAIL_*` a `GMAIL_*` prázdné → `credentials()` vrátí null a nic neodejde),
+takže potvrzení poptávky nemohlo poslat e-mail:
+
+| | „Zaplaceno" na faktuře | Potvrzení poptávky |
+|---|---|---|
+| před klikem | Pohledávka / tlačítko „Zaplaceno" | „Potvrdit jako zakázku" |
+| **během letu** (server zdržen 2,5 s) | už **Zaplaceno / Vrátit** za 300 ms | už **Potvrzeno**, tlačítko vypnuté, za 400 i 1400 ms |
+| po usazení | Zaplaceno (zapsáno) | — |
+| **po přerušení požadavku** | zpět **Pohledávka** + česká hláška do 200 ms | zpět **„Potvrdit jako zakázku"** + česká hláška |
+
+Potvrzení poptávky se schválně nechalo **selhat** (zdržet a přerušit), takže se ověřila
+okamžitost i návrat, a přitom **nic nezapsalo do databáze** — ukázková poptávka „Pekárna
+Nepotvrzená" je po testu pořád nepotvrzená a faktura `UKAZKA-2026-006` zpátky jako pohledávka.
+
+**Dvě chyby, které to odhalilo — obě opravené:**
+1. `MarkPaidButton` nechytal výjimku z volání akce. Při výpadku sítě odmítnutá promise uvnitř
+   `startTransition` **shodila obrazovku do chybové hranice** — řádek z tabulky zmizel.
+   V `LeadCard` jsem `try/catch` dal, tady zapomněl. Stejná díra byla u tří jednoklikových
+   akcí v `LeadsTable`; všechny jedou přes společného pomocníka `optimisticky(…)`.
+2. `LeadCard` ukazoval `err.message`, takže uživatel dostal anglické **„Failed to fetch"**.
+   U serverové chyby by to bylo ještě horší — produkční build Nextu zprávu zahazuje. Teď
+   obyčejná česká hláška.
 
 **Co se neověřilo jinak:** PDF 200 → 304 ověřil jen unit test, na testovací databázi žádná
 faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404).
