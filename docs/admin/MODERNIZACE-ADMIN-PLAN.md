@@ -604,6 +604,17 @@ tabulka nevykreslí na serveru. `LeadsTable` proto dostává hotové odkazy (`so
 načte ≤ 60 řádků; bundle guard drží strop; Finance v GET nezapisují (test); **klik na slot v 11:00
 otevře formulář s 11:00 a událost 10:15–12:00 se nakreslí na správné místo ve správné délce**
 (ověřeno v prohlížeči, ne jen testem).
+
+**Opraveno v zadání 2026-11-12:** podmínka „potvrzení leadu **a „Zaplaceno"** vypadají okamžitě"
+platí jen pro potvrzení leadu. **„Zaplaceno" v adminu jako akce na jedno kliknutí neexistuje** —
+ověřeno v kódu: stav faktury se mění formulářem (`InvoiceFields` → `updateInvoice`) a `paid`
+na zakázce taky (`ProjectForm` → `updateProject`); `ProjectCard` je jen zobrazení a jediné
+jednoklikové „Zaplaceno" v repu je ve Workspace (`components/ws/money/invoice-list.tsx`).
+Udělat ho teď by znamenalo napsat novou peněžní akci, která musí správně projít
+`syncInvoiceTransaction` — a to je přesně to, co má v rukou **AD12/AD13** (R-083: dnešní
+fakturace umí založit příjem dvakrát). Optimistické „Zaplaceno" proto patří k AD12, až ta akce
+vznikne; dělat ji na konci sezení o rychlosti by bylo riziko dvojího započtení příjmu bez
+jakéhokoli zisku na rychlosti.
 **Riziko:** střední — `after()` mění pořadí vedlejších efektů, projít každé místo zvlášť.
 
 **Provedeno 2026-11-12**, v šesti commitech, se čtyřmi odchylkami od zadání:
@@ -762,6 +773,10 @@ musí být na korunu stejný. Když nesedí, migrace se vrací.
 
 ### AD12 — Fakturace: vystavování v adminu (L, **migrace 107**)
 **Cíl:** fakturu vystavíš v adminu, archiv cizích PDF funguje dál.
+**Přibylo z AD08:** s peněžní akcí „Zaplaceno" vznikne i její **jednoklikové tlačítko
+s `useOptimistic`** (vzor: `handleConfirm` v `components/LeadCard.tsx`). AD08 ho udělat nemohl —
+v adminu dnes žádné jednoklikové „Zaplaceno" není a napsat novou peněžní akci na konci sezení
+o rychlosti by riskovalo dvojí započtení příjmu (R-083).
 **Rozhodnutí: rozšířit `invoices`, ne nové tabulky.** Na `invoices` visí `finance_transaction_id`,
 unique index na číslo, `ai_extracted`, `pdf_data`, celé `invoice-actions.ts` a `/api/public/invoices`.
 Druhá tabulka = dvě evidence, dva výpočty „po splatnosti", migrace archivu.
