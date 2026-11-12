@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { X, Loader2, CalendarPlus, Lock } from 'lucide-react'
 import { createCalendarEvent } from '@/app/calendar-actions'
 import { cn } from '@/lib/utils'
@@ -9,11 +9,18 @@ import { getPragueTodayISO, parsePragueDatetimeLocalToISO } from '@/lib/prague-t
 import type { CalendarEventType } from '@/lib/types'
 
 interface AdminEventModalProps {
-  isOpen: boolean
-  onClose: () => void
+  /** `saved` říká, jestli se má kalendář přečíst znovu. */
+  onClose: (saved: boolean) => void
   defaultDate?: string   // 'YYYY-MM-DD' pre-fill the date field
   defaultHour?: number   // pre-fill the start hour
 }
+
+/*
+ * Modal se **mountuje až při otevření** a `<AnimatePresence>` je nad ním
+ * v SmartCalendar (AD08). Dokud byl uvnitř, komponenta se nikdy neodmountovala:
+ * `useState` inicializátory níž se spustily jedinkrát při načtení stránky
+ * a formulář pak navždy nabízel „dnes 10:00", ať se kliklo na jakýkoli slot.
+ */
 
 function toLocalDatetimeValue(date: string, hour: number): string {
   const h = String(hour).padStart(2, '0')
@@ -42,7 +49,7 @@ const EVENT_TYPES: { id: CalendarEventType; label: string; description: string; 
   },
 ]
 
-export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: AdminEventModalProps) {
+export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEventModalProps) {
   const today = getPragueTodayISO()
   const initDate = defaultDate ?? today
   const initHour = defaultHour ?? 10
@@ -55,16 +62,9 @@ export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: A
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  function resetAndClose() {
-    setTitle('')
-    setDescription('')
-    setEventType('manual')
-    setError(null)
-    const d = getPragueTodayISO()
-    setStartsAt(toLocalDatetimeValue(d, 10))
-    setEndsAt(toLocalDatetimeValue(d, 11))
-    onClose()
-  }
+  // Žádné „vrať formulář na dnes 10:00" — stav umírá s odmountováním, takže
+  // druhá událost v sezení začíná tam, kam uživatel klikl (AD08).
+  const close = (saved: boolean) => onClose(saved)
 
   function handleStartsAtChange(val: string) {
     setStartsAt(val)
@@ -97,7 +97,7 @@ export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: A
           ends_at: localDatetimeToISO(endsAt),
           event_type: eventType,
         })
-        resetAndClose()
+        close(true)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Chyba serveru.')
       }
@@ -109,175 +109,173 @@ export function AdminEventModal({ isOpen, onClose, defaultDate, defaultHour }: A
     'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white'
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm"
-            onClick={resetAndClose}
-          />
+    <>
+      <motion.div
+        key="backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm"
+        onClick={() => close(false)}
+      />
 
-          <motion.div
-            key="panel"
-            initial={{ opacity: 0, y: 32, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-          >
-            <div
-              className="pointer-events-auto w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="brand-gradient px-5 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-200" />
-                  <span className="text-white font-semibold text-sm">Přidat do kalendáře</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={resetAndClose}
-                  className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
-                  aria-label="Zavřít"
-                >
-                  <X size={15} strokeWidth={1.5} />
-                </button>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                {/* Event type selector */}
-                <div className="grid grid-cols-2 gap-2">
-                  {EVENT_TYPES.map(({ id, label, description: desc, icon: Icon }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setEventType(id)}
-                      className={cn(
-                        'flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all duration-150',
-                        eventType === id
-                          ? 'border-navy-400 bg-navy-50'
-                          : 'border-border bg-white hover:border-navy-200 hover:bg-navy-50/50',
-                      )}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Icon
-                          size={13}
-                          strokeWidth={1.5}
-                          className={eventType === id ? 'text-navy-700' : 'text-muted-foreground'}
-                        />
-                        <span className={cn(
-                          'text-xs font-semibold',
-                          eventType === id ? 'text-navy-800' : 'text-foreground',
-                        )}>
-                          {label}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground leading-snug">{desc}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Title */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Název *
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    placeholder={eventType === 'block' ? 'Např. Nedostupný' : 'Např. Schůzka s partnerem'}
-                    maxLength={120}
-                    className={inputCls}
-                    autoFocus
-                  />
-                </div>
-
-                {/* Times */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Začátek *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={startsAt}
-                      onChange={e => handleStartsAtChange(e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Konec *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={endsAt}
-                      min={startsAt}
-                      onChange={e => setEndsAt(e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-
-                {/* Description (only for manual events) */}
-                {eventType === 'manual' && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Poznámka (nepovinné)
-                    </label>
-                    <textarea
-                      value={description}
-                      onChange={e => setDescription(e.target.value)}
-                      rows={2}
-                      maxLength={500}
-                      placeholder="Detail nebo připomínka…"
-                      className={cn(inputCls, 'resize-none')}
-                    />
-                  </div>
-                )}
-
-                {error && (
-                  <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                    {error}
-                  </p>
-                )}
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-2 brand-gradient',
-                      'text-white text-sm font-semibold py-2.5 rounded-xl shadow-sm',
-                      'hover:opacity-90 transition-opacity disabled:opacity-60',
-                    )}
-                  >
-                    {isPending
-                      ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
-                      : 'Uložit událost'
-                    }
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetAndClose}
-                    className="px-4 text-sm text-muted-foreground rounded-xl border border-border hover:bg-muted transition-colors"
-                  >
-                    Zrušit
-                  </button>
-                </div>
-              </form>
+      <motion.div
+        key="panel"
+        initial={{ opacity: 0, y: 32, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+      >
+        <div
+          // `max-h-[90vh]` + rolování: na telefonu se formulář nevejde a
+          // `overflow-hidden` samotné odřízlo tlačítko Uložit (AD08).
+          className="pointer-events-auto w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="brand-gradient px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-200" />
+              <span className="text-white font-semibold text-sm">Přidat do kalendáře</span>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            <button
+              type="button"
+              onClick={() => close(false)}
+              className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Zavřít"
+            >
+              <X size={15} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            {/* Event type selector */}
+            <div className="grid grid-cols-2 gap-2">
+              {EVENT_TYPES.map(({ id, label, description: desc, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setEventType(id)}
+                  className={cn(
+                    'flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all duration-150',
+                    eventType === id
+                      ? 'border-navy-400 bg-navy-50'
+                      : 'border-border bg-white hover:border-navy-200 hover:bg-navy-50/50',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Icon
+                      size={13}
+                      strokeWidth={1.5}
+                      className={eventType === id ? 'text-navy-700' : 'text-muted-foreground'}
+                    />
+                    <span className={cn(
+                      'text-xs font-semibold',
+                      eventType === id ? 'text-navy-800' : 'text-foreground',
+                    )}>
+                      {label}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground leading-snug">{desc}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Title */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Název *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder={eventType === 'block' ? 'Např. Nedostupný' : 'Např. Schůzka s partnerem'}
+                maxLength={120}
+                className={inputCls}
+                autoFocus
+              />
+            </div>
+
+            {/* Times */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Začátek *
+                </label>
+                <input
+                  type="datetime-local"
+                  value={startsAt}
+                  onChange={e => handleStartsAtChange(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Konec *
+                </label>
+                <input
+                  type="datetime-local"
+                  value={endsAt}
+                  min={startsAt}
+                  onChange={e => setEndsAt(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            {/* Description (only for manual events) */}
+            {eventType === 'manual' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Poznámka (nepovinné)
+                </label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  placeholder="Detail nebo připomínka…"
+                  className={cn(inputCls, 'resize-none')}
+                />
+              </div>
+            )}
+
+            {error && (
+              <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={isPending}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 brand-gradient',
+                  'text-white text-sm font-semibold py-2.5 rounded-xl shadow-sm',
+                  'hover:opacity-90 transition-opacity disabled:opacity-60',
+                )}
+              >
+                {isPending
+                  ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
+                  : 'Uložit událost'
+                }
+              </button>
+              <button
+                type="button"
+                onClick={() => close(false)}
+                className="px-4 text-sm text-muted-foreground rounded-xl border border-border hover:bg-muted transition-colors"
+              >
+                Zrušit
+              </button>
+            </div>
+          </form>
+        </div>
+      </motion.div>
+    </>
   )
 }

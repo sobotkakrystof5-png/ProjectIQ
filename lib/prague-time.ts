@@ -140,6 +140,44 @@ export function addIsoDays(iso: string, days: number): string {
   return dt.toISOString().slice(0, 10)
 }
 
+// Add (or subtract) whole months from 'YYYY-MM-DD'. Den se drží v měsíci:
+// 31. 1. + 1 měsíc je 28. (nebo 29.) 2., ne 3. 3.
+export function addIsoMonths(iso: string, months: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const total = (y * 12 + (m - 1)) + months
+  const year = Math.floor(total / 12)
+  const month = total % 12 + 1
+  const day = Math.min(d, getDaysInMonth(year, month))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${year}-${pad(month)}-${pad(day)}`
+}
+
+// Day of week of a 'YYYY-MM-DD' date, JS style (0=Sun … 6=Sat). Čistá
+// kalendářní aritmetika — nezávisí na zóně prohlížeče.
+export function isoWeekday(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
+// Pražský kalendářní den okamžiku, jako 'YYYY-MM-DD'. Pro vykreslování
+// kalendáře: `date.getDate()` čte zónu prohlížeče, tahle funkce vždy Prahu.
+export function pragueDayOf(instant: Date | string): string {
+  const { date } = isoToPragueDateAndTime(
+    typeof instant === 'string' ? instant : instant.toISOString(),
+  )
+  return date
+}
+
+// Minuty od pražské midnight (0–1439). Pro svislou pozici v mřížce dne —
+// `getHours()` zahazuje minuty i zónu.
+export function pragueMinutesOf(instant: Date | string): number {
+  const { time } = isoToPragueDateAndTime(
+    typeof instant === 'string' ? instant : instant.toISOString(),
+  )
+  const [hour, minute] = time.split(':').map(Number)
+  return hour * 60 + minute
+}
+
 // Parse a <input type="datetime-local"> value ('YYYY-MM-DDTHH:MM'), treating
 // it as Prague wall-clock time, and return the equivalent UTC ISO string.
 // Correct across CET/CEST transitions (unlike `new Date(localDt).toISOString()`,

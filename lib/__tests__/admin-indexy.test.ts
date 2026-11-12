@@ -36,10 +36,11 @@ const scansEverything = (p: string): boolean => /Seq Scan/i.test(p)
 const QUERIES = {
   // app/calls-actions.ts → getCallsScreen
   hovory: `SELECT id FROM client_leads ORDER BY created_at DESC LIMIT 50`,
-  // app/dashboard/calendar/page.tsx
+  // lib/admin/calendar.ts → okno kalendáře (AD08)
   kalendarLeady: `
     SELECT id FROM client_leads
     WHERE next_action_date IS NOT NULL AND next_action_time IS NOT NULL
+      AND next_action_date >= CURRENT_DATE - 7 AND next_action_date < CURRENT_DATE + 38
       AND lead_status NOT IN ('converted', 'lost') AND calendar_event_id IS NULL
     ORDER BY next_action_date, next_action_time`,
   // lib/admin-today-queries.ts → „Zakázky bez pohybu"
@@ -48,10 +49,16 @@ const QUERIES = {
     WHERE status IN ('new', 'in_progress', 'review')
       AND updated_at < now() - interval '14 days' AND NOT lead_pending
     ORDER BY updated_at ASC LIMIT 5`,
-  // app/dashboard/calendar/page.tsx → termíny
-  terminy: `SELECT id FROM projects WHERE deadline IS NOT NULL ORDER BY deadline`,
-  // app/dashboard/calendar/page.tsx → události
-  udalosti: `SELECT id FROM calendar_events ORDER BY starts_at`,
+  // lib/admin/calendar.ts → termíny v okně (AD08)
+  terminy: `
+    SELECT id FROM projects
+    WHERE deadline >= CURRENT_DATE - 7 AND deadline < CURRENT_DATE + 38
+    ORDER BY deadline`,
+  // lib/admin/calendar.ts → události v okně (AD08)
+  udalosti: `
+    SELECT id FROM calendar_events
+    WHERE starts_at >= now() - interval '7 days' AND starts_at < now() + interval '38 days'
+    ORDER BY starts_at`,
   // app/dashboard/finance/invoice-actions.ts → evidence faktur
   faktury: `SELECT id FROM invoices ORDER BY issued_on DESC LIMIT 50`,
   // lib/admin-today-queries.ts → faktury po splatnosti

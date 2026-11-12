@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -18,49 +18,21 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { cn, whatsappHref } from '@/lib/utils'
-import { toMondayFirst, getDaysInMonth, getMonthStartOffset } from '@/lib/prague-time'
+import {
+  addIsoDays, getDaysInMonth, getMonthStartOffset, isoWeekday,
+  pragueDayOf, pragueMinutesOf, toMondayFirst,
+} from '@/lib/prague-time'
+import { loadCalendarMonth } from '@/app/calendar-actions'
+import type {
+  CalendarData, RawCalendarEvent, RawConsultation, RawDeadline, RawLead,
+} from '@/lib/admin/calendar'
+import {
+  covers, mergeRanges, neighbourAnchor, startOfMonthIso, startOfWeekIso, viewRange,
+  type CalendarView, type DayRange,
+} from '@/lib/admin/calendar-window'
 
-// ─── Raw data shapes (serialised from server) ────────────────────────────────
-
-export interface RawConsultation {
-  id: string
-  scheduled_at: string
-  channel: ConsultationChannel
-  client_wish: string
-  meeting_link: string | null
-  client_email: string | null
-  client_name: string
-  project_id: string
-}
-
-export interface RawDeadline {
-  id: string
-  client_name: string
-  deadline: string // 'YYYY-MM-DD'
-}
-
-export interface RawCalendarEvent {
-  id: string
-  title: string
-  description: string | null
-  starts_at: string
-  ends_at: string
-  event_type: CalendarEventType
-}
-
-export interface RawLead {
-  id: string
-  company_name: string
-  contact_name: string | null
-  next_action: string | null
-  next_action_type: string | null
-  phone: string | null
-  email: string | null
-  lead_status: LeadStatus
-  estimated_value: number | null
-  notes: string | null
-  action_at: string // ISO datetime (date + time combined in Prague TZ)
-}
+// Tvary dat ze serveru žijí v `lib/admin/calendar.ts` — ten je čte z databáze
+// a importuje je i server action pro dotažení dalšího období (AD08).
 
 // ─── Unified event type ───────────────────────────────────────────────────────
 
@@ -71,6 +43,14 @@ interface UnifiedEvent {
   kind: EventKind
   startsAt: Date
   endsAt: Date
+  /**
+   * Pražský kalendářní den a minuty od midnight. Mřížka se kreslí **jen**
+   * z nich: `getHours()` čte zónu prohlížeče a zahazuje minuty, takže
+   * událost v 10:15 se dřív nakreslila na linku 10:00 (AD08).
+   */
+  day: string
+  startMin: number
+  endMin: number
   allDay: boolean
   label: string
   sublabel: string
@@ -129,12 +109,15 @@ function ChannelIcon({ channel }: { channel: ConsultationChannel }) {
 
 // ─── Data unification ─────────────────────────────────────────────────────────
 
-function buildUnified(
-  consultations: RawConsultation[],
-  deadlines: RawDeadline[],
-  events: RawCalendarEvent[],
-  leads: RawLead[],
-): UnifiedEvent[] {
+/** Pražský den a rozsah minut jednoho okamžiku; konec přes midnight se zkrátí. */
+function moment(start: Date, end: Date): Pick<UnifiedEvent, 'day' | 'startMin' | 'endMin'> {
+  const day = pragueDayOf(start)
+  const startMin = pragueMinutesOf(start)
+  const endMin = pragueDayOf(end) === day ? pragueMinutesOf(end) : 24 * 60
+  return { day, startMin, endMin: Math.max(endMin, startMin) }
+}
+
+function buildUnified({ consultations, deadlines, events, leads }: CalendarData): UnifiedEvent[] {
   const result: UnifiedEvent[] = []
 
   for (const c of consultations) {
@@ -145,6 +128,7 @@ function buildUnified(
       kind: 'consultation',
       startsAt: start,
       endsAt: end,
+      ...moment(start, end),
       allDay: false,
       label: c.client_name,
       sublabel: CHANNEL_LABELS[c.channel],
@@ -168,6 +152,10 @@ function buildUnified(
       kind: 'deadline',
       startsAt: start,
       endsAt: end,
+      // Deadline je datum bez času — `d.deadline` je už pražský den.
+      day: d.deadline,
+      startMin: 0,
+      endMin: 24 * 60,
       allDay: true,
       label: d.client_name,
       sublabel: 'Deadline',
@@ -176,11 +164,14 @@ function buildUnified(
   }
 
   for (const e of events) {
+    const start = new Date(e.starts_at)
+    const end = new Date(e.ends_at)
     result.push({
       id: e.id,
       kind: e.event_type as EventKind,
-      startsAt: new Date(e.starts_at),
-      endsAt: new Date(e.ends_at),
+      startsAt: start,
+      endsAt: end,
+      ...moment(start, end),
       allDay: false,
       label: e.title,
       sublabel: e.event_type === 'block' ? 'Blokovaný čas' : 'Událost',
@@ -196,6 +187,7 @@ function buildUnified(
       kind: 'call',
       startsAt: start,
       endsAt: end,
+      ...moment(start, end),
       allDay: false,
       label: lead.contact_name || lead.company_name,
       sublabel: LEAD_ACTION_TYPE_LABELS[lead.next_action_type as LeadActionType] ?? lead.next_action_type ?? 'Akce',
@@ -227,24 +219,9 @@ const MONTHS_CZ = [
 const WEEKDAYS_LONG_CZ = ['Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota','Neděle']
 const WEEKDAYS_SHORT_CZ = ['Po','Út','St','Čt','Pá','So','Ne']
 
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-}
-
-function startOfWeek(date: Date): Date {
-  const d = new Date(date)
-  const dow = toMondayFirst(d.getDay()) // 0=Mon ... 6=Sun
-  d.setDate(d.getDate() - dow)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
+/** 'YYYY-MM-DD' → den měsíce (jen pro popisek v mřížce). */
+function dayNumberOf(iso: string): number {
+  return Number(iso.slice(8, 10))
 }
 
 function formatTime(date: Date): string {
@@ -255,11 +232,8 @@ function formatShortDate(date: Date): string {
   return date.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', timeZone: 'Europe/Prague' })
 }
 
-function eventsForDay(events: UnifiedEvent[], y: number, m: number, d: number): UnifiedEvent[] {
-  return events.filter(ev => {
-    const s = ev.startsAt
-    return s.getFullYear() === y && s.getMonth() + 1 === m && s.getDate() === d
-  })
+function eventsForDay(events: UnifiedEvent[], iso: string): UnifiedEvent[] {
+  return events.filter(ev => ev.day === iso)
 }
 
 // ─── Event detail modal ───────────────────────────────────────────────────────
@@ -527,16 +501,16 @@ function MonthView({
   events,
   year,
   month,
-  today,
+  todayIso,
   onSelectEvent,
   onSelectDay,
 }: {
   events: UnifiedEvent[]
   year: number
   month: number
-  today: Date
+  todayIso: string
   onSelectEvent: (ev: UnifiedEvent) => void
-  onSelectDay: (y: number, m: number, d: number) => void
+  onSelectDay: (iso: string) => void
 }) {
   const daysInMonth = getDaysInMonth(year, month)
   const startOffset = getMonthStartOffset(year, month)
@@ -561,9 +535,10 @@ function MonthView({
             return <div key={i} className="bg-gray-50/50 min-h-[60px] sm:min-h-[90px]" />
           }
 
-          const isToday = isSameDay(today, new Date(year, month - 1, dayNum))
-          const isWeekend = toMondayFirst(new Date(year, month - 1, dayNum).getDay()) >= 5
-          const dayEvents = eventsForDay(events, year, month, dayNum)
+          const iso = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
+          const isToday = iso === todayIso
+          const isWeekend = toMondayFirst(isoWeekday(iso)) >= 5
+          const dayEvents = eventsForDay(events, iso)
           const visible = dayEvents.slice(0, MAX_PILLS_PER_DAY)
           const overflow = dayEvents.length - MAX_PILLS_PER_DAY
 
@@ -574,7 +549,7 @@ function MonthView({
                 'bg-white min-h-[60px] sm:min-h-[90px] p-1 sm:p-1.5 flex flex-col cursor-pointer hover:bg-navy-50/40 transition-colors group',
                 isWeekend && 'bg-gray-50/30',
               )}
-              onClick={() => onSelectDay(year, month, dayNum)}
+              onClick={() => onSelectDay(iso)}
             >
               {/* Day number */}
               <span className={cn(
@@ -628,27 +603,49 @@ function MonthView({
 const HOUR_PX = 52
 const DAY_START = 8
 const DAY_END = 22
+const MIN_BLOCK_PX = 18
+
+/**
+ * Svislá pozice a výška bloku v mřížce dne, v minutách (AD08).
+ *
+ * Dřív se počítala z `getHours()`, takže schůzka 10:15–12:00 se nakreslila
+ * od 10:00 a popisek vedle ní říkal 10:15. Událost začínající před
+ * `DAY_START` navíc úplně zmizela — dnes se přilepí na horní hranu a je
+ * poznat podle zkrácené výšky.
+ */
+function blockGeometry(ev: UnifiedEvent) {
+  const gridStart = DAY_START * 60
+  const gridEnd = (DAY_END + 1) * 60
+  const from = Math.max(ev.startMin, gridStart)
+  const to = Math.min(Math.max(ev.endMin, ev.startMin + 15), gridEnd)
+  const topPx = ((from - gridStart) / 60) * HOUR_PX
+  const heightPx = Math.max(MIN_BLOCK_PX, ((to - from) / 60) * HOUR_PX - 2)
+  return { topPx, heightPx, clippedTop: ev.startMin < gridStart }
+}
+
+/** Padá aspoň část události do zobrazené části dne? */
+function isInGrid(ev: UnifiedEvent): boolean {
+  return !ev.allDay && ev.endMin > DAY_START * 60 && ev.startMin < (DAY_END + 1) * 60
+}
 
 function WeekView({
   events,
   weekStart,
-  today,
+  todayIso,
   onSelectEvent,
   onClickSlot,
 }: {
   events: UnifiedEvent[]
-  weekStart: Date
-  today: Date
+  weekStart: string
+  todayIso: string
   onSelectEvent: (ev: UnifiedEvent) => void
   onClickSlot: (date: string, hour: number) => void
 }) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const days = Array.from({ length: 7 }, (_, i) => addIsoDays(weekStart, i))
   const hours = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => i + DAY_START)
 
   // All-day events (deadlines)
-  const allDayForWeek = events.filter(ev =>
-    ev.allDay && days.some(d => isSameDay(d, ev.startsAt))
-  )
+  const allDayForWeek = events.filter(ev => ev.allDay && days.includes(ev.day))
 
   return (
     <div className="flex flex-col overflow-x-auto">
@@ -657,20 +654,20 @@ function WeekView({
         <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border mb-0">
           <div />
           {days.map((d, i) => {
-            const isToday = isSameDay(d, today)
+            const isToday = d === todayIso
             return (
               <div key={i} className={cn(
                 'text-center py-2 border-l border-border',
                 isToday && 'bg-navy-50',
               )}>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase">
-                  {WEEKDAYS_SHORT_CZ[toMondayFirst(d.getDay())]}
+                  {WEEKDAYS_SHORT_CZ[toMondayFirst(isoWeekday(d))]}
                 </p>
                 <p className={cn(
                   'text-sm font-semibold mx-auto mt-0.5 w-7 h-7 flex items-center justify-center rounded-full',
                   isToday ? 'brand-gradient text-white' : 'text-foreground',
                 )}>
-                  {d.getDate()}
+                  {dayNumberOf(d)}
                 </p>
               </div>
             )
@@ -684,7 +681,7 @@ function WeekView({
               Celý den
             </div>
             {days.map((d, i) => {
-              const dayAllDay = allDayForWeek.filter(ev => isSameDay(ev.startsAt, d))
+              const dayAllDay = allDayForWeek.filter(ev => ev.day === d)
               return (
                 <div key={i} className="border-l border-border py-1 px-0.5 min-h-[28px]">
                   {dayAllDay.map(ev => {
@@ -721,13 +718,9 @@ function WeekView({
 
             {/* Day columns */}
             {days.map((d, di) => {
-              const isToday = isSameDay(d, today)
-              const timedEvents = events.filter(ev =>
-                !ev.allDay && isSameDay(ev.startsAt, d) &&
-                ev.startsAt.getHours() >= DAY_START &&
-                ev.startsAt.getHours() <= DAY_END
-              )
-              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+              const isToday = d === todayIso
+              const timedEvents = events.filter(ev => ev.day === d && isInGrid(ev))
+              const dateStr = d
 
               return (
                 <div
@@ -749,11 +742,7 @@ function WeekView({
                   {/* Events */}
                   {timedEvents.map(ev => {
                     const style = getEventStyle(ev)
-                    const topHour = ev.startsAt.getHours()
-                    const topPx = (topHour - DAY_START) * HOUR_PX
-                    const durationMs = ev.endsAt.getTime() - ev.startsAt.getTime()
-                    const durationHours = Math.max(0.5, durationMs / (1000 * 60 * 60))
-                    const heightPx = durationHours * HOUR_PX - 2
+                    const { topPx, heightPx, clippedTop } = blockGeometry(ev)
 
                     return (
                       <button
@@ -763,6 +752,7 @@ function WeekView({
                         className={cn(
                           'absolute left-0.5 right-0.5 rounded border text-left overflow-hidden z-10',
                           'hover:brightness-95 transition-all shadow-sm',
+                          clippedTop && 'rounded-t-none border-t-2 border-t-current',
                           style.pill,
                         )}
                         style={{ top: `${topPx + 1}px`, height: `${heightPx}px` }}
@@ -798,16 +788,17 @@ function DayView({
   onClickSlot,
 }: {
   events: UnifiedEvent[]
-  date: Date
+  /** 'YYYY-MM-DD' pražského dne */
+  date: string
   onSelectEvent: (ev: UnifiedEvent) => void
   onClickSlot: (dateStr: string, hour: number) => void
 }) {
   const hours = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => i + DAY_START)
-  const dayEvents = events.filter(ev => isSameDay(ev.startsAt, date))
-  const timedEvents = dayEvents.filter(ev => !ev.allDay)
+  const dayEvents = events.filter(ev => ev.day === date)
+  const timedEvents = dayEvents.filter(isInGrid)
   const allDayEvents = dayEvents.filter(ev => ev.allDay)
 
-  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  const dateStr = date
 
   return (
     <div className="flex gap-5">
@@ -855,11 +846,7 @@ function DayView({
             {/* Events */}
             {timedEvents.map(ev => {
               const style = getEventStyle(ev)
-              const topHour = ev.startsAt.getHours()
-              const topPx = (topHour - DAY_START) * HOUR_PX
-              const durationMs = ev.endsAt.getTime() - ev.startsAt.getTime()
-              const durationHours = Math.max(0.5, durationMs / (1000 * 60 * 60))
-              const heightPx = durationHours * HOUR_PX - 2
+              const { topPx, heightPx, clippedTop } = blockGeometry(ev)
 
               return (
                 <button
@@ -869,6 +856,7 @@ function DayView({
                   className={cn(
                     'absolute left-14 right-2 rounded-lg border text-left z-10 shadow-sm',
                     'hover:brightness-95 transition-all',
+                    clippedTop && 'rounded-t-none border-t-2 border-t-current',
                     style.pill,
                   )}
                   style={{ top: `${topPx + 1}px`, height: `${heightPx}px` }}
@@ -955,89 +943,125 @@ function Legend() {
 
 // ─── Main SmartCalendar ───────────────────────────────────────────────────────
 
-type ViewMode = 'month' | 'week' | 'day'
+type ViewMode = CalendarView
 
 export function SmartCalendar({
-  consultations,
-  deadlines,
-  events: rawEvents,
-  leads,
+  initial,
+  initialRange,
+  today,
 }: {
-  consultations: RawConsultation[]
-  deadlines: RawDeadline[]
-  events: RawCalendarEvent[]
-  leads: RawLead[]
+  initial: CalendarData
+  /** Okno, které přišlo se stránkou (AD08). */
+  initialRange: DayRange
+  /** Dnešní pražský den, 'YYYY-MM-DD' — spočítaný na serveru. */
+  today: string
 }) {
   const router = useRouter()
-  const today = new Date()
 
   const [view, setView] = useState<ViewMode>('month')
-  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const [anchor, setAnchor] = useState(() => startOfMonthIso(today))
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null)
   const [createModal, setCreateModal] = useState<{ open: boolean; date?: string; hour?: number }>({ open: false })
 
-  const unified = buildUnified(consultations, deadlines, rawEvents, leads)
+  // Data kalendáře žijí tady, ne v propech: do prohlížeče přijde jen okno
+  // kolem dneška a další měsíce se dotahují přes `loadCalendarMonth` (AD08).
+  const [data, setData] = useState<CalendarData>(initial)
+  const [loaded, setLoaded] = useState<DayRange[]>([initialRange])
+  const [isLoading, startLoading] = useTransition()
+
+  const unified = useMemo(() => buildUnified(data), [data])
+
+  /**
+   * Vymění vše, co padá do `range`, za nově stažené. Jednou funkcí se tak
+   * řeší „dotáhni další měsíc" i „přečti znovu, něco se změnilo" — a není
+   * potřeba nic dedupovat ani mazat podle id.
+   */
+  const replaceRange = useCallback((range: DayRange, incoming: CalendarData) => {
+    const outside = (day: string) => day < range.from || day > range.to
+    setData((prev) => ({
+      consultations: [...prev.consultations.filter((c) => outside(pragueDayOf(c.scheduled_at))), ...incoming.consultations],
+      deadlines: [...prev.deadlines.filter((d) => outside(d.deadline)), ...incoming.deadlines],
+      events: [...prev.events.filter((e) => outside(pragueDayOf(e.starts_at))), ...incoming.events],
+      leads: [...prev.leads.filter((l) => outside(pragueDayOf(l.action_at))), ...incoming.leads],
+    }))
+    setLoaded((prev) => mergeRanges([...prev, range]))
+  }, [])
+
+  /** Stáhne měsíc kolem kotvy, pokud zobrazení není celé v načteném okně. */
+  const ensureLoaded = useCallback((nextView: ViewMode, nextAnchor: string, force = false) => {
+    if (!force && covers(loaded, viewRange(nextView, nextAnchor))) return
+    startLoading(async () => {
+      const { range, data: fresh } = await loadCalendarMonth(nextAnchor)
+      replaceRange(range, fresh)
+    })
+  }, [loaded, replaceRange])
+
+  function goTo(nextView: ViewMode, nextAnchor: string) {
+    setView(nextView)
+    setAnchor(nextAnchor)
+    ensureLoaded(nextView, nextAnchor)
+  }
 
   // Navigation helpers
   function navigate(delta: number) {
-    setCurrentDate(prev => {
-      const d = new Date(prev)
-      if (view === 'month') {
-        d.setMonth(d.getMonth() + delta)
-      } else if (view === 'week') {
-        d.setDate(d.getDate() + delta * 7)
-      } else {
-        d.setDate(d.getDate() + delta)
-      }
-      return d
-    })
+    if (view === 'month') return goTo(view, neighbourAnchor(anchor, delta))
+    if (view === 'week') return goTo(view, addIsoDays(anchor, delta * 7))
+    return goTo(view, addIsoDays(anchor, delta))
   }
 
   function goToToday() {
-    setCurrentDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()))
+    goTo(view, view === 'month' ? startOfMonthIso(today) : today)
   }
 
   function switchView(v: ViewMode) {
-    setView(v)
-    // Keep the date meaningful for the new view
-    if (v === 'month') {
-      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1))
-    }
+    // Měsíc se kotví na první den, aby krok vpřed nepřeskakoval kvůli
+    // různě dlouhým měsícům.
+    goTo(v, v === 'month' ? startOfMonthIso(anchor) : anchor)
   }
 
   // Header title
   function headerTitle() {
-    if (view === 'month') {
-      return `${MONTHS_CZ[currentDate.getMonth()]} ${currentDate.getFullYear()}`
-    }
+    const [y, mo] = anchor.split('-').map(Number)
+    if (view === 'month') return `${MONTHS_CZ[mo - 1]} ${y}`
     if (view === 'week') {
-      const ws = startOfWeek(currentDate)
-      const we = addDays(ws, 6)
-      if (ws.getMonth() === we.getMonth()) {
-        return `${ws.getDate()}. – ${we.getDate()}. ${MONTHS_CZ[ws.getMonth()]} ${ws.getFullYear()}`
+      const ws = startOfWeekIso(anchor)
+      const we = addIsoDays(ws, 6)
+      const [wsY, wsM] = ws.split('-').map(Number)
+      const [weY, weM] = we.split('-').map(Number)
+      if (wsM === weM && wsY === weY) {
+        return `${dayNumberOf(ws)}. – ${dayNumberOf(we)}. ${MONTHS_CZ[wsM - 1]} ${wsY}`
       }
-      return `${ws.getDate()}. ${MONTHS_CZ[ws.getMonth()]} – ${we.getDate()}. ${MONTHS_CZ[we.getMonth()]} ${we.getFullYear()}`
+      return `${dayNumberOf(ws)}. ${MONTHS_CZ[wsM - 1]} – ${dayNumberOf(we)}. ${MONTHS_CZ[weM - 1]} ${weY}`
     }
-    return currentDate.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const [dy, dm, dd] = anchor.split('-').map(Number)
+    return new Date(Date.UTC(dy, dm - 1, dd)).toLocaleDateString('cs-CZ', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+    })
   }
 
-  const handleSelectDay = useCallback((y: number, m: number, d: number) => {
-    setCurrentDate(new Date(y, m - 1, d))
+  const handleSelectDay = useCallback((iso: string) => {
     setView('day')
+    setAnchor(iso)
   }, [])
 
   const handleClickSlot = useCallback((dateStr: string, hour: number) => {
     setCreateModal({ open: true, date: dateStr, hour })
   }, [])
 
-  const handleEventDeleted = useCallback(() => {
+  /** Po změně v kalendáři se přečte znovu jen zobrazený měsíc. */
+  const reloadCurrent = useCallback(() => {
+    startLoading(async () => {
+      const { range, data: fresh } = await loadCalendarMonth(anchor)
+      replaceRange(range, fresh)
+    })
+    // Odznaky v menu a Hovory se počítají na serveru.
     router.refresh()
-  }, [router])
+  }, [anchor, replaceRange, router])
 
-  const handleCreateClose = useCallback(() => {
+  const handleCreateClose = useCallback((saved: boolean) => {
     setCreateModal({ open: false })
-    router.refresh()
-  }, [router])
+    if (saved) reloadCurrent()
+  }, [reloadCurrent])
 
   return (
     <div>
@@ -1105,18 +1129,21 @@ export function SmartCalendar({
         <div className="p-4 sm:p-5">
           <AnimatePresence mode="wait">
             <motion.div
-              key={`${view}-${currentDate.toISOString().slice(0, 10)}`}
+              key={`${view}-${anchor}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
+              // Dokud se dotahuje další měsíc, mřížka zešedne — ale zůstane
+              // vidět a klikatelná, místo aby zmizela za kostlivcem.
+              className={cn(isLoading && 'opacity-60 transition-opacity')}
             >
               {view === 'month' && (
                 <MonthView
                   events={unified}
-                  year={currentDate.getFullYear()}
-                  month={currentDate.getMonth() + 1}
-                  today={today}
+                  year={Number(anchor.slice(0, 4))}
+                  month={Number(anchor.slice(5, 7))}
+                  todayIso={today}
                   onSelectEvent={setSelectedEvent}
                   onSelectDay={handleSelectDay}
                 />
@@ -1124,8 +1151,8 @@ export function SmartCalendar({
               {view === 'week' && (
                 <WeekView
                   events={unified}
-                  weekStart={startOfWeek(currentDate)}
-                  today={today}
+                  weekStart={startOfWeekIso(anchor)}
+                  todayIso={today}
                   onSelectEvent={setSelectedEvent}
                   onClickSlot={handleClickSlot}
                 />
@@ -1133,7 +1160,7 @@ export function SmartCalendar({
               {view === 'day' && (
                 <DayView
                   events={unified}
-                  date={currentDate}
+                  date={anchor}
                   onSelectEvent={setSelectedEvent}
                   onClickSlot={handleClickSlot}
                 />
@@ -1153,16 +1180,25 @@ export function SmartCalendar({
         <EventDetailModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
-          onDeleted={handleEventDeleted}
+          onDeleted={reloadCurrent}
         />
       )}
 
-      <AdminEventModal
-        isOpen={createModal.open}
-        onClose={handleCreateClose}
-        defaultDate={createModal.date}
-        defaultHour={createModal.hour}
-      />
+      {/*
+        AnimatePresence je **tady**, ne uvnitř modalu (AD08). Dřív modal
+        nikdy neodmountoval, takže se `useState` inicializátory spustily jen
+        při prvním načtení stránky a formulář navždy držel „dnes 10:00".
+        Klik na slot v 11:00 se do něj nepropsal.
+      */}
+      <AnimatePresence>
+        {createModal.open && (
+          <AdminEventModal
+            onClose={handleCreateClose}
+            defaultDate={createModal.date}
+            defaultHour={createModal.hour}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,103 +1,20 @@
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
-import { adminDb, q } from '@/lib/admin/db'
 import { SmartCalendar } from '@/components/SmartCalendar'
-import type { RawConsultation, RawDeadline, RawCalendarEvent, RawLead } from '@/components/SmartCalendar'
-import type { LeadStatus } from '@/lib/types'
+import { loadCalendarWindow } from '@/lib/admin/calendar'
+import { windowFor } from '@/lib/admin/calendar-window'
+import { getPragueTodayISO } from '@/lib/prague-time'
 
 // Po sloučení byznysů (AD02, R-088) kalendář ukazuje všechno — i historické
 // záznamy, které sem dřív nepouštěl filtr `business = 'vizeon'`.
+//
+// Od AD08 se čte jen okno kolem zobrazeného měsíce (± týden), ne celá
+// historie. Další období si kalendář dotáhne sám přes `loadCalendarMonth`.
 export const revalidate = 0
 
 export default async function CalendarPage() {
-  // Čtyři dotazy jednou dávkou (AD06). Časové okno místo celé historie
-  // přidá AD08 spolu s opravami kalendáře.
-  const [consultationRows, deadlineRows, eventRows, leadRows] = await adminDb.batch([
-    q`
-      SELECT
-        cs.id,
-        cs.scheduled_at,
-        cs.channel,
-        cs.client_wish,
-        cs.meeting_link,
-        cs.client_email,
-        p.client_name,
-        p.id AS project_id
-      FROM consultation_slots cs
-      JOIN projects p ON cs.project_id = p.id
-      ORDER BY cs.scheduled_at
-    `,
-    q`
-      SELECT id, client_name, deadline
-      FROM projects
-      WHERE deadline IS NOT NULL
-      ORDER BY deadline
-    `,
-    q`
-      SELECT id, title, description, starts_at, ends_at, event_type
-      FROM calendar_events
-      ORDER BY starts_at
-    `,
-    q`
-      SELECT
-        id, company_name, contact_name, next_action, next_action_type,
-        phone, email, lead_status, estimated_value, notes,
-        (next_action_date + next_action_time) AT TIME ZONE 'Europe/Prague' AS action_at
-      FROM client_leads
-      WHERE next_action_date IS NOT NULL
-        AND next_action_time IS NOT NULL
-        AND lead_status NOT IN ('converted', 'lost')
-        AND calendar_event_id IS NULL
-      ORDER BY next_action_date, next_action_time
-    `,
-  ])
-
-  const consultations = (consultationRows as unknown as RawConsultation[]).map(r => ({
-    ...r,
-    scheduled_at: new Date(r.scheduled_at).toISOString(),
-  }))
-
-  const deadlines = (deadlineRows as unknown as { id: string; client_name: string; deadline: Date | string }[]).map(r => ({
-    id: r.id,
-    client_name: r.client_name,
-    deadline: typeof r.deadline === 'string'
-      ? r.deadline.slice(0, 10)
-      : r.deadline.toISOString().slice(0, 10),
-  })) satisfies RawDeadline[]
-
-  const events = (eventRows as unknown as RawCalendarEvent[]).map(r => ({
-    ...r,
-    starts_at: new Date(r.starts_at).toISOString(),
-    ends_at: new Date(r.ends_at).toISOString(),
-  }))
-
-  type LeadRowShape = {
-    id: string
-    company_name: string
-    contact_name: string | null
-    next_action: string | null
-    next_action_type: string | null
-    phone: string | null
-    email: string | null
-    lead_status: string
-    // numeric přijde z neonu jako string — do klienta posíláme číslo
-    estimated_value: string | number | null
-    notes: string | null
-    action_at: Date | string
-  }
-
-  const leads = (leadRows as unknown as LeadRowShape[]).map(r => ({
-    id: r.id,
-    company_name: r.company_name,
-    contact_name: r.contact_name,
-    next_action: r.next_action,
-    next_action_type: r.next_action_type,
-    phone: r.phone,
-    email: r.email,
-    lead_status: r.lead_status as LeadStatus,
-    estimated_value: r.estimated_value == null ? null : Number(r.estimated_value),
-    notes: r.notes,
-    action_at: new Date(r.action_at).toISOString(),
-  })) satisfies RawLead[]
+  const today = getPragueTodayISO()
+  const range = windowFor(today)
+  const data = await loadCalendarWindow(range)
 
   return (
     <PageShell width="wide">
@@ -107,12 +24,7 @@ export default async function CalendarPage() {
         subtitleFont="sans"
       />
 
-      <SmartCalendar
-        consultations={consultations}
-        deadlines={deadlines}
-        events={events}
-        leads={leads}
-      />
+      <SmartCalendar initial={data} initialRange={range} today={today} />
     </PageShell>
   )
 }

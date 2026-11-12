@@ -3,9 +3,26 @@
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
+import { loadCalendarWindow, type CalendarData } from '@/lib/admin/calendar'
+import { windowFor, type DayRange } from '@/lib/admin/calendar-window'
 import { isoToPragueDateAndTime } from '@/lib/prague-time'
 import { DEFAULT_LEAD_ORIGIN } from '@/lib/lead-origins'
 import type { CalendarEventType } from '@/lib/types'
+
+/**
+ * Dotažení dalšího období kalendáře (AD08). Stránka pošle jen okno kolem
+ * zobrazeného měsíce; když se někdo proklikne dál, dojde sem místo
+ * přenačtení celé stránky.
+ *
+ * Kotva je `'YYYY-MM-DD'` z prohlížeče, ale rozsah se z ní spočítá **tady**
+ * (`windowFor`) — z klienta tak nemůže přijít „od roku 2000 do 2100".
+ */
+export async function loadCalendarMonth(anchor: string): Promise<{ range: DayRange; data: CalendarData }> {
+  await requireAuth()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(anchor)) throw new Error('Neplatné datum.')
+  const range = windowFor(anchor)
+  return { range, data: await loadCalendarWindow(range) }
+}
 
 type CalendarEventPayload = {
   title: string
