@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, ExternalLink, CalendarDays } from 'lucide-react'
 import { formatPragueDateTime, utcToPrague, toMondayFirst, getDaysInMonth, getMonthStartOffset } from '@/lib/prague-time'
 import { CHANNEL_LABELS } from '@/lib/types'
@@ -22,14 +22,14 @@ interface Props {
 function SlotDetailModal({ slot, clientName, onClose }: { slot: ConsultationSlot; clientName: string; onClose: () => void }) {
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
         onClick={onClose}
       >
-        <motion.div
+        <m.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95 }}
@@ -80,8 +80,8 @@ function SlotDetailModal({ slot, clientName, onClose }: { slot: ConsultationSlot
               </a>
             )}
           </div>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </AnimatePresence>
   )
 }

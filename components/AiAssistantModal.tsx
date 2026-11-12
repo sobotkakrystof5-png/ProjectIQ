@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { Loader2, Send, X } from 'lucide-react'
 import type { StartupProject, StartupChangelogEntry, StartupImprovement } from '@/lib/types'
 
@@ -130,14 +130,14 @@ export function AiAssistantModal({ assistant, project, changelog, improvements, 
   return (
     <AnimatePresence>
       {assistant && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) onClose() }}
         >
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -218,8 +218,8 @@ export function AiAssistantModal({ assistant, project, changelog, improvements, 
                 </button>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

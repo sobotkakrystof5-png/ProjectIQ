@@ -2,19 +2,19 @@
 
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, Plus, X, ExternalLink,
   CalendarDays, Phone, Monitor, Video, MessageSquare,
   CalendarPlus, Lock, Trash2, Clock, Flag,
   Building2, User, Mail, MessageCircle, Coins,
 } from 'lucide-react'
-import { AdminEventModal } from './AdminEventModal'
 import { deleteCalendarEvent } from '@/app/calendar-actions'
 import {
   CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS,
   type ConsultationChannel, type CalendarEventType, type LeadActionType, type LeadStatus,
 } from '@/lib/types'
+import { AdminEventModal } from './AdminEventModal'
 import { Badge } from '@/components/ui/badge'
 import { LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { cn, whatsappHref } from '@/lib/utils'
@@ -267,7 +267,7 @@ function EventDetailModal({
 
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         key="backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -275,7 +275,7 @@ function EventDetailModal({
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
         onClick={onClose}
       >
-        <motion.div
+        <m.div
           key="card"
           initial={{ opacity: 0, scale: 0.96, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -487,8 +487,8 @@ function EventDetailModal({
               )}
             </div>
           </div>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </AnimatePresence>
   )
 }
@@ -1128,7 +1128,7 @@ export function SmartCalendar({
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="p-4 sm:p-5">
           <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={`${view}-${anchor}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1165,7 +1165,7 @@ export function SmartCalendar({
                   onClickSlot={handleClickSlot}
                 />
               )}
-            </motion.div>
+            </m.div>
           </AnimatePresence>
         </div>
 

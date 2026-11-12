@@ -425,7 +425,8 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
           <button
             onClick={handleGenerateRecurring}
             disabled={isGenerating}
-            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-lg px-3 py-1.5 transition-colors hover:bg-muted disabled:opacity-60"
+            // Dílky, ne staré admin třídy — strop v admin-classes.test.ts
+            className="flex items-center gap-1.5 rounded-full border border-navy-100 bg-surface px-3 py-1.5 text-xs font-medium text-quiet transition-colors hover:bg-accent disabled:opacity-60"
           >
             {isGenerating
               ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />

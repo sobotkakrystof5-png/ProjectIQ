@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { X, Loader2, CalendarPlus, Lock } from 'lucide-react'
 import { createCalendarEvent } from '@/app/calendar-actions'
 import { cn } from '@/lib/utils'
@@ -110,7 +110,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
 
   return (
     <>
-      <motion.div
+      <m.div
         key="backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -120,7 +120,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
         onClick={() => close(false)}
       />
 
-      <motion.div
+      <m.div
         key="panel"
         initial={{ opacity: 0, y: 32, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -275,7 +275,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
             </div>
           </form>
         </div>
-      </motion.div>
+      </m.div>
     </>
   )
 }

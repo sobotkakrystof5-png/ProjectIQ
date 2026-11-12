@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { LazyMotion } from 'framer-motion'
 import { PortalContainerProvider } from '@/components/ui/portal'
 import { setToastApp } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -12,7 +13,13 @@ import { cn } from '@/lib/utils'
  * nejsou, a vypadaly by jako shadcn výchozí šeď.
  *
  * Admin nemá tmavý režim ani režim soukromí, proto je proti WsRoot o dost kratší.
+ *
+ * `LazyMotion` jako ve `WsRoot` (AD08): admin animuje přes `m` a vlastní
+ * balíček Framer Motion (~26 kB gzip) se stáhne až s první animací. Měřeno:
+ * Hovory −25,7 kB a Kalendář −28,9 kB upfront, ostatní obrazovky +0,4 kB
+ * za samotnou `LazyMotion`.
  */
+const loadMotionFeatures = () => import('@/lib/admin/motion-features').then((mod) => mod.default)
 export function AdminRoot({ className, children }: { className?: string; children: React.ReactNode }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
 
@@ -23,7 +30,9 @@ export function AdminRoot({ className, children }: { className?: string; childre
 
   return (
     <div ref={setContainer} data-app="admin" className={cn('min-h-screen bg-background', className)}>
-      <PortalContainerProvider value={container}>{children}</PortalContainerProvider>
+      <LazyMotion features={loadMotionFeatures}>
+        <PortalContainerProvider value={container}>{children}</PortalContainerProvider>
+      </LazyMotion>
     </div>
   )
 }

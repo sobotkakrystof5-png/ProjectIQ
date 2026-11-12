@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { X, Loader2, MessageSquareText, ArrowLeft, Send } from 'lucide-react'
 import { toast } from '@/components/ui/toast'
 import { sendCustomLeadEmail } from '@/app/calls-actions'
@@ -63,7 +63,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
     <AnimatePresence>
       {isOpen && lead && (
         <>
-          <motion.div
+          <m.div
             key="backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -73,7 +73,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
             onClick={handleClose}
           />
 
-          <motion.div
+          <m.div
             key="panel"
             initial={{ opacity: 0, y: 32, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -192,7 +192,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
                 )}
               </div>
             </div>
-          </motion.div>
+          </m.div>
         </>
       )}
     </AnimatePresence>
