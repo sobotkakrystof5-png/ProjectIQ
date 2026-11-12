@@ -1,6 +1,6 @@
 import {
   Bell, Building2, CalendarDays, CheckCircle2, FileText, Inbox, Layers, Megaphone,
-  MessageSquarePlus, PhoneCall, Receipt, Rocket, Star, Sun, UserCircle, Wallet, FolderOpen,
+  MessageSquarePlus, PhoneCall, Receipt, Rocket, Star, Sun, UserCircle, Users, Wallet, FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
 import type { NavIcon } from '@/lib/admin-nav'
@@ -14,6 +14,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   rating: Star,
   calendar: CalendarDays,
   calls: PhoneCall,
+  contacts: Users,
   invoices: FileText,
   costs: Receipt,
   finance: Wallet,

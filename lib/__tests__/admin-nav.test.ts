@@ -75,8 +75,10 @@ describe('navigace administrace', () => {
     expect(activeHref('/login')).toBeNull()
   })
 
-  it('Kontakty v menu zatím nejsou — obrazovku staví AD09', () => {
-    expect(hrefs).not.toContain('/dashboard/kontakty')
+  it('Kontakty jsou v Práci a svítí i na kartě jednoho kontaktu (AD09)', () => {
+    expect(hrefs).toContain('/dashboard/kontakty')
+    expect(ADMIN_NAV.find((g) => g.label === 'Práce')?.items.map((i) => i.label)).toContain('Kontakty')
+    expect(activeHref('/dashboard/kontakty/11111111-1111-4111-8111-111111111111')).toBe('/dashboard/kontakty')
   })
 
   it('odznak nad 99 se zkrátí', () => {

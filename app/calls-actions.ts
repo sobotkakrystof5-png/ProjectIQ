@@ -1,12 +1,14 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { adminDb, q } from '@/lib/admin/db'
 import { loadLeadNotes } from '@/lib/admin/leads'
+import { ensureContact } from '@/lib/admin/contacts'
 import { sendPlainEmail } from '@/lib/email'
 import { notifyClientOfProjectChange } from '@/app/actions'
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
@@ -150,37 +152,85 @@ export async function convertLeadToProject(leadId: string) {
 
   const clientName = lead.contact_name || lead.company_name
 
+  // Jeden člověk = jeden kontakt (AD09). Zakázka se na něj napojí a text
+  // v ní je jen snímek dokladu; `ensureContact` nikdy nespadne na duplicitě.
+  const contactId = await ensureContact({
+    name: lead.contact_name,
+    company: lead.company_name,
+    email: lead.email,
+    phone: lead.phone,
+    source: 'lead',
+  })
+
   // Jeden atomický příkaz: založení projektu (new_project) čte data jen z
   // updated_lead, takže k INSERTu dojde pouze tehdy, když UPDATE skutečně
   // zasáhl řádek (lead existuje a ještě není 'converted'). Zdvojený klik
   // nebo retry po chybě tak nikdy nezaloží duplicitní projekt.
+  //
+  // Co se do zakázky převádí (AD09): kontakt, oba kontaktní údaje, popis,
+  // cena — a navíc **název firmy** (dřív zmizel, když se klient jmenoval
+  // jménem člověka) a **poznámky z hovorů**, které zůstávaly u leadu, takže
+  // v zakázce nebylo vidět, co se s klientem domluvilo.
   const projectRows = await sql`
     WITH updated_lead AS (
-      UPDATE client_leads SET lead_status = 'converted', updated_at = now()
+      UPDATE client_leads
+      SET lead_status = 'converted',
+          contact_id = COALESCE(contact_id, ${contactId}),
+          updated_at = now()
       WHERE id = ${leadId} AND lead_status <> 'converted'
-      RETURNING company_name, contact_name, email, phone, notes, estimated_value
+      RETURNING company_name, contact_name, email, phone, notes, estimated_value, calendar_event_id
     ),
     new_project AS (
-      INSERT INTO projects (client_name, client_email, client_phone, description, status, progress, price, paid)
-      SELECT COALESCE(contact_name, company_name), email, phone, notes, 'new', 0, estimated_value, false
+      INSERT INTO projects (client_name, client_email, client_phone, description, notes, status, progress, price, paid, contact_id)
+      SELECT COALESCE(contact_name, company_name), email, phone, notes,
+             CASE WHEN contact_name IS NOT NULL AND company_name IS NOT NULL THEN 'Firma: ' || company_name END,
+             'new', 0, estimated_value, false, ${contactId}
       FROM updated_lead
-      RETURNING public_token
+      RETURNING id, public_token
+    ),
+    copied_notes AS (
+      INSERT INTO project_notes (project_id, content, created_at)
+      SELECT np.id, ln.content, ln.created_at
+      FROM new_project np
+      JOIN lead_notes ln ON ln.lead_id = ${leadId}
+      RETURNING id
     )
-    SELECT public_token FROM new_project
+    SELECT id, public_token, (SELECT calendar_event_id FROM updated_lead) AS calendar_event_id
+    FROM new_project
   `
   if (!projectRows.length) throw new Error('Kontakt je již převeden na zakázku.')
-  const publicToken = (projectRows[0] as { public_token: string }).public_token
+  const created = projectRows[0] as { id: string; public_token: string; calendar_event_id: string | null }
+
+  // Termín z Hovorů se naváže na zakázku, aby v kalendáři nebyla událost
+  // „bez zakázky". Je to vlastní příkaz: `calendar_events` má překryvový
+  // guard (migrace 044), který u starých dat může zaprotestovat i při
+  // obyčejném zápisu — a to nesmí shodit převod na zakázku.
+  if (created.calendar_event_id) {
+    try {
+      await sql`
+        UPDATE calendar_events SET project_id = ${created.id}
+        WHERE id = ${created.calendar_event_id} AND project_id IS NULL
+      `
+    } catch (e) {
+      console.error('convertLeadToProject: termín se k zakázce nepodařilo navázat', e)
+    }
+  }
 
   // Stejné uvítací upozornění jako u založení zakázky přes /dashboard/new —
   // klient by o novém projektu založeném přes Hovory jinak nikdy nezjistil.
-  await notifyClientOfProjectChange(
-    { client_name: clientName, client_email: lead.email, status: 'new', progress: 0, project_url: null, public_token: publicToken },
-    'created'
+  // Jde mimo akci (AD08): odpověď nečeká na Gmail SMTP.
+  after(() =>
+    notifyClientOfProjectChange(
+      { client_name: clientName, client_email: lead.email, status: 'new', progress: 0, project_url: null, public_token: created.public_token },
+      'created',
+    ),
   )
 
   revalidatePath('/dashboard/calls')
   revalidatePath('/dashboard')
-  redirect('/dashboard')
+  revalidatePath('/dashboard/kontakty')
+  // Dřív to vyhodilo na Dnes, takže se nová zakázka musela hledat.
+  redirect(`/dashboard/${created.id}`)
 }
 
 async function markPortfolioSent(leadId: string) {

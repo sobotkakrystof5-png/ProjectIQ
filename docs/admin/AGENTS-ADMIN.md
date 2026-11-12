@@ -211,6 +211,65 @@ Ruční admin události/blokace v globálním kalendáři (`/dashboard/calendar`
 
 **Propojení s Hovory (migrace 051):** vytvoření kalendářní události automaticky založí odpovídající řádek v `client_leads` (company_name = název události, next_action = popis, next_action_date/time odvozeno z `starts_at` v Europe/Prague) a propojí obě strany přes `calendar_events.lead_id` / `client_leads.calendar_event_id`. Smazání jedné strany smaže i druhou (`deleteCalendarEvent` / `deleteLead` v `app/calendar-actions.ts` a `app/calls-actions.ts`). Kalendářová stránka proto z `client_leads` do zobrazení bere jen řádky s `calendar_event_id IS NULL` — jinak by se termín zdvojil (jednou jako reálná `calendar_events` událost, podruhé jako virtuální položka z `next_action`).
 
+### `contacts` (migrace 104, AD09)
+
+Jeden člověk = jeden řádek. Do AD09 žil kontakt jako text v pěti tabulkách
+(`client_leads`, `projects`, `consultation_slots`, `completed_projects`,
+`agent_leads`) a nešlo zjistit, že `+420 777 123 456` a `0777123456` je tentýž
+člověk.
+
+**Pravidlo: `contact_id` = kdo to je, text = co bylo tehdy napsáno.** Textové
+sloupce (`projects.client_*`, `invoices.client_*`, `completed_projects.client_name`…)
+zůstávají jako **snímek dokladu** a nemažou se. Zakázka navíc svůj snímek
+**musí** mít plněný: `portal.sync_project` (migrace 095) bere `client_name` jako
+název zakázky v klientském prostoru.
+
+| Pole | Typ | Popis |
+|------|-----|-------|
+| id | uuid | Primární klíč |
+| display_name | text | Jméno k zobrazení, NOT NULL (kontakt bez jména se nedá najít) |
+| company | text | Firma |
+| email | text | Malými písmeny; částečný UNIQUE nad `lower(email)` pro nesloučené |
+| phone | text | E.164 (`+420777123456`), CHECK opsaný ze `ws.customers`; částečný UNIQUE pro nesloučené |
+| ico, dic | text | IČO osmimístné, DIČ bez mezer velkými (ARES doplní AD12) |
+| note | text | Poznámka k člověku (ne k zakázce) |
+| source | text | `backfill` / `lead` / `project` / `web` / `manual` |
+| last_seen_at | timestamptz | Kdy se kontakt naposledy objevil |
+| merged_into | uuid | FK → contacts.id; vyplněné = sloučený kontakt |
+| portal_client_id | uuid | FK → `portal.clients` (jen když schéma `portal` existuje); nájemce klientského prostoru, schémata zůstávají oddělená (R-073) |
+
+**Unique je částečný záměrně** (`WHERE merged_into IS NULL`): formuláře zapisují
+do `client_leads` a `projects`, kde žádný unique není, takže duplicitní kontakt
+nikdy nezablokuje uložení — kolize se řeší v UI.
+
+**Sloučení nic nemaže ani nepřepisuje** (R-095): nastaví se `merged_into` a čtení
+vede na cíl (`COALESCE(merged_into, id)`), takže „Zpět" je smazání jedné hodnoty
+a sloučení nepotřebuje zálohu. `contact_id` v řádcích se **nepřesměrovává**;
+dotazy proto počítají s *rodinou* kontaktu (on sám + co je do něj sloučené) —
+hotové dotazy jsou v `lib/admin/contacts.ts`. Řetěz je vždy plochý (A → B,
+nikdy A → B → C), drží to trigger.
+
+**Normalizace** je v `lib/contacts/normalize.ts` (`normalizePhone`, `normalizeEmail`,
+`nameKey`, `normalizeIco`, `normalizeDic`) a **shoda** v `lib/contacts/group.ts`
+(telefon, pak e-mail; e-mail u dvou telefonů je firemní a nepřiřadí se nikomu).
+Oba soubory jsou čisté a bez aliasu `@/`, protože je importuje i
+`scripts/admin-contacts-backfill.mjs` pouštěný Nodem bez překladu
+(`allowImportingTsExtensions` v `tsconfig.json`).
+
+**Převod z Hovorů na zakázku** (`convertLeadToProject` v `app/calls-actions.ts`)
+od AD09 předává `contact_id` místo kopie textu a přebírá i to, co dřív zůstávalo
+za sebou: název firmy (když se klient jmenuje jménem člověka, šel do
+`projects.notes` jako „Firma: …"), poznámky z `lead_notes` (kopie do
+`project_notes`, originál u leadu zůstává) a termín z kalendáře
+(`calendar_events.project_id`). Končí na nové zakázce, ne na Dnes. Navázání
+termínu je vlastní příkaz v `try`: překryvový guard z migrace 044 u starých dat
+protestuje i při obyčejném zápisu a to nesmí shodit převod.
+
+**Backfill není v migraci** — dělá ho `node scripts/admin-contacts-backfill.mjs`
+(výchozí dry-run, `--ano` zapisuje, `--tise` bez výpisu po skupinách). Sporné
+případy zůstanou bez `contact_id` a objeví se v UI. Skript je idempotentní:
+řádku, který kontakt už má, se nedotkne.
+
 ### Katalog ostatních tabulek
 
 Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je jen mapa, co kde žije.
@@ -221,6 +280,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `api_requests` | 007 | Rate limit veřejných API (`lib/api-rate-limit.ts`) |
 | `client_leads` | 010, 017, 024, 049, 051 | **Hovory** — kontakty/leady, další akce, telefonát zvednut, portfolio odesláno, vazba na kalendář |
 | `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
+| `contacts` | 104 | **Kontakty** — jeden člověk, jeden řádek; popis výš v samostatné sekci (AD09) |
 | `agent_leads` | 052 | AI-scorované leady z externího `vizeon-lead-agent` |
 | `completed_projects` | 011, 029, 047, 057 | **Dokončené** zakázky (záloha, vazba na zdrojový projekt, odhad) |
 | `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/dashboard/finance`), volitelná vazba na projekt |
@@ -239,7 +299,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `project_agent_keys` | 094 | Klíče projektů pro hlášení z Claude Code (KP04): prefix + HMAC hash, jeden platný klíč na projekt, kdo a kdy vytvořil/zneplatnil |
 | schéma `portal` (`clients`, `members`, `invites`, `projects`, `activity`, `requests`, `messages`, `feedback`) | 095, 096, 098 | Klientský prostor (KP05–KP07), retence 3 roky (098): projekce schváleného, RLS podle `app.client_id`, role `portal_app` bez práv do `public`. Podrobně `docs/klientsky-prostor/PLAN.md` a `.claude/security/DECISIONS.md` #020 |
 
-**DB funkce/triggery:** `check_calendar_overlap`, `check_consultation_overlap` (overlap guard napříč tabulkami, migrace 008/043/044), `projects_lead_confirmed_sync()` + trigger `trg_projects_lead_confirmed` (čas potvrzení a staré příznaky, migrace 102). Funkce `is_vizeon_pending()` a `is_alteno_pending()` (migrace 048/050) v DB zůstaly, ale kód je už nepoužívá — nahradil je generovaný sloupec `lead_pending`.
+**DB funkce/triggery:** `check_calendar_overlap`, `check_consultation_overlap` (overlap guard napříč tabulkami, migrace 008/043/044), `projects_lead_confirmed_sync()` + trigger `trg_projects_lead_confirmed` (čas potvrzení a staré příznaky, migrace 102), a z migrace 104 (AD09): `contacts_root()` (kořen sloučení), `contacts_before_write()` (plochý řetěz + `updated_at`), `projects_contact_snapshot()` (doplní v zakázce **jen to, co chybí** — vyplněný text se nepřepisuje) a `contacts_snapshot_propagate()` (přejmenování kontaktu propadne do zakázek, které nesly přesně starý text, a nehýbe jejich `updated_at`). Všechny čtyři jsou `SECURITY INVOKER` s připnutým `search_path`. Funkce `is_vizeon_pending()` a `is_alteno_pending()` (migrace 048/050) v DB zůstaly, ale kód je už nepoužívá — nahradil je generovaný sloupec `lead_pending`.
 
 ---
 
@@ -318,6 +378,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `app/client-requests-actions.ts` | Admin: změna stavu požadavku klienta (`/dashboard/pozadavky`) |
 | `app/calendar-actions.ts` | Kalendářní události (+ párový lead v Hovorech) |
 | `app/calls-actions.ts` | Hovory: leady, poznámky, waiting stav, převod na zakázku, portfolio email, vlastní email |
+| `app/contacts-actions.ts` | Kontakty (AD09): úprava údajů, sloučení duplicity a jeho „Zpět" |
 | `app/completed-actions.ts` | Dokončené zakázky + dotazníky |
 | `app/costs-actions.ts` | Náklady — jediný zdroj pravdy pro firemní i osobní náklady |
 | `app/notification-actions.ts` | Notifikace (přečteno) |
@@ -333,7 +394,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Sekce | Routy |
 |-------|-------|
-| Admin (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/zakazky`, `/pozadavky` (požadavky klientů z portálu), `/poptavky` (jeden inbox poptávek ze všech webů), `/calendar`, `/calls` (Hovory), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
+| Admin (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/zakazky`, `/pozadavky` (požadavky klientů z portálu), `/poptavky` (jeden inbox poptávek ze všech webů), `/calendar`, `/calls` (Hovory), `/kontakty` + `/kontakty/[id]` (AD09), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
 | Osobní část (dřív Hub) | `/dashboard/finance`, `/dashboard/projekty` (+ `/new`, `/[id]`), `/dashboard/startup` (+ `/new`, `/[id]`) |
 | Zrušené adresy | `/alteno`, `/alteno/new`, `/alteno/[id]`, `/alteno/rezervace`, `/dashboard/vizeon` (AD02) a všechny `/hub/*` včetně rozcestníku `/hub/byznys` (AD03) — trvale přesměrované (`lib/legacy-redirects.mjs`) |
 
@@ -436,6 +497,25 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - `AdminEventModal` se **mountuje až při otevření**; `<AnimatePresence>` je nad ním
   v `SmartCalendar`. Dokud byl uvnitř modalu, komponenta se neodmountovala a formulář
   navždy držel „dnes 10:00".
+
+### `/dashboard/kontakty` — Kontakty (AD09)
+
+Seznam nad sdílenou tabulkou (AD07): řazení, stránkování, hledání a pohled jsou
+v adrese (`?pohled=duplicity&sort=jmeno&q=…`). Tři pohledy — **Kontakty**
+(nesloučené), **Možné duplicity** (někdo se stejným jménem) a **Sloučené**.
+Hledá se podle jména, firmy, e-mailu i telefonu zapsaného jakkoli
+(`777 123 456` najde `+420777123456`).
+
+`/dashboard/kontakty/[id]` je karta člověka: údaje (jediný klientský kus
+obrazovky), „Objevuje se také jako…" (jiné zápisy jména z řádků), „Kde se
+objevuje" (zakázky, hovory, dokončená práce, konzultace, poptávky — vše
+s odkazem) a „Možné duplicity" s tlačítkem **Sloučit sem**. Sloučení se provede
+hned a toast nabídne „Zpět"; nic se při něm nemaže. Nesmyslné id ukáže 404
+obrazovku **bez jediného dotazu** do databáze (stav odpovědi je kvůli streamování
+kostry 200, stejně jako u ostatních detailů adminu — viz otevřené problémy).
+
+Souhrn čísel kontaktu (příjem, zisk, nezaplacené faktury) sem přijde až
+s pohledy z AD13 — do té doby karta nic nepočítá a jen poctivě odkazuje.
 
 ### `/dashboard/faktury`
 - **Evidence všech vystavených faktur** — archiv dokladů, řazený podle data vystavení a seskupený po rocích

@@ -15,6 +15,10 @@ export default defineConfig({
   oxc: { jsx: { runtime: 'automatic' } },
   test: {
     environment: 'node',
+    // PGlite (Postgres ve WASM) startuje v `beforeAll` a při plném běhu se
+    // takových databází zakládá víc najednou — výchozích 30 s na hook pak
+    // nestačí, i když samostatně je test hotový za sedm sekund (AD09).
+    hookTimeout: 60_000,
     // Staré worktree v .claude/worktrees/ nejsou v gitu, ale vitest by v nich
     // posbíral stovky testů ze starších verzí repa (a desítky padajících).
     exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.claude/worktrees/**'],

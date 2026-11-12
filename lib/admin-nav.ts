@@ -2,12 +2,12 @@
 // Čisté funkce a data bez React a DB, aby šly testovat. Od AD03 (R-087) je menu
 // jedno pro celý admin — Hub zanikl a jeho obrazovky jsou pod /dashboard.
 //
-// Položka „Kontakty“ tu ještě není: kartu kontaktu staví AD09 a menu nesmí
-// slibovat obrazovku, která neexistuje.
+// „Kontakty“ (AD09) jsou v Práci hned za Hovory: Hovory jsou co se má udělat,
+// Kontakty kdo to je.
 
 export type NavIcon =
   | 'today' | 'projects' | 'requests' | 'inbox' | 'done' | 'rating'
-  | 'calendar' | 'calls' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
+  | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
   | 'personal' | 'startup' | 'bell' | 'profile'
 
 export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts'
@@ -44,6 +44,7 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: '/dashboard/poptavky', label: 'Poptávky z webů', icon: 'inbox', count: 'leads' },
       { href: '/dashboard/pozadavky', label: 'Požadavky klientů', icon: 'requests', count: 'requests' },
       { href: '/dashboard/calls', label: 'Hovory', icon: 'calls' },
+      { href: '/dashboard/kontakty', label: 'Kontakty', icon: 'contacts' },
       { href: '/dashboard/calendar', label: 'Kalendář', icon: 'calendar' },
       // Dokončené a Hodnocení se do zakázky slijí až v AD11 a AD16 (R-090).
       { href: '/dashboard/dokoncene', label: 'Dokončené', icon: 'done' },

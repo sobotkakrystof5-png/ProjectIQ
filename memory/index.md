@@ -54,6 +54,7 @@
 | Zjistit, na čem se naposledy pracovalo | `memory.md` → Aktuální stav, Changelog |
 | Pochopit, proč je něco udělané „divně" | `memory.md` → Rozhodnutí; pak komentář v kódu / migraci |
 | Výpis v adminu (řazení, stránkování, filtry) | `lib/admin-table.ts`, `components/admin/{data-table,pagination,table-search}.tsx`, dotazy `lib/admin/{completed,invoices,costs,leads,projects,waitlist}.ts` (AD07) |
+| Kontakty (jeden člověk, jeden řádek; sloučení duplicit) | `lib/contacts/{normalize,group}.ts`, `lib/admin/contacts.ts`, `app/contacts-actions.ts`, `app/dashboard/kontakty/`, `components/admin/contacts/`, `scripts/admin-contacts-backfill.mjs`, migrace 104, R-095 (AD09) |
 | Upravit zakázky | `app/actions.ts`, `components/ProjectForm.tsx`, `ProjectCard.tsx`, `lib/lead-origins.ts` |
 | Požadavky klientů z portálu (text/hlas → shrnutí → zadání pro Claude Code) | `lib/{client-requests,client-request-ai,transcribe}.ts`, `app/api/public/portal/[token]/transcribe/`, `app/portal-actions.ts` (`submitClientRequest`), `app/dashboard/pozadavky/`, `components/ClientRequest*.tsx`, migrace 092, R-069, `.claude/security/DECISIONS.md` #018 |
 | Klientský portál | `app/p/[token]/page.tsx`, `app/portal-actions.ts`, `components/Feedback*`, `Booking*` |

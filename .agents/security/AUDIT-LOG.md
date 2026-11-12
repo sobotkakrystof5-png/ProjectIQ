@@ -16,6 +16,22 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-12 — review: jedna entita kontaktu (AD09)
+Spouštěč: AD09 — tabulka `contacts`, obrazovka Kontakty a sloučení duplicit, před commitem.
+Rozsah: `migrations/104_kontakty.sql` (nová tabulka, čtyři funkce, tři triggery), `lib/admin/contacts.ts`, `app/contacts-actions.ts`, `app/dashboard/kontakty/**`, `components/admin/contacts/*`, `scripts/admin-contacts-backfill.mjs`, změněný `convertLeadToProject` v `app/calls-actions.ts`.
+Výsledek: 1 nález opravený ve stejném commitu, 1 věc zapsaná jako otevřený problém. Žádný nový veřejný vstup, žádný secret, žádné nové vykreslování nedůvěryhodného HTML, CSP beze změny.
+Nálezy:
+1. **Funkce migrace 104 neměly připnutý `search_path`.** `contacts_root`, `contacts_before_write`, `projects_contact_snapshot` a `contacts_snapshot_propagate` používaly nekvalifikované `contacts` a `projects`, takže o tom, co ty názvy znamenají, rozhodoval `search_path` toho, kdo zápis provedl. Migrace `ws` (080) to dělají správně.
+2. **`contacts` je nové uložení osobních údajů, které nic nemaže.** `public.purge_client_retention` (R-076) o tabulce neví a admin žádnou cestu výmazu nemá. Při žádosti o výmaz je od teď potřeba smazat i kontakt. Zapsáno do otevřených problémů (řeší se s AD16/KP10), ne nová kategorie údajů — kontakt je odvozený z leadů a zakázek, které v adminu leží dnes.
+Opraveno: (1) všechny čtyři funkce mají `SECURITY INVOKER SET search_path = pg_catalog, pg_temp` a tabulky kvalifikované jako `public.*`.
+Ověřeno:
+- Všechny dotazy parametrizované. Do textu SQL jde jen `ORDER BY` z whitelistu `CONTACT_SORT` (přes `parseTableParams`, AD07) a podmínka pohledu ze zúženého typu `'aktivni' | 'duplicity' | 'sloucene'`; hledaný text, id ani telefon se do textu dotazu nedostanou. V backfill skriptu pochází název tabulky z konstanty `SOURCES` v tomtéž souboru, nikdy od uživatele.
+- Každá server action začíná `requireAuth()` a ověřuje `id` jako UUID a údaje Zodem včetně maximálních délek. `/dashboard/kontakty/[id]` ověří UUID **před** dotazem, takže nesmyslná adresa vrací 404 bez dotazu do databáze (třída chyby, kterou má `/p/[token]`).
+- Funkce jsou `SECURITY INVOKER`, takže `EXECUTE` pro PUBLIC nic nepřidává — `ws_app` ani `portal_app` nemají na `public.contacts` práva (granty jsou výčtové, `ALTER DEFAULT PRIVILEGES` je jen ve schématu `ws`).
+- Poznámka kontaktu se vykresluje jako text (React), nikde `dangerouslySetInnerHTML`. Žádná nová env proměnná, žádný externí skript, `/dashboard` je dál `noindex, nofollow`.
+- Regulární výrazy v `lib/contacts/normalize.ts` nemají nejednoznačné opakování (segmenty e-mailu nesmí obsahovat `.`), vstup je navíc omezený délkou v Zodu.
+Zůstává: nález 2 (výmaz kontaktu). Průchod obrazovky v prohlížeči okem. Migrace 104 je aplikovaná jen na testovacím Neonu.
+
 ## 2026-11-11 — review: sdílená tabulka a výpisy adminu (AD07)
 Spouštěč: AD07 — řazení, filtry a stránkování výpisů adminu ze serveru, před commitem.
 Rozsah: vstupy z adresy na devíti obrazovkách `/dashboard`, skládání SQL v `lib/admin-table.ts` a `lib/admin/{completed,invoices,costs,leads,projects,waitlist}.ts`, nové a změněné server actions, export CSV.
