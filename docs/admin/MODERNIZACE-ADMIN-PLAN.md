@@ -861,7 +861,11 @@ i v hovorech dá stejný čas (test); rezervace z portálu je vidět v Hovorech.
    `calendar_events.consultation_slot_id` — guard z migrace 044 musí dvojici poznat **v okamžiku
    vkládání události**, kdy rezervace ještě na nic neukazuje. Je to tentýž obousměrný pár jako
    `calendar_events.lead_id` × `client_leads.calendar_event_id` z migrace 051.
-3. **Dvojník se v kalendáři vynechává v TypeScriptu**, ne podmínkou v SQL nad novým sloupcem —
+3. **Termín se dá přesunout jen z Hovorů.** Kalendář žádnou akci na změnu času nemá
+   (`app/calendar-actions.ts` umí jen založit a smazat), takže „stejný čas na obou stranách"
+   drží jediná cesta — `updateLead`. Přetažení bloku v kalendáři je věc AD17, a až vznikne,
+   musí jít přes `admin_lead_reschedule`, ne přes vlastní UPDATE.
+4. **Dvojník se v kalendáři vynechává v TypeScriptu**, ne podmínkou v SQL nad novým sloupcem —
    obrazovka tak funguje i na databázi, kde 105 ještě neproběhla. Páruje se podle zakázky
    a okamžiku.
 
