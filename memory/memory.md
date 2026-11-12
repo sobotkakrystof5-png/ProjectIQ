@@ -12,7 +12,8 @@
 
 **Admin konzole (produkce):** VIZEON `/dashboard`, ALTENO `/alteno`, portál `/p/[token]`, Hub `/hub`; deploy z `main`, produkce běží na starém buildu `d948400`. Popis: `docs/admin/AGENTS-ADMIN.md`. Na větvi `ws/redesign-app` (nenasazeno) má admin novou kostru (R-071), Dnes, detail zakázky se záložkami a správu klientských prostorů; na `admin/modernizace` navíc úklid z AD01.
 
-**Modernizace adminu (R-081–R-092), stav po sezení 2026-11-11:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD08 hotové**, AD09 (jedna entita kontaktu, migrace 104) je další.
+**Modernizace adminu (R-081–R-092), stav po sezení 2026-11-11:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD07 hotové, AD08 uzavřené** (ne všechna kritéria splněná — viz níž), AD09 (jedna entita kontaktu, migrace 104) je další.
+Z „Hotovo, když" u AD08 **zbývá**: průchod adminu s přihlášením na skutečných datech, šířka 390 px a jednoklikové „Zaplaceno" (přesunuté do AD12, v adminu dnes neexistuje). Fázi uzavřel Kryštof 2026-11-12 rozhodnutím, ne tím, že by kritéria platila.
 Z AD08: vedlejší efekty adminu jdou přes `after()` z `next/server` — uložení zakázky, potvrzení
 poptávky, dokončení ani poptávka z webu nečekají na Gmail SMTP (`sendPortfolioEmail`
 a `sendCustomLeadEmail` zůstávají awaitované, tam je e-mail smyslem akce). Kalendář čte
