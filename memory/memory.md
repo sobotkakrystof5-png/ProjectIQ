@@ -757,12 +757,15 @@ s `cancelled_at` (není to pohledávka) a `pdf_generated` (nemá nahrané PDF, g
   pokrývá totéž co dosavadní index). Zato **nový build ji potřebuje**: evidence faktur už čte
   `pdf_generated` a `cancelled_at`. Pustit ji proto **před nasazením větve**, ne po něm.
   Aplikuje Kryštof · od 2026-11-12
-- [ ] **AD12 — co prohlížeč ověřit nemohl:** vystavení faktury na datech, číslo z řady, PDF s QR
-  (Chromium), odeslání e-mailem s přílohou, storno a dotaz do ARESu (server action potřebuje
-  přihlášení). Dočasná stránka ověřila jen rozvržení a předvyplnění. Jde to až na databázi
-  s migrací 107 · od 2026-11-12
-- [ ] **E-mail s fakturou naostro nikdo neposlal:** příloha jde přes Gmail SMTP (`lib/email.ts`,
-  R-004). Ověřit, že doklad dorazí jako `.pdf` a nespadne na limitu schránky · od 2026-11-12
+- [ ] **AD12 — co zbývá ověřit na skutečné databázi:** celá cesta (formulář → doklad → PDF
+  z routy → e-mail s přílohou → storno) je **projetá skutečným kódem nad PGlite s migrací 107**
+  a ARES živým dotazem; rozvržení obrazovek ověřené v prohlížeči na dočasné stránce. Zbývá
+  **klik v přihlášeném adminu na Neonu** (jiná databáze, jiné latence) a **skutečné doručení
+  e-mailu přes Gmail SMTP** — obojí jde až po aplikaci migrace 107. Čas „do 30 s" nikdo
+  nestopoval; naměřená je jen strojová část (vystavení 11 ms, PDF 651 ms) · od 2026-11-12
+- [ ] **E-mail s fakturou naostro nikdo neposlal:** cesta je ověřená s podstrčenou schránkou
+  (příloha `%PDF-`, `sent_at`), ale Gmail SMTP (`lib/email.ts`, R-004) ji nikdy neodeslal.
+  Ověřit, že doklad dorazí jako `.pdf` a nespadne na limitu schránky · od 2026-11-12
 - [ ] **Migrace 106 je na produkci, větev nasazená není (incident 2026-11-12):** produkce běží
   na starém buildu `d948400`, který `completed_projects` čte. Potvrzeno měřením: veřejný dotazník
   `https://www.zakaziq.cz/h/<token>` vrací **500** místo 404; za přihlášením padá `/dashboard/dokoncene`,
@@ -947,6 +950,15 @@ s `cancelled_at` (není to pohledávka) a `pdf_generated` (nemá nahrané PDF, g
   Hlídají to nové kontroly v `admin-fakturace-vystavovani.test.ts`.
 - **fix** Stornovaná faktura se nepočítá mezi pohledávky ani „po splatnosti" (evidence, Finance
   i součty) a nejde označit za zaplacenou. V evidenci přibyl filtr **Storno**.
+- **chore** **Celá cesta ověřená skutečným kódem, ne jen po kusech**
+  (`lib/__tests__/admin-fakturace-cesta.test.ts`): server action dostane přesně ten objekt, jaký
+  posílá formulář → doklad v databázi → **skutečný route handler** `/api/invoices/[id]/pdf` vyrobí
+  PDF Chromiem, uloží ho k dokladu a podruhé vrátí **304** → `/api/invoices/[id]/odeslat` pošle
+  přílohu `%PDF-` a zapíše `sent_at`; cizí původ dostane 403 a stornovaná faktura 400.
+  Podstrčené je jen přihlášení, odesílací schránka a databáze (PGlite s migrací 107).
+  **ARES ověřený živým dotazem** (`ARES_SMOKE=1`): skutečná firma vrátí jméno, adresu i DIČ,
+  překlep v IČO se zastaví ještě před odesláním. Naměřeno: vystavení **11 ms**, první otevření
+  PDF **651 ms** včetně startu Chromu, dotaz do ARESu **~150 ms**.
 - **decision** **R-086** (ARES: ověřený endpoint, jen server, výpadek nezdrží fakturu) a
   **R-098** (dvě osy místo `kind`, číslo `YYYYNNN`, neměnnost v databázi, storno, PDF až při
   otevření, jeden generátor, e-mail bez `after()`).

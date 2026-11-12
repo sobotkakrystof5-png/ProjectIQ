@@ -279,6 +279,28 @@ describe('storno', () => {
   })
 })
 
+describe('ARES', () => {
+  // Skutečný dotaz do rejstříku — pouští se jen s ARES_SMOKE=1, aby `npm test`
+  // nezávisel na síti ani na dostupnosti státní služby.
+  it.runIf(process.env.ARES_SMOKE === '1')('vrátí jméno, adresu a DIČ z rejstříku; překlep v IČO zastaví dřív', async () => {
+    const { lookupIco } = await import('@/lib/ares')
+
+    const nalezeno = await lookupIco('27082440')
+    expect(nalezeno.ok).toBe(true)
+    if (nalezeno.ok) {
+      expect(nalezeno.subject.name.length).toBeGreaterThan(2)
+      expect(nalezeno.subject.address).toMatch(/\d{5}/)
+      expect(nalezeno.subject.dic).toMatch(/^CZ\d+$/)
+    }
+
+    // Na „neexistující" IČO se nespoléhá schválně: 12345679 má platnou
+    // kontrolní číslici a v rejstříku skutečně někdo je. Testuje se proto
+    // jen to, co je jisté — překlep se zastaví ještě před odesláním.
+    const preklep = await lookupIco('12345678')
+    expect(preklep).toEqual({ ok: false, message: 'Tohle IČO neexistuje. Zkontrolujte číslice.' })
+  }, 20000)
+})
+
 describe('součty a IČO', () => {
   it('položky se počítají v haléřích a DPH se zaokrouhluje po položce', () => {
     expect(invoiceSums([{ description: 'X', quantity: 2.5, unitPrice: 100, vatRate: 21 }])).toEqual({ amount: 302.5, vat: 52.5 })
