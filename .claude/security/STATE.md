@@ -133,6 +133,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 ## Neměnit bez zeptání
 
 - `X-Frame-Options: SAMEORIGIN` na `/api/invoices/:id/pdf` — jinak přestane fungovat náhled PDF faktury.
+- `Cache-Control: private, …` na `/api/invoices/:id/pdf` — `private` nikdy nerušit (sdílená cache by držela faktury klientů), DECISIONS #022.
 - Výjimky `/r/*`, `/embed/*`, `/api/public/v1/*` z `X-Frame-Options`/CORP — jinak nepůjde vložit objednávka ani widget na weby klientů.
 - `object-src`/`frame-src 'self'` jen na `/dashboard/faktury/*` — nerozšiřovat na celý admin.
 - Pořadí v `proxy.ts`: admin auth → (Clerk) → CSP. Admin přihlášení se nesmí změnit.
