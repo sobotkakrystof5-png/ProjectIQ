@@ -935,6 +935,55 @@ Pod osou **jedno tlačítko na další krok** („Vystavit fakturu", „Poslat d
 musí být na korunu stejný. Když nesedí, migrace se vrací.
 **Riziko: vysoké** — sahá na daňová čísla. Proto až po AD09 (kontakty) a vždy nejdřív na větvi.
 
+**Výsledek sezení 2026-11-12.** Hotové. `completed_projects` se přejmenovala na
+`completed_projects_archiv` a dokončenost je od teď stav zakázky: `projects.closed_at`
+plus `status IN ('done','paid')`. Zakázka převzala všechno, co uměly jen Dokončené
+(`project_type`, `difficulty`, `time_invested`, `estimated_hours`, `company`, `survey_token`),
+hodnocení visí na `project_surveys.project_id` a `createCompletedProject` — jediná cesta, která
+uměla založit druhý příjem k téže zakázce — zanikla. Uzavření jde vzít zpět, protože se nikam
+nic nekopíruje. Detail zakázky má nad záložkami průvodku s devíti kroky a pod ní **jedno**
+tlačítko na další krok; změna stavu je jeden klik se „Zpět".
+
+**Daňová čísla.** Migrace do `finance_transactions` **nevkládá ani nemaže** jediný řádek, jen
+přepojuje `source_project_id` — součet příjmů za každý rok je po ní z definice stejný.
+Ověřeno testem nad PGlite („součet příjmů po letech sedí na korunu" + „nevznikl ani nezmizel
+jediný řádek příjmu", obojí i po dvojím spuštění migrace). Pro skutečnou databázi je
+`node scripts/admin-income-check.mjs --ulozit pred.json` před migrací a `--porovnat pred.json`
+po ní; skript jen čte a při neshodě skončí nenulovým kódem.
+
+**Odchylky od zadání a proč** (podrobně R-097 v `memory/memory.md`):
+1. **Osobní projekty se převádějí na zakázky** s `project_type='personal'` a ve výpisu je
+   schovává výchozí filtr „Pro klienty" (rozhodl Kryštof). Bez toho by z aplikace zmizely.
+2. **Přehled výkonnosti a souhrn hodnocení jdou na `/dashboard/profil`,** ne na Dnes
+   (rozhodl Kryštof). Dnes má zůstat „co dnes udělat" a od AD03 už jeden blok čísel má.
+3. **Odklad e-mailu u změny stavu je 15 s, ne 60 s,** a „Zpět" ho ruší tím, že se stav
+   v databázi před odesláním přečte znovu. Příznak v paměti by nefungoval — „Zpět" může
+   doletět na jinou instanci funkce; a minuta spícího `after()` je na Hobby plánu na hraně
+   limitu doby běhu. Viditelné okno „Zpět" v toastu zůstává 6 s jako jinde v adminu.
+4. **Hodnoty `project_type` jsou `client` / `personal`,** ne `client` / `vlastni` z plánu —
+   shodují se s `lib/types.ts` a s hodnotami, které v archivu leží.
+5. **Karta kontaktu přišla o řádek „Dokončená práce"** — po slití by ukazovala tytéž zakázky
+   dvakrát.
+
+**Pozor na pořadí migrací:** 103 zakládá index nad `completed_projects`, takže musí jít
+**před** 106 — po přejmenování by `CREATE INDEX` spadl. Běhoun jede číselně, takže při
+běžném postupu to vyjde samo. 106 je jako 102 **nekompatibilní se starým buildem**:
+nasadit větev, pak 102, pak 106.
+
+**Ověřeno v prohlížeči (průvodka a uzavření).** Dočasná stránka s fiktivními daty mimo
+`/dashboard`, po průchodu smazaná — stejný postup jako AD08. Headless Chrome, šest stavů
+zakázky × 390 / 768 / 1280 / 1440 px: nikde vodorovné přetečení, všechny akční plochy 44 px,
+v konzoli jen 404 na `/favicon.ico`. Průchod našel **dvě věci a obě jsou opravené**:
+1. **Osa uvázla na kroku „Poptávka" u každé ručně zapsané zakázky.** Krok nešel splnit, takže
+   `nextStep` nikdy nedošel dál a tlačítko dalšího kroku se neukázalo vůbec. Poptávka je teď
+   splněná vždy a každý krok dostal práh `rank` — rozdělané zakázce se neradí domluvit schůzku,
+   ale doplnit cenu ano.
+2. „Otevřít zpět" mělo 36 px místo 44.
+
+**Co se neověřilo:** migrace 106 na testovacím Neonu není (spuštění zamítlo prostředí), takže
+skutečný detail zakázky, filtry „Uzavřené" a „Vlastní projekty", Profil s přehledem výkonnosti
+a veřejný `/h/[token]` okem nikdo neviděl — nový build na databázi bez 106 nepoběží.
+
 ### AD12 — Fakturace: vystavování v adminu (L, **migrace 107**)
 **Cíl:** fakturu vystavíš v adminu, archiv cizích PDF funguje dál.
 **Hotovo už v AD08:** jednoklikové „Zaplaceno" ve výpisu faktur (`setInvoicePaid` +
@@ -989,7 +1038,7 @@ tabulka `admin_settings (id boolean PK DEFAULT true CHECK (id), invoice_sequence
 nad PGlite), archiv cizích PDF a `syncInvoiceTransaction` mají beze změny chování vlastní test.
 **Riziko: vysoké** (peníze). Archiv se nedotkne, vystavování je oddělená cesta.
 
-**Provedeno 2026-11-12 (R-086, R-097), s těmito odchylkami od zadání:**
+**Provedeno 2026-11-12 (R-086, R-098), s těmito odchylkami od zadání:**
 1. **Dvě osy místo `kind`** podle upřesnění výš: `direction` (`issued`/`received`) a
    `pdf_generated`. Číslo řady drží `number_seq`, a „vystavené tady" se pozná podle
    `number_seq IS NOT NULL` — ne podle `kind`.
@@ -1195,8 +1244,8 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno a ověřeno. |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
-| AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
-| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12** na větvi `admin/ad12-fakturace` (migrace 107 nikde neaplikovaná, v prohlížeči neověřeno; R-086, R-097) |
+| AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (průvodka ověřená v prohlížeči; 106 omylem na produkci, na testu chybí) |
+| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12** na větvi `admin/ad12-fakturace` (migrace 107 nikde neaplikovaná; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **109** | AD05, AD09 | nezačato |
 | AD15 | Paměť projektu (facts + project_memory) | M | 109 (s AD14) | AD14 | nezačato |

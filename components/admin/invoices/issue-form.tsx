@@ -24,11 +24,27 @@ import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
 
 type Party = IssueDraft['counterparty']
 
-const emptyItem = (vatRate: 0 | 12 | 21): InvoiceIssueItem => ({
+/**
+ * Položka tak, jak se do ní píše: počet a cena jsou **text**, ne číslo.
+ *
+ * Kdyby to bylo číslo, nešlo by napsat „1,5" — po napsání čárky by se hodnota
+ * přečetla jako 1, pole by se překreslilo na „1" a čárka by zmizela. Na číslo
+ * se to převádí až při počítání a odesílání.
+ */
+type ItemDraft = { description: string; quantity: string; unitPrice: string; vatRate: 0 | 12 | 21 }
+
+const emptyItem = (vatRate: 0 | 12 | 21): ItemDraft => ({
   description: '',
-  quantity: 1,
-  unitPrice: 0,
+  quantity: '1',
+  unitPrice: '',
   vatRate,
+})
+
+const toItem = (item: ItemDraft): InvoiceIssueItem => ({
+  description: item.description,
+  quantity: toNumber(item.quantity),
+  unitPrice: toNumber(item.unitPrice),
+  vatRate: item.vatRate,
 })
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -68,8 +84,8 @@ export function IssueInvoiceForm({
   const [dueOn, setDueOn] = useState(draft.dueOn)
   const [currency, setCurrency] = useState<string>('CZK')
   const [note, setNote] = useState('')
-  const [items, setItems] = useState<InvoiceIssueItem[]>([
-    { ...emptyItem(vatPayer ? 21 : 0), unitPrice: draft.amount },
+  const [items, setItems] = useState<ItemDraft[]>([
+    { ...emptyItem(vatPayer ? 21 : 0), unitPrice: draft.amount > 0 ? String(draft.amount) : '' },
   ])
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -77,13 +93,13 @@ export function IssueInvoiceForm({
 
   const total = useMemo(() => {
     try {
-      return invoiceTotal(items)
+      return invoiceTotal(items.map(toItem))
     } catch {
       return 0
     }
   }, [items])
 
-  const setItem = (index: number, patch: Partial<InvoiceIssueItem>) =>
+  const setItem = (index: number, patch: Partial<ItemDraft>) =>
     setItems(prev => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
 
   const fromAres = () => {
@@ -114,7 +130,7 @@ export function IssueInvoiceForm({
         suppliedOn,
         dueOn,
         currency,
-        items,
+        items: items.map(toItem),
         note,
       })
       if (result.error || !result.id) {
@@ -180,20 +196,23 @@ export function IssueInvoiceForm({
               </Field>
               <Field label={index === 0 ? 'Počet' : ''}>
                 <Input
-                  value={String(item.quantity)}
+                  value={item.quantity}
                   inputMode="decimal"
-                  onChange={e => setItem(index, { quantity: toNumber(e.target.value) })}
+                  aria-label={`Počet u položky ${index + 1}`}
+                  onChange={e => setItem(index, { quantity: e.target.value })}
                 />
               </Field>
               <Field label={index === 0 ? 'Cena za kus' : ''}>
                 <Input
-                  value={String(item.unitPrice)}
+                  value={item.unitPrice}
                   inputMode="decimal"
-                  onChange={e => setItem(index, { unitPrice: toNumber(e.target.value) })}
+                  placeholder="0"
+                  aria-label={`Cena za kus u položky ${index + 1}`}
+                  onChange={e => setItem(index, { unitPrice: e.target.value })}
                 />
               </Field>
               <div className="flex items-center justify-between gap-3 sm:justify-end">
-                <span className="font-num text-sm tabular-nums text-ink">{money(itemTotals(item).total, currency)}</span>
+                <span className="font-num text-sm tabular-nums text-ink">{money(itemTotals(toItem(item)).total, currency)}</span>
                 {items.length > 1 && (
                   <button
                     type="button"

@@ -177,9 +177,9 @@ export function ProjectForm({ project }: ProjectFormProps) {
       }
     }
 
-    const completedExtra = !project && form.addToCompleted ? {
+    const closeExtra = !project && form.addToCompleted ? {
       project_type: form.completedType,
-      completed_at: form.completedAt,
+      closed_on: form.completedAt,
       difficulty: form.completedDifficulty,
       time_invested: form.completedTimeInvested ? Number(form.completedTimeInvested) : null,
     } : undefined
@@ -199,7 +199,7 @@ export function ProjectForm({ project }: ProjectFormProps) {
         } else {
           const result = await createProject(
             payload,
-            completedExtra,
+            closeExtra,
             wantsInvoice
               ? invoiceFormToFormData(
                   // Odběratel se bere z klienta zakázky, když ho uživatel nepřepsal.
@@ -480,15 +480,15 @@ export function ProjectForm({ project }: ProjectFormProps) {
                 className="w-4 h-4 accent-emerald-600"
               />
               <label htmlFor="addToCompleted" className="text-sm text-foreground cursor-pointer">
-                Ihned přidat do dokončených projektů
+                Zakázka je už hotová — rovnou ji uzavřít
               </label>
             </div>
 
             {form.addToCompleted && (
               <div className="mt-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-4">
-                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Detail dokončeného projektu</p>
+                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Uzavření zakázky</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Typ projektu">
+                  <Field label="Druh zakázky">
                     <div className="relative">
                       <select
                         value={form.completedType}
@@ -496,13 +496,13 @@ export function ProjectForm({ project }: ProjectFormProps) {
                         className={cn(inputCls, 'appearance-none pr-8')}
                       >
                         <option value="client">Zakázka pro klienta</option>
-                        <option value="personal">Osobní projekt</option>
+                        <option value="personal">Vlastní projekt bez klienta</option>
                       </select>
                       <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     </div>
                   </Field>
 
-                  <Field label="Datum dokončení">
+                  <Field label="Datum uzavření">
                     <input
                       type="date"
                       value={form.completedAt}

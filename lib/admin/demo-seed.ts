@@ -77,13 +77,12 @@ export function demoCleanupQueries(): AdminQuery[] {
     q`DELETE FROM progress_updates WHERE project_id IN (SELECT id FROM projects WHERE ${demoNotes})`,
     q`DELETE FROM client_feedback WHERE project_id IN (SELECT id FROM projects WHERE ${demoNotes})`,
     q`DELETE FROM project_activity WHERE project_id IN (SELECT id FROM projects WHERE ${demoNotes})`,
-    // Dotazník visí na dokončené zakázce.
-    q`DELETE FROM project_surveys WHERE completed_project_id IN (SELECT id FROM completed_projects WHERE ${demoNotes})`,
+    // Dotazník visí od migrace 106 na zakázce.
+    q`DELETE FROM project_surveys WHERE project_id IN (SELECT id FROM projects WHERE ${demoNotes})`,
     // Peníze: transakce se váží na faktury i náklady, proto jdou první.
     q`DELETE FROM finance_transactions WHERE ${marked('note')}`,
     q`DELETE FROM invoices WHERE ${marked('note')}`,
     q`DELETE FROM costs WHERE ${marked('description')}`,
-    q`DELETE FROM completed_projects WHERE ${demoNotes}`,
     // Hovory a kalendář: vazba je obousměrná, proto se nejdřív rozpojí.
     q`UPDATE client_leads SET calendar_event_id = NULL WHERE ${demoNotes}`,
     q`DELETE FROM lead_notes WHERE lead_id IN (SELECT id FROM client_leads WHERE ${demoNotes})`,
@@ -254,21 +253,33 @@ function insertQueries(today: string): AdminQuery[] {
     `,
   )
 
-  // --- Dokončené zakázky a dotazník ----------------------------------------
+  // --- Uzavřené zakázky a dotazník (AD11) ----------------------------------
+  // Dřív to byly řádky v `completed_projects`. Od migrace 106 je uzavřená
+  // zakázka obyčejná zakázka s `closed_at` — proto se sem seje do `projects`.
   out.push(
     q`
-      INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested,
-                                      notes, project_type, client_email, deposit_amount, estimated_hours)
+      INSERT INTO projects (client_name, company, description, status, progress, price, paid,
+                            closed_at, project_type, difficulty, time_invested, estimated_hours,
+                            deposit_amount, deposit_paid, notes, client_email, client_phone,
+                            service_type, source, lead_origin, lead_confirmed, invoiced_on_ico)
       VALUES
-        (${'Web pro truhlářství'}, ${'Eva Demo'}, ${'Truhlářství Demo'}, ${day(today, -40)}, 32000, 6, 28,
-         ${mark('dokončená zakázka pro vyzkoušení Dokončených')}, ${'client'}, ${'truhlarstvi@example.cz'}, 10000, 30),
-        (${'Rezervační systém pro úklid'}, ${'Karel Pokusný'}, ${'Úklid Pokusný'}, ${day(today, -12)}, 26000, 7, 34,
-         ${mark('dokončená zakázka pro vyzkoušení Dokončených')}, ${'client'}, ${'uklid@example.cz'}, NULL, 32)
+        (${'Eva Demo'}, ${'Truhlářství Demo'}, ${'Web pro truhlářství'}, ${'paid'}, 100, 32000, true,
+         ${day(today, -40)}, ${'client'}, 6, 28, 30, 10000, true,
+         ${mark('uzavřená zakázka pro vyzkoušení přehledu výkonnosti')}, ${'truhlarstvi@example.cz'},
+         ${'+420000000204'}, ${'Web na míru'}, ${'manual'}, ${'vizeon'}, false, true),
+        (${'Karel Pokusný'}, ${'Úklid Pokusný'}, ${'Rezervační systém pro úklid'}, ${'done'}, 100, 26000, false,
+         ${day(today, -12)}, ${'client'}, 7, 34, 32, NULL, false,
+         ${mark('uzavřená zakázka pro vyzkoušení přehledu výkonnosti')}, ${'uklid@example.cz'},
+         ${'+420000000205'}, ${'Web na míru'}, ${'manual'}, ${'vizeon'}, false, false),
+        (${'Interní nástroj na faktury'}, NULL, ${'Vlastní aplikace na vystavování faktur'}, ${'done'}, 100, 0, false,
+         ${day(today, -70)}, ${'personal'}, 9, 120, 90, NULL, false,
+         ${mark('vlastní projekt pro vyzkoušení přehledu výkonnosti')}, NULL, NULL,
+         NULL, ${'manual'}, ${'vizeon'}, false, false)
     `,
     q`
-      INSERT INTO project_surveys (completed_project_id, rating_cooperation, rating_speed, rating_design,
+      INSERT INTO project_surveys (project_id, rating_cooperation, rating_speed, rating_design,
                                    rating_functionality, rating_reliability, rating_flexibility, reference_text, consent)
-      VALUES ((SELECT id FROM completed_projects WHERE ${marked('notes')} AND title = ${'Web pro truhlářství'}),
+      VALUES ((SELECT id FROM projects WHERE ${marked('notes')} AND description = ${'Web pro truhlářství'}),
               5, 5, 4, 5, 5, 4, ${mark('Spolupráce byla rychlá a web máme přesně podle představ.')}, true)
     `,
   )

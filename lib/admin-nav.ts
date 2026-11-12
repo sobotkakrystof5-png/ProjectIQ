@@ -3,10 +3,11 @@
 // jedno pro celý admin — Hub zanikl a jeho obrazovky jsou pod /dashboard.
 //
 // „Kontakty“ (AD09) jsou v Práci hned za Hovory: Hovory jsou co se má udělat,
-// Kontakty kdo to je.
+// Kontakty kdo to je. Od AD11 (R-090) v menu nejsou Dokončené ani Hodnocení —
+// dokončenost je stav zakázky, ne vlastní obrazovka.
 
 export type NavIcon =
-  | 'today' | 'projects' | 'requests' | 'inbox' | 'done' | 'rating'
+  | 'today' | 'projects' | 'requests' | 'inbox'
   | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
   | 'personal' | 'startup' | 'bell' | 'profile'
 
@@ -46,9 +47,9 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: '/dashboard/calls', label: 'Hovory', icon: 'calls' },
       { href: '/dashboard/kontakty', label: 'Kontakty', icon: 'contacts' },
       { href: '/dashboard/calendar', label: 'Kalendář', icon: 'calendar' },
-      // Dokončené a Hodnocení se do zakázky slijí až v AD11 a AD16 (R-090).
-      { href: '/dashboard/dokoncene', label: 'Dokončené', icon: 'done' },
-      { href: '/dashboard/hodnoceni', label: 'Hodnocení', icon: 'rating' },
+      // Dokončené a Hodnocení v menu nejsou (AD11, R-090): dokončená zakázka
+      // je zakázka se stavem hotovo/zaplaceno, hodnocení je na ní. Přehled
+      // výkonnosti a souhrn hodnocení jsou na Profilu.
     ],
   },
   {

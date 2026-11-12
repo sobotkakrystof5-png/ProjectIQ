@@ -65,7 +65,7 @@
 | Hovory / leady | `app/calls-actions.ts`, `components/LeadsTable.tsx`, `lib/portfolio-email.ts`, `app/api/public/{leads,agent-leads}` |
 | Dokončené, dotazník, hodnocení | `app/completed-actions.ts`, `app/h/[token]`, `components/SurveyForm.tsx`, `HodnoceniDashboard.tsx` |
 | Faktury | `app/dashboard/finance/invoice-actions.ts`, `lib/invoices.ts`, `lib/invoice-ai.ts`, `components/Invoice*`, `docs/FINANCE_SYSTEM_PLAN.md` |
-| Vystavit fakturu v adminu (číslo z řady, položky, PDF s QR, ARES) | `migrations/107_fakturace_vystavovani.sql`, `lib/admin/{invoice-issue,invoice-issue-schema}.ts`, `lib/invoice-pdf/{render,totals}.ts`, `lib/ares.ts`, `app/dashboard/faktury/{nova,dodavatel}/`, `components/admin/invoices/{issue-form,issuer-form,issued-actions}.tsx`, R-086, R-097 (AD12) |
+| Vystavit fakturu v adminu (číslo z řady, položky, PDF s QR, ARES) | `migrations/107_fakturace_vystavovani.sql`, `lib/admin/{invoice-issue,invoice-issue-schema}.ts`, `lib/invoice-pdf/{render,totals}.ts`, `lib/ares.ts`, `app/dashboard/faktury/{nova,dodavatel}/`, `components/admin/invoices/{issue-form,issuer-form,issued-actions}.tsx`, R-086, R-098 (AD12) |
 | Daně | `lib/tax.ts`, `lib/tax-constants.ts`, `lib/tax-deadlines.ts`, `lib/tax-news.ts`, `components/Tax*` |
 | Náklady | `app/costs-actions.ts`, `components/CostsManager.tsx` |
 | Šablony webu | `app/block-templates-actions.ts`, `app/project-blocks-actions.ts`, `components/Block*`, `ProjectBlockList.tsx` |

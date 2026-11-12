@@ -35,7 +35,7 @@ const RATE_LIMIT_QUERIES: Record<
   client_requests: (id, windowMinutes) =>
     sql`SELECT count(*) FROM client_requests WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
   project_surveys: (id, windowMinutes) =>
-    sql`SELECT count(*) FROM project_surveys WHERE completed_project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
+    sql`SELECT count(*) FROM project_surveys WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
 }
 
 async function isRateLimited(
@@ -249,8 +249,11 @@ export async function submitSurvey(
   const parsed = surveySchema.safeParse(rawData)
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Neplatná data.' }
 
+  // Dotazník visí od migrace 106 na zakázce, ne na kopii v Dokončených (AD11).
+  // Token si zakázka přebrala z archivu, takže dřív odeslané odkazy platí dál.
   const projectRows = await sql`
-    SELECT id, title, client_name FROM completed_projects WHERE survey_token = ${token} LIMIT 1
+    SELECT id, coalesce(nullif(btrim(coalesce(description, '')), ''), client_name) AS title, client_name
+    FROM projects WHERE survey_token = ${token} AND NOT lead_pending LIMIT 1
   `
   const cp = projectRows[0] as { id: string; title: string; client_name: string | null } | undefined
   if (!cp) return { success: false, error: 'Dotazník nenalezen.' }
@@ -263,7 +266,7 @@ export async function submitSurvey(
   try {
     await sql`
       INSERT INTO project_surveys (
-        completed_project_id, rating_cooperation, rating_speed, rating_design,
+        project_id, rating_cooperation, rating_speed, rating_design,
         rating_functionality, rating_reliability, rating_flexibility, reference_text, consent
       )
       VALUES (
@@ -280,13 +283,14 @@ export async function submitSurvey(
     return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
   }
 
-  revalidatePath('/dashboard/hodnoceni')
+  revalidatePath(`/dashboard/${cp.id}`)
+  revalidatePath('/dashboard/profil')
 
   void createNotification({
     type: 'survey_submitted',
     title: `Nový dotazník spokojenosti`,
     body: `${cp.client_name ?? cp.title}`,
-    link: `/dashboard/hodnoceni`,
+    link: `/dashboard/${cp.id}`,
   })
 
   const to = adminEmail()

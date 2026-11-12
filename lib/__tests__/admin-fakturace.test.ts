@@ -162,6 +162,27 @@ describe('migrace 107', () => {
   })
 })
 
+describe('řada čísel je zamčená, ne jen spočítaná', () => {
+  // PGlite má jedno spojení, takže dvě současné transakce tu rozjet nejde.
+  // Co jde ověřit, je **pořádek v samotné funkci**: nejdřív zámek řádku
+  // nastavení, teprve potom výpočet čísla. Kdyby to někdo prohodil nebo
+  // `FOR UPDATE` smazal, dvě souběžná vystavení by sáhla po stejném čísle
+  // a zbyl by jen unikátní index — tedy chyba místo faktury.
+  const sql = read('107_fakturace_vystavovani.sql')
+
+  it('zámek `FOR UPDATE` je dřív než výpočet čísla', () => {
+    const lock = sql.indexOf('FROM public.admin_settings WHERE id = true FOR UPDATE')
+    const compute = sql.indexOf('SELECT GREATEST(')
+    expect(lock).toBeGreaterThan(-1)
+    expect(compute).toBeGreaterThan(lock)
+  })
+
+  it('poslední pojistkou je unikátní index na číslo řady', () => {
+    expect(sql).toContain('CREATE UNIQUE INDEX IF NOT EXISTS invoices_number_seq_key')
+    expect(sql).toContain('WHERE number_seq IS NOT NULL')
+  })
+})
+
 describe('vystavení faktury', () => {
   it('přidělí číslo YYYYNNN a uloží doklad i se snímkem dodavatele', async () => {
     const { id, number } = await issueInvoice(input(), ISSUER)

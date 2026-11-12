@@ -72,6 +72,10 @@ const SOURCES = [
   {
     table: 'completed_projects',
     label: 'Dokončené',
+    // Po migraci 106 (AD11) tabulka neexistuje — jmenuje se
+    // `completed_projects_archiv` a kontakty nese zakázka, do které se řádek
+    // převedl. Zdroj se proto smí přeskočit, ne shodit celý backfill.
+    optional: true,
     // Dokončená zakázka nemá telefon; dotáhne se ze zdrojové zakázky, aby
     // nevznikl druhý kontakt téhož člověka jen proto, že tu číslo chybí.
     query: `SELECT d.id::text AS id, coalesce(d.client_name, p.client_name) AS name, d.company,
@@ -110,6 +114,11 @@ async function readRows() {
     try {
       result = await sql.query(source.query)
     } catch (e) {
+      if (source.optional) {
+        console.log(`  ${source.label}: přeskakuji (${source.table} tu není — nejspíš po migraci 106).`)
+        perTable[source.table] = 0
+        continue
+      }
       console.error(`Tabulku ${source.table} nejde přečíst: ${e.message}`)
       console.error('Je migrace 104 aplikovaná? (node scripts/apply-migration.js 104_kontakty.sql)')
       process.exit(1)

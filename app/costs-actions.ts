@@ -16,7 +16,7 @@ export type CostPayload = {
 
 function revalidateCostPaths(projectId: string | null) {
   revalidatePath('/dashboard/naklady')
-  revalidatePath('/dashboard/dokoncene')
+  revalidatePath('/dashboard/profil')
   revalidatePath('/dashboard/finance')
   if (projectId) revalidatePath(`/dashboard/${projectId}`)
 }

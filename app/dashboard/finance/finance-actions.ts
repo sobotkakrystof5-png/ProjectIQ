@@ -270,7 +270,7 @@ export async function createTransaction(data: {
         )
       `
       revalidatePath('/dashboard/naklady')
-      revalidatePath('/dashboard/dokoncene')
+      revalidatePath('/dashboard/profil')
     }
 
     revalidatePath('/dashboard/finance')
@@ -309,7 +309,7 @@ export async function deleteTransaction(id: string): Promise<void> {
   await sql`DELETE FROM finance_transactions WHERE id = ${id} AND user_id IS NULL`
   revalidatePath('/dashboard/finance')
   revalidatePath('/dashboard/naklady')
-  revalidatePath('/dashboard/dokoncene')
+  revalidatePath('/dashboard/profil')
 }
 
 // --- Recurring cash flow ---
@@ -432,7 +432,9 @@ export async function getBusinessIncome(year: number): Promise<BusinessIncomeSum
         declared,
         SUM(amount)::float AS income,
         COUNT(*)::int AS transaction_count,
-        COUNT(DISTINCT COALESCE(source_project_id::text, source_completed_project_id::text))::int AS project_count
+        -- Po migraci 106 (AD11) visí každý příjem z Dokončených na zakázce,
+        -- takže druhá větev COALESCE zmizela.
+        COUNT(DISTINCT source_project_id::text)::int AS project_count
       FROM finance_transactions
       WHERE user_id IS NULL
         AND type = 'income'
