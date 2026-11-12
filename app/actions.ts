@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
@@ -63,16 +64,23 @@ export async function notifyClientOfProjectChange(
   if (project.project_url) ctas.push({ label: 'Zobrazit živou verzi', href: project.project_url })
   ctas.push({ label: 'Otevřít přehled projektu', href: getPublicUrl(project.public_token), primary: false })
 
-  await sendBrandedEmail({
-    to: project.client_email,
-    subject: changeType === 'created' ? 'Váš projekt byl založen – ZakazIQ' : 'Aktualizace vašeho projektu – ZakazIQ',
-    heading: changeType === 'created' ? 'Váš projekt byl založen' : 'Váš projekt byl aktualizován',
-    intro: `Dobrý den, ${project.client_name}, právě jsme aktualizovali stav vašeho projektu.`,
-    fields: [
-      { label: 'Stav', value: STATUS_LABELS[project.status] },
-      { label: 'Postup', value: `${project.progress}%` },
-    ],
-    ctas,
+  // Klient dostane e-mail, až když je uložení odpovězené (AD08). Gmail SMTP
+  // trvá stovky milisekund až sekundy a uložení zakázky na něj čekalo —
+  // `after()` ho pustí po odeslání odpovědi. `sendBrandedEmail` nikdy
+  // nevyhodí výjimku (vrací false a loguje), takže se nemá co ztratit.
+  const email = project.client_email
+  after(async () => {
+    await sendBrandedEmail({
+      to: email,
+      subject: changeType === 'created' ? 'Váš projekt byl založen – ZakazIQ' : 'Aktualizace vašeho projektu – ZakazIQ',
+      heading: changeType === 'created' ? 'Váš projekt byl založen' : 'Váš projekt byl aktualizován',
+      intro: `Dobrý den, ${project.client_name}, právě jsme aktualizovali stav vašeho projektu.`,
+      fields: [
+        { label: 'Stav', value: STATUS_LABELS[project.status] },
+        { label: 'Postup', value: `${project.progress}%` },
+      ],
+      ctas,
+    })
   })
 }
 
@@ -258,12 +266,14 @@ export async function updateProject(
   }
 
   if (oldStatus && oldStatus !== payload.status) {
-    void createNotification({
+    // `void` promise může skončit s odpovědí dřív, než se zápis dokončí —
+    // `after()` ji dožene po odeslání odpovědi (AD08).
+    after(() => createNotification({
       type: 'project_status_changed',
       title: `Stav zakázky změněn — ${payload.client_name}`,
       body: `${STATUS_LABELS[oldStatus as ProjectStatus] ?? oldStatus} → ${STATUS_LABELS[payload.status]}`,
       link: projectPath(id),
-    })
+    }))
   }
 
   // Záloha zaplacena → okamžitě zapsat do financí
@@ -368,37 +378,41 @@ export async function confirmWebLead(projectId: string) {
   const to = adminEmail()
   const portalUrl = getPublicUrl(p.public_token)
 
-  if (p.client_email) {
-    await sendBrandedEmail({
-      to: p.client_email,
-      subject: 'Váš projekt byl oficálně potvrzen – ZakazIQ',
-      heading: 'Váš projekt je oficálně zahájen',
-      intro: `Dobrý den, ${p.client_name}! S radostí vám oznamuji, že váš projekt byl oficálně potvrzen a podle vašeho zadání nyní začínám pracovat. Jakmile bude první ukázka hotová, pošlu vám odkaz, kde uvidíte aktuální stav projektu — budete ho moci ohodnotit, napsat zpětnou vazbu, nebo si se mnou rovnou rezervovat konzultaci a vše osobně probrat.`,
-      fields: [
-        { label: 'Typ projektu', value: p.service_type ?? cfg.defaultServiceType },
-        { label: 'Stav', value: 'V řešení' },
-      ],
-      ctas: [
-        { label: 'Sledovat stav projektu', href: portalUrl },
-      ],
-    })
-  }
+  // Oba e-maily po odpovědi (AD08): potvrzení poptávky se tím z „dvě SMTP
+  // kola za sebou" stane okamžitou akcí. Pořadí (klient, pak admin) zůstává.
+  after(async () => {
+    if (p.client_email) {
+      await sendBrandedEmail({
+        to: p.client_email,
+        subject: 'Váš projekt byl oficálně potvrzen – ZakazIQ',
+        heading: 'Váš projekt je oficálně zahájen',
+        intro: `Dobrý den, ${p.client_name}! S radostí vám oznamuji, že váš projekt byl oficálně potvrzen a podle vašeho zadání nyní začínám pracovat. Jakmile bude první ukázka hotová, pošlu vám odkaz, kde uvidíte aktuální stav projektu — budete ho moci ohodnotit, napsat zpětnou vazbu, nebo si se mnou rovnou rezervovat konzultaci a vše osobně probrat.`,
+        fields: [
+          { label: 'Typ projektu', value: p.service_type ?? cfg.defaultServiceType },
+          { label: 'Stav', value: 'V řešení' },
+        ],
+        ctas: [
+          { label: 'Sledovat stav projektu', href: portalUrl },
+        ],
+      })
+    }
 
-  if (to) {
-    await sendBrandedEmail({
-      to,
-      subject: `Poptávka potvrzena – ${p.client_name}`,
-      heading: 'Poptávka přesunuta do zakázek',
-      intro: `Poptávka od klienta ${p.client_name} byla úspěšně potvrzena a přesunuta do aktivních zakázek.`,
-      fields: [
-        { label: 'Klient', value: p.client_name },
-        ...(cfg.domain ? [{ label: 'Zdroj', value: cfg.domain }] : []),
-        ...(p.service_type ? [{ label: 'Typ projektu', value: p.service_type }] : []),
-        ...(p.description ? [{ label: 'Popis', value: p.description }] : []),
-      ],
-      ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}${projectPath(projectId)}` }],
-    })
-  }
+    if (to) {
+      await sendBrandedEmail({
+        to,
+        subject: `Poptávka potvrzena – ${p.client_name}`,
+        heading: 'Poptávka přesunuta do zakázek',
+        intro: `Poptávka od klienta ${p.client_name} byla úspěšně potvrzena a přesunuta do aktivních zakázek.`,
+        fields: [
+          { label: 'Klient', value: p.client_name },
+          ...(cfg.domain ? [{ label: 'Zdroj', value: cfg.domain }] : []),
+          ...(p.service_type ? [{ label: 'Typ projektu', value: p.service_type }] : []),
+          ...(p.description ? [{ label: 'Popis', value: p.description }] : []),
+        ],
+        ctas: [{ label: 'Otevřít zakázku', href: `${process.env.NEXTAUTH_URL ?? ''}${projectPath(projectId)}` }],
+      })
+    }
+  })
 
   revalidatePath(LEADS_INBOX_PATH)
   revalidatePath(PROJECTS_PATH)
@@ -468,15 +482,18 @@ export async function markProjectAsCompleted(
 
   // Děkovný email + dotazník spokojenosti — jen u klientských zakázek s emailem
   if (extra.project_type === 'client' && p.client_email) {
-    await sendBrandedEmail({
-      to: p.client_email,
-      subject: 'Děkuji za spolupráci – ZakazIQ',
-      heading: 'Děkuji za spolupráci!',
-      intro: `Dobrý den, ${p.client_name}, projekt je hotový a moc vám děkuji za spolupráci — byla mi potěšením. Budu rád, když si najdete chvilku a vyplníte krátký dotazník spokojenosti. Pomůže mi to zlepšovat mé služby a zabere jen pár minut. Na konci můžete napsat i referenci, kterou se mnou chcete sdílet.`,
-      fields: [
-        { label: 'Projekt', value: title },
-      ],
-      ctas: [{ label: 'Vyplnit dotazník spokojenosti', href: getSurveyUrl(surveyToken) }],
+    const to = p.client_email
+    after(async () => {
+      await sendBrandedEmail({
+        to,
+        subject: 'Děkuji za spolupráci – ZakazIQ',
+        heading: 'Děkuji za spolupráci!',
+        intro: `Dobrý den, ${p.client_name}, projekt je hotový a moc vám děkuji za spolupráci — byla mi potěšením. Budu rád, když si najdete chvilku a vyplníte krátký dotazník spokojenosti. Pomůže mi to zlepšovat mé služby a zabere jen pár minut. Na konci můžete napsat i referenci, kterou se mnou chcete sdílet.`,
+        fields: [
+          { label: 'Projekt', value: title },
+        ],
+        ctas: [{ label: 'Vyplnit dotazník spokojenosti', href: getSurveyUrl(surveyToken) }],
+      })
     })
   }
 

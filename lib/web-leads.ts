@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { sql } from '@/lib/db'
 import { adminDb } from '@/lib/admin/db'
 import type { TableParams } from '@/lib/admin-table'
@@ -114,29 +114,35 @@ export function bookingPostHandler(origin: LeadOrigin) {
       `
       const eventId = (eventRows[0] as { id: string }).id
 
+      // Web klienta na nic z toho nečeká (AD08): Gmail SMTP trvá stovky
+      // milisekund až sekundy a poptávka je přitom už uložená. `after()`
+      // pustí e-mail i oznámení až po odeslání odpovědi — a na rozdíl od
+      // plovoucí `void` promise je zaručeně dokončí.
       const to = adminEmail()
-      if (to) {
-        await sendBrandedEmail({
-          to,
-          subject: `Nová poptávka z ${cfg.domain} – ZakazIQ`,
-          heading: 'Nová poptávka z webu',
-          intro: `Přes ${cfg.domain} dorazila nová poptávka a byla automaticky zařazena do přehledu poptávek.`,
-          fields: [
-            { label: 'Klient', value: data.clientName },
-            { label: 'Email', value: data.clientEmail },
-            ...(data.clientPhone ? [{ label: 'Telefon', value: data.clientPhone }] : []),
-            { label: 'Typ služby', value: data.projectType },
-            { label: 'Navržený termín', value: formatPragueDateTime(scheduledAtISO) },
-            ...(data.message ? [{ label: 'Zpráva', value: data.message }] : []),
-          ],
-        })
-      }
+      after(async () => {
+        if (to) {
+          await sendBrandedEmail({
+            to,
+            subject: `Nová poptávka z ${cfg.domain} – ZakazIQ`,
+            heading: 'Nová poptávka z webu',
+            intro: `Přes ${cfg.domain} dorazila nová poptávka a byla automaticky zařazena do přehledu poptávek.`,
+            fields: [
+              { label: 'Klient', value: data.clientName },
+              { label: 'Email', value: data.clientEmail },
+              ...(data.clientPhone ? [{ label: 'Telefon', value: data.clientPhone }] : []),
+              { label: 'Typ služby', value: data.projectType },
+              { label: 'Navržený termín', value: formatPragueDateTime(scheduledAtISO) },
+              ...(data.message ? [{ label: 'Zpráva', value: data.message }] : []),
+            ],
+          })
+        }
 
-      void createNotification({
-        type: 'web_lead',
-        title: `Nová poptávka z ${cfg.domain} — ${data.clientName}`,
-        body: `${data.projectType} · ${formatPragueDateTime(scheduledAtISO)}${data.message ? ' — ' + data.message : ''}`,
-        link: LEADS_INBOX_PATH,
+        await createNotification({
+          type: 'web_lead',
+          title: `Nová poptávka z ${cfg.domain} — ${data.clientName}`,
+          body: `${data.projectType} · ${formatPragueDateTime(scheduledAtISO)}${data.message ? ' — ' + data.message : ''}`,
+          link: LEADS_INBOX_PATH,
+        })
       })
 
       return NextResponse.json(
@@ -220,13 +226,14 @@ export function webLeadPostHandler(origin: LeadOrigin) {
     const projectId = (rows[0] as { id: string }).id
 
     // Nekritický vedlejší efekt — createNotification si chyby chytá sama a
-    // nikdy nesmí shodit odpověď webu.
-    void createNotification({
+    // nikdy nesmí shodit odpověď webu. `after()` ho pustí po odpovědi, ale
+    // na rozdíl od plovoucí `void` promise ho zaručeně dokončí (AD08).
+    after(() => createNotification({
       type: 'web_lead',
       title: `Nová poptávka z ${cfg.domain} — ${data.name}`,
       body: data.automationGoal ?? data.message ?? undefined,
       link: LEADS_INBOX_PATH,
-    })
+    }))
 
     return NextResponse.json({ success: true, id: projectId }, { status: 201 })
   }
