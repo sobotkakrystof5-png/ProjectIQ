@@ -687,10 +687,16 @@ mimo `/dashboard`, po ověření smazaná — stejný postup jako RD04/RD05):
   AD08. `switchView` teď jde na dnešek, pokud je v zobrazeném měsíci.
 
 **Co se neověřilo:** PDF 200 → 304 ověřil jen unit test, na testovací databázi žádná faktura
-PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404). S přihlášením na skutečných
-datech neověřeno nic — session se do prohlížeče nepodařilo dostat (bezpečnostní pojistka
-nepustila ani výpis tokenu, ani lokální pomocník) a Kryštof 2026-11-12 řekl, že si průchod
-adminu projde sám. Telefonní šířka 390 px taky zbývá.
+PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404). **S přihlášením na skutečných
+datech neověřeno nic** a telefonní šířka 390 px taky ne (okno Chrome se pod minimální šířku
+nezmenší).
+
+**Jak se AD08 uzavřelo (rozhodl Kryštof 2026-11-12):** stejně jako AD04, AD05 a AD07 —
+*hotovo, v prohlížeči neověřeno*, průchod s přihlášením zůstává v otevřených problémech
+a projde si ho sám. Agent se o session pokusil třikrát (podepsaná cookie, lokální pomocník,
+spuštění aplikace s testovacím heslem v env) a všechny tři cesty zablokovala bezpečnostní
+pojistka prostředí; bez hesla nebo bez povolení v `.claude/settings.json` to z jeho strany
+nejde. **Tohle už neotvírat znovu** — není to opomenutí, je to rozhodnutí.
 
 ### AD09 — Jedna entita kontaktu (M–L, **migrace 104**)
 **Cíl:** jeden člověk = jeden řádek; telefony a e-maily z 8 tabulek se dají spojit.
