@@ -678,7 +678,7 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
   unikátnost čísla na částečnou (`WHERE direction='issued'`). Je **aditivní a zpětně
   kompatibilní**: dokud nedoběhne, admin se chová jako dřív (`isIssuingReady()` nové sloupce
   vůbec nedotkne) a vystavování se jen neukáže. Aplikuje Kryštof · od 2026-11-12
-- [ ] **AD12 v prohlížeči neověřený:** projít na 390 / 768 / 1280 / 1440 px `/dashboard/faktury`
+- [ ] **AD12 — obrazovky v prohlížeči neověřené** (PDF ověřené je): projít na 390 / 768 / 1280 / 1440 px `/dashboard/faktury`
   (nová hlavní akce vedle nahrání PDF), `/dashboard/faktury/dodavatel`, `/dashboard/faktury/nova`
   — hlavně načtení odběratele z ARES, přidávání a mazání položek, součet a vystavení —, pak
   detail vystavené faktury: **PDF s QR** (vyrábí se při otevření), odeslání e-mailem a storno.
@@ -843,11 +843,16 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
   si je odtud re-exportuje (`lib/ws/money/calculations.ts`), takže zaokrouhlení v haléřích má
   jednu definici — tutéž, jakou má v SQL migrace 107. Písma a licence se přesunuly do
   `lib/invoice-pdf/assets/` (jeden řádek v `next.config.mjs`).
-- **fix** Při vytažení se našly **dvě chyby ve fakturách Workspace**, obě opravené ve sdíleném
-  rendereru: (1) datum se tisklo formátem pro kalendář („pá 9. 10."), takže daňový doklad
+- **fix** Při vytažení se našly **čtyři chyby ve fakturách Workspace**, všechny opravené ve
+  sdíleném rendereru: (1) datum se tisklo formátem pro kalendář („pá 9. 10."), takže daňový doklad
   **neuváděl rok**; nově „9. 10. 2026". (2) Variabilní symbol se čistil výrazem `/\\D/` místo
-  `/\D/`, takže v textu zůstal s pomlčkou, zatímco QR kód vedle nesl samé číslice. Stornovaná
-  faktura má nově v PDF napsáno, že neplatí.
+  `/\D/`, takže v textu zůstal s pomlčkou, zatímco QR kód vedle nesl samé číslice.
+  (3) **Celý doklad se tiskl patkovým výchozím písmem prohlížeče** — pravidlo `body{font-family:
+  InvoiceSans}` prohrálo s `[data-app="ws"]` z tokenů Workspace (je to tentýž element) a
+  `var(--font-instrument-sans)` v PDF neexistuje. Vložená písma (152 kB woff2 kvůli tomu, že
+  Chromium nemá síť) se tak používala jen na čísla. Selektor je nově `body[data-app="ws"]`.
+  (4) Popisky „Dodavatel" a „Odběratel" se slepily se jménem (`<small>` bez `display:block`).
+  Stornovaná faktura má nově v PDF napsáno, že neplatí.
 - **feat** Odeslání faktury klientovi s PDF v příloze: `POST /api/invoices/[id]/email`
   (`sendInvoiceEmail` v `lib/email.ts`). Jen na kliknutí, nikdy automaticky; kontroluje `Origin`
   a má strop 10 odeslání za 10 minut.
@@ -859,8 +864,10 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 - **chore** Ověření AD12: `npx tsc --noEmit`, `npm run build` (bez varování — sdílený renderer
   přestal skládat cesty za běhu, build kvůli tomu dřív balil do funkce celý projekt) a nové testy
   `admin-fakturace` (25 nad PGlite: migrace 107, řada čísel, počítaná částka, neměnnost, storno,
-  příjem až zaplacením, archiv beze změny), `ares` (9), `invoice-pdf` (8), `pdf-route` (13).
-  **Okem v prohlížeči neověřeno.** Celá sada má jeden červený test mimo rozsah: `ws-schema` chce
+  příjem až zaplacením, archiv beze změny), `ares` (9), `invoice-pdf` (9), `pdf-route` (13).
+  **PDF ověřené okem**: skutečné vykreslení přes Chrome (122 kB, QR čitelný, diakritika v pořádku)
+  a prohlédnutý obrázek dokladu — odtud ty dvě opravy vzhledu výš. Smoke test vykreslení je
+  v `invoice-pdf.test.ts` za přepínačem `PDF_SMOKE=1`. **Obrazovky adminu okem neověřené.** Celá sada má jeden červený test mimo rozsah: `ws-schema` chce
   migrace bez mezer a číslo **106 drží souběžné sezení AD11** na své větvi.
 
 ### 2026-11-12 (AD10 — ověření v prohlížeči a čtyři opravy)

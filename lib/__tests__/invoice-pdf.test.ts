@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { invoiceHtml, spaydPaymentString, variableSymbol, type PdfInvoice } from '@/lib/invoice-pdf/render'
+import { invoiceHtml, renderInvoicePdf, spaydPaymentString, variableSymbol, type PdfInvoice } from '@/lib/invoice-pdf/render'
 import { invoiceTotal, itemTotals } from '@/lib/invoice-pdf/totals'
 
 /**
@@ -67,6 +67,15 @@ describe('obsah dokladu', () => {
     expect(html).toContain('26. 11. 2026')
   })
 
+  it('používá vložená písma, ne výchozí patkové', async () => {
+    const html = await invoiceHtml(invoice, { name: 'ZakazIQ', logo: null })
+    // `body` samotné prohrává s `[data-app="ws"]` z tokenů Workspace (je to tentýž
+    // element) a `var(--font-instrument-sans)` v PDF neexistuje — pak se dokument
+    // tiskne patkovým výchozím písmem prohlížeče. Selektor musí zůstat silnější.
+    expect(html).toContain('body[data-app="ws"]{font-family:InvoiceSans')
+    expect(html).toContain('@font-face')
+  })
+
   it('neplátce DPH nemá sloupec DPH a má o tom větu', async () => {
     const html = await invoiceHtml(invoice, { name: 'ZakazIQ', logo: null })
     expect(html).not.toContain('<th>DPH</th>')
@@ -86,6 +95,17 @@ describe('obsah dokladu', () => {
     expect(html).toContain('Doklad byl stornován a neplatí.')
     expect(html).not.toContain('Zaplatit QR kódem')
   })
+
+  // Skutečné vykreslení potřebuje Chrome na počítači, proto za přepínačem
+  // (stejně jako `WS_PDF_SMOKE` ve Workspace): `PDF_SMOKE=1 npx vitest run lib/__tests__/invoice-pdf.test.ts`.
+  it.runIf(process.env.PDF_SMOKE === '1')('se skutečně vykreslí do PDF i s QR a českými znaky', async () => {
+    const pdf = await renderInvoicePdf(
+      { ...invoice, counterparty: { ...invoice.counterparty, name: 'Žluťoučký kůň, s.r.o.' } },
+      { name: 'ZakazIQ', logo: null },
+    )
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-')
+    expect(pdf.length).toBeGreaterThan(10000)
+  }, 60000)
 
   it('text od uživatele se nikdy nevykreslí jako HTML', async () => {
     const html = await invoiceHtml(
