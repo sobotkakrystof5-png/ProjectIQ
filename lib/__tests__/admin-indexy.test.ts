@@ -70,6 +70,9 @@ const QUERIES = {
 
 const before: Record<string, string> = {}
 
+// Hook sype 11 000 řádků do PGlite, pustí `ANALYZE` a 7× `EXPLAIN` před migrací
+// i po ní. Výchozích 10 s na to nestačí (na zatíženém stroji padalo asi v každém
+// třetím běhu celé sady, zjištěno v AD08), proto vlastní limit.
 beforeAll(async () => {
   db = new PGlite()
   await db.exec(`
@@ -165,7 +168,7 @@ beforeAll(async () => {
   for (const [key, query] of Object.entries(QUERIES)) before[key] = await plan(query)
 
   await db.exec(MIGRATION)
-})
+}, 60_000)
 
 describe('migrace 103 — indexy pro obrazovky adminu', () => {
   it('před migrací čtou všechny tyhle dotazy celou tabulku', () => {
