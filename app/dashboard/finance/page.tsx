@@ -12,7 +12,6 @@ import { BusinessCalculator } from './BusinessCalculator'
 import { getBusinessOverview } from './byznys-actions'
 import {
   getTransactions,
-  generateRecurringCostTransactions, generateRecurringCashFlowTransactions,
   getRecurringCashFlow, getFinanceHealthOverview, getMonthSummary, getAllTimeSummary,
   getBusinessIncome,
 } from './finance-actions'
@@ -40,11 +39,10 @@ export default async function FinancePage(
   const currentMonth = searchParams.month ?? new Date().toISOString().slice(0, 7)
   const year = Number(searchParams.year) || new Date().getFullYear()
 
-  await Promise.all([
-    generateRecurringCostTransactions(),
-    generateRecurringCashFlowTransactions(),
-  ])
-
+  // Opakované transakce se **nezakládají při čtení** (AD08). GET nemá
+  // zapisovat a prefetch odkazu by generování spustil, i když stránku
+  // nikdo neotevře. Dělá to denní cron `/api/cron/send-reminders`
+  // a tlačítko „Vygenerovat opakované" v Příjmech a výdajích.
   // Data se tahají jen pro zobrazenou záložku — ta druhá by jinak platila
   // za dotazy, které nikdo neuvidí.
   const [transactions, healthOverview, costs, recurringItems, monthSummary, allTimeSummary] =

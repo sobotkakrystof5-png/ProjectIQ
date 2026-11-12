@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { sendBrandedEmail } from '@/lib/email'
 import { createNotification } from '@/lib/notifications'
-import { generateRecurringCostTransactionsInternal } from '@/lib/recurring-transactions'
+import {
+  generateRecurringCashFlowTransactionsInternal,
+  generateRecurringCostTransactionsInternal,
+} from '@/lib/recurring-transactions'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -186,8 +189,15 @@ export async function GET(req: NextRequest) {
     `,
   ]) as [SlotRow[], SlotRow[], LeadRow[], LeadRow[]]
 
-  // Generate recurring cost transactions (monthly/annual) — idempotent
-  await generateRecurringCostTransactionsInternal().catch(() => {})
+  // Opakované transakce — fixní náklady i cash-flow šablony. Oba generátory
+  // jsou idempotentní (`ON CONFLICT DO NOTHING`), takže se smí pustit znovu.
+  // Cash-flow se sem přidalo v AD08: dřív ho zakládal **render** stránky
+  // Finance, takže vznikaly při prohlížení a vůbec ne, když se tam nikdo
+  // nepodíval. Chyba jednoho generátoru nesmí zastavit připomínky.
+  await Promise.all([
+    generateRecurringCostTransactionsInternal().catch(() => {}),
+    generateRecurringCashFlowTransactionsInternal().catch(() => {}),
+  ])
 
   const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, errors: 0 }
 

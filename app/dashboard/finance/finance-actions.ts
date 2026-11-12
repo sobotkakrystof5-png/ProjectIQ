@@ -371,18 +371,21 @@ export async function deleteRecurringCashFlow(id: string): Promise<void> {
   revalidatePath('/dashboard/finance')
 }
 
-// Generuje chybějící opakované cash-flow transakce pro aktuální měsíc/rok.
-// Idempotentní — bezpečné volat při každém načtení stránky.
-export async function generateRecurringCashFlowTransactions(): Promise<void> {
+/**
+ * Doplní chybějící opakované transakce (fixní náklady i cash-flow šablony)
+ * za aktuální měsíc a rok. Idempotentní — `ON CONFLICT DO NOTHING`.
+ *
+ * Od AD08 je to **jediná ruční cesta**: render stránky Finance už nezapisuje,
+ * běžně to dělá denní cron `/api/cron/send-reminders`. Tlačítko zůstává pro
+ * případ, že cron neproběhl, nebo se šablona přidala dnes.
+ */
+export async function generateRecurringTransactions(): Promise<void> {
   await requireAuth()
-  await generateRecurringCashFlowTransactionsInternal()
-}
-
-// Generuje chybějící opakované cost transakce pro aktuální měsíc/rok.
-// Idempotentní — bezpečné volat při každém načtení stránky.
-export async function generateRecurringCostTransactions(): Promise<void> {
-  await requireAuth()
-  await generateRecurringCostTransactionsInternal()
+  await Promise.all([
+    generateRecurringCostTransactionsInternal(),
+    generateRecurringCashFlowTransactionsInternal(),
+  ])
+  revalidatePath('/dashboard/finance')
 }
 
 // --- Podnikání: dvě linie příjmů (přiznané / nepřiznané) ---

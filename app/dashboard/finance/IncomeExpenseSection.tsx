@@ -10,9 +10,10 @@ import {
   RefreshCw, Tag, ExternalLink, ArrowUpCircle, ArrowDownCircle,
   TrendingUp, TrendingDown, Scale, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react'
+import { toast } from '@/components/ui/toast'
 import {
   createTransaction, deleteTransaction, setTransactionDeclared,
-  createRecurringCashFlow, deleteRecurringCashFlow,
+  createRecurringCashFlow, deleteRecurringCashFlow, generateRecurringTransactions,
   type FinanceTransaction, type TransactionType,
   type RecurringCashFlow, type RecurringFrequency, type MonthSummary,
 } from './finance-actions'
@@ -291,6 +292,20 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
   const [declared, setDeclared] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  async function handleGenerateRecurring() {
+    setIsGenerating(true)
+    try {
+      await generateRecurringTransactions()
+      toast.success('Opakované položky jsou doplněné')
+      router.refresh()
+    } catch {
+      toast.error('Opakované položky se nepodařilo doplnit')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   const incomeOneTime = transactions.filter(t => t.type === 'income')
   const expenseOneTime = transactions.filter(t => t.type === 'expense')
@@ -401,13 +416,30 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
           <Wallet size={16} strokeWidth={1.5} className="text-emerald-600" />
           <h2 className="text-base font-semibold text-foreground">Příjmy &amp; Výdaje</h2>
         </div>
-        <button
-          onClick={() => setShowForm(f => !f)}
-          className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-1.5 transition-colors"
-        >
-          <Plus size={13} strokeWidth={2} />
-          Přidat
-        </button>
+        <div className="flex items-center gap-2">
+          {/*
+            Opakované položky doplňuje denní cron; dřív je zakládal render
+            téhle stránky (AD08). Tlačítko je pro případ, že cron neproběhl
+            nebo se šablona přidala dnes.
+          */}
+          <button
+            onClick={handleGenerateRecurring}
+            disabled={isGenerating}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-lg px-3 py-1.5 transition-colors hover:bg-muted disabled:opacity-60"
+          >
+            {isGenerating
+              ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
+              : <RefreshCw size={13} strokeWidth={1.5} />}
+            Doplnit opakované
+          </button>
+          <button
+            onClick={() => setShowForm(f => !f)}
+            className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <Plus size={13} strokeWidth={2} />
+            Přidat
+          </button>
+        </div>
       </div>
 
       {/* Month picker */}
