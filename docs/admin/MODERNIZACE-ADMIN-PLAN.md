@@ -686,10 +686,26 @@ mimo `/dashboard`, po ověření smazaná — stejný postup jako RD04/RD05):
   v měsíci, ne na dnešek (kotva měsíčního zobrazení je jeho první den). Platilo to i před
   AD08. `switchView` teď jde na dnešek, pokud je v zobrazeném měsíci.
 
-**Co se neověřilo:** PDF 200 → 304 ověřil jen unit test, na testovací databázi žádná faktura
-PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404). **S přihlášením na skutečných
-datech neověřeno nic** a telefonní šířka 390 px taky ne (okno Chrome se pod minimální šířku
-nezmenší).
+**Jak to stojí proti „Hotovo, když“** (ať se to příště nečte zmateně):
+
+| Kritérium | Stav |
+|---|---|
+| uložení zakázky nečeká na SMTP | ✅ `admin-after-emails.test.ts` |
+| kalendář načte ≤ 60 řádků | ✅ `admin-calendar.test.ts` (3 roky dat → 176 řádků) |
+| bundle guard drží strop | ✅ `admin-bundle-guard.test.ts` |
+| Finance v GET nezapisují | ✅ `admin-render-nezapisuje.test.ts` |
+| událost 10:15–12:00 na správném místě **v prohlížeči** | ✅ ověřeno očima |
+| klik na slot **v 11:00** otevře formulář s 11:00 | ⚠️ ověřeno v **15:00 a 17:00** (týž kód, hodina je parametr `defaultHour`); doslova v 11:00 se doklikat nestihlo — rozšíření Chrome se mezitím odpojilo |
+| potvrzení leadu vypadá okamžitě | ✅ `useOptimistic`, reducer v testu |
+| **„Zaplaceno“ vypadá okamžitě** | ❌ nedělá se — v adminu žádné jednoklikové „Zaplaceno“ není, přesunuto do AD12 |
+
+**Co do kritérií AD08 nepatří, i když to zůstává otevřené:** průchod adminu s přihlášením na
+skutečných datech a telefonní šířka 390 px. Ani jedno není v „Hotovo, když“ — je to diligence
+navíc, kterou si agent přidal do otevřených problémů v paměti. (V tabulce stavu to omylem
+chvíli stálo jako nesplněné kritérium; opraveno.)
+
+**Co se neověřilo jinak:** PDF 200 → 304 ověřil jen unit test, na testovací databázi žádná
+faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404).
 
 **Jak se AD08 uzavřelo (rozhodl Kryštof 2026-11-12):** stejně jako AD04, AD05 a AD07 —
 *hotovo, v prohlížeči neověřeno*, průchod s přihlášením zůstává v otevřených problémech
@@ -736,6 +752,38 @@ source, last_seen_at, created_at, updated_at, merged_into REFERENCES contacts(id
 **Hotovo, když:** dry-run nad testovacími daty vypíše počet kontaktů a konfliktů; sloučení a jeho
 Zpět mají test; dva leady se stejným telefonem v jiném zápisu ukazují jeden kontakt.
 **Riziko:** střední. Částečné unique indexy zajistí, že duplicita nikdy nezablokuje zápis z formuláře.
+
+
+**Provedeno 2026-11-12**, s pěti odchylkami od zadání:
+
+1. **Sloučení nepřesměrovává `contact_id`** (R-095). Zadání chtělo „nastaví `merged_into`
+   a přesměruje `contact_id`" a zároveň „Zpět = smazat `merged_into`" — to dohromady nejde:
+   po přesměrování by smazání jedné hodnoty sloučení nevrátilo a bylo by potřeba záloha, kterou
+   zadání výslovně nechtělo. Vyhrála reverzibilita: sloučení je **jedna hodnota** a čtení vede
+   na cíl přes `COALESCE(merged_into, id)`. Dotazy proto počítají s *rodinou* kontaktu
+   (on sám + co je do něj sloučené) a řetěz drží trigger plochý.
+2. **Migrace je 104, ne 101** — čísla 100–103 obsadily AD01, AD02 a AD06.
+3. **E-mail, který patří jedinému telefonu, se k tomu telefonu připojí.** Při běhu na testovacích
+   datech vycházelo 18 kontaktů z 18 řádků, protože dokončená zakázka a konzultace nemají
+   telefon a vznikal z nich druhý kontakt téhož člověka. Po úpravě (a po dotažení telefonu
+   ze zdrojové zakázky u `completed_projects` a `consultation_slots`) je to **14 kontaktů
+   z 18 řádků, 2 sporné případy, 0 nepřiřazených**.
+4. **`client_overview` se nestavěl** — pohled závisí na AD13 (zadání to říká). Karta kontaktu
+   zatím nic nepočítá, jen odkazuje; souhrn čísel přidá AD13.
+5. **`tsconfig.json` má `allowImportingTsExtensions`.** Bez toho nejde z `.mjs` skriptu
+   importovat `lib/contacts/group.ts`, který sám importuje `normalize.ts` (Node 22.18+ spouští
+   `.ts` bez překladu, ale TypeScript bez toho přepínače `./normalize.ts` v importu nepustí).
+
+Navíc nad zadání: **Kontakty jsou v menu** (Práce, za Hovory — AD03 je tam záměrně nedal, dokud
+obrazovka nebyla), **`convertLeadToProject`** přebírá i firmu, poznámky z `lead_notes` a termín
+z kalendáře a končí na nové zakázce (čtyři dluhy, které zadání jmenuje), a **`vitest` má
+`hookTimeout` 60 s** — PGlite databáze startují v `beforeAll` a při plném běhu se jich zakládá
+víc najednou, takže 30 s nestačilo (jeden ze dvou známých nestabilních testů).
+
+**Co se neověřilo:** nic z AD09 nikdo neviděl v prohlížeči. Migrace 104 je aplikovaná **jen na
+testovacím Neonu**; backfill tam proběhl (14 kontaktů) a je idempotentní (druhý běh 0 zápisů).
+Výmaz kontaktu na žádost GDPR nikde není — `purge_client_retention` (R-076) o `contacts` neví
+(zapsáno jako otevřený problém, patří k AD16/KP10).
 
 ### AD10 — Propojení a volání jedním klikem (M, **migrace 105**)
 **Cíl:** telefon, e-mail a SMS jsou klikací všude a kalendář s hovory se nerozcházejí.
@@ -1031,8 +1079,8 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **uzavřeno 2026-11-12** — kód, testy a kalendář v prohlížeči hotové; ze seznamu „Hotovo, když“ **nesplněné**: průchod s přihlášením, 390 px a „Zaplaceno“ (→ AD12). Uzavřel Kryštof rozhodnutím, ne splněním kritérií. |
-| AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | nezačato |
+| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **uzavřeno 2026-11-12** — ze seznamu „Hotovo, když“ splněné čtyři testovatelné body i vykreslení události 10:15–12:00 v prohlížeči; klik na slot ověřen v 15:00 a 17:00, ne doslova v 11:00. Nesplněné: **„Zaplaceno“** (→ AD12, v adminu neexistuje). |
+| AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | nezačato |
