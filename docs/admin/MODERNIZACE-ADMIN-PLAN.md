@@ -970,8 +970,19 @@ po ní; skript jen čte a při neshodě skončí nenulovým kódem.
 běžném postupu to vyjde samo. 106 je jako 102 **nekompatibilní se starým buildem**:
 nasadit větev, pak 102, pak 106.
 
-**Co se neověřilo:** migrace 106 není aplikovaná nikde (ani na testu), takže obrazovky
-po ní nikdo neviděl — nový build na databázi bez 106 nepoběží. V prohlížeči se neověřilo nic.
+**Ověřeno v prohlížeči (průvodka a uzavření).** Dočasná stránka s fiktivními daty mimo
+`/dashboard`, po průchodu smazaná — stejný postup jako AD08. Headless Chrome, šest stavů
+zakázky × 390 / 768 / 1280 / 1440 px: nikde vodorovné přetečení, všechny akční plochy 44 px,
+v konzoli jen 404 na `/favicon.ico`. Průchod našel **dvě věci a obě jsou opravené**:
+1. **Osa uvázla na kroku „Poptávka" u každé ručně zapsané zakázky.** Krok nešel splnit, takže
+   `nextStep` nikdy nedošel dál a tlačítko dalšího kroku se neukázalo vůbec. Poptávka je teď
+   splněná vždy a každý krok dostal práh `rank` — rozdělané zakázce se neradí domluvit schůzku,
+   ale doplnit cenu ano.
+2. „Otevřít zpět" mělo 36 px místo 44.
+
+**Co se neověřilo:** migrace 106 na testovacím Neonu není (spuštění zamítlo prostředí), takže
+skutečný detail zakázky, filtry „Uzavřené" a „Vlastní projekty", Profil s přehledem výkonnosti
+a veřejný `/h/[token]` okem nikdo neviděl — nový build na databázi bez 106 nepoběží.
 
 ### AD12 — Fakturace: vystavování v adminu (L, **migrace 107**)
 **Cíl:** fakturu vystavíš v adminu, archiv cizích PDF funguje dál.
@@ -1209,7 +1220,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno a ověřeno. |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
-| AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (migrace 106 nikde neaplikovaná, v prohlížeči neověřeno) |
+| AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (průvodka ověřená v prohlížeči; 106 omylem na produkci, na testu chybí) |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | nezačato |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **109** | AD05, AD09 | nezačato |

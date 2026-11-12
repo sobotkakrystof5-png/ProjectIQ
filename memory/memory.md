@@ -32,7 +32,15 @@ ne v paměti: „Zpět" může doletět na jinou instanci funkce. **Daňová č�
 migrace do `finance_transactions` nevkládá ani nemaže jediný řádek, jen přepojuje
 `source_project_id`; hlídá to test nad PGlite („součet příjmů po letech sedí na korunu") a pro
 skutečnou databázi `node scripts/admin-income-check.mjs --ulozit/--porovnat`. Odchylky od zadání: R-097.
-**V prohlížeči neověřeno** (nový build potřebuje 106, a ta na testovacím Neonu není).
+**Průvodka ověřená v prohlížeči** (dočasná stránka s fiktivními daty mimo `/dashboard`,
+po průchodu smazaná — postup z AD08): headless Chrome, šest stavů zakázky × 390 / 768 / 1280 /
+1440 px. Nikde vodorovné přetečení, všechny akční plochy 44 px, v konzoli zůstává jen 404
+na `/favicon.ico`. Průchod našel **dvě věci a obě jsou opravené**: osa uvázla na kroku
+„Poptávka" u každé ručně zapsané zakázky (krok nešel splnit, takže se tlačítko dalšího kroku
+nikdy neukázalo) a „Otevřít zpět" mělo 36 px místo 44. Při té opravě dostal každý krok práh
+(`rank`): rozdělané zakázce se už neradí domluvit schůzku, ale cenu doplnit ano.
+**Zbytek AD11 v prohlížeči ověřený není** — skutečný detail zakázky, filtry v Zakázkách
+a Profil potřebují migraci 106 a ta na testovacím Neonu není (spuštění zamítlo prostředí).
 Z AD10: kontakt se vytáčí a píše z jednoho místa — `components/admin/contact-actions.tsx`
 (`tel:`, `sms:`, `mailto:`, WhatsApp, šablony, Zkopírovat; plochy 44 px), odkazy skládá
 `lib/contacts/href.ts` a šablony `lib/message-templates.ts` (plní odkaz, **neposílají**, R-084).
@@ -687,12 +695,12 @@ pak 106; a **103 musí jít před 106**, protože zakládá index nad `completed
   `scripts/admin-106-zpet.sql` (vrátí jen název tabulky a vyškrtne 106 z evidence, aby se po nasazení
   větve pustila znovu). Pouští Kryštof, agent produkční připojení nemá. `.claude/security/AUDIT-LOG.md`
   · od 2026-11-12
-- [ ] **AD11 v prohlížeči neověřený:** nový build potřebuje migraci 106 a ta na testovacím Neonu
-  (větev `rd-test`, kam míří `.env.local`) **není**. Projít na 390 / 768 / 1280 / 1440 px:
-  průvodku na detailu zakázky (osa, tlačítko dalšího kroku, „Zpět" u změny stavu), uzavření zakázky
-  a jeho vrácení, `/dashboard/zakazky` s filtry „Uzavřené" a „Vlastní projekty", `/dashboard/profil`
-  s přehledem výkonnosti a hodnocením, a veřejný `/h/[token]`. Ověřeno zatím testy a buildem
-  · od 2026-11-12
+- [ ] **AD11 — co prohlížeč ověřit nemohl:** **průvodka a formulář uzavření ověřené jsou**
+  (dočasná stránka s fiktivními daty, 390–1440 px, bez nálezu po dvou opravách). Zbývá to,
+  co potřebuje migraci 106 na testovacím Neonu: skutečný detail zakázky, „Zpět" u změny stavu
+  na datech, `/dashboard/zakazky` s filtry „Uzavřené" a „Vlastní projekty", `/dashboard/profil`
+  s přehledem výkonnosti a hodnocením a veřejný `/h/[token]`. Pustit 106 na `rd-test`
+  a projít · od 2026-11-12
 - [ ] **Migrace 106 na testovacím Neonu chybí:** admin lokálně nepoběží, dokud tam nebude
   (chybí `projects.closed_at`, `project_type`, `survey_token` a archiv). Aplikuje Kryštof
   · od 2026-11-12
@@ -863,8 +871,20 @@ pak 106; a **103 musí jít před 106**, protože zakládá index nad `completed
 - **chore** Ověření: `npx tsc --noEmit`, `npm test` **82 souborů / 953 testů** (nové
   `admin-zakazka-jedina-pravda` nad PGlite — migrace 106 včetně brány na daňová čísla
   a dvojího spuštění —, `admin-pruvodka` a `admin-stav-jednim-klikem`), `npm run build:check`
-  prošel při běžícím dev serveru. **Okem v prohlížeči neověřeno** — nový build potřebuje 106
-  a ta na testovacím Neonu není.
+  prošel při běžícím dev serveru; po opravách z průchodu **82 souborů / 956 testů**. Obrazovky,
+  které potřebují data (detail zakázky, filtry, Profil), okem ověřené nejsou — chybí 106
+  na testovacím Neonu.
+- **chore** **Průvodka ověřená v prohlížeči.** Dočasná stránka s fiktivními daty mimo
+  `/dashboard` (po průchodu smazaná, postup z AD08), headless Chrome přes `puppeteer-core`:
+  šest stavů zakázky × 390 / 768 / 1280 / 1440 px. Nikde vodorovné přetečení, akční plochy 44 px,
+  v konzoli jen 404 na `/favicon.ico` (otevřený problém z AD10). Formulář uzavření se na 390 px
+  otevře celý a má šest polí s českými popisky.
+- **fix** **Osa uvázla na „Poptávce" u ručně zapsané zakázky** — krok nešel splnit, takže
+  `nextStep` nikdy nedošel dál a tlačítko dalšího kroku se neukázalo. Poptávka je od teď splněná
+  vždy (zakázka nějak vznikla; odkud, říká štítek v hlavičce) a každý krok má práh `rank`:
+  rozdělané zakázce se neradí domluvit schůzku, ale doplnit cenu ano. Nalezeno průchodem
+  v prohlížeči, pokryto třemi novými testy.
+- **fix** „Otevřít zpět" u uzavřené zakázky mělo 36 px místo 44 (B9).
 - **chore** Incident: 106 pustená na produkci před nasazením větve. Rozbitý je i veřejný dotazník
   (`/h/<token>` → 500, ověřeno curlem). Návrat `scripts/admin-106-zpet.sql`, zápis v AUDIT-LOG.
 

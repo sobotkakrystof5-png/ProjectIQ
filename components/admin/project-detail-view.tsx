@@ -158,7 +158,7 @@ export async function ProjectDetailView({
       </div>
 
       <div className="rounded-2xl border border-border bg-white p-5 shadow-sm sm:p-6">
-        <ProjectJourney projectId={project.id} steps={journey} />
+        <ProjectJourney projectId={project.id} steps={journey} status={project.status as ProjectStatus} />
       </div>
 
       <nav aria-label="Části zakázky" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">

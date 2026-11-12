@@ -27,6 +27,12 @@ export type JourneyStep = {
   label: string
   /** Krok je za námi. */
   done: boolean
+  /**
+   * Od kterého stavu zakázky má smysl krok ještě nabízet. Rozdělaná zakázka
+   * už nemá radit „domluvte termín" — ten vlak jel. Cenu ale doplnit chceme
+   * i rozdělanou, proto má vyšší práh než schůzka.
+   */
+  rank: number
   /** Co se stane, když se na něj klikne — jen u kroku, který je na řadě. */
   action?: { label: string; status: ProjectStatus } | { label: string; href: string }
   /** Vysvětlení pro krok, se kterým teď nejde nic dělat. */
@@ -71,19 +77,26 @@ export function buildJourney(
     {
       key: 'poptavka',
       label: LABELS.poptavka,
-      done: maPoptavku,
+      // Vždy splněné: zakázka nějak vznikla. Jestli přišla z webu, nebo jste ji
+      // zapsal ručně, říká štítek v hlavičce. Kdyby tenhle krok u ruční zakázky
+      // zůstal nesplněný, osa by na něm uvázla navždy a další krok by se nikdy
+      // nenabídl (našlo se při průchodu v prohlížeči).
+      done: true,
+      rank: 0,
       waiting: maPoptavku ? undefined : 'Zakázku jste zapsal ručně.',
     },
     {
       key: 'hovor',
       label: LABELS.hovor,
       done: facts.schuzka,
+      rank: 0,
       action: { label: 'Domluvit termín', href: '/dashboard/calendar' },
     },
     {
       key: 'nabidka',
       label: LABELS.nabidka,
       done: maCenu,
+      rank: AFTER.in_progress,
       action: { label: 'Doplnit cenu', href: '#editace-zakazky' },
     },
     {
@@ -91,36 +104,42 @@ export function buildJourney(
       label: LABELS.zaloha,
       // Zakázka bez zálohy tenhle krok přeskakuje — není co splnit.
       done: chceZalohu ? project.deposit_paid : true,
+      rank: AFTER.in_progress,
       action: { label: 'Doplnit zálohu', href: '#editace-zakazky' },
     },
     {
       key: 'prace',
       label: LABELS.prace,
       done: stage >= AFTER.in_progress,
+      rank: AFTER.in_progress,
       action: { label: 'Začít pracovat', status: 'in_progress' },
     },
     {
       key: 'predano',
       label: LABELS.predano,
       done: stage >= AFTER.review,
+      rank: AFTER.review,
       action: { label: 'Předat klientovi', status: 'review' },
     },
     {
       key: 'faktura',
       label: LABELS.faktura,
       done: facts.faktura,
+      rank: AFTER.done,
       action: { label: 'Otevřít fakturaci', href: '?zalozka=fakturace' },
     },
     {
       key: 'zaplaceno',
       label: LABELS.zaplaceno,
       done: facts.fakturaZaplacena || project.paid,
+      rank: AFTER.done,
       action: { label: 'Otevřít fakturaci', href: '?zalozka=fakturace' },
     },
     {
       key: 'hodnoceni',
       label: LABELS.hodnoceni,
       done: facts.hodnoceni,
+      rank: AFTER.paid,
       waiting: project.closed_at
         ? 'Dotazník klientovi odešel, čeká se na odpověď.'
         : 'Dotazník odejde sám, až zakázku uzavřete.',
@@ -130,7 +149,13 @@ export function buildJourney(
   return steps
 }
 
-/** První nesplněný krok — ten, na který se pod osou nabídne tlačítko. */
-export function nextStep(steps: JourneyStep[]): JourneyStep | null {
-  return steps.find((s) => !s.done) ?? null
+/**
+ * První nesplněný krok, který ještě dává smysl nabídnout — ten, na který se
+ * pod osou ukáže tlačítko. Kroky „pod" dosaženým stavem se přeskakují:
+ * rozdělané zakázce se neradí domluvit schůzku. Když takový krok nezbyde,
+ * vrátí se první nesplněný vůbec, aby osa nepředstírala, že je hotovo.
+ */
+export function nextStep(steps: JourneyStep[], status: ProjectStatus = 'new'): JourneyStep | null {
+  const stage = AFTER[status] ?? 0
+  return steps.find((s) => !s.done && s.rank >= stage) ?? steps.find((s) => !s.done) ?? null
 }

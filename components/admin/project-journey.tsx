@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { nextStep, type JourneyStep } from '@/lib/admin/journey'
+import type { ProjectStatus } from '@/lib/types'
 
 /**
  * Osa zakázky od poptávky po hodnocení (AD11) a pod ní **jedno** tlačítko
@@ -17,9 +18,17 @@ import { nextStep, type JourneyStep } from '@/lib/admin/journey'
  * se zpožděním a před odesláním se stav v databázi přečte znovu, takže se
  * po „Zpět" nikdy neodešle (viz `setProjectStatus`).
  */
-export function ProjectJourney({ projectId, steps }: { projectId: string; steps: JourneyStep[] }) {
+export function ProjectJourney({
+  projectId,
+  steps,
+  status,
+}: {
+  projectId: string
+  steps: JourneyStep[]
+  status: ProjectStatus
+}) {
   const [pending, start] = useTransition()
-  const next = nextStep(steps)
+  const next = nextStep(steps, status)
   const hotovo = steps.filter((s) => s.done).length
 
   const posun = (status: Parameters<typeof setProjectStatus>[1]) =>

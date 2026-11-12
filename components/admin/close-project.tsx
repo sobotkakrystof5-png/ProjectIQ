@@ -209,8 +209,8 @@ export function ReopenProjectButton({
     })
 
   return (
-    <Button type="button" variant="ghost" onClick={reopen} disabled={pending} className="h-9 px-3.5 text-sm">
-      <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
+    <Button type="button" variant="ghost" onClick={reopen} disabled={pending}>
+      <RotateCcw size={15} strokeWidth={1.75} aria-hidden />
       Otevřít zpět
     </Button>
   )

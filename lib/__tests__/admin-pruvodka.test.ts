@@ -35,9 +35,29 @@ describe('průvodka zakázky', () => {
     expect(steps.map((s) => s.key)).toEqual([...JOURNEY_STEPS])
   })
 
-  it('ručně zapsaná zakázka nemá poptávku, zakázka z webu ano', () => {
-    expect(splneno(buildJourney(zakazka(), prazdne), 'poptavka')).toBe(false)
-    expect(splneno(buildJourney(zakazka({ source: 'vizeon_web' }), prazdne), 'poptavka')).toBe(true)
+  // Našlo se při průchodu v prohlížeči: kdyby ruční zakázka měla „Poptávku"
+  // nesplněnou, osa by na ní uvázla navždy a tlačítko dalšího kroku by se
+  // nikdy neukázalo. Odkud zakázka přišla říká štítek v hlavičce.
+  it('poptávka je splněná vždy, u ruční zakázky s poznámkou', () => {
+    const rucni = buildJourney(zakazka(), prazdne).find((s) => s.key === 'poptavka')
+    const zWebu = buildJourney(zakazka({ source: 'vizeon_web' }), prazdne).find((s) => s.key === 'poptavka')
+    expect(rucni?.done).toBe(true)
+    expect(zWebu?.done).toBe(true)
+    expect(rucni?.waiting).toContain('ručně')
+    expect(zWebu?.waiting).toBeUndefined()
+  })
+
+  it('ruční zakázka hned radí domluvit termín, ne uvíznout na poptávce', () => {
+    const steps = buildJourney(zakazka(), prazdne)
+    expect(nextStep(steps, 'new')?.key).toBe('hovor')
+  })
+
+  it('rozdělaná zakázka bez schůzky radí doplnit cenu, ne schůzku', () => {
+    const steps = buildJourney(zakazka({ status: 'in_progress' }), prazdne)
+    // Schůzka má nižší práh než dosažený stav — ten vlak jel.
+    expect(nextStep(steps, 'in_progress')?.key).toBe('nabidka')
+    // Na ose ale zůstane nesplněná, nic se nepředstírá.
+    expect(splneno(steps, 'hovor')).toBe(false)
   })
 
   it('nabídka je splněná až s vyplněnou cenou', () => {
@@ -69,7 +89,7 @@ describe('průvodka zakázky', () => {
 
   it('další krok je první nesplněný a nabízí jednu akci', () => {
     const steps = buildJourney(zakazka({ source: 'vizeon_web' }), { ...prazdne, schuzka: true })
-    const next = nextStep(steps)
+    const next = nextStep(steps, 'new')
     expect(next?.key).toBe('nabidka')
     expect(next?.action).toEqual({ label: 'Doplnit cenu', href: '#editace-zakazky' })
   })
@@ -79,7 +99,7 @@ describe('průvodka zakázky', () => {
       zakazka({ source: 'vizeon_web', price: 10000 }),
       { ...prazdne, schuzka: true },
     )
-    expect(nextStep(steps)?.action).toEqual({ label: 'Začít pracovat', status: 'in_progress' })
+    expect(nextStep(steps, 'new')?.action).toEqual({ label: 'Začít pracovat', status: 'in_progress' })
   })
 
   it('hodnocení čeká na klienta a říká to jinak před uzavřením a po něm', () => {
@@ -91,12 +111,20 @@ describe('průvodka zakázky', () => {
     expect(pred?.action).toBeUndefined()
   })
 
+  it('uzavřená zakázka bez hodnocení osu za hotovou nevydává', () => {
+    const steps = buildJourney(
+      zakazka({ source: 'vizeon_web', price: 10000, paid: true, status: 'paid', closed_at: '2026-11-01' }),
+      { schuzka: true, faktura: true, fakturaZaplacena: true, hodnoceni: false },
+    )
+    expect(nextStep(steps, 'paid')?.key).toBe('hodnoceni')
+  })
+
   it('hotová zakázka nemá další krok', () => {
     const steps = buildJourney(
       zakazka({ source: 'vizeon_web', price: 10000, paid: true, status: 'paid', closed_at: '2026-11-01' }),
       { schuzka: true, faktura: true, fakturaZaplacena: true, hodnoceni: true },
     )
-    expect(nextStep(steps)).toBeNull()
+    expect(nextStep(steps, 'paid')).toBeNull()
   })
 })
 
