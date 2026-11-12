@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
+import { ensureContact } from '@/lib/admin/contacts'
 import { loadCalendarWindow, type CalendarData } from '@/lib/admin/calendar'
 import { isCalendarDay, windowFor, type DayRange } from '@/lib/admin/calendar-window'
 import { isoToPragueDateAndTime } from '@/lib/prague-time'
@@ -31,6 +32,13 @@ type CalendarEventPayload = {
   starts_at: string // ISO string
   ends_at: string   // ISO string
   event_type: CalendarEventType
+  /**
+   * Komu termín patří (AD10). Nepovinné, ale bez toho byl zrcadlený kontakt
+   * v Hovorech jen titulek a popis — nešlo z něj zavolat ani napsat.
+   */
+  contact_name?: string | null
+  phone?: string | null
+  email?: string | null
 }
 
 export async function createCalendarEvent(payload: CalendarEventPayload) {
@@ -43,6 +51,9 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
 
   const title = payload.title.trim()
   const description = payload.description?.trim() || null
+  const contactName = payload.contact_name?.trim() || null
+  const phone = payload.phone?.trim() || null
+  const email = payload.email?.trim() || null
 
   // Blokace jsou soukromé (dovolená, nedostupnost) — nemá smysl je zrcadlit
   // do Hovorů jako kontakt k obvolání. Po sloučení byznysů (AD02) se zrcadlí
@@ -52,6 +63,15 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
   try {
     if (mirrorToLeads) {
       const { date, time } = isoToPragueDateAndTime(payload.starts_at)
+      // Jeden člověk = jeden kontakt (AD09). Zápis nikdy nespadne na
+      // duplicitě; bez telefonu i e-mailu se kontakt nezakládá (`null`).
+      const contactId = await ensureContact({
+        name: contactName,
+        email,
+        phone,
+        source: 'manual',
+        seenAt: payload.starts_at,
+      })
       // Jeden atomický příkaz místo tří samostatných zápisů bez rollbacku —
       // založení kalendářní události, zrcadlení do Hovorů a zpětné propojení
       // lead_id musí uspět (nebo selhat) společně, jinak by výpadek uprostřed
@@ -63,8 +83,13 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
           RETURNING id
         ),
         new_lead AS (
-          INSERT INTO client_leads (company_name, next_action, next_action_date, next_action_time, next_action_type, calendar_event_id)
-          SELECT ${title}, ${description ?? 'Termín z kalendáře'}, ${date}::date, ${time}::time, 'other', id
+          INSERT INTO client_leads (
+            company_name, contact_name, phone, email,
+            next_action, next_action_date, next_action_time, next_action_type,
+            calendar_event_id, contact_id
+          )
+          SELECT ${title}, ${contactName}, ${phone}, ${email},
+                 ${description ?? 'Termín z kalendáře'}, ${date}::date, ${time}::time, 'other', id, ${contactId}
           FROM new_event
           RETURNING id, calendar_event_id
         )
@@ -86,7 +111,10 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
   }
 
   revalidatePath('/dashboard/calendar')
-  if (mirrorToLeads) revalidatePath('/dashboard/calls')
+  if (mirrorToLeads) {
+    revalidatePath('/dashboard/calls')
+    revalidatePath('/dashboard/kontakty')
+  }
 }
 
 export async function deleteCalendarEvent(id: string) {

@@ -239,3 +239,35 @@ export function formatPragueDayDatePhrase(isoDate: string | Date): string {
   const phrase = DAY_PREPOSITION_PHRASE[weekday] ?? `v ${weekday}`
   return `${phrase} ${dayMonth}`
 }
+
+// 'pá 14. 11. v 9:00' — krátký pražský tvar pro texty, které čte člověk
+// (zprávy, šablony, popisky). Delší `formatPragueDateTime` je na e-maily,
+// kde je místo na celý den i měsíc.
+export function formatPragueShortDateTime(utcIso: string | Date): string {
+  const date = utcIso instanceof Date ? utcIso : new Date(utcIso)
+  const day = new Intl.DateTimeFormat('cs-CZ', {
+    timeZone: TZ, weekday: 'short', day: 'numeric', month: 'numeric',
+  }).format(date)
+  const time = new Intl.DateTimeFormat('cs-CZ', {
+    timeZone: TZ, hour: 'numeric', minute: '2-digit',
+  }).format(date)
+  return `${day} v ${time}`
+}
+
+/**
+ * `'YYYY-MM-DD'` + `'HH:MM'` (pražská nástěnná hodina) jako okamžik, nebo
+ * `null`, když některý díl chybí nebo nemá tvar. Používá to příští akce
+ * u kontaktu — v Hovorech i v šablonách zpráv (AD10).
+ */
+export function pragueDateTimeToISO(
+  date: string | Date | null | undefined,
+  time: string | null | undefined,
+): string | null {
+  if (!date || !time) return null
+  const iso = date instanceof Date ? pragueDayOf(date) : date
+  if (!isIsoDate(iso)) return null
+  const [year, month, day] = iso.split('-').map(Number)
+  const [hour, minute] = time.split(':').map(Number)
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
+  return pragueWallClockToISO(year, month, day, hour, minute)
+}

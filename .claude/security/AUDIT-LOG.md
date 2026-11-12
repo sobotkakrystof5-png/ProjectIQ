@@ -16,6 +16,21 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-12 — review: klikací kontakt a propojení kalendáře (AD10)
+Spouštěč: AD10 — odkazy `tel:`/`sms:`/`mailto:`/`wa.me`, šablony zpráv, migrace 105, před commitem.
+Rozsah: `lib/contacts/href.ts`, `lib/message-templates.ts`, `components/admin/contact-actions.tsx`, `migrations/105_propojeni_kalendar_hovory.sql` (dvě nové funkce + náhrada obou překryvových guardů), `app/calls-actions.ts` (`updateLead`), `app/calendar-actions.ts`, `app/portal-actions.ts` (`submitConsultation` — veřejný vstup), obrazovky, které kontakt nově vykreslují.
+Výsledek: 1 nález opravený ve stejném commitu. Žádný nový veřejný endpoint, žádný secret, žádné nové vykreslování nedůvěryhodného HTML, **CSP beze změny** (odkazy `tel:`, `sms:`, `mailto:` a `wa.me` jsou navigace, ne načítání zdroje; žádná nová doména v `connect-src` ani `script-src`).
+Nálezy:
+1. **Adresa v `mailto:` směla obsahovat `&` a `%`.** První verze `MAILTO_SAFE` opisovala místní část z RFC 5322, kde jsou ty znaky povolené. Mírnější poštovní klient si `jana&subject=Vymysleno@example.cz` může vyložit jako adresu s parametrem a přepsat předmět nebo přidat příjemce — přesně to, co řešil R-062 ve Workspace.
+Opraveno: (1) `MAILTO_SAFE` je zúžený na `[A-Za-z0-9._+-]+@…`; `&`, `%`, `?`, `#` ani mezera adresu nepustí a odkaz se pak nevykreslí vůbec (nic se potichu neopravuje). Hlídají to testy v `lib/__tests__/contacts-href.test.ts`.
+Ověřeno:
+- **Vkládání parametrů do odkazů.** Předmět i text jdou přes `encodeURIComponent`; telefon se do `tel:`, `sms:` i `wa.me` dostane jen jako E.164 z `normalizePhone` (`+` a číslice), takže do URL nemá co propašovat. Texty šablon obsahují jen údaje z databáze a vždy zakódované.
+- **Veřejný vstup `submitConsultation`** se nezměnil v tom, co přijímá: Zod (`bookingSchema`), limit 3 rezervace / 30 minut na zakázku, projekt se bere z tokenu, ne z těla. Nový je jen zápis navíc — rezervace, kalendářní událost a zrcadlený kontakt v jedné transakci. Id rezervace se dohledává podle `project_id` + `scheduled_at` (globálně unique), ne z vstupu. Kontakt se z veřejného vstupu **nezakládá**; `admin_slot_ensure_event` použije ten, který má zakázka.
+- **Nové funkce** `admin_lead_reschedule` a `admin_slot_ensure_event` jsou `SECURITY INVOKER SET search_path = pg_catalog, pg_temp` s kvalifikovanými `public.*` tabulkami (vzor 080 a 104). `EXECUTE` pro PUBLIC tím nic nepřidává: `ws_app` ani `portal_app` nemají na tabulky v `public` práva.
+- **Zeslabení překryvového guardu je úzké.** Obě trigger funkce z migrace 044 se liší jediným `IS DISTINCT FROM` na druhé straně dvojice (rezervace × její vlastní událost). Cizí překryv dál končí `23P01` — hlídá to test „cizí překryv guard pořád zastaví" a „kolizi s jinou událostí odmítne českou hláškou". Na starém buildu (bez nových sloupců) je `NEW.consultation_slot_id` NULL, takže se guard chová úplně stejně jako dřív.
+- **Chybová hlášení nic neprozrazují**: `23P01` se překládá na českou větu o obsazeném termínu, ostatní chyby na obecnou hlášku + `console.error` na serveru.
+Zůstává: `app/portal-actions.ts` dál posílá dva e-maily uvnitř akce a má plovoucí `void createNotification` (otevřený problém z AD08, AD10 se toho nedotkl).
+
 ## 2026-11-12 — review: jedna entita kontaktu (AD09)
 Spouštěč: AD09 — tabulka `contacts`, obrazovka Kontakty a sloučení duplicit, před commitem.
 Rozsah: `migrations/104_kontakty.sql` (nová tabulka, čtyři funkce, tři triggery), `lib/admin/contacts.ts`, `app/contacts-actions.ts`, `app/dashboard/kontakty/**`, `components/admin/contacts/*`, `scripts/admin-contacts-backfill.mjs`, změněný `convertLeadToProject` v `app/calls-actions.ts`.

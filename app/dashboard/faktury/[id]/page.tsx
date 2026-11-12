@@ -9,6 +9,7 @@ import {
 import { getInvoiceDetail, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceDetail } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceDetailActions } from '@/components/InvoiceDetailActions'
+import { ContactActions } from '@/components/admin/contact-actions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'
 
@@ -205,6 +206,12 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   Otevřít zakázku
                   <ExternalLink size={11} strokeWidth={1.5} />
                 </Link>
+                {/* Urgovat nezaplacenou fakturu jde odsud, bez opisování (AD10). */}
+                <ContactActions
+                  phone={invoice.project_client_phone}
+                  email={invoice.project_client_email}
+                  context={{ projectName: invoice.project_client_name }}
+                />
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">

@@ -38,6 +38,8 @@ export type RawCalendarEvent = {
   starts_at: string
   ends_at: string
   event_type: CalendarEventType
+  /** Zakázka termínu — kvůli párování s rezervacemi (AD10). */
+  project_id: string | null
 }
 
 export type RawLead = {
@@ -106,7 +108,7 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
       ORDER BY deadline
     `,
     q`
-      SELECT id, title, description, starts_at, ends_at, event_type
+      SELECT id, title, description, starts_at, ends_at, event_type, project_id
       FROM calendar_events
       WHERE starts_at >= ${fromInstant} AND starts_at < ${toInstant}
       ORDER BY starts_at
@@ -127,21 +129,34 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
     `,
   ])
 
+  const consultations = (consultationRows as unknown as RawConsultation[]).map((r) => ({
+    ...r,
+    scheduled_at: iso(r.scheduled_at),
+  }))
+
+  // Rezervace z portálu má od AD10 svou kalendářní událost (migrace 105),
+  // aby byla vidět i v Hovorech. V kalendáři se ale kreslí **jednou** —
+  // zůstává karta konzultace, protože ví o kanálu, odkazu na schůzku i
+  // zakázce. Páruje se podle zakázky a okamžiku, ne podle nového sloupce:
+  // obrazovka tak funguje i na databázi, kde migrace 105 ještě neproběhla.
+  const slotKeys = new Set(
+    consultations.map((c) => `${c.project_id}@${new Date(c.scheduled_at).getTime()}`),
+  )
+
   return {
-    consultations: (consultationRows as unknown as RawConsultation[]).map((r) => ({
-      ...r,
-      scheduled_at: iso(r.scheduled_at),
-    })),
+    consultations,
     deadlines: (deadlineRows as unknown as RawDeadline[]).map((r) => ({
       id: r.id,
       client_name: r.client_name,
       deadline: dayOnly(r.deadline),
     })),
-    events: (eventRows as unknown as RawCalendarEvent[]).map((r) => ({
-      ...r,
-      starts_at: iso(r.starts_at),
-      ends_at: iso(r.ends_at),
-    })),
+    events: (eventRows as unknown as RawCalendarEvent[])
+      .map((r) => ({
+        ...r,
+        starts_at: iso(r.starts_at),
+        ends_at: iso(r.ends_at),
+      }))
+      .filter((r) => !slotKeys.has(`${r.project_id}@${new Date(r.starts_at).getTime()}`)),
     leads: (leadRows as unknown as (Omit<RawLead, 'estimated_value'> & { estimated_value: string | number | null })[]).map((r) => ({
       ...r,
       // numeric přijde z Neonu jako string — do prohlížeče posíláme číslo

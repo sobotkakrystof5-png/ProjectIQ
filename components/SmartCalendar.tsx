@@ -17,7 +17,9 @@ import {
 import { AdminEventModal } from './AdminEventModal'
 import { Badge } from '@/components/ui/badge'
 import { LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
-import { cn, whatsappHref } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { ContactActions } from '@/components/admin/contact-actions'
+import { mailtoHref } from '@/lib/contacts/href'
 import {
   addIsoDays, getDaysInMonth, getMonthStartOffset, isoWeekday,
   pragueDayOf, pragueMinutesOf, toMondayFirst,
@@ -251,7 +253,6 @@ function EventDetailModal({
   const style = getEventStyle(event)
   const isManualEvent = event.kind === 'manual' || event.kind === 'block'
   const lead = event.kind === 'call' ? event.meta.lead : undefined
-  const waHref = lead?.phone ? whatsappHref(lead.phone) : null
 
   async function handleDelete() {
     if (!confirm('Smazat tuto událost?')) return
@@ -352,21 +353,13 @@ function EventDetailModal({
                     )}
                   </div>
 
-                  {lead.phone && (
-                    <a href={`tel:${lead.phone}`} className="flex items-center gap-2.5 text-navy-700 hover:underline">
-                      <Phone size={14} strokeWidth={1.5} className="shrink-0" />
-                      {lead.phone}
-                    </a>
-                  )}
-                  {lead.email && (
-                    <a href={`mailto:${lead.email}`} className="flex items-center gap-2.5 text-navy-700 hover:underline break-all">
-                      <Mail size={14} strokeWidth={1.5} className="shrink-0" />
-                      {lead.email}
-                    </a>
-                  )}
-                  {!lead.phone && !lead.email && (
-                    <p className="text-xs text-muted-foreground">Kontakt nemá vyplněný telefon ani e-mail.</p>
-                  )}
+                  {/* Volat, SMS, e-mail, WhatsApp i šablony z jednoho místa (AD10). */}
+                  <ContactActions
+                    phone={lead.phone}
+                    email={lead.email}
+                    context={{ at: event.startsAt }}
+                    emptyHint="Kontakt nemá vyplněný telefon ani e-mail."
+                  />
 
                   {lead.notes && (
                     <div>
@@ -375,40 +368,6 @@ function EventDetailModal({
                     </div>
                   )}
 
-                  {/* Rychlé akce */}
-                  {(lead.phone || lead.email) && (
-                    <div className="flex gap-1.5 pt-0.5">
-                      {lead.phone && (
-                        <a
-                          href={`tel:${lead.phone}`}
-                          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border py-2 rounded-lg hover:bg-muted transition-colors"
-                        >
-                          <Phone size={12} strokeWidth={1.5} />
-                          Volat
-                        </a>
-                      )}
-                      {lead.email && (
-                        <a
-                          href={`mailto:${lead.email}`}
-                          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border py-2 rounded-lg hover:bg-muted transition-colors"
-                        >
-                          <Mail size={12} strokeWidth={1.5} />
-                          Napsat
-                        </a>
-                      )}
-                      {waHref && (
-                        <a
-                          href={waHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700 bg-white border border-green-200 py-2 rounded-lg hover:bg-green-50 transition-colors"
-                        >
-                          <MessageCircle size={12} strokeWidth={1.5} />
-                          WhatsApp
-                        </a>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -424,7 +383,10 @@ function EventDetailModal({
               {event.meta.clientEmail && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">E-mail klienta</p>
-                  <a href={`mailto:${event.meta.clientEmail}`} className="text-navy-700 hover:underline">
+                  <a
+                    href={mailtoHref(event.meta.clientEmail) ?? `mailto:${event.meta.clientEmail}`}
+                    className="text-navy-700 hover:underline"
+                  >
                     {event.meta.clientEmail}
                   </a>
                 </div>

@@ -327,6 +327,9 @@ export interface InvoiceDetail extends InvoiceRegistryItem {
   created_at: string
   updated_at: string | null
   ledger: InvoiceLedgerEntry | null
+  /** Kontakt ze zakázky (AD10) — nezaplacenou fakturu jde urgovat odsud. */
+  project_client_phone: string | null
+  project_client_email: string | null
 }
 
 export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null> {
@@ -344,6 +347,8 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
       p.lead_origin AS project_lead_origin,
       p.client_name AS project_client_name,
       p.description AS project_description,
+      p.client_phone AS project_client_phone,
+      p.client_email AS project_client_email,
       COALESCE((
         SELECT COUNT(*) FROM finance_transactions t
         WHERE t.source_project_id = i.project_id
@@ -363,11 +368,16 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
         created_at: string
         updated_at: string | null
         finance_transaction_id: string | null
+        project_client_phone: string | null
+        project_client_email: string | null
       })
     | undefined
   if (!row) return null
 
-  const { ai_extracted, created_at, updated_at, finance_transaction_id, ...registryRow } = row
+  const {
+    ai_extracted, created_at, updated_at, finance_transaction_id,
+    project_client_phone, project_client_email, ...registryRow
+  } = row
 
   let ledger: InvoiceLedgerEntry | null = null
   if (finance_transaction_id) {
@@ -381,5 +391,9 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
     ledger = ((txRows[0] as InvoiceLedgerEntry | undefined) ?? null)
   }
 
-  return { ...toRegistryItem(registryRow), ai_extracted, created_at, updated_at, ledger }
+  return {
+    ...toRegistryItem(registryRow),
+    ai_extracted, created_at, updated_at, ledger,
+    project_client_phone, project_client_email,
+  }
 }

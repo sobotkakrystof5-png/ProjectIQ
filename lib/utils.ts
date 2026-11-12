@@ -50,13 +50,6 @@ export function getSurveyUrl(token: string): string {
   return `${appBaseUrl()}/h/${token}`
 }
 
-// wa.me chce mezinárodní tvar bez '+' a bez mezer. České devítimístné číslo
-// doplníme o předvolbu 420; z čehokoli kratšího se WhatsApp odkaz udělat nedá.
-export function whatsappHref(phone: string): string | null {
-  let digits = phone.trim()
-  if (digits.startsWith('+')) digits = digits.slice(1)
-  else if (digits.startsWith('00')) digits = digits.slice(2)
-  digits = digits.replace(/\D/g, '')
-  if (digits.length === 9) digits = `420${digits}`
-  return digits.length >= 9 ? `https://wa.me/${digits}` : null
-}
+// Odkazy na zavolání a napsání (`tel:`, `sms:`, `mailto:`, `wa.me`) jsou od
+// AD10 v `lib/contacts/href.ts` — jedno místo, které umí i text zprávy
+// a hlídá, co se dostane do adresy.

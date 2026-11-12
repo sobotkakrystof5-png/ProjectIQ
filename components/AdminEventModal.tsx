@@ -57,6 +57,9 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [eventType, setEventType] = useState<CalendarEventType>('manual')
+  const [contactName, setContactName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [startsAt, setStartsAt] = useState(toLocalDatetimeValue(initDate, initHour))
   const [endsAt, setEndsAt] = useState(toLocalDatetimeValue(initDate, initHour + 1))
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +99,11 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
           starts_at: localDatetimeToISO(startsAt),
           ends_at: localDatetimeToISO(endsAt),
           event_type: eventType,
+          // Blokace je soukromá — do Hovorů se nezrcadlí, takže ani kontakt
+          // nemá komu patřit.
+          contact_name: eventType === 'manual' ? contactName.trim() || null : null,
+          phone: eventType === 'manual' ? phone.trim() || null : null,
+          email: eventType === 'manual' ? email.trim() || null : null,
         })
         close(true)
       } catch (err) {
@@ -227,6 +235,44 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
               </div>
             </div>
 
+            {/* Kontakt (AD10) — jen u událostí, blokace se nezrcadlí */}
+            {eventType === 'manual' && (
+              <div className="flex flex-col gap-2 rounded-xl border border-border bg-navy-50/40 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Kontakt (nepovinné)
+                </p>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  Doplňte telefon nebo e-mail a z Hovorů i z kalendáře pak zavoláte jedním klikem.
+                </p>
+                <input
+                  type="text"
+                  value={contactName}
+                  onChange={e => setContactName(e.target.value)}
+                  placeholder="Jméno"
+                  maxLength={120}
+                  className={inputCls}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="Telefon"
+                    maxLength={40}
+                    className={inputCls}
+                  />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="E-mail"
+                    maxLength={200}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Description (only for manual events) */}
             {eventType === 'manual' && (
               <div className="flex flex-col gap-1.5">
@@ -256,7 +302,8 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
                 disabled={isPending}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 brand-gradient',
-                  'text-white text-sm font-semibold py-2.5 rounded-xl shadow-sm',
+                  // 44 px podle Dílků — dřív to bylo 39 px (otevřený problém z AD08).
+                  'text-white text-sm font-semibold min-h-11 px-4 rounded-xl shadow-sm',
                   'hover:opacity-90 transition-opacity disabled:opacity-60',
                 )}
               >
@@ -268,7 +315,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
               <button
                 type="button"
                 onClick={() => close(false)}
-                className="px-4 text-sm text-muted-foreground rounded-xl border border-border hover:bg-muted transition-colors"
+                className="min-h-11 px-4 text-sm text-muted-foreground rounded-xl border border-border hover:bg-muted transition-colors"
               >
                 Zrušit
               </button>

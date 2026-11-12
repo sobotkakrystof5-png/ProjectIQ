@@ -8,6 +8,7 @@ import { PillNav } from '@/components/ws/app/toolbar'
 import { Pagination } from '@/components/admin/pagination'
 import { EmptyState } from '@/components/ws/brand'
 import { parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
+import { getPublicUrl } from '@/lib/utils'
 
 const PATH = '/dashboard/pozadavky'
 
@@ -21,6 +22,10 @@ type JoinedRow = ClientRequestRow & {
   focus: string | null
   project_url: string | null
   lead_origin: string | null
+  /** Kontakt ze zakázky (AD10) — dřív se sem vůbec nenačítal. */
+  client_phone: string | null
+  client_email: string | null
+  public_token: string | null
 }
 
 // Požadavky klientů z portálu — jedna fronta pro všechny zakázky.
@@ -38,7 +43,8 @@ export default async function PozadavkyPage({ searchParams: raw }: PageProps) {
   // která chybějící tabulku přežije (vrátí prázdno místo chyby).
   const [rows, counts] = (await batchTolerant([
     {
-      text: `SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.lead_origin
+      text: `SELECT r.*, p.client_name, p.description, p.focus, p.project_url, p.lead_origin,
+                    p.client_phone, p.client_email, p.public_token
              FROM client_requests r JOIN projects p ON p.id = r.project_id
              WHERE r.status ${showClosed ? '<>' : '='} 'new'
              ORDER BY r.created_at DESC
@@ -79,6 +85,9 @@ export default async function PozadavkyPage({ searchParams: raw }: PageProps) {
       createdAt: new Date(r.created_at).toISOString(),
       prompt,
       terminalCommand: buildTerminalCommand(prompt),
+      phone: r.client_phone,
+      email: r.client_email,
+      portalUrl: r.public_token ? getPublicUrl(r.public_token) : null,
     }
   })
 

@@ -17,6 +17,7 @@ import { MarkCompletedButton } from '@/components/MarkCompletedButton'
 import { InvoiceArchive } from '@/components/InvoiceArchive'
 import { ProjectCosts } from '@/components/admin/costs/project-costs'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
+import { ContactActions } from '@/components/admin/contact-actions'
 import { ProjectActivityPanel } from '@/components/ProjectActivityPanel'
 import { AgentKeyPanel } from '@/components/AgentKeyPanel'
 import { PortalReplyPanel, type PortalThreadMessage } from '@/components/admin/portal-reply-panel'
@@ -131,6 +132,13 @@ export async function ProjectDetailView({
               )}
             </>
           }
+        />
+        <ContactActions
+          className="mt-3"
+          phone={project.client_phone}
+          email={project.client_email}
+          context={{ projectName: project.client_name, portalUrl: getPublicUrl(project.public_token) }}
+          emptyHint="Zakázka nemá telefon ani e-mail. Doplňte je v Editaci zakázky a zavoláte odsud jedním klikem."
         />
       </div>
 
@@ -313,6 +321,9 @@ function RequestsTab({ project, rows: raw }: { project: Project; rows: AdminRow[
       createdAt: new Date(r.created_at).toISOString(),
       prompt,
       terminalCommand: buildTerminalCommand(prompt),
+      phone: project.client_phone,
+      email: project.client_email,
+      portalUrl: getPublicUrl(project.public_token),
     }
   })
 

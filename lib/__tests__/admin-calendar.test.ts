@@ -136,7 +136,8 @@ beforeAll(async () => {
       description text,
       starts_at timestamptz NOT NULL,
       ends_at timestamptz NOT NULL,
-      event_type text NOT NULL DEFAULT 'manual'
+      event_type text NOT NULL DEFAULT 'manual',
+      project_id uuid REFERENCES projects(id)
     );
     CREATE TABLE client_leads (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -209,6 +210,29 @@ describe('co přijde ze databáze', () => {
     const days = data.events.map((e) => pragueDayOf(e.starts_at)).sort()
     expect(days[0]).toBe(range.from)
     expect(days[days.length - 1]).toBe(range.to)
+  })
+
+  it('rezervace s vlastním termínem se nekreslí dvakrát', async () => {
+    // Od AD10 má rezervace z portálu i kalendářní událost (aby byla vidět
+    // v Hovorech). V kalendáři zůstává karta konzultace — ta ví o kanálu
+    // i odkazu na schůzku — a párová událost se vynechá.
+    const project = await db.query<{ id: string }>(
+      `INSERT INTO projects (client_name) VALUES ('Dvojník') RETURNING id::text AS id`,
+    )
+    const projectId = project.rows[0].id
+    const at = '2026-11-10T13:00:00Z'
+    await db.query(`INSERT INTO consultation_slots (project_id, scheduled_at) VALUES ($1, $2)`, [projectId, at])
+    await db.query(
+      `INSERT INTO calendar_events (title, starts_at, ends_at, project_id)
+       VALUES ('Konzultace: Dvojník', $2, $2::timestamptz + interval '1 hour', $1)`,
+      [projectId, at],
+    )
+
+    const data = await loadCalendarWindow({ from: '2026-11-10', to: '2026-11-10' })
+    expect(data.consultations.filter((c) => c.project_id === projectId)).toHaveLength(1)
+    expect(data.events.filter((e) => e.title === 'Konzultace: Dvojník')).toHaveLength(0)
+    // Cizí události ten den zůstávají.
+    expect(data.events.length).toBeGreaterThan(0)
   })
 
   it('události mimo okno nejsou v odpovědi vůbec', async () => {

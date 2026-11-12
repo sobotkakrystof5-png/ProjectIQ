@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Check, ChevronDown, Copy, Mic, RotateCcw, X } from 'lucide-react'
 import { setClientRequestStatus } from '@/app/client-requests-actions'
 import { REQUEST_KIND_LABELS, type RequestKind } from '@/lib/client-requests'
+import { ContactActions } from '@/components/admin/contact-actions'
 import { cn, formatDateTime } from '@/lib/utils'
 
 export interface ClientRequestCardData {
@@ -25,6 +26,11 @@ export interface ClientRequestCardData {
   prompt: string
   /** Příkaz pro terminál, který otevře Claude Code se zadáním (úroveň 2, KP09), složený na serveru. */
   terminalCommand?: string
+  /** Kontakt klienta ze zakázky — aby šlo zavolat, když je požadavek nejasný (AD10). */
+  phone?: string | null
+  email?: string | null
+  /** Odkaz na přehled zakázky pro šablonu e-mailu. */
+  portalUrl?: string | null
 }
 
 export function ClientRequestCard({ request }: { request: ClientRequestCardData }) {
@@ -126,6 +132,18 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
           {error}
         </p>
       )}
+
+      <ContactActions
+        className="mt-3"
+        phone={request.phone}
+        email={request.email}
+        context={{ projectName: request.clientName, portalUrl: request.portalUrl }}
+        emptyHint={
+          request.unclear
+            ? 'Zakázka nemá uložený telefon ani e-mail — doplňte kontakt v zakázce a zeptáte se jedním klikem.'
+            : undefined
+        }
+      />
 
       <footer className="mt-4 flex flex-wrap items-center gap-2">
         <button

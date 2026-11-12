@@ -7,6 +7,7 @@ import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { BILLING_ACCESS_TONE, toneVariant } from '@/lib/admin-status'
 import { ACCESS_LABEL, AUDIT_LABEL, ago, formatDate, formatDateTime } from '../labels'
 import { ResendInviteForm, WebKeysPanel } from './panels'
+import { ContactActions } from '@/components/admin/contact-actions'
 
 // Vykreslení detailu účtu Workspace (S17) — bez načítání dat.
 
@@ -108,12 +109,17 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
         {client.membersList.length > 0 && (
           <ul className="space-y-1.5">
             {client.membersList.map((m, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 text-sm">
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span className="min-w-0 truncate">
                   {m.name ?? m.email ?? 'bez jména'}
                   {m.name && m.email && <span className="text-muted-foreground"> · {m.email}</span>}
                 </span>
-                <span className="text-[11px] text-muted-foreground shrink-0">{m.role === 'owner' ? 'vlastník' : 'pracovník'}</span>
+                <span className="flex items-center gap-2">
+                  {/* Napsat klientovi jedním klikem (AD10). Telefon na členy
+                      Workspace nemáme — ten zůstává jen u klientů adminu. */}
+                  <ContactActions variant="compact" email={m.email} />
+                  <span className="text-[11px] text-muted-foreground shrink-0">{m.role === 'owner' ? 'vlastník' : 'pracovník'}</span>
+                </span>
               </li>
             ))}
           </ul>

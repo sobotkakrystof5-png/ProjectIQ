@@ -6,13 +6,13 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import { adminDb, q } from '@/lib/admin/db'
+import { adminDb, q, type AdminRow } from '@/lib/admin/db'
 import { loadLeadNotes } from '@/lib/admin/leads'
 import { ensureContact } from '@/lib/admin/contacts'
 import { sendPlainEmail } from '@/lib/email'
 import { notifyClientOfProjectChange } from '@/app/actions'
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
-import { getPragueTodayISO } from '@/lib/prague-time'
+import { getPragueTodayISO, pragueDateTimeToISO } from '@/lib/prague-time'
 import type { ClientLead, LeadNote, LeadStatus, LeadActionType } from '@/lib/types'
 
 export type LeadPayload = {
@@ -84,7 +84,14 @@ export async function createLead(payload: LeadPayload) {
 
 export async function updateLead(id: string, payload: LeadPayload) {
   await requireAuth()
-  const rows = await sql`
+
+  // Dvojice kalendář ↔ hovor (051) se dřív rozpadla: tenhle UPDATE přepsal
+  // čas u kontaktu a termín v kalendáři zůstal na starém. `admin_lead_reschedule`
+  // (migrace 105) přepíše obě strany v jedné transakci; dávka je jedno kolo
+  // po síti (R-092).
+  // Rozpad času dělá `lib/prague-time.ts`, ne SQL (R-093).
+  const instant = pragueDateTimeToISO(payload.next_action_date, payload.next_action_time)
+  const update = q`
     UPDATE client_leads SET
       company_name = ${payload.company_name},
       contact_name = ${payload.contact_name},
@@ -110,8 +117,24 @@ export async function updateLead(id: string, payload: LeadPayload) {
     WHERE id = ${id}
     RETURNING reminder_day_before_sent, reminder_2h_before_sent, updated_at
   `
+
+  let rows: AdminRow[]
+  try {
+    const results = await adminDb.batch(
+      instant === null ? [update] : [update, q`SELECT admin_lead_reschedule(${id}, ${instant}::timestamptz) AS event_id`],
+    )
+    rows = results[0]
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === '23P01') {
+      throw new Error('Tento termín se překrývá s jinou událostí v kalendáři. Vyberte prosím jiný čas.')
+    }
+    throw err
+  }
+
   revalidatePath('/dashboard/calls')
-  return rows[0] as Pick<ClientLead, 'reminder_day_before_sent' | 'reminder_2h_before_sent' | 'updated_at'>
+  // Termín se mohl posunout i v kalendáři.
+  if (instant !== null) revalidatePath('/dashboard/calendar')
+  return rows[0] as unknown as Pick<ClientLead, 'reminder_day_before_sent' | 'reminder_2h_before_sent' | 'updated_at'>
 }
 
 export async function setCallAnswered(id: string, answered: boolean | null) {

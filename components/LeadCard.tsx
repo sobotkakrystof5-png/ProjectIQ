@@ -5,6 +5,8 @@ import { Mail, Phone, Calendar, Briefcase, MessageSquare, CheckCircle, Trash2, L
 import { confirmWebLead, deleteWebLead } from '@/app/actions'
 import { toast } from '@/components/ui/toast'
 import { LEAD_ORIGINS, toLeadOrigin } from '@/lib/lead-origins'
+import { ContactActions } from '@/components/admin/contact-actions'
+import { formatPhone, mailtoHref, telHref } from '@/lib/contacts/href'
 
 export interface WebLead {
   id: string
@@ -113,7 +115,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
         {lead.client_email && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Mail size={14} strokeWidth={1.5} className={iconCls} />
-            <a href={`mailto:${lead.client_email}`} className={`${linkCls} truncate`}>
+            <a href={mailtoHref(lead.client_email) ?? `mailto:${lead.client_email}`} className={`${linkCls} truncate`}>
               {lead.client_email}
             </a>
           </div>
@@ -121,8 +123,8 @@ export function LeadCard({ lead }: { lead: WebLead }) {
         {lead.client_phone && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Phone size={14} strokeWidth={1.5} className={iconCls} />
-            <a href={`tel:${lead.client_phone}`} className={linkCls}>
-              {lead.client_phone}
+            <a href={telHref(lead.client_phone) ?? `tel:${lead.client_phone}`} className={linkCls}>
+              {formatPhone(lead.client_phone) ?? lead.client_phone}
             </a>
           </div>
         )}
@@ -146,6 +148,13 @@ export function LeadCard({ lead }: { lead: WebLead }) {
           <p className="leading-relaxed">{lead.description}</p>
         </div>
       )}
+
+      {/* Zavolat nebo napsat ještě před potvrzením poptávky (AD10). */}
+      <ContactActions
+        phone={lead.client_phone}
+        email={lead.client_email}
+        context={{ projectName: lead.client_name, at: lead.consultation_at }}
+      />
 
       <div className="pt-1">
         <button

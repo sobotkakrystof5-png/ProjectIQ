@@ -10,7 +10,10 @@ import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswer
 import type { LeadPayload } from '@/app/calls-actions'
 import type { SortDir } from '@/lib/admin-table'
 import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
-import { whatsappHref, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
+import { ContactActions } from '@/components/admin/contact-actions'
+import { formatPhone, mailtoHref, telHref } from '@/lib/contacts/href'
+import { pragueDateTimeToISO } from '@/lib/prague-time'
 import {
   LEAD_STATUS_LABELS,
   LEAD_ACTION_TYPE_LABELS,
@@ -332,9 +335,12 @@ function PhoneCell({ lead }: { lead: ClientLead }) {
   return (
     <td className="px-3 py-2.5">
       {lead.phone && (
-        <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline">
+        <a
+          href={telHref(lead.phone) ?? `tel:${lead.phone}`}
+          className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline"
+        >
           <Phone size={12} strokeWidth={1.5} />
-          {lead.phone}
+          {formatPhone(lead.phone) ?? lead.phone}
         </a>
       )}
     </td>
@@ -346,7 +352,10 @@ function EmailCell({ lead }: { lead: ClientLead }) {
     <td className="px-3 py-2.5">
       {lead.email && (
         <div className="flex flex-col gap-0.5">
-          <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline truncate max-w-[160px]">
+          <a
+            href={mailtoHref(lead.email) ?? `mailto:${lead.email}`}
+            className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline truncate max-w-[160px]"
+          >
             <Mail size={12} strokeWidth={1.5} />
             {lead.email}
           </a>
@@ -542,7 +551,6 @@ function LeadDetailRow({
   onDeleteNote: (id: string) => void
   isPending: boolean
 }) {
-  const waHref = lead.phone ? whatsappHref(lead.phone) : null
   const [draft, setDraft] = useState('')
 
   const submit = () => {
@@ -615,40 +623,14 @@ function LeadDetailRow({
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 md:justify-end">
-            {lead.phone && (
-              <a
-                href={`tel:${lead.phone}`}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border px-3 py-2 rounded-lg hover:bg-muted transition-colors"
-              >
-                <Phone size={12} strokeWidth={1.5} />
-                Volat
-              </a>
-            )}
-            {lead.email && (
-              <a
-                href={`mailto:${lead.email}`}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-white border border-border px-3 py-2 rounded-lg hover:bg-muted transition-colors"
-              >
-                <Mail size={12} strokeWidth={1.5} />
-                Napsat
-              </a>
-            )}
-            {waHref && (
-              <a
-                href={waHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-white border border-green-200 px-3 py-2 rounded-lg hover:bg-green-50 transition-colors"
-              >
-                <MessageCircle size={12} strokeWidth={1.5} />
-                WhatsApp
-              </a>
-            )}
-            {!lead.phone && !lead.email && (
-              <span className="text-xs text-muted-foreground/70">Kontakt nemá telefon ani e-mail.</span>
-            )}
-          </div>
+          {/* Volat, SMS, e-mail, WhatsApp i šablony z jednoho místa (AD10). */}
+          <ContactActions
+            className="md:justify-end"
+            phone={lead.phone}
+            email={lead.email}
+            context={{ at: pragueDateTimeToISO(lead.next_action_date, lead.next_action_time) }}
+            emptyHint="Kontakt nemá telefon ani e-mail. Doplňte je úpravou kontaktu a zavoláte jedním klikem."
+          />
         </div>
       </td>
     </tr>

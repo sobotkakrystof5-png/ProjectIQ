@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { sql } from '@/lib/db'
+import { adminDb, q } from '@/lib/admin/db'
 import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@/lib/feedback-schema'
 import { sendBrandedEmail } from '@/lib/email'
 import { SURVEY_CATEGORIES } from '@/lib/types'
@@ -150,10 +151,36 @@ export async function submitConsultation(
   const meetingLink = generateMeetingLink(parsed.data.channel, scheduledDate)
 
   try {
-    await sql`
+    // Rezervace, kalendářní událost a zrcadlený kontakt v Hovorech vznikají
+    // v **jedné transakci** (AD10, migrace 105) — jinak by domluvená
+    // konzultace žila jen ve `consultation_slots`, kde ji Hovory nevidí.
+    //
+    // Pořadí je dané křížovým guardem (044): rezervace první (její trigger
+    // kontroluje cizí události), událost až po ní s odkazem na rezervaci,
+    // takže guard dvojici pozná a nehlásí překryv sám se sebou. Dvě
+    // samostatné příkazy proto, že funkce `admin_slot_ensure_event` by řádek
+    // vložený v CTE téhož příkazu neviděla.
+    const insertSlot = q`
       INSERT INTO consultation_slots (project_id, scheduled_at, channel, channel_other_text, client_wish, meeting_link, client_email)
       VALUES (${projectId}, ${scheduledDate.toISOString()}, ${effectiveChannel}, ${parsed.data.channelOtherText ?? null}, ${parsed.data.clientWish}, ${meetingLink}, ${parsed.data.clientEmail})
     `
+    try {
+      await adminDb.batch([
+        insertSlot,
+        q`
+          SELECT admin_slot_ensure_event(id) AS event_id
+          FROM consultation_slots
+          WHERE project_id = ${projectId} AND scheduled_at = ${scheduledDate.toISOString()}
+        `,
+      ])
+    } catch (pairErr: unknown) {
+      // Databáze bez migrace 105 (`42883` = funkce neexistuje) nesmí stát
+      // klienta rezervaci — ta se uloží i sama, jen se nezrcadlí do kalendáře
+      // a Hovorů. Stejná úvaha jako `batchTolerant` v `lib/admin/db.ts`.
+      if ((pairErr as { code?: string })?.code !== '42883') throw pairErr
+      console.error('[Booking] migrace 105 chybí, rezervace se nezrcadlí do kalendáře')
+      await adminDb.batch([insertSlot])
+    }
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code
     if (code === '23505' || code === '23P01') {
@@ -205,6 +232,10 @@ export async function submitConsultation(
     body: `${formattedTime} · ${channelName} — ${parsed.data.clientWish}`,
     link: projectPath(projectId),
   })
+
+  // Rezervace je od AD10 vidět v kalendáři i v Hovorech.
+  revalidatePath('/dashboard/calendar')
+  revalidatePath('/dashboard/calls')
 
   return { success: true }
 }
