@@ -28,7 +28,8 @@ vi.mock('@/lib/email', () => ({ sendBrandedEmail: (...a: unknown[]) => sendBrand
 vi.mock('@/lib/notifications', () => ({ createNotification: (...a: unknown[]) => createNotificationMock(...a) }))
 vi.mock('@/lib/invoices', () => ({ parseInvoiceForm: vi.fn(), insertInvoice: vi.fn() }))
 
-import { confirmWebLead, markProjectAsCompleted, updateProject } from '@/app/actions'
+import { confirmWebLead, updateProject } from '@/app/actions'
+import { closeProject } from '@/app/closed-actions'
 
 const PROJECT_ID = '11111111-1111-4111-8111-111111111111'
 
@@ -137,28 +138,74 @@ describe('potvrzení poptávky', () => {
   })
 })
 
-describe('dokončení zakázky', () => {
+describe('uzavření zakázky (AD11)', () => {
   it('dotazník spokojenosti odejde po odpovědi', async () => {
     queueSql([
-      [{ client_name: 'Novák', client_email: 'novak@example.cz', description: 'Web', price: 1000, notes: null, estimated_costs: null }],
+      [{
+        client_name: 'Novák', client_email: 'novak@example.cz', description: 'Web',
+        status: 'in_progress', closed_at: null, estimated_costs: null, survey_token: 'surv',
+      }],
       [],
-      [{ survey_token: 'surv' }],
     ])
 
-    const result = await markProjectAsCompleted(PROJECT_ID, {
+    const result = await closeProject(PROJECT_ID, {
       project_type: 'client',
-      completed_at: '2026-11-12',
+      closed_on: '2026-11-12',
       difficulty: 3,
       time_invested: null,
       estimated_hours: null,
       include_costs: false,
     })
 
-    expect(result).toEqual({ skippedCostsDueToExisting: false })
+    expect(result).toEqual({ previousStatus: 'in_progress', skippedCostsDueToExisting: false })
     expect(sendBrandedMock).not.toHaveBeenCalled()
 
     await runAfter()
     expect(sendBrandedMock).toHaveBeenCalledTimes(1)
     expect(sendBrandedMock.mock.calls[0][0]).toMatchObject({ to: 'novak@example.cz' })
+  })
+
+  it('už uzavřenou zakázku neuzavře podruhé', async () => {
+    queueSql([
+      [{
+        client_name: 'Novák', client_email: 'novak@example.cz', description: 'Web',
+        status: 'done', closed_at: '2026-11-01', estimated_costs: null, survey_token: 'surv',
+      }],
+    ])
+
+    await expect(
+      closeProject(PROJECT_ID, {
+        project_type: 'client',
+        closed_on: '2026-11-12',
+        difficulty: 3,
+        time_invested: null,
+        estimated_hours: null,
+        include_costs: false,
+      }),
+    ).rejects.toThrow('už uzavřená')
+    expect(afterCallbacks).toHaveLength(0)
+  })
+
+  it('vlastní projekt bez klienta dotazník neposílá', async () => {
+    queueSql([
+      [{
+        client_name: 'Interní nástroj', client_email: 'ja@example.cz', description: null,
+        status: 'in_progress', closed_at: null, estimated_costs: null, survey_token: 'surv',
+      }],
+      [],
+    ])
+
+    await closeProject(PROJECT_ID, {
+      project_type: 'personal',
+      closed_on: '2026-11-12',
+      difficulty: 8,
+      time_invested: 20,
+      estimated_hours: null,
+      include_costs: false,
+    })
+
+    expect(afterCallbacks).toHaveLength(0)
+    expect(await runAfter()).toBe(0)
+    expect(sendBrandedMock).not.toHaveBeenCalled()
   })
 })

@@ -13,7 +13,8 @@ import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
 import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 import { DeleteButton } from '@/components/DeleteButton'
-import { MarkCompletedButton } from '@/components/MarkCompletedButton'
+import { CloseProjectButton, ReopenProjectButton } from '@/components/admin/close-project'
+import { ProjectJourney } from '@/components/admin/project-journey'
 import { InvoiceArchive } from '@/components/InvoiceArchive'
 import { ProjectCosts } from '@/components/admin/costs/project-costs'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
@@ -29,6 +30,7 @@ import { loadProjectActivity } from '@/lib/project-activity-queries'
 import { buildTerminalCommand } from '@/lib/claude-code-handoff'
 import { buildClaudeCodePrompt, type ClientRequestRow } from '@/lib/client-requests'
 import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
+import { buildJourney, journeySqlText, type JourneyFacts } from '@/lib/admin/journey'
 import { formatDate, getPublicUrl, cn } from '@/lib/utils'
 import type {
   Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot, ProjectNote,
@@ -84,9 +86,11 @@ export async function ProjectDetailView({
   // Záložky Aktivita a Fakturace čtou přes sdílené funkce (faktury a náklady
   // mají svoje mapování v `invoice-actions`/`costs-actions`), takže jim zbývá
   // druhá vlna — přepisuje je AD12/AD13.
-  const [projectRows, requestCount, ...tabRows] = await batchTolerant([
+  const [projectRows, requestCount, journeyRows, ...tabRows] = await batchTolerant([
     q`SELECT * FROM projects WHERE id = ${projectId} LIMIT 1`,
     q`SELECT count(*)::int AS count FROM client_requests WHERE project_id = ${projectId} AND status = 'new'`,
+    // Průvodka nečte nic nového, jen se ptá, co už v databázi je (AD11).
+    { text: journeySqlText(), params: [projectId] },
     ...tabQueries(tab, projectId),
   ])
   if (!projectRows.length) notFound()
@@ -97,6 +101,17 @@ export async function ProjectDetailView({
   const tabs = DETAIL_TABS
 
   const openRequests = Number((requestCount[0] as { count?: number } | undefined)?.count ?? 0)
+
+  const raw = journeyRows[0] as
+    | { schuzka: boolean; faktura: boolean; faktura_zaplacena: boolean; hodnoceni: boolean }
+    | undefined
+  const facts: JourneyFacts = {
+    schuzka: raw?.schuzka ?? false,
+    faktura: raw?.faktura ?? false,
+    fakturaZaplacena: raw?.faktura_zaplacena ?? false,
+    hodnoceni: raw?.hodnoceni ?? false,
+  }
+  const journey = buildJourney(project, facts)
 
   return (
     <PageShell width={tab === 'fakturace' ? 'wide' : 'narrow'}>
@@ -140,6 +155,10 @@ export async function ProjectDetailView({
           context={{ projectName: project.client_name, portalUrl: getPublicUrl(project.public_token) }}
           emptyHint="Zakázka nemá telefon ani e-mail. Doplňte je v Editaci zakázky a zavoláte odsud jedním klikem."
         />
+      </div>
+
+      <div className="rounded-2xl border border-border bg-white p-5 shadow-sm sm:p-6">
+        <ProjectJourney projectId={project.id} steps={journey} />
       </div>
 
       <nav aria-label="Části zakázky" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
@@ -222,7 +241,7 @@ async function OverviewTab({ project }: { project: Project }) {
 
   return (
     <>
-      <div className={card}>
+      <div className={card} id="editace-zakazky">
         <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Editace zakázky</h2>
         <ProjectForm project={project} />
       </div>
@@ -249,15 +268,28 @@ async function OverviewTab({ project }: { project: Project }) {
       </div>
 
       <div className={card}>
-        <h2 className={h2}>Přidat do dokončených</h2>
-        <p className="mb-4 text-xs text-muted-foreground">
-          Přidá záznam do sekce Dokončené zakázky a zahrne ji do kalkulačky výdělků. Zakázka zůstane i v aktivním přehledu.
-        </p>
-        <MarkCompletedButton
-          projectId={project.id}
-          projectName={project.client_name}
-          hasEstimatedCosts={project.estimated_costs != null && Number(project.estimated_costs) > 0}
-        />
+        <h2 className={h2}>{project.closed_at ? 'Uzavřená zakázka' : 'Uzavřít zakázku'}</h2>
+        {project.closed_at ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Uzavřeno <span className="font-num">{formatDate(project.closed_at)}</span>. Zakázka se počítá do přehledu
+              výkonnosti na Profilu.
+            </p>
+            <ReopenProjectButton projectId={project.id} status={project.status as ProjectStatus} />
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Hotová zakázka se započítá do přehledu výkonnosti a klientovi odejde poděkování s dotazníkem.
+              Uzavření jde vzít zpět.
+            </p>
+            <CloseProjectButton
+              projectId={project.id}
+              projectName={project.client_name}
+              hasEstimatedCosts={project.estimated_costs != null && Number(project.estimated_costs) > 0}
+            />
+          </>
+        )}
       </div>
 
       <div className={card}>

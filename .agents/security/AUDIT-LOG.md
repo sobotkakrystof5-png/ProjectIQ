@@ -16,6 +16,32 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-12 — incident: migrace 106 na produkci před nasazením větve
+Spouštěč: Kryštof pustil `106_zakazka_jedina_pravda.sql` na **produkčním** Neonu, zatímco produkce běží na starém buildu `d948400` (větev `admin/modernizace` nasazená není).
+Rozsah: `public.completed_projects` přejmenovaná na `completed_projects_archiv`; aditivní část migrace (sloupce na `projects` a `project_surveys`, zakázky vzniklé z ručně doplněné historie) starému buildu nevadí.
+Výsledek: **rozbité části produkce.** Potvrzeno měřením 2026-11-12: `https://www.zakaziq.cz/h/00000000-0000-4000-8000-000000000000` vrací **500** místo 404 — veřejný dotazník spokojenosti, jehož odkazy klienti dostali e-mailem. Za přihlášením dál padá `/dashboard/dokoncene`, `/dashboard/hodnoceni`, `/dashboard/profil`, výkonnost byznysu ve Financích a „Přidat do dokončených" na detailu zakázky.
+Nálezy:
+1. **Dopad na data je nulový.** Migrace do `finance_transactions` nevkládá ani nemaže jediný řádek, jen přepojuje `source_project_id` — součty příjmů (a tedy daňový základ) se nezměnily. Ověřit se to dá `node scripts/admin-income-check.mjs --env .env.production.local`.
+2. **Únik dat nehrozí.** Nic se nezveřejnilo, nezpřístupnilo ani neodeslalo; je to výpadek funkce, ne expozice. Stavová stránka 500 nic neprozrazuje (produkční build Nextu hlášku zahazuje).
+3. **Nové zakázky z archivu jsou v produkčním seznamu vidět** — ručně doplněná historie Dokončených je od teď zakázka ve stavu „Zaplaceno". Je to záměr AD11, jen o něco dřív, než se čekalo.
+Opraveno: připravené `scripts/admin-106-zpet.sql` — vrátí **jen název tabulky** a vyškrtne 106 z `public.schema_migrations`, aby ji běhoun po nasazení větve pustil znovu (migrace je idempotentní, `migrated_project_id` hlídá, co už vzniklo). Aditivní část zůstává, starému buildu nevadí. Spouští Kryštof, agent produkční připojení nemá.
+Zůstává: pravidlo „106 je jako 102 nekompatibilní se starým buildem" je v hlavičce migrace, v `docs/admin/AGENTS-ADMIN.md` a v plánu modernizace. Správné pořadí: nasadit větev → 102 → 106. Stejná past čeká u 102, která na produkci taky nesmí dřív než větev.
+
+## 2026-11-12 — review: zakázka jako jediná pravda (AD11)
+Spouštěč: AD11 — migrace 106, uzavírání zakázek, průvodka, změna stavu jedním klikem, před commitem.
+Rozsah: `migrations/106_zakazka_jedina_pravda.sql`, `app/closed-actions.ts` (nový, nahradil `app/completed-actions.ts`), `setProjectStatus`/`undoProjectStatus` v `app/actions.ts`, `lib/admin/journey.ts`, `lib/admin/closed.ts`, `lib/admin/projects.ts` (nový filtr), veřejné `app/h/[token]/page.tsx` a `submitSurvey` v `app/portal-actions.ts`, `scripts/admin-income-check.mjs`.
+Výsledek: 2 věci utažené ve stejném commitu, žádný otevřený nález. Žádný nový veřejný endpoint, žádný secret, žádné nové vykreslování nedůvěryhodného HTML, **CSP beze změny**.
+Nálezy:
+1. **Token dotazníku nese nově každá zakázka, i nepotvrzená poptávka z webu.** `projects.survey_token` má DEFAULT, takže ho po migraci 106 dostane každý řádek — dřív ho měly jen Dokončené. Token se rozesílá jedině při uzavření zakázky, ale nestojí to na jediné podmínce v kódu: veřejná stránka `/h/[token]` i `submitSurvey` se proto ptají i na `NOT lead_pending`. Nepotvrzená poptávka tak přes dotazník nejde otevřít ani kdyby token unikl.
+2. **Nové server actions neověřovaly tvar id.** `closeProject`, `reopenProject`, `deleteProjectSurvey`, `setProjectStatus` i `undoProjectStatus` posílaly id rovnou do dotazu; cizí hodnota by skončila chybou typu `22P02` a stavem 500 místo české hlášky. Doplněna kontrola UUID (stejný vzor jako `ProjectDetailView` a PDF route z AD08).
+Ověřeno:
+- **Žádná SQL injekce v nových dotazech.** `journeySqlText()` je pevný text s `$1`; pseudostav `uzavrene` v `lib/admin/projects.ts` přidává jen literál `closed_at IS NOT NULL`, nikdy hodnotu z adresy; `project_type` jde jako parametr. Klíč řazení se dál **vybírá** ze seznamu povolených sloupců (AD07).
+- **Autorizace.** Všechny nové akce začínají `requireAuth()`. `setProjectStatus` i `undoProjectStatus` pouštějí jen stavy ze `STATUS_ORDER`, `closeProject` ověřuje datum i rozsah náročnosti.
+- **Odložený e-mail nejde zneužít k rozesílání.** `setProjectStatus` adresu nepřijímá — čte ji ze zakázky a před odesláním si stav v databázi ověří znovu. Adresát se tedy nedá podstrčit ani opakovaným voláním; opakované volání se stejným stavem se zastaví hned (`if (p.status === status) return`).
+- **Migrace nemění peníze.** 106 do `finance_transactions` nic nevkládá ani nemaže, jen přepojuje `source_project_id`. Hlídá to test „součet příjmů po letech sedí na korunu" nad PGlite a `scripts/admin-income-check.mjs` pro skutečnou databázi (skript jen čte).
+- **Osobní údaje.** Migrace převádí jméno, firmu a e-mail z archivu do zakázky, tedy do tabulky, kde tytéž údaje dnes leží. Žádná nová kategorie údajů; archiv zůstává a smí se smazat až po AD18.
+Zůstává: `completed_projects_archiv` drží osobní údaje historických zakázek a `public.purge_client_retention` (R-076) o něm neví — stejná třída věci jako `contacts` z AD09, řeší se s AD16/KP10. Výmaz kontaktu na žádost GDPR dál v adminu neexistuje.
+
 ## 2026-11-12 — review: klikací kontakt a propojení kalendáře (AD10)
 Spouštěč: AD10 — odkazy `tel:`/`sms:`/`mailto:`/`wa.me`, šablony zpráv, migrace 105, před commitem.
 Rozsah: `lib/contacts/href.ts`, `lib/message-templates.ts`, `components/admin/contact-actions.tsx`, `migrations/105_propojeni_kalendar_hovory.sql` (dvě nové funkce + náhrada obou překryvových guardů), `app/calls-actions.ts` (`updateLead`), `app/calendar-actions.ts`, `app/portal-actions.ts` (`submitConsultation` — veřejný vstup), obrazovky, které kontakt nově vykreslují.

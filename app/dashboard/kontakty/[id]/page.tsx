@@ -21,12 +21,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const KIND_LABEL: Record<ContactOccurrence['kind'], string> = {
   zakazka: 'Zakázky',
   hovor: 'Hovory',
-  dokoncene: 'Dokončená práce',
   konzultace: 'Konzultace',
   poptavka: 'Poptávky z webu',
 }
 
-const KIND_ORDER: ContactOccurrence['kind'][] = ['zakazka', 'hovor', 'dokoncene', 'konzultace', 'poptavka']
+const KIND_ORDER: ContactOccurrence['kind'][] = ['zakazka', 'hovor', 'konzultace', 'poptavka']
 
 const REASON_LABEL = {
   jmeno: 'stejné jméno',

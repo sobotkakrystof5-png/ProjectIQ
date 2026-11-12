@@ -18,8 +18,12 @@ export interface BusinessOverview {
 }
 
 // Skutečná výkonnost byznysu, vycházející z reálně zaznamenaných transakcí (žádné odhady/projekce):
-// - Příjmy: zakázky (zálohy i doplatky), dokončené projekty a byznys příjmy + zálohy u dokončených
-//   projektů, které (zatím) nemají vlastní finance_transactions řádek.
+// - Příjmy: zakázky (zálohy i doplatky), dokončené projekty a byznys příjmy + zálohy u uzavřených
+//   zakázek, které vlastní finance_transactions řádek nemají.
+//   Od AD11 se zálohy čtou ze zakázky (`completed_projects` byla její kopie). Podmínka
+//   `NOT EXISTS … deposit_transaction` je tu nová a nutná: běžná zakázka svůj zálohový příjem
+//   v transakcích má, takže bez ní by se záloha započítala dvakrát. Platí jen pro historii
+//   doplněnou ručně, kterou migrace 106 převedla ze starých Dokončených.
 // - Výdaje: reálné transakce tagované area='byznys' nebo napojené na náklad (`costs`), který NENÍ
 //   označen jako 'personal' — takže osobní útraty (i když omylem uložené do `costs`) se nepočítají.
 // annualFixedCosts zůstává projekcí (fixed_monthly*12 + fixed_annual, bez 'personal' nákladů) — používá
@@ -36,9 +40,15 @@ export async function getBusinessOverview(): Promise<BusinessOverview> {
         AND (area = 'byznys' OR category IN ('zakázka', 'dokončený projekt'))
     `,
     q`
-      SELECT COALESCE(SUM(deposit_amount), 0)::float AS total
-      FROM completed_projects
-      WHERE project_type = 'client'
+      SELECT COALESCE(SUM(p.deposit_amount), 0)::float AS total
+      FROM projects p
+      WHERE p.closed_at IS NOT NULL
+        AND p.project_type = 'client'
+        AND p.deposit_paid
+        AND NOT EXISTS (
+          SELECT 1 FROM finance_transactions t
+          WHERE t.source_project_id = p.id AND t.deposit_transaction
+        )
     `,
     q`
       SELECT COALESCE(SUM(ft.amount), 0)::float AS total

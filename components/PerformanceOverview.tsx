@@ -6,7 +6,7 @@ import {
   TrendingUp, Clock, Target, Star, Gauge, ArrowUpRight,
   ArrowDownRight, ChevronDown, ChevronRight, Sparkles,
 } from 'lucide-react'
-import { SURVEY_CATEGORIES, type CompletedProject, type ProjectSurvey } from '@/lib/types'
+import { SURVEY_CATEGORIES, type ClosedProject, type ProjectSurvey } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
@@ -68,12 +68,14 @@ function SectionHeader({ icon, title, sub }: { icon: React.ReactNode; title: str
 
 // ─── Náročnost vs. skutečný čas ────────────────────────────────────────────
 
-function DifficultyVsTime({ projects }: { projects: CompletedProject[] }) {
+function DifficultyVsTime({ projects }: { projects: ClosedProject[] }) {
   const [expanded, setExpanded] = useState(false)
 
+  // Náročnost je od migrace 106 nepovinná — historické zakázky ji nemají
+  // a do porovnání „náročnost vs. čas" by se nevešly.
   const rows = projects
-    .filter(p => p.time_invested != null && Number(p.time_invested) > 0)
-    .map(p => ({ id: p.id, title: p.title, difficulty: p.difficulty, hours: Number(p.time_invested) }))
+    .filter(p => p.difficulty != null && p.time_invested != null && Number(p.time_invested) > 0)
+    .map(p => ({ id: p.id, title: p.title, difficulty: Number(p.difficulty), hours: Number(p.time_invested) }))
     .sort((a, b) => a.difficulty - b.difficulty || a.hours - b.hours)
 
   if (rows.length === 0) {
@@ -157,7 +159,7 @@ function DifficultyVsTime({ projects }: { projects: CompletedProject[] }) {
 
 // ─── Odhad vs. realita ──────────────────────────────────────────────────────
 
-function EstimateVsReality({ projects }: { projects: CompletedProject[] }) {
+function EstimateVsReality({ projects }: { projects: ClosedProject[] }) {
   const rows = projects
     .filter(p => p.estimated_hours != null && p.time_invested != null && Number(p.estimated_hours) > 0)
     .map(p => {
@@ -221,13 +223,13 @@ function EstimateVsReality({ projects }: { projects: CompletedProject[] }) {
 
 // ─── Vývoj v čase ───────────────────────────────────────────────────────────
 
-function TrendOverTime({ projects }: { projects: CompletedProject[] }) {
+function TrendOverTime({ projects }: { projects: ClosedProject[] }) {
   const rows = projects
     .filter(p => p.time_invested != null && Number(p.time_invested) > 0 && Number(p.amount) > 0)
     .map(p => ({
       id: p.id,
       title: p.title,
-      date: new Date(p.completed_at),
+      date: new Date(p.closed_at),
       rate: Number(p.amount) / Number(p.time_invested),
     }))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
@@ -298,9 +300,9 @@ function TrendOverTime({ projects }: { projects: CompletedProject[] }) {
 
 // ─── Spokojenost klientů ────────────────────────────────────────────────────
 
-function ClientSatisfaction({ projects, surveys }: { projects: CompletedProject[]; surveys: ProjectSurvey[] }) {
+function ClientSatisfaction({ projects, surveys }: { projects: ClosedProject[]; surveys: ProjectSurvey[] }) {
   const projectIds = new Set(projects.map(p => p.id))
-  const answered = surveys.filter(s => projectIds.has(s.completed_project_id))
+  const answered = surveys.filter(s => s.project_id !== null && projectIds.has(s.project_id))
 
   if (projects.length === 0) return null
 
@@ -310,7 +312,7 @@ function ClientSatisfaction({ projects, surveys }: { projects: CompletedProject[
         <SectionHeader icon={<Star size={14} className="text-amber-500" strokeWidth={1.5} />} title="Spokojenost klientů" />
         <p className="text-sm text-muted-foreground">
           Zatím žádný klient nevyplnil dotazník spokojenosti.{' '}
-          <Link href="/dashboard/hodnoceni" className="text-navy-700 hover:underline">Zobrazit v Hodnocení →</Link>
+          <span className="text-quiet">Dotazník se posílá e-mailem při uzavření zakázky.</span>
         </p>
       </div>
     )
@@ -343,10 +345,6 @@ function ClientSatisfaction({ projects, surveys }: { projects: CompletedProject[
           </div>
         ))}
       </div>
-
-      <Link href="/dashboard/hodnoceni" className="inline-flex items-center gap-1 text-xs text-navy-700 hover:underline">
-        Zobrazit všechna hodnocení <ChevronRight size={12} strokeWidth={1.5} />
-      </Link>
     </div>
   )
 }
@@ -365,15 +363,16 @@ export default function PerformanceOverview({
   projects,
   surveys,
 }: {
-  projects: CompletedProject[]
+  projects: ClosedProject[]
   surveys: ProjectSurvey[]
 }) {
   const clientProjects = projects.filter(p => p.project_type === 'client')
   const clientHours = clientProjects.reduce((s, p) => s + (p.time_invested != null ? Number(p.time_invested) : 0), 0)
   const clientEarnings = clientProjects.reduce((s, p) => s + Number(p.amount), 0)
   const grossHourlyRate = clientHours > 0 ? clientEarnings / clientHours : 0
-  const avgDifficulty = clientProjects.length > 0
-    ? clientProjects.reduce((s, p) => s + p.difficulty, 0) / clientProjects.length
+  const rated = clientProjects.filter(p => p.difficulty != null)
+  const avgDifficulty = rated.length > 0
+    ? rated.reduce((s, p) => s + Number(p.difficulty), 0) / rated.length
     : 0
   const totalHours = projects.reduce((s, p) => s + (p.time_invested != null ? Number(p.time_invested) : 0), 0)
 

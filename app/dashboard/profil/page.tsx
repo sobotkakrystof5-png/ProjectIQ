@@ -11,6 +11,9 @@ import { sql } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
 import { STATUS_LABELS } from '@/lib/types'
 import { ProfileAvatar } from '@/components/ProfileAvatar'
+import PerformanceOverview from '@/components/PerformanceOverview'
+import { HodnoceniDashboard } from '@/components/HodnoceniDashboard'
+import { loadPerformanceScreen } from '@/lib/admin/closed'
 
 async function loadStats() {
   const [
@@ -62,8 +65,9 @@ async function loadStats() {
     sql`
       SELECT
         COUNT(*)::int AS total,
-        COALESCE(SUM(amount), 0)::numeric AS revenue
-      FROM completed_projects
+        COALESCE(SUM(price), 0)::numeric AS revenue
+      FROM projects
+      WHERE closed_at IS NOT NULL AND NOT lead_pending
     `,
     sql`
       SELECT
@@ -157,7 +161,8 @@ export default async function ProfilPage() {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
-  const stats = await loadStats()
+  // Dvě nezávislá čtení — souhrn profilu a podklady pro přehled výkonnosti.
+  const [stats, performance] = await Promise.all([loadStats(), loadPerformanceScreen()])
   const { projects, vizeon, consultations, feedback, completed, costs, uniqueClients, firstProjectAt, surveys } = stats
 
   const email = session.user?.email ?? ''
@@ -433,16 +438,31 @@ export default async function ProfilPage() {
         </div>
       </div>
 
+      {/* Výkonnost a hodnocení — dřív samostatné obrazovky Dokončené
+          a Hodnocení (AD11, R-090). */}
+      {performance.projects.length > 0 && (
+        <div className="border-t border-navy-100 pt-8">
+          <PerformanceOverview projects={performance.projects} surveys={performance.surveys} />
+        </div>
+      )}
+
+      {performance.surveys.length > 0 && (
+        <div className="border-t border-navy-100 pt-8">
+          <SectionHeader icon={<Star size={14} strokeWidth={1.5} />} title="Hodnocení od klientů" />
+          <HodnoceniDashboard projects={performance.projects} surveys={performance.surveys} />
+        </div>
+      )}
+
       {/* Rychlé odkazy */}
       <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
         <SectionHeader icon={<ArrowRight size={14} strokeWidth={1.5} />} title="Rychlé přístupy" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { href: '/dashboard/vizeon', label: 'Vizeon', icon: <Inbox size={14} strokeWidth={1.5} /> },
+            { href: '/dashboard/poptavky', label: 'Poptávky z webů', icon: <Inbox size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/calendar', label: 'Kalendář', icon: <CalendarCheck size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/calls', label: 'Hovory / Leady', icon: <PhoneCall size={14} strokeWidth={1.5} /> },
-            { href: '/dashboard/hodnoceni', label: 'Hodnocení', icon: <Star size={14} strokeWidth={1.5} /> },
-            { href: '/dashboard/dokoncene', label: 'Dokončené', icon: <CheckCircle2 size={14} strokeWidth={1.5} /> },
+            { href: '/dashboard/zakazky?status=uzavrene', label: 'Uzavřené zakázky', icon: <CheckCircle2 size={14} strokeWidth={1.5} /> },
+            { href: '/dashboard/kontakty', label: 'Kontakty', icon: <Users size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/naklady', label: 'Náklady', icon: <Receipt size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/projekty', label: 'Projekty', icon: <Briefcase size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/new', label: 'Nová zakázka', icon: <Clock size={14} strokeWidth={1.5} /> },

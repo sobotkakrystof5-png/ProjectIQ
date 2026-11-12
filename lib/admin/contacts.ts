@@ -45,7 +45,6 @@ export type ContactRow = {
   /** Kolikrát se kontakt objevuje; počítá se za celou rodinu. */
   zakazky: number
   hovory: number
-  dokoncene: number
   konzultace: number
   poptavky: number
 }
@@ -68,7 +67,6 @@ const OCCURRENCES = `
     SELECT
       (SELECT count(*) FROM projects p           WHERE p.contact_id = ANY(fam.ids))::int AS zakazky,
       (SELECT count(*) FROM client_leads l       WHERE l.contact_id = ANY(fam.ids))::int AS hovory,
-      (SELECT count(*) FROM completed_projects d WHERE d.contact_id = ANY(fam.ids))::int AS dokoncene,
       (SELECT count(*) FROM consultation_slots s WHERE s.contact_id = ANY(fam.ids))::int AS konzultace,
       (SELECT count(*) FROM agent_leads a        WHERE a.contact_id = ANY(fam.ids))::int AS poptavky
   ) occ ON true`
@@ -76,7 +74,7 @@ const OCCURRENCES = `
 const ROW_COLUMNS = `c.id::text, c.display_name, c.company, c.email, c.phone, c.ico, c.dic, c.note,
   c.source, c.last_seen_at, c.created_at, c.merged_into::text,
   t.display_name AS merged_into_name,
-  occ.zakazky, occ.hovory, occ.dokoncene, occ.konzultace, occ.poptavky`
+  occ.zakazky, occ.hovory, occ.konzultace, occ.poptavky`
 
 const TARGET_JOIN = `LEFT JOIN contacts t ON t.id = c.merged_into`
 
@@ -155,7 +153,7 @@ export async function loadContactsScreen(
 
 /** Jedno místo, kde se kontakt objevuje — s textem, který ten řádek nese. */
 export type ContactOccurrence = {
-  kind: 'zakazka' | 'hovor' | 'dokoncene' | 'konzultace' | 'poptavka'
+  kind: 'zakazka' | 'hovor' | 'konzultace' | 'poptavka'
   id: string
   title: string
   /** Jak je kontakt v tom řádku napsaný (jméno, e-mail, telefon). */
@@ -212,12 +210,6 @@ export async function loadContactDetail(id: string): Promise<ContactDetail | nul
            ORDER BY created_at DESC LIMIT $2`,
     params: [id, DETAIL_LIMIT],
   }
-  const completed: AdminQuery = {
-    text: `SELECT id::text, title, coalesce(client_name, company) AS written, completed_at AS at
-           FROM completed_projects WHERE contact_id IN ${family}
-           ORDER BY completed_at DESC LIMIT $2`,
-    params: [id, DETAIL_LIMIT],
-  }
   const slots: AdminQuery = {
     text: `SELECT id::text, coalesce(channel, 'Konzultace') AS title, client_email AS written, scheduled_at AS at
            FROM consultation_slots WHERE contact_id IN ${family}
@@ -248,8 +240,8 @@ export async function loadContactDetail(id: string): Promise<ContactDetail | nul
     params: [id, DETAIL_LIMIT],
   }
 
-  const [headRows, mergedRows, projectRows, leadRows, completedRows, slotRows, agentRows, candidateRows] =
-    await adminDb.batch([head, merged, projects, leads, completed, slots, agent, candidates])
+  const [headRows, mergedRows, projectRows, leadRows, slotRows, agentRows, candidateRows] =
+    await adminDb.batch([head, merged, projects, leads, slots, agent, candidates])
 
   const contact = (headRows[0] as unknown as ContactRow) ?? null
   if (contact === null) return null
@@ -257,7 +249,6 @@ export async function loadContactDetail(id: string): Promise<ContactDetail | nul
   const occurrences: ContactOccurrence[] = [
     ...projectRows.map((r) => ({ kind: 'zakazka' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: `/dashboard/${String(r.id)}` })),
     ...leadRows.map((r) => ({ kind: 'hovor' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: '/dashboard/calls' })),
-    ...completedRows.map((r) => ({ kind: 'dokoncene' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: '/dashboard/dokoncene' })),
     ...slotRows.map((r) => ({ kind: 'konzultace' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: '/dashboard/calendar' })),
     ...agentRows.map((r) => ({ kind: 'poptavka' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: '/dashboard/poptavky' })),
   ]

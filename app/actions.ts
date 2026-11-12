@@ -7,7 +7,7 @@ import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
-import { STATUS_LABELS, type ProjectStatus, type ProjectType } from '@/lib/types'
+import { STATUS_LABELS, STATUS_ORDER, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
 import {
   LEAD_ORIGINS, LEADS_INBOX_PATH, DEFAULT_LEAD_ORIGIN, adminEmail, projectPath, toLeadOrigin,
@@ -17,6 +17,9 @@ import { parseInvoiceForm, insertInvoice, type InvoiceInput, type InvoicePdf } f
 
 /** Seznam zakázek — jedna sekce adminu po sloučení byznysů (AD02, R-088). */
 const PROJECTS_PATH = '/dashboard/zakazky'
+
+/** Cizí adresa nemá skončit chybou typu z Postgresu (`22P02`) a stavem 500. */
+const PROJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
@@ -84,16 +87,17 @@ export async function notifyClientOfProjectChange(
   })
 }
 
-type CompletedExtra = {
+/** Zakázka se zakládá rovnou jako uzavřená (AD11) — dřív to byla kopie v Dokončených. */
+type CloseExtra = {
   project_type: ProjectType
-  completed_at: string
+  closed_on: string
   difficulty: number
   time_invested: number | null
 }
 
 export async function createProject(
   payload: ProjectPayload,
-  completedExtra?: CompletedExtra,
+  closeExtra?: CloseExtra,
   /** Volitelná faktura přiložená rovnou při zakládání zakázky (pole z `InvoiceFields`) */
   invoiceForm?: FormData,
   /**
@@ -170,23 +174,19 @@ export async function createProject(
     { client_name: payload.client_name, client_email: payload.client_email, status: payload.status, progress, project_url: payload.project_url, public_token: publicToken },
     'created'
   )
-  if (completedExtra) {
+  // Zakázka zapsaná rovnou jako hotová se uzavře na místě. Dřív se vedle ní
+  // zakládal druhý řádek v Dokončených s vlastní cenou (AD11, R-090).
+  if (closeExtra) {
     await sql`
-      INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, notes, project_type, source_project_id)
-      VALUES (
-        ${payload.description || payload.client_name},
-        ${payload.client_name},
-        null,
-        ${completedExtra.completed_at},
-        ${payload.price ?? 0},
-        ${completedExtra.difficulty},
-        ${completedExtra.time_invested},
-        ${payload.notes},
-        ${completedExtra.project_type},
-        ${newProjectId}
-      )
+      UPDATE projects SET
+        closed_at       = ${closeExtra.closed_on}::date,
+        status          = CASE WHEN status = 'paid' THEN 'paid' ELSE 'done' END,
+        project_type    = ${closeExtra.project_type},
+        difficulty      = ${closeExtra.difficulty},
+        time_invested   = ${closeExtra.time_invested}
+      WHERE id = ${newProjectId}
     `
-    revalidatePath('/dashboard/dokoncene')
+    revalidatePath('/dashboard/profil')
   }
 
   // Až za příjmovými transakcemi ze zakázky — `syncInvoiceTransaction` pak
@@ -425,117 +425,88 @@ export async function deleteWebLead(projectId: string) {
   revalidatePath(LEADS_INBOX_PATH)
 }
 
-export async function markProjectAsCompleted(
+/**
+ * Změna stavu zakázky jedním klikem, se „Zpět" (AD11).
+ *
+ * `AGENTS-ADMIN.md` dřív říkalo, že to nejde: `updateProject` pošle klientovi
+ * e-mail a „Zpět" by ho poslal podruhé. Řeší to odklad — e-mail odchází
+ * v `after()` se zpožděním a těsně před odesláním se **znovu přečte stav
+ * v databázi**. Když ho „Zpět" vrátil, e-mail neodejde.
+ *
+ * Kontrola v databázi (ne příznak v paměti) je tu proto, že „Zpět" může
+ * doletět na jinou instanci funkce než původní změna; sdílená paměť mezi nimi
+ * neexistuje, ale databáze ano.
+ */
+const STAGE_EMAIL_DELAY_MS = 15_000
+
+export async function setProjectStatus(
   projectId: string,
-  extra: {
-    project_type: ProjectType
-    completed_at: string
-    difficulty: number
-    time_invested: number | null
-    estimated_hours: number | null
-    include_costs: boolean
-  }
-) {
+  status: ProjectStatus,
+): Promise<{ previousStatus: ProjectStatus }> {
   await requireAuth()
+  if (!PROJECT_UUID.test(projectId)) throw new Error('Zakázka nenalezena')
+  if (!STATUS_ORDER.includes(status)) throw new Error('Neznámý stav zakázky.')
+
   const rows = await sql`
-    SELECT client_name, client_email, description, price, notes, estimated_costs
+    SELECT status, client_name, client_email, progress, project_url, public_token
     FROM projects WHERE id = ${projectId} LIMIT 1
   `
   if (!rows.length) throw new Error('Zakázka nenalezena')
   const p = rows[0] as {
+    status: ProjectStatus
     client_name: string
     client_email: string | null
-    description: string | null
-    price: number | null
-    notes: string | null
-    estimated_costs: number | null
+    progress: number
+    project_url: string | null
+    public_token: string
   }
+  if (p.status === status) return { previousStatus: p.status }
 
-  const title = p.description || p.client_name
-  // Scoped na source_project_id, ne na title/client_name — jinak dva různé
-  // projekty od stejného klienta s prázdným popisem (title spadne na
-  // client_name) vypadají jako "duplicitní", i když jde o odlišné zakázky.
-  const existing = await sql`
-    SELECT id FROM completed_projects WHERE source_project_id = ${projectId} LIMIT 1
-  `
-  if (existing.length) throw new Error('Tato zakázka již byla přidána do dokončených.')
+  await sql`UPDATE projects SET status = ${status}, updated_at = now() WHERE id = ${projectId}`
 
-  const inserted = await sql`
-    INSERT INTO completed_projects (title, client_name, company, completed_at, amount, difficulty, time_invested, estimated_hours, notes, project_type, client_email, source_project_id)
-    VALUES (
-      ${p.description || p.client_name},
-      ${p.client_name},
-      null,
-      ${extra.completed_at},
-      ${p.price ?? 0},
-      ${extra.difficulty},
-      ${extra.time_invested},
-      ${extra.estimated_hours},
-      ${p.notes},
-      ${extra.project_type},
-      ${p.client_email},
-      ${projectId}
-    )
-    RETURNING survey_token
-  `
-  const surveyToken = (inserted[0] as { survey_token: string }).survey_token
+  after(() => createNotification({
+    type: 'project_status_changed',
+    title: `Stav zakázky změněn — ${p.client_name}`,
+    body: `${STATUS_LABELS[p.status]} → ${STATUS_LABELS[status]}`,
+    link: projectPath(projectId),
+  }))
 
-  // Děkovný email + dotazník spokojenosti — jen u klientských zakázek s emailem
-  if (extra.project_type === 'client' && p.client_email) {
+  if (p.client_email) {
     const to = p.client_email
+    const ctas: EmailCta[] = []
+    if (p.project_url) ctas.push({ label: 'Zobrazit živou verzi', href: p.project_url })
+    ctas.push({ label: 'Otevřít přehled projektu', href: getPublicUrl(p.public_token), primary: false })
     after(async () => {
+      await new Promise((resolve) => setTimeout(resolve, STAGE_EMAIL_DELAY_MS))
+      const current = await sql`SELECT status, progress FROM projects WHERE id = ${projectId} LIMIT 1`
+      const now = current[0] as { status: ProjectStatus; progress: number } | undefined
+      // Zakázka mezitím zmizela, nebo se stav vrátil („Zpět") — e-mail neodejde.
+      if (!now || now.status !== status) return
       await sendBrandedEmail({
         to,
-        subject: 'Děkuji za spolupráci – ZakazIQ',
-        heading: 'Děkuji za spolupráci!',
-        intro: `Dobrý den, ${p.client_name}, projekt je hotový a moc vám děkuji za spolupráci — byla mi potěšením. Budu rád, když si najdete chvilku a vyplníte krátký dotazník spokojenosti. Pomůže mi to zlepšovat mé služby a zabere jen pár minut. Na konci můžete napsat i referenci, kterou se mnou chcete sdílet.`,
+        subject: 'Aktualizace vašeho projektu – ZakazIQ',
+        heading: 'Váš projekt byl aktualizován',
+        intro: `Dobrý den, ${p.client_name}, právě jsme aktualizovali stav vašeho projektu.`,
         fields: [
-          { label: 'Projekt', value: title },
+          { label: 'Stav', value: STATUS_LABELS[status] },
+          { label: 'Postup', value: `${now.progress}%` },
         ],
-        ctas: [{ label: 'Vyplnit dotazník spokojenosti', href: getSurveyUrl(surveyToken) }],
+        ctas,
       })
     })
   }
 
-  let skippedCostsDueToExisting = false
+  revalidatePath(PROJECTS_PATH)
+  revalidatePath(projectPath(projectId))
+  return { previousStatus: p.status }
+}
 
-  if (extra.include_costs && p.estimated_costs && p.estimated_costs > 0) {
-    // Zakázka může už mít ručně evidované skutečné náklady (panel na detailu
-    // zakázky, Fáze 2) — v tom případě je odhad `estimated_costs` zastaralý
-    // a přičítat ho navrch by vytvořilo duplicitní součet.
-    const existingCosts = await sql`SELECT COUNT(*)::int AS count FROM costs WHERE project_id = ${projectId}`
-    const hasExistingCosts = (existingCosts[0] as { count: number }).count > 0
-
-    if (hasExistingCosts) {
-      skippedCostsDueToExisting = true
-    } else {
-      const costName = 'Náklady: ' + (p.description || p.client_name)
-      const costRows = await sql`
-        INSERT INTO costs (name, amount, cost_type, category, description, project_id)
-        VALUES (
-          ${costName},
-          ${p.estimated_costs},
-          ${'one_time'},
-          ${'client'},
-          ${'Předpokládané náklady ze zakázky ' + p.client_name},
-          ${projectId}
-        )
-        RETURNING id
-      `
-      const costId = (costRows[0] as { id: string }).id
-      // Provázat s finance transakcí, ať je náklad vidět i v cash flow (jeden integrovaný systém)
-      await sql`
-        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_cost_id)
-        VALUES (${p.estimated_costs}, 'expense', 'náklady', ${costName}, ${extra.completed_at}, NULL, ${costId})
-      `
-      revalidatePath('/dashboard/naklady')
-      revalidatePath('/dashboard/finance')
-    }
-  }
-
-  revalidatePath('/dashboard/dokoncene')
-  revalidatePath('/dashboard/hodnoceni')
-  revalidatePath(`/dashboard/${projectId}`)
-
-  return { skippedCostsDueToExisting }
+/** „Zpět" ke změně stavu. Vrácení stavu zároveň zruší odložený e-mail. */
+export async function undoProjectStatus(projectId: string, previousStatus: ProjectStatus) {
+  await requireAuth()
+  if (!PROJECT_UUID.test(projectId)) throw new Error('Zakázka nenalezena')
+  if (!STATUS_ORDER.includes(previousStatus)) throw new Error('Neznámý stav zakázky.')
+  await sql`UPDATE projects SET status = ${previousStatus}, updated_at = now() WHERE id = ${projectId}`
+  revalidatePath(PROJECTS_PATH)
+  revalidatePath(projectPath(projectId))
 }

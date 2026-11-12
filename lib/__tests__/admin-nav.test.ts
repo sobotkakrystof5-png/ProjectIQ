@@ -10,16 +10,15 @@ import { resolveLegacyRedirect } from '@/lib/legacy-redirects.mjs'
 import { filterPages, normalizeQuery, toLikePattern } from '@/lib/admin-search'
 
 // Cesty ze starých horních lišt a z mobilního menu před KP01. Adresy zrušené
-// v AD02 (`/dashboard/vizeon`, `/alteno*`) a v AD03 (`/hub*`) tu nejsou — ty
-// řeší přesměrování (lib/__tests__/lead-origins.test.ts a test níž).
+// v AD02 (`/dashboard/vizeon`, `/alteno*`), AD03 (`/hub*`) a AD11
+// (`/dashboard/{dokoncene,hodnoceni}`) tu nejsou — ty řeší přesměrování
+// (lib/__tests__/lead-origins.test.ts a test níž).
 const OLD_MENU_PATHS = [
   '/dashboard',
   '/dashboard/pozadavky',
   '/dashboard/poptavky',
   '/dashboard/calendar',
   '/dashboard/calls',
-  '/dashboard/dokoncene',
-  '/dashboard/hodnoceni',
   '/dashboard/naklady',
   '/dashboard/faktury',
   '/dashboard/klienti',
@@ -39,6 +38,16 @@ describe('navigace administrace', () => {
     for (const path of OLD_MENU_PATHS) {
       expect(activeHref(path), path).not.toBeNull()
     }
+  })
+
+  // AD11 (R-090): dokončenost je stav zakázky, hodnocení je na ní. Obě staré
+  // adresy leží v `notifications.link` a ve starých e-mailech, takže se z nich
+  // nesmí stát 404.
+  it('Dokončené a Hodnocení z menu zmizely, ale jejich adresy vedou dál', () => {
+    expect(allNavItems().map((i) => i.href)).not.toContain('/dashboard/dokoncene')
+    expect(allNavItems().map((i) => i.href)).not.toContain('/dashboard/hodnoceni')
+    expect(resolveLegacyRedirect('/dashboard/dokoncene')).toBe('/dashboard/zakazky?status=uzavrene')
+    expect(resolveLegacyRedirect('/dashboard/hodnoceni')).toBe('/dashboard/profil')
   })
 
   it('adresy položek jsou jedinečné', () => {

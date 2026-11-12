@@ -31,7 +31,6 @@ function occurrences(row: ContactRow): React.ReactNode {
   }
   add(row.zakazky, ['zakázka', 'zakázky', 'zakázek'])
   add(row.hovory, ['hovor', 'hovory', 'hovorů'])
-  add(row.dokoncene, ['dokončená', 'dokončené', 'dokončených'])
   add(row.konzultace, ['konzultace', 'konzultace', 'konzultací'])
   add(row.poptavky, ['poptávka', 'poptávky', 'poptávek'])
   if (parts.length === 0) return <span className="text-quiet">Zatím nikde</span>

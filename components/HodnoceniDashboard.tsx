@@ -5,12 +5,12 @@ import {
   Star, ChevronDown, ChevronRight, Clock, Copy, Check, Trash2,
   Link2, Quote, ShieldCheck, Loader2, Inbox,
 } from 'lucide-react'
-import { deleteProjectSurvey } from '@/app/completed-actions'
+import { deleteProjectSurvey } from '@/app/closed-actions'
 import { getSurveyUrl, cn } from '@/lib/utils'
-import { SURVEY_CATEGORIES, type CompletedProject, type ProjectSurvey } from '@/lib/types'
+import { SURVEY_CATEGORIES, type ClosedProject, type ProjectSurvey } from '@/lib/types'
 
 interface Props {
-  projects: CompletedProject[]
+  projects: ClosedProject[]
   surveys: ProjectSurvey[]
 }
 
@@ -145,7 +145,7 @@ export function HodnoceniDashboard({ projects, surveys }: Props) {
 
   const surveyByProject = useMemo(() => {
     const map = new Map<string, ProjectSurvey>()
-    for (const s of localSurveys) map.set(s.completed_project_id, s)
+    for (const s of localSurveys) if (s.project_id) map.set(s.project_id, s)
     return map
   }, [localSurveys])
 
@@ -197,7 +197,7 @@ export function HodnoceniDashboard({ projects, surveys }: Props) {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {project.client_name ?? 'Neznámý klient'}
                     {' · '}
-                    {new Date(project.completed_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(project.closed_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">

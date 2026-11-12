@@ -6,10 +6,10 @@ import { Pagination } from '@/components/admin/pagination'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
 import { EmptyState } from '@/components/ws/brand'
-import { loadProjectsScreen, PROJECT_SORT } from '@/lib/admin/projects'
+import { CLOSED_FILTER, loadProjectsScreen, PROJECT_SORT } from '@/lib/admin/projects'
 import { parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
 import { WEB_LEAD_ORIGINS, type LeadOrigin } from '@/lib/lead-origins'
-import { STATUS_LABELS, STATUS_ORDER } from '@/lib/types'
+import { STATUS_LABELS, STATUS_ORDER, type ProjectType } from '@/lib/types'
 
 // Seznam zakázek — jeden byznys, zakázky ze všech webů (AD02, R-088).
 // Filtr „Zdroj" dřív přepínal firmu (VIZEON / ALTENO); dnes říká jen to,
@@ -18,6 +18,11 @@ import { STATUS_LABELS, STATUS_ORDER } from '@/lib/types'
 //
 // Od AD07 filtruje a stránkuje databáze. Adresy filtrů se nemění
 // (`?status=`, `?zdroj=`), takže uložené odkazy fungují dál.
+//
+// AD11 sem stáhlo Dokončené: `?status=uzavrene` je výpis uzavřených zakázek
+// (stará adresa `/dashboard/dokoncene` sem přesměrovává) a `?typ=personal`
+// ukáže vlastní projekty bez klienta, které dřív žily v druhé záložce
+// Dokončených. Výchozí pohled je práce pro klienty.
 
 const PATH = '/dashboard/zakazky'
 
@@ -30,7 +35,11 @@ export default async function ProjectsPage(props: {
   const rawOrigin = one(searchParams.zdroj)
   const origin: LeadOrigin | null = WEB_LEAD_ORIGINS.some((o) => o.key === rawOrigin) ? (rawOrigin as LeadOrigin) : null
   const rawStatus = one(searchParams.status)
-  const status = STATUS_ORDER.includes(rawStatus as (typeof STATUS_ORDER)[number]) ? (rawStatus as string) : null
+  const status =
+    rawStatus === CLOSED_FILTER || STATUS_ORDER.includes(rawStatus as (typeof STATUS_ORDER)[number])
+      ? (rawStatus as string)
+      : null
+  const type: ProjectType = one(searchParams.typ) === 'personal' ? 'personal' : 'client'
 
   const params = parseTableParams(searchParams, {
     allowed: PROJECT_SORT,
@@ -38,15 +47,15 @@ export default async function ProjectsPage(props: {
     pageSize: 24,
     tiebreak: 'created_at',
   })
-  const screen = await loadProjectsScreen(params, origin, status)
+  const screen = await loadProjectsScreen(params, origin, status, type)
   const links = tableLinks(PATH, searchParams)
-  const filtered = origin !== null || status !== null
+  const filtered = origin !== null || status !== null || type !== 'client'
 
   return (
     <PageShell width="wide">
       <PageHeader
         title="Zakázky"
-        subtitle="Zakázky ze všech webů na jednom místě."
+        subtitle="Všechna práce na jednom místě — od poptávky po uzavření."
         subtitleFont="sans"
         action={
           <Link
@@ -57,6 +66,26 @@ export default async function ProjectsPage(props: {
             Nová zakázka
           </Link>
         }
+      />
+
+      <PillNav
+        label="Druh zakázky"
+        items={[
+          {
+            key: 'client',
+            label: 'Pro klienty',
+            href: tableHref(PATH, searchParams, { typ: null, page: null }),
+            active: type === 'client',
+            count: screen.typeCounts.client,
+          },
+          {
+            key: 'personal',
+            label: 'Vlastní projekty',
+            href: tableHref(PATH, searchParams, { typ: 'personal', page: null }),
+            active: type === 'personal',
+            count: screen.typeCounts.personal,
+          },
+        ]}
       />
 
       <PillNav
@@ -97,6 +126,13 @@ export default async function ProjectsPage(props: {
               active: status === value,
               count: screen.counts[value] ?? 0,
             })),
+            {
+              key: CLOSED_FILTER,
+              label: 'Uzavřené',
+              href: tableHref(PATH, searchParams, { status: CLOSED_FILTER, page: null }),
+              active: status === CLOSED_FILTER,
+              count: screen.counts[CLOSED_FILTER] ?? 0,
+            },
           ]}
         />
       </Toolbar>

@@ -22,11 +22,31 @@ export interface Project {
   deposit_paid: boolean
   /** Fakturováno na IČO — příjem ze zakázky patří do přiznané linie (migrace 054) */
   invoiced_on_ico: boolean
+  /**
+   * Kdy se zakázka uzavřela (migrace 106, AD11). Uzavřená zakázka **je** ta,
+   * která se dřív kopírovala do Dokončených. Uzavření jde vzít zpět — stačí
+   * hodnotu vymazat, protože se nikam nekopíruje.
+   */
+  closed_at: string | Date | null
+  /** `client` = práce pro klienta, `personal` = vlastní aplikace bez klienta. */
+  project_type: ProjectType
+  /** Náročnost 1–10. Nepovinná — historické zakázky ji nemají (B10). */
+  difficulty: number | null
+  /** Skutečně odpracované hodiny. */
+  time_invested: number | null
+  /** Odhad hodin z doby, kdy se zakázka brala — proti `time_invested`. */
+  estimated_hours: number | null
+  company: string | null
+  /** Klíč veřejného dotazníku `/h/<token>`. */
+  survey_token: string
   created_at: string | Date | null
   updated_at: string | Date | null
 }
 
-export type ProjectInsert = Omit<Project, 'id' | 'public_token' | 'created_at' | 'updated_at'>
+export type ProjectInsert = Omit<
+  Project,
+  'id' | 'public_token' | 'survey_token' | 'closed_at' | 'created_at' | 'updated_at'
+>
 export type ProjectUpdate = Partial<ProjectInsert>
 
 export const STATUS_LABELS: Record<ProjectStatus, string> = {
@@ -172,30 +192,37 @@ export const COST_CATEGORY_LABELS: Record<CostCategory, string> = {
   ostatní: 'Ostatní',
 }
 
-export interface CompletedProject {
+/**
+ * Uzavřená zakázka pro přehled výkonnosti a hodnocení (AD11).
+ *
+ * Dřív to byl samostatný řádek v `completed_projects` s vlastní cenou —
+ * druhá verze pravdy o tomtéž. Od migrace 106 je to **projekce zakázky**:
+ * `title` je její popis, `amount` její cena. Nic se nekopíruje.
+ */
+export interface ClosedProject {
   id: string
   title: string
   client_name: string | null
   company: string | null
-  completed_at: string | Date
+  closed_at: string | Date
   amount: number
   deposit_amount: number | null
-  difficulty: number
+  difficulty: number | null
   time_invested: number | null
   // Odhad v hodinách, jak se čekalo při zadání zakázky — volitelný, historická
   // data ho nemají (migrace 057). Slouží jen k metrice „odhad vs. realita".
   estimated_hours: number | null
-  notes: string | null
   project_type: ProjectType
   survey_token: string
   client_email: string | null
-  source_project_id: string | null
-  created_at: string | Date
 }
 
 export interface ProjectSurvey {
   id: string
-  completed_project_id: string
+  /** Zakázka, ke které hodnocení patří (migrace 106). */
+  project_id: string | null
+  /** Odkaz do `completed_projects_archiv`; u nových dotazníků NULL. */
+  completed_project_id: string | null
   rating_cooperation: number
   rating_speed: number
   rating_design: number

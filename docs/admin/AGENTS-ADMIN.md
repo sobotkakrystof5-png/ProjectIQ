@@ -311,9 +311,9 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
 | `contacts` | 104 | **Kontakty** — jeden člověk, jeden řádek; popis výš v samostatné sekci (AD09) |
 | `agent_leads` | 052 | AI-scorované leady z externího `vizeon-lead-agent` |
-| `completed_projects` | 011, 029, 047, 057 | **Dokončené** zakázky (záloha, vazba na zdrojový projekt, odhad) |
+| `completed_projects_archiv` | 011, 029, 047, 057, **106** | Původní **Dokončené** — kopie zakázky s vlastní cenou. Od AD11 se z ní nečte ani nepíše; drží se jen jako doklad, dokud daňové součty sedí. `migrated_project_id` říká, která zakázka z řádku vznikla. |
 | `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/dashboard/finance`), volitelná vazba na projekt |
-| `project_surveys` | 016, 046 | Dotazník spokojenosti (`/h/[token]`, `completed_projects.survey_token`) — max 1 na zakázku |
+| `project_surveys` | 016, 046, **106** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
 | `invoices` | 053, 056 | Archiv faktur (PDF, AI přepis, vazba na transakci) |
@@ -423,7 +423,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Sekce | Routy |
 |-------|-------|
-| Admin (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/zakazky`, `/pozadavky` (požadavky klientů z portálu), `/poptavky` (jeden inbox poptávek ze všech webů), `/calendar`, `/calls` (Hovory), `/kontakty` + `/kontakty/[id]` (AD09), `/dokoncene`, `/hodnoceni`, `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
+| Admin (`/dashboard`) | `/dashboard`, `/new`, `/[id]`, `/zakazky`, `/pozadavky` (požadavky klientů z portálu), `/poptavky` (jeden inbox poptávek ze všech webů), `/calendar`, `/calls` (Hovory), `/kontakty` + `/kontakty/[id]` (AD09), `/naklady`, `/faktury`, `/faktury/[id]`, `/notifications`, `/profil`, `/klienti` + `/klienti/[id]` a `/novinky` (ZakazIQ Workspace, S17 — popis v `docs/AGENTS-REFERENCE.md` → „Admin nad Workspace“) |
 | Osobní část (dřív Hub) | `/dashboard/finance`, `/dashboard/projekty` (+ `/new`, `/[id]`), `/dashboard/startup` (+ `/new`, `/[id]`) |
 | Zrušené adresy | `/alteno`, `/alteno/new`, `/alteno/[id]`, `/alteno/rezervace`, `/dashboard/vizeon` (AD02) a všechny `/hub/*` včetně rozcestníku `/hub/byznys` (AD03) — trvale přesměrované (`lib/legacy-redirects.mjs`) |
 
@@ -432,7 +432,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | Routa | Co |
 |-------|----|
 | `/p/[token]` | Klientský portál zakázky (`projects.public_token`) |
-| `/h/[token]` | Dotazník spokojenosti po dokončení (`completed_projects.survey_token`) |
+| `/h/[token]` | Dotazník spokojenosti po uzavření zakázky (`projects.survey_token`) |
 | `/login` | Přihlášení |
 
 ### API routy
@@ -504,7 +504,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 ### `/dashboard/[id]` — detail zakázky (KP02)
 - Jedna komponenta `components/admin/project-detail-view.tsx`, záložky v adrese `?zalozka=`: **Přehled** (editace, sdílení a QR, přidat do dokončených, smazat) · **Aktivita** (koncepty a schvalování, napojení Claude Code) · **Požadavky** (karty z `/dashboard/pozadavky` filtrované na zakázku) · **Zprávy** (vlákno v klientském prostoru, vzkazy, historie postupu, zpětná vazba, konzultace, poznámky) · **Fakturace** (faktury a náklady). Načítají se jen data aktivní záložky.
 - Od AD02 má **každá** zakázka všechny záložky — i poptávky z alteno.cz mají Fakturaci, dokončení a poznámky ze schůzek. V záhlaví je štítek zdroje (`lead_origin`).
-- Nepřevedeno z plánu: změna stavu a fáze jedním klikem se „Zpět“. `updateProject` posílá klientovi e-mail, takže „Zpět“ by ho poslal podruhé.
+- Změna stavu jedním klikem se „Zpět“ je od AD11 hotová (`setProjectStatus` / `undoProjectStatus` v `app/actions.ts`): e-mail klientovi odchází v `after()` se zpožděním a před odesláním se stav načte z databáze znovu, takže se po „Zpět“ neodešle. Kontrola je v databázi, ne v paměti — „Zpět“ může doletět na jinou instanci funkce.
 
 ### `/dashboard/calendar`
 - Globální kalendář (Měsíc / Týden / Den) — konzultace, deadliny, plánované hovory z Hovorů
@@ -579,6 +579,51 @@ je verze bez popisků do tabulek a karet.
   v Hovorech, detail události v kalendáři, `/dashboard/faktury/[id]` (karta Zakázka)
   a členové účtu v `/dashboard/klienti/[id]`. V tabulce Hovorů zůstávají v buňkách prosté
   odkazy — jedenáctisloupcový výpis by tlačítka 44 px neunesl.
+
+### Zakázka je jediná pravda (AD11, R-090)
+
+Dokončenost je **stav zakázky**, ne vlastní záznam. `completed_projects` byla plná kopie
+zakázky (`title`, `client_name`, `amount`, `notes`), která se s originálem rozcházela,
+a `createCompletedProject` k ní uměl vložit příjem nezávisle na tom, jestli zakázka
+svůj příjem už má — odtud dvojí započtení. Migrace 106 to rozpletla.
+
+- **Nové sloupce na `projects`:** `closed_at` (uzavřeno), `project_type`
+  (`client` / `personal`), `difficulty`, `time_invested`, `estimated_hours`, `company`
+  a `survey_token`. Uzavřená zakázka = `closed_at IS NOT NULL`; status je přitom
+  `done` nebo `paid`.
+- **Uzavření a jeho vrácení** jsou `closeProject` a `reopenProject` v `app/closed-actions.ts`
+  (soubor nahradil `app/completed-actions.ts`). Uzavření nic nekopíruje, takže „Zpět"
+  je jen vymazání `closed_at` a návrat stavu. Převedený odhad nákladů zůstává — je to
+  skutečný náklad a maže se v Nákladech; UI to u zaškrtávátka říká.
+- **Dotazník** visí na `projects.survey_token` a zapisuje se do `project_surveys.project_id`.
+  Token si zakázka při migraci **přebrala z archivu**, takže odkazy z dřív odeslaných
+  e-mailů dál fungují. `projects_survey_token_uq` hlídá, že je jedinečný.
+- **Obrazovky Dokončené a Hodnocení zanikly.** Uzavřené zakázky jsou
+  `/dashboard/zakazky?status=uzavrene` (pseudostav `CLOSED_FILTER` v `lib/admin/projects.ts`,
+  ptá se na `closed_at`), vlastní projekty bez klienta `?typ=personal`. Přehled výkonnosti
+  a souhrn hodnocení jsou na `/dashboard/profil` (`lib/admin/closed.ts`). Staré adresy
+  přesměrovávají (`lib/legacy-redirects.mjs`).
+- **Zálohy ve výkonnosti byznysu**: `getBusinessOverview` přičítá `deposit_amount` jen
+  u zakázek, které zálohový příjem **nemají** v `finance_transactions`. Bez té podmínky
+  by se záloha běžné zakázky započítala dvakrát.
+- **Archiv se nemaže.** `completed_projects_archiv` drží původní řádky a
+  `migrated_project_id` říká, která zakázka z kterého vznikla. `DROP` je samostatný krok
+  až po AD18 a až budou daňové součty potvrzené.
+- **Pořadí migrací:** 103 zakládá index nad `completed_projects`, takže musí jít
+  **před** 106 — po přejmenování by `CREATE INDEX` spadl. Běhoun je číslovaný, takže
+  při běžném postupu to vyjde samo.
+
+### Průvodka zakázky (AD11)
+
+`lib/admin/journey.ts` skládá osu devíti kroků (poptávka → hovor → nabídka → záloha →
+práce → předáno → faktura → zaplaceno → hodnocení) z toho, co v databázi stejně je:
+zakázka sama plus jeden dotaz se čtyřmi `EXISTS` (`journeySqlText`), který jede **v téže
+dávce** jako hlavička detailu. Logika je čistá funkce, takže se testuje bez databáze
+(`lib/__tests__/admin-pruvodka.test.ts`).
+
+Pod osou je **jedno** tlačítko na první nesplněný krok. Kroky „práce" a „předáno" mění stav
+jedním klikem (`setProjectStatus`), ostatní vedou odkazem tam, kde se to dodělá.
+Nehotové (vystavení faktury, AD12) nic nepředstírá — odkáže na záložku Fakturace.
 
 ### `/dashboard/faktury`
 - **Evidence všech vystavených faktur** — archiv dokladů, řazený podle data vystavení a seskupený po rocích

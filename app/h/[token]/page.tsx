@@ -11,14 +11,17 @@ interface PageProps {
 
 export default async function SurveyPage(props: PageProps) {
   const params = await props.params
+  // Dotazník patří zakázce (migrace 106, AD11). Token se při migraci přenesl
+  // z Dokončených, takže odkaz z dřív odeslaného e-mailu funguje dál.
   const rows = await sql`
-    SELECT id, title, client_name FROM completed_projects WHERE survey_token = ${params.token} LIMIT 1
+    SELECT id, coalesce(nullif(btrim(coalesce(description, '')), ''), client_name) AS title, client_name
+    FROM projects WHERE survey_token = ${params.token} AND NOT lead_pending LIMIT 1
   `
   if (!rows.length) notFound()
   const cp = rows[0] as { id: string; title: string; client_name: string | null }
 
   const existing = await sql`
-    SELECT 1 FROM project_surveys WHERE completed_project_id = ${cp.id} LIMIT 1
+    SELECT 1 FROM project_surveys WHERE project_id = ${cp.id} LIMIT 1
   `
   const alreadyDone = existing.length > 0
 
