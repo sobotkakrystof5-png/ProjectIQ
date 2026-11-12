@@ -680,9 +680,12 @@ porovnat naměřená pozice s vypočítanou:
   a 11:00) a končí na 12:00. Chyba 3 ověřená.
 - **Událost 7:00–9:00** (před `DAY_START`) je vidět přilepená na horní hraně a končí v 9:00;
   dřív zmizela úplně.
-- Modal má `max-height: 631,8 px` při výšce okna 702 px (= 90 vh) a `overflow-y: auto`;
-  po umělém zkrácení na 260 px je rolovatelný a tlačítko „Uložit událost" zůstane dosažitelné.
-  **Skutečných 390 px se ověřit nepodařilo** — okno Chrome se pod minimální šířku nezmenší.
+- **Telefon 390 × 844 px** (headless Chrome, `isMobile` + dotyk): **žádný vodorovný posuv**
+  (`scrollWidth` 390 = `innerWidth`), klik na slot 11:00 vyplní 11:00 i tam, modal se vejde
+  celý do obrazovky a tlačítko „Uložit událost" je vidět **bez rolování**. `max-h-[90vh]`
+  + `overflow-y: auto` je pojistka pro nižší displeje; ověřeno zvlášť, že po umělém zkrácení
+  panelu na 260 px je rolovatelný a tlačítko zůstane dosažitelné (dřívější `overflow-hidden`
+  ho odřízl).
 - Konzole při načtení i po proklikání **bez jediné zprávy** (žádná hydratace, žádná blokace
   CSP, žádná stížnost na `m` bez `LazyMotion`).
 - **Našla se čtvrtá chyba, opravená hned:** přepnutí **Měsíc → Den** skákalo na prvního
@@ -707,8 +710,14 @@ skutečných datech a telefonní šířka 390 px. Ani jedno není v „Hotovo, k
 navíc, kterou si agent přidal do otevřených problémů v paměti. (V tabulce stavu to omylem
 chvíli stálo jako nesplněné kritérium; opraveno.)
 
+**Nález z průchodu na 390 px:** tlačítko „Uložit událost" v `AdminEventModal` má **39 px**,
+pravidlo Dílků chce plochy ≥ 44 px. Nedělal jsem to — vzhled obrazovek překresluje AD17,
+a měnit ho na konci sezení o rychlosti by bylo mimo zadání. Zapsáno do otevřených problémů.
+
 **Co se neověřilo jinak:** PDF 200 → 304 ověřil jen unit test, na testovací databázi žádná
-faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404).
+faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404). Průchod adminu
+**s přihlášením na skutečných datech** zůstává na Kryštofovi (rozhodl 2026-11-12); není to
+kritérium AD08, ale je to v otevřených problémech.
 
 **Jak se AD08 uzavřelo (rozhodl Kryštof 2026-11-12):** stejně jako AD04, AD05 a AD07 —
 *hotovo, v prohlížeči neověřeno*, průchod s přihlášením zůstává v otevřených problémech
