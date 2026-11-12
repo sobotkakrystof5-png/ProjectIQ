@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-12 · Modernizace adminu: AD00–AD09 hotové (nově jedna entita kontaktu: tabulka `contacts`, obrazovka Kontakty se sloučením duplicit, normalizace telefonů a e-mailů, backfill skript a převod z Hovorů, který už nic neztrácí; migrace 104 jen na testu; R-095) · Modernizace adminu: AD00–AD08 hotové (nově rychlost II: e-maily a oznámení mimo akci přes `after()`, kalendář čte okno místo celé historie a tři nahlášené chyby zadávání času opravené, Finance v GET nezapisují, Framer Motion líně — Hovory a Kalendář o 28 kB lehčí, potvrzení poptávky vypadá okamžitě, PDF faktury s ETagem; R-093, R-094, DECISIONS #022) · 2026-11-11 · AD00–AD07 hotové (nově sdílená tabulka adminu: řazení, filtry a stránkování v adrese, počítá je databáze, a žádný výpis už netahá celou tabulku) (rychlost I: dávkovaný `lib/admin/db.ts` — Dnes 8 kol → 1, detail zakázky 12 dotazů v 5 vlnách → 1 dávka, Klienti bez 11 korelovaných podvýběrů; migrace 103 s indexy; kostra streamem, `staleTimes`, landing bez NextAuth, R-092) na větvi `admin/modernizace` (nově jedna kostra: šířku a hlavičku obrazovky určuje stránka přes `PageShell`/`PageHeader`, jeden systém odznaků v `lib/admin-status.ts` místo deseti palet, R-091) (nově vizuální základ: paleta Dílků na `:root`, Instrument Sans místo Interu, zúžená CSP, portály a toasty adminu přes `components/ui`, `brand-*` → `navy-*`) (ukázková data, evidence migrací, výchozí měření, úklid čtyř modulů, jeden byznys se třemi zdroji poptávek, zrušení Hubu a jedna navigace s měsíčními čísly na Dnes; migrace 100–102 jen na testu) · 2026-11-10 · Plán modernizace admin konzole AD00–AD18 (R-081–R-085, kód se zatím nemění) · Řemeslné skilly třetích stran, impeccable 4.8.2, tasteskill 2.5.1 uživatelsky (R-080) · 2026-11-04 · Incident: produkce bez DB po výměně hesla `neondb_owner`, opraveno (AUDIT-LOG) · 2026-11-03 · Právní texty a provozovatel na webu (R-079) · Review před spuštěním a opravy (R-077, migrace 099 připravená, CI s testy, chybové stránky, Clerk `authorizedParties`, session adminu 12 h) · 2026-11-01 · Klientský prostor, hlášení z Claude Code a nová kostra adminu (R-070–R-073, migrace 092–096 aplikované na produkci, `portal_app` vytvořena, commit 41c6873 pushnutý, Preview Ready) · Požadavky klientů z portálu (R-069) · Preview na testovací DB, 084 na testu i produkci; redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 rozpracováno; produkční migrace 064–091 aplikované; připraven samostatný prázdný testovací Neon projekt · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
+> **Poslední aktualizace:** 2026-11-12 · Modernizace adminu: AD00–AD10 hotové (nově kontakt jedním klikem: `tel:`, `sms:`, `mailto:` a WhatsApp se šablonami na každé obrazovce, kde kontakt je — včetně detailu zakázky, kde dosud nebyl ani jeden; přesun termínu v Hovorech posune i kalendář a rezervace z portálu je vidět v Hovorech; migrace 105 nikde neaplikovaná; R-096) · Modernizace adminu: AD00–AD09 hotové (nově jedna entita kontaktu: tabulka `contacts`, obrazovka Kontakty se sloučením duplicit, normalizace telefonů a e-mailů, backfill skript a převod z Hovorů, který už nic neztrácí; migrace 104 jen na testu; R-095) · Modernizace adminu: AD00–AD08 hotové (nově rychlost II: e-maily a oznámení mimo akci přes `after()`, kalendář čte okno místo celé historie a tři nahlášené chyby zadávání času opravené, Finance v GET nezapisují, Framer Motion líně — Hovory a Kalendář o 28 kB lehčí, potvrzení poptávky vypadá okamžitě, PDF faktury s ETagem; R-093, R-094, DECISIONS #022) · 2026-11-11 · AD00–AD07 hotové (nově sdílená tabulka adminu: řazení, filtry a stránkování v adrese, počítá je databáze, a žádný výpis už netahá celou tabulku) (rychlost I: dávkovaný `lib/admin/db.ts` — Dnes 8 kol → 1, detail zakázky 12 dotazů v 5 vlnách → 1 dávka, Klienti bez 11 korelovaných podvýběrů; migrace 103 s indexy; kostra streamem, `staleTimes`, landing bez NextAuth, R-092) na větvi `admin/modernizace` (nově jedna kostra: šířku a hlavičku obrazovky určuje stránka přes `PageShell`/`PageHeader`, jeden systém odznaků v `lib/admin-status.ts` místo deseti palet, R-091) (nově vizuální základ: paleta Dílků na `:root`, Instrument Sans místo Interu, zúžená CSP, portály a toasty adminu přes `components/ui`, `brand-*` → `navy-*`) (ukázková data, evidence migrací, výchozí měření, úklid čtyř modulů, jeden byznys se třemi zdroji poptávek, zrušení Hubu a jedna navigace s měsíčními čísly na Dnes; migrace 100–102 jen na testu) · 2026-11-10 · Plán modernizace admin konzole AD00–AD18 (R-081–R-085, kód se zatím nemění) · Řemeslné skilly třetích stran, impeccable 4.8.2, tasteskill 2.5.1 uživatelsky (R-080) · 2026-11-04 · Incident: produkce bez DB po výměně hesla `neondb_owner`, opraveno (AUDIT-LOG) · 2026-11-03 · Právní texty a provozovatel na webu (R-079) · Review před spuštěním a opravy (R-077, migrace 099 připravená, CI s testy, chybové stránky, Clerk `authorizedParties`, session adminu 12 h) · 2026-11-01 · Klientský prostor, hlášení z Claude Code a nová kostra adminu (R-070–R-073, migrace 092–096 aplikované na produkci, `portal_app` vytvořena, commit 41c6873 pushnutý, Preview Ready) · Požadavky klientů z portálu (R-069) · Preview na testovací DB, 084 na testu i produkci; redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 rozpracováno; produkční migrace 064–091 aplikované; připraven samostatný prázdný testovací Neon projekt · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
 
 ---
 
@@ -12,7 +12,17 @@
 
 **Admin konzole (produkce):** VIZEON `/dashboard`, ALTENO `/alteno`, portál `/p/[token]`, Hub `/hub`; deploy z `main`, produkce běží na starém buildu `d948400`. Popis: `docs/admin/AGENTS-ADMIN.md`. Na větvi `ws/redesign-app` (nenasazeno) má admin novou kostru (R-071), Dnes, detail zakázky se záložkami a správu klientských prostorů; na `admin/modernizace` navíc úklid z AD01.
 
-**Modernizace adminu (R-081–R-092), stav po sezení 2026-11-11:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD07 hotové, AD08 uzavřené** (ne všechna kritéria splněná — viz níž), AD09 (jedna entita kontaktu, migrace 104) je další.
+**Modernizace adminu (R-081–R-096), stav po sezení 2026-11-12:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD10 hotové**, AD11 (Dokončené do zakázky a průvodka, migrace 106) je další. Žádná migrace z této větve (100–105) **není na produkci**; 100–104 jsou na testovacím Neonu, 105 nikde.
+Z AD10: kontakt se vytáčí a píše z jednoho místa — `components/admin/contact-actions.tsx`
+(`tel:`, `sms:`, `mailto:`, WhatsApp, šablony, Zkopírovat; plochy 44 px), odkazy skládá
+`lib/contacts/href.ts` a šablony `lib/message-templates.ts` (plní odkaz, **neposílají**, R-084).
+Nově je kontakt i tam, kde nebyl vůbec: detail zakázky, `/dashboard/pozadavky`, detail faktury
+a členové účtu v Klientech. **Migrace 105** přidala `admin_lead_reschedule` (přesun termínu
+přepíše kontakt i kalendář — dvojice z migrace 051 se dosud rozcházela) a `admin_slot_ensure_event`
+(rezervace z portálu zakládá událost i zrcadlený kontakt v Hovorech, idempotentně) a naučila
+křížový překryvový guard z migrace 044 poznat dvojici. V kalendáři je rezervace vidět **jednou**.
+Odchylky od zadání a proč: R-096. **Okem v prohlížeči neověřeno** (smoke test přes HTTP: 9 výpisů
+a 5 detailů vrací 200, kontaktní akce jsou v HTML).
 Z „Hotovo, když" u AD08 je splněné a ověřené **všech osm bodů** včetně jednoklikového „Zaplaceno" a doslovného kliku na slot v 11:00. **Průchod s přihlášením a 390 px v kritériích AD08 nejsou**, je to diligence navíc v otevřených problémech.
 Z AD08: vedlejší efekty adminu jdou přes `after()` z `next/server` — uložení zakázky, potvrzení
 poptávky, dokončení ani poptávka z webu nečekají na Gmail SMTP (`sendPortfolioEmail`
@@ -594,17 +604,58 @@ s rodinou, ne jen s `contact_id = $1`. Odchylka od plánu, zapsaná i v `docs/ad
 je to samostatné rozhodnutí včetně toho, čím se nahradí „Zpět".
 
 
+### R-096 · Rezervace se zrcadlí do Hovorů, Hovory nečtou kalendář (2026-11-12)
+**Rozhodnutí:** rezervace z portálu dostane v téže transakci **kalendářní událost a zrcadlený
+kontakt v `client_leads`** — stejnou dvojici, jakou od migrace 051 zakládá ruční termín. Dotaz
+Hovorů se nemění a `calendar_events` nečte. Dvojice má obě strany
+(`consultation_slots.calendar_event_id` i `calendar_events.consultation_slot_id`) a křížový
+překryvový guard z migrace 044 ji pozná podle odkazu na vkládaném řádku. V kalendáři se dvojník
+vynechává v TypeScriptu podle zakázky a okamžiku, ne podmínkou nad novým sloupcem. Blokace se
+do Hovorů dál nezrcadlí.
+**Proč:** zadání AD10 chtělo „rozšířit dotaz Hovorů, aby četl `calendar_events` podle typu".
+Hovory jsou ale po AD07 sdílená tabulka s řazením, stránkováním, poznámkami a akcemi nad
+`client_leads`; druhý druh řádku by to všechno musel umět taky. Zrcadlení naopak nestojí nic
+navíc a drží jediné pravidlo (R-010). Obě strany dvojice musí existovat proto, že guard
+rozhoduje **v okamžiku vkládání události**, kdy rezervace ještě na nic neukazuje — odkaz proto
+nese vkládaný řádek. Dvojník se zahazuje v TypeScriptu, aby kalendář fungoval i na databázi
+bez migrace 105 (aplikuje ji Kryštof, může to být až po nasazení větve).
+**Důsledek:** nová časová tabulka v adminu se zrcadlí přes `calendar_events`, ne přidáním
+dalšího druhu řádku do Hovorů. Kdo bude chtít v Hovorech i blokace, musí nejdřív rozhodnout,
+co s tím, že blokace je soukromá nedostupnost bez kontaktu (AD08). `docs/admin/AGENTS-ADMIN.md`
+→ `consultation_slots` a `calendar_events`; plán modernizace → AD10.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Migrace 105 na produkci (AD10):** `consultation_slots.calendar_event_id`,
+  `calendar_events.consultation_slot_id`, funkce `admin_lead_reschedule`
+  a `admin_slot_ensure_event` a náhrada obou překryvových guardů z migrace 044.
+  **Neaplikovaná nikde.** Je **aditivní a zpětně kompatibilní** (na starém buildu je
+  `NEW.consultation_slot_id` NULL a guard se chová jako dřív), takže na rozdíl od 102 nečeká
+  na nasazení větve. Závěrečný blok spáruje **budoucí** rezervace, které už v databázi leží;
+  kolize přeskočí s `NOTICE` a dá se pustit znovu. Aplikuje Kryštof · od 2026-11-12
+- [ ] **AD10 v prohlížeči neověřený:** projít na 390 / 768 / 1280 / 1440 px kontaktní akce
+  (Zavolat, SMS, WhatsApp, E-mail, **Podle šablony**, Zkopírovat) na detailu zakázky,
+  v Poptávkách, Požadavcích, v rozbaleném kontaktu v Hovorech, v detailu události v kalendáři,
+  na faktuře a u členů účtu v Klientech. Hlavně: otevře `mailto:` skutečně předvyplněnou
+  zprávu, chová se `sms:` správně na iPhonu i Androidu, a vejde se řada tlačítek na 390 px.
+  Dál nový nepovinný kontakt v okně „Přidat do kalendáře" a přesun termínu v Hovorech, který
+  má posunout i kalendář · od 2026-11-12
+- [ ] **Rezervaci z portálu nikdo neposlal naživo (AD10):** párování rezervace → událost →
+  kontakt v Hovorech je ověřené jen v PGlite. Projít `/p/[token]` → rezervace → zkontrolovat,
+  že je v kalendáři **jednou** a v Hovorech jednou. Jde to až na databázi s migrací 105 · od 2026-11-12
+- [ ] **Nový kontakt v Hovorech se na `contacts` nenapojuje (AD09/AD10):** `createLead`
+  a `updateLead` `contact_id` neplní — kontakt vzniká jen backfillem, převodem leadu na zakázku
+  (`convertLeadToProject`) a nově z okna kalendáře (`createCalendarEvent`). Ručně zapsaný hovor
+  tak na kartě kontaktu nebude. Doplnit s AD17, nebo až bude jasné, jak se má chovat překlep
+  v telefonu (nový kontakt vs. návrh sloučení) · od 2026-11-12
 - [ ] **Migrace 104 na produkci (AD09):** tabulka `contacts`, `contact_id` v pěti tabulkách, čtyři funkce a tři triggery. **Aplikovaná jen na testovacím Neonu.** Je **aditivní**, takže na rozdíl od 102 nečeká na nasazení větve. Po ní pustit `node scripts/admin-contacts-backfill.mjs` (nejdřív bez `--ano`, podívat se na sporné případy, pak `--ano`); na produkci to dělá Kryštof · od 2026-11-12
 - [ ] **Výmaz kontaktu na žádost GDPR neexistuje (AD09):** `contacts` drží jméno, telefon, e-mail a poznámku, ale `public.purge_client_retention` (R-076) o tabulce neví a admin žádnou cestu výmazu nemá. Při žádosti je od teď potřeba smazat i kontakt. Není to nová kategorie údajů (kontakt je odvozený z leadů a zakázek), ale patří to k AD16/KP10 · `.claude/security/AUDIT-LOG.md` 2026-11-12 · od 2026-11-12
 - [ ] **AD09 v prohlížeči neověřený:** projít na 390 / 768 / 1280 / 1440 px `/dashboard/kontakty` — tři pohledy (Kontakty, Možné duplicity, Sloučené), hledání podle telefonu zapsaného jinak, **karty místo tabulky pod 640 px** — a kartu kontaktu: uložení údajů (hlavně hláška u telefonu, kterému nejde rozumět, a kolize e-mailu), **Sloučit sem** a jeho „Zpět" v toastu, „Rozdělit zpět" u sloučeného kontaktu. Dál převod kontaktu na zakázku z Hovorů: musí skončit na nové zakázce, mít v ní poznámky z hovorů a navázaný termín v kalendáři · od 2026-11-12
 - [ ] **`notFound()` v adminu vrací 200, ne 404 (zjištěno 2026-11-12):** `/dashboard/<neexistující id>`, `/dashboard/faktury/<id>`, `/dashboard/kontakty/<id>` i neexistující stránka **vykreslí 404 obrazovku, ale se stavem 200**. Je to důsledek streamování kostry (AD06): hlavička odejde dřív, než stránka zjistí, že záznam není. Pro uživatele je to v pořádku (vidí „nenalezeno"), pro monitoring a roboty ne — `/dashboard` je sice `noindex`. Platí pro celý admin, ne jen pro nové obrazovky; opravit s AD18 (přístupnost a kvalita) · od 2026-11-12
 - [ ] **`npm run build:check` při běžícím `next dev` není neškodný (zjištěno 2026-11-12):** `scripts/build-check.sh` tvrdí, že od Next 16 má dev vlastní výstup a `next build` mu ho nepřepíše. V AD08 se ukázalo, že build **přepíše `.next/static`** pod už běžícím `next start` — ten pak servíroval chunky, které na disku nejsou (HTML na ně odkazuje, server vrací 500), a měření balíčku kvůli tomu jednou vyšlo falešně o 18–27 % lépe. Pro měření proto platí: po buildu server **restartovat** a zkontrolovat, že žádný skript z HTML na disku nechybí. `next dev` build **přežije** (ověřeno v AD09: po `build:check` vracel dev server dál 200 na 15 adresách); zbývá tedy jen případ `next start` · `scripts/build-check.sh` · od 2026-11-12
 - [ ] **Datum v UTC na dalších čtyřech místech financí:** `new Date().toISOString().slice(0, 10)` místo `getPragueTodayISO()` v `app/dashboard/faktury/[id]/page.tsx:91`, `invoice-actions.ts:116,158` a dvakrát v `IncomeExpenseSection.tsx`. Mezi 23:00 a půlnocí je to o den vedle — dnes jen u porovnání „po splatnosti" a výchozího data ve formuláři, ne u zápisu. Na výpisu faktur opraveno v AD08 (tam z toho je datum zaplacení); zbytek patří k nápravě financí v **AD13** · od 2026-11-12
-- [ ] **Tlačítko „Uložit událost" v `AdminEventModal` má 39 px**, Dílky chtějí plochy ≥ 44 px (naměřeno na 390 px v AD08). Oprava je `py-3` nebo `min-h-[44px]`; vzhled obrazovek překresluje **AD17**, tak jsem ho na konci sezení o rychlosti neměnil · `components/AdminEventModal.tsx` · od 2026-11-12
 - [ ] **Ikonová tlačítka v kalendáři nemají přístupný název:** šipky vpřed/vzad v `SmartCalendar` jsou `<button>` jen s SVG, bez `aria-label` — čtečka přečte „tlačítko". Všiml jsem si při řízení prohlížeče (musel jsem je hledat přes sourozence tlačítka „Dnes"). Patří k přístupnosti v **AD17** · `components/SmartCalendar.tsx` · od 2026-11-12
 - [ ] **PDF faktury 200 → 304 ověřené jen unit testem (AD08):** na testovací databázi žádná faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404), takže skutečné 304 v DevTools nikdo neviděl. Ověřit s fakturou, která `pdf_data` má · `app/api/invoices/[id]/pdf/route.ts` · od 2026-11-12
 - [ ] **`LeadsTable` drží kopii serverových dat v `useState`** a synchronizuje ji ručně po každé akci. `useOptimistic` z AD08 na tom nic nemění. Rozchod je možný (jiná záložka, cizí změna) a stránka se po každé akci zbytečně vykreslí na serveru nadarmo. Odstranit při přepsání obrazovky v **AD17** — vykreslovat z propů · `components/LeadsTable.tsx` · od 2026-11-12
@@ -701,6 +752,46 @@ je to samostatné rozhodnutí včetně toho, čím se nahradí „Zpět".
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-12 (AD10)
+- **feat** **AD10 hotovo** — kontakt jedním klikem a konec rozcházení kalendáře s Hovory.
+  (1) Nová `components/admin/contact-actions.tsx`: `tel:`, `sms:` (v repu dosud 0×), `mailto:`,
+  WhatsApp, šablony a „Zkopírovat", plochy 44 px. Nahradila čtyři různě vypadající sady odkazů
+  (včetně zelených WhatsApp tlačítek mimo Dílky) a přidala kontakt tam, kde nebyl vůbec:
+  **detail zakázky** (dosud ani jeden klikací kontakt, jen `<input>` ve formuláři),
+  `/dashboard/pozadavky` (kontakt se tam vůbec nenačítal), detail faktury a členové účtu
+  v Klientech. (2) `lib/contacts/href.ts` skládá odkazy na jednom místě: telefon jen jako E.164,
+  adresa do `mailto:` přes užší whitelist než RFC, předmět i text přes `encodeURIComponent`.
+  Duplicitní `whatsappHref` z `lib/utils.ts` zmizel. (3) `lib/message-templates.ts` — sedm
+  šablon pro SMS, e-mail a WhatsApp; **plní odkaz, neposílají** (R-084) a o údaji, který nemají,
+  nemluví (`needs`). (4) `admin_lead_reschedule` (migrace 105) přepíše čas u kontaktu
+  **i v kalendáři**; dosud `updateLead` přepsal jen `client_leads` a termín zůstal na starém
+  čase. `ends_at => NULL` nechá termín stejně dlouhý, připomínky se nulují jen při skutečné
+  změně času, `23P01` se překládá na českou větu. (5) Rezervace z portálu zakládá
+  v téže transakci kalendářní událost a zrcadlený kontakt v Hovorech
+  (`admin_slot_ensure_event`, idempotentní); v kalendáři je vidět **jednou**. (6) Okno
+  „Přidat do kalendáře" má nepovinný kontakt (jméno, telefon, e-mail) — zrcadlený řádek
+  v Hovorech dosud nesl jen titulek a popis, takže z něj nešlo zavolat.
+  Soubory: `migrations/105_propojeni_kalendar_hovory.sql`, `lib/{contacts/href,message-templates,prague-time,utils}.ts`,
+  `lib/admin/calendar.ts`, `app/{calls-actions,calendar-actions,portal-actions}.ts`,
+  `app/dashboard/{pozadavky/page,faktury/[id]/page,finance/invoice-actions,klienti/[id]/detail-view}`,
+  `components/{AdminEventModal,ClientRequestCard,LeadCard,LeadsTable,SmartCalendar}.tsx`,
+  `components/admin/{contact-actions,project-detail-view}.tsx`. **Migrace 105 aplikovaná: ne.**
+- **fix** Tlačítko „Uložit událost" v `AdminEventModal` má 44 px (otevřený problém z AD08);
+  „Zrušit" vedle něj taky.
+- **db** Migrace 105 navíc **nahrazuje obě trigger funkce z migrace 044**: křížový překryvový
+  guard nově pozná dvojici rezervace × její vlastní událost (jediné `IS DISTINCT FROM` navíc).
+  Cizí překryv dál končí `23P01`; na starém buildu se guard chová úplně stejně jako dřív.
+- **decision** **R-096** — rezervace se zrcadlí do Hovorů, Hovory nečtou `calendar_events`
+  (odchylka od zadání AD10, se zdůvodněním).
+- **docs** Bezpečnostní review AD10 (AUDIT-LOG 2026-11-12): jeden nález opravený — adresa
+  v `mailto:` směla obsahovat `&` a `%`, takže mírnější poštovní klient si mohl vyložit
+  `jana&subject=…@example.cz` jako adresu s parametrem. CSP beze změny.
+- **chore** Ověření AD10: `tsc`, **79 souborů / 914 testů** (nové `admin-propojeni` nad PGlite —
+  migrace 105, přesun termínu přes `updateLead`, párování rezervace a guard — a `contacts-href`;
+  `admin-calendar` má navíc případ „rezervace se nekreslí dvakrát"), `build:check` a smoke test
+  přes podepsanou session: 9 výpisů a 5 detailů vrací 200 a kontaktní akce jsou v HTML.
+  **Okem v prohlížeči neověřeno.**
 
 ### 2026-11-12
 - **feat** **AD09 hotovo** — jedna entita kontaktu. Nová tabulka `contacts` (migrace 104: `display_name`,

@@ -851,6 +851,26 @@ Výmaz kontaktu na žádost GDPR nikde není — `purge_client_retention` (R-076
 i v hovorech dá stejný čas (test); rezervace z portálu je vidět v Hovorech.
 **Riziko:** střední — zakládání událostí ke starým slotům musí být idempotentní.
 
+**Hotovo 2026-11-12**, se třemi upřesněními proti zadání (R-096):
+1. **Hovory nečtou `calendar_events`.** Zadání chtělo rozšířit dotaz Hovorů, aby tabulku četl
+   podle typu. Místo toho se rezervace **zrcadlí do `client_leads`** stejnou dvojicí, jakou
+   zakládá ruční termín od migrace 051 — Hovory si tak nechávají řazení, stránkování, poznámky
+   i akce z AD07 a nemusí umět dva druhy řádků. Blokace se do Hovorů dál nezrcadlí schválně
+   (soukromá nedostupnost, rozhodnuto v AD08); poptávky z alteno.cz zrcadlí AD02.
+2. **Dvojice má obě strany.** Kromě `consultation_slots.calendar_event_id` ze zadání přibyl
+   `calendar_events.consultation_slot_id` — guard z migrace 044 musí dvojici poznat **v okamžiku
+   vkládání události**, kdy rezervace ještě na nic neukazuje. Je to tentýž obousměrný pár jako
+   `calendar_events.lead_id` × `client_leads.calendar_event_id` z migrace 051.
+3. **Dvojník se v kalendáři vynechává v TypeScriptu**, ne podmínkou v SQL nad novým sloupcem —
+   obrazovka tak funguje i na databázi, kde 105 ještě neproběhla. Páruje se podle zakázky
+   a okamžiku.
+
+**Co se neověřilo:** nic z AD10 nikdo neviděl v prohlížeči (ověřeno smoke testem přes HTTP
+s podepsanou session: 9 výpisů + 5 detailů vrací 200, kontaktní akce jsou v HTML u Poptávek,
+Požadavků i detailu zakázky). Migrace 105 **není aplikovaná nikde**. Rezervaci z portálu nikdo
+neposlal naživo — párování je ověřené jen v PGlite. V Hovorech jsou plné kontaktní akce až
+v rozbaleném řádku; v samotné tabulce zůstávají prosté odkazy na telefon a e-mail.
+
 ### AD11 — Zakázka jako jediná pravda: Dokončené a průvodka (M–L, **migrace 106**)
 **Cíl:** zakázka ve stavu hotovo/zaplaceno **je** dokončená. Konec kopie s vlastní cenou.
 
@@ -1126,7 +1146,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno a ověřeno. |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
-| AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
+| AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (migrace nikde neaplikovaná, v prohlížeči neověřeno) |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | nezačato |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |

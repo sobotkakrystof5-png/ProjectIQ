@@ -191,7 +191,17 @@ Rezervace konzultací, odesílá klient z portálu přes `submitConsultation`. `
 | client_wish | text | Přání/poznámka klienta k termínu |
 | meeting_link | text | Vygenerovaný link na schůzku (WhatsApp/Meet/Teams/tel:) |
 | client_email | text | Email klienta — pro potvrzovací email |
+| contact_id | uuid | FK → contacts.id, ON DELETE SET NULL (migrace 104) |
+| calendar_event_id | uuid | FK → calendar_events.id, ON DELETE SET NULL (migrace 105) — párová událost, viz níže |
 | created_at | timestamptz | Datum vytvoření rezervace |
+
+**Rezervace je od AD10 vidět i v Hovorech (migrace 105).** `submitConsultation` zapíše rezervaci,
+kalendářní událost a zrcadlený kontakt **v jedné transakci** (`adminDb.batch`): nejdřív rezervaci,
+pak `admin_slot_ensure_event(slot)`. Funkce je idempotentní (slot s dvojicí jen vrátí její id)
+a kontakt **nezakládá** — bere ten, který má zakázka. Pořadí zápisů je dané křížovým guardem
+(migrace 044): rezervace musí existovat první, událost se vkládá s odkazem na ni
+(`calendar_events.consultation_slot_id`), takže guard dvojici pozná a nehlásí překryv sám se sebou.
+Na databázi bez migrace 105 (`42883`) se rezervace uloží samotná a jen se nezrcadlí.
 
 ### `calendar_events` (migrace 002)
 
@@ -208,8 +218,23 @@ Ruční admin události/blokace v globálním kalendáři (`/dashboard/calendar`
 | created_at | timestamptz | Datum vytvoření |
 | lead_origin | text | `vizeon` / `alteno` / `prvotka` / `jiny`, default `'vizeon'` (migrace 050 jako `business`, přejmenováno 102) — kalendář od AD02 nefiltruje, je to jen štítek |
 | lead_id | uuid | FK → client_leads.id, ON DELETE SET NULL (migrace 051) — párový kontakt v Hovorech, viz níže |
+| project_id | uuid | FK → projects.id, ON DELETE SET NULL (migrace 007) |
+| consultation_slot_id | uuid | FK → consultation_slots.id, ON DELETE SET NULL (migrace 105) — druhá strana dvojice s rezervací |
 
 **Propojení s Hovory (migrace 051):** vytvoření kalendářní události automaticky založí odpovídající řádek v `client_leads` (company_name = název události, next_action = popis, next_action_date/time odvozeno z `starts_at` v Europe/Prague) a propojí obě strany přes `calendar_events.lead_id` / `client_leads.calendar_event_id`. Smazání jedné strany smaže i druhou (`deleteCalendarEvent` / `deleteLead` v `app/calendar-actions.ts` a `app/calls-actions.ts`). Kalendářová stránka proto z `client_leads` do zobrazení bere jen řádky s `calendar_event_id IS NULL` — jinak by se termín zdvojil (jednou jako reálná `calendar_events` událost, podruhé jako virtuální položka z `next_action`).
+
+**Čas drží obě strany pohromadě (migrace 105, AD10).** `updateLead` přepisoval jen
+`client_leads.next_action_date/time` a termín v kalendáři nechával na starém čase. Od AD10 jde
+přesun přes `admin_lead_reschedule(lead, starts_at, ends_at DEFAULT NULL)`: v jedné transakci
+přepíše kontakt i párovou událost, `ends_at => NULL` nechá termín stejně dlouhý a připomínky
+nuluje **jen při skutečné změně času**. Okamžik skládá `pragueDateTimeToISO` v
+`lib/prague-time.ts` (R-093), funkce ho zpátky na `date` + `time` rozpadá projekcí
+`AT TIME ZONE 'Europe/Prague'` — ne podmínkou, takže žádný index nepadá. Překryv vrací `23P01`
+a `updateLead` ho překládá na českou větu.
+
+**Kontakt ve zrcadleném řádku.** CTE v `createCalendarEvent` zakládalo lead jen s titulkem
+a popisem; od AD10 nese `contact_name`, `phone`, `email` i `contact_id` z `ensureContact`
+(nepovinná část formuláře v `AdminEventModal`, u blokace se neukazuje).
 
 ### `contacts` (migrace 104, AD09)
 
@@ -494,6 +519,11 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
   `UnifiedEvent` nese `day`, `startMin` a `endMin`; pozice bloku je `blockGeometry`.
   `getHours()` v kalendáři nepoužívej — zahazuje minuty i zónu (AD08 to byla jedna
   ze tří nahlášených chyb).
+- **Rezervace z portálu se kreslí jednou (AD10).** Má od migrace 105 vlastní kalendářní
+  událost (aby byla vidět v Hovorech), ale v kalendáři zůstává karta konzultace — ví o kanálu,
+  odkazu na schůzku i zakázce. Párová událost se v `loadCalendarWindow` vynechá podle
+  **zakázky a okamžiku**, ne podle sloupce z migrace 105: obrazovka tak funguje i na databázi,
+  kde migrace ještě neproběhla.
 - `AdminEventModal` se **mountuje až při otevření**; `<AnimatePresence>` je nad ním
   v `SmartCalendar`. Dokud byl uvnitř modalu, komponenta se neodmountovala a formulář
   navždy držel „dnes 10:00".
@@ -516,6 +546,27 @@ kostry 200, stejně jako u ostatních detailů adminu — viz otevřené problé
 
 Souhrn čísel kontaktu (příjem, zisk, nezaplacené faktury) sem přijde až
 s pohledy z AD13 — do té doby karta nic nepočítá a jen poctivě odkazuje.
+
+### Kontakt jedním klikem (AD10)
+
+`components/admin/contact-actions.tsx` je **jediné místo**, odkud se v adminu volá a píše:
+`tel:`, `sms:`, `mailto:`, WhatsApp, šablony a „Zkopírovat". Nová obrazovka s kontaktem
+dostane tuhle komponentu, nepíše si vlastní odkaz. Plochy mají 44 px, `variant="compact"`
+je verze bez popisků do tabulek a karet.
+
+- **Odkazy skládá `lib/contacts/href.ts`** (`telHref`, `smsHref`, `mailtoHref`, `whatsappHref`,
+  `formatPhone`). Telefon jde do odkazu jen jako E.164 z `normalizePhone`; adresa do `mailto:`
+  projde užším whitelistem než RFC (bez `&`, `%`, `?`, `#`), jinak se odkaz nevykreslí.
+  Předmět i text vždy `encodeURIComponent` — vkládání parametrů do `mailto:` řešil R-062.
+- **Šablony jsou v `lib/message-templates.ts`**: `{ id, channel, label, subject?, body(ctx) }`,
+  kontext `{ projectName, at, portalUrl }`. Šablona **jen plní odkaz, nic neposílá** (R-084)
+  a o údaji, který nemá, nemluví (`needs` ji schová). Jméno v oslovení záměrně není —
+  pátý pád se z „Novák Jan s.r.o." neudělá.
+- **Kde to je:** detail zakázky (hlavička, na každé záložce), `/dashboard/poptavky` (`LeadCard`),
+  `/dashboard/pozadavky` i záložka Požadavky (`ClientRequestCard`), rozbalený kontakt
+  v Hovorech, detail události v kalendáři, `/dashboard/faktury/[id]` (karta Zakázka)
+  a členové účtu v `/dashboard/klienti/[id]`. V tabulce Hovorů zůstávají v buňkách prosté
+  odkazy — jedenáctisloupcový výpis by tlačítka 44 px neunesl.
 
 ### `/dashboard/faktury`
 - **Evidence všech vystavených faktur** — archiv dokladů, řazený podle data vystavení a seskupený po rocích
