@@ -1031,7 +1031,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** (v prohlížeči neověřeno) |
+| AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **uzavřeno 2026-11-12** — kód, testy a kalendář v prohlížeči hotové; ze seznamu „Hotovo, když“ **nesplněné**: průchod s přihlášením, 390 px a „Zaplaceno“ (→ AD12). Uzavřel Kryštof rozhodnutím, ne splněním kritérií. |
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | nezačato |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | nezačato |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | nezačato |
