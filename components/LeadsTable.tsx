@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useState, useTransition } from 'react'
+import { Fragment, useEffect, useOptimistic, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -882,6 +882,16 @@ const PlainHeader = ({ label, className }: { label: string; className?: string }
  * jen kvůli okamžité odezvě po úpravě. Poznámky má každý řádek v náhledu
  * a celé se načtou, až se kontakt rozbalí.
  */
+/** Jediná změna, kterou kliknutí slibuje, než server odpoví. */
+export type OptimisticChange =
+  | { type: 'answered'; id: string; value: boolean | null }
+  | { type: 'remove'; id: string }
+
+export function optimisticReducer(current: LeadWithNotes[], change: OptimisticChange): LeadWithNotes[] {
+  if (change.type === 'remove') return current.filter((l) => l.id !== change.id)
+  return current.map((l) => (l.id === change.id ? { ...l, call_answered: change.value } : l))
+}
+
 export default function LeadsTable({
   initialLeads,
   waiting,
@@ -900,6 +910,13 @@ export default function LeadsTable({
   focusLeadId?: string
 }) {
   const [leads, setLeads] = useState<LeadWithNotes[]>(initialLeads)
+  /**
+   * Akce na jedno kliknutí se ukážou hned (AD08). `useOptimistic` drží změnu
+   * jen po dobu akce — pak ji přebije `setLeads` se skutečnou odpovědí, nebo
+   * se při chybě sama vrátí. Výsledek v `leads` proto nic nepřepisuje a není
+   * potřeba nic „vracet zpět" ručně.
+   */
+  const [optimisticLeads, applyOptimistic] = useOptimistic(leads, optimisticReducer)
   const [notes, setNotes] = useState<Record<string, LeadNote[]>>(() =>
     Object.fromEntries(initialLeads.map((lead) => [lead.id, lead.note_preview ?? []])),
   )
@@ -978,6 +995,7 @@ export default function LeadsTable({
   const handleDelete = (id: string) => {
     if (!confirm('Opravdu smazat tento kontakt?')) return
     startTransition(async () => {
+      applyOptimistic({ type: 'remove', id })
       await deleteLead(id)
       setLeads((prev) => prev.filter((l) => l.id !== id))
     })
@@ -993,6 +1011,7 @@ export default function LeadsTable({
   // Přesun mezi pohledy řádek z téhle stránky odebere — je teď v tom druhém.
   const handleMoveToWaiting = (id: string) => {
     startTransition(async () => {
+      applyOptimistic({ type: 'remove', id })
       await moveLeadToWaiting(id)
       setLeads((prev) => prev.filter((l) => l.id !== id))
     })
@@ -1000,6 +1019,7 @@ export default function LeadsTable({
 
   const handleMoveFromWaiting = (id: string) => {
     startTransition(async () => {
+      applyOptimistic({ type: 'remove', id })
       await moveLeadFromWaiting(id)
       setLeads((prev) => prev.filter((l) => l.id !== id))
     })
@@ -1007,6 +1027,7 @@ export default function LeadsTable({
 
   const handleToggleAnswered = (id: string, val: boolean | null) => {
     startTransition(async () => {
+      applyOptimistic({ type: 'answered', id, value: val })
       await setCallAnswered(id, val)
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, call_answered: val, updated_at: new Date() } : l)))
     })
@@ -1085,14 +1106,14 @@ export default function LeadsTable({
                 </tr>
               </thead>
               <tbody>
-                {leads.length === 0 && (
+                {optimisticLeads.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-10 text-center text-sm text-quiet">
                       Nikdo nečeká na odpověď. Kontakt sem přesunete z Hovorů ikonkou hodin.
                     </td>
                   </tr>
                 )}
-                {leads.map((lead) =>
+                {optimisticLeads.map((lead) =>
                   editingWaitingId === lead.id ? (
                     <WaitingLeadForm
                       key={lead.id}
@@ -1166,14 +1187,14 @@ export default function LeadsTable({
                   isPending={isPending}
                 />
               )}
-              {leads.length === 0 && !addingNew && (
+              {optimisticLeads.length === 0 && !addingNew && (
                 <tr>
                   <td colSpan={11} className="px-4 py-12 text-center text-sm text-quiet">
                     Zatím žádné kontakty. Tlačítkem „Přidat kontakt" si poznamenáte, s kým jste mluvili a co dál.
                   </td>
                 </tr>
               )}
-              {leads.map((lead) =>
+              {optimisticLeads.map((lead) =>
                 editingId === lead.id ? (
                   <LeadForm
                     key={lead.id}

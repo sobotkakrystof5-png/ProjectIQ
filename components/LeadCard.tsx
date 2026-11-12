@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useOptimistic, useTransition } from 'react'
 import { Mail, Phone, Calendar, Briefcase, MessageSquare, CheckCircle, Trash2, Loader2 } from 'lucide-react'
 import { confirmWebLead, deleteWebLead } from '@/app/actions'
+import { toast } from '@/components/ui/toast'
 import { LEAD_ORIGINS, toLeadOrigin } from '@/lib/lead-origins'
 
 export interface WebLead {
@@ -39,30 +40,46 @@ function formatCreated(dateStr: string): string {
   })
 }
 
+/**
+ * Potvrzení a odmítnutí se ukáže hned (AD08). `useOptimistic` drží stav jen
+ * po dobu akce: dojde-li potvrzení do konce, server poptávku z inboxu vyřadí
+ * a karta zmizí; selže-li, stav se sám vrátí a tlačítko je zase aktivní —
+ * není potřeba ho ručně přepínat zpátky.
+ */
+type Pending = 'idle' | 'confirming' | 'deleting'
+
 export function LeadCard({ lead }: { lead: WebLead }) {
-  const [confirming, setConfirming] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [pending, setPending] = useOptimistic<Pending, Pending>('idle', (_, next) => next)
+  const [, startTransition] = useTransition()
+  const confirming = pending === 'confirming'
+  const deleting = pending === 'deleting'
   const cfg = LEAD_ORIGINS[toLeadOrigin(lead.lead_origin)]
 
-  async function handleConfirm() {
-    if (confirming) return
-    setConfirming(true)
-    try {
-      await confirmWebLead(lead.id)
-    } catch {
-      setConfirming(false)
-    }
+  function handleConfirm() {
+    if (pending !== 'idle') return
+    startTransition(async () => {
+      setPending('confirming')
+      try {
+        await confirmWebLead(lead.id)
+      } catch (err) {
+        // Nejčastěji souběh: poptávku už potvrdil někdo jinde. Stav se sám
+        // vrátí na výchozí, jen je potřeba říct, proč karta zůstala.
+        toast.error(err instanceof Error ? err.message : 'Poptávku se nepodařilo potvrdit')
+      }
+    })
   }
 
-  async function handleDelete() {
-    if (deleting) return
+  function handleDelete() {
+    if (pending !== 'idle') return
     if (!confirm(`Opravdu smazat poptávku od ${lead.client_name}?`)) return
-    setDeleting(true)
-    try {
-      await deleteWebLead(lead.id)
-    } catch {
-      setDeleting(false)
-    }
+    startTransition(async () => {
+      setPending('deleting')
+      try {
+        await deleteWebLead(lead.id)
+      } catch {
+        toast.error('Poptávku se nepodařilo smazat')
+      }
+    })
   }
 
   const iconCls = 'shrink-0 text-navy-400'
@@ -139,7 +156,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
           ) : (
             <CheckCircle size={15} strokeWidth={1.5} />
           )}
-          {confirming ? 'Potvrzuji…' : 'Potvrdit jako zakázku'}
+          {confirming ? 'Potvrzeno' : 'Potvrdit jako zakázku'}
         </button>
         <p className="text-xs text-muted-foreground mt-2">
           Odešle klientovi e-mail o zahájení zakázky a přesune ji do zakázek.
