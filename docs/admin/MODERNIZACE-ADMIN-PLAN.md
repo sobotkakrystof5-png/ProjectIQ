@@ -714,10 +714,24 @@ chvíli stálo jako nesplněné kritérium; opraveno.)
 pravidlo Dílků chce plochy ≥ 44 px. Nedělal jsem to — vzhled obrazovek překresluje AD17,
 a měnit ho na konci sezení o rychlosti by bylo mimo zadání. Zapsáno do otevřených problémů.
 
+**Průchod přihlášeným adminem na skutečných datech, 2026-11-12** (headless Chrome, session
+cookie, testovací Neon `rd-test` s ukázkovými daty; Kryštof k tomu povolil `Bash`):
+- Sedm obrazovek vrací 200 přihlášené a se správným nadpisem: Dnes, Kalendář, Poptávky,
+  Hovory, Faktury, Finance, Zakázky. **Žádná chyba v konzoli ani `pageerror` nikde.**
+- **Dnes** dopočítá měsíční čísla z AD03: „listopad 2026 · 0 Kč přišlo na účet, z toho
+  přiznaných 0 Kč · Nezaplacené faktury 73 000 Kč · 3 faktury".
+- **Kalendář, krok mimo načtené okno:** Listopad 2026 (36 pilulek) → Prosinec → **Leden 2027**,
+  přitom odešla **dvě volání server action** `loadCalendarMonth`. Mřížka zůstala vykreslená,
+  nadpis se posunul, nic nespadlo — přesně chování podle R-093.
+- **Faktury:** 6 řádků, **12 tlačítek „Zaplaceno"/„Vrátit"** (desktop i mobilní karty), tedy
+  jednoklikové „Zaplaceno" z AD08 je tam na skutečných datech.
+- **Finance:** tlačítko „Doplnit opakované" je na obrazovce.
+- **Vědomě se neklikalo** na potvrzení poptávky ani na „Zaplaceno": zapsalo by to do databáze
+  a potvrzení poptávky by přes `after()` poslalo **skutečný e-mail** z produkční schránky.
+  Optimistické chování těch dvou akcí je ověřené reducerem a testy, ne klikem na ostro.
+
 **Co se neověřilo jinak:** PDF 200 → 304 ověřil jen unit test, na testovací databázi žádná
-faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404). Průchod adminu
-**s přihlášením na skutečných datech** zůstává na Kryštofovi (rozhodl 2026-11-12); není to
-kritérium AD08, ale je to v otevřených problémech.
+faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404).
 
 **Jak se AD08 uzavřelo (rozhodl Kryštof 2026-11-12):** stejně jako AD04, AD05 a AD07 —
 *hotovo, v prohlížeči neověřeno*, průchod s přihlášením zůstává v otevřených problémech
