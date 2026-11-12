@@ -296,6 +296,12 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   context={{ projectName: invoice.project_client_name }}
                 />
               </div>
+            ) : invoice.issued ? (
+              // Vystavený doklad se neupravuje, takže odkaz na „Upravit" by lhal.
+              <p className="text-sm text-quiet">
+                Faktura není navázaná na žádnou zakázku. Příště ji vystavte přímo ze zakázky —
+                předvyplní se odběratel i částka.
+              </p>
             ) : (
               <p className="text-sm text-muted-foreground">
                 Faktura není navázaná na žádnou zakázku. Přes „Upravit" ji jde přiřadit.
@@ -329,6 +335,8 @@ export default async function InvoiceDetailPage(props: PageProps) {
             )}
           </Card>
 
+          {/* U faktury vystavené tady se žádné PDF nečetlo — karta by jen mátla (AD12). */}
+          {!invoice.issued && (
           <Card title="Co z PDF přečetla AI" icon={<Sparkles size={14} strokeWidth={1.5} className="text-emerald-600" />}>
             {extracted.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -356,6 +364,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
               </div>
             )}
           </Card>
+          )}
 
           <div className="text-xs text-muted-foreground px-1 space-y-0.5">
             <p>Přidáno do evidence {formatDateTime(invoice.created_at)}</p>

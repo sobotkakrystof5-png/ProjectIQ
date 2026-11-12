@@ -12,7 +12,7 @@
 
 **Admin konzole (produkce):** VIZEON `/dashboard`, ALTENO `/alteno`, portál `/p/[token]`, Hub `/hub`; deploy z `main`, produkce běží na starém buildu `d948400`. Popis: `docs/admin/AGENTS-ADMIN.md`. Na větvi `ws/redesign-app` (nenasazeno) má admin novou kostru (R-071), Dnes, detail zakázky se záložkami a správu klientských prostorů; na `admin/modernizace` navíc úklid z AD01.
 
-**Modernizace adminu (R-081–R-098), stav po sezení 2026-11-12:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD11 hotové**; **AD12 (vystavování faktur, migrace 107) je hotové na větvi `admin/ad12-fakturace`**, která už má `admin/modernizace` v sobě sloučenou a čeká na merge — další na řadě je AD13 (náprava financí, migrace 108). Z migrací této větve (100–107) jsou 100–104 na testovacím Neonu, 105 a 107 nikde a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG).
+**Modernizace adminu (R-081–R-098), stav po sezení 2026-11-12:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD11 hotové**; **AD12 (vystavování faktur, migrace 107) je hotové na větvi `admin/ad12-fakturace`**, která už má `admin/modernizace` v sobě sloučenou a čeká na merge — další na řadě je AD13 (náprava financí, migrace 108). Z migrací této větve (100–107) jsou 100–104 a **107** na testovacím Neonu, 105 nikde a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). Vystavení faktury je ověřené naživo: proklikané v prohlížeči proti testovací databázi (2 s, PDF 132 kB) a souběh dvěma spojeními (2026001/2026002, bez díry).
 Z AD11: dokončenost je **stav zakázky**, ne vlastní záznam. `completed_projects` byla plná kopie
 zakázky s vlastní cenou a `createCompletedProject` k ní uměl vložit příjem nezávisle na tom,
 jestli zakázka svůj příjem už má — odtud riziko dvojího započtení. **Migrace 106** tabulku
@@ -738,24 +738,17 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 - [ ] **Migrace 106 na testovacím Neonu chybí:** admin lokálně nepoběží, dokud tam nebude
   (chybí `projects.closed_at`, `project_type`, `survey_token` a archiv). Aplikuje Kryštof
   · od 2026-11-12
-- [ ] **Migrace 107 (AD12) neběžela nikde — ani na testu.** Přidává `invoices.{direction,
+- [ ] **Migrace 107 (AD12) na produkci.** Na **testovacím Neonu je od 2026-11-12 aplikovaná**
+  (a ověřená průchodem), na produkci ne. Přidává `invoices.{direction,
   pdf_generated,items,issuer,client_address,supplied_on,vat_total,number_seq,cancelled_at,sent_at}`,
   tabulku `admin_settings`, funkci `admin_invoice_issue`, trigger `admin_invoice_locked` a mění
   unikátnost čísla na částečnou (`WHERE direction='issued'`). Je **aditivní a zpětně
   kompatibilní**: dokud nedoběhne, admin se chová jako dřív (`isIssuingReady()` nové sloupce
   vůbec nedotkne) a vystavování se jen neukáže. Aplikuje Kryštof · od 2026-11-12
-- [ ] **AD12 — zbytek obrazovek v prohlížeči neověřený.** Ověřené je PDF (skutečné vykreslení
-  přes Chrome, prohlédnuté okem) a **formulář nové faktury** na dočasné stránce s fiktivními daty:
-  390 / 768 / 1280 / 1440 px bez vodorovného přetečení, všechny plochy ≥ 44 px, živý součet,
-  desetinná čísla s čárkou, mazání pole. Vystavení, storno a e-mail jsou ověřené **testy proti
-  skutečnému SQL** (server action → řádek → PDF; route e-mailu s mocky pošty), ale **ne klikáním**:
-  k tomu je potřeba přihlášení a databáze se 107. Projít pak: načtení odběratele z ARES, vystavení
-  od začátku do konce, detail vystavené faktury s PDF, odeslání e-mailem, storno a hlavní akce
-  na `/dashboard/faktury` · od 2026-11-12
-- [ ] **Souběžné vystavení dvou faktur nikdo nezkusil naživo (AD12):** PGlite má jedno spojení,
-  lokálně je jen klient Postgresu. Skutečný test chce buď 107 na testovacím Neonu a dvě spojení
-  přes `Pool` (WebSocket), nebo lokální server. Co je ověřené: `GREATEST` z uložené řady i
-  z tabulky, unikátní index na `number_seq` a pořadí zámku ve funkci · od 2026-11-12
+- [ ] **AD12 — tlačítko „Načíst z rejstříku" nikdo neklikl naživo.** Endpoint ARES je ověřený
+  skutečným požadavkem a akce má testy s podstrčeným `fetch`, ale v prohlížeči se IČO vyplňovalo
+  ručně. Zkusit s existujícím i neexistujícím IČO a při vypnuté síti (nesmí zablokovat formulář)
+  · od 2026-11-12
 - [ ] **Odeslání faktury e-mailem nikdo nezkusil naživo (AD12):** `POST /api/invoices/[id]/email`
   posílá přes Gmail SMTP (`lib/email.ts`, R-004) s PDF v příloze. Ověřit skutečné doručení,
   velikost přílohy a jak to vypadá v Gmailu a Apple Mailu · od 2026-11-12
@@ -895,6 +888,28 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-12 (AD12 — ověření naživo na testovací databázi)
+- **chore** **Migrace 107 je na testovacím Neonu** (`rd-test`, se souhlasem Kryštofa; produkce
+  se nedotkla). Před spuštěním se ověřilo, že `.env.local` míří na test a ne na produkci —
+  testovací databáze má `contacts` ze 104 a **nemá** `completed_projects_archiv` ze 106.
+  Běhoun `node scripts/apply-migration.js 107_fakturace_vystavovani.sql`, 15 příkazů.
+- **chore** **Souběh ověřený naživo, ne jen v PGlite.** Dvě spojení přes `Pool`: transakce A
+  vystavila fakturu a nekomitla, transakce B na `admin_invoice_issue` **čekala** (po 1,5 s pořád
+  běžela), po commitu A dostala další číslo. Výsledek `2026001` a `2026002` — různá čísla,
+  bez díry, řada v `admin_settings` na dvojce. Tím padá poslední bod „Hotovo, když" u AD12.
+- **chore** **Celá cesta proklikaná v prohlížeči** s přihlášením (podepsaná session, produkční
+  build proti testovací databázi): Faktury → **Vystavit fakturu** → údaje dodavatele uložené →
+  nová faktura vyplněná a vystavená **za 2,0 s** (číslo `2026003`) → detail s položkami, stornem
+  a odesláním → **PDF 200, 132 763 B, `%PDF-`** vyrobené při otevření → storno prošlo. Na 390 px
+  nic nepřetéká a tlačítko Vystavit fakturu (44 px) nezakrývá spodní lišta. V konzoli jen
+  404 na `/favicon.ico`.
+- **fix** Průchod našel dva zavádějící texty na detailu vystavené faktury: svítila karta
+  „Co z PDF přečetla AI" (u dokladu vystaveného tady se žádné PDF nečetlo) a prázdný stav
+  zakázky odkazoval na tlačítko **„Upravit", které u vystavené faktury není**. První se u vystavené
+  faktury neukazuje vůbec, druhý říká, že příště jde fakturu vystavit rovnou ze zakázky.
+- **chore** Po ověření se testovací doklady `2026003` a `2026004` smazaly; archiv (6 řádků)
+  zůstal nedotčený a **řada zůstala na čtyřce** — číslo se nerecykluje, jak má být.
 
 ### 2026-11-12 (AD12 — vystavování faktur, souběžně s AD11)
 - **feat** **AD12 hotovo** — admin faktury vystavuje, nejen archivuje. Nová obrazovka
