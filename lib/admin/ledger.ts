@@ -49,14 +49,31 @@ export type LedgerSql = {
   costsActive(alias?: string): string
 }
 
+/**
+ * Měna transakce **bez** sloupce `currency` — odvozená z faktury, která ji
+ * založila. Je to přesně to pravidlo, podle kterého migrace 109 sloupec
+ * zpětně plní (`invoices.currency` existuje od migrace 053).
+ *
+ * Díky tomu se eurová faktura přestane sčítat s korunami **hned po nasazení
+ * větve**, ne až po migraci. Sloupec je pak už jen trvalejší a rychlejší
+ * forma téhož: udrží měnu i u řádků, které s fakturou nesouvisí.
+ *
+ * Převzatý příjem (`source_invoice_id IS NULL`) zůstává korunový — zapsala
+ * ho zakázka a ta jinou měnu nezná. Stejně to dělá i migrace.
+ */
+function derivedCurrency(alias?: string): string {
+  const col = alias ? `${alias}.source_invoice_id` : 'source_invoice_id'
+  return `COALESCE((SELECT fak.currency FROM invoices fak WHERE fak.id = ${col}), '${BASE_CURRENCY}')`
+}
+
 function sqlFor(has: boolean): LedgerSql {
   const currency = (alias?: string) =>
-    has ? (alias ? `${alias}.currency` : 'currency') : `'${BASE_CURRENCY}'::text`
+    has ? (alias ? `${alias}.currency` : 'currency') : derivedCurrency(alias)
   const col = (alias: string | undefined, name: string) => (alias ? `${alias}.${name}` : name)
   return {
     has,
     currency,
-    czkOnly: (alias?: string) => (has ? `${currency(alias)} = '${BASE_CURRENCY}'` : 'TRUE'),
+    czkOnly: (alias?: string) => `${currency(alias)} = '${BASE_CURRENCY}'`,
     costsActive: (alias?: string) => (has ? `${col(alias, 'archived_at')} IS NULL` : 'TRUE'),
   }
 }

@@ -247,7 +247,10 @@ export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[
   // Měna je v ledgeru až od migrace 109. Dokud nedoběhne, chová se sync
   // přesně jako dřív (viz `lib/admin/ledger.ts`).
   const withCurrency = L.has
-  const currencyMatch = withCurrency ? `AND t.currency = f.currency` : ''
+  // Měna se porovnává **vždy**, i před migrací 109: faktura ji má od migrace
+  // 053 a u transakce se dá odvodit z dokladu, který ji založil. Eurová
+  // faktura tak nikdy nepřevezme korunový příjem zakázky.
+  const currencyMatch = `AND ${L.currency('t')} = f.currency`
 
   return [
     // 1. Pohledávka (nebo storno): vlastní příjem v ledgeru nemá co dělat.
@@ -311,7 +314,7 @@ export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[
     {
       text: `
         WITH faktura AS (
-          SELECT i.id, i.project_id, i.amount${withCurrency ? ', i.currency' : ''}
+          SELECT i.id, i.project_id, i.amount, i.currency
           FROM invoices i
           WHERE i.id = $1 AND i.paid_on IS NOT NULL
             AND i.finance_transaction_id IS NULL AND i.project_id IS NOT NULL

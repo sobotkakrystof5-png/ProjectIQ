@@ -680,11 +680,19 @@ Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a ad
 
 ### Náprava financí (AD13, R-099)
 
-Migrace **109** je jedna migrace o pěti věcech. Dokud neběží, chová se admin jako dřív:
-`lib/admin/ledger.ts` zjistí stav **ze samotného dotazu** — čtení se pošle tak, jak má vypadat
-po migraci, a teprve když databáze odpoví „takový sloupec neznám" (42703), zopakuje se bez něj.
-V normálním stavu to nestojí ani jedno kolo navíc. Zápis se raději zeptá (`ledgerSql()`), protože
-opakovat zápis jde jen díky tomu, že dávka je transakce — a to platí v produkci, ne v testech.
+Migrace **109** je jedna migrace o pěti věcech. `lib/admin/ledger.ts` zjistí stav **ze samotného
+dotazu** — čtení se pošle tak, jak má vypadat po migraci, a teprve když databáze odpoví „takový
+sloupec neznám" (42703), zopakuje se bez něj. V normálním stavu to nestojí ani jedno kolo navíc.
+Zápis se raději zeptá (`ledgerSql()`), protože opakovat zápis jde jen díky tomu, že dávka je
+transakce — a to platí v produkci, ne v testech.
+
+**Oprava měn ale na migraci nečeká.** Bez sloupce `currency` se měna transakce **odvodí
+z faktury, která ji založila** (`derivedCurrency`: `COALESCE((SELECT fak.currency FROM invoices
+fak WHERE fak.id = source_invoice_id), 'CZK')`) — je to přesně to pravidlo, podle kterého migrace
+sloupec zpětně plní, a `invoices.currency` existuje od migrace 053. Eurová faktura tedy přestane
+plnit korunové součty **hned po nasazení větve**; sloupec je pak trvalejší a rychlejší forma
+téhož a navíc udrží měnu i u řádků, které s fakturou nesouvisí. Totéž platí pro převzetí příjmu:
+měna se porovnává vždy, takže eurová faktura nikdy nepřevezme korunový příjem zakázky.
 
 **Měna v ledgeru.** `finance_transactions.currency` (`DEFAULT 'CZK'`, CHECK CZK/EUR). Do AD13
 měna na transakci nebyla, zatímco faktura ji měla: zaplacená eurová faktura vložila do ledgeru

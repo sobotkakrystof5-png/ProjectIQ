@@ -25,6 +25,8 @@ import { setAdminDbForTests, type AdminDriver } from '@/lib/admin/db'
 import { ledgerCurrencyState, ledgerSql, resetLedgerCurrencyForTests } from '@/lib/admin/ledger'
 import { insertInvoice, syncInvoiceTransaction, invoiceSyncQueries, type InvoiceInput } from '@/lib/invoices'
 import { getBusinessIncome } from '@/app/dashboard/finance/finance-actions'
+import { loadMonthMoney } from '@/lib/admin-today-queries'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { pgliteAdminDriver } from './helpers/admin-pglite'
 
 const invoice = (over: Partial<InvoiceInput> = {}): InvoiceInput => ({
@@ -106,21 +108,67 @@ beforeEach(async () => {
   await db.exec(`DELETE FROM finance_transactions; DELETE FROM invoices; DELETE FROM projects;`)
 })
 
-describe('před migrací 109', () => {
-  it('admin počítá dál a sám pozná, že sloupec ještě není', async () => {
+describe('před migrací 109 — eura se už taky nesčítají s korunami', () => {
+  it('měna se odvodí z faktury, která příjem založila', async () => {
     const { id } = await insertInvoice(invoice({ amount: 2500, currency: 'EUR' }), null)
     // Zápis se na stav zeptal, než něco uložil.
     expect(ledgerCurrencyState()).toBe(false)
+
     const [tx] = await rows<{ amount: string }>(
       `SELECT amount FROM finance_transactions WHERE source_invoice_id = $1`,
       [id],
     )
-    // Dnešní (chybné) chování zůstává: bez migrace se měna nikam neuloží.
+    // Sloupec `currency` ještě není, částka se uložila tak jako dřív.
     expect(Number(tx.amount)).toBe(2500)
 
+    // Součty ji ale do korun **nepustí**: vazba na doklad řekne, že jsou to
+    // eura. Oprava tedy zabírá hned po nasazení, ne až po migraci.
     const summary = await getBusinessIncome(2026)
+    expect(summary.total).toBe(0)
+    expect(summary.declared.income).toBe(0)
+    expect(summary.foreign).toEqual([{ currency: 'EUR', amount: 2500, count: 1 }])
+  })
+
+  it('korunová faktura do korunového součtu patří', async () => {
+    await insertInvoice(invoice({ amount: 1800, currency: 'CZK' }), null)
+    const summary = await getBusinessIncome(2026)
+    expect(summary.declared.income).toBe(1800)
     expect(summary.foreign).toEqual([])
-    expect(summary.total).toBe(2500)
+  })
+
+  it('ani Dnes nepřičte eura ke korunám', async () => {
+    const dnes = getPragueTodayISO()
+    await insertInvoice(invoice({ amount: 5000, currency: 'CZK', paid_on: dnes }), null)
+    await insertInvoice(invoice({ amount: 200, currency: 'EUR', paid_on: dnes }), null)
+
+    const money = await loadMonthMoney(dnes)
+    expect(money.income).toBe(5000)
+    expect(money.declaredIncome).toBe(5000)
+    expect(money.foreignIncome).toEqual([{ currency: 'EUR', amount: 200, count: 1 }])
+  })
+
+  it('eurová faktura nepřevezme korunový příjem zakázky ani bez migrace', async () => {
+    const [project] = await rows<{ id: string }>(
+      `INSERT INTO projects (client_name, price, paid) VALUES ('Pekárna', 900, true) RETURNING id::text AS id`,
+    )
+    await db.query(
+      `INSERT INTO finance_transactions (amount, type, category, date, source_project_id)
+       VALUES (900, 'income', 'zakázka', '2026-05-01', $1)`,
+      [project.id],
+    )
+    const { id } = await insertInvoice(
+      invoice({ amount: 900, currency: 'EUR', project_id: project.id, paid_on: '2026-05-02' }),
+      null,
+    )
+    const [inv] = await rows<{ finance_transaction_id: string }>(
+      `SELECT finance_transaction_id::text FROM invoices WHERE id = $1`,
+      [id],
+    )
+    const [vlastni] = await rows<{ id: string }>(
+      `SELECT id::text FROM finance_transactions WHERE source_invoice_id = $1`,
+      [id],
+    )
+    expect(inv.finance_transaction_id).toBe(vlastni.id)
   })
 })
 
