@@ -1,7 +1,9 @@
-import { sql } from '@/lib/db'
+import { randomUUID } from 'node:crypto'
+import { adminDb, type AdminQuery } from '@/lib/admin/db'
+import { ledgerSql, type LedgerSql } from '@/lib/admin/ledger'
 import { projectPath } from '@/lib/lead-origins'
 import type { InvoiceListItem, InvoiceRegistryItem } from '@/app/dashboard/finance/invoice-actions'
-import type { Invoice, InvoiceAiExtract } from '@/lib/types'
+import type { InvoiceAiExtract } from '@/lib/types'
 import {
   MAX_PDF_BYTES, MAX_PDF_LABEL, INVOICE_INCOME_CATEGORY,
   INVOICE_CURRENCIES, type InvoiceCurrency,
@@ -210,144 +212,174 @@ export async function parseInvoiceForm(fd: FormData): Promise<ParsedInvoiceForm>
   return { data, pdf, removePdf: fd.get('remove_pdf') === '1' }
 }
 
-type StoredInvoice = Pick<Invoice, 'id' | 'project_id' | 'amount' | 'paid_on' | 'invoice_number' | 'finance_transaction_id'>
-
-async function loadInvoice(id: string): Promise<StoredInvoice | null> {
-  const rows = await sql`
-    SELECT id::text, project_id::text, amount::float AS amount, paid_on::text,
-           invoice_number, finance_transaction_id::text
-    FROM invoices WHERE id = ${id} LIMIT 1
-  `
-  return (rows[0] as StoredInvoice | undefined) ?? null
-}
-
 /**
- * Srovná ledger se stavem faktury.
+ * Srovná ledger se stavem faktury — **jedním požadavkem, v jedné transakci**.
  *
  * `paid_on` vyplněno → faktura musí mít v ledgeru právě jeden příjem.
- * Buď převezme ten, který už zakázka založila (stejná částka, zatím
+ * Buď převezme ten, který už zakázka založila (stejná částka i měna, zatím
  * nezabraný jinou fakturou), nebo si založí vlastní. Převzatou transakci
  * nikdy nepřepisuje ani nemaže — patří zakázce.
  *
  * `paid_on` prázdné → faktura je pohledávka a v ledgeru nesmí mít nic:
  * vlastní transakce se maže, převzatá se jen rozváže.
+ *
+ * Do AD13 to bylo 4–6 samostatných dotazů (načti fakturu → načti vazbu →
+ * hledej adoptovatelnou transakci → vlož/uprav → naváž). Pád nebo timeout
+ * mezi nimi nechal fakturu zaplacenou, ale bez příjmu — tedy chybějící
+ * peníze v daňovém základu. Každá větev je teď jeden SQL příkaz, který je
+ * sám o sobě no-op, když na fakturu nesedí; celá sada jde do databáze jako
+ * jedna dávka (`adminDb.batch` = jedna Neon HTTP transakce), takže platí
+ * buď celá, nebo nic.
  */
-export async function syncInvoiceTransaction(invoiceId: string): Promise<void> {
-  const invoice = await loadInvoice(invoiceId)
-  if (!invoice) return
+export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[] {
+  // Měna je v ledgeru až od migrace 109. Dokud nedoběhne, chová se sync
+  // přesně jako dřív (viz `lib/admin/ledger.ts`).
+  const withCurrency = L.has
+  const currencyMatch = withCurrency ? `AND t.currency = f.currency` : ''
 
-  const linked = invoice.finance_transaction_id
-    ? ((
-        await sql`
-          SELECT id::text, source_invoice_id::text
-          FROM finance_transactions WHERE id = ${invoice.finance_transaction_id} LIMIT 1
-        `
-      )[0] as { id: string; source_invoice_id: string | null } | undefined) ?? null
-    : null
-
-  const ownsLinked = linked?.source_invoice_id === invoice.id
-
-  if (!invoice.paid_on) {
-    if (linked && ownsLinked) {
-      await sql`DELETE FROM finance_transactions WHERE id = ${linked.id}`
-    }
-    if (invoice.finance_transaction_id) {
-      await sql`UPDATE invoices SET finance_transaction_id = NULL WHERE id = ${invoice.id}`
-    }
-    return
-  }
-
-  if (linked) {
-    if (ownsLinked) {
-      await sql`
-        UPDATE finance_transactions
-        SET amount = ${invoice.amount}, date = ${invoice.paid_on}, declared = true
-        WHERE id = ${linked.id}
-      `
-    } else {
-      // Převzatá transakce patří zakázce — měníme na ní jen příslušnost k linii.
-      await sql`UPDATE finance_transactions SET declared = true WHERE id = ${linked.id}`
-    }
-    return
-  }
-
-  // Zakázka už možná svůj příjem do ledgeru zapsala (zaplacená zakázka /
-  // záloha). Stejná částka = tytéž peníze, jen jiný doklad → převzít,
-  // nezakládat druhý.
-  if (invoice.project_id) {
-    const candidates = await sql`
-      SELECT t.id::text
-      FROM finance_transactions t
-      WHERE t.source_project_id = ${invoice.project_id}
-        AND t.type = 'income'
-        AND t.user_id IS NULL
-        AND t.source_invoice_id IS NULL
-        AND t.amount = ${invoice.amount}
-        AND NOT EXISTS (
-          SELECT 1 FROM invoices i WHERE i.finance_transaction_id = t.id
+  return [
+    // 1. Pohledávka (nebo storno): vlastní příjem v ledgeru nemá co dělat.
+    {
+      text: `
+        DELETE FROM finance_transactions t
+        USING invoices i
+        WHERE i.id = $1 AND i.paid_on IS NULL AND t.source_invoice_id = i.id
+      `,
+      params: [invoiceId],
+    },
+    // 2. …a vazba na něj taky ne. Převzatý příjem zůstává zakázce.
+    {
+      text: `
+        UPDATE invoices SET finance_transaction_id = NULL
+        WHERE id = $1 AND paid_on IS NULL AND finance_transaction_id IS NOT NULL
+      `,
+      params: [invoiceId],
+    },
+    // 3. Vazba na transakci, která už neexistuje (smazaná ručně ve Financích),
+    //    by zablokovala jak převzetí, tak vložení. Uklidí se.
+    {
+      text: `
+        UPDATE invoices i SET finance_transaction_id = NULL
+        WHERE i.id = $1 AND i.finance_transaction_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM finance_transactions t WHERE t.id = i.finance_transaction_id)
+      `,
+      params: [invoiceId],
+    },
+    // 4. Zaplaceno + vlastní transakce → srovnat ji s dokladem.
+    {
+      text: `
+        UPDATE finance_transactions t
+        SET amount = i.amount, date = i.paid_on, declared = true${withCurrency ? ', currency = i.currency' : ''}
+        FROM invoices i
+        WHERE i.id = $1 AND i.paid_on IS NOT NULL
+          AND t.id = i.finance_transaction_id AND t.source_invoice_id = i.id
+      `,
+      params: [invoiceId],
+    },
+    // 5. Zaplaceno + převzatá transakce → měníme na ní jen příslušnost k linii.
+    {
+      text: `
+        UPDATE finance_transactions t
+        SET declared = true
+        FROM invoices i
+        WHERE i.id = $1 AND i.paid_on IS NOT NULL
+          AND t.id = i.finance_transaction_id AND t.source_invoice_id IS DISTINCT FROM i.id
+      `,
+      params: [invoiceId],
+    },
+    // 6. Zakázka už možná svůj příjem do ledgeru zapsala (zaplacená zakázka /
+    //    záloha). Stejná částka i měna = tytéž peníze, jen jiný doklad →
+    //    převzít, nezakládat druhý.
+    {
+      text: `
+        WITH faktura AS (
+          SELECT i.id, i.project_id, i.amount${withCurrency ? ', i.currency' : ''}
+          FROM invoices i
+          WHERE i.id = $1 AND i.paid_on IS NOT NULL
+            AND i.finance_transaction_id IS NULL AND i.project_id IS NOT NULL
+        ),
+        kandidat AS (
+          SELECT t.id
+          FROM finance_transactions t JOIN faktura f ON t.source_project_id = f.project_id
+          WHERE t.type = 'income'
+            AND t.user_id IS NULL
+            AND t.source_invoice_id IS NULL
+            AND t.amount = f.amount
+            ${currencyMatch}
+            AND NOT EXISTS (SELECT 1 FROM invoices x WHERE x.finance_transaction_id = t.id)
+          ORDER BY t.date DESC
+          LIMIT 1
+        ),
+        prevzeti AS (
+          UPDATE finance_transactions SET declared = true
+          WHERE id IN (SELECT id FROM kandidat)
+          RETURNING id
         )
-      ORDER BY t.date DESC
-      LIMIT 1
-    `
-    const adopted = (candidates[0] as { id: string } | undefined) ?? null
-    if (adopted) {
-      await sql`UPDATE finance_transactions SET declared = true WHERE id = ${adopted.id}`
-      await sql`UPDATE invoices SET finance_transaction_id = ${adopted.id}::uuid WHERE id = ${invoice.id}`
-      return
-    }
-  }
+        UPDATE invoices SET finance_transaction_id = (SELECT id FROM prevzeti)
+        WHERE id = $1 AND EXISTS (SELECT 1 FROM prevzeti)
+      `,
+      params: [invoiceId],
+    },
+    // 7. Nic k převzetí → faktura si příjem založí sama.
+    {
+      text: `
+        WITH faktura AS (
+          SELECT i.id, i.project_id, i.amount, i.paid_on, i.invoice_number${withCurrency ? ', i.currency' : ''}
+          FROM invoices i
+          WHERE i.id = $1 AND i.paid_on IS NOT NULL AND i.finance_transaction_id IS NULL
+        ),
+        vlozeni AS (
+          INSERT INTO finance_transactions
+            (amount, type, category, note, date, user_id, source_project_id, source_invoice_id, declared${withCurrency ? ', currency' : ''})
+          SELECT f.amount, 'income', $2, 'Faktura ' || f.invoice_number, f.paid_on,
+                 NULL, f.project_id, f.id, true${withCurrency ? ', f.currency' : ''}
+          FROM faktura f
+          RETURNING id
+        )
+        UPDATE invoices SET finance_transaction_id = (SELECT id FROM vlozeni)
+        WHERE id = $1 AND EXISTS (SELECT 1 FROM vlozeni)
+      `,
+      params: [invoiceId, INVOICE_INCOME_CATEGORY],
+    },
+  ]
+}
 
-  const note = `Faktura ${invoice.invoice_number}`
-  const inserted = await sql`
-    INSERT INTO finance_transactions
-      (amount, type, category, note, date, user_id, source_project_id, source_invoice_id, declared)
-    VALUES (
-      ${invoice.amount},
-      'income',
-      ${INVOICE_INCOME_CATEGORY},
-      ${note},
-      ${invoice.paid_on},
-      NULL,
-      ${invoice.project_id},
-      ${invoice.id}::uuid,
-      true
-    )
-    RETURNING id::text AS id
-  `
-  const transactionId = (inserted[0] as { id: string }).id
-  await sql`UPDATE invoices SET finance_transaction_id = ${transactionId}::uuid WHERE id = ${invoice.id}`
+/** Srovnání ledgeru samostatně — jedna dávka, jedno kolo do databáze. */
+export async function syncInvoiceTransaction(invoiceId: string): Promise<void> {
+  await adminDb.batch(invoiceSyncQueries(await ledgerSql(), invoiceId))
 }
 
 export async function insertInvoice(
   data: InvoiceInput,
   pdf: InvoicePdf | null
 ): Promise<{ id: string }> {
-  const rows = await sql`
-    INSERT INTO invoices (
-      invoice_number, project_id, client_name, client_ico, client_dic,
-      issued_on, due_on, paid_on, amount, currency, note,
-      pdf_data, pdf_filename, pdf_size, ai_extracted
-    ) VALUES (
-      ${data.invoice_number},
-      ${data.project_id},
-      ${data.client_name},
-      ${data.client_ico},
-      ${data.client_dic},
-      ${data.issued_on},
-      ${data.due_on},
-      ${data.paid_on},
-      ${data.amount},
-      ${data.currency},
-      ${data.note},
-      decode(${pdf?.base64 ?? null}::text, 'base64'),
-      ${pdf?.filename ?? null},
-      ${pdf?.size ?? null},
-      ${data.ai_extracted ? JSON.stringify(data.ai_extracted) : null}::jsonb
-    )
-    RETURNING id::text AS id
-  `
-  const id = (rows[0] as { id: string }).id
-  await syncInvoiceTransaction(id)
+  // Id se generuje tady, ne v databázi: uložení dokladu a jeho zápis do
+  // ledgeru tak jde do jedné dávky, místo aby se na id čekalo zvlášť.
+  const id = randomUUID()
+  const L = await ledgerSql()
+
+  await adminDb.batch([
+    {
+      text: `
+        INSERT INTO invoices (
+          id, invoice_number, project_id, client_name, client_ico, client_dic,
+          issued_on, due_on, paid_on, amount, currency, note,
+          pdf_data, pdf_filename, pdf_size, ai_extracted
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+          decode($13::text, 'base64'), $14, $15, $16::jsonb
+        )
+      `,
+      params: [
+        id, data.invoice_number, data.project_id, data.client_name, data.client_ico, data.client_dic,
+        data.issued_on, data.due_on, data.paid_on, data.amount, data.currency, data.note,
+        pdf?.base64 ?? null, pdf?.filename ?? null, pdf?.size ?? null,
+        data.ai_extracted ? JSON.stringify(data.ai_extracted) : null,
+      ],
+    },
+    ...invoiceSyncQueries(L, id),
+  ])
+
   return { id }
 }
 
@@ -357,53 +389,58 @@ export async function updateInvoiceRow(
   pdf: InvoicePdf | null,
   removePdf: boolean
 ): Promise<void> {
-  await sql`
-    UPDATE invoices SET
-      invoice_number = ${data.invoice_number},
-      project_id = ${data.project_id},
-      client_name = ${data.client_name},
-      client_ico = ${data.client_ico},
-      client_dic = ${data.client_dic},
-      issued_on = ${data.issued_on},
-      due_on = ${data.due_on},
-      paid_on = ${data.paid_on},
-      amount = ${data.amount},
-      currency = ${data.currency},
-      note = ${data.note},
-      updated_at = now()
-    WHERE id = ${id}
-  `
+  const base: AdminQuery[] = [
+    {
+      text: `
+        UPDATE invoices SET
+          invoice_number = $2, project_id = $3, client_name = $4, client_ico = $5, client_dic = $6,
+          issued_on = $7, due_on = $8, paid_on = $9, amount = $10, currency = $11, note = $12,
+          updated_at = now()
+        WHERE id = $1
+      `,
+      params: [
+        id, data.invoice_number, data.project_id, data.client_name, data.client_ico, data.client_dic,
+        data.issued_on, data.due_on, data.paid_on, data.amount, data.currency, data.note,
+      ],
+    },
+  ]
 
   // Jen když přepis reálně proběhl — běžná editace nesmí přepsat historii
   // toho, co AI kdysi vyčetla, prázdnou hodnotou.
   if (data.ai_extracted) {
-    await sql`
-      UPDATE invoices SET ai_extracted = ${JSON.stringify(data.ai_extracted)}::jsonb WHERE id = ${id}
-    `
+    base.push({
+      text: `UPDATE invoices SET ai_extracted = $2::jsonb WHERE id = $1`,
+      params: [id, JSON.stringify(data.ai_extracted)],
+    })
   }
 
   if (pdf) {
-    await sql`
-      UPDATE invoices
-      SET pdf_data = decode(${pdf.base64}::text, 'base64'),
-          pdf_filename = ${pdf.filename},
-          pdf_size = ${pdf.size}
-      WHERE id = ${id}
-    `
+    base.push({
+      text: `
+        UPDATE invoices
+        SET pdf_data = decode($2::text, 'base64'), pdf_filename = $3, pdf_size = $4
+        WHERE id = $1
+      `,
+      params: [id, pdf.base64, pdf.filename, pdf.size],
+    })
   } else if (removePdf) {
-    await sql`
-      UPDATE invoices SET pdf_data = NULL, pdf_filename = NULL, pdf_size = NULL WHERE id = ${id}
-    `
+    base.push({
+      text: `UPDATE invoices SET pdf_data = NULL, pdf_filename = NULL, pdf_size = NULL WHERE id = $1`,
+      params: [id],
+    })
   }
 
-  await syncInvoiceTransaction(id)
+  await adminDb.batch([...base, ...invoiceSyncQueries(await ledgerSql(), id)])
 }
 
 /**
  * Smaže fakturu i příjem, který sama založila. Převzatý příjem zůstává —
- * patří zakázce a peníze reálně dorazily.
+ * patří zakázce a peníze reálně dorazily. Obojí jednou dávkou: smazaný
+ * doklad nesmí po pádu uprostřed nechat v ledgeru příjem bez faktury.
  */
 export async function deleteInvoiceRow(id: string): Promise<void> {
-  await sql`DELETE FROM finance_transactions WHERE source_invoice_id = ${id}::uuid`
-  await sql`DELETE FROM invoices WHERE id = ${id}`
+  await adminDb.batch([
+    { text: `DELETE FROM finance_transactions WHERE source_invoice_id = $1::uuid`, params: [id] },
+    { text: `DELETE FROM invoices WHERE id = $1`, params: [id] },
+  ])
 }

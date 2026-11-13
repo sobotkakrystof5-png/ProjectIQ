@@ -7,13 +7,10 @@ import { TaxNewsBlock } from '@/components/TaxNewsBlock'
 import type { BusinessIncomeSummary, IncomeLine } from './finance-actions'
 import type { InvoiceArchiveData, InvoiceProjectOption } from './invoice-actions'
 import type { TaxNewsData } from './tax-news-actions'
+import { BASE_CURRENCY, formatMoney } from '@/lib/money-currency'
 
 function formatAmount(amount: number) {
-  return new Intl.NumberFormat('cs-CZ', {
-    style: 'currency',
-    currency: 'CZK',
-    maximumFractionDigits: 0,
-  }).format(amount)
+  return formatMoney(amount, BASE_CURRENCY)
 }
 
 function projectsLabel(count: number) {
@@ -157,11 +154,24 @@ export function BusinessSection({
         <AlertCircle size={13} className="shrink-0 mt-0.5" strokeWidth={1.5} />
         <span>
           Celkový příjem za {summary.year}: <strong className="text-foreground">{formatAmount(summary.total)}</strong>{' '}
-          — součet obou linií. Do daní níže vstupuje jen přiznaná část.
+          — součet obou linií v korunách. Do daní níže vstupuje jen přiznaná část.
           {summary.declared.outstanding + summary.undeclared.outstanding > 0 &&
             ' Nezaplacené zakázky se počítají napříč roky: dokud peníze nedorazí, nepatří žádnému.'}
         </span>
       </div>
+
+      {/* Cizí měna stojí vedle korun, ne v nich: kurz nikde neukládáme, takže
+          převod by byl vymyšlené číslo (R-048). Do daní nevstupuje. */}
+      {summary.foreign.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+          <AlertCircle size={13} className="mt-0.5 shrink-0" strokeWidth={1.5} />
+          <span>
+            Navíc v jiné měně:{' '}
+            <strong>{summary.foreign.map((f) => formatMoney(f.amount, f.currency)).join(' · ')}</strong>. Ke korunám se
+            to nepřičítá a v odhadu daně to není — přepočet si udělejte kurzem ke dni platby.
+          </span>
+        </div>
+      )}
 
       {/* Archiv faktur je podsekce přiznané linie — faktura je doklad k příjmu,
           který do téhle linie spadá. Samostatná stránka by ten vztah rozbila. */}

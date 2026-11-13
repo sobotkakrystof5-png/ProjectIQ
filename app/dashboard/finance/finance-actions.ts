@@ -1,7 +1,8 @@
 'use server'
 
 import { sql } from '@/lib/db'
-import { adminDb, q } from '@/lib/admin/db'
+import { adminDb, q, type AdminQuery } from '@/lib/admin/db'
+import { toForeignTotals, withLedger, type ForeignTotal } from '@/lib/admin/ledger'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import {
@@ -22,6 +23,8 @@ export interface FinanceTransaction {
   date: string
   /** Příjem fakturovaný na IČO — vstupuje do daňového základu (migrace 054) */
   declared: boolean
+  /** Měna řádku (migrace 109). Součty jedou po měnách, nikdy přes ně (R-048). */
+  currency: string
   created_at: string
 }
 
@@ -44,24 +47,30 @@ export interface MonthlyAggregate {
 
 export async function getTransactions(month: string): Promise<FinanceTransaction[]> {
   await requireAuth()
-  const rows = await sql`
-    SELECT
-      id::text,
-      amount::float AS amount,
-      type,
-      category,
-      note,
-      area,
-      date::text,
-      declared,
-      created_at::text
-    FROM finance_transactions
-    WHERE user_id IS NULL
-      AND to_char(date, 'YYYY-MM') = ${month}
-      AND source_recurring_cash_flow_id IS NULL
-    ORDER BY date DESC, created_at DESC
-  `
-  return rows as FinanceTransaction[]
+  const [rows] = await withLedger((L) => adminDb.batch([
+    {
+      text: `
+        SELECT
+          id::text,
+          amount::float AS amount,
+          type,
+          category,
+          note,
+          area,
+          date::text,
+          declared,
+          ${L.currency()} AS currency,
+          created_at::text
+        FROM finance_transactions
+        WHERE user_id IS NULL
+          AND to_char(date, 'YYYY-MM') = $1
+          AND source_recurring_cash_flow_id IS NULL
+        ORDER BY date DESC, created_at DESC
+      `,
+      params: [month],
+    },
+  ]))
+  return rows as unknown as FinanceTransaction[]
 }
 
 export async function getMonthlyAggregates(): Promise<MonthlyAggregate[]> {
@@ -76,17 +85,25 @@ export async function getMonthlyAggregates(): Promise<MonthlyAggregate[]> {
     months.push({ month: `${yyyy}-${mm}`, income: 0, expense: 0 })
   }
 
-  const rows = await sql`
-    SELECT
-      to_char(date, 'YYYY-MM') AS month,
-      type,
-      SUM(amount)::float AS total
-    FROM finance_transactions
-    WHERE user_id IS NULL
-      AND date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
-    GROUP BY 1, 2
-    ORDER BY 1
-  `
+  // Jen koruny. Cizí měna se nikdy nepřičítá ke korunám (R-048, migrace 109) —
+  // příjem v eurech je vidět ve Financích › Podnikání jako vlastní řádek.
+  const [rows] = await withLedger((L) => adminDb.batch([
+    {
+      text: `
+        SELECT
+          to_char(date, 'YYYY-MM') AS month,
+          type,
+          SUM(amount)::float AS total
+        FROM finance_transactions
+        WHERE user_id IS NULL
+          AND ${L.czkOnly()}
+          AND date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+        GROUP BY 1, 2
+        ORDER BY 1
+      `,
+      params: [],
+    },
+  ]))
 
   for (const row of rows as any[]) {
     const m = months.find(x => x.month === row.month)
@@ -117,16 +134,22 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
   const prevDate = new Date(y, m - 2, 1)
   const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
 
-  const rows = await sql`
-    SELECT
-      to_char(date, 'YYYY-MM') AS month,
-      type,
-      SUM(amount)::float AS total
-    FROM finance_transactions
-    WHERE user_id IS NULL
-      AND to_char(date, 'YYYY-MM') IN (${month}, ${prevMonth})
-    GROUP BY 1, 2
-  `
+  const [rows] = await withLedger((L) => adminDb.batch([
+    {
+      text: `
+        SELECT
+          to_char(date, 'YYYY-MM') AS month,
+          type,
+          SUM(amount)::float AS total
+        FROM finance_transactions
+        WHERE user_id IS NULL
+          AND ${L.czkOnly()}
+          AND to_char(date, 'YYYY-MM') IN ($1, $2)
+        GROUP BY 1, 2
+      `,
+      params: [month, prevMonth],
+    },
+  ]))
 
   let income = 0, expense = 0, prevIncome = 0, prevExpense = 0
   for (const row of rows as { month: string; type: TransactionType; total: number }[]) {
@@ -162,12 +185,17 @@ export interface AllTimeSummary {
 export async function getAllTimeSummary(): Promise<AllTimeSummary> {
   await requireAuth()
 
-  const rows = await sql`
-    SELECT type, SUM(amount)::float AS total
-    FROM finance_transactions
-    WHERE user_id IS NULL
-    GROUP BY type
-  `
+  const [rows] = await withLedger((L) => adminDb.batch([
+    {
+      text: `
+        SELECT type, SUM(amount)::float AS total
+        FROM finance_transactions
+        WHERE user_id IS NULL AND ${L.czkOnly()}
+        GROUP BY type
+      `,
+      params: [],
+    },
+  ]))
 
   let income = 0, expense = 0
   for (const row of rows as { type: TransactionType; total: number }[]) {
@@ -192,16 +220,22 @@ export interface FinanceHealthOverview {
 export async function getFinanceHealthOverview(): Promise<FinanceHealthOverview> {
   await requireAuth()
 
-  const [rows, trend] = await Promise.all([
-    sql`
-      SELECT
-        type,
-        SUM(amount)::float AS total
-      FROM finance_transactions
-      WHERE user_id IS NULL
-        AND date >= CURRENT_DATE - INTERVAL '12 months'
-      GROUP BY type
-    `,
+  const [[rows], trend] = await Promise.all([
+    withLedger((L) => adminDb.batch([
+      {
+        text: `
+          SELECT
+            type,
+            SUM(amount)::float AS total
+          FROM finance_transactions
+          WHERE user_id IS NULL
+            AND ${L.czkOnly()}
+            AND date >= CURRENT_DATE - INTERVAL '12 months'
+          GROUP BY type
+        `,
+        params: [],
+      },
+    ])),
     getMonthlyAggregates(),
   ])
 
@@ -416,8 +450,14 @@ export interface BusinessIncomeSummary {
   availableYears: number[]
   declared: IncomeLine
   undeclared: IncomeLine
-  /** Součet obou linií — musí sedět na celkový příjem za rok */
+  /** Součet obou linií — musí sedět na celkový příjem za rok, v korunách */
   total: number
+  /**
+   * Příjmy v cizí měně za tentýž rok. Stojí **vedle** korun, ne v nich:
+   * bez uloženého kurzu by jakýkoli součet přes měny byl vymyšlené číslo
+   * (R-048). Do daňového základu proto nevstupují a kalkulačka to říká.
+   */
+  foreign: ForeignTotal[]
 }
 
 const EMPTY_LINE: IncomeLine = { income: 0, transactionCount: 0, projectCount: 0, outstanding: 0 }
@@ -425,41 +465,61 @@ const EMPTY_LINE: IncomeLine = { income: 0, transactionCount: 0, projectCount: 0
 export async function getBusinessIncome(year: number): Promise<BusinessIncomeSummary> {
   await requireAuth()
 
-  // Tři dotazy jedním požadavkem (AD06).
-  const [incomeRows, outstandingRows, yearRows] = await adminDb.batch([
-    q`
-      SELECT
-        declared,
-        SUM(amount)::float AS income,
-        COUNT(*)::int AS transaction_count,
-        -- Po migraci 106 (AD11) visí každý příjem z Dokončených na zakázce,
-        -- takže druhá větev COALESCE zmizela.
-        COUNT(DISTINCT source_project_id::text)::int AS project_count
-      FROM finance_transactions
-      WHERE user_id IS NULL
-        AND type = 'income'
-        AND EXTRACT(YEAR FROM date) = ${year}
-      GROUP BY declared
-    `,
-    // Zbývá doplatit = cena − už zaplacená záloha. Zakázky obou byznysů
-    // dohromady: je to jedno IČO a jedno daňové přiznání.
-    q`
-      SELECT
-        invoiced_on_ico AS declared,
-        SUM(GREATEST(price - CASE WHEN deposit_paid THEN COALESCE(deposit_amount, 0) ELSE 0 END, 0))::float AS outstanding
-      FROM projects
-      WHERE paid = false
-        AND price IS NOT NULL
-        AND price > 0
-      GROUP BY invoiced_on_ico
-    `,
-    q`
-      SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS year
-      FROM finance_transactions
-      WHERE user_id IS NULL AND type = 'income'
-      ORDER BY year DESC
-    `,
-  ])
+  // Čtyři dotazy jedním požadavkem (AD06). Linie se počítají **jen
+  // z korun** — eurová faktura se do daňového základu nesmí připočíst
+  // nepřepočtená (AD13, migrace 109). Cizí měny jdou vedle, vlastním dotazem.
+  const [incomeRows, outstandingRows, yearRows, foreignRows] = await withLedger((L) =>
+    adminDb.batch([
+      {
+        text: `
+          SELECT
+            declared,
+            SUM(amount)::float AS income,
+            COUNT(*)::int AS transaction_count,
+            -- Po migraci 106 (AD11) visí každý příjem z Dokončených na zakázce,
+            -- takže druhá větev COALESCE zmizela.
+            COUNT(DISTINCT source_project_id::text)::int AS project_count
+          FROM finance_transactions
+          WHERE user_id IS NULL
+            AND type = 'income'
+            AND ${L.czkOnly()}
+            AND EXTRACT(YEAR FROM date) = $1
+          GROUP BY declared
+        `,
+        params: [year],
+      },
+      // Zbývá doplatit = cena − už zaplacená záloha. Zakázky obou byznysů
+      // dohromady: je to jedno IČO a jedno daňové přiznání.
+      q`
+        SELECT
+          invoiced_on_ico AS declared,
+          SUM(GREATEST(price - CASE WHEN deposit_paid THEN COALESCE(deposit_amount, 0) ELSE 0 END, 0))::float AS outstanding
+        FROM projects
+        WHERE paid = false
+          AND price IS NOT NULL
+          AND price > 0
+        GROUP BY invoiced_on_ico
+      `,
+      q`
+        SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS year
+        FROM finance_transactions
+        WHERE user_id IS NULL AND type = 'income'
+        ORDER BY year DESC
+      `,
+      {
+        text: `
+          SELECT ${L.currency()} AS currency, SUM(amount)::float AS amount, COUNT(*)::int AS count
+          FROM finance_transactions
+          WHERE user_id IS NULL
+            AND type = 'income'
+            AND NOT (${L.czkOnly()})
+            AND EXTRACT(YEAR FROM date) = $1
+          GROUP BY 1
+        `,
+        params: [year],
+      },
+    ]),
+  )
 
   const lines: Record<'true' | 'false', IncomeLine> = {
     true: { ...EMPTY_LINE },
@@ -487,5 +547,6 @@ export async function getBusinessIncome(year: number): Promise<BusinessIncomeSum
     declared: lines.true,
     undeclared: lines.false,
     total: lines.true.income + lines.false.income,
+    foreign: toForeignTotals((foreignRows ?? []) as { currency: unknown; amount: unknown; count: unknown }[]),
   }
 }

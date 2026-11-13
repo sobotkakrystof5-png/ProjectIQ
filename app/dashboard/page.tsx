@@ -4,6 +4,7 @@ import { ArrowRight, CalendarClock, FileWarning, MessageSquarePlus, PauseCircle,
 import { loadTodayScreen } from '@/lib/admin-today-queries'
 import { isTodayEmpty, pickFocus, daysBetween, type MonthMoney } from '@/lib/admin-today'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
+import { BASE_CURRENCY, foreignLabel, formatMoney } from '@/lib/money-currency'
 
 // Dnes (KP02): co je teď potřeba udělat. Jedna hlavní věc nahoře, zbytek pod ní.
 // Seznam všech zakázek je na /dashboard/zakazky. Vpravo peníze za tenhle měsíc
@@ -23,12 +24,9 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
   )
 }
 
-const formatMoney = (amount: number, currency: string): string =>
-  new Intl.NumberFormat('cs-CZ', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
-
 const rowClass = 'flex min-h-[44px] items-center justify-between gap-3 rounded-chip px-3 py-2 text-sm hover:bg-navy-50'
 
-const formatCZK = (amount: number): string => formatMoney(amount, 'CZK')
+const formatCZK = (amount: number): string => formatMoney(amount, BASE_CURRENCY)
 
 const invoicesLabel = (count: number): string =>
   count === 1 ? '1 faktura' : count >= 2 && count <= 4 ? `${count} faktury` : `${count} faktur`
@@ -51,6 +49,12 @@ function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
         přišlo na účet, z toho přiznaných{' '}
         <span className="font-num text-ink">{formatCZK(money.declaredIncome)}</span>
       </p>
+      {money.foreignIncome.length > 0 && (
+        <p className="mt-1 text-xs text-quiet">
+          Mimo součet <span className="font-num text-ink">{foreignLabel(money.foreignIncome)}</span> — jiná měna se
+          ke korunám nepřičítá.
+        </p>
+      )}
 
       <dl className="mt-4 space-y-2 border-t border-navy-100 pt-3 text-sm">
         <div className="flex items-start justify-between gap-3">

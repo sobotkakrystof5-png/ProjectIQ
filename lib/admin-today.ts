@@ -1,6 +1,8 @@
 // Úvodní stránka administrace „Dnes“ (KP02): co je teď potřeba udělat.
 // Čisté funkce bez DB — dotazy jsou v lib/admin-today-queries.ts.
 
+import type { ForeignTotal } from '@/lib/money-currency'
+
 export interface TodayRequest {
   id: string
   clientName: string
@@ -63,8 +65,13 @@ export interface MonthMoney {
   income: number
   /** Z toho fakturovaný na IČO, tedy ten, co jde do přiznání. */
   declaredIncome: number
-  /** Přiznaný příjem za celý rok — vstup do odhadu daně. */
+  /** Přiznaný příjem za celý rok — vstup do odhadu daně. Jen koruny. */
   yearDeclaredIncome: number
+  /**
+   * Příjem měsíce v cizí měně. Stojí vedle korun, nikdy v nich — bez kurzu
+   * by součet přes měny byl vymyšlené číslo (R-048, migrace 109).
+   */
+  foreignIncome: ForeignTotal[]
   unpaidInvoices: UnpaidInvoiceLine[]
   /** Odhad daně a odvodů z ročního přiznaného příjmu (`calculateTax`). */
   levies: number

@@ -18,6 +18,7 @@ import {
   type RecurringCashFlow, type RecurringFrequency, type MonthSummary,
 } from './finance-actions'
 import type { Cost } from '@/lib/types'
+import { BASE_CURRENCY } from '@/lib/money-currency'
 import {
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
   LIFE_AREAS, AREA_LABELS, type LifeArea,
@@ -33,10 +34,10 @@ function formatMonth(month: string) {
   return `${MONTHS_FULL[parseInt(mon) - 1]} ${year}`
 }
 
-function formatAmount(amount: number) {
+function formatAmount(amount: number, currency: string = BASE_CURRENCY) {
   return new Intl.NumberFormat('cs-CZ', {
     style: 'currency',
-    currency: 'CZK',
+    currency,
     maximumFractionDigits: 0,
   }).format(amount)
 }
@@ -157,7 +158,9 @@ function ColumnSection({
                 )}
                 {t.area && <AreaBadge area={t.area} />}
                 <span className="text-xs text-muted-foreground shrink-0">{formatDate(t.date)}</span>
-                <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">{formatAmount(t.amount)}</span>
+                {/* Vlastní měna řádku (migrace 109) — eurová faktura se nesmí
+                    tvářit jako koruny jen proto, že je v témže seznamu. */}
+                <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">{formatAmount(t.amount, t.currency)}</span>
                 <button
                   onClick={() => onDeleteTransaction(t.id)}
                   disabled={isPending}

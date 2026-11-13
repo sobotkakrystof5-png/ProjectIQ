@@ -70,7 +70,9 @@ describe('loadTodayData — čas další akce z Hovorů', () => {
 describe('loadMonthMoney — peníze za tenhle měsíc', () => {
   beforeEach(() => {
     missingTable = null
-    incomeRows = [{ month_income: 48_000, month_declared: 30_000, year_declared: 420_000 }]
+    // Od migrace 109 se příjmy čtou po měnách (AD13) — koruny jsou hlavní
+    // číslo, cizí měna má vlastní řádek a do daní nevstupuje.
+    incomeRows = [{ currency: 'CZK', month_income: 48_000, month_declared: 30_000, year_declared: 420_000, count: 4 }]
     unpaidRows = [{ currency: 'CZK', amount: 24_200, count: 3, overdue: 1 }]
   })
 
@@ -98,6 +100,21 @@ describe('loadMonthMoney — peníze za tenhle měsíc', () => {
       { currency: 'CZK', amount: 24_200, count: 3, overdue: 1 },
       { currency: 'EUR', amount: 900, count: 1, overdue: 0 },
     ])
+  })
+
+  it('příjem v cizí měně se nepřičte ke korunám a do odhadu daně', async () => {
+    incomeRows = [
+      { currency: 'CZK', month_income: 48_000, month_declared: 30_000, year_declared: 420_000, count: 4 },
+      { currency: 'EUR', month_income: 1_200, month_declared: 1_200, year_declared: 1_200, count: 1 },
+    ]
+    const money = await loadMonthMoney('2026-11-11')
+
+    expect(money.income).toBe(48_000)
+    expect(money.yearDeclaredIncome).toBe(420_000)
+    expect(money.foreignIncome).toEqual([{ currency: 'EUR', amount: 1_200, count: 1 }])
+    // Daň se počítá jen z korunového přiznaného příjmu — jinak by eura
+    // nafoukla daňový základ nepřepočteným číslem.
+    expect(money.levies).toBe(calculateTax({ income: 420_000, year: 2026 }).totalLevies)
   })
 
   it('chybějící tabulka ani prázdná databáze stránku neshodí', async () => {

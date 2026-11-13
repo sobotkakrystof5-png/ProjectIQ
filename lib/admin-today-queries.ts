@@ -1,4 +1,5 @@
 import { batchTolerant, q, type AdminQuery, type AdminRow } from '@/lib/admin/db'
+import { BASE_CURRENCY, isMissingLedgerCurrency, toForeignTotals, withLedger, type LedgerSql } from '@/lib/admin/ledger'
 import { projectPath } from '@/lib/lead-origins'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { calculateTax } from '@/lib/tax'
@@ -134,18 +135,28 @@ export async function loadMonthMoney(todayIso: string = getPragueTodayISO()): Pr
   const month = todayIso.slice(0, 7)
   const year = Number(todayIso.slice(0, 4))
 
-  return mapMoney(await batchTolerant(moneyQueries(month, year)), month, year)
+  const rows = await withLedger((L) => batchTolerant(moneyQueries(L, month, year), isMissingLedgerCurrency))
+  return mapMoney(rows, month, year)
 }
 
-const moneyQueries = (month: string, year: number): AdminQuery[] => [
-    q`
-      SELECT
-        COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = ${month}), 0)::float AS month_income,
-        COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = ${month} AND declared), 0)::float AS month_declared,
-        COALESCE(SUM(amount) FILTER (WHERE declared), 0)::float AS year_declared
-      FROM finance_transactions
-      WHERE user_id IS NULL AND type = 'income' AND EXTRACT(YEAR FROM date) = ${year}
-    `,
+const moneyQueries = (L: LedgerSql, month: string, year: number): AdminQuery[] => [
+    // Po měnách, ne přes ně (R-048, migrace 109): eurová faktura se nesmí
+    // přičíst ke korunám v příjmu měsíce ani v přiznaném příjmu za rok,
+    // ze kterého se počítá odhad daně.
+    {
+      text: `
+        SELECT
+          ${L.currency()} AS currency,
+          COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = $1), 0)::float AS month_income,
+          COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = $1 AND declared), 0)::float AS month_declared,
+          COALESCE(SUM(amount) FILTER (WHERE declared), 0)::float AS year_declared,
+          COUNT(*) FILTER (WHERE to_char(date, 'YYYY-MM') = $1)::int AS count
+        FROM finance_transactions
+        WHERE user_id IS NULL AND type = 'income' AND EXTRACT(YEAR FROM date) = $2
+        GROUP BY 1
+      `,
+      params: [month, year],
+    },
     q`
       SELECT currency,
              COALESCE(SUM(amount), 0)::float AS amount,
@@ -158,8 +169,17 @@ const moneyQueries = (month: string, year: number): AdminQuery[] => [
     `,
 ]
 
+type IncomeByCurrency = {
+  currency: string
+  month_income: number
+  month_declared: number
+  year_declared: number
+  count: number
+}
+
 function mapMoney([incomeRows, invoiceRows]: AdminRow[][], month: string, year: number): MonthMoney {
-  const income = (incomeRows as { month_income: number; month_declared: number; year_declared: number }[])[0]
+  const byCurrency = incomeRows as unknown as IncomeByCurrency[]
+  const income = byCurrency.find((row) => String(row.currency) === BASE_CURRENCY)
   const yearDeclaredIncome = Number(income?.year_declared ?? 0)
   const tax = calculateTax({ income: yearDeclaredIncome, year })
 
@@ -169,6 +189,9 @@ function mapMoney([incomeRows, invoiceRows]: AdminRow[][], month: string, year: 
     income: Number(income?.month_income ?? 0),
     declaredIncome: Number(income?.month_declared ?? 0),
     yearDeclaredIncome,
+    foreignIncome: toForeignTotals(
+      byCurrency.map((row) => ({ currency: row.currency, amount: row.month_income, count: row.count })),
+    ),
     unpaidInvoices: (invoiceRows as unknown as UnpaidInvoiceLine[]).map((i) => ({
       currency: i.currency,
       amount: Number(i.amount),
@@ -193,7 +216,12 @@ export async function loadTodayScreen(
   const month = todayIso.slice(0, 7)
   const year = Number(todayIso.slice(0, 4))
   const today = todayQueries()
-  const rows = await batchTolerant([...today, ...moneyQueries(month, year)])
+  // `batchTolerant` snese chybějící tabulku z pozdějších migrací, ale
+  // „sloupec currency neexistuje" spolknout nesmí — jinak by se peníze
+  // tiše nespočítaly (AD13).
+  const rows = await withLedger((L) =>
+    batchTolerant([...today, ...moneyQueries(L, month, year)], isMissingLedgerCurrency),
+  )
   return {
     data: mapToday(rows.slice(0, today.length)),
     money: mapMoney(rows.slice(today.length), month, year),

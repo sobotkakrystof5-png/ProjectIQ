@@ -6,6 +6,7 @@ import {
   AlertCircle, CheckCircle2, BadgeCheck,
 } from 'lucide-react'
 import type { BusinessOverview } from './byznys-actions'
+import { foreignLabel } from '@/lib/money-currency'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(n)
@@ -116,6 +117,15 @@ export function BusinessCalculator({ overview }: Props) {
           accent={marginPct >= 0 ? 'purple' : 'red'}
         />
       </div>
+
+      {/* Příjem v jiné měně se do korunových dlaždic nepočítá (R-048, AD13). */}
+      {overview.foreign.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Mimo tahle čísla je ještě{' '}
+          <strong className="text-foreground">{foreignLabel(overview.foreign)}</strong> — jiná měna se ke korunám
+          nepřičítá.
+        </p>
+      )}
 
       {/* Co kdyby simulace */}
       <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">

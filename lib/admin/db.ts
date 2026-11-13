@@ -80,10 +80,15 @@ export const adminDb: AdminDb = Object.assign(
  * ostatní. Běžný případ je tedy jedno kolo; když transakce selže, zkusí se
  * dotazy jednotlivě a ten rozbitý vrátí prázdno.
  */
-export async function batchTolerant(queries: AdminQuery[]): Promise<AdminRow[][]> {
+export async function batchTolerant(
+  queries: AdminQuery[],
+  /** Chyba, která se nesmí spolknout — třeba „sloupec currency neexistuje" (AD13). */
+  rethrowIf?: (err: unknown) => boolean,
+): Promise<AdminRow[][]> {
   try {
     return await batch(queries)
-  } catch {
+  } catch (err) {
+    if (rethrowIf?.(err)) throw err
     return Promise.all(
       queries.map((query) =>
         batch([query])
