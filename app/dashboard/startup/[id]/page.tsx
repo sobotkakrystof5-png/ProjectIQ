@@ -57,11 +57,8 @@ export default async function StartupDetailPage(props: Props) {
         waitlist={waitlist}
       />
 
-      <AiAssistantsSection
-        project={project}
-        changelog={changelog}
-        improvements={improvements}
-      />
+      {/* Data projektu si asistent načte na serveru podle odkazu (AD14). */}
+      <AiAssistantsSection projectId={project.id} projectName={project.name} />
     </PageShell>
   )
 }

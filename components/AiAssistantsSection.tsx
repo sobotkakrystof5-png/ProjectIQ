@@ -2,112 +2,62 @@
 
 import { useState } from 'react'
 import { AiAssistantModal } from '@/components/AiAssistantModal'
-import type { StartupProject, StartupChangelogEntry, StartupImprovement } from '@/lib/types'
+import { CONSULT_MODES, CONSULT_PROFILES, type ConsultMode } from '@/lib/ai/consultants'
 
-interface Assistant {
-  icon: string
-  name: string
-  description: string
-  role: string
-}
-
-const ASSISTANTS: Assistant[] = [
-  {
-    icon: '📣',
-    name: 'Marketingový stratég',
-    description: 'Pomáhá s propagací, obsahovou strategií a growth hackingem',
-    role: 'marketing',
-  },
-  {
-    icon: '📰',
-    name: 'PR & komunikace',
-    description: 'Tiskové zprávy, mediální strategie, budování značky',
-    role: 'pr',
-  },
-  {
-    icon: '🚀',
-    name: 'Launch Manager',
-    description: 'Plánování spuštění, go-to-market strategie, product hunt',
-    role: 'launch',
-  },
-  {
-    icon: '💰',
-    name: 'Byznys poradce',
-    description: 'Byznysová rozhodnutí, pricing, partnerství, škálování',
-    role: 'business',
-  },
-  {
-    icon: '🎨',
-    name: 'Grafický designér',
-    description: 'Brand identity, vizuální styl, UI/UX doporučení',
-    role: 'design',
-  },
-  {
-    icon: '📊',
-    name: 'Finanční analytik',
-    description: 'Finanční projekce, unit economics, fundraising',
-    role: 'finance',
-  },
-  {
-    icon: '⚙️',
-    name: 'Operations Manager',
-    description: 'Procesy, automatizace, chod firmy a týmu',
-    role: 'operations',
-  },
-  {
-    icon: '🤝',
-    name: 'Tvoje pravá ruka',
-    description: 'Sleduje vše — rozhodnutí, plány, změny projektu. Tvůj osobní COO.',
-    role: 'pravá ruka',
-  },
-]
+/**
+ * Dlaždice konzultantů u startupového projektu.
+ *
+ * Seznam rolí i jejich popis bere z `lib/ai/consultants.ts` — ze stejného
+ * číselníku, ze kterého server skládá systémový prompt (AD14). Komponenta
+ * tak nemůže nabídnout roli, kterou server nezná, a prompt ani data projektu
+ * se už nestaví v prohlížeči.
+ */
 
 interface Props {
-  project: StartupProject
-  changelog?: StartupChangelogEntry[]
-  improvements?: StartupImprovement[]
+  projectId: string
+  projectName: string
 }
 
-export function AiAssistantsSection({ project, changelog, improvements }: Props) {
-  const [activeAssistant, setActiveAssistant] = useState<Assistant | null>(null)
+export function AiAssistantsSection({ projectId, projectName }: Props) {
+  const [mode, setMode] = useState<ConsultMode | null>(null)
 
   return (
     <>
       <div className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">AI Asistenti</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Konzultuj projekt s AI specialisty zaměřenými na konkrétní oblast</p>
+          <h2 className="text-lg font-semibold text-ink">Konzultanti</h2>
+          <p className="text-sm text-quiet mt-0.5">
+            Poraďte se k projektu. Konzultant odpovídá, nic sám nemění ani neposílá.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {ASSISTANTS.map(assistant => (
-            <button
-              key={assistant.name}
-              type="button"
-              onClick={() => setActiveAssistant(assistant)}
-              className="group text-left bg-white border border-border rounded-2xl p-4 hover:shadow-md hover:border-navy-200 transition-all"
-            >
-              <div className="text-2xl mb-2">{assistant.icon}</div>
-              <h3 className="font-medium text-foreground text-sm mb-1 group-hover:text-navy-700 transition-colors">
-                {assistant.name}
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">{assistant.description}</p>
-              <div className="mt-3 pt-3 border-t border-border">
-                <span className="text-xs font-semibold text-navy-600 group-hover:text-navy-700 transition-colors">
-                  Konzultovat →
-                </span>
-              </div>
-            </button>
-          ))}
+          {CONSULT_MODES.map((key) => {
+            const profile = CONSULT_PROFILES[key]
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMode(key)}
+                className="group min-h-[44px] text-left bg-surface border border-navy-100 rounded-panel p-4 transition-all hover:border-navy-300 hover:shadow-md"
+              >
+                <div className="text-2xl mb-2" aria-hidden="true">{profile.icon}</div>
+                <h3 className="font-medium text-ink text-sm mb-1">{profile.name}</h3>
+                <p className="text-xs text-quiet leading-relaxed">{profile.description}</p>
+                <div className="mt-3 pt-3 border-t border-navy-100">
+                  <span className="text-xs font-semibold text-navy-700">Zeptat se →</span>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
       <AiAssistantModal
-        assistant={activeAssistant}
-        project={project}
-        changelog={changelog}
-        improvements={improvements}
-        onClose={() => setActiveAssistant(null)}
+        mode={mode}
+        projectId={projectId}
+        projectName={projectName}
+        onClose={() => setMode(null)}
       />
     </>
   )

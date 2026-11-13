@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import type { InvoiceAiExtract } from '@/lib/types'
 import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
+import { aiModel, isAiConfigured } from '@/lib/ai/models'
 
 /**
  * AI přepis PDF faktury.
@@ -13,7 +14,6 @@ import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
  * spadne síť, formulář se pořád vyplní ručně.
  */
 
-const MODEL = 'claude-opus-5'
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
@@ -48,7 +48,7 @@ export interface InvoiceExtractResult {
 
 /** Bez klíče se na API vůbec nesahá — příznak čte i UI, aby tlačítko vůbec nenabízelo. */
 export function isInvoiceAiConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)
+  return isAiConfigured()
 }
 
 /** Datum z modelu bereme jen ve tvaru, který přijme `<input type="date">`. */
@@ -63,34 +63,44 @@ function safeText(value: string | null): string | null {
   return trimmed ? trimmed : null
 }
 
+/** Jedno volání modelu. `null` = model vrátil něco, co schématu neodpovídá. */
+async function readWith(model: string, pdfBase64: string) {
+  const client = new Anthropic()
+  const response = await client.messages.parse({
+    model,
+    max_tokens: 16000,
+    system: SYSTEM_PROMPT,
+    // Přepis dokladu je jednoduchá extrakce — nízký effort stačí a šetří tokeny.
+    output_config: { effort: 'low', format: zodOutputFormat(extractSchema) },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 },
+          },
+          { type: 'text', text: 'Přepiš údaje z této faktury.' },
+        ],
+      },
+    ],
+  })
+  return response.parsed_output ?? null
+}
+
 export async function extractInvoiceFromPdf(pdfBase64: string): Promise<InvoiceExtractResult> {
   if (!isInvoiceAiConfigured()) {
     return { error: 'AI přepis není nakonfigurovaný — vyplň fakturu ručně' }
   }
 
   try {
-    const client = new Anthropic()
-    const response = await client.messages.parse({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      // Přepis dokladu je jednoduchá extrakce — nízký effort stačí a šetří tokeny.
-      output_config: { effort: 'low', format: zodOutputFormat(extractSchema) },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 },
-            },
-            { type: 'text', text: 'Přepiš údaje z této faktury.' },
-          ],
-        },
-      ],
-    })
-
-    const parsed = response.parsed_output
+    // Od AD14 čte doklad `vision` (haiku) místo opusu — tatáž práce za zlomek
+    // ceny. Když se model do schématu netrefí, zkusí to jednou `smart`
+    // (sonnet); je to jedna faktura za čas, ne hromadný provoz.
+    let parsed = await readWith(aiModel('vision'), pdfBase64)
+    if (!parsed && aiModel('smart') !== aiModel('vision')) {
+      parsed = await readWith(aiModel('smart'), pdfBase64)
+    }
     if (!parsed) return { error: 'Z faktury se nepodařilo nic vyčíst — vyplň ji ručně' }
 
     // Normalizace: model může vrátit platný JSON s nepoužitelnou hodnotou

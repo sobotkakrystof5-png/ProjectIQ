@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import { REQUEST_KINDS, type RequestKind } from '@/lib/client-requests'
+import { aiModel, isAiConfigured } from '@/lib/ai/models'
 
 /**
  * Shrnutí požadavku klienta a návrh zadání pro Claude Code.
@@ -10,8 +11,6 @@ import { REQUEST_KINDS, type RequestKind } from '@/lib/client-requests'
  * nikdy neplní, (2) výsledek nic nespouští, čte ho člověk, (3) selhání AI
  * požadavek neblokuje — vrací `error` a požadavek zůstane s původním textem.
  */
-
-const DEFAULT_MODEL = 'claude-sonnet-5-5'
 
 const resultSchema = z.object({
   kind: z.enum(REQUEST_KINDS).describe('Druh požadavku'),
@@ -41,7 +40,7 @@ export interface ClientRequestAiResult {
 }
 
 export function isClientRequestAiConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)
+  return isAiConfigured()
 }
 
 /** Značka v textu klienta by mohla zavřít citaci a vložit vlastní instrukce. */
@@ -60,7 +59,9 @@ export async function summarizeClientRequest(params: {
   try {
     const client = new Anthropic()
     const response = await client.messages.parse({
-      model: process.env.CLIENT_REQUEST_AI_MODEL?.trim() || DEFAULT_MODEL,
+      // `CLIENT_REQUEST_AI_MODEL` platí dál (je nastavená ve Vercelu, R-069);
+      // bez ní rozhoduje `smart` z `lib/ai/models.ts` (AD14).
+      model: process.env.CLIENT_REQUEST_AI_MODEL?.trim() || aiModel('smart'),
       max_tokens: 2000,
       system: SYSTEM_PROMPT,
       output_config: { effort: 'low', format: zodOutputFormat(resultSchema) },
