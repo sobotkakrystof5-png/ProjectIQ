@@ -43,12 +43,24 @@ export function InvoiceDropZone({
 }
 
 /** Hlavní akce obrazovky Faktury. */
-export function NewInvoiceButton({ projects }: { projects: InvoiceProjectOption[] }) {
+/**
+ * Nahrání cizího PDF. Je to **vedlejší** akce obrazovky — hlavní je od AD12
+ * vystavení vlastní faktury, a dvě plné navy pilulky vedle sebe říkaly, že
+ * obě jsou stejně důležité (B9: jedna hlavní akce na obrazovku). `variant`
+ * umí volající přebít tam, kde je nahrání jediná akce (prázdný stav).
+ */
+export function NewInvoiceButton({
+  projects,
+  variant = 'outline',
+}: {
+  projects: InvoiceProjectOption[]
+  variant?: 'primary' | 'outline'
+}) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
-        <Plus size={16} strokeWidth={1.5} />
+      <Button variant={variant} onClick={() => setOpen(true)}>
+        <Plus size={16} strokeWidth={1.5} aria-hidden="true" />
         Nová faktura
       </Button>
       {open && <InvoiceUploadModal onClose={() => setOpen(false)} projects={projects} />}

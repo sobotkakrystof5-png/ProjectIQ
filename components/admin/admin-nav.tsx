@@ -38,7 +38,7 @@ function NavLink({ item, active, counts, onNavigate }: { item: NavItem; active: 
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex min-h-[44px] items-center gap-3 rounded-chip px-3 text-sm font-medium transition-colors lg:min-h-[40px]',
+        'flex min-h-[44px] items-center gap-3 rounded-chip px-3 text-sm font-medium transition-colors',
         active ? 'bg-navy-50 text-navy-700' : 'text-quiet hover:bg-navy-50/60 hover:text-ink',
       )}
     >

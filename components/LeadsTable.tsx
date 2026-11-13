@@ -101,7 +101,7 @@ function CallAnsweredToggle({
         onClick={() => onClick(next)}
         disabled={isPending}
         title="Zvedl — klikni pro změnu"
-        className={cn(badgeVariants({ variant: toneVariant('success') }), 'transition-colors hover:bg-navy-800 disabled:opacity-40')}
+        className={cn(badgeVariants({ variant: toneVariant('success') }), 'min-h-11 px-3 transition-colors hover:bg-navy-800 disabled:opacity-40')}
       >
         <Check size={11} strokeWidth={1.5} />
         Zvedl
@@ -115,7 +115,7 @@ function CallAnsweredToggle({
         onClick={() => onClick(next)}
         disabled={isPending}
         title="Nezvedl — klikni pro změnu"
-        className={cn(badgeVariants({ variant: toneVariant('danger') }), 'transition-colors hover:bg-danger/20 disabled:opacity-40')}
+        className={cn(badgeVariants({ variant: toneVariant('danger') }), 'min-h-11 px-3 transition-colors hover:bg-danger/20 disabled:opacity-40')}
       >
         <X size={11} strokeWidth={1.5} />
         Nezvedl
@@ -128,7 +128,7 @@ function CallAnsweredToggle({
       onClick={() => onClick(next)}
       disabled={isPending}
       title="Zaznamenat výsledek hovoru"
-      className={cn(badgeVariants({ variant: toneVariant('neutral') }), 'transition-colors hover:bg-navy-100 disabled:opacity-40')}
+      className={cn(badgeVariants({ variant: toneVariant('neutral') }), 'min-h-11 px-3 transition-colors hover:bg-navy-100 disabled:opacity-40')}
     >
       <Phone size={11} strokeWidth={1.5} />
       —
@@ -305,7 +305,8 @@ function CompanyCell({
             onClick={onToggleExpand}
             title={expanded ? 'Sbalit detail' : 'Rozbalit detail'}
             aria-expanded={expanded}
-            className="-ml-1 shrink-0 rounded-chip p-0.5 text-quiet transition-colors hover:bg-navy-50 hover:text-navy-700"
+            aria-label={expanded ? 'Sbalit detail kontaktu' : 'Rozbalit detail kontaktu'}
+            className="-ml-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-chip text-quiet transition-colors hover:bg-navy-50 hover:text-navy-700"
           >
             {expanded
               ? <ChevronDown size={13} strokeWidth={1.5} />
@@ -354,10 +355,10 @@ function PhoneCell({ lead }: { lead: ClientLead }) {
       {lead.phone && (
         <a
           href={telHref(lead.phone) ?? `tel:${lead.phone}`}
-          className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline"
+          className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap text-sm text-navy-700 hover:underline"
         >
-          <Phone size={12} strokeWidth={1.5} />
-          {formatPhone(lead.phone) ?? lead.phone}
+          <Phone size={13} strokeWidth={1.5} aria-hidden="true" />
+          <span className="font-num">{formatPhone(lead.phone) ?? lead.phone}</span>
         </a>
       )}
     </td>
@@ -371,10 +372,10 @@ function EmailCell({ lead }: { lead: ClientLead }) {
         <div className="flex flex-col gap-0.5">
           <a
             href={mailtoHref(lead.email) ?? `mailto:${lead.email}`}
-            className="flex items-center gap-1.5 text-sm text-navy-700 hover:underline truncate max-w-[160px]"
+            className="inline-flex min-h-11 max-w-[180px] items-center gap-1.5 text-sm text-navy-700 hover:underline"
           >
-            <Mail size={12} strokeWidth={1.5} />
-            {lead.email}
+            <Mail size={13} strokeWidth={1.5} aria-hidden="true" />
+            <span className="truncate">{lead.email}</span>
           </a>
           {lead.portfolio_sent_at && (
             <span className="flex items-center gap-1 text-[11px] text-navy-700" title="Portfolio bylo odesláno">
@@ -392,7 +393,7 @@ function ValueCell({ lead }: { lead: ClientLead }) {
   return (
     <td className="px-3 py-2.5">
       {lead.estimated_value != null ? (
-        <span className="text-sm font-medium text-foreground">
+        <span className="whitespace-nowrap font-num text-sm font-medium text-ink">
           {Number(lead.estimated_value).toLocaleString('cs-CZ')} Kč
         </span>
       ) : (
@@ -532,16 +533,20 @@ function LeadRow({
             </button>
             <button
               onClick={onEdit}
+              title="Upravit kontakt"
+              aria-label="Upravit kontakt"
               className={iconAction}
             >
-              <Pencil size={13} strokeWidth={1.5} />
+              <Pencil size={15} strokeWidth={1.5} aria-hidden="true" />
             </button>
             <button
               onClick={onDelete}
               disabled={isPending}
+              title="Smazat kontakt"
+              aria-label="Smazat kontakt"
               className={iconActionDanger}
             >
-              <Trash2 size={13} strokeWidth={1.5} />
+              <Trash2 size={15} strokeWidth={1.5} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -857,7 +862,7 @@ function SortHeader({
       <Link
         href={href}
         scroll={false}
-        className={`group -mx-1 inline-flex items-center gap-1.5 rounded-tiny px-1 py-1 uppercase transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'text-ink' : ''}`}
+        className={`group -mx-2 inline-flex min-h-11 items-center gap-1.5 rounded-chip px-2 uppercase transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'text-ink' : ''}`}
       >
         {label}
         {active ? (

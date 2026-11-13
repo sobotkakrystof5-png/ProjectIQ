@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils'
-import { SectionLabel } from '@/components/ws/brand'
 
 /**
  * Pracovní panel adminu (AD17).
@@ -32,10 +31,15 @@ export function Card({
 }
 
 /**
- * Nadpis panelu: štítek Dílků (JetBrains Mono, verzálky) a pod ním jedna věta,
- * k čemu panel je. Vykresluje se jako `h2`, aby obrazovka měla osnovu nadpisů
- * pro čtečku — proto `SectionLabel` s `as`.
+ * Štítek sekce Dílků jako **třída**, ne komponenta: nadpis panelu má být `h2`
+ * a popisek pole `label`, aby obrazovka dávala smysl čtečce. Komponenta
+ * `SectionLabel` z `components/ws/brand` umí jen `p`, a rozšiřovat ji kvůli
+ * adminu se neosvědčilo — v dev režimu se server a prohlížeč rozcházely
+ * v hydrataci (AD17).
  */
+export const SECTION_LABEL = 'font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet'
+
+/** Nadpis panelu: štítek Dílků a pod ním jedna věta, k čemu panel je. */
 export function CardHead({
   title,
   hint,
@@ -51,7 +55,7 @@ export function CardHead({
   return (
     <div className={cn('mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2', className)}>
       <div className="min-w-0">
-        <SectionLabel as="h2">{title}</SectionLabel>
+        <h2 className={SECTION_LABEL}>{title}</h2>
         {hint && <p className="mt-2 text-sm text-quiet">{hint}</p>}
       </div>
       {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}

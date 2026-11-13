@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { SectionLabel } from '@/components/ws/brand'
+import { SECTION_LABEL } from '@/components/admin/card'
 import {
   InvoiceFields, emptyInvoiceForm, validateInvoiceForm, invoiceFormToFormData,
   type InvoiceFormState,
@@ -361,9 +361,9 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
           </div>
           {progressChanged && (
             <div className="mt-3">
-              <SectionLabel as="h3" className="mb-1.5 text-signal-ink">
+              <label className="mb-1.5 block text-sm font-medium text-signal-ink">
                 Co jsi udělal? ({originalProgress}% → {form.progress}%) *
-              </SectionLabel>
+              </label>
               <textarea
                 value={form.progressNote}
                 onChange={e => set('progressNote', e.target.value)}
@@ -456,7 +456,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
               id="invoiced_on_ico"
               checked={form.invoiced_on_ico}
               onChange={e => set('invoiced_on_ico', e.target.checked)}
-              className="w-4 h-4 accent-emerald-600 mt-0.5"
+              className="mt-0.5 h-4 w-4 accent-navy-700"
             />
             <div>
               <label htmlFor="invoiced_on_ico" className="text-sm text-foreground cursor-pointer">
@@ -471,7 +471,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
 
           {/* Záloha */}
           <div className="space-y-3 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
-            <SectionLabel as="h3">
+            <h3 className={SECTION_LABEL}>
               Záloha{(() => {
                 const price = Number(form.price)
                 const deposit = Number(depositAmount)
@@ -481,7 +481,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                 }
                 return ' — 30 % z ceny (auto)'
               })()}
-            </SectionLabel>
+            </h3>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -548,7 +548,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
 
             {form.addToCompleted && (
               <div className="mt-4 space-y-4 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
-                <SectionLabel as="h3">Uzavření zakázky</SectionLabel>
+                <h3 className={SECTION_LABEL}>Uzavření zakázky</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="Druh zakázky">
                     <div className="relative">
@@ -623,7 +623,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
 
             {attachInvoice && (
               <div className="mt-4 space-y-3 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
-                <SectionLabel as="h3">Faktura k zakázce</SectionLabel>
+                <h3 className={SECTION_LABEL}>Faktura k zakázce</h3>
                 <InvoiceFields
                   value={invoiceForm}
                   onChange={setInvoiceForm}
@@ -663,7 +663,7 @@ const inputCls =
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <SectionLabel as="h3">{label}</SectionLabel>
+      <label className="text-sm font-medium text-ink">{label}</label>
       {children}
     </div>
   )

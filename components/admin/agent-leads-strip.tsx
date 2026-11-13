@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Bot, ChevronDown, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { SectionLabel } from '@/components/ws/brand'
+import { SECTION_LABEL } from '@/components/admin/card'
 import { toast } from '@/components/ui/toast'
 import { ContactActions } from '@/components/admin/contact-actions'
 import {
@@ -15,7 +15,7 @@ import {
   restoreAgentLead,
 } from '@/app/agent-leads-actions'
 import { AGENT_LEAD_PRIORITY_LABEL, AGENT_LEAD_PRIORITY_TONE, toneVariant } from '@/lib/admin-status'
-import { formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 import type { AgentLeadRow } from '@/lib/admin/agent-leads'
 
 /**
@@ -37,10 +37,10 @@ export function AgentLeadsStrip({ rows, total }: { rows: AgentLeadRow[]; total: 
   return (
     <section aria-label="Leady od AI" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <SectionLabel as="h2" className="flex items-center gap-2">
+        <h2 className={cn(SECTION_LABEL, 'flex items-center gap-2')}>
           <Bot size={15} strokeWidth={1.5} aria-hidden="true" />
           Poptávky od AI agenta
-        </SectionLabel>
+        </h2>
         <p className="text-xs text-quiet">
           {total === 1 ? '1 čeká na vyřízení' : `${total} čeká na vyřízení`}
           {total > rows.length && ` · ukazuje se ${rows.length} s nejvyšším skóre`}
@@ -135,20 +135,20 @@ function AgentLeadItem({ row, open, onToggle }: { row: AgentLeadRow; open: boole
 
           {row.clientMessage && (
             <div>
-              <SectionLabel as="h3">Co napsal do formuláře</SectionLabel>
+              <h3 className={SECTION_LABEL}>Co napsal do formuláře</h3>
               <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{row.clientMessage}</p>
             </div>
           )}
 
           <div>
-            <SectionLabel as="h3">Shrnutí od AI</SectionLabel>
+            <h3 className={SECTION_LABEL}>Shrnutí od AI</h3>
             <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{row.summary}</p>
             <p className="mt-1 text-xs text-quiet">Odhad modelu, ne ověřený fakt. Klientovi to neposílejte.</p>
           </div>
 
           {(row.strategy.tone || row.strategy.style || row.strategy.focus?.length || row.strategy.avoid?.length) && (
             <div>
-              <SectionLabel as="h3">Jak s ním mluvit (návrh AI)</SectionLabel>
+              <h3 className={SECTION_LABEL}>Jak s ním mluvit (návrh AI)</h3>
               <dl className="mt-1 flex flex-col gap-1 text-sm text-ink">
                 {row.strategy.tone && <Line label="Tón" value={row.strategy.tone} />}
                 {row.strategy.style && <Line label="Styl" value={row.strategy.style} />}

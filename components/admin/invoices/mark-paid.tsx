@@ -71,14 +71,14 @@ export function PaidCell({
       onClick={toggle}
       disabled={isPending}
       title={isPaid ? 'Vrátit mezi pohledávky' : 'Označit jako zaplacené'}
-      className="inline-flex items-center gap-1.5 rounded-full border border-navy-100 bg-surface px-2 py-1 text-xs font-medium text-quiet transition-colors hover:bg-accent disabled:opacity-60"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50 disabled:opacity-60"
     >
       {isPending ? (
-        <Loader2 size={12} strokeWidth={1.5} className="animate-spin" aria-hidden />
+        <Loader2 size={15} strokeWidth={1.5} className="animate-spin" aria-hidden />
       ) : isPaid ? (
-        <Undo2 size={12} strokeWidth={1.5} aria-hidden />
+        <Undo2 size={15} strokeWidth={1.5} aria-hidden />
       ) : (
-        <Check size={12} strokeWidth={1.5} aria-hidden />
+        <Check size={15} strokeWidth={1.5} aria-hidden />
       )}
       {isPaid ? 'Vrátit' : 'Zaplaceno'}
       </button>

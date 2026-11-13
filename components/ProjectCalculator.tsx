@@ -192,7 +192,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
             <button
               key={p.label}
               onClick={() => loadPreset(p)}
-              className="text-sm px-3 py-1.5 rounded-chip border border-navy-100 bg-surface hover:border-navy-400 hover:bg-navy-50 hover:text-navy-700 transition-colors font-medium"
+              className="inline-flex min-h-11 items-center rounded-full border border-input bg-surface px-4 text-sm font-semibold transition-colors hover:border-navy-400 hover:bg-navy-50 hover:text-navy-700"
             >
               {p.label}
             </button>
@@ -217,7 +217,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
             ) : (
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-navy-100">
+                  <tr className="border-b border-navy-100 bg-navy-50">
                     <th className="px-3 py-2 text-xs font-semibold text-quiet uppercase tracking-wide text-left">Položka</th>
                     <th className="px-3 py-2 text-xs font-semibold text-quiet uppercase tracking-wide text-right w-36">Cena (Kč)</th>
                     <th className="w-8" />
@@ -225,7 +225,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
                 </thead>
                 <tbody>
                   {items.map(item => (
-                    <tr key={item.id} className="border-t border-navy-100 hover:bg-slate-50/60 transition-colors">
+                    <tr key={item.id} className="border-t border-navy-100 transition-colors hover:bg-navy-50/50">
                       <td className="px-3 py-2 text-sm text-ink">{item.name}</td>
                       <td className="px-3 py-2 text-right">
                         <input
@@ -257,7 +257,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
           */}
           <div className="flex flex-wrap gap-2">
             <input
-              className="min-w-0 flex-1 text-sm border border-navy-100 rounded-chip px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
+              className="min-w-0 flex-1 min-h-11 rounded-chip border border-input bg-surface px-3.5 text-[15px] text-ink transition-colors placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Vlastní položka…"
               value={customName}
               onChange={e => setCustomName(e.target.value)}
@@ -265,7 +265,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
             />
             <input
               type="number"
-              className="w-28 text-sm border border-navy-100 rounded-chip px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
+              className="w-28 min-h-11 rounded-chip border border-input bg-surface px-3.5 text-[15px] text-ink transition-colors placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
               placeholder="Cena Kč"
               value={customPrice}
               onChange={e => setCustomPrice(e.target.value)}
@@ -274,7 +274,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
             <button
               onClick={addCustom}
               disabled={!customName.trim() || !customPrice}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-chip bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus size={14} />
               Přidat
@@ -390,13 +390,11 @@ export default function ProjectCalculator() {
       </p>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-chip w-fit mb-6">
+      <div className="mb-6 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full bg-navy-50 p-1">
         <button
           onClick={() => setTab('client')}
-          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-chip transition-all ${
-            tab === 'client'
-              ? 'bg-surface text-navy-800 shadow-sm'
-              : 'text-quiet hover:text-ink'
+          className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors ${
+            tab === 'client' ? 'bg-navy-700 text-white' : 'text-quiet hover:text-ink'
           }`}
         >
           <Briefcase size={14} strokeWidth={1.5} />
@@ -404,10 +402,8 @@ export default function ProjectCalculator() {
         </button>
         <button
           onClick={() => setTab('personal')}
-          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-chip transition-all ${
-            tab === 'personal'
-              ? 'bg-surface text-navy-800 shadow-sm'
-              : 'text-quiet hover:text-ink'
+          className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors ${
+            tab === 'personal' ? 'bg-navy-700 text-white' : 'text-quiet hover:text-ink'
           }`}
         >
           <Layers size={14} strokeWidth={1.5} />

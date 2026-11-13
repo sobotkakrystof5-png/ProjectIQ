@@ -37,7 +37,9 @@ export function PillNav({
     <nav
       aria-label={label}
       className={cn(
-        segmented ? 'flex gap-1 rounded-full bg-navy-50 p-1 dark:bg-navy-900' : '-mx-1 flex gap-2 overflow-x-auto px-1 pb-1',
+        // `max-w-full overflow-x-auto`: šest filtrů faktur bylo na 390 px širších
+        // než okno a roztáhlo stránku o 147 px (AD17).
+        segmented ? 'flex max-w-full gap-1 overflow-x-auto rounded-full bg-navy-50 p-1 dark:bg-navy-900' : '-mx-1 flex gap-2 overflow-x-auto px-1 pb-1',
         className,
       )}
     >

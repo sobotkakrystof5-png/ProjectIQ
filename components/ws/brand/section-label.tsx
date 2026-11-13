@@ -1,24 +1,19 @@
 import { cn } from '@/lib/ws/utils'
 
-/**
- * Štítek sekce „01 — CO TO UMÍ": JetBrains Mono, verzálky. Číslo jen tam, kde sekce jdou po sobě.
- * `as` je kvůli adminu (AD17): nadpis panelu má být `h2`, aby obrazovka měla osnovu pro čtečku.
- */
+/** Štítek sekce „01 — CO TO UMÍ": JetBrains Mono, verzálky. Číslo jen tam, kde sekce jdou po sobě. */
 export function SectionLabel({
   number,
   onDark = false,
-  as: Tag = 'p',
   className,
   children,
 }: {
   number?: string
   onDark?: boolean
-  as?: 'p' | 'h2' | 'h3'
   className?: string
   children: React.ReactNode
 }) {
   return (
-    <Tag
+    <p
       className={cn(
         'font-num text-xs font-medium uppercase tracking-[0.12em]',
         onDark ? 'text-navy-400' : 'text-quiet',
@@ -32,6 +27,6 @@ export function SectionLabel({
         </>
       )}
       {children}
-    </Tag>
+    </p>
   )
 }

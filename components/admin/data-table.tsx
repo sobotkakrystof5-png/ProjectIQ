@@ -88,7 +88,8 @@ function HeaderCell<T>({ column, sort }: { column: AdminColumn<T>; sort?: { para
         href={sort.links.sortHref(column.key, nextDir)}
         scroll={false}
         className={cn(
-          'group inline-flex items-center gap-1.5 rounded-tiny px-1 py-1 -mx-1 uppercase transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          // Plocha 44 px (AD17): řazení je akce, ne popisek.
+          'group -mx-2 inline-flex min-h-11 items-center gap-1.5 rounded-chip px-2 uppercase transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           column.align === 'right' && 'flex-row-reverse',
           active && 'text-ink',
         )}
@@ -135,12 +136,13 @@ function MobileCard<T>({
           ) : (
             head
           )}
+          {/* `min-w-0` na hodnotě: bez něj roztáhl dlouhý popis kartu přes okno (AD17). */}
           {meta.length > 0 && (
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+            <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
               {meta.map((c) => (
                 <div key={c.key} className="contents">
                   <dt className="text-xs text-quiet">{c.header}</dt>
-                  <dd className="text-sm text-ink">{c.cell(row)}</dd>
+                  <dd className="min-w-0 text-sm text-ink">{c.cell(row)}</dd>
                 </div>
               ))}
             </dl>

@@ -5,8 +5,8 @@ import { loadTodayScreen } from '@/lib/admin-today-queries'
 import { isTodayEmpty, pickFocus, daysBetween, type MonthMoney } from '@/lib/admin-today'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import { BASE_CURRENCY, foreignLabel, formatMoney } from '@/lib/money-currency'
-import { Card } from '@/components/admin/card'
-import { EmptyState, SectionLabel } from '@/components/ws/brand'
+import { Card, SECTION_LABEL } from '@/components/admin/card'
+import { EmptyState } from '@/components/ws/brand'
 
 // Dnes (KP02): co je teď potřeba udělat. Jedna hlavní věc nahoře, zbytek pod ní.
 // Seznam všech zakázek je na /dashboard/zakazky. Vpravo peníze za tenhle měsíc
@@ -16,11 +16,11 @@ export const dynamic = 'force-dynamic'
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <Card className="p-5">
-      <SectionLabel as="h2" className="mb-3 flex items-center gap-2">
+    <Card className="min-w-0 p-5">
+      <h2 className={cn(SECTION_LABEL, 'mb-3 flex items-center gap-2')}>
         <span className="text-navy-500">{icon}</span>
         {title}
-      </SectionLabel>
+      </h2>
       {children}
     </Card>
   )
@@ -37,13 +37,13 @@ const invoicesLabel = (count: number): string =>
 function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
   const monthName = new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric' }).format(now)
   return (
-    <Card className="p-5 lg:self-start">
-      <SectionLabel as="h2" className="flex items-center gap-2">
+    <Card className="min-w-0 p-5 lg:self-start">
+      <h2 className={cn(SECTION_LABEL, 'flex items-center gap-2')}>
         <span className="text-navy-500">
           <Wallet size={16} strokeWidth={1.5} aria-hidden="true" />
         </span>
         Jak se daří tenhle měsíc
-      </SectionLabel>
+      </h2>
       <p className="mt-0.5 text-xs text-quiet">{monthName}</p>
 
       <p className="mt-4 font-num text-2xl font-semibold leading-none text-ink">{formatCZK(money.income)}</p>
@@ -142,9 +142,14 @@ export default async function TodayPage() {
         />
       )}
 
-      <div className={cn('grid gap-4', !empty && 'lg:grid-cols-3')}>
+      {/*
+        `min-w-0` je tu kvůli telefonu: položka mřížky má výchozí
+        `min-width: auto`, takže se sloupec nesmí zúžit pod šířku obsahu
+        a dlouhý název zakázky roztáhl stránku o 53 px přes okno (AD17).
+      */}
+      <div className={cn('grid min-w-0 gap-4', !empty && 'lg:grid-cols-3')}>
         {!empty && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-1">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-1">
             {data.requests.length > 0 && (
               <Section title="Požadavky klientů" icon={<MessageSquarePlus size={16} strokeWidth={1.5} aria-hidden="true" />}>
                 <ul>

@@ -177,9 +177,9 @@ export default async function FakturyPage(props: {
             {/* Hlavní akce je od AD12 vystavení; nahrání cizího PDF zůstává vedle (a dál jde i přetažením). */}
             <Link
               href="/dashboard/faktury/nova"
-              className="inline-flex h-11 items-center gap-2 rounded-chip bg-navy-700 px-5 text-[15px] font-medium text-white transition-colors hover:bg-navy-800"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-navy-700 px-5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800"
             >
-              <FilePlus2 size={16} strokeWidth={1.75} />
+              <FilePlus2 size={16} strokeWidth={1.5} aria-hidden="true" />
               Vystavit fakturu
             </Link>
             <NewInvoiceButton projects={screen.projects} />
@@ -258,7 +258,7 @@ export default async function FakturyPage(props: {
                 screen.grandTotal === 0
                   ? 'Přetáhněte sem PDF odkudkoli — přečte ho AI a předvyplní pole. Nebo fakturu zadejte ručně.'
                   : 'Zkuste jiný rok, stav nebo hledaný výraz.',
-              action: screen.grandTotal === 0 ? <NewInvoiceButton projects={screen.projects} /> : undefined,
+              action: screen.grandTotal === 0 ? <NewInvoiceButton projects={screen.projects} variant="primary" /> : undefined,
             }}
           />
         </div>

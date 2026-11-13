@@ -164,7 +164,7 @@ export function FinanceHealthSection({ overview }: Props) {
         />
         <SummaryCard
           icon={<Percent size={14} strokeWidth={1.5} className="text-navy-600" />}
-          label="Savings rate"
+          label="Míra úspor"
           value={`${Math.round(savingsRate)} %`}
           color="purple"
         />

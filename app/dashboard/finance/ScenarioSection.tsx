@@ -235,7 +235,7 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
-                className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
+                className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
                   period === p ? 'bg-navy-700 text-white' : 'text-quiet hover:text-ink'
                 }`}
               >
@@ -251,12 +251,10 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
               key={s}
               type="button"
               onClick={() => setScenario(s)}
-              className={`flex-1 py-2.5 text-sm font-medium rounded-chip border transition-colors flex items-center justify-center gap-1.5 ${
+              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border text-sm font-semibold transition-colors ${
                 scenario === s
-                  ? s === 'income'
-                    ? 'border-navy-700 bg-navy-700 text-white'
-                    : 'border-navy-700 bg-navy-700 text-white'
-                  : 'bg-surface text-quiet border-navy-100 hover:border-foreground/20'
+                  ? 'border-navy-700 bg-navy-700 text-white'
+                  : 'border-input bg-surface text-quiet hover:border-navy-300'
               }`}
             >
               {s === 'income' ? <TrendingUp size={14} strokeWidth={2} /> : <TrendingDown size={14} strokeWidth={2} />}
@@ -266,7 +264,7 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
         </div>
 
         <div>
-          <label className="text-xs font-medium text-quiet block mb-1">Částka (Kč)</label>
+          <label className="mb-1.5 block text-xs font-medium text-quiet">Částka (Kč)</label>
           <input
             type="number"
             min="0"
@@ -284,10 +282,10 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
               key={q}
               type="button"
               onClick={() => setAmount(String(q))}
-              className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+              className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition-colors ${
                 amountNum === q
                   ? 'border-navy-700 bg-navy-700 text-white'
-                  : 'bg-surface text-quiet border-navy-100 hover:border-foreground/20'
+                  : 'border-input bg-surface text-quiet hover:border-navy-300'
               }`}
             >
               {q.toLocaleString('cs-CZ')} Kč
@@ -301,10 +299,10 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
               key={r}
               type="button"
               onClick={() => setRecurrence(r)}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-chip border transition-colors flex items-center justify-center gap-1.5 ${
+              className={`inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border text-sm font-semibold transition-colors ${
                 recurrence === r
                   ? 'border-navy-700 bg-navy-700 text-white'
-                  : 'bg-surface text-quiet border-navy-100 hover:border-foreground/20'
+                  : 'border-input bg-surface text-quiet hover:border-navy-300'
               }`}
             >
               {r === 'onetime' ? <Tag size={11} strokeWidth={2} /> : <RefreshCw size={11} strokeWidth={2} />}

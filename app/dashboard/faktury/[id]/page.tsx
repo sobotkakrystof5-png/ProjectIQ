@@ -15,8 +15,7 @@ import { PaymentMatch } from '@/components/admin/invoices/payment-match'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
-import { Card as AdminCard } from '@/components/admin/card'
-import { SectionLabel } from '@/components/ws/brand'
+import { Card as AdminCard, SECTION_LABEL } from '@/components/admin/card'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { isInvoiceOverdue } from '@/lib/invoice-status'
 import { loadHandover } from '@/lib/admin/handover'
@@ -39,7 +38,7 @@ function formatFileSize(bytes: number | null) {
 function Field({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
   return (
     <div>
-      <SectionLabel as="h3" className="text-[11px]">{label}</SectionLabel>
+      <dt className={cn(SECTION_LABEL, 'text-[11px]')}>{label}</dt>
       <dd className={cn('mt-0.5 text-sm text-ink', mono && 'font-num tabular-nums')}>
         {value && value.trim() !== '' ? value : <span className="text-quiet">—</span>}
       </dd>
@@ -51,10 +50,10 @@ function Field({ label, value, mono }: { label: string; value: string | null; mo
 function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <AdminCard className="p-5">
-      <SectionLabel as="h2" className="mb-4 flex items-center gap-2 normal-case tracking-normal">
+      <h2 className={cn(SECTION_LABEL, 'mb-4 flex items-center gap-2 normal-case tracking-normal')}>
         {icon}
         {title}
-      </SectionLabel>
+      </h2>
       {children}
     </AdminCard>
   )

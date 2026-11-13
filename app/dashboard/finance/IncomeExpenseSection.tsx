@@ -79,14 +79,14 @@ function RecurringRowItem({
       <div className="min-w-0 flex-1">
         <span className="text-sm font-medium text-ink">{row.label}</span>
         {row.description && (
-          <span className="text-xs text-quiet ml-2 truncate">{row.description}</span>
+            <span className="block truncate text-xs text-quiet">{row.description}</span>
         )}
       </div>
       {row.area && <AreaBadge area={row.area} />}
       {row.source === 'cost' ? (
         <Link
           href="/dashboard/naklady"
-          className="hidden sm:flex items-center gap-1 text-[10px] text-quiet bg-muted px-1.5 py-0.5 rounded-full hover:text-ink transition-colors shrink-0"
+          className="hidden shrink-0 items-center gap-1 rounded-full px-2 text-[10px] text-quiet transition-colors hover:text-ink sm:inline-flex sm:min-h-11"
         >
           <ExternalLink size={9} strokeWidth={1.5} />
           Náklady zakázek
@@ -99,7 +99,8 @@ function RecurringRowItem({
         <button
           onClick={() => onDelete(row.id)}
           disabled={isPending}
-          className="shrink-0 p-1 text-quiet opacity-0 transition-all hover:text-danger group-hover:opacity-100 disabled:opacity-30"
+          aria-label="Smazat položku"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-chip text-quiet opacity-0 transition-all hover:bg-danger/5 hover:text-danger group-hover:opacity-100 disabled:opacity-30"
         >
           <Trash2 size={13} strokeWidth={1.5} />
         </button>
@@ -140,7 +141,7 @@ function ColumnSection({
               <div key={t.id} className="flex items-center gap-2.5 py-2 px-2.5 hover:bg-muted/40 rounded-chip group transition-colors">
                 <div className="min-w-0 flex-1">
                   <span className="text-sm font-medium text-ink">{t.category}</span>
-                  {t.note && <span className="text-xs text-quiet ml-2 truncate">{t.note}</span>}
+                  {t.note && <span className="block truncate text-xs text-quiet">{t.note}</span>}
                 </div>
                 {t.type === 'income' && (
                   <button
@@ -170,7 +171,8 @@ function ColumnSection({
                 <button
                   onClick={() => onDeleteTransaction(t.id)}
                   disabled={isPending}
-                  className="shrink-0 p-1 text-quiet opacity-0 transition-all hover:text-danger group-hover:opacity-100 disabled:opacity-30"
+                  aria-label="Smazat zápis"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-chip text-quiet opacity-0 transition-all hover:bg-danger/5 hover:text-danger group-hover:opacity-100 disabled:opacity-30"
                 >
                   <Trash2 size={13} strokeWidth={1.5} />
                 </button>
@@ -446,8 +448,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
           <button
             onClick={handleGenerateRecurring}
             disabled={isGenerating}
-            // Dílky, ne staré admin třídy — strop v admin-classes.test.ts
-            className="flex items-center gap-1.5 rounded-full border border-navy-100 bg-surface px-3 py-1.5 text-xs font-medium text-quiet transition-colors hover:bg-accent disabled:opacity-60"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50 disabled:opacity-60"
           >
             {isGenerating
               ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
@@ -466,12 +467,22 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
 
       {/* Month picker */}
       <div className="flex items-center justify-center gap-3">
-        <button onClick={() => navigateMonth('prev')} className="p-1.5 hover:bg-muted rounded-chip transition-colors">
-          <ChevronLeft size={16} strokeWidth={1.5} className="text-quiet" />
+        <button
+          type="button"
+          onClick={() => navigateMonth('prev')}
+          aria-label="Předchozí měsíc"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-chip transition-colors hover:bg-navy-50"
+        >
+          <ChevronLeft size={18} strokeWidth={1.5} className="text-quiet" aria-hidden="true" />
         </button>
         <span className="text-sm font-semibold text-ink w-36 text-center">{formatMonth(currentMonth)}</span>
-        <button onClick={() => navigateMonth('next')} className="p-1.5 hover:bg-muted rounded-chip transition-colors">
-          <ChevronRight size={16} strokeWidth={1.5} className="text-quiet" />
+        <button
+          type="button"
+          onClick={() => navigateMonth('next')}
+          aria-label="Následující měsíc"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-chip transition-colors hover:bg-navy-50"
+        >
+          <ChevronRight size={18} strokeWidth={1.5} className="text-quiet" aria-hidden="true" />
         </button>
       </div>
 
