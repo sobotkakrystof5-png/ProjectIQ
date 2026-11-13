@@ -3,11 +3,11 @@
 > Současný stav. Přepisuje se — historie je v ostatních souborech.
 > Čti na začátku každého sezení, které sahá na hlavičky, CSP, proxy, API nebo vstupy.
 
-**Poslední aktualizace:** 2026-11-03, review před spuštěním (AUDIT-LOG): Clerk `authorizedParties`, session adminu 12 h, `/r` jen po Checkoutu, předání do Claude Code v režimu plánu, CI s testy
+**Poslední aktualizace:** 2026-11-13, nasazení AD00–AD13 na produkci (`7a15ad2`): vynucená CSP, COOP/CORP, HSTS, `security.txt` a chybějící `x-powered-by` jsou poprvé ověřené na živém `www.zakaziq.cz`; s adminem se na produkci dostal i Workspace, landing page a klientský prostor. Předchozí: 2026-11-03, review před spuštěním (AUDIT-LOG): Clerk `authorizedParties`, session adminu 12 h, `/r` jen po Checkoutu, předání do Claude Code v režimu plánu, CI s testy
 
 ## Projekt
 
-- Weby: admin konzole (produkce, Vercel, deploy z `main`), ZakazIQ Workspace + landing page (větev `workspace`, zatím nenasazeno, cílová doména `zakaziq.cz`)
+- Weby: jedna aplikace na `https://www.zakaziq.cz` (apex přesměrovává 308 na www), Vercel, deploy z `main`. Od 2026-11-13 je na produkci všechno najednou: admin konzole, landing page, Workspace `/w` i klientský prostor `/klient` (do té doby jen admin)
 - Hosting: Vercel (Hobby, crony ve `vercel.json`)
 - Framework: Next.js 16.4 App Router (Turbopack, React 19); `proxy.ts` běží na Node runtime (dřív edge middleware)
 - Repo: github.com/sobotkakrystof5-png/ProjectIQ, soukromé: ověřit
@@ -101,12 +101,14 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 - Secrets: jen env Vercelu, `.env*` v `.gitignore` (kromě vzorů), gitleaks v CI. Historie gitu 2026-10-08 čistá (90 commitů)
 - Objednávací stránka `/r/[slug]` a widget podle slugu jen pro účet, který dokončil Checkout (aspoň jeden řádek `ws.subscriptions`, migrace 099, R-077); po skončeném předplatném poptávky přijímá dál (B5)
 - Session: NextAuth JWT (admin) s platností 12 h (`lib/auth.ts`, od 2026-11-03, dřív výchozích 30 dní), zámek 5 chybných pokusů za 15 min na IP, bez dvoufázového ověření (otevřená položka). Clerk v produkci přijímá jen session tokeny pro `NEXT_PUBLIC_APP_URL` (`authorizedParties`, `lib/security/clerk.ts`, DECISIONS #021), Clerk (Workspace pod `/w` a `/api/ws`, klientský prostor pod `/klient` a `/api/klient` — proxy Clerk jinde nespouští). Cookie `__session` Clerku není HttpOnly (DECISIONS #009)
+- Co je po nasazení 2026-11-13 veřejně dosažitelné (ověřeno zvenku, bez přihlášení): landing `/`, `/login`, `/podminky`, `/robots.txt` a `/.well-known/security.txt` vracejí 200; `/h/<token>` a `/p/<token>` 404 (ne 500); `POST /api/public/prvotka-leads` 401 (fail-closed, klíč ve Vercelu zatím není); `/w/prihlaseni`, `/w/registrace` a `/klient/prihlaseni` 200 s `X-Robots-Tag: noindex, nofollow`; `/r/test` 404. Hlavičky na `/` i `/login`: vynucená CSP s nonce, HSTS 2 roky s `preload`, COOP a CORP `same-origin`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, bez `x-powered-by`. **Registrace do Workspace přitom mluví s dev instancí Clerku** (`connect-src https://ultimate-chimp-4657.clerk.accounts.dev`) a se sandboxem Stripe — viz Otevřené položky
 - Zálohy: Neon point-in-time restore (podle plánu Neonu) — test obnovy nikdy neproběhl
 
 ## Otevřené položky
 
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
+| Vstup do Workspace je od nasazení veřejně dosažitelný | landing page vede tlačítkem na `/w/registrace` (200) a ta běží na **dev instanci Clerku** a sandboxu Stripe. Cizí člověk si může založit účet, který přepnutí na produkční Clerk nepřežije, a projít „platbou", která nic nestrhne. Buď vstup do Workspace schovat, dokud nebude Clerk i Stripe v produkčním režimu, nebo to vědomě nechat | Kryštof (rozhodnutí) | hned |
 | `DATABASE_URL_WS` do Vercelu (Production + Preview) | migrace `ws` i role `ws_app` jsou na Neonu od 2026-10-09 (ověřeno: bez BYPASSRLS, do `public` nevidí); bez proměnné ve Vercelu Workspace v produkci nemá DB. Roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli | Kryštof | před nasazením `/w` |
 | Clerk produkční instance (`clerk deploy`, `clerk.zakaziq.cz`, produkční klíče, Google OAuth s vlastními údaji) | dev klíče mají limity a dev banner, dev instance nesmí do produkce | Kryštof + Claude | před spuštěním (S19) |
 | Webhook Clerku: endpoint v Clerk dashboardu + `CLERK_WEBHOOK_SECRET` (lokálně i Vercel) | bez něj se nesynchronizují členové a název účtu (route vrací 503) | Kryštof | po prvním nasazení `/w` |
@@ -115,7 +117,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 | Stripe live mód (produkt, cena, Portal, e-maily, šablona faktury s IČO, webhook) | sandbox nesmí do produkce | Kryštof + Claude | S19 |
 | `WS_KEY_PEPPER` do Vercelu (Production + Preview, jiná hodnota než lokálně) | bez něj tajné klíče webů nejde vytvořit ani ověřit (API 503). Po nastavení už neměnit — změna zneplatní všechny tajné klíče | Kryštof | před nasazením `/w` |
 | Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; Workspace zatím Zod jen na serveru (S07) — `z.config({ jitless: true })` až s prvním formulářem validovaným v prohlížeči | — | S10+ |
-| `security.txt` | Canonical od 2026-11-01 na `https://www.zakaziq.cz/` (hlavní host D1, R-075). Audit neobdržel 200; soubor existuje v `public/.well-known/security.txt` a v Preview balíčku, produkce běží ze staršího commitu; kontakt a HTTP cestu ověřit | po přístupu k doméně |
+| `security.txt` ✅ | od nasazení 2026-11-13 vrací `https://www.zakaziq.cz/.well-known/security.txt` 200 (canonical na www, R-075). Zbývá hlídat `Expires` (2027-10-01) | Claude | hotovo |
 | DNS `zakaziq.cz` (DNSSEC, CAA, SPF, DKIM, DMARC) + doména v Resendu | bez nich lze posílat poštu jménem domény a e-maily padají do spamu; postup `docs/workspace/SETUP.md` → E-maily (S15) | Kryštof | před nastavením `WS_EMAIL_FROM` |
 | `WS_EMAIL_FROM` a `RESEND_WEBHOOK_SECRET` do Vercelu (+ endpoint webhooku v Resendu) | 2026-11-01: doména Verified, obě proměnné jen ve Vercel Production (Preview záměrně bez odesílání), webhook v Resendu založený a **vypnutý do nasazení** (platí pro celý účet, dnešní produkce cestu nemá). Zbývá: zapnout webhook při nasazení, DMARC `_dmarc`, klíč s právem jen Sending access pro `zakaziq.cz` | Kryštof + Claude | při nasazení |
 | CI proměnná `SITE_URL` | job `headers` se jinak neprovede | Kryštof | po prvním nasazení Workspace |
@@ -123,7 +125,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 | `NEXT_PUBLIC_APP_URL` v Production = `https://www.zakaziq.cz` při nasazení Workspace | `authorizedParties` (DECISIONS #021) bere origin odtud; jiná hodnota = přihlášení přes Clerk v produkci neprojde | Kryštof | při nasazení `/w` |
 | Monitoring chyb (Sentry nebo Vercel Observability) | o chybě po spuštění se jinak nikdo nedozví; Sentry potřebuje záznam v CSP-LOG (`connect-src`); výpadek 2026-11-04 (AUDIT-LOG) se zjistil jen ze screenshotu | Kryštof (rozhodnutí) | před spuštěním |
 | Samostatná DB role pro běh adminu (bez DDL), `neondb_owner` jen na migrace | dnes admin běží rolí vlastníka s BYPASSRLS | Kryštof + Claude | po spuštění |
-| Živý audit produkce | `www.zakaziq.cz`: chybí CSP, COOP, CORP, `security.txt`, SPF a DMARC; `x-powered-by` zůstává. Produkce je starší `main`; opravy jsou v Preview/kódu | před spuštěním |
+| Živý audit produkce | 2026-11-13 po nasazení ručně ověřeno, že CSP (vynucená, s nonce), COOP, CORP, HSTS, `security.txt` i absence `x-powered-by` na živé doméně **sedí**. Zbývá SPF a `rua` v DMARC (DNS) a celý běh skillu `web-security-audit` | Kryštof + Claude | před spuštěním |
 | Chrome/Safari průchod vynucené CSP | Preview build READY; Chrome načetl landing page, ale konzole hlásí chybu konfigurace NextAuth; přihlášení Workspace i Safari čekají na ruční ověření | po doplnění Preview env |
 | Migrace 092–096 na produkci a role `portal_app` (`scripts/portal-create-role.js`), `DATABASE_URL_PORTAL`, `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER` do Vercelu | bez nich nejde vytvořit klíč projektu ani pozvánku a `/klient` nemá DB; roli jen skriptem, nikdy v konzoli (konzolové role obcházejí RLS) | Kryštof | před nasazením klientského prostoru |
 | Přihlášení přes Clerk na `/klient` v prohlížeči | proxy, CSP a pozvánka jsou ověřené jen testy; skutečný průchod (registrace z pozvánky, přihlášení, odhlášení) nikdo neprošel | Kryštof + Claude | před prvním klientem |
