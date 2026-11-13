@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Plus, Trash2, Copy, Check, Calculator, Briefcase, Layers } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 
 type CalcType = 'client' | 'personal'
 
@@ -185,20 +186,20 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
     <div className="space-y-5">
       {/* Presets */}
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rychlý start</p>
+        <p className="text-xs font-semibold text-quiet uppercase tracking-wide mb-2">Rychlý start</p>
         <div className="flex flex-wrap gap-2">
           {presets.map(p => (
             <button
               key={p.label}
               onClick={() => loadPreset(p)}
-              className="text-sm px-3 py-1.5 rounded-lg border border-border bg-white hover:border-navy-400 hover:bg-navy-50 hover:text-navy-700 transition-colors font-medium"
+              className="text-sm px-3 py-1.5 rounded-chip border border-navy-100 bg-surface hover:border-navy-400 hover:bg-navy-50 hover:text-navy-700 transition-colors font-medium"
             >
               {p.label}
             </button>
           ))}
           <button
             onClick={() => setItems([])}
-            className="text-sm px-3 py-1.5 rounded-lg border border-border bg-white text-muted-foreground hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+            className="inline-flex min-h-11 items-center rounded-full border border-input px-4 text-sm font-semibold text-quiet transition-colors hover:border-danger/30 hover:bg-danger/5 hover:text-danger"
           >
             Vyčistit
           </button>
@@ -208,28 +209,28 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: items list */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
+          <div className="border border-navy-100 rounded-chip overflow-hidden bg-surface shadow-sm">
             {items.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              <div className="px-4 py-8 text-center text-sm text-quiet">
                 Vyber preset nebo přidej vlastní položky →
               </div>
             ) : (
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-border">
-                    <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-left">Položka</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-right w-36">Cena (Kč)</th>
+                  <tr className="bg-slate-50 border-b border-navy-100">
+                    <th className="px-3 py-2 text-xs font-semibold text-quiet uppercase tracking-wide text-left">Položka</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-quiet uppercase tracking-wide text-right w-36">Cena (Kč)</th>
                     <th className="w-8" />
                   </tr>
                 </thead>
                 <tbody>
                   {items.map(item => (
-                    <tr key={item.id} className="border-t border-border hover:bg-slate-50/60 transition-colors">
-                      <td className="px-3 py-2 text-sm text-foreground">{item.name}</td>
+                    <tr key={item.id} className="border-t border-navy-100 hover:bg-slate-50/60 transition-colors">
+                      <td className="px-3 py-2 text-sm text-ink">{item.name}</td>
                       <td className="px-3 py-2 text-right">
                         <input
                           type="number"
-                          className="w-28 text-sm text-right border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                          className="w-28 text-sm text-right border border-navy-100 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-navy-500"
                           value={item.price}
                           onChange={e => updatePrice(item.id, e.target.value)}
                         />
@@ -237,7 +238,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
                       <td className="px-2 py-2">
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="p-1 rounded text-muted-foreground/50 hover:text-red-500 transition-colors"
+                          className="rounded-chip p-1 text-quiet/60 transition-colors hover:text-danger"
                         >
                           <Trash2 size={13} strokeWidth={1.5} />
                         </button>
@@ -256,7 +257,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
           */}
           <div className="flex flex-wrap gap-2">
             <input
-              className="min-w-0 flex-1 text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
+              className="min-w-0 flex-1 text-sm border border-navy-100 rounded-chip px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
               placeholder="Vlastní položka…"
               value={customName}
               onChange={e => setCustomName(e.target.value)}
@@ -264,7 +265,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
             />
             <input
               type="number"
-              className="w-28 text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
+              className="w-28 text-sm border border-navy-100 rounded-chip px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
               placeholder="Cena Kč"
               value={customPrice}
               onChange={e => setCustomPrice(e.target.value)}
@@ -273,7 +274,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
             <button
               onClick={addCustom}
               disabled={!customName.trim() || !customPrice}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-chip bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Plus size={14} />
               Přidat
@@ -282,7 +283,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
 
           {/* Add-ons */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Doplňkové položky</p>
+            <p className="text-xs font-semibold text-quiet uppercase tracking-wide mb-2">Doplňkové položky</p>
             <div className="flex flex-wrap gap-2">
               {addons.map(a => {
                 const added = items.some(i => i.name === a.name)
@@ -291,10 +292,10 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
                     key={a.name}
                     onClick={() => addAddon(a)}
                     disabled={added}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                    className={`text-xs px-2.5 py-1.5 rounded-chip border transition-colors ${
                       added
                         ? 'border-navy-200 bg-navy-50 text-navy-600 cursor-default'
-                        : 'border-border bg-white hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700'
+                        : 'border-navy-100 bg-surface hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700'
                     }`}
                   >
                     {added && <Check size={10} className="inline mr-1" />}
@@ -308,13 +309,13 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
 
         {/* Right: summary */}
         <div>
-          <div className="border border-border rounded-xl bg-white shadow-sm p-4 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Shrnutí</p>
+          <div className="border border-navy-100 rounded-chip bg-surface shadow-sm p-4 space-y-3">
+            <p className="text-xs font-semibold text-quiet uppercase tracking-wide">Shrnutí</p>
 
             <div className="space-y-1.5">
               {items.map(item => (
                 <div key={item.id} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground truncate mr-2">{item.name}</span>
+                  <span className="text-quiet truncate mr-2">{item.name}</span>
                   <span className="shrink-0 font-medium">{fmt(item.price)} Kč</span>
                 </div>
               ))}
@@ -322,31 +323,31 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
 
             {items.length > 0 && (
               <>
-                <div className="border-t border-border pt-3 space-y-3">
+                <div className="border-t border-navy-100 pt-3 space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <label className="text-muted-foreground">Marže / přirážka</label>
+                    <label className="text-quiet">Marže / přirážka</label>
                     <div className="flex items-center gap-1.5">
                       <input
                         type="number"
                         min={0}
                         max={200}
-                        className="w-16 text-sm text-right border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        className="w-16 text-sm text-right border border-navy-100 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-navy-500"
                         value={margin}
                         onChange={e => setMargin(Number(e.target.value) || 0)}
                       />
-                      <span className="text-sm text-muted-foreground">%</span>
+                      <span className="text-sm text-quiet">%</span>
                     </div>
                   </div>
 
                   {margin > 0 && (
-                    <div className="flex justify-between text-sm text-muted-foreground">
+                    <div className="flex justify-between text-sm text-quiet">
                       <span>Mezisoučet</span>
                       <span>{fmt(total)} Kč</span>
                     </div>
                   )}
 
                   <div className="flex justify-between items-baseline">
-                    <span className="font-semibold text-foreground">Celkem</span>
+                    <span className="font-semibold text-ink">Celkem</span>
                     <span className="text-xl font-bold text-navy-700">
                       {fmt(totalWithMargin)} Kč
                     </span>
@@ -355,7 +356,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
 
                 <button
                   onClick={copyToClipboard}
-                  className="w-full flex items-center justify-center gap-2 text-sm font-medium px-3 py-2 rounded-lg bg-navy-600 text-white hover:bg-navy-700 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 text-sm font-medium px-3 py-2 rounded-chip bg-navy-600 text-white hover:bg-navy-700 transition-colors"
                 >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
                   {copied ? 'Zkopírováno!' : 'Zkopírovat kalkulaci'}
@@ -364,7 +365,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
             )}
 
             {items.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
+              <p className="text-sm text-quiet text-center py-4">
                 Přidej položky pro výpočet
               </p>
             )}
@@ -382,20 +383,20 @@ export default function ProjectCalculator() {
     <div className="mt-10">
       <div className="flex items-center gap-2 mb-4">
         <Calculator size={18} strokeWidth={1.5} className="text-navy-600" />
-        <h2 className="text-lg font-semibold text-foreground">Kalkulačka projektu</h2>
+        <h2 className="text-lg font-semibold text-ink">Kalkulačka projektu</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-5">
+      <p className="text-sm text-quiet mb-5">
         Rychlý odhad ceny přímo při hovoru s klientem. Vyber typ projektu, načti preset a uprav položky.
       </p>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit mb-6">
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-chip w-fit mb-6">
         <button
           onClick={() => setTab('client')}
-          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-chip transition-all ${
             tab === 'client'
-              ? 'bg-white text-navy-800 shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
+              ? 'bg-surface text-navy-800 shadow-sm'
+              : 'text-quiet hover:text-ink'
           }`}
         >
           <Briefcase size={14} strokeWidth={1.5} />
@@ -403,10 +404,10 @@ export default function ProjectCalculator() {
         </button>
         <button
           onClick={() => setTab('personal')}
-          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+          className={`flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-chip transition-all ${
             tab === 'personal'
-              ? 'bg-white text-navy-800 shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
+              ? 'bg-surface text-navy-800 shadow-sm'
+              : 'text-quiet hover:text-ink'
           }`}
         >
           <Layers size={14} strokeWidth={1.5} />
@@ -416,8 +417,8 @@ export default function ProjectCalculator() {
 
       {tab === 'client' && (
         <div>
-          <p className="text-xs text-muted-foreground mb-4 flex items-center gap-1.5">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 ring-1 ring-sky-200">Ceník VIZEON</span>
+          <p className="text-xs text-quiet mb-4 flex items-center gap-1.5">
+            <Badge>Ceník VIZEON</Badge>
             Ceny vycházejí z aktuálního ceníku vizeon.cz
           </p>
           <CalcPanel presets={CLIENT_PRESETS} addons={CLIENT_ADDONS} />
@@ -426,8 +427,8 @@ export default function ProjectCalculator() {
 
       {tab === 'personal' && (
         <div>
-          <p className="text-xs text-muted-foreground mb-4 flex items-center gap-1.5">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700 ring-1 ring-violet-200">Osobní projekty</span>
+          <p className="text-xs text-quiet mb-4 flex items-center gap-1.5">
+            <Badge>Osobní projekty</Badge>
             Aplikace, systémy, automatizace — orientační ceny
           </p>
           <CalcPanel presets={PERSONAL_PRESETS} addons={PERSONAL_ADDONS} />

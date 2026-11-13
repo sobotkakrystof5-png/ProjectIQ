@@ -56,8 +56,8 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
   }
 
   const inputCls =
-    'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground ' +
-    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white'
+    'w-full border border-navy-100 rounded-chip px-3 py-2 text-sm text-ink placeholder:text-quiet ' +
+    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-surface'
 
   return (
     <AnimatePresence>
@@ -82,10 +82,10 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="pointer-events-auto w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
+              className="pointer-events-auto w-full max-w-lg bg-surface rounded-box shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="brand-gradient px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center justify-between bg-navy-800 px-5 py-4">
                 <div className="flex items-center gap-2.5">
                   <MessageSquareText size={16} strokeWidth={1.5} className="text-navy-200" />
                   <span className="text-white font-semibold text-sm">
@@ -95,7 +95,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-chip text-navy-200 hover:text-white hover:bg-surface/10 transition-colors"
                   aria-label="Zavřít"
                 >
                   <X size={15} strokeWidth={1.5} />
@@ -103,14 +103,14 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
               </div>
 
               <div className="p-5 space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  Komu: <span className="font-medium text-foreground">{lead.email}</span>
+                <p className="text-xs text-quiet">
+                  Komu: <span className="font-medium text-ink">{lead.email}</span>
                 </p>
 
                 {step === 'edit' ? (
                   <>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <label className="text-xs font-medium text-quiet uppercase tracking-wide">
                         Předmět
                       </label>
                       <input
@@ -121,7 +121,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <label className="text-xs font-medium text-quiet uppercase tracking-wide">
                         Text zprávy
                       </label>
                       <textarea
@@ -136,18 +136,14 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
                         type="button"
                         disabled={!subject.trim() || !body.trim()}
                         onClick={() => setStep('preview')}
-                        className={cn(
-                          'flex-1 flex items-center justify-center gap-2 brand-gradient',
-                          'text-white text-sm font-semibold py-2.5 rounded-xl shadow-sm',
-                          'hover:opacity-90 transition-opacity disabled:opacity-50'
-                        )}
+                        className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-navy-700 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-50"
                       >
                         Potvrdit
                       </button>
                       <button
                         type="button"
                         onClick={handleClose}
-                        className="px-4 text-sm text-muted-foreground rounded-xl border border-border hover:bg-muted transition-colors"
+                        className="inline-flex min-h-11 items-center rounded-full border border-input px-5 text-[15px] font-semibold text-ink transition-colors hover:bg-navy-50"
                       >
                         Zrušit
                       </button>
@@ -155,18 +151,18 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
                   </>
                 ) : (
                   <>
-                    <div className="border border-border rounded-xl bg-slate-50 px-4 py-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                    <div className="rounded-chip border border-navy-100 bg-navy-50/60 px-4 py-3">
+                      <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">
                         {subject}
                       </p>
-                      <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{body}</p>
+                      <p className="text-sm text-ink whitespace-pre-line leading-relaxed">{body}</p>
                     </div>
                     <div className="flex gap-2 pt-1">
                       <button
                         type="button"
                         disabled={isPending}
                         onClick={handleSend}
-                        className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white text-sm font-semibold py-2.5 rounded-xl shadow-sm hover:bg-green-700 transition-colors disabled:opacity-60"
+                        className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-navy-700 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
                       >
                         {isPending ? (
                           <>
@@ -182,7 +178,7 @@ export function PortfolioEmailModal({ isOpen, lead, onClose, onSent }: Portfolio
                         type="button"
                         disabled={isPending}
                         onClick={() => setStep('edit')}
-                        className="flex items-center gap-1.5 px-4 text-sm text-muted-foreground rounded-xl border border-border hover:bg-muted transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-4 text-sm text-quiet rounded-chip border border-navy-100 hover:bg-muted transition-colors disabled:opacity-50"
                       >
                         <ArrowLeft size={14} strokeWidth={1.5} />
                         Zpět upravit

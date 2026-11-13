@@ -3,14 +3,16 @@
 import { Fragment, useEffect, useOptimistic, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Badge, badgeVariants } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ws/brand'
 import { toast } from '@/components/ui/toast'
 import { LEAD_ACTION_TONE, LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote, getLeadNotes } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import type { SortDir } from '@/lib/admin-table'
 import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
-import { formatDate } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { formatPhone, mailtoHref, telHref } from '@/lib/contacts/href'
 import { pragueDateTimeToISO } from '@/lib/prague-time'
@@ -22,6 +24,21 @@ import {
   type LeadActionType,
   type LeadNote,
 } from '@/lib/types'
+
+/**
+ * Pole v řádku tabulky (AD17). Dílky mají pro pole rádius 12 px a navy okraj
+ * při zaostření (DESIGN.md → Inputs); v hustém řádku je jen nižší než jinde.
+ */
+const cellInput =
+  'w-full rounded-chip border border-input bg-surface px-2.5 py-1.5 text-sm text-ink transition-colors placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
+
+/** Ikonová akce v řádku: plocha 44 px (B9), ikona uvnitř zůstává drobná. */
+const iconAction =
+  'inline-flex h-11 w-11 items-center justify-center rounded-chip text-quiet transition-colors hover:bg-navy-50 hover:text-navy-700 disabled:opacity-40 disabled:cursor-not-allowed'
+const iconActionDanger =
+  'inline-flex h-11 w-11 items-center justify-center rounded-chip text-quiet transition-colors hover:bg-danger/5 hover:text-danger disabled:opacity-40'
+const iconActionPrimary =
+  'inline-flex h-11 w-11 items-center justify-center rounded-chip bg-navy-700 text-white transition-colors hover:bg-navy-800 disabled:opacity-40 disabled:cursor-not-allowed'
 
 const LEAD_STATUSES: LeadStatus[] = ['cold', 'warm', 'hot', 'converted', 'lost']
 const LEAD_ACTION_TYPES: LeadActionType[] = ['call', 'meeting', 'email', 'whatsapp', 'online', 'other']
@@ -84,7 +101,7 @@ function CallAnsweredToggle({
         onClick={() => onClick(next)}
         disabled={isPending}
         title="Zvedl — klikni pro změnu"
-        className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-40"
+        className={cn(badgeVariants({ variant: toneVariant('success') }), 'transition-colors hover:bg-navy-800 disabled:opacity-40')}
       >
         <Check size={11} strokeWidth={1.5} />
         Zvedl
@@ -98,7 +115,7 @@ function CallAnsweredToggle({
         onClick={() => onClick(next)}
         disabled={isPending}
         title="Nezvedl — klikni pro změnu"
-        className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100 transition-colors disabled:opacity-40"
+        className={cn(badgeVariants({ variant: toneVariant('danger') }), 'transition-colors hover:bg-danger/20 disabled:opacity-40')}
       >
         <X size={11} strokeWidth={1.5} />
         Nezvedl
@@ -111,7 +128,7 @@ function CallAnsweredToggle({
       onClick={() => onClick(next)}
       disabled={isPending}
       title="Zaznamenat výsledek hovoru"
-      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-400 ring-1 ring-slate-200 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-40"
+      className={cn(badgeVariants({ variant: toneVariant('neutral') }), 'transition-colors hover:bg-navy-100 disabled:opacity-40')}
     >
       <Phone size={11} strokeWidth={1.5} />
       —
@@ -141,7 +158,7 @@ function LeadForm({
       <td className="px-3 py-2">
         <input
           autoFocus
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          className={cn(cellInput)}
           placeholder="Název firmy *"
           value={form.company_name}
           onChange={e => setForm(prev => ({ ...prev, company_name: e.target.value }))}
@@ -149,7 +166,7 @@ function LeadForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          className={cn(cellInput)}
           placeholder="Jméno"
           value={form.contact_name ?? ''}
           onChange={e => set('contact_name', e.target.value)}
@@ -157,7 +174,7 @@ function LeadForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          className={cn(cellInput)}
           placeholder="+420…"
           value={form.phone ?? ''}
           onChange={e => set('phone', e.target.value)}
@@ -168,7 +185,7 @@ function LeadForm({
       <td className="px-3 py-2">
         <input
           type="email"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          className={cn(cellInput)}
           placeholder="email@firma.cz"
           value={form.email ?? ''}
           onChange={e => set('email', e.target.value)}
@@ -177,7 +194,7 @@ function LeadForm({
       <td className="px-3 py-2">
         <div className="relative">
           <select
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-navy-500 appearance-none bg-white"
+            className={cn(cellInput, 'appearance-none pr-7')}
             value={form.lead_status}
             onChange={e => setForm(prev => ({ ...prev, lead_status: e.target.value as LeadStatus }))}
           >
@@ -185,13 +202,13 @@ function LeadForm({
               <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>
             ))}
           </select>
-          <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-quiet" />
         </div>
       </td>
       <td className="px-3 py-2">
         <div className="relative">
           <select
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-navy-500 appearance-none bg-white"
+            className={cn(cellInput, 'appearance-none pr-7')}
             value={form.next_action_type ?? ''}
             onChange={e => set('next_action_type', e.target.value || null)}
           >
@@ -200,12 +217,12 @@ function LeadForm({
               <option key={t} value={t}>{LEAD_ACTION_TYPE_LABELS[t]}</option>
             ))}
           </select>
-          <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-quiet" />
         </div>
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+          className={cn(cellInput)}
           placeholder="Zavolat zítra, poslat email…"
           value={form.next_action ?? ''}
           onChange={e => set('next_action', e.target.value)}
@@ -215,13 +232,13 @@ function LeadForm({
         <div className="flex flex-col gap-1">
           <input
             type="date"
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+            className={cn(cellInput)}
             value={form.next_action_date ?? ''}
             onChange={e => set('next_action_date', e.target.value)}
           />
           <input
             type="time"
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+            className={cn(cellInput)}
             value={form.next_action_time ?? ''}
             onChange={e => set('next_action_time', e.target.value)}
           />
@@ -231,13 +248,13 @@ function LeadForm({
         <div className="flex flex-col gap-1">
           <input
             type="number"
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500"
+            className={cn(cellInput)}
             placeholder="Kč"
             value={form.estimated_value ?? ''}
             onChange={e => set('estimated_value', e.target.value ? Number(e.target.value) : null)}
           />
           <textarea
-            className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
+            className={cn(cellInput, 'resize-none')}
             placeholder="Shrnutí (kontext leadu)…"
             value={form.notes ?? ''}
             rows={2}
@@ -250,13 +267,13 @@ function LeadForm({
           <button
             disabled={!form.company_name.trim() || isPending}
             onClick={() => form.company_name.trim() && onSave(form)}
-            className="p-1.5 rounded-md bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className={iconActionPrimary}
           >
             <Check size={14} />
           </button>
           <button
             onClick={onCancel}
-            className="p-1.5 rounded-md text-muted-foreground hover:bg-slate-100 transition-colors"
+            className={iconAction}
           >
             <X size={14} />
           </button>
@@ -288,7 +305,7 @@ function CompanyCell({
             onClick={onToggleExpand}
             title={expanded ? 'Sbalit detail' : 'Rozbalit detail'}
             aria-expanded={expanded}
-            className="p-0.5 -ml-1 rounded text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors shrink-0"
+            className="-ml-1 shrink-0 rounded-chip p-0.5 text-quiet transition-colors hover:bg-navy-50 hover:text-navy-700"
           >
             {expanded
               ? <ChevronDown size={13} strokeWidth={1.5} />
@@ -296,7 +313,7 @@ function CompanyCell({
             }
           </button>
         ) : (
-          <Building2 size={13} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
+          <Building2 size={13} className="shrink-0 text-quiet" strokeWidth={1.5} />
         )}
         <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
         {lead.calendar_event_id && (
@@ -307,7 +324,7 @@ function CompanyCell({
         {noteCount > 0 && (
           <span
             title={lastNote ? `${noteCount}× poznámka — naposledy: ${lastNote.content}` : `${noteCount}× poznámka`}
-            className="flex items-center gap-0.5 shrink-0 text-muted-foreground/70"
+            className="flex shrink-0 items-center gap-0.5 text-quiet/70"
           >
             <StickyNote size={11} strokeWidth={1.5} />
             <span className="text-[11px]">{noteCount}</span>
@@ -323,7 +340,7 @@ function ContactCell({ lead }: { lead: ClientLead }) {
     <td className="px-3 py-2.5">
       {lead.contact_name && (
         <div className="flex items-center gap-1.5">
-          <User size={12} className="text-muted-foreground shrink-0" strokeWidth={1.5} />
+          <User size={12} className="shrink-0 text-quiet" strokeWidth={1.5} />
           <span className="text-sm text-foreground">{lead.contact_name}</span>
         </div>
       )}
@@ -360,7 +377,7 @@ function EmailCell({ lead }: { lead: ClientLead }) {
             {lead.email}
           </a>
           {lead.portfolio_sent_at && (
-            <span className="flex items-center gap-1 text-[11px] text-emerald-600" title="Portfolio bylo odesláno">
+            <span className="flex items-center gap-1 text-[11px] text-navy-700" title="Portfolio bylo odesláno">
               <CheckCircle2 size={11} strokeWidth={1.5} />
               Odesláno {new Date(lead.portfolio_sent_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
             </span>
@@ -379,7 +396,7 @@ function ValueCell({ lead }: { lead: ClientLead }) {
           {Number(lead.estimated_value).toLocaleString('cs-CZ')} Kč
         </span>
       ) : (
-        <span className="text-muted-foreground/50">—</span>
+        <span className="text-quiet/60">—</span>
       )}
     </td>
   )
@@ -434,8 +451,8 @@ function LeadRow({
     <Fragment>
     <tr
       id={`lead-${lead.id}`}
-      className={`border-t border-border transition-colors group ${
-        highlighted ? 'bg-navy-50 ring-2 ring-inset ring-navy-300' : 'hover:bg-slate-50/60'
+      className={`group border-t border-navy-100 transition-colors ${
+        highlighted ? 'bg-navy-50 ring-2 ring-inset ring-navy-300' : 'hover:bg-navy-50/50'
       }`}
     >
       <CompanyCell lead={lead} expanded={expanded} onToggleExpand={onToggleExpand} notes={notes} />
@@ -455,22 +472,22 @@ function LeadRow({
       <td className="px-3 py-2.5">
         {lead.next_action_type
           ? <ActionTypeBadge type={lead.next_action_type} />
-          : <span className="text-muted-foreground/50">—</span>
+          : <span className="text-quiet/60">—</span>
         }
       </td>
       <td className="px-3 py-2.5">
-        <span className="text-sm text-foreground">{lead.next_action ?? <span className="text-muted-foreground/50">—</span>}</span>
+        <span className="text-sm text-ink">{lead.next_action ?? <span className="text-quiet/60">—</span>}</span>
       </td>
       <td className="px-3 py-2.5">
         {formattedDateTime ? (
           <div className="flex flex-col gap-0.5">
-            <span className={`text-sm font-medium ${isOverdue ? 'text-red-600' : 'text-foreground'}`}>
+            <span className={cn('font-num text-sm font-medium', isOverdue ? 'text-danger' : 'text-ink')}>
               {formattedDateTime}
               {isOverdue && ' ⚠'}
             </span>
           </div>
         ) : (
-          <span className="text-muted-foreground/50">—</span>
+          <span className="text-quiet/60">—</span>
         )}
       </td>
       <ValueCell lead={lead} />
@@ -481,7 +498,7 @@ function LeadRow({
               onClick={onSendPortfolio}
               disabled={isPending}
               title="Poslat portfolio (odešle ihned)"
-              className="p-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-40"
+              className={iconActionPrimary}
             >
               <Send size={13} strokeWidth={1.5} />
             </button>
@@ -491,7 +508,7 @@ function LeadRow({
               onClick={onOpenCustomMessage}
               disabled={isPending}
               title="Napsat jinou zprávu"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors disabled:opacity-40"
+              className={iconAction}
             >
               <MessageSquareText size={13} strokeWidth={1.5} />
             </button>
@@ -501,7 +518,7 @@ function LeadRow({
               onClick={onConvert}
               disabled={isPending || lead.lead_status === 'converted'}
               title="Převést na zakázku"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className={iconAction}
             >
               <FolderPlus size={13} strokeWidth={1.5} />
             </button>
@@ -509,20 +526,20 @@ function LeadRow({
               onClick={onMoveToWaiting}
               disabled={isPending}
               title="Přesunout do Čekání"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-50 transition-colors disabled:opacity-40"
+              className={iconAction}
             >
               <Clock size={13} strokeWidth={1.5} />
             </button>
             <button
               onClick={onEdit}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-navy-700 hover:bg-navy-50 transition-colors"
+              className={iconAction}
             >
               <Pencil size={13} strokeWidth={1.5} />
             </button>
             <button
               onClick={onDelete}
               disabled={isPending}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+              className={iconActionDanger}
             >
               <Trash2 size={13} strokeWidth={1.5} />
             </button>
@@ -561,18 +578,18 @@ function LeadDetailRow({
   }
 
   return (
-    <tr className="bg-slate-50/80 border-t border-border">
+    <tr className="border-t border-navy-100 bg-navy-50/60">
       <td colSpan={11} className="px-6 py-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
           <div className="space-y-3 min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <p className="flex items-center gap-1.5 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">
               <StickyNote size={12} strokeWidth={1.5} />
               Poznámky
             </p>
 
             <div className="flex flex-col gap-1.5">
               <textarea
-                className="w-full text-sm border border-border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none bg-white"
+                className={cn(cellInput, 'resize-none')}
                 placeholder="Nový zápisek z hovoru…"
                 rows={2}
                 value={draft}
@@ -581,7 +598,7 @@ function LeadDetailRow({
               <button
                 onClick={submit}
                 disabled={!draft.trim() || isPending}
-                className="self-start flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-navy-600 text-white hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Plus size={12} strokeWidth={1.5} />
                 Přidat poznámku
@@ -598,11 +615,11 @@ function LeadDetailRow({
                     </div>
                     <div className="pb-2.5 flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{formatDate(note.created_at)}</span>
+                        <span className="font-num text-xs text-quiet">{formatDate(note.created_at)}</span>
                         <button
                           onClick={() => onDeleteNote(note.id)}
                           disabled={isPending}
-                          className="opacity-0 group-hover/note:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity disabled:opacity-40"
+                          className="text-quiet opacity-0 transition-opacity hover:text-danger group-hover/note:opacity-100 disabled:opacity-40"
                           title="Smazat poznámku"
                         >
                           <Trash2 size={11} strokeWidth={1.5} />
@@ -614,10 +631,10 @@ function LeadDetailRow({
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground/70">Žádné poznámky.</p>
+              <p className="text-sm text-quiet">Žádné poznámky.</p>
             )}
 
-            <p className="text-xs text-muted-foreground pt-1">
+            <p className="pt-1 text-xs text-quiet">
               Kontakt přidán {new Date(lead.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
               {lead.calendar_event_id && ' · založeno z kalendáře'}
             </p>
@@ -654,11 +671,11 @@ function WaitingLeadForm({
   }
 
   return (
-    <tr className="bg-sky-50/40">
+    <tr className="bg-navy-50/40">
       <td className="px-3 py-2">
         <input
           autoFocus
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className={cn(cellInput)}
           placeholder="Název firmy *"
           value={form.company_name}
           onChange={e => setForm(prev => ({ ...prev, company_name: e.target.value }))}
@@ -666,7 +683,7 @@ function WaitingLeadForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className={cn(cellInput)}
           placeholder="Jméno"
           value={form.contact_name ?? ''}
           onChange={e => set('contact_name', e.target.value)}
@@ -674,7 +691,7 @@ function WaitingLeadForm({
       </td>
       <td className="px-3 py-2">
         <input
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className={cn(cellInput)}
           placeholder="+420…"
           value={form.phone ?? ''}
           onChange={e => set('phone', e.target.value)}
@@ -683,7 +700,7 @@ function WaitingLeadForm({
       <td className="px-3 py-2">
         <input
           type="email"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className={cn(cellInput)}
           placeholder="email@firma.cz"
           value={form.email ?? ''}
           onChange={e => set('email', e.target.value)}
@@ -691,7 +708,7 @@ function WaitingLeadForm({
       </td>
       <td className="px-3 py-2">
         <textarea
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+          className={cn(cellInput, 'resize-none')}
           placeholder="Shrnutí (kontext leadu)…"
           value={form.notes ?? ''}
           rows={2}
@@ -701,7 +718,7 @@ function WaitingLeadForm({
       <td className="px-3 py-2">
         <input
           type="number"
-          className="w-full text-sm border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className={cn(cellInput)}
           placeholder="Kč"
           value={form.estimated_value ?? ''}
           onChange={e => set('estimated_value', e.target.value ? Number(e.target.value) : null)}
@@ -712,13 +729,13 @@ function WaitingLeadForm({
           <button
             disabled={!form.company_name.trim() || isPending}
             onClick={() => form.company_name.trim() && onSave(form)}
-            className="p-1.5 rounded-md bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className={iconActionPrimary}
           >
             <Check size={14} />
           </button>
           <button
             onClick={onCancel}
-            className="p-1.5 rounded-md text-muted-foreground hover:bg-slate-100 transition-colors"
+            className={iconAction}
           >
             <X size={14} />
           </button>
@@ -752,8 +769,8 @@ function WaitingRow({
   return (
     <tr
       id={`lead-${lead.id}`}
-      className={`border-t border-border transition-colors group ${
-        highlighted ? 'bg-sky-50 ring-2 ring-inset ring-sky-300' : 'hover:bg-slate-50/60'
+      className={`group border-t border-navy-100 transition-colors ${
+        highlighted ? 'bg-navy-50 ring-2 ring-inset ring-navy-300' : 'hover:bg-navy-50/50'
       }`}
     >
       <CompanyCell lead={lead} notes={notes} />
@@ -762,9 +779,9 @@ function WaitingRow({
       <EmailCell lead={lead} />
       <td className="px-3 py-2.5">
         {lastNote ? (
-          <span className="text-sm text-muted-foreground truncate max-w-[200px] block">{lastNote.content}</span>
+          <span className="block max-w-[200px] truncate text-sm text-quiet">{lastNote.content}</span>
         ) : (
-          <span className="text-muted-foreground/40">—</span>
+          <span className="text-quiet/60">—</span>
         )}
       </td>
       <ValueCell lead={lead} />
@@ -774,7 +791,7 @@ function WaitingRow({
             onClick={onConvert}
             disabled={isPending}
             title="Převést na zakázku"
-            className="p-1.5 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className={iconAction}
           >
             <FolderPlus size={13} strokeWidth={1.5} />
           </button>
@@ -782,21 +799,21 @@ function WaitingRow({
             onClick={onMoveBack}
             disabled={isPending}
             title="Vrátit zpět do Hovorů"
-            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+            className={iconAction}
           >
             <Undo2 size={13} strokeWidth={1.5} />
           </button>
           <button
             onClick={onEdit}
             title="Upravit"
-            className="p-1.5 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-50 transition-colors"
+            className={iconAction}
           >
             <Pencil size={13} strokeWidth={1.5} />
           </button>
           <button
             onClick={onDelete}
             disabled={isPending}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+            className={iconActionDanger}
           >
             <Trash2 size={13} strokeWidth={1.5} />
           </button>
@@ -891,18 +908,21 @@ export default function LeadsTable({
   sortLinks: Record<string, string>
   focusLeadId?: string
 }) {
-  const [leads, setLeads] = useState<LeadWithNotes[]>(initialLeads)
   /**
-   * Akce na jedno kliknutí se ukážou hned (AD08). `useOptimistic` drží změnu
-   * jen po dobu akce — pak ji přebije `setLeads` se skutečnou odpovědí, nebo
-   * se při chybě sama vrátí. Výsledek v `leads` proto nic nepřepisuje a není
-   * potřeba nic „vracet zpět" ručně.
+   * Řádky se vykreslují **z propů** (AD17). Dřív si je komponenta kopírovala
+   * do `useState` a po každé akci kopii ručně dorovnávala — kopie se přitom
+   * mohla se serverem rozejít (jiná záložka, cizí změna) a stránka se po
+   * každé akci vykreslovala na serveru nadarmo. Každá akce v
+   * `app/calls-actions.ts` volá `revalidatePath('/dashboard/calls')`, takže
+   * nové řádky přijdou shora.
+   *
+   * Akce na jedno kliknutí se ukážou hned (AD08): `useOptimistic` drží změnu
+   * jen po dobu transakce, pak ji přebijí skutečné propy — nebo se při chybě
+   * sama vrátí.
    */
-  const [optimisticLeads, applyOptimistic] = useOptimistic(leads, optimisticReducer)
-  const [notes, setNotes] = useState<Record<string, LeadNote[]>>(() =>
-    Object.fromEntries(initialLeads.map((lead) => [lead.id, lead.note_preview ?? []])),
-  )
-  const [fullyLoaded, setFullyLoaded] = useState<string[]>([])
+  const [optimisticLeads, applyOptimistic] = useOptimistic(initialLeads, optimisticReducer)
+  /** Celé poznámky rozbaleného kontaktu; nenačtené padají zpátky na náhled z propů. */
+  const [loadedNotes, setLoadedNotes] = useState<Record<string, LeadNote[]>>({})
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
@@ -911,7 +931,7 @@ export default function LeadsTable({
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const notesOf = (leadId: string) => notes[leadId] ?? []
+  const notesOf = (lead: LeadWithNotes) => loadedNotes[lead.id] ?? lead.note_preview ?? []
 
   // Příchod z kalendáře (`?lead=ID`): kontakt rozbalit, odscrollovat na něj
   // a na chvíli zvýraznit, ať je v široké tabulce vidět, o který řádek jde.
@@ -936,39 +956,23 @@ export default function LeadsTable({
   /** Rozbalení kontaktu dotáhne celé poznámky; náhled zůstane, než dojdou. */
   const toggleExpand = (leadId: string) => {
     setExpandedId((prev) => (prev === leadId ? null : leadId))
-    if (fullyLoaded.includes(leadId)) return
+    if (loadedNotes[leadId]) return
     startTransition(async () => {
       const full = await getLeadNotes(leadId)
-      setNotes((prev) => ({ ...prev, [leadId]: full }))
-      setFullyLoaded((prev) => [...prev, leadId])
+      setLoadedNotes((prev) => ({ ...prev, [leadId]: full }))
     })
   }
 
   const handleCreate = (data: LeadPayload) => {
     startTransition(async () => {
-      const created = await createLead(data)
-      const newLead: LeadWithNotes = {
-        ...data,
-        id: created.id,
-        call_answered: null,
-        reminder_day_before_sent: false,
-        reminder_2h_before_sent: false,
-        portfolio_sent_at: null,
-        calendar_event_id: null,
-        created_at: created.created_at,
-        updated_at: null,
-        note_preview: [],
-        notes_count: 0,
-      }
-      setLeads((prev) => [newLead, ...prev])
+      await createLead(data)
       setAddingNew(false)
     })
   }
 
   const handleUpdate = (id: string, data: LeadPayload) => {
     startTransition(async () => {
-      const result = await updateLead(id, data)
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...data, ...result } : l)))
+      await updateLead(id, data)
       setEditingId(null)
       setEditingWaitingId(null)
     })
@@ -976,8 +980,7 @@ export default function LeadsTable({
 
   const handleDelete = (id: string) => {
     if (!confirm('Opravdu smazat tento kontakt?')) return
-    optimisticky({ type: 'remove', id }, () => deleteLead(id), () =>
-      setLeads((prev) => prev.filter((l) => l.id !== id)))
+    optimisticky({ type: 'remove', id }, () => deleteLead(id))
   }
 
   const handleConvert = (id: string) => {
@@ -994,33 +997,23 @@ export default function LeadsTable({
    * požadavkem (AD08). Optimistický stav se vrátí sám, uživateli stačí říct,
    * že se to neuložilo.
    */
-  const optimisticky = (zmena: OptimisticChange, akce: () => Promise<void>, potvrd: () => void) => {
+  const optimisticky = (zmena: OptimisticChange, akce: () => Promise<void>) => {
     startTransition(async () => {
       applyOptimistic(zmena)
       try {
         await akce()
-        potvrd()
       } catch {
         toast.error('Nepodařilo se uložit, zkuste to prosím znovu')
       }
     })
   }
 
-  const handleMoveToWaiting = (id: string) =>
-    optimisticky({ type: 'remove', id }, () => moveLeadToWaiting(id), () =>
-      setLeads((prev) => prev.filter((l) => l.id !== id)))
+  const handleMoveToWaiting = (id: string) => optimisticky({ type: 'remove', id }, () => moveLeadToWaiting(id))
 
-  const handleMoveFromWaiting = (id: string) =>
-    optimisticky({ type: 'remove', id }, () => moveLeadFromWaiting(id), () =>
-      setLeads((prev) => prev.filter((l) => l.id !== id)))
+  const handleMoveFromWaiting = (id: string) => optimisticky({ type: 'remove', id }, () => moveLeadFromWaiting(id))
 
   const handleToggleAnswered = (id: string, val: boolean | null) =>
-    optimisticky({ type: 'answered', id, value: val }, () => setCallAnswered(id, val), () =>
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, call_answered: val, updated_at: new Date() } : l))))
-
-  const handlePortfolioSent = (id: string) => {
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, portfolio_sent_at: new Date() } : l)))
-  }
+    optimisticky({ type: 'answered', id, value: val }, () => setCallAnswered(id, val))
 
   const handleSendPortfolio = (id: string) => {
     startTransition(async () => {
@@ -1030,7 +1023,6 @@ export default function LeadsTable({
         return
       }
       toast.success('Portfolio odesláno')
-      handlePortfolioSent(id)
     })
   }
 
@@ -1038,15 +1030,16 @@ export default function LeadsTable({
     startTransition(async () => {
       const created = await addLeadNote(leadId, content)
       const newNote: LeadNote = { id: created.id, lead_id: leadId, content, created_at: created.created_at }
-      setNotes((prev) => ({ ...prev, [leadId]: [newNote, ...(prev[leadId] ?? [])] }))
-      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, notes_count: l.notes_count + 1 } : l)))
+      // Jen u rozbaleného kontaktu, kde jsou načtené celé poznámky; ostatním
+      // přijde nový náhled s příštím vykreslením ze serveru.
+      setLoadedNotes((prev) => (prev[leadId] ? { ...prev, [leadId]: [newNote, ...prev[leadId]] } : prev))
     })
   }
 
   const handleDeleteNote = (id: string) => {
     startTransition(async () => {
       await deleteLeadNote(id)
-      setNotes((prev) => {
+      setLoadedNotes((prev) => {
         const next: Record<string, LeadNote[]> = {}
         for (const [leadId, list] of Object.entries(prev)) next[leadId] = list.filter((n) => n.id !== id)
         return next
@@ -1093,8 +1086,12 @@ export default function LeadsTable({
               <tbody>
                 {optimisticLeads.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-quiet">
-                      Nikdo nečeká na odpověď. Kontakt sem přesunete z Hovorů ikonkou hodin.
+                    <td colSpan={7} className="p-4">
+                      <EmptyState
+                        size="compact"
+                        title="Nikdo nečeká na odpověď"
+                        description="Kontakt sem přesunete z Hovorů ikonkou hodin."
+                      />
                     </td>
                   </tr>
                 )}
@@ -1111,7 +1108,7 @@ export default function LeadsTable({
                     <WaitingRow
                       key={lead.id}
                       lead={lead}
-                      notes={notesOf(lead.id)}
+                      notes={notesOf(lead)}
                       onEdit={() => setEditingWaitingId(lead.id)}
                       onConvert={() => handleConvert(lead.id)}
                       onMoveBack={() => handleMoveFromWaiting(lead.id)}
@@ -1132,17 +1129,16 @@ export default function LeadsTable({
   return (
     <div>
       <div className="mb-4 flex items-center justify-end">
-        <button
+        <Button
           onClick={() => {
             setAddingNew(true)
             setEditingId(null)
           }}
           disabled={addingNew}
-          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-50"
         >
-          <Plus size={15} strokeWidth={1.5} />
+          <Plus size={16} strokeWidth={1.5} aria-hidden="true" />
           Přidat kontakt
-        </button>
+        </Button>
       </div>
 
       <div className="overflow-hidden rounded-box border border-navy-100 bg-surface">
@@ -1174,8 +1170,23 @@ export default function LeadsTable({
               )}
               {optimisticLeads.length === 0 && !addingNew && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-12 text-center text-sm text-quiet">
-                    Zatím žádné kontakty. Tlačítkem „Přidat kontakt" si poznamenáte, s kým jste mluvili a co dál.
+                  <td colSpan={11} className="p-4">
+                    <EmptyState
+                      size="compact"
+                      title="Zatím žádné kontakty"
+                      description="Poznamenejte si, s kým jste mluvili a co dál. Z kontaktu pak uděláte zakázku jedním klikem."
+                      action={
+                        <Button
+                          onClick={() => {
+                            setAddingNew(true)
+                            setEditingId(null)
+                          }}
+                        >
+                          <Plus size={16} strokeWidth={1.5} aria-hidden="true" />
+                          Přidat kontakt
+                        </Button>
+                      }
+                    />
                   </td>
                 </tr>
               )}
@@ -1192,7 +1203,7 @@ export default function LeadsTable({
                   <LeadRow
                     key={lead.id}
                     lead={lead}
-                    notes={notesOf(lead.id)}
+                    notes={notesOf(lead)}
                     onEdit={() => {
                       setEditingId(lead.id)
                       setAddingNew(false)
@@ -1221,7 +1232,8 @@ export default function LeadsTable({
         isOpen={!!portfolioModalLead}
         lead={portfolioModalLead}
         onClose={() => setPortfolioModalLead(null)}
-        onSent={() => portfolioModalLead && handlePortfolioSent(portfolioModalLead.id)}
+        // Odeslání zapisuje `portfolio_sent_at` a revaliduje, nový řádek přijde ze serveru.
+        onSent={() => {}}
       />
     </div>
   )
