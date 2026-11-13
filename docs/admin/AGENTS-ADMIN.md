@@ -145,6 +145,10 @@ CREATE TABLE projects (
 | lead_pending | boolean | **generovaný** | `source IS NOT NULL AND source <> 'manual' AND NOT lead_confirmed` — jediné pravidlo pro inbox. **Do INSERTu nikdy nepatří** (migrace 102) |
 | vizeon_confirmed | boolean | false | Starý příznak; drží ho v souladu trigger, čte se už jen při revertu (zahodí samostatná migrace) |
 | alteno_confirmed | boolean | false | Starý příznak, dtto (migrace 050) |
+| survey_requested_at | timestamptz | — | Kdy klientovi odešel dotazník. Nastavuje ho týž `UPDATE`, který zakázku vybere — je to zámek proti dvojímu odeslání (migrace 112) |
+| survey_reminded_at | timestamptz | — | Kdy odešla jediná připomínka. Vyplněné = další už neodejde (migrace 112) |
+| handover | jsonb | — | Předávací dokument „co bylo dodané" — tvar hlídá Zod v `lib/admin/handover-schema.ts`, databáze jen to, že je to objekt (migrace 112) |
+| handover_issued_at | timestamptz | — | Kdy se dokument naposledy vystavil; plní krok „Předáno" v průvodce (migrace 112) |
 
 ### `client_messages`
 
@@ -310,10 +314,10 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `client_leads` | 010, 017, 024, 049, 051 | **Hovory** — kontakty/leady, další akce, telefonát zvednut, portfolio odesláno, vazba na kalendář |
 | `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
 | `contacts` | 104 | **Kontakty** — jeden člověk, jeden řádek; popis výš v samostatné sekci (AD09) |
-| `agent_leads` | 052 | AI-scorované leady z externího `vizeon-lead-agent` |
+| `agent_leads` | 052, **112** | AI-scorované leady z externího `vizeon-lead-agent`. Od AD16 visí v pruhu nad Hovory; `handled_at`, `client_lead_id` a `project_id` říkají, co už někdo vyřídil |
 | `completed_projects_archiv` | 011, 029, 047, 057, **106** | Původní **Dokončené** — kopie zakázky s vlastní cenou. Od AD11 se z ní nečte ani nepíše; drží se jen jako doklad, dokud daňové součty sedí. `migrated_project_id` říká, která zakázka z řádku vznikla. |
 | `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/dashboard/finance`), volitelná vazba na projekt |
-| `project_surveys` | 016, 046, **106** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. |
+| `project_surveys` | 016, 046, **106** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. Je to **odpověď** klienta, proto razítka odeslání nesou `projects.survey_*` (AD16). |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
 | `invoices` | 053, 056, **107**, **108** | Faktury. Archiv cizích PDF (AI přepis, vazba na transakci) **i doklady vystavené tady** (AD12): `direction` (`issued`/`received`), `pdf_generated`, `items`, `issuer` (snímek dodavatele), `client_address`, `supplied_on`, `vat_total`, `number_seq`, `cancelled_at`, `sent_at`. Vystavená tady = `number_seq IS NOT NULL`. Unikátnost čísla je částečná (`WHERE direction='issued'`), aby přijatá faktura mohla nést číslo dodavatele |
@@ -450,7 +454,8 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
 | `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury. Archiv: bajty z `pdf_data`, `ETag` z `md5(pdf_data)`, při shodě 304 **bez čtení bajtů** (AD08). Vystavená tady (AD12): PDF se **vyrobí teď** sdíleným rendererem, ETag nese obsah dokladu, takže opakované otevření nespouští Chromium. `Cache-Control: private, max-age=0, must-revalidate` — `private` nikdy neruš (DECISIONS #022). `X-Frame-Options: SAMEORIGIN` z `next.config.mjs` neměň (DECISIONS #004). |
-| `POST /api/invoices/[id]/email` | session **+ shodný `Origin`** + limit 10/10 min na IP | Odeslání vystavené faktury klientovi s PDF v příloze (AD12). Jen na kliknutí, nikdy automaticky; stornovanou neodešle. Úspěch zapíše `invoices.sent_at` |
+| `POST /api/invoices/[id]/email` | session **+ shodný `Origin`** + limit 10/10 min na IP | Odeslání vystavené faktury klientovi s PDF v příloze (AD12). Jen na kliknutí, nikdy automaticky; stornovanou neodešle. Se `predani: true` přiloží i předávací dokument (AD16) a když není vyplněný, e-mail radši neodešle. Úspěch zapíše `invoices.sent_at` |
+| `POST /api/projects/[id]/predani` | session **+ shodný `Origin`** | Předávací dokument „co bylo dodané" jako PDF (AD16). **POST, ne GET** — vystavení zapisuje `handover_issued_at`; zápis na GET by šel vyvolat obrázkem na cizí stránce (DECISIONS #027). Karta ho volá formulářem s `target="_blank"` |
 | `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
 | `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
@@ -462,7 +467,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 
 | Endpoint | Kdy (UTC) | Co |
 |----------|-----------|----|
-| `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací a lead akcí (idempotentní příznaky proti duplicitám). **Od AD08 tu vznikají i opakované transakce** — fixní náklady i cash-flow šablony (`lib/recurring-transactions.ts`). Dřív je zakládal render stránky Finance. |
+| `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací a lead akcí (idempotentní příznaky proti duplicitám). **Od AD08 tu vznikají i opakované transakce** — fixní náklady i cash-flow šablony (`lib/recurring-transactions.ts`). Dřív je zakládal render stránky Finance. Od AD14 tu propadají nevyřízené návrhy asistenta, od AD15 vznikají návrhy paměti a od AD16 odchází **jediná připomínka dotazníku** po sedmi dnech (`remindPendingSurveys`). |
 | `/api/cron/tax-news` | pondělí 5:00 | Stažení legislativních novinek (`ON CONFLICT DO NOTHING`) |
 | `/api/cron/client-retention` | denně 3:30 | Retence D-K10 (R-076, migrace 098): `public.purge_client_retention(3)` — dokončená zakázka (`done`/`paid`) bez pohybu 3 roky přijde o aktivitu, požadavky (`client_requests`, `portal.requests`), zprávy a slovní hodnocení; zakázka, cena a číselné hodnocení zůstávají. Pozvánky 90 dní po použití/zrušení/vypršení. `lib/client-retention.ts` |
 
@@ -854,6 +859,56 @@ sebe a k modelu se žádný `<kontext>` nedostal.
 
 **Bezpečnost:** `.claude/security/DECISIONS.md` #026. V adminu **není** cesta k exportu údajů
 kontaktu, takže řádky paměti zatím nejsou v žádném exportu; výmaz pokrytý je.
+
+### Hodnocení, reference a předání (AD16, R-090, R-102)
+
+**Dotazník odchází sám.** Do AD16 se posílal jen při ručním „Přidat do dokončených", takže
+zaplacená zakázka mohla skončit, aniž se klienta kdokoli zeptal. Teď ho zařadí obojí:
+`closeProject` (`app/closed-actions.ts`) i `setProjectStatus` na `done`/`paid` (`app/actions.ts`).
+
+- Posílá `lib/admin/surveys.ts` z `after()` po **15 s**. Během nich „Zpět" stačí stav vrátit
+  a podmínka „zakázka skončila" se čte až při odesílání, ne při kliknutí.
+- **Dvakrát neodejde:** `survey_requested_at` nastavuje týž `UPDATE`, který zakázku vybere.
+- Při `done`/`paid` dotazník **nahrazuje** obvyklou zprávu o změně stavu. Dvě zprávy během
+  patnácti vteřin jsou hluk; když dotazník neodejde, pošle se obvyklá zpráva.
+- **Jedna připomínka** po sedmi dnech z denního cronu `send-reminders` (`remindPendingSurveys`),
+  strop 20 na běh, okno stáří 60 dní. Vyplněný dotazník i otevřená zakázka ji ruší. Pak už nic.
+- Co se stalo, je vidět u zakázky, v průvodce a v přehledu na `/dashboard/profil`.
+
+**Razítka jsou na `projects`** (`survey_requested_at`, `survey_reminded_at`, migrace 112), ne
+na `project_surveys`: ta tabulka je **odpověď** klienta (hvězdičky `NOT NULL`, jeden řádek na
+zakázku od migrace 106), takže před vyplněním není kam zapsat, že se někdo zeptal.
+
+**Reference pro web** (`lib/admin/reference.ts`) je čistá funkce: z hodnocení se souhlasem klienta udělá
+jméno, firmu, hvězdičky a text **doslova tak, jak ho klient napsal**. Dva formáty ke zkopírování
+(text a objekt pro pole referencí na vizeon.cz), publikuje pořád člověk. **Bez souhlasu se
+nenabídne** — a souhlas je od AD16 dobrovolný; dokud ho formulář vyžadoval k odeslání, neznamenal nic.
+
+**Předávací dokument** „co bylo dodané" je `projects.handover` (jsonb, migrace 112) se čtyřmi
+částmi: co klient dostal, kde má přístupy, co je v ceně údržby a co není. Předvyplní se z popisu
+zakázky a položek poslední faktury (`lib/admin/handover.ts`), zbytek píše člověk — nic se
+nedomyšlí (B10). PDF vyrábí `lib/invoice-pdf/handover.ts` **touž cestou jako fakturu** (tokeny
+Dílků, vložená písma, Chromium bez sítě a bez JavaScriptu), neukládá se a při vystavení zapisuje
+`handover_issued_at` — to plní krok **Předáno** v průvodce. K faktuře se přikládá jen na
+zaškrtnutí (`POST /api/invoices/[id]/email` s `predani: true`).
+
+Dvě věci, které u něj platí tvrdě:
+1. **Žádné heslo.** Text jde přes `redactSensitive()` a dokument, ve kterém se cokoli našlo, se
+   **neuloží celý** — PDF odchází klientovi do schránky (DECISIONS #027).
+2. **Routa je `POST`**, ne GET: vystavení zapisuje, a zápis na GET by šel vyvolat obrázkem na
+   cizí stránce. Karta ji volá formulářem s `target="_blank"`.
+
+**AI leady konečně vidět.** `agent_leads` se od migrace 052 plnily z vizeon-lead-agent a v celém
+repu k nim vedl jediný řádek — INSERT v route handleru. Teď visí nad Hovory jako pruh
+(`lib/admin/agent-leads.ts`, `components/admin/agent-leads-strip.tsx`) seřazený podle skóre,
+s prioritou, shrnutím a návrhem, jak s člověkem mluvit. Vyřízení drží `agent_leads.handled_at`
+(migrace 112), „Nezajímavé" má „Zpět".
+
+Zakázka z AI leadu jde **stejnou cestou jako z ostatních**: lead se přepíše do Hovorů
+(`convertAgentLeadToCall`, `ensureContact` + řádek `client_leads`) a převezme ho stávající
+`convertLeadToProject`. Druhá cesta do `projects` nevznikla. `summary`
+a `communication_strategy` jsou **odhad modelu o skutečném člověku**: v poznámce jsou označené
+jako odhad, vykreslují se jen jako text a klientovi neodcházejí.
 
 ### Zdroje poptávek (AD02, R-088)
 

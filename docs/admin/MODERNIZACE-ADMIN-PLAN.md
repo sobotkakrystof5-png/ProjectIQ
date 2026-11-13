@@ -1326,6 +1326,39 @@ vygeneruje do PDF; `agent_leads` jsou v Hovorech vidět.
 **Riziko:** nízké — e-maily jdou přes existující frontu a odesílají se klientovi, takže text
 projde `zakaziq-ux-texty-cs`.
 
+**Provedeno 2026-11-13 (AD16), s osmi odchylkami — R-102:**
+
+1. **Razítka dotazníku jsou na `projects`**, ne na `project_surveys` (prompt nechal volbu na
+   sezení). Důvod: `project_surveys` je **odpověď** klienta — hvězdičky jsou `NOT NULL`
+   a od migrace 106 smí být na zakázku nejvýš jedna. Před vyplněním žádný řádek neexistuje,
+   a právě tehdy je potřeba vědět, kdy se kdo zeptal.
+2. **Dotazník posílá i `setProjectStatus`** na `done`/`paid`, ne jen uzavření zakázky — jinak
+   by díra zůstala otevřená právě tam, kde ji zadání popisuje („zakázka může být zaplacená
+   a klient dotazník nikdy nedostane"). Při téhle změně stavu dotazník **nahrazuje** obvyklou
+   zprávu o změně stavu: dvě zprávy během patnácti vteřin jsou hluk.
+3. **Souhlas se zveřejněním je nově dobrovolný** (`consent` už není `z.literal(true)`).
+   Bod 3 zadání stojí na tom, že hodnocení může být i bez souhlasu — dokud ho formulář
+   vyžadoval k odeslání, „se souhlasem" neznamenalo nic.
+4. **Migrace 112 nese i AI leady** (`agent_leads.handled_at`, `client_lead_id`, `project_id`),
+   ne jen dotazník. Bez stopy po vyřízení by pruh v Hovorech rostl donekonečna.
+5. **Zakázka z AI leadu jde přes Hovory** — lead se přepíše do `client_leads` a převezme ho
+   stávající `convertLeadToProject`. Druhá cesta do `projects` by měla vlastní pravidla
+   o kontaktu, poznámkách a uvítacím e-mailu; zadání chtělo „stejnou cestu jako z ostatních".
+6. **PDF routa je `POST`, ne GET.** Vystavení zapisuje `handover_issued_at` a zápis na GET by
+   šel vyvolat obrázkem na cizí stránce (DECISIONS #027, nález bezpečnostního review).
+7. **Reference zůstává na `/dashboard/profil`**, kam hodnocení přesunulo AD11 — ne na detailu
+   zakázky.
+8. **Předávací dokument má vlastní obsah** (`projects.handover`, jsonb), ne jen složení
+   z položek zakázky: přístupy a dvě strany údržby se z faktury odvodit nedají. Položky
+   a popis se **předvyplní**, zbytek píše člověk.
+
+**Mimochodem opraveno:** `/api/invoices/*/email` chyběla v `outputFileTracingIncludes`, takže
+odeslání faktury s PDF by na produkci spadlo na chybějícím Chromiu (dluh z AD12).
+
+**Neověřeno:** v prohlížeči nikdo nic neviděl a **migrace 112 neběžela nikde**. Vzhled PDF
+ověřený okem na vyrobeném dokumentu (jedna strana A4, Instrument Sans, datum s rokem);
+faktura po vytažení společného rendereru vypadá stejně jako dřív.
+
 ### AD17 — Ruční překreslení denních obrazovek (L, bez migrace)
 `/dashboard` (Dnes) · `/dashboard/[id]` · `/dashboard/calls` · `/dashboard/calendar` ·
 `/dashboard/faktury` + detail · `/hub` a `/hub/finance`. Jedna hlavní akce na obrazovce, detail
@@ -1367,7 +1400,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | **hotovo a nasazeno 2026-11-13** (109 podle Kryštofa na produkci; `WARNING` o duplicitních příjmech nikdo nezkontroloval, v prohlížeči neověřeno; R-099) |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | **hotovo 2026-11-13** (110 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-100) |
 | AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | **hotovo 2026-11-13** (111 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-101) |
-| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | nezačato |
+| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | **hotovo 2026-11-13** (112 aplikovaná nikde; v prohlížeči neověřeno, PDF ověřené okem; R-102) |
 | AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | nezačato |
 | AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | nezačato |
 

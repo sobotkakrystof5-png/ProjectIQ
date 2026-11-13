@@ -55,6 +55,8 @@
 | Pochopit, proč je něco udělané „divně" | `memory.md` → Rozhodnutí; pak komentář v kódu / migraci |
 | Výpis v adminu (řazení, stránkování, filtry) | `lib/admin-table.ts`, `components/admin/{data-table,pagination,table-search}.tsx`, dotazy `lib/admin/{completed,invoices,costs,leads,projects,waitlist}.ts` (AD07) |
 | Kontakty (jeden člověk, jeden řádek; sloučení duplicit) | `lib/contacts/{normalize,group}.ts`, `lib/admin/contacts.ts`, `app/contacts-actions.ts`, `app/dashboard/kontakty/`, `components/admin/contacts/`, `scripts/admin-contacts-backfill.mjs`, migrace 104, R-095 (AD09) |
+| Dotazník spokojenosti, reference na web, předávací dokument | `lib/admin/{surveys,reference,handover,handover-schema}.ts`, `lib/invoice-pdf/handover.ts`, `app/handover-actions.ts`, `app/api/projects/[id]/predani/`, `components/admin/handover-card.tsx`, `components/HodnoceniDashboard.tsx`, migrace 112, R-102 (AD16) |
+| AI leady z `vizeon-lead-agent` v Hovorech | `lib/admin/agent-leads.ts`, `app/agent-leads-actions.ts`, `components/admin/agent-leads-strip.tsx`, `app/api/public/agent-leads/`, migrace 052 a 112, R-102 (AD16) |
 | Paměť projektu: předvyplnění z historie, věty, retence | `lib/admin/memory/{facts,store,drafts,prefill,types}.ts`, `app/memory-actions.ts`, `components/admin/memory/`, `lib/ai/markers.ts`, migrace 111, R-085, R-101 (AD15) |
 | Zavolat, napsat SMS, e-mail nebo WhatsApp z adminu | `components/admin/contact-actions.tsx`, `lib/contacts/href.ts`, `lib/message-templates.ts`, R-084 (AD10) |
 | Propojení kalendáře, Hovorů a rezervací z portálu | `migrations/105_propojeni_kalendar_hovory.sql`, `app/calls-actions.ts` (`updateLead`), `app/calendar-actions.ts`, `app/portal-actions.ts`, `lib/admin/calendar.ts`, R-010, R-096 (AD10) |

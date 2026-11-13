@@ -2,7 +2,16 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-13 · **AD15 hotové v kódu: paměť projektu ve dvou vrstvách.**
+> **Poslední aktualizace:** 2026-11-13 · **AD16 hotové v kódu: dotazník odchází sám.**
+> Dosud se poslal jen při ručním „Přidat do dokončených", takže zakázka mohla skončit zaplacená
+> a klient se nikdy nedočkal; teď odchází po uzavření i po přepnutí na Hotovo s patnáctivteřinovým
+> oknem na „Zpět" a po sedmi dnech odejde **jedna** připomínka. Z hodnocení **se souhlasem** jde
+> jedním klikem vzít reference na web — a souhlas už není podmínkou odeslání dotazníku, takže
+> konečně něco znamená. Klient dostává **předávací dokument** „co bylo dodané" (PDF touž cestou
+> jako faktura, do kterého se heslo neuloží) a **AI leady z `vizeon-lead-agent` jsou poprvé
+> vidět** — od migrace 052 se ukládaly a v celém repu k nim vedl jediný řádek.
+> Review našlo zápis na GET u PDF routy, je opravený (POST + `Origin`). **V prohlížeči
+> neověřeno, migrace 112 neběžela nikde**; vzhled PDF ověřený okem (R-102). · **AD15 hotové v kódu: paměť projektu ve dvou vrstvách.**
 > Formuláře se předvyplňují z **faktů** — čísel spočítaných z historie klienta (poslední cena,
 > obvyklá sazba, položky poslední faktury), která se nikdy neukládají jako text, takže do pole
 > nemůže vstoupit věta od modelu. Vedle toho stojí **paměť** (`project_memory`, **migrace 111,
@@ -28,7 +37,25 @@
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-13 na **`7a15ad2`** (AD00–AD13 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
-**Modernizace adminu (R-081–R-101), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`**. **AD00–AD15 hotové** — další na řadě je **AD16 (hodnocení a reference, migrace 112** — R-100).
+**Modernizace adminu (R-081–R-101), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`**. **AD00–AD16 hotové** — další na řadě je **AD17 (ruční překreslení denních obrazovek, bez
+migrace)**.
+Z AD16: dotazník spokojenosti **odchází sám** (`lib/admin/surveys.ts`) — zařadí ho uzavření
+zakázky i přepnutí na Hotovo/Zaplaceno, jde z `after()` po 15 s (okno na „Zpět") a dvakrát
+odejít nemůže, protože `survey_requested_at` zapisuje týž UPDATE, který zakázku vybere.
+Po sedmi dnech bez odpovědi pošle denní cron `send-reminders` **jednu** připomínku — pak už nic
+a klientovi se to v e-mailu řekne. Razítka jsou na **zakázce**, ne na `project_surveys`: ta
+tabulka je odpověď klienta a před vyplněním neexistuje (R-102). Z hodnocení **se souhlasem**
+dělá `lib/admin/reference.ts` úryvek pro vizeon.cz (jméno, firma, hvězdičky, text doslova) ve
+dvou formátech ke zkopírování; **souhlas je nově dobrovolný**, dosud si ho formulář vynutil
+jako podmínku odeslání. **Předávací dokument** (`projects.handover`) má čtyři části — co klient
+dostal, kde má přístupy, co je a není v ceně údržby — předvyplní se z popisu zakázky a položek
+poslední faktury a PDF vzniká **touž cestou jako faktura**; **text s heslem se neuloží vůbec**
+a vystavení plní krok „Předáno" v průvodce. **AI leady** (`agent_leads`) konečně visí nad
+Hovory seřazené podle skóre; zakázka z nich vzniká stejnou cestou jako z ostatních kontaktů
+a shrnutí od modelu je všude označené jako odhad. Bezpečnostní review našlo **jednu věc**:
+PDF routa zapisovala na GET, teď je to POST se shodným `Origin` (DECISIONS #027).
+**V prohlížeči neověřeno a migrace 112 není nikde**; vzhled PDF ověřený okem na vyrobeném
+dokumentu.
 Z AD15: paměť adminu má **dvě vrstvy a nemíchají se** (R-085). **Fakta** (`lib/admin/memory/facts.ts`)
 se počítají čistě SQL nad historií klienta — poslední cena, obvyklá hodinová sazba
 (`price / time_invested`), průměrná doba do uzavření, typický zdroj poptávky, položky poslední
@@ -65,7 +92,7 @@ pravý panel na každé obrazovce. Názvy modelů mají jediné místo (`lib/ai/
 test — přepis PDF faktury tím slezl z opusu na haiku v adminu i ve Workspace. Odchylky: R-100.
 **V prohlížeči neověřeno a živý dotaz na model v sezení neproběhl** (klíč se nepoužil), takže
 tvar strukturovaného výstupu se zanořeným sjednocením a čtení cache zbývá ověřit prvním
-skutečným dotazem. Z migrací této větve (100–109) jsou 100–104 a **107** na testovacím Neonu, 105, 108 a **109 nikde** a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). **Pořadí při nasazení:** aditivní 103, 104, 105, 107, 108 a 109 **před** deployem (bez 107 by evidence faktur vracela chybu), nekompatibilní 102 a 106 **po** něm.
+skutečným dotazem. Z migrací této větve (100–109) jsou 100–104 a **107** na testovacím Neonu, 105, 108 a **109 nikde** a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). **Pořadí při nasazení:** aditivní 103, 104, 105, 107, 108 a 109 **před** deployem (bez 107 by evidence faktur vracela chybu), nekompatibilní 102 a 106 **po** něm. Migrace 110, 111 a **112** jsou aditivní a aplikované nikde.
 Z AD13: `finance_transactions` má **měnu** (`currency`) a bez migrace se měna **odvodí z faktury**
 (`derivedCurrency` v `lib/admin/ledger.ts`), takže eurová faktura přestane plnit korunové součty
 a daňový základ nepřepočteným číslem **hned po nasazení větve**, ne až po 109; měny se nikde
@@ -889,10 +916,56 @@ Nová tabulka s osobními údaji navázaná polymorfně = trigger, ne spoléhán
 Při AD16 (migrace 112) nezapomenout, že `project_memory` do retence patří a `purge_client_retention`
 z migrace 098 o ní **neví** — úklid paměti dělá `purge_memory_retention` z migrace 111.
 
+### R-102 · Dotazník má razítka na zakázce a souhlas je dobrovolný (2026-11-13)
+**Rozhodnutí:** osm odchylek od zadání AD16.
+(1) `survey_requested_at` a `survey_reminded_at` jsou na **`projects`**, ne na `project_surveys`
+(prompt nechal volbu na sezení).
+(2) Dotazník posílá i `setProjectStatus` na `done`/`paid` a v tu chvíli **nahrazuje** obvyklou
+zprávu o změně stavu.
+(3) **Souhlas se zveřejněním je nově dobrovolný** — veřejný formulář `/h/[token]` ho už
+nevyžaduje k odeslání.
+(4) Migrace 112 nese i `agent_leads.handled_at`, `client_lead_id` a `project_id`, ne jen dotazník.
+(5) Zakázka z AI leadu vzniká **přes Hovory** (`convertAgentLeadToCall` → stávající
+`convertLeadToProject`), ne vlastní cestou.
+(6) PDF předávacího dokumentu chodí na **`POST`** se shodným `Origin`, ne na GET.
+(7) Reference zůstává na `/dashboard/profil`, kam hodnocení přesunulo AD11.
+(8) Předávací dokument má vlastní obsah (`projects.handover`, jsonb), ne jen složení z položek
+zakázky.
+**Proč:** (1) `project_surveys` je **odpověď** klienta — hvězdičky `NOT NULL` a od migrace 106
+nejvýš jedna na zakázku. Dokud klient nevyplnil, žádný řádek neexistuje, a právě tehdy je
+potřeba vědět, kdy se kdo zeptal; prázdný řádek dopředu by si vyžádal NULL u hodnocení, nebo
+nuly v průměrech. (2) Jinak by díra zůstala otevřená právě tam, kde ji zadání popisuje; dvě
+zprávy klientovi během patnácti vteřin jsou hluk. (3) Bez toho by „se souhlasem" z bodu 3
+zadání neznamenalo nic — formulář si souhlas vynutil u každého, kdo chtěl odeslat hodnocení.
+(4) Bez stopy po vyřízení by pruh AI leadů rostl donekonečna. (5) Zadání chtělo „stejnou cestu
+jako z ostatních"; druhá cesta do `projects` by měla vlastní pravidla o kontaktu, poznámkách
+a uvítacím e-mailu. (6) Vystavení **zapisuje** `handover_issued_at` a zápis na GET by šel
+vyvolat obrázkem na cizí stránce (nález bezpečnostního review, DECISIONS #027) — AD08 tutéž
+třídu rušila ve Financích. (7) Hodnocení je po AD11 na Profilu a detail zakázky žádné
+neukazuje. (8) Přístupy ani dvě strany údržby se z položek faktury odvodit nedají.
+**Důsledek:** `docs/admin/AGENTS-ADMIN.md` → „Hodnocení, reference a předání (AD16)", plán
+modernizace → AD16 (seznam odchylek), `.claude/security/DECISIONS.md` #027. **Nové předvyplnění
+předávacího dokumentu smí brát hodnotu jen z toho, co v databázi je** — nikdy z modelu (B10).
+Nová cesta, která zakázku uzavře, musí zavolat `sendSurveyRequest`, jinak dotazník neodejde.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **AD16 v prohlížeči neověřený:** migrace 112 **není nikde**. Projít na 390 / 768 / 1280 /
+  1440 px: uzavření zkušební zakázky (dotazník má odejít až po 15 s, „Zpět" ho musí zrušit),
+  věta o dotazníku u uzavřené zakázky a na `/dashboard/profil`, blok **Reference na web**
+  (jen u hodnocení se souhlasem), karta **Předávací dokument** (přidávání řádků, odmítnutí
+  textu s heslem, Otevřít PDF) a pruh **AI leadů** nad Hovory včetně „Udělat zakázku".
+  Naostro nikdo nezkusil ani připomínku z denního cronu — chce to zakázku s odeslaným
+  dotazníkem starším sedmi dnů · od 2026-11-13
+- [ ] **AI leady nikdo neviděl na skutečných datech (AD16):** `agent_leads` je na testovacím
+  Neonu prázdná a na produkci do ní posílá `vizeon-lead-agent`. Až se větev nasadí, zkontrolovat,
+  jestli se pruh naplní a jestli `communication_strategy` ze skutečného payloadu sedí na schéma
+  (tón, styl, focus, avoid) · od 2026-11-13
+- [ ] **Předávací dokument nemá vlastní retenci (AD16):** `projects.handover` drží jména
+  a adresy administrací, dokud existuje zakázka — `purge_client_retention` (R-076) o něm neví.
+  Doplnit spolu s výmazem a exportem údajů kontaktu · DECISIONS #027 · od 2026-11-13
 - [ ] **AD15 v prohlížeči neověřený:** migrace 111 **není nikde**, takže paměť nikdo neviděl.
   Projít na 390 / 768 / 1280 / 1440 px: karta kontaktu (blok „Co víme z historie", Uložit do
   paměti, odmítnutí textu s klíčem), detail zakázky (sekce Paměť, „O klientovi", Potvrdit
@@ -1080,6 +1153,50 @@ z migrace 098 o ní **neví** — úklid paměti dělá `purge_memory_retention`
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-13 (AD16 — hodnocení, reference, předání)
+- **feat** **AD16 hotové v kódu.** Čtyři commity, každý s testem. Technický popis:
+  `docs/admin/AGENTS-ADMIN.md` → „Hodnocení, reference a předání (AD16)", odchylky v R-102.
+  **DDL je v migraci 112. Aplikovaná: nikde.**
+- **feat** **Dotazník odchází sám.** Dosud se poslal **jen jednou**, při ručním „Přidat do
+  dokončených" — zaplacená zakázka tak mohla skončit, aniž se klienta kdokoli zeptal, a když
+  neodpověděl, kopíroval se odkaz ručně (bylo to doslova napsané v `HodnoceniDashboard`).
+  Teď ho zařadí uzavření i přepnutí na Hotovo/Zaplaceno, odchází po **15 s** (do té doby ho
+  „Zpět" zruší) a **dvakrát odejít nemůže** — razítko zapisuje týž UPDATE, který zakázku vybere.
+  Po sedmi dnech bez odpovědi pošle denní cron `send-reminders` **jednu** připomínku a pak už nic.
+  Soubory: `lib/admin/surveys.ts`, `app/closed-actions.ts`, `app/actions.ts`,
+  `app/api/cron/send-reminders/route.ts`.
+- **feat** **Reference pro web** (`lib/admin/reference.ts`): z hodnocení **se souhlasem** jedním
+  klikem jméno, firma, hvězdičky a text tak, jak ho klient napsal — ve dvou formátech
+  (text a objekt pro vizeon.cz). Publikuje pořád člověk.
+- **fix** **Souhlas se zveřejněním už není podmínkou odeslání** dotazníku. Dosud ho formulář
+  vyžadoval k odeslání vůbec, takže „se souhlasem" neznamenalo nic — každý souhlas byl vynucený.
+  Bez zaškrtnutí se reference nenabídne a admin to řekne.
+- **feat** **Předávací dokument „co bylo dodané"** (`projects.handover`): co klient dostal, kde má
+  přístupy, co je v ceně údržby a co není. Předvyplní se z popisu zakázky a položek poslední
+  faktury, PDF jede **touž cestou jako faktura** (`lib/invoice-pdf/handover.ts`, žádná nová
+  závislost), vystavení zapisuje datum a plní tím krok **Předáno** v průvodce. K faktuře se
+  přikládá na zaškrtnutí.
+- **fix** **Do předávacího dokumentu neprojde heslo ani connection string** — text jde přes
+  `redactSensitive()` a dokument, ve kterém se cokoli našlo, se neuloží celý. PDF odchází
+  klientovi do schránky, takže je to únik, ne překlep.
+- **feat** **AI leady jsou konečně vidět.** `agent_leads` se od migrace 052 plnily z
+  `vizeon-lead-agent` a v celém repu k nim vedl jediný řádek — INSERT v route handleru. Teď visí
+  nad Hovory jako pruh seřazený podle skóre, s prioritou, shrnutím a návrhem, jak s člověkem
+  mluvit; zakázka z nich vzniká **stejnou cestou jako z ostatních**. Shrnutí od modelu je všude
+  označené jako odhad a klientovi neodchází.
+- **fix** Bezpečnostní review AD16 našlo **jednu věc a je opravená**: PDF předávacího dokumentu
+  chodilo na **GET, který zapisoval** datum předání — přihlášenému adminovi by to šlo vyvolat
+  obrázkem na cizí stránce. Teď je to POST se shodným `Origin`. AUDIT-LOG 2026-11-13,
+  DECISIONS #027.
+- **fix** Mimochodem: `/api/invoices/*/email` chyběla v `outputFileTracingIncludes`, takže
+  odeslání faktury s PDF by na produkci spadlo na chybějícím Chromiu (dluh z AD12).
+- **chore** Ověření: `npm test` **102 souborů / 1208 testů** (3 přeskočené, **30 nových**
+  v `admin-hodnoceni`, `admin-ai-leady` a `predani-route`), `npx tsc --noEmit` a
+  `npm run build:check` bez varování. **V prohlížeči neověřeno**; vzhled PDF ověřený okem
+  na vyrobeném dokumentu (jedna strana A4) a faktura po vytažení společného rendereru vypadá
+  stejně jako dřív.
+- **decision** **R-102** — osm vědomých odchylek od zadání AD16.
 
 ### 2026-11-13 (AD15 — paměť projektu)
 - **feat** **AD15 hotové v kódu.** Technický popis: `docs/admin/AGENTS-ADMIN.md` → „Paměť
