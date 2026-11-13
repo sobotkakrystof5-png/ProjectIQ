@@ -19,14 +19,14 @@ const PATHS = ['app/dashboard', 'app/p', 'app/h', 'app/(auth)', 'app/globals.css
 const RAINBOW = 'red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose'
 const PREFIX = 'bg|text|border|ring|from|via|to|divide|placeholder|decoration|outline|accent|caret|fill|stroke|shadow'
 
-/** Naměřeno 2026-11-13 po AD17 (Hovory). Snižovat, nikdy nezvyšovat. */
+/** Naměřeno 2026-11-13 po AD17 (Kalendář). Snižovat, nikdy nezvyšovat. */
 const LIMITS: Record<string, { limit: number; re: RegExp }> = {
-  'muted-foreground': { limit: 454, re: /muted-foreground/g },
-  'rounded-lg|xl|2xl': { limit: 312, re: /\brounded-(lg|xl|2xl)\b/g },
+  'muted-foreground': { limit: 423, re: /muted-foreground/g },
+  'rounded-lg|xl|2xl': { limit: 286, re: /\brounded-(lg|xl|2xl)\b/g },
   'brand-*': { limit: 0, re: new RegExp(`\\b(${PREFIX})-brand-\\d{2,3}\\b`, 'g') },
-  'border-border': { limit: 204, re: /\bborder-border\b/g },
-  'duhové barvy': { limit: 559, re: new RegExp(`\\b(bg|text|border|ring)-(${RAINBOW})-\\d{2,3}\\b`, 'g') },
-  'bg-white': { limit: 140, re: /\bbg-white\b/g },
+  'border-border': { limit: 187, re: /\bborder-border\b/g },
+  'duhové barvy': { limit: 523, re: new RegExp(`\\b(bg|text|border|ring)-(${RAINBOW})-\\d{2,3}\\b`, 'g') },
+  'bg-white': { limit: 132, re: /\bbg-white\b/g },
 }
 
 function adminSource() {

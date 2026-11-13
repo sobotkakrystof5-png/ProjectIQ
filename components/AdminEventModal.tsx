@@ -113,8 +113,8 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
   }
 
   const inputCls =
-    'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground ' +
-    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white'
+    'w-full border border-navy-100 rounded-chip px-3 py-2 text-sm text-ink placeholder:text-quiet ' +
+    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-surface'
 
   return (
     <>
@@ -139,11 +139,11 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
         <div
           // `max-h-[90vh]` + rolování: na telefonu se formulář nevejde a
           // `overflow-hidden` samotné odřízlo tlačítko Uložit (AD08).
-          className="pointer-events-auto w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
+          className="pointer-events-auto w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-box shadow-2xl"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="brand-gradient px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center justify-between bg-navy-800 px-5 py-4">
             <div className="flex items-center gap-2.5">
               <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-200" />
               <span className="text-white font-semibold text-sm">Přidat do kalendáře</span>
@@ -151,7 +151,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
             <button
               type="button"
               onClick={() => close(false)}
-              className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-chip text-navy-200 hover:text-white hover:bg-surface/10 transition-colors"
               aria-label="Zavřít"
             >
               <X size={15} strokeWidth={1.5} />
@@ -168,33 +168,33 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
                   type="button"
                   onClick={() => setEventType(id)}
                   className={cn(
-                    'flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all duration-150',
+                    'flex flex-col items-start gap-1 p-3 rounded-chip border text-left transition-all duration-150',
                     eventType === id
                       ? 'border-navy-400 bg-navy-50'
-                      : 'border-border bg-white hover:border-navy-200 hover:bg-navy-50/50',
+                      : 'border-navy-100 bg-surface hover:border-navy-200 hover:bg-navy-50/50',
                   )}
                 >
                   <div className="flex items-center gap-1.5">
                     <Icon
                       size={13}
                       strokeWidth={1.5}
-                      className={eventType === id ? 'text-navy-700' : 'text-muted-foreground'}
+                      className={eventType === id ? 'text-navy-700' : 'text-quiet'}
                     />
                     <span className={cn(
                       'text-xs font-semibold',
-                      eventType === id ? 'text-navy-800' : 'text-foreground',
+                      eventType === id ? 'text-navy-800' : 'text-ink',
                     )}>
                       {label}
                     </span>
                   </div>
-                  <span className="text-[11px] text-muted-foreground leading-snug">{desc}</span>
+                  <span className="text-[11px] text-quiet leading-snug">{desc}</span>
                 </button>
               ))}
             </div>
 
             {/* Title */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <label className="text-xs font-medium text-quiet uppercase tracking-wide">
                 Název *
               </label>
               <input
@@ -211,7 +211,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
             {/* Times */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <label className="text-xs font-medium text-quiet uppercase tracking-wide">
                   Začátek *
                 </label>
                 <input
@@ -222,7 +222,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <label className="text-xs font-medium text-quiet uppercase tracking-wide">
                   Konec *
                 </label>
                 <input
@@ -237,11 +237,11 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
 
             {/* Kontakt (AD10) — jen u událostí, blokace se nezrcadlí */}
             {eventType === 'manual' && (
-              <div className="flex flex-col gap-2 rounded-xl border border-border bg-navy-50/40 p-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="flex flex-col gap-2 rounded-chip border border-navy-100 bg-navy-50/40 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-quiet">
                   Kontakt (nepovinné)
                 </p>
-                <p className="text-[11px] leading-snug text-muted-foreground">
+                <p className="text-[11px] leading-snug text-quiet">
                   Doplňte telefon nebo e-mail a z Hovorů i z kalendáře pak zavoláte jedním klikem.
                 </p>
                 <input
@@ -276,7 +276,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
             {/* Description (only for manual events) */}
             {eventType === 'manual' && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <label className="text-xs font-medium text-quiet uppercase tracking-wide">
                   Poznámka (nepovinné)
                 </label>
                 <textarea
@@ -291,7 +291,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
             )}
 
             {error && (
-              <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <p className="rounded-chip border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-medium text-danger">
                 {error}
               </p>
             )}
@@ -300,12 +300,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
               <button
                 type="submit"
                 disabled={isPending}
-                className={cn(
-                  'flex-1 flex items-center justify-center gap-2 brand-gradient',
-                  // 44 px podle Dílků — dřív to bylo 39 px (otevřený problém z AD08).
-                  'text-white text-sm font-semibold min-h-11 px-4 rounded-xl shadow-sm',
-                  'hover:opacity-90 transition-opacity disabled:opacity-60',
-                )}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-navy-700 px-5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
               >
                 {isPending
                   ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
@@ -315,7 +310,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
               <button
                 type="button"
                 onClick={() => close(false)}
-                className="min-h-11 px-4 text-sm text-muted-foreground rounded-xl border border-border hover:bg-muted transition-colors"
+                className="inline-flex min-h-11 items-center rounded-full border border-input px-5 text-[15px] font-semibold text-ink transition-colors hover:bg-navy-50"
               >
                 Zrušit
               </button>

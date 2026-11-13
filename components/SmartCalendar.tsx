@@ -16,8 +16,11 @@ import {
 } from '@/lib/types'
 import { AdminEventModal } from './AdminEventModal'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Toolbar } from '@/components/ws/app/toolbar'
 import { LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { cn } from '@/lib/utils'
+import { staffAccent, staffTint } from '@/lib/ws/staff-colors'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { mailtoHref } from '@/lib/contacts/href'
 import {
@@ -90,24 +93,57 @@ interface UnifiedEvent {
 
 // ─── Colour system ────────────────────────────────────────────────────────────
 
-const CHANNEL_COLORS: Record<ConsultationChannel, { pill: string; dot: string; icon: string }> = {
-  whatsapp: { pill: 'bg-green-100 text-green-800 border-green-200',  dot: 'bg-green-500',  icon: 'text-green-600' },
-  teams:    { pill: 'bg-blue-100 text-blue-800 border-blue-200',     dot: 'bg-blue-500',   icon: 'text-blue-600' },
-  meet:     { pill: 'bg-red-100 text-red-800 border-red-200',        dot: 'bg-red-500',    icon: 'text-red-600' },
-  phone:    { pill: 'bg-slate-100 text-slate-700 border-slate-200',  dot: 'bg-slate-400',  icon: 'text-slate-500' },
-  other:    { pill: 'bg-gray-100 text-gray-700 border-gray-200',     dot: 'bg-gray-400',   icon: 'text-gray-500' },
+/**
+ * Barva události (AD17). Druh události ani kanál konzultace nejsou stav, jen
+ * kategorie — a kategorie se podle R-091 nebarví vlastní paletou. Dílky mají
+ * přesně na tohle tóny termínů `--staff-1…5` (DESIGN.md → Colors: „rozlišují
+ * vlastníky termínů, nikdy nenesou naléhavost ani chybu"). Devět vlastních
+ * odstínů od zelené po fialovou tím mizí.
+ *
+ * Barva se vkládá stylem, ne třídou: tokeny jsou CSS proměnné a plocha je
+ * jejich nádech přes `color-mix`.
+ */
+const CHANNEL_TONE: Record<ConsultationChannel, number> = {
+  whatsapp: 1,
+  teams: 2,
+  meet: 3,
+  phone: 0,
+  other: 4,
 }
 
-const KIND_COLORS: Partial<Record<EventKind, { pill: string; dot: string }>> = {
-  deadline: { pill: 'bg-purple-100 text-purple-800 border-purple-200', dot: 'bg-purple-500' },
-  manual:   { pill: 'bg-amber-100 text-amber-800 border-amber-200',    dot: 'bg-amber-500' },
-  block:    { pill: 'bg-slate-100 text-slate-600 border-slate-300',    dot: 'bg-slate-400' },
-  call:     { pill: 'bg-cyan-100 text-cyan-800 border-cyan-200',       dot: 'bg-cyan-500' },
+const KIND_TONE: Partial<Record<EventKind, number>> = {
+  consultation: 0,
+  deadline: 3,
+  manual: 4,
+  block: 0,
+  call: 1,
 }
 
-function getEventStyle(ev: UnifiedEvent) {
-  if (ev.kind === 'consultation' && ev.channel) return CHANNEL_COLORS[ev.channel]
-  return KIND_COLORS[ev.kind] ?? { pill: 'bg-gray-100 text-gray-700 border-gray-200', dot: 'bg-gray-400' }
+export type EventStyle = {
+  /** Plná barva: proužek, tečka, zvýraznění. */
+  dot: React.CSSProperties
+  /** Plocha bloku: nádech barvy, tenký okraj, text v barvě. */
+  pill: React.CSSProperties
+}
+
+function getEventStyle(ev: UnifiedEvent): EventStyle {
+  const tone = ev.kind === 'consultation' && ev.channel ? CHANNEL_TONE[ev.channel] : (KIND_TONE[ev.kind] ?? 0)
+  const accent = staffAccent(null, tone)
+  // Blokace je soukromá nedostupnost, ne něco, na co se kouká — proto tiše.
+  if (ev.kind === 'block') {
+    return {
+      dot: { backgroundColor: 'rgb(var(--navy-300))' },
+      pill: { backgroundColor: 'rgb(var(--navy-50))', borderColor: 'rgb(var(--navy-200))', color: 'rgb(var(--quiet))' },
+    }
+  }
+  return {
+    dot: { backgroundColor: accent },
+    pill: {
+      backgroundColor: staffTint(accent),
+      borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
+      color: accent,
+    },
+  }
 }
 
 function ChannelIcon({ channel }: { channel: ConsultationChannel }) {
@@ -304,17 +340,17 @@ function EventDetailModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+          className="w-full max-w-sm overflow-hidden rounded-box bg-surface shadow-2xl"
           onClick={e => e.stopPropagation()}
         >
           {/* Coloured header strip */}
-          <div className={cn('h-1.5', style.dot)} />
+          <div className="h-1.5" style={style.dot} />
 
           <div className="p-5">
             {/* Header row */}
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <div className={cn('inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full border mb-2', style.pill)}>
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold" style={style.pill}>
                   {event.kind === 'consultation' && event.channel && (
                     <ChannelIcon channel={event.channel} />
                   )}
@@ -322,12 +358,12 @@ function EventDetailModal({
                   {event.kind === 'block' && <Lock size={10} strokeWidth={1.5} />}
                   <span>{event.sublabel}</span>
                 </div>
-                <h3 className="font-semibold text-foreground text-base leading-tight">{event.label}</h3>
+                <h3 className="font-semibold text-ink text-base leading-tight">{event.label}</h3>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors shrink-0"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-chip text-quiet transition-colors hover:bg-navy-50"
               >
                 <X size={15} strokeWidth={1.5} />
               </button>
@@ -336,9 +372,9 @@ function EventDetailModal({
             <div className="space-y-3 text-sm">
               {/* Date / time */}
               <div className="flex items-start gap-2.5">
-                <Clock size={14} strokeWidth={1.5} className="text-muted-foreground mt-0.5 shrink-0" />
+                <Clock size={14} strokeWidth={1.5} className="text-quiet mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-foreground font-medium">
+                  <p className="text-ink font-medium">
                     {event.allDay
                       ? formatShortDate(event.startsAt)
                       : `${formatShortDate(event.startsAt)}, ${formatTime(event.startsAt)} – ${formatTime(event.endsAt)}`
@@ -349,11 +385,11 @@ function EventDetailModal({
 
               {/* Kontakt u ručně zapsané události (AD10) */}
               {contact && (
-                <div className="space-y-2.5 rounded-xl bg-slate-50 border border-border p-3">
+                <div className="space-y-2.5 rounded-chip border border-navy-100 bg-navy-50/60 p-3">
                   {contact.name !== null && contact.name !== '' && (
                     <div className="flex items-center gap-2.5">
                       <Building2 size={14} strokeWidth={1.5} className="shrink-0 text-quiet" />
-                      <span className="text-foreground">{contact.name}</span>
+                      <span className="text-ink">{contact.name}</span>
                     </div>
                   )}
                   <ContactActions
@@ -366,17 +402,17 @@ function EventDetailModal({
 
               {/* Kontakt z Hovorů */}
               {lead && (
-                <div className="space-y-2.5 rounded-xl bg-slate-50 border border-border p-3">
+                <div className="space-y-2.5 rounded-chip border border-navy-100 bg-navy-50/60 p-3">
                   {lead.contactName && (
                     <div className="flex items-center gap-2.5">
-                      <Building2 size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
-                      <span className="text-foreground">{lead.companyName}</span>
+                      <Building2 size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
+                      <span className="text-ink">{lead.companyName}</span>
                     </div>
                   )}
                   {!lead.contactName && lead.companyName && (
                     <div className="flex items-center gap-2.5">
-                      <User size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground">Kontaktní osoba není vyplněná</span>
+                      <User size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
+                      <span className="text-quiet">Kontaktní osoba není vyplněná</span>
                     </div>
                   )}
 
@@ -385,7 +421,7 @@ function EventDetailModal({
                       {LEAD_STATUS_LABELS[lead.status]}
                     </Badge>
                     {lead.estimatedValue != null && (
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 text-xs text-quiet">
                         <Coins size={12} strokeWidth={1.5} />
                         {lead.estimatedValue.toLocaleString('cs-CZ')} Kč
                       </span>
@@ -402,8 +438,8 @@ function EventDetailModal({
 
                   {lead.notes && (
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Poznámky ke kontaktu</p>
-                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{lead.notes}</p>
+                      <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">Poznámky ke kontaktu</p>
+                      <p className="text-ink leading-relaxed whitespace-pre-wrap">{lead.notes}</p>
                     </div>
                   )}
 
@@ -413,15 +449,15 @@ function EventDetailModal({
               {/* Client wish */}
               {event.meta.clientWish && (
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Přání klienta</p>
-                  <p className="text-foreground leading-relaxed whitespace-pre-wrap">{event.meta.clientWish}</p>
+                  <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">Přání klienta</p>
+                  <p className="text-ink leading-relaxed whitespace-pre-wrap">{event.meta.clientWish}</p>
                 </div>
               )}
 
               {/* Client email */}
               {event.meta.clientEmail && (
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">E-mail klienta</p>
+                  <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">E-mail klienta</p>
                   <a
                     href={mailtoHref(event.meta.clientEmail) ?? `mailto:${event.meta.clientEmail}`}
                     className="text-navy-700 hover:underline"
@@ -434,10 +470,10 @@ function EventDetailModal({
               {/* Description */}
               {event.meta.description && (
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">
                     {lead ? 'Co je v plánu' : 'Poznámka'}
                   </p>
-                  <p className="text-foreground leading-relaxed whitespace-pre-wrap">{event.meta.description}</p>
+                  <p className="text-ink leading-relaxed whitespace-pre-wrap">{event.meta.description}</p>
                 </div>
               )}
             </div>
@@ -449,7 +485,7 @@ function EventDetailModal({
                   href={event.meta.meetingLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-1.5 brand-gradient text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-navy-700 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
                 >
                   <ExternalLink size={13} strokeWidth={1.5} />
                   Připojit se
@@ -459,7 +495,7 @@ function EventDetailModal({
               {event.meta.projectId && event.kind === 'consultation' && (
                 <a
                   href={`/dashboard/${event.meta.projectId}`}
-                  className="flex-1 flex items-center justify-center text-sm font-semibold text-navy-800 border border-navy-200 py-2.5 rounded-xl hover:bg-navy-50 transition-colors"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
                 >
                   Detail zakázky
                 </a>
@@ -468,7 +504,7 @@ function EventDetailModal({
               {event.kind === 'call' && (
                 <a
                   href={lead ? `/dashboard/calls?lead=${lead.id}` : '/dashboard/calls'}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-navy-800 border border-navy-200 py-2.5 rounded-xl hover:bg-navy-50 transition-colors"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
                 >
                   <ExternalLink size={13} strokeWidth={1.5} />
                   Otevřít hovory
@@ -480,7 +516,7 @@ function EventDetailModal({
                   type="button"
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="p-2.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-danger/30 text-danger transition-colors hover:bg-danger/5 disabled:opacity-50"
                   aria-label="Smazat událost"
                 >
                   <Trash2 size={14} strokeWidth={1.5} />
@@ -520,9 +556,9 @@ function MonthView({
   return (
     <div>
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 mb-1 border-b border-border pb-2">
+      <div className="grid grid-cols-7 mb-1 border-b border-navy-100 pb-2">
         {WEEKDAYS_SHORT_CZ.map(d => (
-          <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-wider py-1">
+          <div key={d} className="text-center text-[10px] font-semibold text-quiet uppercase tracking-wider py-1">
             {d}
           </div>
         ))}
@@ -533,7 +569,7 @@ function MonthView({
         {Array.from({ length: totalCells }, (_, i) => {
           const dayNum = i - startOffset + 1
           if (dayNum < 1 || dayNum > daysInMonth) {
-            return <div key={i} className="bg-gray-50/50 min-h-[60px] sm:min-h-[90px]" />
+            return <div key={i} className="min-h-[60px] bg-navy-50/40 sm:min-h-[90px]" />
           }
 
           const iso = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
@@ -547,8 +583,8 @@ function MonthView({
             <div
               key={i}
               className={cn(
-                'bg-white min-h-[60px] sm:min-h-[90px] p-1 sm:p-1.5 flex flex-col cursor-pointer hover:bg-navy-50/40 transition-colors group',
-                isWeekend && 'bg-gray-50/30',
+                'group flex min-h-[60px] cursor-pointer flex-col bg-surface p-1 transition-colors hover:bg-navy-50/40 sm:min-h-[90px] sm:p-1.5',
+                isWeekend && 'bg-navy-50/30',
               )}
               onClick={() => onSelectDay(iso)}
             >
@@ -556,8 +592,8 @@ function MonthView({
               <span className={cn(
                 'text-xs font-semibold self-end w-6 h-6 flex items-center justify-center rounded-full mb-1 transition-colors',
                 isToday
-                  ? 'brand-gradient text-white shadow-sm'
-                  : 'text-foreground group-hover:text-navy-800',
+                  ? 'bg-navy-700 text-white'
+                  : 'text-ink group-hover:text-navy-800',
                 isWeekend && !isToday && 'text-navy-500',
               )}>
                 {dayNum}
@@ -573,13 +609,13 @@ function MonthView({
                       type="button"
                       onClick={e => { e.stopPropagation(); onSelectEvent(ev) }}
                       className={cn(
-                        'flex items-center gap-1 text-left rounded px-1 py-0.5 text-[10px] font-semibold',
-                        'border truncate w-full hover:opacity-80 transition-opacity',
-                        style.pill,
+                        'flex w-full items-center gap-1 truncate rounded-tiny border px-1 py-0.5 text-left text-[10px] font-semibold',
+                        'transition-opacity hover:opacity-80',
                       )}
+                      style={style.pill}
                       title={ev.label}
                     >
-                      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dot)} />
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={style.dot} />
                       <span className="truncate">
                         {!ev.allDay && `${ev.startsAt.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' })} `}
                         {ev.label}
@@ -588,7 +624,7 @@ function MonthView({
                   )
                 })}
                 {overflow > 0 && (
-                  <span className="text-[10px] text-muted-foreground font-medium px-1">+{overflow} dalších</span>
+                  <span className="px-1 text-[10px] font-medium text-quiet">+{overflow} dalších</span>
                 )}
               </div>
             </div>
@@ -652,21 +688,21 @@ function WeekView({
     <div className="flex flex-col overflow-x-auto">
       <div className="min-w-[560px]">
         {/* Day headers */}
-        <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border mb-0">
+        <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-navy-100 mb-0">
           <div />
           {days.map((d, i) => {
             const isToday = d === todayIso
             return (
               <div key={i} className={cn(
-                'text-center py-2 border-l border-border',
+                'text-center py-2 border-l border-navy-100',
                 isToday && 'bg-navy-50',
               )}>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase">
+                <p className="text-[10px] font-semibold text-quiet uppercase">
                   {WEEKDAYS_SHORT_CZ[toMondayFirst(isoWeekday(d))]}
                 </p>
                 <p className={cn(
                   'text-sm font-semibold mx-auto mt-0.5 w-7 h-7 flex items-center justify-center rounded-full',
-                  isToday ? 'brand-gradient text-white' : 'text-foreground',
+                  isToday ? 'bg-navy-700 text-white' : 'text-ink',
                 )}>
                   {dayNumberOf(d)}
                 </p>
@@ -677,14 +713,14 @@ function WeekView({
 
         {/* All-day row */}
         {allDayForWeek.length > 0 && (
-          <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border">
-            <div className="text-[9px] text-muted-foreground uppercase font-semibold flex items-center justify-end pr-2 py-1">
+          <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-navy-100">
+            <div className="text-[9px] text-quiet uppercase font-semibold flex items-center justify-end pr-2 py-1">
               Celý den
             </div>
             {days.map((d, i) => {
               const dayAllDay = allDayForWeek.filter(ev => ev.day === d)
               return (
-                <div key={i} className="border-l border-border py-1 px-0.5 min-h-[28px]">
+                <div key={i} className="border-l border-navy-100 py-1 px-0.5 min-h-[28px]">
                   {dayAllDay.map(ev => {
                     const style = getEventStyle(ev)
                     return (
@@ -692,7 +728,8 @@ function WeekView({
                         key={ev.id}
                         type="button"
                         onClick={() => onSelectEvent(ev)}
-                        className={cn('w-full text-[10px] font-semibold px-1 py-0.5 rounded border truncate block', style.pill)}
+                        className="block w-full truncate rounded-tiny border px-1 py-0.5 text-[10px] font-semibold"
+                        style={style.pill}
                       >
                         {ev.label}
                       </button>
@@ -712,7 +749,7 @@ function WeekView({
               {hours.map(h => (
                 <div key={h} style={{ height: `${HOUR_PX}px` }}
                   className="flex items-start justify-end pr-2 pt-0.5">
-                  <span className="text-[10px] text-muted-foreground font-medium">{h}:00</span>
+                  <span className="font-num text-[10px] font-medium text-quiet">{h}:00</span>
                 </div>
               ))}
             </div>
@@ -726,14 +763,14 @@ function WeekView({
               return (
                 <div
                   key={di}
-                  className={cn('border-l border-border relative', isToday && 'bg-navy-50/30')}
+                  className={cn('border-l border-navy-100 relative', isToday && 'bg-navy-50/30')}
                   style={{ height: `${HOUR_PX * hours.length}px` }}
                 >
                   {/* Hour grid lines + click zones */}
                   {hours.map((h, hi) => (
                     <div
                       key={h}
-                      className="absolute w-full border-t border-gray-100 hover:bg-navy-50/60 cursor-pointer transition-colors"
+                      className="absolute w-full cursor-pointer border-t border-navy-50 transition-colors hover:bg-navy-50/60"
                       style={{ top: `${hi * HOUR_PX}px`, height: `${HOUR_PX}px` }}
                       onClick={() => onClickSlot(dateStr, h)}
                       title={`Přidat ${h}:00`}
@@ -751,12 +788,11 @@ function WeekView({
                         type="button"
                         onClick={e => { e.stopPropagation(); onSelectEvent(ev) }}
                         className={cn(
-                          'absolute left-0.5 right-0.5 rounded border text-left overflow-hidden z-10',
-                          'hover:brightness-95 transition-all shadow-sm',
+                          'absolute left-0.5 right-0.5 z-10 overflow-hidden rounded-tiny border text-left',
+                          'transition-all hover:brightness-95',
                           clippedTop && 'rounded-t-none border-t-2 border-t-current',
-                          style.pill,
                         )}
-                        style={{ top: `${topPx + 1}px`, height: `${heightPx}px` }}
+                        style={{ ...style.pill, top: `${topPx + 1}px`, height: `${heightPx}px` }}
                       >
                         <div className="px-1.5 py-1 flex flex-col h-full">
                           <span className="text-[10px] font-bold truncate leading-tight">{ev.label}</span>
@@ -815,7 +851,8 @@ function DayView({
                   key={ev.id}
                   type="button"
                   onClick={() => onSelectEvent(ev)}
-                  className={cn('w-full text-left text-xs font-semibold px-3 py-2 rounded-lg border', style.pill)}
+                  className="w-full rounded-chip border px-3 py-2 text-left text-xs font-semibold"
+                  style={style.pill}
                 >
                   <span className="flex items-center gap-1.5">
                     <Flag size={10} strokeWidth={1.5} />
@@ -828,17 +865,17 @@ function DayView({
         )}
 
         {/* Hour grid */}
-        <div className="overflow-y-auto rounded-xl border border-border" style={{ maxHeight: '560px' }}>
+        <div className="overflow-y-auto rounded-chip border border-navy-100" style={{ maxHeight: '560px' }}>
           <div className="relative" style={{ height: `${HOUR_PX * hours.length}px` }}>
             {/* Background grid lines */}
             {hours.map((h, hi) => (
               <div
                 key={h}
-                className="absolute w-full flex items-start border-t border-gray-100 hover:bg-navy-50/40 cursor-pointer transition-colors"
+                className="absolute flex w-full cursor-pointer items-start border-t border-navy-50 transition-colors hover:bg-navy-50/40"
                 style={{ top: `${hi * HOUR_PX}px`, height: `${HOUR_PX}px` }}
                 onClick={() => onClickSlot(dateStr, h)}
               >
-                <span className="text-[10px] text-muted-foreground font-medium w-12 text-right pr-3 pt-0.5 shrink-0">
+                <span className="w-12 shrink-0 pr-3 pt-0.5 text-right font-num text-[10px] font-medium text-quiet">
                   {h}:00
                 </span>
               </div>
@@ -855,12 +892,11 @@ function DayView({
                   type="button"
                   onClick={e => { e.stopPropagation(); onSelectEvent(ev) }}
                   className={cn(
-                    'absolute left-14 right-2 rounded-lg border text-left z-10 shadow-sm',
-                    'hover:brightness-95 transition-all',
+                    'absolute left-14 right-2 z-10 rounded-tiny border text-left',
+                    'transition-all hover:brightness-95',
                     clippedTop && 'rounded-t-none border-t-2 border-t-current',
-                    style.pill,
                   )}
-                  style={{ top: `${topPx + 1}px`, height: `${heightPx}px` }}
+                  style={{ ...style.pill, top: `${topPx + 1}px`, height: `${heightPx}px` }}
                 >
                   <div className="px-3 py-1.5 flex flex-col h-full justify-center">
                     <span className="text-xs font-bold leading-tight">{ev.label}</span>
@@ -879,7 +915,7 @@ function DayView({
       {/* Day event list sidebar */}
       {timedEvents.length > 0 && (
         <div className="hidden sm:block w-52 shrink-0">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          <p className="mb-3 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">
             {timedEvents.length} {timedEvents.length === 1 ? 'událost' : 'události'}
           </p>
           <div className="flex flex-col gap-2">
@@ -890,13 +926,10 @@ function DayView({
                   key={ev.id}
                   type="button"
                   onClick={() => onSelectEvent(ev)}
-                  className={cn(
-                    'w-full text-left flex items-start gap-2.5 px-3 py-2.5 rounded-xl border',
-                    'hover:brightness-95 transition-all',
-                    style.pill,
-                  )}
+                  className="flex w-full items-start gap-2.5 rounded-chip border px-3 py-2.5 text-left transition-all hover:brightness-95"
+                  style={style.pill}
                 >
-                  <div className={cn('w-1.5 h-1.5 rounded-full shrink-0 mt-1.5', style.dot)} />
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={style.dot} />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold truncate">{ev.label}</p>
                     <p className="text-[11px] opacity-70">{formatTime(ev.startsAt)}</p>
@@ -915,27 +948,27 @@ function DayView({
 
 function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-      {(Object.entries(CHANNEL_COLORS) as [ConsultationChannel, typeof CHANNEL_COLORS[ConsultationChannel]][]).map(([ch, c]) => (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-quiet">
+      {(Object.keys(CHANNEL_TONE) as ConsultationChannel[]).map((ch) => (
         <div key={ch} className="flex items-center gap-1.5">
-          <span className={cn('w-2 h-2 rounded-full', c.dot)} />
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, CHANNEL_TONE[ch]) }} />
           <span>{CHANNEL_LABELS[ch]}</span>
         </div>
       ))}
       <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-purple-500" />
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, KIND_TONE.deadline ?? 0) }} />
         <span>Deadline</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-amber-500" />
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, KIND_TONE.manual ?? 0) }} />
         <span>Vlastní událost</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-slate-400" />
+        <span className="h-2 w-2 rounded-full bg-navy-300" />
         <span>Blokovaný čas</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-cyan-500" />
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, KIND_TONE.call ?? 0) }} />
         <span>Plánovaná akce (Hovory)</span>
       </div>
     </div>
@@ -945,6 +978,9 @@ function Legend() {
 // ─── Main SmartCalendar ───────────────────────────────────────────────────────
 
 type ViewMode = CalendarView
+
+/** Co šipka posune — čte to `aria-label`, aby čtečka neříkala jen „tlačítko". */
+const VIEW_STEP_LABELS: Record<ViewMode, string> = { month: 'měsíc', week: 'týden', day: 'den' }
 
 export function SmartCalendar({
   initial,
@@ -1072,45 +1108,49 @@ export function SmartCalendar({
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-5">
+      <Toolbar className="mb-5">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          {/*
+            Šipky měly jen ikonu, takže je čtečka četla jako „tlačítko"
+            (otevřený problém z AD10). `aria-label` říká, kam vedou — měsíc,
+            týden nebo den podle zobrazení.
+          */}
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => navigate(-1)}
-            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-navy-50 hover:text-navy-800 hover:border-navy-200 transition-colors"
+            aria-label={`Předchozí ${VIEW_STEP_LABELS[view]}`}
+            title={`Předchozí ${VIEW_STEP_LABELS[view]}`}
           >
-            <ChevronLeft size={16} strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
+            <ChevronLeft size={18} strokeWidth={1.5} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => navigate(1)}
-            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-navy-50 hover:text-navy-800 hover:border-navy-200 transition-colors"
+            aria-label={`Následující ${VIEW_STEP_LABELS[view]}`}
+            title={`Následující ${VIEW_STEP_LABELS[view]}`}
           >
-            <ChevronRight size={16} strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
-            onClick={goToToday}
-            className="text-xs font-semibold text-navy-800 border border-navy-200 px-3 py-1.5 rounded-lg hover:bg-navy-50 transition-colors"
-          >
+            <ChevronRight size={18} strokeWidth={1.5} aria-hidden="true" />
+          </Button>
+          <Button variant="outline" onClick={goToToday}>
             Dnes
-          </button>
-          <h2 className="text-base font-semibold text-foreground ml-1">{headerTitle()}</h2>
+          </Button>
+          <h2 className="ml-1 text-base font-semibold text-ink">{headerTitle()}</h2>
         </div>
 
         <div className="flex items-center gap-2 sm:ml-auto">
-          {/* View switcher */}
-          <div className="flex items-center bg-muted rounded-lg p-0.5">
+          {/* Zobrazení: pilulky v jednom pouzdře jako v kalendáři Workspace. */}
+          <div className="flex gap-1 rounded-full bg-navy-50 p-1" role="group" aria-label="Zobrazení kalendáře">
             {(['month', 'week', 'day'] as ViewMode[]).map(v => (
               <button
                 key={v}
                 type="button"
                 onClick={() => switchView(v)}
+                aria-pressed={view === v}
                 className={cn(
-                  'text-xs font-semibold px-3 py-1.5 rounded-md transition-all',
-                  view === v
-                    ? 'bg-white text-navy-800 shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
+                  'inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold transition-colors',
+                  view === v ? 'bg-navy-700 text-white' : 'text-navy-900 hover:bg-navy-100',
                 )}
               >
                 {v === 'month' ? 'Měsíc' : v === 'week' ? 'Týden' : 'Den'}
@@ -1118,20 +1158,16 @@ export function SmartCalendar({
             ))}
           </div>
 
-          {/* Add event */}
-          <button
-            type="button"
-            onClick={() => setCreateModal({ open: true })}
-            className="flex items-center gap-1.5 brand-gradient text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
-          >
-            <Plus size={13} strokeWidth={1.5} />
+          {/* Jedna hlavní akce obrazovky. */}
+          <Button onClick={() => setCreateModal({ open: true })}>
+            <Plus size={16} strokeWidth={1.5} aria-hidden="true" />
             Přidat
-          </button>
+          </Button>
         </div>
-      </div>
+      </Toolbar>
 
       {/* Calendar body */}
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-box border border-navy-100 bg-surface">
         <div className="p-4 sm:p-5">
           <AnimatePresence mode="wait">
             <m.div
@@ -1176,7 +1212,7 @@ export function SmartCalendar({
         </div>
 
         {/* Legend footer */}
-        <div className="border-t border-border px-5 py-3">
+        <div className="border-t border-navy-100 px-5 py-3">
           <Legend />
         </div>
       </div>
