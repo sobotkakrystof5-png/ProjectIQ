@@ -2,7 +2,7 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-12 · **AD12 hotové na vlastní větvi `admin/ad12-fakturace`** (souběžně s AD11): admin fakturu vystaví — číslo `YYYYNNN` z databáze, položky, QR platba, PDF se vyrábí při otevření, odběratel z ARES, vystavený doklad je neměnný a opravuje se stornem; příjem vzniká pořád až zaplacením. PDF faktury je nově jedno pro celé repo a při vytažení se v něm našly a opravily čtyři chyby Workspace (patkové písmo místo Dílků, datum bez roku, variabilní symbol s pomlčkou, slepené popisky stran). Migrace 107 neběžela nikde, PDF i formulář ověřené v prohlížeči; R-086, R-098, DECISIONS #023 a #024 · **AD11 hotové v kódu: zakázka je jediná pravda** — `completed_projects` se přejmenovala na archiv, dokončenost je `projects.closed_at`, hodnocení visí na zakázce a detail má průvodku s devíti kroky; změna stavu je jeden klik se „Zpět" (migrace 106, R-097) · **Incident: 106 pustená na produkci před nasazením větve** — veřejný dotazník `/h/[token]` vrací 500, návrat je `scripts/admin-106-zpet.sql` (AUDIT-LOG 2026-11-12) · **AD10 uzavřené a ověřené v prohlížeči** na 390–1440 px; průchod našel a opravil čtyři věci (karta kontaktu neuměla zavolat a přetékala na telefonu, kalendář neukázal kontakt u ručně zapsané události, `updateLead` by spadl na databázi bez migrace 105) · Modernizace adminu: AD00–AD10 hotové (nově kontakt jedním klikem: `tel:`, `sms:`, `mailto:` a WhatsApp se šablonami na každé obrazovce, kde kontakt je — včetně detailu zakázky, kde dosud nebyl ani jeden; přesun termínu v Hovorech posune i kalendář a rezervace z portálu je vidět v Hovorech; migrace 105 nikde neaplikovaná; R-096) · Modernizace adminu: AD00–AD09 hotové (nově jedna entita kontaktu: tabulka `contacts`, obrazovka Kontakty se sloučením duplicit, normalizace telefonů a e-mailů, backfill skript a převod z Hovorů, který už nic neztrácí; migrace 104 jen na testu; R-095) · Modernizace adminu: AD00–AD08 hotové (nově rychlost II: e-maily a oznámení mimo akci přes `after()`, kalendář čte okno místo celé historie a tři nahlášené chyby zadávání času opravené, Finance v GET nezapisují, Framer Motion líně — Hovory a Kalendář o 28 kB lehčí, potvrzení poptávky vypadá okamžitě, PDF faktury s ETagem; R-093, R-094, DECISIONS #022) · 2026-11-11 · AD00–AD07 hotové (nově sdílená tabulka adminu: řazení, filtry a stránkování v adrese, počítá je databáze, a žádný výpis už netahá celou tabulku) (rychlost I: dávkovaný `lib/admin/db.ts` — Dnes 8 kol → 1, detail zakázky 12 dotazů v 5 vlnách → 1 dávka, Klienti bez 11 korelovaných podvýběrů; migrace 103 s indexy; kostra streamem, `staleTimes`, landing bez NextAuth, R-092) na větvi `admin/modernizace` (nově jedna kostra: šířku a hlavičku obrazovky určuje stránka přes `PageShell`/`PageHeader`, jeden systém odznaků v `lib/admin-status.ts` místo deseti palet, R-091) (nově vizuální základ: paleta Dílků na `:root`, Instrument Sans místo Interu, zúžená CSP, portály a toasty adminu přes `components/ui`, `brand-*` → `navy-*`) (ukázková data, evidence migrací, výchozí měření, úklid čtyř modulů, jeden byznys se třemi zdroji poptávek, zrušení Hubu a jedna navigace s měsíčními čísly na Dnes; migrace 100–102 jen na testu) · 2026-11-10 · Plán modernizace admin konzole AD00–AD18 (R-081–R-085, kód se zatím nemění) · Řemeslné skilly třetích stran, impeccable 4.8.2, tasteskill 2.5.1 uživatelsky (R-080) · 2026-11-04 · Incident: produkce bez DB po výměně hesla `neondb_owner`, opraveno (AUDIT-LOG) · 2026-11-03 · Právní texty a provozovatel na webu (R-079) · Review před spuštěním a opravy (R-077, migrace 099 připravená, CI s testy, chybové stránky, Clerk `authorizedParties`, session adminu 12 h) · 2026-11-01 · Klientský prostor, hlášení z Claude Code a nová kostra adminu (R-070–R-073, migrace 092–096 aplikované na produkci, `portal_app` vytvořena, commit 41c6873 pushnutý, Preview Ready) · Požadavky klientů z portálu (R-069) · Preview na testovací DB, 084 na testu i produkci; redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 rozpracováno; produkční migrace 064–091 aplikované; připraven samostatný prázdný testovací Neon projekt · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
+> **Poslední aktualizace:** 2026-11-13 · **AD13 hotové v kódu: náprava financí** — `finance_transactions` dostala **měnu**, takže se eurová faktura přestane sčítat s korunami (nejdůležitější oprava celého plánu: dosud to lezlo do daňového základu); uložení faktury je **jedna transakce**, „po splatnosti" má jeden výpočet s pražským dneškem, editace fixního nákladu **nemaže historii** a dvojí příjem k zakázce hlídá databáze — zbytek rozhodne člověk („Je tohle ta platba?"). Příjem nese datum platby, ne zápisu. Všechno DDL v **migraci 109, nikde neaplikované**; R-099 · **AD12 hotové na vlastní větvi `admin/ad12-fakturace`** (souběžně s AD11): admin fakturu vystaví — číslo `YYYYNNN` z databáze, položky, QR platba, PDF se vyrábí při otevření, odběratel z ARES, vystavený doklad je neměnný a opravuje se stornem; příjem vzniká pořád až zaplacením. PDF faktury je nově jedno pro celé repo a při vytažení se v něm našly a opravily čtyři chyby Workspace (patkové písmo místo Dílků, datum bez roku, variabilní symbol s pomlčkou, slepené popisky stran). Migrace 107 neběžela nikde, PDF i formulář ověřené v prohlížeči; R-086, R-098, DECISIONS #023 a #024 · **AD11 hotové v kódu: zakázka je jediná pravda** — `completed_projects` se přejmenovala na archiv, dokončenost je `projects.closed_at`, hodnocení visí na zakázce a detail má průvodku s devíti kroky; změna stavu je jeden klik se „Zpět" (migrace 106, R-097) · **Incident: 106 pustená na produkci před nasazením větve** — veřejný dotazník `/h/[token]` vrací 500, návrat je `scripts/admin-106-zpet.sql` (AUDIT-LOG 2026-11-12) · **AD10 uzavřené a ověřené v prohlížeči** na 390–1440 px; průchod našel a opravil čtyři věci (karta kontaktu neuměla zavolat a přetékala na telefonu, kalendář neukázal kontakt u ručně zapsané události, `updateLead` by spadl na databázi bez migrace 105) · Modernizace adminu: AD00–AD10 hotové (nově kontakt jedním klikem: `tel:`, `sms:`, `mailto:` a WhatsApp se šablonami na každé obrazovce, kde kontakt je — včetně detailu zakázky, kde dosud nebyl ani jeden; přesun termínu v Hovorech posune i kalendář a rezervace z portálu je vidět v Hovorech; migrace 105 nikde neaplikovaná; R-096) · Modernizace adminu: AD00–AD09 hotové (nově jedna entita kontaktu: tabulka `contacts`, obrazovka Kontakty se sloučením duplicit, normalizace telefonů a e-mailů, backfill skript a převod z Hovorů, který už nic neztrácí; migrace 104 jen na testu; R-095) · Modernizace adminu: AD00–AD08 hotové (nově rychlost II: e-maily a oznámení mimo akci přes `after()`, kalendář čte okno místo celé historie a tři nahlášené chyby zadávání času opravené, Finance v GET nezapisují, Framer Motion líně — Hovory a Kalendář o 28 kB lehčí, potvrzení poptávky vypadá okamžitě, PDF faktury s ETagem; R-093, R-094, DECISIONS #022) · 2026-11-11 · AD00–AD07 hotové (nově sdílená tabulka adminu: řazení, filtry a stránkování v adrese, počítá je databáze, a žádný výpis už netahá celou tabulku) (rychlost I: dávkovaný `lib/admin/db.ts` — Dnes 8 kol → 1, detail zakázky 12 dotazů v 5 vlnách → 1 dávka, Klienti bez 11 korelovaných podvýběrů; migrace 103 s indexy; kostra streamem, `staleTimes`, landing bez NextAuth, R-092) na větvi `admin/modernizace` (nově jedna kostra: šířku a hlavičku obrazovky určuje stránka přes `PageShell`/`PageHeader`, jeden systém odznaků v `lib/admin-status.ts` místo deseti palet, R-091) (nově vizuální základ: paleta Dílků na `:root`, Instrument Sans místo Interu, zúžená CSP, portály a toasty adminu přes `components/ui`, `brand-*` → `navy-*`) (ukázková data, evidence migrací, výchozí měření, úklid čtyř modulů, jeden byznys se třemi zdroji poptávek, zrušení Hubu a jedna navigace s měsíčními čísly na Dnes; migrace 100–102 jen na testu) · 2026-11-10 · Plán modernizace admin konzole AD00–AD18 (R-081–R-085, kód se zatím nemění) · Řemeslné skilly třetích stran, impeccable 4.8.2, tasteskill 2.5.1 uživatelsky (R-080) · 2026-11-04 · Incident: produkce bez DB po výměně hesla `neondb_owner`, opraveno (AUDIT-LOG) · 2026-11-03 · Právní texty a provozovatel na webu (R-079) · Review před spuštěním a opravy (R-077, migrace 099 připravená, CI s testy, chybové stránky, Clerk `authorizedParties`, session adminu 12 h) · 2026-11-01 · Klientský prostor, hlášení z Claude Code a nová kostra adminu (R-070–R-073, migrace 092–096 aplikované na produkci, `portal_app` vytvořena, commit 41c6873 pushnutý, Preview Ready) · Požadavky klientů z portálu (R-069) · Preview na testovací DB, 084 na testu i produkci; redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 rozpracováno; produkční migrace 064–091 aplikované; připraven samostatný prázdný testovací Neon projekt · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
 
 ---
 
@@ -12,7 +12,19 @@
 
 **Admin konzole (produkce):** VIZEON `/dashboard`, ALTENO `/alteno`, portál `/p/[token]`, Hub `/hub`; deploy z `main`, produkce běží na starém buildu `d948400`. Popis: `docs/admin/AGENTS-ADMIN.md`. Na větvi `ws/redesign-app` (nenasazeno) má admin novou kostru (R-071), Dnes, detail zakázky se záložkami a správu klientských prostorů; na `admin/modernizace` navíc úklid z AD01.
 
-**Modernizace adminu (R-081–R-098), stav po sezení 2026-11-12:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD11 hotové**; **AD12 (vystavování faktur, migrace 107 + 108) je hotové a 2026-11-13 sloučené do `admin/modernizace`** — další na řadě je AD13 (náprava financí, migrace **109**; 108 zabral doplněk AD12). Z migrací této větve (100–107) jsou 100–104 a **107** na testovacím Neonu, 105 nikde a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). Vystavení faktury je ověřené naživo: proklikané v prohlížeči proti testovací databázi (2 s, PDF 132 kB) a souběh dvěma spojeními (2026001/2026002, bez díry).
+**Modernizace adminu (R-081–R-099), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD13 hotové** — další na řadě je **AD14 (AI asistent, migrace 110**; 109 zabralo AD13, takže AD15 jede s 110 a AD16 má 111). Z migrací této větve (100–109) jsou 100–104 a **107** na testovacím Neonu, 105, 108 a **109 nikde** a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). **Pořadí při nasazení:** aditivní 103, 104, 105, 107, 108 a 109 **před** deployem (bez 107 by evidence faktur vracela chybu), nekompatibilní 102 a 106 **po** něm.
+Z AD13: `finance_transactions` má **měnu** (`currency`), takže eurová faktura přestane plnit
+korunové součty a daňový základ nepřepočteným číslem; měny se nikde nesčítají (R-048) a cizí
+měna má vlastní řádek. Uložení faktury je **jedna dávka** = jedna transakce (dřív 4–6 dotazů,
+pád uprostřed nechal zaplacenou fakturu bez příjmu). „Po splatnosti" má jediný zdroj
+(`lib/invoice-status.ts`) s pražským dneškem a zná storno — Dnes dřív vymáhalo stornované
+doklady. `updateCost` **nemaže vygenerovanou historii** (nová částka platí od aktuální periody,
+smazání nákladu s historií ho jen ukončí) a `generate_recurring_costs` doplní vynechané měsíce
+i zpětně. Dvojí příjem hlídají dva částečné unikátní indexy (jeden na doklad, jeden zálohový
+a jeden doplatkový **ze zakázky**), automaticky se převezme jen jednoznačný kandidát a zbytek
+rozhodne člověk na detailu faktury; převzetí platby z uzavřeného roku chce potvrzení. Příjem
+ze zakázky nese **datum platby** (`projects.paid_on`, `deposit_paid_on`), ne okamžik zápisu
+v UTC. Odchylky od zadání: R-099. **V prohlížeči neověřeno** — chybí 109 na testovacím Neonu. Vystavení faktury je ověřené naživo: proklikané v prohlížeči proti testovací databázi (2 s, PDF 132 kB) a souběh dvěma spojeními (2026001/2026002, bez díry).
 Z AD11: dokončenost je **stav zakázky**, ne vlastní záznam. `completed_projects` byla plná kopie
 zakázky s vlastní cenou a `createCompletedProject` k ní uměl vložit příjem nezávisle na tom,
 jestli zakázka svůj příjem už má — odtud riziko dvojího započtení. **Migrace 106** tabulku
@@ -717,14 +729,57 @@ testy `lib/__tests__/admin-fakturace.test.ts`. Upřesňuje R-083 (tam ještě `k
 a migrace 103/104 — platí tenhle zápis). Admin běží rolí vlastníka tabulek, takže si trigger může
 vypnout; je to pojistka proti omylu, ne proti záměru.
 
+### R-099 · Index proti dvojímu příjmu jen na zakázku; migrace na duplicitách nepadá (2026-11-13)
+**Rozhodnutí:** šest odchylek od zadání AD13.
+(1) Migrace má číslo **109** (prompt psal 104, to zabraly Kontakty), takže **AD14/AD15 jdou
+na 110 a AD16 na 111**.
+(2) Částečný unikátní index proti dvojímu příjmu platí **jen pro `income_origin = 'project'`**
+(zakázka si zapíše nejvýš jeden zálohový a jeden doplatkový příjem) a vedle něj stojí index
+„jeden příjem na doklad". Příjmů z faktur se netýká.
+(3) `CREATE UNIQUE INDEX` běží v `DO` bloku, který `unique_violation` odchytí a vypíše `WARNING`;
+migrace na existujících duplicitách **nepadá**.
+(4) Převzetí příjmu zůstává automatické, ale jen když je **jednoznačné** (jeden kandidát, stejná
+částka i měna). Jinak se zeptá člověka.
+(5) Konstanta sloupců se jmenuje `invoiceColumns(L)`, ne `invoiceSelect`.
+(6) Opakované náklady nemají nový cron, volá je týž denní `send-reminders`.
+**Proč:** (2) Zadání chtělo index přes **všechny** příjmy zakázky. To by zablokovalo zakázku
+fakturovanou po etapách: druhá zaplacená faktura by si nemohla zapsat příjem a peníze by
+v ledgeru **chyběly** — horší chyba než ta, kterou index řeší. Dvojí započtení u faktur řeší
+vazba na doklad a výslovné „Je tohle ta platba?". (3) Kdyby na duplicitách padla celá migrace,
+nedoběhla by ani měna v ledgeru, což je nejdůležitější oprava celého plánu. (4) „Zaplaceno" je
+od AD08 akce na jeden klik ve výpisu; ptát se u každé faktury by ji rozbilo. (5) Je to funkce,
+protože `payment_reviewed_at` existuje až po migraci 109.
+**Důsledek:** `docs/admin/AGENTS-ADMIN.md` → „Náprava financí (AD13, R-099)", plán modernizace
+→ AD13 (seznam odchylek). Nový součet nad `finance_transactions` **musí** mít `L.czkOnly()`
+(`lib/admin/ledger.ts`), jinak se vrátí sčítání měn. Nová cesta k příjmu musí nastavit
+`income_origin`, jinak ji index nehlídá. Duplicity v datech najde
+`node scripts/admin-prijmy-duplicity.mjs` (jen čte); po úklidu se migrace 109 pustí znovu.
+
 ---
 
 ## 3. Otevřené problémy
 
 - [ ] **Migrace 108 nikde (AD12, doplněk):** trigger, který zakáže smazat vystavený doklad.
   Aditivní, starému buildu neškodí, na produkci patří spolu se 107. Aplikuje Kryštof · od 2026-11-13
-- [ ] **AD13 má nově migraci 109, ne 108:** číslo 108 zabral doplněk AD12. Opraveno v plánu
-  modernizace · od 2026-11-13
+- [ ] **Migrace 109 (AD13) nikde, ani na testu.** Měna v ledgeru, doba platnosti nákladu
+  a `generate_recurring_costs`, `income_origin`/`payment_origin` a dva unikátní indexy,
+  `projects.paid_on`/`deposit_paid_on`. Je **aditivní a zpětně kompatibilní** (bez ní se admin
+  chová jako dřív, viz `lib/admin/ledger.ts`), takže se smí pustit kdykoli — a **dokud neproběhne,
+  eurová faktura se dál sčítá s korunami**. Při spuštění hlídat `WARNING` o nevytvořeném indexu:
+  znamená duplicitní příjmy v datech, najde je `node scripts/admin-prijmy-duplicity.mjs` a po
+  úklidu se migrace pustí znovu. Aplikuje Kryštof · od 2026-11-13
+- [ ] **Pořadí migrací při nasazení větve `admin/modernizace` (zjištěno 2026-11-13):** aditivní
+  migrace **103, 104, 105, 107, 108 a 109 patří před deploy**, nekompatibilní **102 a 106 až po
+  něm**. Důvod pro 107: `invoiceColumns` čte `invoices.cancelled_at` (AD12 doplněk) **bez**
+  přepínače, takže na databázi bez 107 by evidence faktur, archiv ve Financích i záložka
+  Fakturace na zakázce vracely chybu. Tvrzení z AD12, že se admin „bez 107 chová jako dřív",
+  platí jen pro vystavování, ne pro výpisy · od 2026-11-13
+- [ ] **AD13 v prohlížeči neověřené:** jde to až s migrací 109 na testovacím Neonu. Projít na
+  390 / 768 / 1280 / 1440 px: Finance › Podnikání (řádek cizí měny u příjmů i u výkonnosti),
+  Dnes (řádek „mimo součet"), detail faktury s **„Je tohle ta platba?"** (přiřazení, „Ne, byly
+  to jiné peníze", potvrzení u platby z loňska), formulář zakázky s „Peníze dorazily"
+  a „Záloha dorazila", Náklady (ukončení fixního nákladu s historií a hláška „Náklad ukončený,
+  historie zůstala") a tlačítko „Doplnit opakované" · od 2026-11-13
 - [ ] **Migrace 106 je na produkci, větev nasazená není (incident 2026-11-12):** produkce běží
   na starém buildu `d948400`, který `completed_projects` čte. Potvrzeno měřením: veřejný dotazník
   `https://www.zakaziq.cz/h/<token>` vrací **500** místo 404; za přihlášením padá `/dashboard/dokoncene`,
@@ -756,9 +811,6 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 - [ ] **Odeslání faktury e-mailem nikdo nezkusil naživo (AD12):** `POST /api/invoices/[id]/email`
   posílá přes Gmail SMTP (`lib/email.ts`, R-004) s PDF v příloze. Ověřit skutečné doručení,
   velikost přílohy a jak to vypadá v Gmailu a Apple Mailu · od 2026-11-12
-- [ ] **Faktura v EUR se v ledgeru pořád sčítá s korunami (AD12 → AD13):** vystavit jde doklad
-  v EUR, ale `finance_transactions` nemá `currency` (R-083), takže se částka přičte ke korunám.
-  Do AD13 fakturovat v EUR jen vědomě · od 2026-11-12
 - [ ] **`ws-schema` test je na větvi `admin/ad12-fakturace` červený:** hlídá migrace bez mezer
   a číslo **106 drží souběžné sezení AD11**. Není to chyba AD12 — zmizí po rebase na větev,
   kde 106 je. Před mergem do `admin/modernizace` pustit `npm test` znovu · od 2026-11-12
@@ -795,7 +847,6 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 - [ ] **AD09 v prohlížeči neověřený:** projít na 390 / 768 / 1280 / 1440 px `/dashboard/kontakty` — tři pohledy (Kontakty, Možné duplicity, Sloučené), hledání podle telefonu zapsaného jinak, **karty místo tabulky pod 640 px** — a kartu kontaktu: uložení údajů (hlavně hláška u telefonu, kterému nejde rozumět, a kolize e-mailu), **Sloučit sem** a jeho „Zpět" v toastu, „Rozdělit zpět" u sloučeného kontaktu. Dál převod kontaktu na zakázku z Hovorů: musí skončit na nové zakázce, mít v ní poznámky z hovorů a navázaný termín v kalendáři · od 2026-11-12
 - [ ] **`notFound()` v adminu vrací 200, ne 404 (zjištěno 2026-11-12):** `/dashboard/<neexistující id>`, `/dashboard/faktury/<id>`, `/dashboard/kontakty/<id>` i neexistující stránka **vykreslí 404 obrazovku, ale se stavem 200**. Je to důsledek streamování kostry (AD06): hlavička odejde dřív, než stránka zjistí, že záznam není. Pro uživatele je to v pořádku (vidí „nenalezeno"), pro monitoring a roboty ne — `/dashboard` je sice `noindex`. Platí pro celý admin, ne jen pro nové obrazovky; opravit s AD18 (přístupnost a kvalita) · od 2026-11-12
 - [ ] **`npm run build:check` při běžícím `next dev` není neškodný (zjištěno 2026-11-12):** `scripts/build-check.sh` tvrdí, že od Next 16 má dev vlastní výstup a `next build` mu ho nepřepíše. V AD08 se ukázalo, že build **přepíše `.next/static`** pod už běžícím `next start` — ten pak servíroval chunky, které na disku nejsou (HTML na ně odkazuje, server vrací 500), a měření balíčku kvůli tomu jednou vyšlo falešně o 18–27 % lépe. Pro měření proto platí: po buildu server **restartovat** a zkontrolovat, že žádný skript z HTML na disku nechybí. `next dev` build **přežije** (ověřeno v AD09: po `build:check` vracel dev server dál 200 na 15 adresách); zbývá tedy jen případ `next start` · `scripts/build-check.sh` · od 2026-11-12
-- [ ] **Datum v UTC na dalších čtyřech místech financí:** `new Date().toISOString().slice(0, 10)` místo `getPragueTodayISO()` v `app/dashboard/faktury/[id]/page.tsx:91`, `invoice-actions.ts:116,158` a dvakrát v `IncomeExpenseSection.tsx`. Mezi 23:00 a půlnocí je to o den vedle — dnes jen u porovnání „po splatnosti" a výchozího data ve formuláři, ne u zápisu. Na výpisu faktur opraveno v AD08 (tam z toho je datum zaplacení); zbytek patří k nápravě financí v **AD13** · od 2026-11-12
 - [ ] **Ikonová tlačítka v kalendáři nemají přístupný název:** šipky vpřed/vzad v `SmartCalendar` jsou `<button>` jen s SVG, bez `aria-label` — čtečka přečte „tlačítko". Všiml jsem si při řízení prohlížeče (musel jsem je hledat přes sourozence tlačítka „Dnes"). Patří k přístupnosti v **AD17** · `components/SmartCalendar.tsx` · od 2026-11-12
 - [ ] **PDF faktury 200 → 304 ověřené jen unit testem (AD08):** na testovací databázi žádná faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404), takže skutečné 304 v DevTools nikdo neviděl. Ověřit s fakturou, která `pdf_data` má · `app/api/invoices/[id]/pdf/route.ts` · od 2026-11-12
 - [ ] **`LeadsTable` drží kopii serverových dat v `useState`** a synchronizuje ji ručně po každé akci. `useOptimistic` z AD08 na tom nic nemění. Rozchod je možný (jiná záložka, cizí změna) a stránka se po každé akci zbytečně vykreslí na serveru nadarmo. Odstranit při přepsání obrazovky v **AD17** — vykreslovat z propů · `components/LeadsTable.tsx` · od 2026-11-12
@@ -893,6 +944,54 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
+### 2026-11-13 (AD13 — náprava financí)
+- **feat** **AD13 hotové v kódu.** Pět commitů, každý s testem. Technický popis:
+  `docs/admin/AGENTS-ADMIN.md` → „Náprava financí (AD13, R-099)", odchylky v plánu modernizace.
+  **Všechno DDL je v migraci 109. Aplikovaná: nikde.**
+- **fix** **Měna v ledgeru — nejdůležitější oprava celého plánu.** `finance_transactions` neměla
+  měnu, zatímco faktura ano: zaplacená **eurová faktura vložila do ledgeru nepřepočtené číslo**
+  a sečetlo se s korunami v `getBusinessIncome`, `getMonthlyAggregates`, výkonnosti podnikání,
+  na Dnes i v daňové kalkulačce — tedy špatné číslo v daňovém základu. Evidence faktur přitom
+  sčítala po měnách, takže o týchž penězích existovaly dvě pravdy a ta horší šla do daní.
+  Nově má transakce `currency`, do korunových součtů jdou jen koruny a cizí měna má vlastní
+  řádek, který říká, že se nepřičítá. Soubory: `migrations/109_finance_meny_a_naklady.sql`,
+  `lib/admin/ledger.ts`, `lib/money-currency.ts`, `lib/invoices.ts`,
+  `app/dashboard/finance/{finance-actions,byznys-actions,BusinessSection,BusinessCalculator,IncomeExpenseSection}`,
+  `lib/admin-today-queries.ts`, `app/dashboard/page.tsx`.
+- **fix** **Uložení faktury je jedna transakce.** Dřív 4–6 samostatných dotazů; pád mezi nimi
+  nechal zaplacenou fakturu **bez příjmu**. `invoiceSyncQueries` dává sedm příkazů (každý no-op,
+  když nesedí) a jdou do databáze jednou dávkou spolu se změnou dokladu — i u „Zaplaceno"
+  jedním klikem a u storna.
+- **fix** **Jeden výpočet „po splatnosti"** (`lib/invoice-status.ts`) místo čtyř. Tři z nich
+  brala dnešek v UTC (po pražské půlnoci ještě včerejší datum, takže se faktura po splatnosti
+  na hodinu zatajila) a dvě neznala storno z AD12 — Dnes proto vymáhalo stornované doklady.
+  Dnešek teď vždy přichází ze serveru, i do klientských komponent.
+- **refactor** Čtvrtá kopie osmnácti sloupců faktury zmizela (`invoiceColumns(L)`); detail
+  faktury jede jednou dávkou místo tří kol.
+- **fix** **Editace fixního nákladu mazala historii.** `updateCost` končila
+  `DELETE FROM finance_transactions WHERE source_cost_id = …`, takže i pouhé přejmenování smazalo
+  **všechny** vygenerované měsíční výdaje a cron dogeneroval jen ten aktuální. Nově přejmenování
+  přepíše popis, nová částka platí od aktuální periody dál a smazání nákladu s historií ho jen
+  **ukončí** (`ends_on`, `archived_at`). Chybějící periody doplní DB funkce
+  `generate_recurring_costs` i zpětně (strop 36 měsíců) z téhož denního cronu.
+- **feat** **Konec dvojího příjmu.** Faktura si brala příjem zakázky sama podle rovnosti částky
+  a první podle data — u zálohy a doplatku stejné výše mohla převzít ten špatný, při zaokrouhlení
+  nepřevzala nic a vložila druhý. Nově se automaticky převezme jen **jednoznačný** kandidát,
+  zbytek rozhodne člověk („Je tohle ta platba?" na detailu faktury) a dvojí příjem **ze zakázky**
+  hlídají dva částečné unikátní indexy. Převzetí platby z uzavřeného roku chce potvrzení —
+  mění daňový základ za loňsko.
+- **fix** **Datum platby, ne datum zápisu.** Příjem ze zakázky se zapisoval `now()::date` v UTC,
+  takže peníze z prosince zapsané v lednu spadly do jiného daňového roku. Zakázka má nově
+  „Peníze dorazily" a „Záloha dorazila" (`projects.paid_on`, `deposit_paid_on`; prázdné = dnes).
+- **chore** **Testy na cesty, které žádné neměly:** `parseInvoiceForm`, `updateInvoiceRow`,
+  `syncInvoiceTransaction`, adopce platby, `costs-actions`, `recurring-transactions`
+  a `POST /api/public/invoices`. Pět nových souborů, 66 testů. Celkem `npm test`
+  **93 souborů / 1103 testů**, `npx tsc --noEmit` a `npm run build:check` bez varování.
+  **Obrazovky v prohlížeči neověřené** (migrace 109 není ani na testu).
+- **decision** **R-099** — šest vědomých odchylek od zadání AD13 (hlavně rozsah unikátního
+  indexu a to, že migrace na duplicitách nepadá).
+- **docs** Bezpečnostní review AD13: bez nálezu (AUDIT-LOG 2026-11-13).
+
 ### 2026-11-13 (AD12 — sloučení a průchod na testovací databázi)
 - **chore** **AD12 sloučená do `admin/modernizace`** (`ed2b084`). Druhá, souběžně vzniklá verze
   z `admin/modernizace` je vrácená revertem (`daf8240`); její rozdíly jsou přenesené v `145b1a1`.
@@ -937,178 +1036,4 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
   `admin-faktura-storno-a-mazani.test.ts` nad PGlite: zákaz mazání, archiv se maže dál, storno
   mimo pohledávky i součty, „Zaplaceno" odmítnuto), `npm run build:check`.
 
-### 2026-11-12 (AD12 — ověření naživo na testovací databázi)
-- **chore** **Migrace 107 je na testovacím Neonu** (`rd-test`, se souhlasem Kryštofa; produkce
-  se nedotkla). Před spuštěním se ověřilo, že `.env.local` míří na test a ne na produkci —
-  testovací databáze má `contacts` ze 104 a **nemá** `completed_projects_archiv` ze 106.
-  Běhoun `node scripts/apply-migration.js 107_fakturace_vystavovani.sql`, 15 příkazů.
-- **chore** **Souběh ověřený naživo, ne jen v PGlite.** Dvě spojení přes `Pool`: transakce A
-  vystavila fakturu a nekomitla, transakce B na `admin_invoice_issue` **čekala** (po 1,5 s pořád
-  běžela), po commitu A dostala další číslo. Výsledek `2026001` a `2026002` — různá čísla,
-  bez díry, řada v `admin_settings` na dvojce. Tím padá poslední bod „Hotovo, když" u AD12.
-- **chore** **Celá cesta proklikaná v prohlížeči** s přihlášením (podepsaná session, produkční
-  build proti testovací databázi): Faktury → **Vystavit fakturu** → údaje dodavatele uložené →
-  nová faktura vyplněná a vystavená **za 2,0 s** (číslo `2026003`) → detail s položkami, stornem
-  a odesláním → **PDF 200, 132 763 B, `%PDF-`** vyrobené při otevření → storno prošlo. Na 390 px
-  nic nepřetéká a tlačítko Vystavit fakturu (44 px) nezakrývá spodní lišta. V konzoli jen
-  404 na `/favicon.ico`.
-- **fix** Průchod našel dva zavádějící texty na detailu vystavené faktury: svítila karta
-  „Co z PDF přečetla AI" (u dokladu vystaveného tady se žádné PDF nečetlo) a prázdný stav
-  zakázky odkazoval na tlačítko **„Upravit", které u vystavené faktury není**. První se u vystavené
-  faktury neukazuje vůbec, druhý říká, že příště jde fakturu vystavit rovnou ze zakázky.
-- **chore** Po ověření se testovací doklady `2026003` a `2026004` smazaly; archiv (6 řádků)
-  zůstal nedotčený a **řada zůstala na čtyřce** — číslo se nerecykluje, jak má být.
-
-### 2026-11-12 (AD12 — vystavování faktur, souběžně s AD11)
-- **feat** **AD12 hotovo** — admin faktury vystavuje, nejen archivuje. Nová obrazovka
-  `/dashboard/faktury/nova` (hlavní akcí evidence je nově „Vystavit fakturu", nahrání cizího PDF
-  zůstalo vedle) a `/dashboard/faktury/dodavatel` (údaje dodavatele jednou, na doklad jako snímek).
-  Číslo přiděluje databáze: `admin_invoice_issue` pod zámkem jediného řádku `admin_settings`,
-  formát **`YYYYNNN`** (`2026001`) — jde rovnou do variabilního symbolu, který smí být jen
-  z číslic. Částku a DPH **počítá databáze z položek** a proti poslané hodnotě je porovná.
-  Vystavený doklad je neměnný (trigger `admin_invoice_locked`), opravuje se stornem a novou
-  fakturou. PDF se neukládá — vyrábí se při otevření z položek a snímku dodavatele, s QR platbou
-  (SPAYD). Odběratele doplní ARES podle IČO. Soubory: `migrations/107_fakturace_vystavovani.sql`,
-  `lib/ares.ts`, `lib/admin/{invoice-issue,invoice-issue-schema}.ts`,
-  `lib/invoice-pdf/{render,totals}.ts` + `assets/`, `app/dashboard/faktury/{nova,dodavatel}/page.tsx`,
-  `components/admin/invoices/{issue-form,issuer-form,issued-actions}.tsx`,
-  `app/dashboard/finance/invoice-actions.ts`, `app/api/invoices/[id]/{pdf,email}/route.ts`,
-  `lib/email.ts`, `next.config.mjs`. **Migrace 107 aplikovaná: ne** (ani na testu).
-- **refactor** **PDF faktury je jedno pro celé repo.** `lib/ws/money/pdf.ts` se zmenšil na adaptér
-  nad `lib/invoice-pdf/render.ts`; součty položek jsou v `lib/invoice-pdf/totals.ts` a Workspace
-  si je odtud re-exportuje (`lib/ws/money/calculations.ts`), takže zaokrouhlení v haléřích má
-  jednu definici — tutéž, jakou má v SQL migrace 107. Písma a licence se přesunuly do
-  `lib/invoice-pdf/assets/` (jeden řádek v `next.config.mjs`).
-- **fix** **Do počtu ani ceny nešlo napsat desetinné číslo** (našel průchod formuláře v prohlížeči):
-  pole držela číslo, takže po napsání čárky se hodnota přečetla jako celé číslo, pole se překreslilo
-  a čárka zmizela — „1,5" ani „1 200,50" nešlo zadat a smazané pole zůstávalo na nule. Položka se
-  teď v formuláři drží jako text a na číslo se převádí až při počítání a odesílání.
-- **fix** Při vytažení se našly **čtyři chyby ve fakturách Workspace**, všechny opravené ve
-  sdíleném rendereru: (1) datum se tisklo formátem pro kalendář („pá 9. 10."), takže daňový doklad
-  **neuváděl rok**; nově „9. 10. 2026". (2) Variabilní symbol se čistil výrazem `/\\D/` místo
-  `/\D/`, takže v textu zůstal s pomlčkou, zatímco QR kód vedle nesl samé číslice.
-  (3) **Celý doklad se tiskl patkovým výchozím písmem prohlížeče** — pravidlo `body{font-family:
-  InvoiceSans}` prohrálo s `[data-app="ws"]` z tokenů Workspace (je to tentýž element) a
-  `var(--font-instrument-sans)` v PDF neexistuje. Vložená písma (152 kB woff2 kvůli tomu, že
-  Chromium nemá síť) se tak používala jen na čísla. Selektor je nově `body[data-app="ws"]`.
-  (4) Popisky „Dodavatel" a „Odběratel" se slepily se jménem (`<small>` bez `display:block`).
-  Stornovaná faktura má nově v PDF napsáno, že neplatí.
-- **feat** Odeslání faktury klientovi s PDF v příloze: `POST /api/invoices/[id]/email`
-  (`sendInvoiceEmail` v `lib/email.ts`). Jen na kliknutí, nikdy automaticky; kontroluje `Origin`
-  a má strop 10 odeslání za 10 minut.
-- **decision** **R-086** (ARES: ověřený endpoint, mod 11, timeout, Zod, cache, selhání neblokuje)
-  a **R-098** (neměnný doklad, formát čísla, PDF se nevyrábí dopředu, příjem až zaplacením).
-- **docs** Bezpečnostní review AD12 (AUDIT-LOG 2026-11-12): jeden nález opravený — e-mailová route
-  neměla strop, doplněn rate limit. Zapsané kompromisy: **DECISIONS #023** (ARES jako vnější
-  závislost, CSP se nemění) a **#024** (neměnnost v databázi, ne v UI).
-- **chore** Ověření AD12: `npx tsc --noEmit`, `npm run build` (bez varování — sdílený renderer
-  přestal skládat cesty za běhu, build kvůli tomu dřív balil do funkce celý projekt) a nové testy
-  `admin-fakturace` (33 nad PGlite: migrace 107, řada čísel, počítaná částka, neměnnost, storno,
-  příjem až zaplacením, archiv beze změny a **celá cesta vystavení** — server action s přihlášením
-  a Zodem → řádek v databázi → PDF z uloženého dokladu, se skutečným vykreslením přes Chrome za
-  `PDF_SMOKE=1`), `ares` (9), `invoice-pdf` (9), `pdf-route` (13), `email-route` (9: přihlášení,
-  cizí `Origin`, neplatná adresa, storno, strop, selhání pošty i Chromia).
-  **Souběh otestovaný není a tady ani nejde**: PGlite má jedno spojení, lokálně není server
-  Postgresu (jen klient) a na Neonu by to chtělo nejdřív pustit 107. Ověřené je to, co souběh
-  musí přežít — `GREATEST` z uložené řady i z tabulky, unikátní index na `number_seq` a pořadí
-  „zámek řádku nastavení dřív než výpočet čísla" (strukturální test nad textem migrace).
-  **PDF ověřené okem**: skutečné vykreslení přes Chrome (122 kB, QR čitelný, diakritika v pořádku)
-  a prohlédnutý obrázek dokladu — odtud ty dvě opravy vzhledu výš. Smoke test vykreslení je
-  v `invoice-pdf.test.ts` za přepínačem `PDF_SMOKE=1`. **Obrazovky adminu okem neověřené.** Celá sada má jeden červený test mimo rozsah: `ws-schema` chce
-  migrace bez mezer a číslo **106 drží souběžné sezení AD11** na své větvi.
-
-### 2026-11-12 (AD10 — ověření v prohlížeči a čtyři opravy)
-- **chore** **AD10 ověřené okem**, čímž je sezení uzavřené. Headless Chrome s podepsanou session,
-  osm obrazovek × 390 / 768 / 1280 / 1440 px. Potvrzeno první kritérium („z detailu zakázky
-  zavoláš, napíšeš SMS i e-mail bez opisování"): `tel:`, `sms:`, WhatsApp i `mailto:` jsou
-  tlačítka 44 px vysoká a čtyři šablony plní odkaz hotovým předmětem a textem. Totéž
-  v rozbaleném kontaktu v Hovorech. Vodorovné přetečení nikde, v konzoli jediná zpráva —
-  404 na `/favicon.ico`.
-- **fix** **Karta kontaktu neuměla zavolat.** `/dashboard/kontakty/[id]` je jediná obrazovka
-  celá o jednom člověku a jako jediná `ContactActions` neměla — AD10 je doplnilo všude jinde.
-  Doplněno pod hlavičku, s hláškou pro kontakt bez telefonu a e-mailu.
-  Soubory: `app/dashboard/kontakty/[id]/page.tsx`.
-- **fix** **Karta kontaktu přetékala na 390 px o 71 px.** Mřížka měla sloupce jen od `lg`, takže
-  pod ním měl jediný sloupec šířku `auto` a roztáhl ho nejširší vnitřek (pole formuláře, datum
-  u položky). `grid-cols-1` dá podlahu na nulu v obou rozvrženích.
-- **fix** **Z kalendáře nešlo zavolat u ručně zapsané události.** Detail kreslil kontakt jen
-  u řádků druhu `call`; událost s kontaktem zrcadleným v Hovorech (dvojice z migrace 051) ho
-  neukázala — a právě tu AD10 nově zakládá s nepovinným telefonem, takže uložený údaj nebyl
-  k ničemu. Dotaz okna ho teď dotáhne `LEFT JOIN client_leads ON l.id = e.lead_id`
-  (`contact_name/phone/email` v `RawCalendarEvent`), detail ho vykreslí stejným `ContactActions`.
-  U blokace se kontakt nehledá — je to soukromá nedostupnost bez protistrany.
-  Soubory: `lib/admin/calendar.ts`, `components/SmartCalendar.tsx`.
-- **fix** **`updateLead` nesnesl databázi bez migrace 105.** Dávka je transakce, takže dokud
-  `admin_lead_reschedule` neexistuje, selhal by i samotný UPDATE a úprava hovoru by na produkci
-  přestala fungovat v okně mezi nasazením větve a spuštěním migrace. Nově se `42883` odchytí
-  a pustí se samotný UPDATE; termín v kalendáři se pak jen neposune, přesně jak se admin choval
-  před AD10. Rezervace z portálu to uměla od začátku, Hovory ne. Soubory: `app/calls-actions.ts`.
-- **fix** Dvě starší přetečení na 390 px, obě mimo AD10: blok „Sdílet s klientem" v detailu
-  zakázky roztahoval stránku o 110 px (`items-start` dává ve sloupci šířku podle obsahu —
-  doplněno `w-full`) a řádek vlastní položky v kalkulačce na Hovorech o 30 px (`flex-wrap`
-  a `min-w-0`). Soubory: `components/admin/project-detail-view.tsx`, `components/ProjectCalculator.tsx`.
-- **chore** Tři nové testy: kontakt přes `LEFT JOIN` v okně kalendáře (+ `lead_id` v testovací
-  tabulce, bez něj dotaz v PGlite padal) a „uložení hovoru přežije databázi bez migrace 105"
-  (funkce se v testu zahodí a migrace se pak pustí znovu). `npm test` **79 souborů / 915 testů**,
-  `npx tsc --noEmit`, `npm run build:check` — vše prošlo, dev server build přežil.
-- **docs** Bezpečnostní review těchto změn (AUDIT-LOG 2026-11-12): bez nálezu. Nový `LEFT JOIN`
-  nepřijímá nic z prohlížeče, kalendář neposílá novou kategorii údajů (`phone`/`email` z téže
-  tabulky už nesl pro řádky `call`) a větev `42883` nic neobchází — `requireAuth()` běží před
-  dávkou a záložní cesta pouští týž parametrizovaný UPDATE.
-- **db** Žádná migrace. **105 zůstává nepuštěná i na testu** — spuštění bylo zamítnuté, pouští
-  ji Kryštof. Živé ověření rezervace z portálu proto dál čeká na ni.
-
-### 2026-11-12 (AD11)
-- **feat** **AD11 hotovo v kódu** — zakázka je jediná pravda. (1) **Migrace 106** přejmenovala
-  `completed_projects` na `completed_projects_archiv` (nemaže se), dala zakázce `closed_at`,
-  `project_type`, `difficulty`, `time_invested`, `estimated_hours`, `company` a `survey_token`,
-  přepojila hodnocení na `project_surveys.project_id` a z ručně doplněné historie bez zakázky
-  **založila zakázky** ve stavu `paid`, aby se neztratil příjem ani hodnocení. Token dotazníku
-  si zakázka přebrala z archivu, takže dřív odeslané odkazy `/h/<token>` platí dál.
-  (2) `app/closed-actions.ts` nahradil `app/completed-actions.ts`: `closeProject` nic nekopíruje,
-  takže `reopenProject` je prosté vymazání `closed_at` a návrat stavu. `createCompletedProject` —
-  jediná cesta, která uměla založit druhý příjem k téže zakázce — zanikla. (3) **Průvodka zakázky**
-  (`lib/admin/journey.ts` + `components/admin/project-journey.tsx`): devět kroků z toho, co v databázi
-  stejně je (jeden dotaz se čtyřmi `EXISTS` v téže dávce jako hlavička), pod osou jedno tlačítko
-  na další krok. (4) **Změna stavu jedním klikem se „Zpět"** (`setProjectStatus`/`undoProjectStatus`) —
-  tím padá dluh z `AGENTS-ADMIN.md`. (5) Obrazovky Dokončené a Hodnocení zanikly; uzavřené zakázky
-  jsou `/dashboard/zakazky?status=uzavrene`, vlastní projekty `?typ=personal`, přehled výkonnosti
-  a souhrn hodnocení na `/dashboard/profil`, staré adresy přesměrovávají.
-  Soubory: `migrations/106_zakazka_jedina_pravda.sql`, `app/closed-actions.ts`, `app/actions.ts`,
-  `lib/admin/{journey,closed,projects,contacts}.ts`, `lib/{types,admin-nav,legacy-redirects.mjs}.ts`,
-  `components/admin/{project-journey,close-project,project-detail-view}.tsx`,
-  `components/{ProjectForm,PerformanceOverview,HodnoceniDashboard}.tsx`,
-  `app/dashboard/{zakazky,profil,kontakty}/`, `app/h/[token]/page.tsx`, `app/portal-actions.ts`,
-  `app/dashboard/finance/{byznys-actions,finance-actions}.ts`, `scripts/admin-income-check.mjs`.
-  **Migrace 106 aplikovaná: omylem na produkci, jinde ne.**
-- **fix** Dvě utažení z bezpečnostního review (AUDIT-LOG): `survey_token` nese od 106 **každá**
-  zakázka včetně nepotvrzené poptávky, takže se `/h/[token]` i `submitSurvey` ptají i na
-  `NOT lead_pending`; nové server actions ověřují tvar id, aby cizí adresa nekončila chybou
-  typu `22P02` a stavem 500.
-- **fix** `getBusinessOverview` přičítá zálohu uzavřené zakázky, **jen když** k ní neexistuje
-  zálohový příjem v `finance_transactions`. Dřív se sčítaly zálohy z Dokončených, které vlastní
-  transakci nikdy neměly; bez té podmínky by se po slití záloha běžné zakázky započítala dvakrát.
-- **chore** Nový `scripts/admin-income-check.mjs` (jen čte): `--ulozit` před migrací,
-  `--porovnat` po ní. Součty příjmů po letech musí sedět na korunu, jinak skript skončí chybou.
-- **decision** **R-097** — dokončenost je stav zakázky; pět odchylek od zadání AD11 a proč.
-- **chore** Ověření: `npx tsc --noEmit`, `npm test` **82 souborů / 953 testů** (nové
-  `admin-zakazka-jedina-pravda` nad PGlite — migrace 106 včetně brány na daňová čísla
-  a dvojího spuštění —, `admin-pruvodka` a `admin-stav-jednim-klikem`), `npm run build:check`
-  prošel při běžícím dev serveru; po opravách z průchodu **82 souborů / 956 testů**. Obrazovky,
-  které potřebují data (detail zakázky, filtry, Profil), okem ověřené nejsou — chybí 106
-  na testovacím Neonu.
-- **chore** **Průvodka ověřená v prohlížeči.** Dočasná stránka s fiktivními daty mimo
-  `/dashboard` (po průchodu smazaná, postup z AD08), headless Chrome přes `puppeteer-core`:
-  šest stavů zakázky × 390 / 768 / 1280 / 1440 px. Nikde vodorovné přetečení, akční plochy 44 px,
-  v konzoli jen 404 na `/favicon.ico` (otevřený problém z AD10). Formulář uzavření se na 390 px
-  otevře celý a má šest polí s českými popisky.
-- **fix** **Osa uvázla na „Poptávce" u ručně zapsané zakázky** — krok nešel splnit, takže
-  `nextStep` nikdy nedošel dál a tlačítko dalšího kroku se neukázalo. Poptávka je od teď splněná
-  vždy (zakázka nějak vznikla; odkud, říká štítek v hlavičce) a každý krok má práh `rank`:
-  rozdělané zakázce se neradí domluvit schůzku, ale doplnit cenu ano. Nalezeno průchodem
-  v prohlížeči, pokryto třemi novými testy.
-- **fix** „Otevřít zpět" u uzavřené zakázky mělo 36 px místo 44 (B9).
-- **chore** Incident: 106 pustená na produkci před nasazením větve. Rozbitý je i veřejný dotazník
-  (`/h/<token>` → 500, ověřeno curlem). Návrat `scripts/admin-106-zpet.sql`, zápis v AUDIT-LOG.
-
-*Starší dny (včetně AD08–AD10 z 2026-11-12): `archiv/2026-11.md`, `archiv/2026-10.md` (včetně 2026-10-31).*
+*Starší dny (AD08–AD12 z 2026-11-12 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*

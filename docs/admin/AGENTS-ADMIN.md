@@ -678,6 +678,66 @@ Pravidla, která drží databáze (migrace 107), ne aplikace:
 
 Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a admin se chová jako dřív.
 
+### Náprava financí (AD13, R-099)
+
+Migrace **109** je jedna migrace o pěti věcech. Dokud neběží, chová se admin jako dřív:
+`lib/admin/ledger.ts` zjistí stav **ze samotného dotazu** — čtení se pošle tak, jak má vypadat
+po migraci, a teprve když databáze odpoví „takový sloupec neznám" (42703), zopakuje se bez něj.
+V normálním stavu to nestojí ani jedno kolo navíc. Zápis se raději zeptá (`ledgerSql()`), protože
+opakovat zápis jde jen díky tomu, že dávka je transakce — a to platí v produkci, ne v testech.
+
+**Měna v ledgeru.** `finance_transactions.currency` (`DEFAULT 'CZK'`, CHECK CZK/EUR). Do AD13
+měna na transakci nebyla, zatímco faktura ji měla: zaplacená eurová faktura vložila do ledgeru
+nepřepočtené číslo a sečetlo se s korunami v `getBusinessIncome`, `getMonthlyAggregates`,
+výkonnosti podnikání, na Dnes i v daňové kalkulačce — zatímco evidence faktur sčítala po měnách.
+**Měny se nesčítají** (R-048): hlavní číslo je vždy v korunách, cizí měna má vlastní řádek
+(`lib/money-currency.ts` → `ForeignTotal`, `foreignLabel`) a nikam se nepřičítá. Nový součet nad
+`finance_transactions` **musí** mít `L.czkOnly()`, jinak se ta chyba vrátí.
+
+**Uložení faktury je jedna transakce.** `invoiceSyncQueries(L, id)` vrací sedm příkazů, každý
+no-op, když na fakturu nesedí; `insertInvoice`, `updateInvoiceRow`, `setInvoicePaid` i storno je
+posílají **jednou dávkou** (= jedna Neon HTTP transakce) spolu se svou změnou dokladu. Dřív to
+bylo 4–6 samostatných dotazů a pád uprostřed nechal zaplacenou fakturu bez příjmu.
+
+**Jeden výpočet stavu faktury.** `lib/invoice-status.ts` (`invoiceState`, `isInvoiceOverdue`,
+`isInvoiceOutstanding`, `daysOverdue`) + tytéž podmínky pro SQL v `invoiceSql`. Dřív se
+„po splatnosti" počítalo na čtyřech místech, tři z nich brala dnešek v UTC (po pražské půlnoci
+ještě včerejší datum) a dvě neznala storno z AD12. Dnešek **vždy** přichází ze serveru
+(`getPragueTodayISO()`), i do klientských komponent.
+
+**Jeden seznam sloupců.** `invoiceColumns(L)` v `lib/invoices.ts` — archiv, evidence, zakázka
+i detail. Detail jede jednou dávkou (dřív tři kola: doklad, ledger, vystavená část).
+
+**Jeden příjem jednou.** `finance_transactions.income_origin`
+(`project|invoice|completed|manual`) říká, kdo řádek založil; `invoices.payment_origin`
+(`created|adopted`), jestli si faktura příjem vyrobila, nebo převzala cizí. Dva částečné
+unikátní indexy: jeden příjem na doklad a jeden zálohový + jeden doplatkový příjem **ze zakázky**
+(`income_origin = 'project'`). Příjmů z faktur se index vědomě netýká — dílčí fakturace po
+etapách je legitimní. Automaticky se převezme jen **jednoznačný** kandidát (jeden, stejná částka
+i měna); zbytek rozhodne člověk na detailu faktury („Je tohle ta platba?",
+`components/admin/invoices/payment-match.tsx` + `getPaymentCandidates`, `adoptPayment`,
+`keepPaymentsSeparate`). Převzetí platby z **uzavřeného roku** chce výslovné potvrzení — mění
+daňový základ za loňsko.
+
+**Datum platby, ne datum zápisu.** `projects.paid_on` a `deposit_paid_on`; formulář zakázky má
+„Peníze dorazily" a „Záloha dorazila" (prázdné = dnes). Všechny čtyři cesty k příjmu ze zakázky
+vedou přes `insertProjectIncome` v `app/actions.ts`. Dřív `now()::date` v UTC, takže platba
+z prosince zapsaná v lednu spadla do jiného daňového roku.
+
+**Náklady mají dobu platnosti.** `costs.{incurred_on,starts_on,ends_on,archived_at}`.
+`updateCost` **nemaže historii**: přejmenování přepíše popis všech záznamů, nová částka platí
+od aktuální periody dál. `deleteCost` u nákladu s historií jen nastaví `ends_on` a `archived_at`
+(výpisy archivované vynechávají, generátor je negeneruje). Dřív každá editace fixního nákladu
+smazala **všechny** jeho vygenerované měsíční výdaje. Chybějící periody doplní DB funkce
+`generate_recurring_costs(p_until, p_max_months)` — i zpětně, strop 36 měsíců, idempotentně přes
+`UNIQUE (source_cost_id, recurring_period)`; volá ji denní cron `send-reminders` a tlačítko
+„Doplnit opakované".
+
+**Vědomě nedořešené** (zapsáno jako záměr, ne nedopatření): `updateProject` přepisuje `declared`
+všem transakcím zakázky (potřebuje rozhodnutí, neměnit potichu) · `declared` na šesti místech ·
+obousměrná automatika `costs` ↔ `finance_transactions` · dvě sady daňových sazeb ·
+`pdf_data bytea` v řádku faktury.
+
 ### Zdroje poptávek (AD02, R-088)
 
 VIZEON a ALTENO už nejsou dvě firmy. Je to **jeden byznys**, který přijímá poptávky z několika webů, a u zakázky, termínu i leadu se eviduje jen `lead_origin` — odkud poptávka přišla.

@@ -516,3 +516,34 @@ Ověřeno: `npx tsc --noEmit`, `npm run build` (bez varování), `npx vitest run
 Mimo bezpečnost, ale ze stejného průchodu: prohlédnutý doklad odhalil, že se PDF tisklo patkovým výchozím písmem prohlížeče (pravidlo `body` prohrávalo s `[data-app="ws"]`, takže vložená písma sloužila jen číslům) a že popisky stran se slepily se jménem. Obojí opraveno ve sdíleném rendereru, projeví se i ve Workspace.
 
 **Doplněno týž den po ověření naživo:** migrace 107 běžela se souhlasem Kryštofa na **testovacím** Neonu (`rd-test`). Před spuštěním se ověřilo, že `.env.local` nemíří na produkci — testovací databáze má `contacts` ze 104 a **nemá** `completed_projects_archiv` ze 106 (po dnešním incidentu s 106 na produkci to nebyla formalita). Pod přihlášením se proklikala celá cesta vystavení včetně PDF (200, 132 kB) a storna; **e-mail se naživo neposílal** — odešel by přes Gmail SMTP skutečnému příjemci, takže zůstává ověřený jen testy route. Souběžné vystavení ze dvou spojení potvrdilo, že `FOR UPDATE` drží řadu: druhá transakce čekala a dostala až další číslo. Testovací doklady se po průchodu smazaly, řada čísel se schválně nevrací (číslo se nerecykluje).
+
+## 2026-11-13 — review AD13 (náprava financí, migrace 109)
+
+**Rozsah:** `migrations/109_finance_meny_a_naklady.sql`, `lib/admin/ledger.ts`,
+`lib/money-currency.ts`, `lib/invoice-status.ts`, `lib/invoices.ts`, `lib/admin/{invoices,costs}.ts`,
+`app/costs-actions.ts`, `app/actions.ts`, `app/dashboard/finance/*`, `lib/recurring-transactions.ts`,
+`components/admin/invoices/payment-match.tsx`, `scripts/admin-prijmy-duplicity.mjs`.
+
+**Bez nálezu.** Co se kontrolovalo:
+
+- **Nové server actions** (`getPaymentCandidates`, `adoptPayment`, `keepPaymentsSeparate`) začínají
+  `requireAuth()`, ověřují tvar id proti `UUID_RE` (cizí adresa tak nekončí chybou databáze se
+  stavem 500) a pracují jen s parametry, nikdy s textem z prohlížeče. `adoptPayment` navíc
+  kandidáta ověří dotazem na **tutéž zakázku**, takže platbu cizí zakázky přiřadit nejde (test).
+- **Skládání SQL:** do textu dotazu jde jen `L.currency()`, `L.czkOnly()`, `L.costsActive()`,
+  `invoiceSql.*` a `invoiceColumns(L)` — všechno konstanty z repa, žádná hodnota od uživatele.
+  Řazení a stránkování dál prochází whitelistem z AD07.
+- **Opakování dotazu po chybě 42703** (`withLedger`) se týká jen **čtení**; zápis se na stav
+  databáze zeptá dopředu (`ledgerSql()`), aby se opakování nespolehlo na to, že dávka je
+  transakce. Detektor hlídá jmenovitý seznam sloupců migrace 109, ne jakoukoli chybu 42703.
+- **Nová DB funkce** `generate_recurring_costs` je `SECURITY INVOKER` (výchozí), bez
+  `search_path` triku a bez dynamického SQL; vkládá jen do `finance_transactions` podle
+  `costs`. Volá ji přihlášená server action a denní cron.
+- **`scripts/admin-prijmy-duplicity.mjs` jen čte** (dva `SELECT`y, parametrizované) a nic
+  nevypisuje z `.env.local` kromě použití `DATABASE_URL`.
+- **Daňová pojistka jako bezpečnostní vlastnost:** převzetí platby z uzavřeného roku mění daňový
+  základ za rok, který už je přiznaný. Server ho bez `confirmClosedYear` odmítne — potvrzení
+  se nedá obejít tím, že ho prohlížeč neukáže.
+- CSP, hlavičky ani veřejné vstupy se nemění. `POST /api/public/invoices` zůstal beze změny
+  chování (bearer klíč, rate limit, Zod) a nově ho pokrývají testy včetně odmítnutí souboru,
+  který není PDF.

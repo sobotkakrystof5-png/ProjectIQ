@@ -1121,7 +1121,45 @@ a provoz je jeden člověk.
 > ať nevznikne dojem, že pečlivá evidence nákladů sníží daň.
 **Riziko: vysoké.** Každý krok samostatný commit, všechny s testem.
 
-### AD14 — AI asistent: navrhne, ty potvrdíš (M–L, **migrace 109**)
+**Provedeno 2026-11-13 (AD13)** — pět commitů, každý s testem; `npm test` 93 souborů / 1103 testů,
+`npx tsc --noEmit`, `npm run build:check` bez varování. Všechno DDL je v jedné **migraci 109**
+(měna v ledgeru · doba platnosti nákladu + `generate_recurring_costs` · `income_origin`,
+`payment_origin` a dva unikátní indexy · `projects.paid_on`/`deposit_paid_on`). **Aplikovaná:
+nikde.** Technický popis: `docs/admin/AGENTS-ADMIN.md` → „Náprava financí (AD13, R-099)".
+
+Šest odchylek od zadání, všechny vědomé (podrobně R-099 v `memory/memory.md`):
+
+1. **Číslo migrace je 109, ne 104** (prompt sezení psal 104; to zabraly Kontakty v AD09).
+   **AD14 a AD15 tím posouvají na 110** — tabulka v sekci 6 opravená.
+2. **Unikátní index se netýká příjmů z faktur.** Zadání chtělo
+   `UNIQUE (source_project_id, COALESCE(deposit_transaction,false)) WHERE type='income' AND
+   user_id IS NULL` pro **všechny** příjmy. To by zablokovalo zakázku fakturovanou po etapách:
+   druhá zaplacená faktura by si nemohla zapsat příjem a peníze by v ledgeru chyběly — horší
+   chyba než ta, kterou index řeší. Index proto platí jen pro `income_origin = 'project'`
+   (zakázka si zapisuje nejvýš jeden zálohový a jeden doplatkový příjem — přesně to, co dosud
+   hlídala dvojice „zjisti a pak vlož") a navíc vznikl index „jeden příjem na doklad".
+   Dvojí započtení u faktur řeší výslovné „Je tohle ta platba?".
+3. **Migrace na duplicitách nepadá.** Zadání počítalo s tím, že se index nevytvoří, dokud se
+   data neuklidí. Kdyby na tom padla celá migrace, nedoběhlo by ani to ostatní (měna v ledgeru!),
+   takže `CREATE UNIQUE INDEX` běží v `DO` bloku, který `unique_violation` odchytí a vypíše
+   `WARNING` s odkazem na `node scripts/admin-prijmy-duplicity.mjs` (jen čte). Po úklidu se
+   migrace pustí znovu — je idempotentní.
+4. **Převzetí příjmu zůstává automatické, ale jen když je jednoznačné** (jeden kandidát, stejná
+   částka i měna). Zadání chtělo nahradit adopci výslovnou otázkou vždy; „Zaplaceno" je ale od
+   AD08 akce na jeden klik ve výpisu a ptát se u každé faktury by ji rozbilo. Otázka se proto
+   ukáže jen tam, kde systém neví.
+5. **Konstanta se jmenuje `invoiceColumns(L)`, ne `invoiceSelect`** — je to funkce, protože
+   `payment_reviewed_at` existuje až po migraci 109.
+6. **Opakované náklady nedostaly nový cron** (zadání ani plán ho nechtěly, ale stojí za zápis):
+   volá je týž denní `send-reminders`, jen nově DB funkcí se zpětným doplněním.
+
+**Co se našlo mimochodem:** (a) pravý sloupec Dnes i jeho „nezaplacené faktury" počítaly
+stornované doklady jako pohledávky (AD12 to opravilo jen v evidenci); (b) `getProjectInvoices`
+mezi pohledávky řadila i storno; (c) `deleteCost` mazala vygenerovanou historii i tam, kde
+náklad jen přestal platit; (d) pět míst s datem v UTC (čtyři z nich jsou ten otevřený problém
+z AD08, pátý byl formulář transakce ve Financích).
+
+### AD14 — AI asistent: navrhne, ty potvrdíš (M–L, **migrace 110** — 109 zabralo AD13)
 **Cíl:** z věty vznikne návrh akce, který provedeš jedním klikem — a nic se neuloží samo.
 - **Vstup:** ⌘K (`components/admin/admin-search.tsx`) — když dotaz nic nenajde, nabídne „Zeptat se
   asistenta"; a pravý panel `components/admin/assistant-panel.tsx` nad `detail-sheet.tsx`.
@@ -1130,7 +1168,7 @@ a provoz je jeden člověk.
   model *konal*; chceme typovaný návrh. Jedna `z.discriminatedUnion('kind', …)`: `create_lead`,
   `schedule_call`, `update_project_status`, `create_invoice_draft`, `add_note`, `send_message`, `none`.
   Každý návrh nese `confidence`, `assumptions: string[]`, `missing: string[]`.
-- **Migrace 109:** `ai_suggestions (id, created_at, author_email, source, input_text, model,
+- **Migrace 110:** `ai_suggestions (id, created_at, author_email, source, input_text, model,
   proposal jsonb, status CHECK ('pending','applied','rejected','expired'), applied_at,
   applied_ref jsonb, tokens_in, tokens_out)`. Do DB, ne do stavu prohlížeče: potvrzení běží server
   actionou, která **znovu** parsuje uložený návrh, vznikne audit a dataset na zlepšení promptů.
@@ -1180,7 +1218,7 @@ kontaktem a jedním klikem termín; test, že `systemPrompt` z těla požadavku 
   a řádek z `.env` se do paměti nedostanou.
 **Riziko:** střední (osobní údaje) — proto redakce a retence ve stejném sezení, ne později.
 
-### AD16 — Hodnocení, reference a předávací dokument (M, **migrace 110**)
+### AD16 — Hodnocení, reference a předávací dokument (M, **migrace 111** — 109 zabralo AD13, 110 AD14/AD15)
 **Cíl:** dotazník odejde sám a z odpovědí se dá udělat reference na web.
 
 **Dnes:** dotazník se pošle **jen jednou**, při ručním kliknutí „Přidat do dokončených", a když
@@ -1191,7 +1229,7 @@ doslova napsané. Zakázka tak může být zaplacená a klient nikdy dotazník n
   s odkladem, takže Zpět ho zruší.
 - **Jedna připomínka** po sedmi dnech, když klient nevyplnil. Pak už nic. Denní cron
   `send-reminders` ji pošle spolu s ostatními — žádný nový cron.
-- **Migrace 110:** `project_surveys.reminded_at`, `requested_at`; `completed_projects_archiv`
+- **Migrace 111:** `project_surveys.reminded_at`, `requested_at`; `completed_projects_archiv`
   se už nepoužívá (AD11).
 - **Reference pro web:** z hodnocení **se souhlasem** se jedním klikem vezme úryvek pro vizeon.cz
   (jméno, firma, hvězdičky, text). Výstup je text ke zkopírování, ne automatická publikace.
@@ -1246,10 +1284,10 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (průvodka ověřená v prohlížeči; 106 omylem na produkci, na testu chybí) |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12** na větvi `admin/ad12-fakturace` (migrace 107 nikde neaplikovaná; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
-| AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | nezačato |
-| AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **109** | AD05, AD09 | nezačato |
-| AD15 | Paměť projektu (facts + project_memory) | M | 109 (s AD14) | AD14 | nezačato |
-| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **110** | AD11, AD12 | nezačato |
+| AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | **hotovo 2026-11-13** (migrace 109 nikde neaplikovaná, v prohlížeči neověřeno; R-099) |
+| AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | nezačato |
+| AD15 | Paměť projektu (facts + project_memory) | M | 110 (s AD14) | AD14 | nezačato |
+| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **111** | AD11, AD12 | nezačato |
 | AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | nezačato |
 | AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | nezačato |
 
