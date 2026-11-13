@@ -5,6 +5,8 @@ import { loadTodayScreen } from '@/lib/admin-today-queries'
 import { isTodayEmpty, pickFocus, daysBetween, type MonthMoney } from '@/lib/admin-today'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import { BASE_CURRENCY, foreignLabel, formatMoney } from '@/lib/money-currency'
+import { Card } from '@/components/admin/card'
+import { EmptyState, SectionLabel } from '@/components/ws/brand'
 
 // Dnes (KP02): co je teď potřeba udělat. Jedna hlavní věc nahoře, zbytek pod ní.
 // Seznam všech zakázek je na /dashboard/zakazky. Vpravo peníze za tenhle měsíc
@@ -14,13 +16,13 @@ export const dynamic = 'force-dynamic'
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-box border border-navy-100 bg-surface p-5">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+    <Card className="p-5">
+      <SectionLabel as="h2" className="mb-3 flex items-center gap-2">
         <span className="text-navy-500">{icon}</span>
         {title}
-      </h2>
+      </SectionLabel>
       {children}
-    </section>
+    </Card>
   )
 }
 
@@ -35,13 +37,13 @@ const invoicesLabel = (count: number): string =>
 function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
   const monthName = new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric' }).format(now)
   return (
-    <aside className="rounded-box border border-navy-100 bg-surface p-5 lg:self-start">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+    <Card className="p-5 lg:self-start">
+      <SectionLabel as="h2" className="flex items-center gap-2">
         <span className="text-navy-500">
           <Wallet size={16} strokeWidth={1.5} aria-hidden="true" />
         </span>
         Jak se daří tenhle měsíc
-      </h2>
+      </SectionLabel>
       <p className="mt-0.5 text-xs text-quiet">{monthName}</p>
 
       <p className="mt-4 font-num text-2xl font-semibold leading-none text-ink">{formatCZK(money.income)}</p>
@@ -97,7 +99,7 @@ function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
         Otevřít Finance a daně
         <ArrowRight size={15} strokeWidth={1.5} aria-hidden="true" />
       </Link>
-    </aside>
+    </Card>
   )
 }
 
@@ -126,16 +128,18 @@ export default async function TodayPage() {
           </span>
         </Link>
       ) : (
-        <div className="rounded-panel border border-navy-100 bg-surface p-6">
-          <p className="text-lg font-semibold text-ink">Všechno je vyřízené.</p>
-          <p className="mt-1 text-sm text-quiet">Žádný požadavek, hlášení ani faktura po splatnosti nečeká.</p>
-          <Link
-            href="/dashboard/zakazky"
-            className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-chip border border-navy-100 px-4 text-sm font-medium text-ink hover:border-navy-300"
-          >
-            Projít zakázky
-          </Link>
-        </div>
+        <EmptyState
+          title="Všechno je vyřízené"
+          description="Žádný požadavek, hlášení ani faktura po splatnosti nečeká."
+          action={
+            <Link
+              href="/dashboard/zakazky"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-input px-5 text-[15px] font-semibold text-ink transition-colors hover:bg-navy-50"
+            >
+              Projít zakázky
+            </Link>
+          }
+        />
       )}
 
       <div className={cn('grid gap-4', !empty && 'lg:grid-cols-3')}>
@@ -151,7 +155,7 @@ export default async function TodayPage() {
                           <span className="block truncate font-medium text-ink">{r.clientName}</span>
                           {r.summary && <span className="block truncate text-xs text-quiet">{r.summary}</span>}
                         </span>
-                        <span className="shrink-0 text-xs text-quiet">{formatDate(r.createdAt)}</span>
+                        <span className="shrink-0 font-num text-xs text-quiet">{formatDate(r.createdAt)}</span>
                       </Link>
                     </li>
                   ))}
@@ -167,7 +171,8 @@ export default async function TodayPage() {
                       <Link href={d.href} className={rowClass}>
                         <span className="truncate font-medium text-ink">{d.clientName}</span>
                         <span className="shrink-0 text-xs text-quiet">
-                          {d.count}× {d.sensitive > 0 ? `(${d.sensitive} k úpravě)` : ''}
+                          <span className="font-num">{d.count}×</span>{' '}
+                          {d.sensitive > 0 ? `(${d.sensitive} k úpravě)` : ''}
                         </span>
                       </Link>
                     </li>
@@ -206,7 +211,7 @@ export default async function TodayPage() {
                           <span className="block truncate font-medium text-ink">{e.label}</span>
                           {e.detail && <span className="block truncate text-xs text-quiet">{e.detail}</span>}
                         </span>
-                        <span className="shrink-0 text-xs text-quiet">{formatDateTime(e.at)}</span>
+                        <span className="shrink-0 font-num text-xs text-quiet">{formatDateTime(e.at)}</span>
                       </Link>
                     </li>
                   ))}
@@ -221,7 +226,7 @@ export default async function TodayPage() {
                     <li key={s.id}>
                       <Link href={s.href} className={rowClass}>
                         <span className="truncate font-medium text-ink">{s.clientName}</span>
-                        <span className="shrink-0 text-xs text-quiet">{daysBetween(s.updatedAt, now)} dní</span>
+                        <span className="shrink-0 text-xs text-quiet"><span className="font-num">{daysBetween(s.updatedAt, now)}</span> dní</span>
                       </Link>
                     </li>
                   ))}
