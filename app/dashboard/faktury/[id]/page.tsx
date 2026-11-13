@@ -17,6 +17,7 @@ import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { isInvoiceOverdue } from '@/lib/invoice-status'
+import { loadHandover } from '@/lib/admin/handover'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -94,9 +95,11 @@ export default async function InvoiceDetailPage(props: PageProps) {
 
   // Kandidáty na „tytéž peníze" hledáme jen tam, kde to má smysl: zaplacená
   // faktura se zakázkou, u které se ještě nerozhodlo (AD13).
-  const [projects, candidates] = await Promise.all([
+  const [projects, candidates, handover] = await Promise.all([
     getInvoiceProjectOptions(),
     invoice.duplicate_risk ? getPaymentCandidates(invoice.id) : Promise.resolve([]),
+    // Má zakázka vyplněný předávací dokument? Pak jde přiložit k faktuře (AD16).
+    invoice.project_id ? loadHandover(invoice.project_id) : Promise.resolve(null),
   ])
 
   const today = getPragueTodayISO()
@@ -132,6 +135,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   defaultEmail={invoice.project_client_email}
                   cancelled={invoice.issued.cancelled_at !== null}
                   sentAt={invoice.issued.sent_at}
+                  handoverReady={handover?.saved ?? false}
                 />
               ) : (
                 <InvoiceDetailActions invoice={invoice} projects={projects} />

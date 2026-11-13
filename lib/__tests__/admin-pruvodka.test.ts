@@ -111,13 +111,26 @@ describe('průvodka zakázky', () => {
     expect(nextStep(steps, 'new')?.action).toEqual({ label: 'Začít pracovat', status: 'in_progress' })
   })
 
-  it('hodnocení čeká na klienta a říká to jinak před uzavřením a po něm', () => {
-    const pred = buildJourney(zakazka(), prazdne).find((s) => s.key === 'hodnoceni')
-    const po = buildJourney(zakazka({ closed_at: '2026-11-01' }), prazdne).find((s) => s.key === 'hodnoceni')
-    expect(pred?.waiting).toContain('až zakázku uzavřete')
-    expect(po?.waiting).toContain('čeká se na odpověď')
-    // Na hodnocení se klikat nedá — pošle ho uzavření zakázky.
-    expect(pred?.action).toBeUndefined()
+  it('hodnocení říká, co se s dotazníkem stalo (AD16)', () => {
+    const krok = (p: Parameters<typeof zakazka>[0]) =>
+      buildJourney(zakazka(p), prazdne).find((s) => s.key === 'hodnoceni')
+
+    expect(krok({})?.waiting).toContain('až zakázku uzavřete')
+    expect(krok({ closed_at: '2026-11-01' })?.waiting).toContain('za chvíli odejde')
+    expect(krok({ closed_at: '2026-11-01', survey_requested_at: '2026-11-02' })?.waiting).toContain(
+      'Čeká se na odpověď',
+    )
+    // Po připomínce už se neříká, že nějaká přijde — druhá neodejde.
+    const popripomince = krok({
+      closed_at: '2026-11-01',
+      survey_requested_at: '2026-11-02',
+      survey_reminded_at: '2026-11-09',
+    })?.waiting
+    expect(popripomince).toContain('Připomínka')
+    expect(popripomince).toContain('další už neposlílám')
+
+    // Na hodnocení se klikat nedá — dotazník odejde sám.
+    expect(krok({})?.action).toBeUndefined()
   })
 
   it('uzavřená zakázka bez hodnocení osu za hotovou nevydává', () => {

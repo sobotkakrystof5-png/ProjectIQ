@@ -32,6 +32,13 @@ vi.mock('@/lib/invoices', () => ({ parseInvoiceForm: vi.fn(), insertInvoice: vi.
 vi.mock('@/lib/admin/db', () => ({
   adminDb: Object.assign(vi.fn(), { batch: async () => [[]] }),
 }))
+// Dotazník má od AD16 vlastní modul a odklad 15 s — test čeká na rozhodnutí,
+// ne na časovač. Co posílá a komu, hlídá `admin-hodnoceni.test.ts`.
+const sendSurveyMock = vi.fn()
+vi.mock('@/lib/admin/surveys', () => ({
+  SURVEY_SEND_DELAY_MS: 0,
+  sendSurveyRequest: (...a: unknown[]) => sendSurveyMock(...a),
+}))
 
 import { confirmWebLead, updateProject } from '@/app/actions'
 import { closeProject } from '@/app/closed-actions'
@@ -77,6 +84,7 @@ const payload = {
 beforeEach(() => {
   sqlMock.mockReset()
   sendBrandedMock.mockReset()
+  sendSurveyMock.mockReset()
   createNotificationMock.mockReset()
   afterCallbacks.length = 0
   sendBrandedMock.mockResolvedValue(true)
@@ -114,7 +122,7 @@ describe('uložení zakázky nečeká na e-mail', () => {
 
     expect(afterCallbacks).toHaveLength(0)
     expect(await runAfter()).toBe(0)
-    expect(sendBrandedMock).not.toHaveBeenCalled()
+    expect(sendSurveyMock).not.toHaveBeenCalled()
   })
 })
 
@@ -144,7 +152,7 @@ describe('potvrzení poptávky', () => {
 })
 
 describe('uzavření zakázky (AD11)', () => {
-  it('dotazník spokojenosti odejde po odpovědi', async () => {
+  it('dotazník se zařadí až po odpovědi', async () => {
     queueSql([
       [{
         client_name: 'Novák', client_email: 'novak@example.cz', description: 'Web',
@@ -163,11 +171,12 @@ describe('uzavření zakázky (AD11)', () => {
     })
 
     expect(result).toEqual({ previousStatus: 'in_progress', skippedCostsDueToExisting: false })
-    expect(sendBrandedMock).not.toHaveBeenCalled()
+    expect(sendSurveyMock).not.toHaveBeenCalled()
 
     await runAfter()
-    expect(sendBrandedMock).toHaveBeenCalledTimes(1)
-    expect(sendBrandedMock.mock.calls[0][0]).toMatchObject({ to: 'novak@example.cz' })
+    // Uzavření posílá dotazník i na databázi bez migrace 112 — dělalo to tak
+    // i před AD16, takže se klient o dotazník nasazením nepřipraví.
+    expect(sendSurveyMock).toHaveBeenCalledWith(PROJECT_ID, { fallbackWithoutColumn: true })
   })
 
   it('už uzavřenou zakázku neuzavře podruhé', async () => {
@@ -211,6 +220,6 @@ describe('uzavření zakázky (AD11)', () => {
 
     expect(afterCallbacks).toHaveLength(0)
     expect(await runAfter()).toBe(0)
-    expect(sendBrandedMock).not.toHaveBeenCalled()
+    expect(sendSurveyMock).not.toHaveBeenCalled()
   })
 })

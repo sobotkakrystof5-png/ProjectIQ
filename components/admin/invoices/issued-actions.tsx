@@ -23,15 +23,19 @@ export function IssuedInvoiceActions({
   defaultEmail,
   cancelled,
   sentAt,
+  handoverReady = false,
 }: {
   id: string
   number: string
   defaultEmail: string | null
   cancelled: boolean
   sentAt: string | null
+  /** Zakázka má vyplněný předávací dokument (AD16) — jde přiložit k faktuře. */
+  handoverReady?: boolean
 }) {
   const router = useRouter()
   const [email, setEmail] = useState(defaultEmail ?? '')
+  const [predani, setPredani] = useState(false)
   const [composing, setComposing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [sending, setSending] = useState(false)
@@ -43,14 +47,14 @@ export function IssuedInvoiceActions({
       const response = await fetch(`/api/invoices/${id}/email`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ to: email }),
+        body: JSON.stringify({ to: email, predani }),
       })
       const data = (await response.json().catch(() => ({}))) as { error?: string }
       if (!response.ok) {
         toast.error(data.error ?? 'E-mail se nepodařilo odeslat.')
         return
       }
-      toast.success('Faktura odeslaná')
+      toast.success(predani ? 'Faktura a předávací dokument odeslané' : 'Faktura odeslaná')
       setComposing(false)
       router.refresh()
     } catch {
@@ -81,6 +85,17 @@ export function IssuedInvoiceActions({
     <div className="flex flex-wrap items-center gap-2">
       {composing ? (
         <div className="flex flex-wrap items-center gap-2">
+          {handoverReady && (
+            <label className="flex w-full items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={predani}
+                onChange={e => setPredani(e.target.checked)}
+                className="h-4 w-4 accent-navy-700"
+              />
+              Přiložit předávací dokument
+            </label>
+          )}
           <Input
             type="email"
             value={email}

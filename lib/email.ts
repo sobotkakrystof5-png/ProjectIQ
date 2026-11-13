@@ -181,7 +181,8 @@ export async function sendInvoiceEmail(opts: {
   to: string
   subject: string
   text: string
-  pdf: { filename: string; content: Buffer }
+  /** Faktura, a od AD16 volitelně i předávací dokument. */
+  pdfs: { filename: string; content: Buffer }[]
 }): Promise<boolean> {
   const mailer = await getTransporter()
   if (!mailer) return false
@@ -192,7 +193,7 @@ export async function sendInvoiceEmail(opts: {
       subject: opts.subject,
       text: opts.text,
       html: buildPlainLayout(opts.text),
-      attachments: [{ filename: opts.pdf.filename, content: opts.pdf.content, contentType: 'application/pdf' }],
+      attachments: opts.pdfs.map(pdf => ({ filename: pdf.filename, content: pdf.content, contentType: 'application/pdf' })),
     })
     return true
   } catch (err) {

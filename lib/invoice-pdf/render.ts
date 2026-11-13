@@ -122,6 +122,59 @@ async function fontCss(): Promise<string> {
   return css
 }
 
+/**
+ * Společný základ stylů pro každý dokument, který se tiskne: paleta Dílků,
+ * vložená písma a `extraCss` toho konkrétního dokladu. Používá ji faktura
+ * i předávací dokument (AD16), aby nevznikly dvě party písem a barev.
+ *
+ * Cesty jsou napsané doslova, aby bundler věděl, které dva soubory sbalit —
+ * při skládání cesty za běhu by do funkce zabalil celý projekt.
+ */
+export async function documentStyles(extraCss: string): Promise<string> {
+  const tokens = (
+    await Promise.all([
+      readFile(path.join(process.cwd(), 'app/tokens-dilky.css'), 'utf8'),
+      readFile(path.join(process.cwd(), 'app/ws-tokens.css'), 'utf8'),
+    ])
+  ).join('\n')
+  return tokens + (await fontCss()) + extraCss
+}
+
+/** Escapování do HTML. Uživatelská hodnota se nikdy nevykreslí jako značky. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  )
+}
+
+/**
+ * Chromium, který z HTML udělá PDF. Bez JavaScriptu a bez sítě: pustit se smí
+ * jen `data:` URL, takže dokument nemá jak stařit na cizím serveru.
+ */
+export async function renderPdf(html: string): Promise<Buffer> {
+  const puppeteer = (await import('puppeteer-core')).default
+  const chromium = process.env.VERCEL ? (await import('@sparticuz/chromium')).default : null
+  const browser = await puppeteer.launch({
+    executablePath: chromium
+      ? await chromium.executablePath(path.join(process.cwd(), 'node_modules/@sparticuz/chromium/bin'))
+      : process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    args: chromium ? chromium.args : [],
+    headless: true,
+  })
+  try {
+    const page = await browser.newPage()
+    await page.setJavaScriptEnabled(false)
+    await page.setRequestInterception(true)
+    page.on('request', r => { void (r.url().startsWith('data:') ? r.continue() : r.abort()) })
+    await page.setContent(html, { waitUntil: 'load', timeout: 20000 })
+    await page.evaluate(() => document.fonts.ready)
+    return Buffer.from(await page.pdf({ format: 'A4', printBackground: true, timeout: 20000 }))
+  } finally {
+    await browser.close()
+  }
+}
+
 // `body[data-app="ws"]`, ne jen `body`: tokeny Workspace nastavují font-family
 // na `[data-app="ws"]`, což je sám `<body>` — a `var(--font-instrument-sans)`
 // v PDF neexistuje, takže slabší pravidlo prohrálo a dokument se tiskl
@@ -189,18 +242,7 @@ export async function invoiceHtml(invoice: PdfInvoice, brand: PdfBrand): Promise
   } catch {
     console.warn('[invoice-pdf] Logo se do PDF nepodařilo načíst.')
   }
-  // Paleta je od AD04 na :root v app/tokens-dilky.css, přepisy Workspace v app/ws-tokens.css.
-  // Cesty jsou napsané doslova, aby bundler věděl, které dva soubory sbalit —
-  // při skládání cesty za běhu by do funkce zabalil celý projekt.
-  const tokens = (
-    await Promise.all([
-      readFile(path.join(process.cwd(), 'app/tokens-dilky.css'), 'utf8'),
-      readFile(path.join(process.cwd(), 'app/ws-tokens.css'), 'utf8'),
-    ])
-  ).join('\n')
-
-  const text = (value: unknown) =>
-    String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+  const text = escapeHtml
   const party = (p: PdfParty) =>
     '<strong>' + text(p.name) + '</strong><p>' + text(p.address) + '</p>' +
     (p.ico ? '<p>IČO ' + text(p.ico) + '</p>' : '') +
@@ -229,7 +271,7 @@ export async function invoiceHtml(invoice: PdfInvoice, brand: PdfBrand): Promise
   // Uživatelské hodnoty se serializují pouze jako escapovaný text, nikdy HTML.
   return '<!doctype html><html lang="cs"><head><meta charset="utf-8">' +
     '<meta http-equiv="Content-Security-Policy" content="default-src ' + text("'none'") + '; img-src data:; font-src data:; style-src ' + text("'unsafe-inline'") + '">' +
-    '<style>' + tokens + (await fontCss()) + CSS + '</style></head><body data-app="ws">' +
+    '<style>' + (await documentStyles(CSS)) + '</style></head><body data-app="ws">' +
     '<div class="brand">' + (logo ? '<img alt="' + text(brand.name) + '" src="' + logo + '">' : '<div class="tiles"><i></i><i></i><i></i><i></i></div>') +
     '<div><small>' + text(brand.name) + '</small><h1>Faktura ' + num(invoice.number) + (invoice.cancelled ? ' — storno' : '') + '</h1></div></div>' +
     (invoice.cancelled ? '<p><strong>Doklad byl stornován a neplatí.</strong></p>' : '') +
@@ -255,24 +297,5 @@ export async function invoiceHtml(invoice: PdfInvoice, brand: PdfBrand): Promise
 }
 
 export async function renderInvoicePdf(invoice: PdfInvoice, brand: PdfBrand): Promise<Buffer> {
-  const puppeteer = (await import('puppeteer-core')).default
-  const chromium = process.env.VERCEL ? (await import('@sparticuz/chromium')).default : null
-  const browser = await puppeteer.launch({
-    executablePath: chromium
-      ? await chromium.executablePath(path.join(process.cwd(), 'node_modules/@sparticuz/chromium/bin'))
-      : process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    args: chromium ? chromium.args : [],
-    headless: true,
-  })
-  try {
-    const page = await browser.newPage()
-    await page.setJavaScriptEnabled(false)
-    await page.setRequestInterception(true)
-    page.on('request', r => { void (r.url().startsWith('data:') ? r.continue() : r.abort()) })
-    await page.setContent(await invoiceHtml(invoice, brand), { waitUntil: 'load', timeout: 20000 })
-    await page.evaluate(() => document.fonts.ready)
-    return Buffer.from(await page.pdf({ format: 'A4', printBackground: true, timeout: 20000 }))
-  } finally {
-    await browser.close()
-  }
+  return renderPdf(await invoiceHtml(invoice, brand))
 }

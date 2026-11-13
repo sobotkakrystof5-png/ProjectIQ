@@ -29,6 +29,9 @@ vi.mock('@/lib/email', () => ({
 import { setAdminDbForTests } from '@/lib/admin/db'
 import { remindPendingSurveys, sendSurveyRequest, SURVEY_REMINDER_DAYS } from '@/lib/admin/surveys'
 import { buildReference, canUseAsReference, referenceAsJson, referenceAsText } from '@/lib/admin/reference'
+import { loadHandover, loadHandoverForPdf, resetHandoverReadyForTests, saveHandover } from '@/lib/admin/handover'
+import { handoverHtml } from '@/lib/invoice-pdf/handover'
+import { buildJourney } from '@/lib/admin/journey'
 import { pgliteAdminDriver } from './helpers/admin-pglite'
 
 /** Jen to, na co dotazník sahá. */
@@ -42,7 +45,15 @@ CREATE TABLE projects (
   project_type text NOT NULL DEFAULT 'client',
   lead_pending boolean NOT NULL DEFAULT false,
   closed_at timestamptz,
-  survey_token uuid NOT NULL DEFAULT gen_random_uuid()
+  survey_token uuid NOT NULL DEFAULT gen_random_uuid(),
+  updated_at timestamptz
+);
+CREATE TABLE invoices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid REFERENCES projects(id) ON DELETE SET NULL,
+  items jsonb,
+  issued_on date NOT NULL DEFAULT current_date,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE project_surveys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -273,5 +284,114 @@ describe('reference pro web', () => {
     expect(snippet.company).toBeNull()
     expect(referenceAsText(snippet).startsWith('\u2014 Jan')).toBe(true)
     expect(JSON.parse(referenceAsJson(snippet)).text).toBeNull()
+  })
+})
+
+describe('p\u0159ed\u00e1vac\u00ed dokument', () => {
+  beforeEach(() => resetHandoverReadyForTests())
+
+  it('p\u0159edvypln\u00ed se z popisu zak\u00e1zky a polo\u017eek posledn\u00ed faktury', async () => {
+    const id = await newProject()
+    await db.query(
+      `INSERT INTO invoices (project_id, items) VALUES ($1, $2::jsonb)`,
+      [id, JSON.stringify([{ description: 'Web na m\u00edru' }, { description: 'Napojen\u00ed formul\u00e1\u0159e' }])],
+    )
+
+    const state = await loadHandover(id)
+    expect(state?.available).toBe(true)
+    expect(state?.saved).toBe(false)
+    expect(state?.doc.summary).toBe('Web na m\u00edru')
+    expect(state?.doc.items.map((i) => i.label)).toEqual(['Web na m\u00edru', 'Napojen\u00ed formul\u00e1\u0159e'])
+    // Nic se nedomysl\u00ed: p\u0159\u00edstupy ani \u00fadr\u017eba se nep\u0159edvypl\u0148uj\u00ed.
+    expect(state?.doc.access).toEqual([])
+    expect(state?.doc.maintenance).toEqual({ included: [], excluded: [] })
+  })
+
+  it('ulo\u017e\u00ed se a nedopsan\u00e9 \u0159\u00e1dky zahod\u00ed', async () => {
+    const id = await newProject()
+    const result = await saveHandover(id, {
+      summary: 'P\u0159ed\u00e1no 13. 11.',
+      items: [{ label: '\u00davodn\u00ed str\u00e1nka', note: '' }, { label: '   ', note: 'nedopsan\u00e9' }],
+      access: [{ label: 'Administrace', where: 'example.cz/admin' }],
+      maintenance: { included: ['Z\u00e1lohy', '  '], excluded: [] },
+      note: '',
+    })
+    expect(result).toEqual({ ok: true })
+
+    const state = await loadHandover(id)
+    expect(state?.saved).toBe(true)
+    expect(state?.doc.items).toEqual([{ label: '\u00davodn\u00ed str\u00e1nka', note: '' }])
+    expect(state?.doc.maintenance.included).toEqual(['Z\u00e1lohy'])
+  })
+
+  it('heslo ani connection string do dokumentu neprojdou', async () => {
+    const id = await newProject()
+    const result = await saveHandover(id, {
+      summary: '',
+      items: [{ label: 'Datab\u00e1ze', note: 'postgres://admin:tajneheslo@db.example.cz/app' }],
+      access: [],
+      maintenance: { included: [], excluded: [] },
+      note: '',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('heslo')
+
+    const state = await loadHandover(id)
+    expect(state?.saved).toBe(false)
+  })
+
+  it('pr\u00e1zdn\u00fd dokument se nevystavuje, vypln\u011bn\u00fd zap\u00ed\u0161e datum p\u0159ed\u00e1n\u00ed', async () => {
+    const id = await newProject()
+    expect(await loadHandoverForPdf(id)).toBeNull()
+
+    await saveHandover(id, {
+      summary: 'Hotovo.',
+      items: [{ label: '\u00davodn\u00ed str\u00e1nka', note: '' }],
+      access: [],
+      maintenance: { included: [], excluded: [] },
+      note: '',
+    })
+    const data = await loadHandoverForPdf(id)
+    expect(data?.filename.startsWith('predani-')).toBe(true)
+
+    const row = await db.query<{ handover_issued_at: string | null }>(
+      `SELECT handover_issued_at FROM projects WHERE id = $1`,
+      [id],
+    )
+    expect(row.rows[0].handover_issued_at).not.toBeNull()
+  })
+
+  it('vystaven\u00fd dokument spln\u00ed krok P\u0159ed\u00e1no v pr\u016fvodce', () => {
+    const zakladni = {
+      id: 'p', source: 'manual', status: 'in_progress' as const, price: 1, paid: false,
+      deposit_amount: null, deposit_paid: false, closed_at: null,
+    }
+    const fakta = { schuzka: false, faktura: false, fakturaZaplacena: false, hodnoceni: false }
+    const bez = buildJourney(zakladni, fakta).find((s) => s.key === 'predano')
+    const s = buildJourney({ ...zakladni, handover_issued_at: '2026-11-13' }, fakta).find((s) => s.key === 'predano')
+    expect(bez?.done).toBe(false)
+    expect(s?.done).toBe(true)
+  })
+
+  it('text klienta se do PDF vykresl\u00ed jako text, ne jako zna\u010dky', async () => {
+    const html = await handoverHtml(
+      {
+        projectTitle: '<script>alert(1)</script>',
+        clientName: 'Jan Nov\u00e1k',
+        issuerName: 'Kry\u0161tof Sobotka',
+        issuedOn: '2026-11-13',
+        summary: 'Hotovo & p\u0159ed\u00e1no',
+        items: [{ label: '\u00davodn\u00ed str\u00e1nka', note: '' }],
+        access: [{ label: 'Administrace', where: 'example.cz/admin' }],
+        maintenance: { included: ['Z\u00e1lohy'], excluded: ['Nov\u00e9 str\u00e1nky'] },
+        note: '',
+      },
+      { name: 'ZakazIQ', logo: null },
+    )
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).toContain('Hotovo &amp; p\u0159ed\u00e1no')
+    // Datum s rokem, stejn\u011b jako na faktu\u0159e.
+    expect(html).toContain('13. 11. 2026')
   })
 })

@@ -91,12 +91,16 @@ export async function closeProject(projectId: string, extra: CloseProjectExtra):
   // podmínku „zakázka skončila" už nenajde splněnou. Odkaz vede na
   // `projects.survey_token` (migrace 106 ho přebrala z archivu, takže starší
   // odeslané odkazy platí dál).
-  after(async () => {
-    await new Promise((resolve) => setTimeout(resolve, SURVEY_SEND_DELAY_MS))
-    // Bez migrace 112 chybí zámek proti dvojímu odeslání; uzavření je ale
-    // jediná cesta, která dotazník posílala i před AD16, takže posílá dál.
-    await sendSurveyRequest(projectId, { fallbackWithoutColumn: true })
-  })
+  // Vlastní projekt dotazník nedostává — nemá komu. Podmínku zná i dotaz
+  // v `sendSurveyRequest`, tady je proto, aby se kvůli ní nebudil `after()`.
+  if (extra.project_type === 'client') {
+    after(async () => {
+      await new Promise((resolve) => setTimeout(resolve, SURVEY_SEND_DELAY_MS))
+      // Bez migrace 112 chybí zámek proti dvojímu odeslání; uzavření je ale
+      // jediná cesta, která dotazník posílala i před AD16, takže posílá dál.
+      await sendSurveyRequest(projectId, { fallbackWithoutColumn: true })
+    })
+  }
 
   let skippedCostsDueToExisting = false
 

@@ -87,7 +87,7 @@ export function buildJourney(
     Project,
     'id' | 'source' | 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid' | 'closed_at'
   > &
-    Partial<Pick<Project, 'survey_requested_at' | 'survey_reminded_at'>>,
+    Partial<Pick<Project, 'survey_requested_at' | 'survey_reminded_at' | 'handover_issued_at'>>,
   facts: JourneyFacts,
 ): JourneyStep[] {
   const stage = AFTER[project.status] ?? 0
@@ -139,7 +139,9 @@ export function buildJourney(
     {
       key: 'predano',
       label: LABELS.predano,
-      done: stage >= AFTER.review,
+      // Vystavený předávací dokument (AD16) je předání stejně jako stav
+      // „Čeká na schválení" — kdo klientovi pošle soupis dodaného, předal.
+      done: stage >= AFTER.review || Boolean(project.handover_issued_at),
       rank: AFTER.review,
       action: { label: 'Předat klientovi', status: 'review' },
     },

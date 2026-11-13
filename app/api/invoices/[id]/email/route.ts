@@ -7,6 +7,9 @@ import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { sql } from '@/lib/db'
 import { loadIssuedInvoiceForPdf } from '@/lib/admin/invoice-issue'
 import { renderInvoicePdf } from '@/lib/invoice-pdf/render'
+import { loadHandoverForPdf } from '@/lib/admin/handover'
+import { renderHandoverPdf } from '@/lib/invoice-pdf/handover'
+import { adminDb } from '@/lib/admin/db'
 import { sendInvoiceEmail } from '@/lib/email'
 
 /**
@@ -33,6 +36,8 @@ const bodySchema = z.object({
   to: z.string().trim().max(254).email(),
   subject: z.string().trim().max(200).optional(),
   text: z.string().trim().max(4000).optional(),
+  /** Přiložit i předávací dokument „co bylo dodané" (AD16). */
+  predani: z.boolean().optional(),
 })
 
 function sameOrigin(req: NextRequest): boolean {
@@ -90,12 +95,45 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     parsed.data.text ||
     `Dobrý den,\n\nposílám fakturu ${issued.invoice.number} se splatností ${issued.invoice.dueOn}.\nNajdete ji v příloze.\n\nDěkuju,\n${issued.invoice.issuer.name}`
 
-  const sent = await sendInvoiceEmail({
-    to: parsed.data.to,
-    subject,
-    text,
-    pdf: { filename: issued.filename, content: pdf },
-  })
+  // Předávací dokument se přikládá jen na výslovné zaškrtnutí a jen když
+  // u zakázky je vyplněný. Když se nepodaří, e-mail se **neposlíže** —
+  // klient by dostal fakturu bez soupisu, o kterém si myslíte, že ho má.
+  const attachments = [{ filename: issued.filename, content: pdf }]
+  if (parsed.data.predani === true) {
+    const projectRows = await adminDb<{ project_id: string | null }>`
+      SELECT project_id::text AS project_id FROM invoices WHERE id = ${params.id} LIMIT 1
+    `
+    const projectId = projectRows[0]?.project_id ?? null
+    const handover = projectId === null ? null : await loadHandoverForPdf(projectId)
+    if (!handover) {
+      return NextResponse.json(
+        { error: 'Předávací dokument u téhle zakázky zatím není vyplněný.' },
+        { status: 400 },
+      )
+    }
+    try {
+      const handoverPdf = await renderHandoverPdf(
+        {
+          projectTitle: handover.projectTitle,
+          clientName: handover.clientName,
+          issuerName: handover.issuerName,
+          issuedOn: handover.issuedOn,
+          summary: handover.doc.summary,
+          items: handover.doc.items,
+          access: handover.doc.access,
+          maintenance: handover.doc.maintenance,
+          note: handover.doc.note,
+        },
+        { name: handover.issuerName, logo: null },
+      )
+      attachments.push({ filename: handover.filename, content: handoverPdf })
+    } catch (err) {
+      console.error('[Faktury] Předávací dokument se nepodařilo vyrobit.', err instanceof Error ? `${err.name}: ${err.message}` : String(err))
+      return NextResponse.json({ error: 'Předávací dokument se nepovedlo připravit, e-mail jsem neposlal.' }, { status: 503 })
+    }
+  }
+
+  const sent = await sendInvoiceEmail({ to: parsed.data.to, subject, text, pdfs: attachments })
   if (!sent) return NextResponse.json({ error: 'E-mail se nepodařilo odeslat. Zkuste to prosím znovu.' }, { status: 502 })
 
   await sql`UPDATE invoices SET sent_at = now() WHERE id = ${params.id}`

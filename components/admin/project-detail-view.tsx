@@ -16,6 +16,7 @@ import { DeleteButton } from '@/components/DeleteButton'
 import { CloseProjectButton, ReopenProjectButton } from '@/components/admin/close-project'
 import { ProjectJourney } from '@/components/admin/project-journey'
 import { MemoryCard } from '@/components/admin/memory/memory-card'
+import { HandoverCard } from '@/components/admin/handover-card'
 import { InvoiceArchive } from '@/components/InvoiceArchive'
 import { ProjectCosts } from '@/components/admin/costs/project-costs'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
@@ -33,6 +34,7 @@ import { buildTerminalCommand } from '@/lib/claude-code-handoff'
 import { buildClaudeCodePrompt, type ClientRequestRow } from '@/lib/client-requests'
 import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { buildJourney, journeySqlText, type JourneyFacts } from '@/lib/admin/journey'
+import { loadHandover } from '@/lib/admin/handover'
 import { formatDate, getPublicUrl, cn } from '@/lib/utils'
 import type {
   Project, ProjectStatus, ClientMessage, ProgressUpdate, ClientFeedback, ConsultationSlot, ProjectNote,
@@ -267,6 +269,9 @@ async function OverviewTab({ project }: { project: Project }) {
       {/* Paměť zakázky (AD15): čísla z historie klienta a věty, které si k ní někdo zapsal. */}
       <MemoryCard scope="project" refId={project.id} className={card} />
 
+      {/* Předávací dokument (AD16). */}
+      <HandoverBlock project={project} />
+
       <div className={card}>
         <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Sdílet s klientem</h2>
         <div className="flex flex-col items-start gap-6 sm:flex-row">
@@ -323,6 +328,23 @@ async function OverviewTab({ project }: { project: Project }) {
         <DeleteButton projectId={project.id} />
       </div>
     </>
+  )
+}
+
+/** Karta předávacího dokumentu. Bez migrace 112 se jen nedají uložit změny. */
+async function HandoverBlock({ project }: { project: Project }) {
+  const state = await loadHandover(project.id)
+  if (!state) return null
+  return (
+    <div className={card}>
+      <HandoverCard
+        projectId={project.id}
+        initial={state.doc}
+        issuedAt={state.issuedAt}
+        available={state.available}
+        saved={state.saved}
+      />
+    </div>
   )
 }
 

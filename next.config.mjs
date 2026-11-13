@@ -60,6 +60,11 @@ const nextConfig = {
     '/api/ws/*/faktury/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     // Admin: faktura vystavená v adminu nemá uložené PDF, vyrábí se při stažení (AD12).
     '/api/invoices/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Odeslání faktury e-mailem vyrábí PDF taky — a od AD16 k němu umí přiložit
+    // předávací dokument.
+    '/api/invoices/*/email': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Admin: předávací dokument „co bylo dodané“ (AD16).
+    '/api/projects/*/predani': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/z/*/faktura/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/ucet/export': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/*/faktury': ['./node_modules/@sparticuz/chromium/bin/**/*'],
