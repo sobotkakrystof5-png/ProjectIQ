@@ -1,5 +1,6 @@
 import 'server-only'
 import { adminDb, type AdminQuery } from './db'
+import { withLedger, type LedgerSql } from './ledger'
 import type { TableParams } from '@/lib/admin-table'
 import type { Cost } from '@/lib/types'
 
@@ -49,17 +50,26 @@ const COLUMNS = `c.id::text, c.name, c.amount::float AS amount, c.cost_type, c.c
   c.description, c.project_id::text, c.source_finance_transaction_id::text,
   c.created_at::text, p.client_name AS project_client_name`
 
-function where(kind: CostKindFilter): string {
-  if (kind === 'fixni') return `WHERE c.cost_type IN ('fixed_monthly', 'fixed_annual')`
-  if (kind === 'jednorazove') return `WHERE c.cost_type = 'one_time'`
-  return ''
+/**
+ * Ukončený náklad (AD13) ve výpisu není: už neběží, ale jeho výdaje
+ * v ledgeru zůstaly, takže se nesmí mazat jen proto, že zmizel ze seznamu.
+ */
+function where(L: LedgerSql, kind: CostKindFilter): string {
+  const parts = [L.costsActive('c')]
+  if (kind === 'fixni') parts.push(`c.cost_type IN ('fixed_monthly', 'fixed_annual')`)
+  if (kind === 'jednorazove') parts.push(`c.cost_type = 'one_time'`)
+  return `WHERE ${parts.join(' AND ')}`
 }
 
 export async function loadCostsScreen(params: TableParams, kind: CostKindFilter): Promise<CostsScreen> {
+  return withLedger((L) => loadWith(L, params, kind))
+}
+
+async function loadWith(L: LedgerSql, params: TableParams, kind: CostKindFilter): Promise<CostsScreen> {
   const page: AdminQuery = {
     text: `SELECT ${COLUMNS}
            FROM costs c LEFT JOIN projects p ON p.id = c.project_id
-           ${where(kind)}
+           ${where(L, kind)}
            ${params.orderBy}
            LIMIT $1 OFFSET $2`,
     params: [params.limit, params.offset],
@@ -77,7 +87,8 @@ export async function loadCostsScreen(params: TableParams, kind: CostKindFilter)
              count(*)::int AS pocet,
              count(*) FILTER (WHERE cost_type IN ('fixed_monthly', 'fixed_annual'))::int AS fixni_pocet,
              count(*) FILTER (WHERE cost_type = 'one_time')::int AS jednorazove_pocet
-           FROM costs`,
+           FROM costs c
+           WHERE ${L.costsActive('c')}`,
     params: [],
   }
 

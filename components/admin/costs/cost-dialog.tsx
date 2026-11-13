@@ -211,11 +211,18 @@ export function CostRowActions({ cost, className }: { cost: Cost; className?: st
   const [open, setOpen] = useState(false)
   const [pending, start] = useTransition()
 
+  const fixni = cost.cost_type !== 'one_time'
+
   const remove = () => {
-    if (!confirm(`Smazat náklad „${cost.name}“?`)) return
+    // U fixního nákladu se maže jen do budoucna: výdaje za uplynulé měsíce
+    // jsou skutečné peníze a zůstávají v evidenci (AD13).
+    const otazka = fixni
+      ? `Ukončit náklad „${cost.name}“? Výdaje za uplynulé měsíce zůstanou v evidenci.`
+      : `Smazat náklad „${cost.name}“?`
+    if (!confirm(otazka)) return
     start(async () => {
-      await deleteCost(cost.id, cost.project_id ?? null)
-      toast.success('Náklad smazaný')
+      const vysledek = await deleteCost(cost.id, cost.project_id ?? null)
+      toast.success(vysledek.archived ? 'Náklad ukončený, historie zůstala' : 'Náklad smazaný')
     })
   }
 

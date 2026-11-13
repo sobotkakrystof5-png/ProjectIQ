@@ -62,6 +62,14 @@ beforeAll(async () => {
       invoiced_on_ico boolean NOT NULL DEFAULT false,
       created_at timestamptz DEFAULT now()
     );
+    CREATE TABLE costs (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      name text NOT NULL,
+      amount numeric NOT NULL DEFAULT 0,
+      cost_type text NOT NULL,
+      category text,
+      created_at timestamptz DEFAULT now()
+    );
     CREATE TABLE finance_transactions (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id uuid,

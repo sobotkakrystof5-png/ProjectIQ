@@ -34,32 +34,39 @@ export function ledgerCurrencyState(): boolean | null {
 /**
  * Kousky SQL, které se liší podle toho, jestli migrace 109 doběhla.
  * Do textu dotazu jde jen tohle, nikdy nic od uživatele.
+ *
+ * Jeden příznak pokrývá celou migraci: `finance_transactions.currency`
+ * i `costs.archived_at` přicházejí spolu, takže se nezjišťují zvlášť.
  */
 export type LedgerSql = {
-  /** Má databáze sloupec `currency`? */
+  /** Doběhla migrace 109? */
   has: boolean
   /** Výraz pro měnu řádku — sloupec, nebo konstanta před migrací. */
   currency(alias?: string): string
   /** Podmínka „jen koruny". Před migrací `TRUE`: tam jsou všechny řádky brané jako korunové. */
   czkOnly(alias?: string): string
+  /** Podmínka „náklad není archivovaný". Před migrací `TRUE` — archiv tam ještě není. */
+  costsActive(alias?: string): string
 }
 
 function sqlFor(has: boolean): LedgerSql {
   const currency = (alias?: string) =>
     has ? (alias ? `${alias}.currency` : 'currency') : `'${BASE_CURRENCY}'::text`
+  const col = (alias: string | undefined, name: string) => (alias ? `${alias}.${name}` : name)
   return {
     has,
     currency,
     czkOnly: (alias?: string) => (has ? `${currency(alias)} = '${BASE_CURRENCY}'` : 'TRUE'),
+    costsActive: (alias?: string) => (has ? `${col(alias, 'archived_at')} IS NULL` : 'TRUE'),
   }
 }
 
-/** Pozná „sloupec currency neexistuje" a nic jiného. */
+/** Pozná „sloupec z migrace 109 neexistuje" a nic jiného. */
 export function isMissingLedgerCurrency(err: unknown): boolean {
   const code = (err as { code?: string })?.code
   const message = err instanceof Error ? err.message : String(err)
-  const aboutCurrency = /currency/i.test(message) && /does not exist|neexistuje/i.test(message)
-  return (code === '42703' && aboutCurrency) || aboutCurrency
+  const about109 = /currency|archived_at/i.test(message) && /does not exist|neexistuje/i.test(message)
+  return (code === '42703' && about109) || about109
 }
 
 /**
