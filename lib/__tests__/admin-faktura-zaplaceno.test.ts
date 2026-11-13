@@ -3,26 +3,37 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 /**
  * AD08: „Zaplaceno" jedním kliknutím ve výpisu faktur.
  *
- * Akce **nepřidává peněžní logiku** — nastaví `paid_on` a pustí tutéž
- * `syncInvoiceTransaction`, kterou volá i formulář. Test proto hlídá hlavně
- * to, že se ta funkce opravdu zavolá (bez ní by faktura byla zaplacená,
- * ale v ledgeru by nic nebylo) a že se vstup z prohlížeče ověřuje.
+ * Akce **nepřidává peněžní logiku** — nastaví `paid_on` a pustí tytéž
+ * dotazy pro srovnání ledgeru, jaké používá formulář. Test hlídá, že se
+ * to opravdu děje (bez toho by faktura byla zaplacená, ale v ledgeru by
+ * nic nebylo) a že se vstup z prohlížeče ověřuje.
+ *
+ * Od AD13 jde zaplacení **a** srovnání ledgeru jednou dávkou: mezi nimi
+ * nesmí nic spadnout, jinak je faktura zaplacená bez příjmu.
  */
 
 const sqlMock = vi.fn()
 const requireAuthMock = vi.fn()
-const syncMock = vi.fn()
+const batchMock = vi.fn()
 
 vi.mock('@/lib/db', () => ({ sql: (...args: unknown[]) => sqlMock(...args) }))
 vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: () => requireAuthMock() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
-vi.mock('@/lib/admin/db', () => ({ adminDb: Object.assign(vi.fn(), { batch: vi.fn() }) }))
+vi.mock('@/lib/admin/db', () => ({
+  adminDb: Object.assign(vi.fn(), { batch: (...a: unknown[]) => batchMock(...a) }),
+}))
+vi.mock('@/lib/admin/ledger', () => ({
+  ledgerSql: async () => ({ has: true, currency: () => 'currency', czkOnly: () => `currency = 'CZK'` }),
+}))
 vi.mock('@/lib/invoices', () => ({
   parseInvoiceForm: vi.fn(),
   insertInvoice: vi.fn(),
   updateInvoiceRow: vi.fn(),
   deleteInvoiceRow: vi.fn(),
-  syncInvoiceTransaction: (...a: unknown[]) => syncMock(...a),
+  invoiceSyncQueries: (_L: unknown, id: string) => [
+    { text: 'SYNC 1', params: [id] },
+    { text: 'SYNC 2', params: [id] },
+  ],
   INVOICE_COLUMNS: '',
   INCOME_JOIN: '',
   OTHER_INCOME_COUNT: '',
@@ -34,70 +45,80 @@ import { setInvoicePaid } from '@/app/dashboard/finance/invoice-actions'
 
 const ID = '11111111-1111-4111-8111-111111111111'
 
-function queueSql(rows: unknown[]) {
-  const calls: { text: string; params: unknown[] }[] = []
-  sqlMock.mockImplementation(async (strings: TemplateStringsArray, ...params: unknown[]) => {
-    calls.push({ text: strings.join('?'), params })
-    return rows
+type Query = { text: string; params: unknown[] }
+
+/** Dávka vrátí řádky pro první dotaz (UPDATE … RETURNING), zbytek prázdno. */
+function queueBatch(updateRows: unknown[]) {
+  const batches: Query[][] = []
+  batchMock.mockImplementation(async (queries: Query[]) => {
+    batches.push(queries)
+    return queries.map((_, i) => (i === 0 ? updateRows : []))
   })
-  return calls
+  return batches
 }
 
 beforeEach(() => {
   sqlMock.mockReset()
   requireAuthMock.mockReset()
-  syncMock.mockReset()
+  batchMock.mockReset()
   requireAuthMock.mockResolvedValue(undefined)
-  syncMock.mockResolvedValue(undefined)
+  sqlMock.mockResolvedValue([])
 })
 
 describe('Zaplaceno jedním kliknutím', () => {
   it('bez přihlášení nic nezapíše', async () => {
     requireAuthMock.mockRejectedValue(new Error('Neautorizovaný přístup'))
-    const calls = queueSql([{ project_id: null }])
+    const batches = queueBatch([{ project_id: null }])
     const result = await setInvoicePaid(ID, '2026-11-12')
     expect(result.error).toBeTruthy()
-    expect(calls).toEqual([])
-    expect(syncMock).not.toHaveBeenCalled()
+    expect(batches).toEqual([])
   })
 
-  it('zapíše datum zaplacení a srovná ledger', async () => {
-    const calls = queueSql([{ project_id: 'p1' }])
+  it('zapíše datum zaplacení a srovná ledger jednou dávkou', async () => {
+    const batches = queueBatch([{ project_id: 'p1' }])
     const result = await setInvoicePaid(ID, '2026-11-12')
     expect(result).toEqual({})
-    expect(calls).toHaveLength(1)
-    expect(calls[0].text).toMatch(/UPDATE invoices SET paid_on/)
-    expect(calls[0].params).toEqual(['2026-11-12', ID])
-    // Bez tohohle by faktura byla zaplacená, ale v ledgeru by nebyl příjem.
-    expect(syncMock).toHaveBeenCalledWith(ID)
+
+    expect(batches).toHaveLength(1)
+    const [queries] = batches
+    expect(queries[0].text).toMatch(/UPDATE invoices SET paid_on/)
+    expect(queries[0].params).toEqual([ID, '2026-11-12'])
+    // Bez tohohle by faktura byla zaplacená, ale v ledgeru by nebyl příjem —
+    // a protože je to jedna dávka, nemůže se stát jen jedno z toho.
+    expect(queries.slice(1).map((q) => q.text)).toEqual(['SYNC 1', 'SYNC 2'])
   })
 
   it('vrácení mezi pohledávky pošle null a taky srovná ledger', async () => {
-    const calls = queueSql([{ project_id: null }])
+    const batches = queueBatch([{ project_id: null }])
     expect(await setInvoicePaid(ID, null)).toEqual({})
-    expect(calls[0].params).toEqual([null, ID])
-    expect(syncMock).toHaveBeenCalledWith(ID)
+    expect(batches[0][0].params).toEqual([ID, null])
+    expect(batches[0]).toHaveLength(3)
   })
 
   it('cizí nebo nesmyslné id se do databáze vůbec nedostane', async () => {
-    const calls = queueSql([])
+    const batches = queueBatch([])
     expect((await setInvoicePaid('neco-jineho', '2026-11-12')).error).toBe('Faktura nenalezena')
-    expect(calls).toEqual([])
-    expect(syncMock).not.toHaveBeenCalled()
+    expect(batches).toEqual([])
   })
 
   it('neplatné datum se odmítne, ledger se nehýbe', async () => {
-    const calls = queueSql([])
+    const batches = queueBatch([])
     for (const bad of ['2026-99-99', 'dnes', '12.11.2026', '']) {
       expect((await setInvoicePaid(ID, bad)).error).toBe('Neplatné datum zaplacení')
     }
-    expect(calls).toEqual([])
-    expect(syncMock).not.toHaveBeenCalled()
+    expect(batches).toEqual([])
   })
 
-  it('neexistující faktura nezavolá srovnání ledgeru', async () => {
-    queueSql([])
+  it('neexistující faktura skončí hláškou, ne tichým úspěchem', async () => {
+    queueBatch([])
     expect((await setInvoicePaid(ID, '2026-11-12')).error).toBe('Faktura nenalezena')
-    expect(syncMock).not.toHaveBeenCalled()
+  })
+
+  it('stornovaný doklad se zaplatit nedá', async () => {
+    queueBatch([])
+    sqlMock.mockResolvedValue([{ cancelled_at: '2026-11-12T10:00:00Z' }])
+    expect((await setInvoicePaid(ID, '2026-11-12')).error).toBe(
+      'Stornovaná faktura se nedá označit jako zaplacená.',
+    )
   })
 })

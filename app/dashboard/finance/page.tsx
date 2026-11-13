@@ -147,6 +147,7 @@ export default async function FinancePage(
 
       {/* Příjmy & Výdaje (sjednocené) */}
       <IncomeExpenseSection
+        todayIso={getPragueTodayISO()}
         transactions={transactions!}
         currentMonth={currentMonth}
         recurringItems={recurringItems!}

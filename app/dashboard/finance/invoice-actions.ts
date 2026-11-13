@@ -5,19 +5,21 @@ import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import {
-  parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow, syncInvoiceTransaction,
+  parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow, invoiceSyncQueries,
   INVOICE_COLUMNS, INCOME_JOIN, OTHER_INCOME_COUNT,
   toInvoiceItem, toInvoiceRegistryItem,
   type InvoiceRow, type InvoiceRegistryRow,
 } from '@/lib/invoices'
 import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
-import { isIsoDate } from '@/lib/prague-time'
+import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
+import { isInvoiceOutstanding, isInvoiceOverdue, invoiceSql } from '@/lib/invoice-status'
 import {
-  cancelInvoice, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, saveIssuerProfile,
+  cancelInvoiceQuery, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, saveIssuerProfile,
   type IssuerSettings,
 } from '@/lib/admin/invoice-issue'
 import { issueInvoiceSchema, issuerProfileSchema } from '@/lib/admin/invoice-issue-schema'
 import { lookupIco } from '@/lib/ares'
+import { ledgerSql } from '@/lib/admin/ledger'
 import type { InvoiceAiExtract } from '@/lib/types'
 
 /**
@@ -92,7 +94,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
         ${INCOME_JOIN}
-        WHERE i.paid_on IS NOT NULL AND EXTRACT(YEAR FROM i.paid_on) = $1
+        WHERE ${invoiceSql.paid()} AND EXTRACT(YEAR FROM i.paid_on) = $1
         ORDER BY i.paid_on DESC, i.created_at DESC
         LIMIT ${ARCHIVE_LIMIT}
       `,
@@ -103,7 +105,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         SELECT ${INVOICE_COLUMNS}, 0 AS other_income_count
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
-        WHERE i.paid_on IS NULL AND i.cancelled_at IS NULL
+        WHERE ${invoiceSql.outstanding()}
         ORDER BY COALESCE(i.due_on, i.issued_on) ASC
         LIMIT ${ARCHIVE_LIMIT}
       `,
@@ -122,8 +124,10 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
   const paid = (paidRows as unknown as Row[]).map(toItem)
   const outstanding = (outstandingRows as unknown as Row[]).map(toItem)
 
-  const today = new Date().toISOString().slice(0, 10)
-  const overdueCount = outstanding.filter(i => i.due_on !== null && i.due_on < today).length
+  // Pražský dnešek, ne UTC: po pražské půlnoci vrací UTC ještě včerejší
+  // datum, takže by se faktura po splatnosti na hodinu zatajila (AD13).
+  const today = getPragueTodayISO()
+  const overdueCount = outstanding.filter(i => isInvoiceOverdue(i, today)).length
 
   const currentYear = new Date().getFullYear()
   const years = (yearRows as unknown as { year: number }[]).map(r => r.year)
@@ -161,10 +165,11 @@ export async function getProjectInvoices(projectId: string): Promise<InvoiceArch
     },
   ])
 
+  const today = getPragueTodayISO()
   const all = (rows as unknown as Row[]).map(toItem)
   const paid = all.filter(i => i.paid_on !== null)
-  const outstanding = all.filter(i => i.paid_on === null)
-  const today = new Date().toISOString().slice(0, 10)
+  // Stornovaný doklad není pohledávka — nikdo ho nevymáhá (AD12).
+  const outstanding = all.filter(i => isInvoiceOutstanding(i, today))
 
   return {
     year: new Date().getFullYear(),
@@ -173,7 +178,7 @@ export async function getProjectInvoices(projectId: string): Promise<InvoiceArch
     outstanding,
     paidTotal: paid.reduce((s, i) => s + i.amount, 0),
     outstandingTotal: outstanding.reduce((s, i) => s + i.amount, 0),
-    overdueCount: outstanding.filter(i => i.due_on !== null && i.due_on < today).length,
+    overdueCount: outstanding.filter(i => isInvoiceOverdue(i, today)).length,
   }
 }
 
@@ -247,18 +252,26 @@ export async function setInvoicePaid(id: string, paidOn: string | null): Promise
     if (paidOn !== null && !isIsoDate(paidOn)) return { error: 'Neplatné datum zaplacení' }
 
     // Stornovaný doklad se neplatí — jinak by storno zrušený příjem
-    // (`cancelInvoice`) vzniknul znovu jedním kliknutím ve výpisu.
-    const rows = await sql`
-      UPDATE invoices SET paid_on = ${paidOn}
-      WHERE id = ${id} AND cancelled_at IS NULL
-      RETURNING project_id::text
-    `
+    // (`cancelInvoiceQuery`) vzniknul znovu jedním kliknutím ve výpisu.
+    //
+    // Zaplacení a srovnání ledgeru jdou jednou dávkou (AD13): mezi nimi
+    // nesmí nic spadnout, jinak by faktura byla zaplacená bez příjmu.
+    const [rows] = await adminDb.batch([
+      {
+        text: `
+          UPDATE invoices SET paid_on = $2
+          WHERE id = $1 AND cancelled_at IS NULL
+          RETURNING project_id::text
+        `,
+        params: [id, paidOn],
+      },
+      ...invoiceSyncQueries(await ledgerSql(), id),
+    ])
     if (!rows.length) {
       const existuje = await sql`SELECT cancelled_at FROM invoices WHERE id = ${id} LIMIT 1`
       return { error: existuje.length ? 'Stornovaná faktura se nedá označit jako zaplacená.' : 'Faktura nenalezena' }
     }
 
-    await syncInvoiceTransaction(id)
     revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
     return {}
   } catch (err) {
@@ -369,33 +382,41 @@ export interface InvoiceDetail extends InvoiceRegistryItem {
 
 export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null> {
   await requireAuth()
+  if (!UUID_RE.test(id)) return null
 
-  const rows = await sql`
-    SELECT
-      i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
-      i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
-      i.currency, i.note, i.pdf_filename, i.pdf_size,
-      (i.pdf_data IS NOT NULL) AS has_pdf,
-      i.ai_extracted,
-      i.created_at::text, i.updated_at::text,
-      i.finance_transaction_id::text,
-      p.lead_origin AS project_lead_origin,
-      p.client_name AS project_client_name,
-      p.description AS project_description,
-      p.client_phone AS project_client_phone,
-      p.client_email AS project_client_email,
-      COALESCE((
-        SELECT COUNT(*) FROM finance_transactions t
-        WHERE t.source_project_id = i.project_id
-          AND t.type = 'income'
-          AND t.user_id IS NULL
-          AND (i.finance_transaction_id IS NULL OR t.id <> i.finance_transaction_id)
-      ), 0)::int AS other_income_count
-    FROM invoices i
-    LEFT JOIN projects p ON p.id = i.project_id
-    WHERE i.id = ${id}
-    LIMIT 1
-  `
+  // Sloupce faktury jsou na jednom místě (`INVOICE_COLUMNS` v `lib/invoices.ts`) —
+  // stejný seznam, jaký používá evidence i archiv. Dřív tu byla čtvrtá kopie
+  // osmnácti sloupců a dvě další kola do databáze (ledger a vystavená část);
+  // od AD13 je to jedna dávka.
+  const issuingReady = await isIssuingReady()
+  const [rows, issuedRows] = await adminDb.batch([
+    {
+      text: `
+        SELECT ${INVOICE_COLUMNS},
+          i.ai_extracted,
+          i.created_at::text, i.updated_at::text,
+          i.finance_transaction_id::text,
+          p.description AS project_description,
+          p.client_phone AS project_client_phone,
+          p.client_email AS project_client_email,
+          t.id::text AS ledger_id,
+          t.amount::float AS ledger_amount,
+          t.date::text AS ledger_date,
+          t.category AS ledger_category,
+          t.note AS ledger_note,
+          (t.source_invoice_id IS NOT NULL AND t.source_invoice_id = i.id) AS ledger_owned_by_invoice,
+          ${OTHER_INCOME_COUNT}
+        FROM invoices i
+        LEFT JOIN projects p ON p.id = i.project_id
+        LEFT JOIN finance_transactions t ON t.id = i.finance_transaction_id
+        ${INCOME_JOIN}
+        WHERE i.id = $1
+        LIMIT 1
+      `,
+      params: [id],
+    },
+    ...(issuingReady ? [issuedQuery(id)] : []),
+  ])
 
   const row = rows[0] as
     | (RegistryRow & {
@@ -405,59 +426,72 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
         finance_transaction_id: string | null
         project_client_phone: string | null
         project_client_email: string | null
+        ledger_id: string | null
+        ledger_amount: number | null
+        ledger_date: string | null
+        ledger_category: string | null
+        ledger_note: string | null
+        ledger_owned_by_invoice: boolean | null
       })
     | undefined
   if (!row) return null
 
   const {
     ai_extracted, created_at, updated_at, finance_transaction_id,
-    project_client_phone, project_client_email, ...registryRow
+    project_client_phone, project_client_email,
+    ledger_id, ledger_amount, ledger_date, ledger_category, ledger_note, ledger_owned_by_invoice,
+    ...registryRow
   } = row
 
-  let ledger: InvoiceLedgerEntry | null = null
-  if (finance_transaction_id) {
-    const txRows = await sql`
-      SELECT id::text, amount::float AS amount, date::text, category, note,
-             (source_invoice_id IS NOT NULL AND source_invoice_id::text = ${id}) AS owned_by_invoice
-      FROM finance_transactions
-      WHERE id = ${finance_transaction_id}
-      LIMIT 1
-    `
-    ledger = ((txRows[0] as InvoiceLedgerEntry | undefined) ?? null)
-  }
+  const ledger: InvoiceLedgerEntry | null =
+    ledger_id !== null
+      ? {
+          id: ledger_id,
+          amount: Number(ledger_amount ?? 0),
+          date: String(ledger_date),
+          category: String(ledger_category),
+          note: ledger_note,
+          owned_by_invoice: ledger_owned_by_invoice === true,
+        }
+      : null
 
   return {
     ...toRegistryItem(registryRow),
     ai_extracted, created_at, updated_at, ledger,
     project_client_phone, project_client_email,
-    issued: await loadIssuedPart(id),
+    issued: toIssuedPart(issuedRows?.[0]),
   }
 }
 
 /**
  * Část dokladu, kterou má jen faktura vystavená tady. Samostatný dotaz
  * schválně: dokud nedoběhne migrace 107, ty sloupce v databázi nejsou
- * a hlavní dotaz by na nich spadl (AD12).
+ * a hlavní dotaz by na nich spadl (AD12). Od AD13 jede ve stejné dávce.
  */
-async function loadIssuedPart(id: string): Promise<IssuedInvoiceDetail | null> {
-  if (!(await isIssuingReady())) return null
-  const rows = await sql`
-    SELECT items, issuer, client_address, supplied_on::text,
-           vat_total::float AS vat_total, cancelled_at::text, sent_at::text
-    FROM invoices
-    WHERE id = ${id} AND number_seq IS NOT NULL
-    LIMIT 1
-  `
-  const row = rows[0] as (IssuedInvoiceDetail & { items: unknown; issuer: unknown }) | undefined
-  if (!row) return null
+function issuedQuery(id: string): AdminQuery {
   return {
-    items: (row.items as IssuedInvoiceDetail['items']) ?? [],
-    issuer: row.issuer as IssuedInvoiceDetail['issuer'],
-    client_address: row.client_address,
-    supplied_on: row.supplied_on,
-    vat_total: row.vat_total,
-    cancelled_at: row.cancelled_at,
-    sent_at: row.sent_at,
+    text: `
+      SELECT items, issuer, client_address, supplied_on::text,
+             vat_total::float AS vat_total, cancelled_at::text, sent_at::text
+      FROM invoices
+      WHERE id = $1 AND number_seq IS NOT NULL
+      LIMIT 1
+    `,
+    params: [id],
+  }
+}
+
+function toIssuedPart(row: unknown): IssuedInvoiceDetail | null {
+  if (!row) return null
+  const r = row as IssuedInvoiceDetail & { items: unknown; issuer: unknown }
+  return {
+    items: (r.items as IssuedInvoiceDetail['items']) ?? [],
+    issuer: r.issuer as IssuedInvoiceDetail['issuer'],
+    client_address: r.client_address,
+    supplied_on: r.supplied_on,
+    vat_total: r.vat_total,
+    cancelled_at: r.cancelled_at,
+    sent_at: r.sent_at,
   }
 }
 
@@ -519,11 +553,11 @@ export async function cancelIssuedInvoice(id: string): Promise<{ error?: string 
   try {
     const rows = await sql`SELECT project_id::text FROM invoices WHERE id = ${id} AND number_seq IS NOT NULL LIMIT 1`
     if (!rows.length) return { error: 'Stornovat jde jen fakturu vystavenou tady.' }
-    await cancelInvoice(id)
-    // Stornovaná faktura nesmí zůstat v ledgeru jako příjem; `paid_on` je pryč,
-    // takže `syncInvoiceTransaction` smaže transakci, kterou sama založila,
-    // a převzatý příjem zakázky jen rozváže.
-    await syncInvoiceTransaction(id)
+    // Storno a úklid ledgeru jednou dávkou (AD13): stornovaná faktura nesmí
+    // zůstat v ledgeru jako příjem ani na okamžik. `paid_on` je pryč, takže
+    // sync smaže transakci, kterou faktura založila, a převzatý příjem
+    // zakázky jen rozváže.
+    await adminDb.batch([cancelInvoiceQuery(id), ...invoiceSyncQueries(await ledgerSql(), id)])
     revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
     return {}
   } catch (err) {

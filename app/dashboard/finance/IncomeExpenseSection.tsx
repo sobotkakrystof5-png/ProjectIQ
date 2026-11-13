@@ -277,9 +277,11 @@ interface Props {
   recurringItems: RecurringCashFlow[]
   costs: Cost[]
   summary: MonthSummary
+  /** Dnešek v Praze, spočítaný na serveru (AD13). */
+  todayIso: string
 }
 
-export function IncomeExpenseSection({ transactions, currentMonth, recurringItems, costs, summary }: Props) {
+export function IncomeExpenseSection({ transactions, currentMonth, recurringItems, costs, summary, todayIso }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -290,7 +292,10 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
   const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0])
   const [area, setArea] = useState<string>('')
   const [amount, setAmount] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  // Dnešek v Praze ze serveru. `new Date().toISOString()` je kalendářní datum
+  // v UTC, které je po pražské půlnoci ještě včerejší — transakce by se
+  // uložila na předchozí den, a u 31. 12. do jiného daňového roku (AD13).
+  const [date, setDate] = useState(todayIso)
   const [description, setDescription] = useState('')
   const [declared, setDeclared] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -381,7 +386,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
 
     setAmount('')
     setDescription('')
-    setDate(new Date().toISOString().slice(0, 10))
+    setDate(todayIso)
     setArea('')
     setDeclared(false)
     setShowForm(false)

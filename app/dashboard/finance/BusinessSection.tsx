@@ -178,6 +178,7 @@ export function BusinessSection({
       <div className="border-t border-border pt-6">
         <InvoiceArchive
           data={invoices}
+          todayIso={todayIso}
           projects={projectOptions}
           description="Doklady k přiznané linii. Zdanitelný příjem vzniká datem zaplacení, ne vystavení."
         />

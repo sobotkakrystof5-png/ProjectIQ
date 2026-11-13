@@ -14,6 +14,8 @@ import { IssuedInvoiceActions } from '@/components/admin/invoices/issued-actions
 import { ContactActions } from '@/components/admin/contact-actions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'
+import { getPragueTodayISO } from '@/lib/prague-time'
+import { isInvoiceOverdue } from '@/lib/invoice-status'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -91,8 +93,8 @@ export default async function InvoiceDetailPage(props: PageProps) {
 
   const projects = await getInvoiceProjectOptions()
 
-  const today = new Date().toISOString().slice(0, 10)
-  const overdue = invoice.paid_on === null && invoice.due_on !== null && invoice.due_on < today
+  const today = getPragueTodayISO()
+  const overdue = isInvoiceOverdue(invoice, today)
   const extracted = aiRows(invoice)
   const pdfHref = `/api/invoices/${invoice.id}/pdf`
 

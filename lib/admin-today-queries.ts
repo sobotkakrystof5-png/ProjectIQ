@@ -1,5 +1,6 @@
 import { batchTolerant, q, type AdminQuery, type AdminRow } from '@/lib/admin/db'
 import { BASE_CURRENCY, isMissingLedgerCurrency, toForeignTotals, withLedger, type LedgerSql } from '@/lib/admin/ledger'
+import { invoiceSql } from '@/lib/invoice-status'
 import { projectPath } from '@/lib/lead-origins'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { calculateTax } from '@/lib/tax'
@@ -42,12 +43,17 @@ const todayQueries = (): AdminQuery[] => [
       GROUP BY p.id, p.client_name
       ORDER BY min(a.created_at) ASC LIMIT 20
     `,
-    q`
-      SELECT id, invoice_number, client_name, due_on, amount, currency
-      FROM invoices
-      WHERE paid_on IS NULL AND due_on IS NOT NULL AND due_on < CURRENT_DATE
-      ORDER BY due_on ASC LIMIT 10
-    `,
+    // Stav faktury se počítá na jednom místě (`lib/invoice-status.ts`, AD13).
+    // Stornovaný doklad do „po splatnosti" nepatří — nikdo ho nevymáhá.
+    {
+      text: `
+        SELECT i.id, i.invoice_number, i.client_name, i.due_on, i.amount, i.currency
+        FROM invoices i
+        WHERE ${invoiceSql.overdue('i')}
+        ORDER BY i.due_on ASC LIMIT 10
+      `,
+      params: [],
+    },
     q`
       SELECT cs.id, cs.scheduled_at AS at, p.client_name, p.id AS project_id
       FROM consultation_slots cs JOIN projects p ON p.id = cs.project_id
@@ -157,16 +163,19 @@ const moneyQueries = (L: LedgerSql, month: string, year: number): AdminQuery[] =
       `,
       params: [month, year],
     },
-    q`
-      SELECT currency,
-             COALESCE(SUM(amount), 0)::float AS amount,
-             COUNT(*)::int AS count,
-             COUNT(*) FILTER (WHERE due_on IS NOT NULL AND due_on < CURRENT_DATE)::int AS overdue
-      FROM invoices
-      WHERE paid_on IS NULL
-      GROUP BY currency
-      ORDER BY SUM(amount) DESC
-    `,
+    {
+      text: `
+        SELECT i.currency,
+               COALESCE(SUM(i.amount), 0)::float AS amount,
+               COUNT(*)::int AS count,
+               COUNT(*) FILTER (WHERE ${invoiceSql.overdue('i')})::int AS overdue
+        FROM invoices i
+        WHERE ${invoiceSql.outstanding('i')}
+        GROUP BY i.currency
+        ORDER BY SUM(i.amount) DESC
+      `,
+      params: [],
+    },
 ]
 
 type IncomeByCurrency = {

@@ -19,7 +19,7 @@ const lead = (date: Date | string, time: string | null) => ({
 })
 
 let leadRows: ReturnType<typeof lead>[] = []
-let incomeRows: Record<string, number>[] = []
+let incomeRows: Record<string, unknown>[] = []
 let unpaidRows: Record<string, unknown>[] = []
 /** Tabulka, kterou dotaz nenajde (migrace ještě neproběhla). */
 let missingTable: string | null = null

@@ -12,6 +12,7 @@ import { usePdfDrop } from '@/lib/use-pdf-drop'
 import { deleteInvoice } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceArchiveData, InvoiceListItem, InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceFormState } from '@/components/InvoiceFields'
+import { isInvoiceOverdue } from '@/lib/invoice-status'
 
 function formatAmount(amount: number, currency: string) {
   return new Intl.NumberFormat('cs-CZ', {
@@ -27,22 +28,21 @@ function formatDate(value: string | null) {
   return new Date(y, m - 1, d).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: '2-digit' })
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 function InvoiceRow({
   invoice,
+  todayIso,
   onEdit,
   onDelete,
   isPending,
 }: {
   invoice: InvoiceListItem
+  /** Dnešek v Praze ze serveru — prohlížeč v jiné zóně by odpočty posunul (AD13). */
+  todayIso: string
   onEdit: (invoice: InvoiceListItem) => void
   onDelete: (invoice: InvoiceListItem) => void
   isPending: boolean
 }) {
-  const overdue = invoice.paid_on === null && invoice.due_on !== null && invoice.due_on < todayISO()
+  const overdue = isInvoiceOverdue(invoice, todayIso)
   const client = invoice.client_name ?? invoice.project_client_name
 
   return (
@@ -134,6 +134,7 @@ function InvoiceRow({
  */
 export function InvoiceArchive({
   data,
+  todayIso,
   projects,
   defaults,
   title = 'Archiv faktur',
@@ -141,6 +142,8 @@ export function InvoiceArchive({
   paidLabel,
 }: {
   data: InvoiceArchiveData
+  /** Dnešek v Praze, spočítaný na serveru (AD13). */
+  todayIso: string
   projects?: InvoiceProjectOption[]
   defaults?: Partial<InvoiceFormState>
   title?: string
@@ -225,6 +228,7 @@ export function InvoiceArchive({
                   <InvoiceRow
                     key={invoice.id}
                     invoice={invoice}
+                    todayIso={todayIso}
                     onEdit={inv => setModal({ invoice: inv })}
                     onDelete={handleDelete}
                     isPending={isPending && deletingId === invoice.id}
@@ -255,6 +259,7 @@ export function InvoiceArchive({
                   <InvoiceRow
                     key={invoice.id}
                     invoice={invoice}
+                    todayIso={todayIso}
                     onEdit={inv => setModal({ invoice: inv })}
                     onDelete={handleDelete}
                     isPending={isPending && deletingId === invoice.id}

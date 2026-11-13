@@ -1,6 +1,6 @@
 import 'server-only'
 import { sql } from '@/lib/db'
-import { adminDb } from './db'
+import { adminDb, type AdminQuery } from './db'
 import { invoiceTotal } from '@/lib/invoice-pdf/totals'
 import type { PdfInvoice } from '@/lib/invoice-pdf/render'
 import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
@@ -136,8 +136,16 @@ export async function issueInvoice(input: IssueInvoiceInput, issuer: IssuerProfi
  * oprava znamená zrušit tenhle a vystavit nový. Zaplacení se přitom vrací
  * zpět, aby stornovaná faktura nezůstala v ledgeru jako příjem.
  */
+/** Storno dokladu. Dotaz, ne provedení — jde do jedné dávky se srovnáním ledgeru (AD13). */
+export function cancelInvoiceQuery(id: string): AdminQuery {
+  return {
+    text: `UPDATE invoices SET paid_on = NULL, cancelled_at = now() WHERE id = $1 AND number_seq IS NOT NULL`,
+    params: [id],
+  }
+}
+
 export async function cancelInvoice(id: string): Promise<void> {
-  await sql`UPDATE invoices SET paid_on = NULL, cancelled_at = now() WHERE id = ${id} AND number_seq IS NOT NULL`
+  await adminDb.batch([cancelInvoiceQuery(id)])
 }
 
 // ─── Předvyplnění ────────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import {
 } from '@/lib/admin/invoices'
 import { parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
 import { getPragueTodayISO } from '@/lib/prague-time'
+import { isInvoiceOverdue } from '@/lib/invoice-status'
 import type { InvoiceRegistryItem } from '@/app/dashboard/finance/invoice-actions'
 
 /**
@@ -44,10 +45,6 @@ function formatDay(value: string | null): React.ReactNode {
   if (!value) return <span className="text-quiet/50">—</span>
   const [y, m, d] = value.split('-').map(Number)
   return <span className="font-num">{new Date(y, m - 1, d).toLocaleDateString('cs-CZ')}</span>
-}
-
-function isOverdue(invoice: InvoiceRegistryItem, today: string): boolean {
-  return invoice.paid_on === null && invoice.cancelled_at === null && invoice.due_on !== null && invoice.due_on < today
 }
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -81,7 +78,7 @@ function columns(today: string): AdminColumn<InvoiceRegistryItem>[] {
       header: 'Stav',
       mobile: 'badge',
       cell: (invoice) => {
-        const overdue = isOverdue(invoice, today)
+        const overdue = isInvoiceOverdue(invoice, today)
         return (
           <span className="inline-flex flex-wrap items-center gap-1.5">
             {/* Stav i tlačítko „Zaplaceno" sdílejí optimistický stav (AD08). */}

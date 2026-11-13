@@ -23,6 +23,7 @@ import { ProjectActivityPanel } from '@/components/ProjectActivityPanel'
 import { AgentKeyPanel } from '@/components/AgentKeyPanel'
 import { PortalReplyPanel, type PortalThreadMessage } from '@/components/admin/portal-reply-panel'
 import { getProjectInvoices } from '@/app/dashboard/finance/invoice-actions'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { getProjectCosts } from '@/app/costs-actions'
 import { getActiveAgentKey, isAgentKeyConfigured, maskAgentKey } from '@/lib/agent-keys'
 import { buildAgentEnvBlock, buildClaudeMdBlock } from '@/lib/agent-setup'
@@ -491,6 +492,7 @@ async function BillingTab({ project }: { project: Project }) {
       <div className={card}>
         <InvoiceArchive
           data={invoices}
+          todayIso={getPragueTodayISO()}
           defaults={{
             project_id: project.id,
             client_name: project.client_name,
