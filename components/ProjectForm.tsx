@@ -11,6 +11,7 @@ import {
   InvoiceFields, emptyInvoiceForm, validateInvoiceForm, invoiceFormToFormData,
   type InvoiceFormState,
 } from '@/components/InvoiceFields'
+import type { ProjectPrefill } from '@/lib/admin/memory/types'
 
 type FormData = {
   client_name: string
@@ -43,6 +44,11 @@ type FormData = {
 
 interface ProjectFormProps {
   project?: Project
+  /**
+   * Předvyplnění u známého klienta (AD15). Jen spočítané z historie —
+   * věta od modelu se do formuláře nikdy nedostane (R-085).
+   */
+  prefill?: ProjectPrefill
 }
 
 const defaultData: FormData = {
@@ -103,8 +109,22 @@ function projectToForm(p: Project): FormData {
   }
 }
 
-export function ProjectForm({ project }: ProjectFormProps) {
-  const [form, setForm] = useState<FormData>(project ? projectToForm(project) : defaultData)
+/** Prázdná pole nové zakázky vyplní historie klienta; všechno jde přepsat. */
+function prefillToForm(prefill: ProjectPrefill): FormData {
+  return {
+    ...defaultData,
+    client_name: prefill.clientName,
+    client_email: prefill.clientEmail,
+    client_phone: prefill.clientPhone,
+    service_type: prefill.serviceType,
+    price: prefill.price,
+  }
+}
+
+export function ProjectForm({ project, prefill }: ProjectFormProps) {
+  const [form, setForm] = useState<FormData>(
+    project ? projectToForm(project) : prefill ? prefillToForm(prefill) : defaultData,
+  )
   const [depositManuallySet, setDepositManuallySet] = useState(
     project ? project.deposit_amount !== null : false
   )

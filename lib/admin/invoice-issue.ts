@@ -1,5 +1,6 @@
 import 'server-only'
 import { sql } from '@/lib/db'
+import { contactOfProject, loadFacts, type AdminFacts } from '@/lib/admin/memory/facts'
 import { adminDb, type AdminQuery } from './db'
 import { invoiceTotal } from '@/lib/invoice-pdf/totals'
 import type { PdfInvoice } from '@/lib/invoice-pdf/render'
@@ -167,6 +168,26 @@ export type IssueDraft = {
   amount: number
   projectId: string | null
   projectLabel: string | null
+  /**
+   * Co se u tohohle klienta obvykle fakturuje (AD15). Popis bere z poslední
+   * vystavené faktury téhož kontaktu — spočítaný z historie, ne napsaný
+   * modelem (R-085). Prázdné pole = fakturuje se mu poprvé.
+   */
+  items: { description: string; quantity: number; unitPrice: number }[]
+}
+
+/**
+ * Položky k předvyplnění. Když zakázka zná částku, je to jedna položka
+ * s popisem z minula; bez částky se nabídnou celé položky z poslední
+ * faktury. Všechno jde ve formuláři přepsat — je to nápověda, ne doklad.
+ */
+function suggestItems(facts: AdminFacts, amount: number): IssueDraft['items'] {
+  const previous = facts.lastInvoiceItems
+  if (amount > 0) {
+    const description = previous[0]?.description ?? ''
+    return description === '' ? [] : [{ description, quantity: 1, unitPrice: amount }]
+  }
+  return previous.slice(0, 5)
 }
 
 /**
@@ -184,6 +205,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     amount: 0,
     projectId,
     projectLabel: null,
+    items: [],
   }
   if (!projectId) return draft
 
@@ -244,6 +266,11 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     ico: last?.client_ico ?? project.contact_ico ?? '',
     dic: last?.client_dic ?? project.contact_dic ?? '',
   }
+
+  // Popis položky dřív nikdo nepředvyplňoval, takže se u stálého klienta
+  // opisoval pokaždé znovu (zjištěno při průchodu AD12). Fakta vědí, co se
+  // mu fakturovalo naposledy.
+  draft.items = suggestItems(await loadFacts(await contactOfProject(projectId)), draft.amount)
   return draft
 }
 

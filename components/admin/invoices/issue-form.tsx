@@ -84,9 +84,20 @@ export function IssueInvoiceForm({
   const [dueOn, setDueOn] = useState(draft.dueOn)
   const [currency, setCurrency] = useState<string>('CZK')
   const [note, setNote] = useState('')
-  const [items, setItems] = useState<ItemDraft[]>([
-    { ...emptyItem(vatPayer ? 21 : 0), unitPrice: draft.amount > 0 ? String(draft.amount) : '' },
-  ])
+  // Popis i cena z historie klienta (AD15): co se mu fakturovalo naposledy.
+  // Bez toho se u stálého klienta opisovalo totéž pokaždé znovu.
+  const [items, setItems] = useState<ItemDraft[]>(() => {
+    const vatRate = vatPayer ? 21 : 0
+    if (draft.items.length > 0) {
+      return draft.items.map((item) => ({
+        description: item.description,
+        quantity: String(item.quantity),
+        unitPrice: String(item.unitPrice),
+        vatRate,
+      }))
+    }
+    return [{ ...emptyItem(vatRate), unitPrice: draft.amount > 0 ? String(draft.amount) : '' }]
+  })
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const [aresPending, startAres] = useTransition()
