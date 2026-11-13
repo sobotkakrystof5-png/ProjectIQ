@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { AdminMobileTabs, AdminNavList } from './admin-nav'
 import { AdminRoot } from './admin-root'
 import { AdminSearch } from './admin-search'
+import { AssistantPanel } from './assistant-panel'
 
 function Logo() {
   return (
@@ -131,6 +132,9 @@ export function AdminShell({
       <div className="font-ws">
         {withCounts((c) => <AdminMobileTabs counts={c} />, <AdminMobileTabs counts={EMPTY_COUNTS} />)}
       </div>
+
+      {/* Asistent je dostupný z každé obrazovky; otevírá ho ⌘K (AD14). */}
+      <AssistantPanel />
     </AdminRoot>
   )
 }

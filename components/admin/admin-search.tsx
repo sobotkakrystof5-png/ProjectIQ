@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search } from 'lucide-react'
+import { Search, Sparkles } from 'lucide-react'
 import { searchAdmin } from '@/app/admin-search-actions'
 import { allNavItems } from '@/lib/admin-nav'
 import {
@@ -12,6 +12,7 @@ import {
   type SearchHit,
   type SearchKind,
 } from '@/lib/admin-search'
+import { openAssistant } from '@/lib/admin/assistant-open'
 import { cn } from '@/lib/utils'
 
 const ORDER: SearchKind[] = ['page', 'project', 'lead', 'invoice']
@@ -75,6 +76,17 @@ export function AdminSearch({ className }: { className?: string }) {
     router.push(hit.href)
   }
 
+  /**
+   * Když hledání nic nenajde, nabídne se asistent (AD14). Je to nejčastější
+   * okamžik, kdy člověk ⌘K nepoužil k hledání, ale napsal, co chce udělat —
+   * „zavolat Nováka ve čtvrtek" žádnou stránku nenajde.
+   */
+  function askAssistant() {
+    const sentence = query.trim()
+    close()
+    openAssistant(sentence)
+  }
+
   function onInputKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -82,9 +94,10 @@ export function AdminSearch({ className }: { className?: string }) {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setActive((i) => Math.max(i - 1, 0))
-    } else if (e.key === 'Enter' && hits[active]) {
+    } else if (e.key === 'Enter') {
       e.preventDefault()
-      go(hits[active])
+      if (hits[active]) go(hits[active])
+      else if (query.trim().length >= SEARCH_MIN_CHARS) askAssistant()
     }
   }
 
@@ -131,7 +144,22 @@ export function AdminSearch({ className }: { className?: string }) {
               {query.trim().length < SEARCH_MIN_CHARS ? (
                 <li className="px-3 py-6 text-center text-sm text-quiet">Napište aspoň dvě písmena.</li>
               ) : hits.length === 0 ? (
-                <li className="px-3 py-6 text-center text-sm text-quiet">Nic jsme nenašli.</li>
+                <li>
+                  <p className="px-3 pb-3 pt-6 text-center text-sm text-quiet">Nic jsme nenašli.</p>
+                  <button
+                    type="button"
+                    onClick={askAssistant}
+                    className="flex min-h-[44px] w-full items-center gap-3 rounded-chip px-3 py-2 text-left hover:bg-navy-50"
+                  >
+                    <Sparkles size={16} strokeWidth={1.5} className="shrink-0 text-quiet" aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-ink">Zeptat se asistenta</span>
+                      <span className="block truncate text-xs text-quiet">
+                        Připraví návrh. Nic se neprovede bez vašeho kliknutí.
+                      </span>
+                    </span>
+                  </button>
+                </li>
               ) : (
                 hits.map((hit, i) => (
                   <li
