@@ -7,10 +7,11 @@ import {
   ArrowLeft, Ban, FileText, ExternalLink, Sparkles, AlertTriangle, Clock, Landmark, Paperclip,
 } from 'lucide-react'
 import { itemTotals } from '@/lib/invoice-pdf/totals'
-import { getInvoiceDetail, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
+import { getInvoiceDetail, getInvoiceProjectOptions, getPaymentCandidates } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceDetail } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceDetailActions } from '@/components/InvoiceDetailActions'
 import { IssuedInvoiceActions } from '@/components/admin/invoices/issued-actions'
+import { PaymentMatch } from '@/components/admin/invoices/payment-match'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'
@@ -91,7 +92,12 @@ export default async function InvoiceDetailPage(props: PageProps) {
   const invoice = await getInvoiceDetail(params.id)
   if (!invoice) notFound()
 
-  const projects = await getInvoiceProjectOptions()
+  // Kandidáty na „tytéž peníze" hledáme jen tam, kde to má smysl: zaplacená
+  // faktura se zakázkou, u které se ještě nerozhodlo (AD13).
+  const [projects, candidates] = await Promise.all([
+    getInvoiceProjectOptions(),
+    invoice.duplicate_risk ? getPaymentCandidates(invoice.id) : Promise.resolve([]),
+  ])
 
   const today = getPragueTodayISO()
   const overdue = isInvoiceOverdue(invoice, today)
@@ -135,7 +141,11 @@ export default async function InvoiceDetailPage(props: PageProps) {
         />
       </div>
 
-      {invoice.duplicate_risk && (
+      {/* Dvojí započtení rozhoduje člověk, ne odhad podle částky (AD13). */}
+      {invoice.duplicate_risk && candidates.length > 0 && (
+        <PaymentMatch invoiceId={invoice.id} candidates={candidates} />
+      )}
+      {invoice.duplicate_risk && candidates.length === 0 && (
         <div className="flex items-start gap-2.5 rounded-chip border border-signal-line bg-signal-bg px-4 py-3 text-sm text-signal-ink">
           <AlertTriangle size={15} strokeWidth={1.5} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>

@@ -61,11 +61,18 @@ function sqlFor(has: boolean): LedgerSql {
   }
 }
 
+/**
+ * Sloupce, které přidává migrace 109. Dokud nedoběhne, databáze na dotaz
+ * odpoví „takový sloupec neznám" a `withLedger` ho zopakuje bez nich.
+ */
+const SLOUPCE_109 =
+  /(currency|archived_at|payment_reviewed_at|payment_origin|income_origin|starts_on|ends_on|incurred_on)/i
+
 /** Pozná „sloupec z migrace 109 neexistuje" a nic jiného. */
 export function isMissingLedgerCurrency(err: unknown): boolean {
   const code = (err as { code?: string })?.code
   const message = err instanceof Error ? err.message : String(err)
-  const about109 = /currency|archived_at/i.test(message) && /does not exist|neexistuje/i.test(message)
+  const about109 = SLOUPCE_109.test(message) && /does not exist|neexistuje/i.test(message)
   return (code === '42703' && about109) || about109
 }
 

@@ -155,3 +155,86 @@ BEGIN
 
   RETURN vlozeno;
 END $$;
+
+-- ── D. Konec dvojího příjmu ─────────────────────────────────────────────
+--
+-- K příjmu v ledgeru vedlo pět cest a žádná z nich neuměla říct, odkud řádek
+-- je. Faktura se navíc snažila příjem zakázky převzít **jen při přesné shodě
+-- částky** — při zaokrouhlení nebo částečné platbě ležely peníze v ledgeru
+-- dvakrát a systém to jen označil jako `duplicate_risk`.
+--
+-- `income_origin` říká, kdo řádek založil. `payment_origin` na faktuře říká,
+-- jestli si příjem vyrobila sama, nebo převzala cizí — bez toho nejde udělat
+-- bezpečné „Zpět" (vlastní se maže, převzatý jen rozváže).
+
+ALTER TABLE finance_transactions ADD COLUMN IF NOT EXISTS income_origin text;
+
+DO $$ BEGIN
+  ALTER TABLE finance_transactions
+    ADD CONSTRAINT finance_transactions_income_origin_check
+    CHECK (income_origin IS NULL OR income_origin IN ('project', 'invoice', 'completed', 'manual'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Zpětné doplnění podle toho, co o řádku víme. Pořadí větví je pořadí
+-- jistoty: vazba na fakturu → kategorie → zakázka → ruční zápis.
+UPDATE finance_transactions
+SET income_origin = CASE
+  WHEN source_invoice_id IS NOT NULL THEN 'invoice'
+  WHEN category = 'dokončený projekt' THEN 'completed'
+  WHEN source_project_id IS NOT NULL THEN 'project'
+  ELSE 'manual'
+END
+WHERE type = 'income' AND income_origin IS NULL;
+
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_origin text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_reviewed_at timestamptz;
+
+DO $$ BEGIN
+  ALTER TABLE invoices
+    ADD CONSTRAINT invoices_payment_origin_check
+    CHECK (payment_origin IS NULL OR payment_origin IN ('created', 'adopted'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Co o existujících fakturách víme: vlastní transakce nese `source_invoice_id`,
+-- převzatá ne.
+UPDATE invoices i
+SET payment_origin = CASE WHEN t.source_invoice_id = i.id THEN 'created' ELSE 'adopted' END
+FROM finance_transactions t
+WHERE t.id = i.finance_transaction_id AND i.payment_origin IS NULL;
+
+-- Jeden doklad = nejvýš jeden příjem. Tohle je tvrdá pravda: faktura, která
+-- by si vložila druhý příjem, by tytéž peníze započítala dvakrát.
+CREATE UNIQUE INDEX IF NOT EXISTS finance_transactions_invoice_unique
+  ON finance_transactions (source_invoice_id)
+  WHERE source_invoice_id IS NOT NULL AND type = 'income';
+
+-- Jedna zakázka = nejvýš jeden zálohový a jeden doplatkový příjem **ze
+-- zakázky**. Kontrola v `app/actions.ts` existovala, ale byla to dvojice
+-- „zjisti a pak vlož" (TOCTOU); tady to hlídá databáze.
+--
+-- Index se vědomě netýká příjmů z faktur: jedna zakázka může mít fakturu
+-- na zálohu, na doplatek i dílčí fakturaci po etapách, a každá taková
+-- platba je jiné peníze. Dvojí započtení u nich řeší vazba na doklad
+-- a výslovné „Je tohle ta platba?" v adminu (R-099).
+--
+-- Jestli v datech duplicity jsou, index se nevytvoří a migrace to vypíše —
+-- padat na tom nesmí, protože zbytek je potřeba pustit. Úklid udělá člověk
+-- (`node scripts/admin-prijmy-duplicity.mjs`) a migrace se pak pustí znovu.
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS finance_transactions_project_income_unique
+    ON finance_transactions (source_project_id, deposit_transaction)
+    WHERE type = 'income' AND user_id IS NULL AND income_origin = 'project'
+      AND source_project_id IS NOT NULL;
+EXCEPTION WHEN unique_violation THEN
+  RAISE WARNING 'Index finance_transactions_project_income_unique se nevytvořil — některá zakázka má dva příjmy téhož druhu. Najdete je: node scripts/admin-prijmy-duplicity.mjs. Po úklidu pusťte migraci 109 znovu.';
+END $$;
+
+-- ── E. Datum platby, ne datum zápisu ───────────────────────────────────
+--
+-- Příjem ze zakázky se zapisoval s datem `now()::date`, tedy kdy to někdo
+-- naklikal — a navíc v UTC, takže po pražské půlnoci o den dřív. Peníze,
+-- které dorazily v prosinci a zapsaly se v lednu, tak spadly do **jiného
+-- daňového roku**. Datum platby je od teď na zakázce; prázdné znamená
+-- „dorazily dnes".
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS paid_on date;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS deposit_paid_on date;

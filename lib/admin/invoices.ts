@@ -1,6 +1,7 @@
 import 'server-only'
 import { adminDb, type AdminQuery } from './db'
-import { INCOME_JOIN, INVOICE_COLUMNS, OTHER_INCOME_COUNT, toInvoiceRegistryItem, type InvoiceRegistryRow } from '@/lib/invoices'
+import { INCOME_JOIN, invoiceColumns, OTHER_INCOME_COUNT, toInvoiceRegistryItem, type InvoiceRegistryRow } from '@/lib/invoices'
+import { withLedger, type LedgerSql } from './ledger'
 import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, toLeadOrigin } from '@/lib/lead-origins'
 import type { TableParams } from '@/lib/admin-table'
 import { invoiceSql } from '@/lib/invoice-status'
@@ -110,11 +111,19 @@ function where(filters: InvoiceFilters): { sql: string; params: unknown[] } {
 }
 
 export async function loadInvoiceRegistry(params: TableParams, filters: InvoiceFilters): Promise<InvoiceRegistryScreen> {
+  return withLedger((L) => loadRegistryWith(L, params, filters))
+}
+
+async function loadRegistryWith(
+  L: LedgerSql,
+  params: TableParams,
+  filters: InvoiceFilters,
+): Promise<InvoiceRegistryScreen> {
   const filter = where(filters)
   const base = `FROM invoices i LEFT JOIN projects p ON p.id = i.project_id`
 
   const page: AdminQuery = {
-    text: `SELECT ${INVOICE_COLUMNS}, p.description AS project_description, ${OTHER_INCOME_COUNT}
+    text: `SELECT ${invoiceColumns(L)}, p.description AS project_description, ${OTHER_INCOME_COUNT}
            ${base}
            ${INCOME_JOIN}
            ${filter.sql}

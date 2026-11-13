@@ -91,6 +91,8 @@ beforeAll(async () => {
       note text,
       date date NOT NULL,
       declared boolean NOT NULL DEFAULT false,
+      deposit_transaction boolean NOT NULL DEFAULT false,
+      source_project_id uuid REFERENCES projects(id) ON DELETE SET NULL,
       source_cost_id uuid REFERENCES costs(id) ON DELETE SET NULL,
       source_invoice_id uuid,
       recurring_period text,

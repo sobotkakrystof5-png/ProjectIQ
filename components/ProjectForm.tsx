@@ -24,9 +24,12 @@ type FormData = {
   progress: number
   price: string
   paid: boolean
+  /** Kdy peníze dorazily — prázdné znamená dnes (AD13). */
+  paid_on: string
   estimated_costs: string
   deposit_amount: string
   deposit_paid: boolean
+  deposit_paid_on: string
   invoiced_on_ico: boolean
   deadline: string
   notes: string
@@ -54,9 +57,11 @@ const defaultData: FormData = {
   progress: 0,
   price: '',
   paid: false,
+  paid_on: '',
   estimated_costs: '',
   deposit_amount: '',
   deposit_paid: false,
+  deposit_paid_on: '',
   invoiced_on_ico: false,
   deadline: '',
   notes: '',
@@ -81,9 +86,11 @@ function projectToForm(p: Project): FormData {
     progress: p.progress,
     price: p.price !== null ? String(p.price) : '',
     paid: p.paid,
+    paid_on: p.paid_on ?? '',
     estimated_costs: p.estimated_costs !== null ? String(p.estimated_costs) : '',
     deposit_amount: p.deposit_amount !== null ? String(p.deposit_amount) : '',
     deposit_paid: p.deposit_paid,
+    deposit_paid_on: p.deposit_paid_on ?? '',
     invoiced_on_ico: p.invoiced_on_ico ?? false,
     deadline: p.deadline ?? '',
     notes: p.notes ?? '',
@@ -160,9 +167,11 @@ export function ProjectForm({ project }: ProjectFormProps) {
       progress: form.progress,
       price: form.price !== '' ? Number(form.price) : null,
       paid: form.paid,
+      paid_on: form.paid ? form.paid_on || null : null,
       estimated_costs: form.estimated_costs !== '' ? Number(form.estimated_costs) : null,
       deposit_amount: depositAmount !== '' ? Number(depositAmount) : null,
       deposit_paid: form.deposit_paid,
+      deposit_paid_on: form.deposit_paid ? form.deposit_paid_on || null : null,
       invoiced_on_ico: form.invoiced_on_ico,
       deadline: form.deadline || null,
       notes: form.notes.trim() || null,
@@ -401,6 +410,24 @@ export function ProjectForm({ project }: ProjectFormProps) {
             </label>
           </div>
 
+          {/* Datum platby, ne datum zápisu: příjem z prosince zapsaný v lednu
+              by jinak spadl do jiného daňového roku (AD13). */}
+          {form.paid && (
+            <div className="flex flex-wrap items-center gap-3">
+              <label htmlFor="paid_on" className="text-sm text-muted-foreground">
+                Peníze dorazily
+              </label>
+              <input
+                type="date"
+                id="paid_on"
+                value={form.paid_on}
+                onChange={e => set('paid_on', e.target.value)}
+                className={cn(inputCls, 'w-auto min-h-11')}
+              />
+              <span className="text-xs text-muted-foreground">prázdné = dnes</span>
+            </div>
+          )}
+
           {/* Řídí, do které linie příjmů zakázka spadne — přiznané jdou do
               daňového přiznání a do daňové kalkulačky ve Financích. */}
           <div className="flex items-start gap-3">
@@ -465,6 +492,21 @@ export function ProjectForm({ project }: ProjectFormProps) {
                 Záloha zaplacena
               </label>
             </div>
+            {form.deposit_paid && (
+              <div className="flex flex-wrap items-center gap-3">
+                <label htmlFor="deposit_paid_on" className="text-sm text-amber-800">
+                  Záloha dorazila
+                </label>
+                <input
+                  type="date"
+                  id="deposit_paid_on"
+                  value={form.deposit_paid_on}
+                  onChange={e => set('deposit_paid_on', e.target.value)}
+                  className={cn(inputCls, 'w-auto min-h-11')}
+                />
+                <span className="text-xs text-amber-600">prázdné = dnes</span>
+              </div>
+            )}
           </div>
         </div>
 

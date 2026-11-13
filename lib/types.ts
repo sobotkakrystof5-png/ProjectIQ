@@ -20,6 +20,13 @@ export interface Project {
   estimated_costs: number | null
   deposit_amount: number | null
   deposit_paid: boolean
+  /**
+   * Kdy peníze dorazily (migrace 109, AD13). `null` = neuvedeno, příjem se
+   * zapsal ke dni zápisu. Daňová evidence jede na hotovostním principu, takže
+   * rok příjmu určuje tohle datum, ne okamžik, kdy to někdo naklikal.
+   */
+  paid_on?: string | null
+  deposit_paid_on?: string | null
   /** Fakturováno na IČO — příjem ze zakázky patří do přiznané linie (migrace 054) */
   invoiced_on_ico: boolean
   /**

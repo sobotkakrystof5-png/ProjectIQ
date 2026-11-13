@@ -14,15 +14,26 @@ export {
   INVOICE_CURRENCIES, type InvoiceCurrency,
 }
 
-export const INVOICE_COLUMNS = `
+/**
+ * Sloupce faktury pro každý výpis — jeden seznam pro archiv, evidenci,
+ * zakázku i detail (AD13; dřív čtyři kopie osmnácti sloupců).
+ *
+ * `payment_reviewed_at` je z migrace 109, takže se dosazuje podle stavu
+ * databáze: dokud migrace nedoběhne, vrací se `NULL` a admin se chová
+ * jako dřív.
+ */
+export function invoiceColumns(L: LedgerSql): string {
+  return `
   i.id::text, i.invoice_number, i.project_id::text, i.client_name, i.client_ico, i.client_dic,
   i.issued_on::text, i.due_on::text, i.paid_on::text, i.amount::float AS amount,
   i.currency, i.note, i.pdf_filename, i.pdf_size,
   (i.pdf_data IS NOT NULL) AS has_pdf,
   i.cancelled_at::text,
+  ${L.has ? 'i.payment_reviewed_at::text' : 'NULL::text AS payment_reviewed_at'},
   p.lead_origin AS project_lead_origin,
   p.client_name AS project_client_name
 `
+}
 
 export const INCOME_JOIN = `
   LEFT JOIN (
@@ -38,7 +49,7 @@ export const INCOME_JOIN = `
 
 export const OTHER_INCOME_COUNT = `GREATEST(COALESCE(inc.n, 0) - CASE WHEN own.id IS NULL THEN 0 ELSE 1 END, 0)::int AS other_income_count`
 
-/** Řádek výpisu faktur tak, jak ho vrací `INVOICE_COLUMNS` + `OTHER_INCOME_COUNT`. */
+/** Řádek výpisu faktur tak, jak ho vrací `invoiceColumns` + `OTHER_INCOME_COUNT`. */
 export type InvoiceRow = Omit<InvoiceListItem, 'project_href' | 'duplicate_risk'> & {
   project_lead_origin: string | null
   other_income_count: number
@@ -57,7 +68,8 @@ export function toInvoiceItem(row: InvoiceRow): InvoiceListItem {
   return {
     ...rest,
     project_href: rest.project_id !== null ? projectPath(rest.project_id) : null,
-    duplicate_risk: rest.paid_on !== null && other_income_count > 0,
+    // Jednou vyřízené „Je tohle ta platba?" se znovu neptá (AD13).
+    duplicate_risk: rest.paid_on !== null && other_income_count > 0 && rest.payment_reviewed_at === null,
   }
 }
 
@@ -250,7 +262,8 @@ export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[
     // 2. …a vazba na něj taky ne. Převzatý příjem zůstává zakázce.
     {
       text: `
-        UPDATE invoices SET finance_transaction_id = NULL
+        UPDATE invoices
+        SET finance_transaction_id = NULL${withCurrency ? ', payment_origin = NULL, payment_reviewed_at = NULL' : ''}
         WHERE id = $1 AND paid_on IS NULL AND finance_transaction_id IS NOT NULL
       `,
       params: [invoiceId],
@@ -290,6 +303,11 @@ export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[
     // 6. Zakázka už možná svůj příjem do ledgeru zapsala (zaplacená zakázka /
     //    záloha). Stejná částka i měna = tytéž peníze, jen jiný doklad →
     //    převzít, nezakládat druhý.
+    //
+    //    Od AD13 se převezme **jen jednoznačný** kandidát. Dřív se bral první
+    //    podle data, takže u dvou stejně vysokých příjmů (záloha a doplatek
+    //    stejné výše) mohla faktura převzít ten špatný. Je-li kandidátů víc,
+    //    rozhodne člověk v detailu faktury („Je tohle ta platba?").
     {
       text: `
         WITH faktura AS (
@@ -298,7 +316,7 @@ export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[
           WHERE i.id = $1 AND i.paid_on IS NOT NULL
             AND i.finance_transaction_id IS NULL AND i.project_id IS NOT NULL
         ),
-        kandidat AS (
+        kandidati AS (
           SELECT t.id
           FROM finance_transactions t JOIN faktura f ON t.source_project_id = f.project_id
           WHERE t.type = 'income'
@@ -307,15 +325,17 @@ export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[
             AND t.amount = f.amount
             ${currencyMatch}
             AND NOT EXISTS (SELECT 1 FROM invoices x WHERE x.finance_transaction_id = t.id)
-          ORDER BY t.date DESC
-          LIMIT 1
+        ),
+        jediny AS (
+          SELECT id FROM kandidati WHERE (SELECT count(*) FROM kandidati) = 1
         ),
         prevzeti AS (
           UPDATE finance_transactions SET declared = true
-          WHERE id IN (SELECT id FROM kandidat)
+          WHERE id IN (SELECT id FROM jediny)
           RETURNING id
         )
-        UPDATE invoices SET finance_transaction_id = (SELECT id FROM prevzeti)
+        UPDATE invoices
+        SET finance_transaction_id = (SELECT id FROM prevzeti)${withCurrency ? `, payment_origin = 'adopted'` : ''}
         WHERE id = $1 AND EXISTS (SELECT 1 FROM prevzeti)
       `,
       params: [invoiceId],
@@ -330,13 +350,14 @@ export function invoiceSyncQueries(L: LedgerSql, invoiceId: string): AdminQuery[
         ),
         vlozeni AS (
           INSERT INTO finance_transactions
-            (amount, type, category, note, date, user_id, source_project_id, source_invoice_id, declared${withCurrency ? ', currency' : ''})
+            (amount, type, category, note, date, user_id, source_project_id, source_invoice_id, declared${withCurrency ? ", currency, income_origin" : ''})
           SELECT f.amount, 'income', $2, 'Faktura ' || f.invoice_number, f.paid_on,
-                 NULL, f.project_id, f.id, true${withCurrency ? ', f.currency' : ''}
+                 NULL, f.project_id, f.id, true${withCurrency ? ", f.currency, 'invoice'" : ''}
           FROM faktura f
           RETURNING id
         )
-        UPDATE invoices SET finance_transaction_id = (SELECT id FROM vlozeni)
+        UPDATE invoices
+        SET finance_transaction_id = (SELECT id FROM vlozeni)${withCurrency ? `, payment_origin = 'created'` : ''}
         WHERE id = $1 AND EXISTS (SELECT 1 FROM vlozeni)
       `,
       params: [invoiceId, INVOICE_INCOME_CATEGORY],

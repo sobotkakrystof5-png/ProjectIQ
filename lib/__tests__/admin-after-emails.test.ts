@@ -27,6 +27,11 @@ vi.mock('next/server', () => ({
 vi.mock('@/lib/email', () => ({ sendBrandedEmail: (...a: unknown[]) => sendBrandedMock(...a) }))
 vi.mock('@/lib/notifications', () => ({ createNotification: (...a: unknown[]) => createNotificationMock(...a) }))
 vi.mock('@/lib/invoices', () => ({ parseInvoiceForm: vi.fn(), insertInvoice: vi.fn() }))
+// Od AD13 ukládá zakázka i datum platby přes dávkovaný `lib/admin/db.ts`.
+// Bez migrace 109 se jen zjistí, že sloupce nejsou, a nic se nezapisuje.
+vi.mock('@/lib/admin/db', () => ({
+  adminDb: Object.assign(vi.fn(), { batch: async () => [[]] }),
+}))
 
 import { confirmWebLead, updateProject } from '@/app/actions'
 import { closeProject } from '@/app/closed-actions'

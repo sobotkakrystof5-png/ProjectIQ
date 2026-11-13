@@ -6,7 +6,7 @@ import { sql } from '@/lib/db'
 import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import {
   parseInvoiceForm, insertInvoice, updateInvoiceRow, deleteInvoiceRow, invoiceSyncQueries,
-  INVOICE_COLUMNS, INCOME_JOIN, OTHER_INCOME_COUNT,
+  invoiceColumns, INCOME_JOIN, OTHER_INCOME_COUNT,
   toInvoiceItem, toInvoiceRegistryItem,
   type InvoiceRow, type InvoiceRegistryRow,
 } from '@/lib/invoices'
@@ -19,7 +19,7 @@ import {
 } from '@/lib/admin/invoice-issue'
 import { issueInvoiceSchema, issuerProfileSchema } from '@/lib/admin/invoice-issue-schema'
 import { lookupIco } from '@/lib/ares'
-import { ledgerSql } from '@/lib/admin/ledger'
+import { ledgerSql, withLedger } from '@/lib/admin/ledger'
 import type { InvoiceAiExtract } from '@/lib/types'
 
 /**
@@ -49,6 +49,12 @@ export interface InvoiceListItem {
   has_pdf: boolean
   /** Storno (AD12): doklad zůstává v evidenci kvůli souvislé řadě, ale neplatí. */
   cancelled_at: string | null
+  /**
+   * Kdy člověk rozhodl, jestli příjem zakázky patří téhle faktuře (AD13).
+   * `null` = ještě se neptal; po rozhodnutí se varování o dvojím započtení
+   * neukazuje. Před migrací 109 je vždy `null`.
+   */
+  payment_reviewed_at: string | null
   /** Odkaz na zakázku v adminu — null u faktury bez zakázky */
   project_href: string | null
   project_client_name: string | null
@@ -87,10 +93,10 @@ const ARCHIVE_LIMIT = 500
 export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
   await requireAuth()
 
-  const [paidRows, outstandingRows, yearRows] = await adminDb.batch([
+  const [paidRows, outstandingRows, yearRows] = await withLedger((L) => adminDb.batch([
     {
       text: `
-        SELECT ${INVOICE_COLUMNS}, ${OTHER_INCOME_COUNT}
+        SELECT ${invoiceColumns(L)}, ${OTHER_INCOME_COUNT}
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
         ${INCOME_JOIN}
@@ -102,7 +108,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
     },
     {
       text: `
-        SELECT ${INVOICE_COLUMNS}, 0 AS other_income_count
+        SELECT ${invoiceColumns(L)}, 0 AS other_income_count
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
         WHERE ${invoiceSql.outstanding()}
@@ -119,7 +125,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
       `,
       params: [],
     },
-  ])
+  ]))
 
   const paid = (paidRows as unknown as Row[]).map(toItem)
   const outstanding = (outstandingRows as unknown as Row[]).map(toItem)
@@ -150,10 +156,10 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
 export async function getProjectInvoices(projectId: string): Promise<InvoiceArchiveData> {
   await requireAuth()
 
-  const [rows] = await adminDb.batch([
+  const [rows] = await withLedger((L) => adminDb.batch([
     {
       text: `
-        SELECT ${INVOICE_COLUMNS}, ${OTHER_INCOME_COUNT}
+        SELECT ${invoiceColumns(L)}, ${OTHER_INCOME_COUNT}
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
         ${INCOME_JOIN}
@@ -163,7 +169,7 @@ export async function getProjectInvoices(projectId: string): Promise<InvoiceArch
       `,
       params: [projectId],
     },
-  ])
+  ]))
 
   const today = getPragueTodayISO()
   const all = (rows as unknown as Row[]).map(toItem)
@@ -384,15 +390,16 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
   await requireAuth()
   if (!UUID_RE.test(id)) return null
 
-  // Sloupce faktury jsou na jednom místě (`INVOICE_COLUMNS` v `lib/invoices.ts`) —
+  // Sloupce faktury jsou na jednom místě (`invoiceColumns` v `lib/invoices.ts`) —
   // stejný seznam, jaký používá evidence i archiv. Dřív tu byla čtvrtá kopie
   // osmnácti sloupců a dvě další kola do databáze (ledger a vystavená část);
   // od AD13 je to jedna dávka.
   const issuingReady = await isIssuingReady()
+  const L = await ledgerSql()
   const [rows, issuedRows] = await adminDb.batch([
     {
       text: `
-        SELECT ${INVOICE_COLUMNS},
+        SELECT ${invoiceColumns(L)},
           i.ai_extracted,
           i.created_at::text, i.updated_at::text,
           i.finance_transaction_id::text,
@@ -493,6 +500,152 @@ function toIssuedPart(row: unknown): IssuedInvoiceDetail | null {
     cancelled_at: r.cancelled_at,
     sent_at: r.sent_at,
   }
+}
+
+// ─── „Je tohle ta platba?" (AD13) ────────────────────────────────────────────
+
+/**
+ * Příjem zakázky, který nezastupuje žádný doklad — tedy možná tytéž peníze
+ * jako tahle faktura.
+ *
+ * Do AD13 si faktura brala takový příjem **sama**, jen podle přesné rovnosti
+ * částky, a první podle data. U zálohy a doplatku stejné výše tím mohla
+ * převzít ten špatný, a při zaokrouhlení nebo částečné platbě nepřevzala nic
+ * a vložila druhý příjem — tytéž peníze ležely v ledgeru dvakrát.
+ *
+ * Nově si bere jen jednoznačného kandidáta (jeden, stejná částka i měna).
+ * Zbytek rozhodne člověk tady.
+ */
+export interface PaymentCandidate {
+  id: string
+  amount: number
+  currency: string
+  date: string
+  note: string | null
+  category: string
+  /** Záloha zakázky (`deposit_transaction`). */
+  deposit: boolean
+  declared: boolean
+  /** Příjem je ze uzavřeného roku — převzetí změní loňský daňový základ. */
+  closedYear: boolean
+}
+
+export async function getPaymentCandidates(invoiceId: string): Promise<PaymentCandidate[]> {
+  await requireAuth()
+  if (!UUID_RE.test(invoiceId)) return []
+
+  const L = await ledgerSql()
+  const [rows] = await adminDb.batch([
+    {
+      text: `
+        SELECT t.id::text, t.amount::float AS amount, t.date::text, t.note, t.category,
+               t.deposit_transaction AS deposit, t.declared,
+               ${L.currency('t')} AS currency
+        FROM finance_transactions t
+        JOIN invoices i ON i.id = $1
+        WHERE t.source_project_id = i.project_id
+          AND t.type = 'income'
+          AND t.user_id IS NULL
+          AND t.source_invoice_id IS NULL
+          AND (i.finance_transaction_id IS NULL OR t.id <> i.finance_transaction_id)
+          AND NOT EXISTS (SELECT 1 FROM invoices x WHERE x.finance_transaction_id = t.id)
+        ORDER BY t.date DESC
+        LIMIT 20
+      `,
+      params: [invoiceId],
+    },
+  ])
+
+  const letos = Number(getPragueTodayISO().slice(0, 4))
+  return (rows as unknown as (Omit<PaymentCandidate, 'closedYear'> & { date: string })[]).map((r) => ({
+    ...r,
+    amount: Number(r.amount),
+    closedYear: Number(String(r.date).slice(0, 4)) < letos,
+  }))
+}
+
+/**
+ * „Ano, je to tahle platba." Faktura převezme vybraný příjem zakázky
+ * a vlastní vložený příjem zmizí — tytéž peníze zůstanou v ledgeru jednou.
+ *
+ * Daňová pojistka: převzetí nastaví `declared = true`, takže mění daňový
+ * základ. Když platba spadá do uzavřeného roku, akce bez výslovného
+ * potvrzení neprojde — tichá změna loňska je tiché přepsání přiznání.
+ */
+export async function adoptPayment(
+  invoiceId: string,
+  transactionId: string,
+  options: { confirmClosedYear?: boolean } = {},
+): Promise<{ error?: string; needsConfirm?: string }> {
+  await requireAuth()
+  if (!UUID_RE.test(invoiceId) || !UUID_RE.test(transactionId)) return { error: 'Platba nenalezena' }
+
+  const kandidati = await getPaymentCandidates(invoiceId)
+  const vybrany = kandidati.find((k) => k.id === transactionId)
+  if (!vybrany) return { error: 'Tahle platba už k faktuře přiřadit nejde. Otevřete fakturu znovu.' }
+  if (vybrany.closedYear && options.confirmClosedYear !== true) {
+    return { needsConfirm: String(vybrany.date).slice(0, 4) }
+  }
+
+  const L = await ledgerSql()
+  try {
+    const [, linked] = await adminDb.batch([
+      // Vlastní příjem faktury zmizí — jinak by tytéž peníze zůstaly dvakrát.
+      {
+        text: `
+          DELETE FROM finance_transactions t
+          USING invoices i
+          WHERE i.id = $1 AND t.source_invoice_id = i.id
+        `,
+        params: [invoiceId],
+      },
+      {
+        text: `
+          WITH oznaceni AS (
+            UPDATE finance_transactions SET declared = true
+            WHERE id = $2
+              AND type = 'income'
+              AND user_id IS NULL
+              AND source_invoice_id IS NULL
+              AND source_project_id = (SELECT project_id FROM invoices WHERE id = $1)
+            RETURNING id
+          )
+          UPDATE invoices
+          SET finance_transaction_id = (SELECT id FROM oznaceni)${L.has ? `, payment_origin = 'adopted', payment_reviewed_at = now()` : ''}
+          WHERE id = $1 AND paid_on IS NOT NULL AND EXISTS (SELECT 1 FROM oznaceni)
+          RETURNING project_id::text
+        `,
+        params: [invoiceId, transactionId],
+      },
+    ])
+
+    if (!linked.length) return { error: 'Platbu se nepodařilo přiřadit. Zkuste to prosím znovu.' }
+    revalidateInvoicePaths((linked[0] as { project_id: string | null }).project_id)
+    return {}
+  } catch {
+    return { error: 'Platbu se nepodařilo přiřadit. Zkuste to prosím znovu.' }
+  }
+}
+
+/**
+ * „Ne, byly to jiné peníze." Oba příjmy zůstanou a varování o dvojím
+ * započtení zmizí — rozhodl o tom člověk, ne odhad podle částky.
+ */
+export async function keepPaymentsSeparate(invoiceId: string): Promise<{ error?: string }> {
+  await requireAuth()
+  if (!UUID_RE.test(invoiceId)) return { error: 'Faktura nenalezena' }
+  const L = await ledgerSql()
+  if (!L.has) return { error: 'Tohle půjde až po nasazení migrace 109.' }
+
+  const [rows] = await adminDb.batch([
+    {
+      text: `UPDATE invoices SET payment_reviewed_at = now() WHERE id = $1 RETURNING project_id::text`,
+      params: [invoiceId],
+    },
+  ])
+  if (!rows.length) return { error: 'Faktura nenalezena' }
+  revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
+  return {}
 }
 
 // ─── Vystavování faktur (AD12) ───────────────────────────────────────────────

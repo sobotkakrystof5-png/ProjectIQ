@@ -14,6 +14,9 @@ import {
   type LeadOrigin,
 } from '@/lib/lead-origins'
 import { parseInvoiceForm, insertInvoice, type InvoiceInput, type InvoicePdf } from '@/lib/invoices'
+import { adminDb } from '@/lib/admin/db'
+import { ledgerSql } from '@/lib/admin/ledger'
+import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
 
 /** Seznam zakázek — jedna sekce adminu po sloučení byznysů (AD02, R-088). */
 const PROJECTS_PATH = '/dashboard/zakazky'
@@ -42,8 +45,68 @@ type ProjectPayload = {
   estimated_costs: number | null
   deposit_amount: number | null
   deposit_paid: boolean
+  /**
+   * Kdy peníze dorazily (AD13). Prázdné = dnes. Příjem se dřív zapisoval
+   * s datem zápisu v UTC, takže platba z prosince zapsaná v lednu spadla
+   * do jiného daňového roku.
+   */
+  paid_on?: string | null
+  deposit_paid_on?: string | null
   /** Fakturováno na IČO — příjmy z této zakázky patří do přiznané linie */
   invoiced_on_ico: boolean
+}
+
+/**
+ * Příjem ze zakázky do ledgeru. Jedno místo pro všechny čtyři cesty
+ * (záloha a doplatek, při zakládání i při úpravě zakázky).
+ *
+ * Datum je den platby, jinak pražský dnešek — `now()::date` je v UTC a po
+ * půlnoci o den vedle; u 31. 12. o celý daňový rok (AD13).
+ *
+ * `income_origin = 'project'` říká, že řádek založila zakázka. Od migrace 109
+ * na něm stojí index, který zakázce nedovolí mít dva zálohové nebo dva
+ * doplatkové příjmy — dřív to hlídala jen dvojice „zjisti a pak vlož".
+ */
+/**
+ * Datum platby na zakázku. Samostatný dotaz schválně: sloupce jsou z migrace
+ * 109 a dokud nedoběhne, zakázka se ukládá úplně jako dřív.
+ */
+async function saveProjectPaymentDates(
+  projectId: string,
+  paidOn: string | null | undefined,
+  depositPaidOn: string | null | undefined,
+): Promise<void> {
+  const L = await ledgerSql()
+  if (!L.has) return
+  const den = (value: string | null | undefined) => (value && isIsoDate(value) ? value : null)
+  await adminDb.batch([
+    {
+      text: `UPDATE projects SET paid_on = $2::date, deposit_paid_on = $3::date WHERE id = $1`,
+      params: [projectId, den(paidOn), den(depositPaidOn)],
+    },
+  ])
+}
+
+async function insertProjectIncome(input: {
+  projectId: string
+  amount: number
+  note: string
+  date: string | null
+  deposit: boolean
+  declared: boolean
+}): Promise<void> {
+  const L = await ledgerSql()
+  const den = input.date && isIsoDate(input.date) ? input.date : getPragueTodayISO()
+  await adminDb.batch([
+    {
+      text: `
+        INSERT INTO finance_transactions
+          (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared${L.has ? ', income_origin' : ''})
+        VALUES ($1, 'income', 'zakázka', $2, $3::date, NULL, $4, $5, $6${L.has ? `, 'project'` : ''})
+      `,
+      params: [input.amount, input.note, den, input.projectId, input.deposit, input.declared],
+    },
+  ])
 }
 
 export async function notifyClientOfProjectChange(
@@ -150,13 +213,19 @@ export async function createProject(
   const newProjectId = (rows[0] as { id: string; public_token: string }).id
   const publicToken = (rows[0] as { id: string; public_token: string }).public_token
 
+  await saveProjectPaymentDates(newProjectId, payload.paid_on, payload.deposit_paid_on)
+
   // Záloha zaplacena při vytvoření → okamžitě zapsat do financí
   if (payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0) {
     const note = payload.client_name + (payload.description ? ' — ' + payload.description : '') + ' (záloha)'
-    await sql`
-      INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
-      VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, true, ${payload.invoiced_on_ico})
-    `
+    await insertProjectIncome({
+      projectId: newProjectId,
+      amount: payload.deposit_amount,
+      note,
+      date: payload.deposit_paid_on ?? null,
+      deposit: true,
+      declared: payload.invoiced_on_ico,
+    })
   }
   // Projekt vytvořen rovnou jako zaplacený → zapsat zbývající část
   if (payload.paid && payload.price && payload.price > 0) {
@@ -164,10 +233,14 @@ export async function createProject(
     const remaining = depositAlreadyPaid ? payload.price - (payload.deposit_amount ?? 0) : payload.price
     if (remaining > 0) {
       const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
-      await sql`
-        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
-        VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${newProjectId}, false, ${payload.invoiced_on_ico})
-      `
+      await insertProjectIncome({
+        projectId: newProjectId,
+        amount: remaining,
+        note,
+        date: payload.paid_on ?? null,
+        deposit: false,
+        declared: payload.invoiced_on_ico,
+      })
     }
   }
   await notifyClientOfProjectChange(
@@ -256,6 +329,8 @@ export async function updateProject(
   // a součet obou linií by přestal sedět na celkový příjem.
   // Zakázka je pro své transakce zdroj pravdy: ruční přeřazení jednotlivé
   // transakce tenhle přepis přebije.
+  await saveProjectPaymentDates(id, payload.paid_on, payload.deposit_paid_on)
+
   if (wasInvoicedOnIco !== payload.invoiced_on_ico) {
     await sql`
       UPDATE finance_transactions
@@ -284,10 +359,14 @@ export async function updateProject(
     `
     if ((existingDeposit as unknown[]).length === 0) {
       const note = payload.client_name + (payload.description ? ' — ' + payload.description : '') + ' (záloha)'
-      await sql`
-        INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
-        VALUES (${payload.deposit_amount}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, true, ${payload.invoiced_on_ico})
-      `
+      await insertProjectIncome({
+        projectId: id,
+        amount: payload.deposit_amount,
+        note,
+        date: payload.deposit_paid_on ?? null,
+        deposit: true,
+        declared: payload.invoiced_on_ico,
+      })
     }
   }
 
@@ -302,10 +381,14 @@ export async function updateProject(
       `
       if ((existingFinal as unknown[]).length === 0) {
         const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')
-        await sql`
-          INSERT INTO finance_transactions (amount, type, category, note, date, user_id, source_project_id, deposit_transaction, declared)
-          VALUES (${remaining}, 'income', 'zakázka', ${note}, now()::date, NULL, ${id}, false, ${payload.invoiced_on_ico})
-        `
+        await insertProjectIncome({
+          projectId: id,
+          amount: remaining,
+          note,
+          date: payload.paid_on ?? null,
+          deposit: false,
+          declared: payload.invoiced_on_ico,
+        })
       }
     }
   }

@@ -47,6 +47,7 @@ describe('render adminu nezapisuje', () => {
 
   it('generátory jsou jen v cronu a v server actions Financí', () => {
     const importers = [...tracked('app/**/*.ts'), ...tracked('app/**/*.tsx'), ...tracked('lib/**/*.ts')]
+      .filter((f) => !f.includes('__tests__'))
       .filter((f) => /from '@\/lib\/recurring-transactions'/.test(read(f)))
     expect(importers.sort()).toEqual([
       'app/api/cron/send-reminders/route.ts',
