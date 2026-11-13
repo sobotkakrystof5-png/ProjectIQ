@@ -16,6 +16,16 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-13 — nasazení AD00–AD13 na produkci (uzavírá incident se 106)
+Spouštěč: Kryštof pustil migrace na produkčním Neonu a zadal merge + push.
+Rozsah: fast-forward `admin/modernizace` → `main` (`d948400` → `7a15ad2`), produkční deploy na Vercelu, veřejné ověření bez přihlášení.
+Výsledek: **incident z 2026-11-12 je uzavřený.** `https://www.zakaziq.cz/h/00000000-0000-4000-8000-000000000000` vrací **404** místo 500. Ta stránka čte `survey_token` (106) i `lead_pending` (102), takže je tím zároveň prokázané, že obě nekompatibilní migrace na produkci jsou a běží k nim správný build. `scripts/admin-106-zpet.sql` se nepoužil a není potřeba.
+Nálezy:
+1. **První produkční build spadl** — Turbopack, 12 chyb `Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'` z `next/font/google`. Lokální build téhož commitu přitom prošel a log začínal „Restored build cache from previous deployment". Deploy **bez cache** prošel beze změny kódu. Není to bezpečnostní nález, ale je to způsob, jak se produkce může zaseknout na starém buildu, aniž by za to mohl kód.
+2. **Na produkci se tím poprvé dostal Workspace, landing page a klientský prostor.** Veřejně ověřeno: `/w/prihlaseni` a `/klient/prihlaseni` vracejí 200, `/w/novy` 404, `/r/<neexistující slug>` 404 (R-077), `/api/cron/*` 401, veřejná API 405 na GET, hlavičky a `security.txt` sedí. Clerk běží dál na **dev instanci** a Stripe na sandboxu — platební a registrační cesty tím nejsou živé.
+Opraveno: nic v kódu; deploy se zopakoval bez build cache.
+Zůstává: za přihlášením okem nikdo produkci neviděl; doprovodné kroky po migracích (kontrola `lead_pending` po 102, `WARNING` u 109, backfill kontaktů po 104) nikdo neodškrtl; které migrace přesně běžely, ví jen Kryštof — ověří se výpisem `public.schema_migrations`.
+
 ## 2026-11-12 — incident: migrace 106 na produkci před nasazením větve
 Spouštěč: Kryštof pustil `106_zakazka_jedina_pravda.sql` na **produkčním** Neonu, zatímco produkce běží na starém buildu `d948400` (větev `admin/modernizace` nasazená není).
 Rozsah: `public.completed_projects` přejmenovaná na `completed_projects_archiv`; aditivní část migrace (sloupce na `projects` a `project_surveys`, zakázky vzniklé z ručně doplněné historie) starému buildu nevadí.

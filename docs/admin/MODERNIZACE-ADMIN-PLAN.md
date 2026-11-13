@@ -1273,18 +1273,18 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 |---|---|---|---|---|---|
 | AD00 | Příprava, větev, testovací data, měření | S | — | — | **hotovo 2026-11-11** |
 | AD01 | Úklid: Škola, Sport, Plány, Šablony pryč | M | **100 + 101** | AD00 | **hotovo 2026-11-11** (migrace jen na testu) |
-| AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | **hotovo 2026-11-11** (migrace jen na testu) |
+| AD02 | Jeden byznys, tři zdroje poptávek (Prvotka) | M | **102** | AD01 | **hotovo 2026-11-11**, **nasazeno 2026-11-13** (102 na produkci, ověřeno `/h/<token>` → 404) |
 | AD03 | Jedna navigace, zrušení Hubu, Dnes s čísly | M | — | AD02 | **hotovo 2026-11-11** |
 | AD04 | Vizuální základ (tokeny, písmo, CSP, portály, `brand→navy`) | M | — | AD03 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD05 | Kostra, šířky, jeden systém odznaků | M | — | AD04 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
-| AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11** (migrace nikde neaplikovaná) |
+| AD06 | Rychlost I: dávkování, indexy, streaming | M | **103** | AD04 | **hotovo 2026-11-11**, **nasazeno 2026-11-13** (103 podle Kryštofa na produkci) |
 | AD07 | Sdílená tabulka a výpisy | M–L | — | AD05, AD06 | **hotovo 2026-11-11** (v prohlížeči neověřeno) |
 | AD08 | Rychlost II: `after()`, opravy kalendáře, bundle | M | — | AD06 | **hotovo 2026-11-12** — všech osm bodů „Hotovo, když“ splněno a ověřeno. |
-| AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
-| AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
-| AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (průvodka ověřená v prohlížeči; 106 omylem na produkci, na testu chybí) |
-| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12** na větvi `admin/ad12-fakturace` (migrace 107 nikde neaplikovaná; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
-| AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | **hotovo 2026-11-13** (migrace 109 nikde neaplikovaná, v prohlížeči neověřeno; R-099) |
+| AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (104 na produkci; **backfill kontaktů ještě neproběhl**, v prohlížeči neověřeno) |
+| AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (ověřeno v prohlížeči 390–1440 px; rezervace z portálu naživo neposlaná) |
+| AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (incident se 106 tím uzavřený, `/h/[token]` vrací 404; na testovacím Neonu 106 pořád chybí) |
+| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (107 i 108 podle Kryštofa na produkci; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
+| AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | **hotovo a nasazeno 2026-11-13** (109 podle Kryštofa na produkci; `WARNING` o duplicitních příjmech nikdo nezkontroloval, v prohlížeči neověřeno; R-099) |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | nezačato |
 | AD15 | Paměť projektu (facts + project_memory) | M | 110 (s AD14) | AD14 | nezačato |
 | AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **111** | AD11, AD12 | nezačato |
