@@ -378,3 +378,35 @@ describe('uložení faktury je jedna transakce', () => {
     expect(inv.finance_transaction_id).toBeNull()
   })
 })
+
+/**
+ * Strop proti návratu té chyby. Součet nad ledgerem bez filtru měny je
+ * přesně to, čím eura lezla do daňového základu — a je to chyba, kterou
+ * nejde poznat, dokud někdo nevyfakturuje v eurech.
+ */
+describe('žádný součet nad ledgerem bez měny', () => {
+  const SOUBORY = [
+    'app/dashboard/finance/finance-actions.ts',
+    'app/dashboard/finance/byznys-actions.ts',
+    'lib/admin-today-queries.ts',
+    'lib/admin/invoices.ts',
+  ]
+
+  it('každý dotaz, který sčítá `finance_transactions`, měnu řeší', () => {
+    const hrisnici: string[] = []
+    for (const soubor of SOUBORY) {
+      const text = fs.readFileSync(path.join(ROOT, soubor), 'utf8')
+      // Dotazy se hledají jako bloky mezi `text: \`` a koncem šablony.
+      const dotazy = text.match(/text: `[\s\S]*?`,/g) ?? []
+      for (const dotaz of dotazy) {
+        const sumuje = /SUM\(\s*(?:[a-z]+\.)?amount/i.test(dotaz)
+        const nadLedgerem = /FROM finance_transactions/i.test(dotaz)
+        const resiMenu = /czkOnly\(|L\.currency\(/.test(dotaz)
+        if (sumuje && nadLedgerem && !resiMenu) {
+          hrisnici.push(`${soubor}: ${dotaz.slice(0, 80)}…`)
+        }
+      }
+    }
+    expect(hrisnici).toEqual([])
+  })
+})
