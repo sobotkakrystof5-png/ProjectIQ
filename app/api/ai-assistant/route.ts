@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Je to jeden admin (R-001), takže se limit počítá na jeho e-mail —
-  // IP se mu mění podle sítě a je to zbytečně hrubé měřítko.
-  const actor = session.user?.email ?? 'admin'
+  // Je to jeden admin (R-001), takže se limit počítá na jeden klíč: IP se
+  // mění podle sítě a e-mail by se zbytečně zapisoval do `api_requests`.
+  const actor = 'admin'
   if (await isApiRateLimited(RATE_KEY, actor, RATE_WINDOW_MINUTES, RATE_MAX_REQUESTS)) {
     return NextResponse.json({ error: 'Moc dotazů za sebou. Zkus to za chvíli.' }, { status: 429 })
   }

@@ -30,6 +30,13 @@ import type { ProjectStatus } from '@/lib/types'
  * poslaný z prohlížeče tak nemá kudy projít — neposílá se.
  */
 
+/**
+ * Identifikátor návrhu z prohlížeče. Bez kontroly by neplatný tvar spadl
+ * až v Postgresu (`22P02`) a místo české hlášky by přišla chybová stránka —
+ * táž třída chyby jako `/p/<nesmyslný token>`.
+ */
+const SUGGESTION_ID = z.string().uuid()
+
 const proposeInput = z.object({
   text: z.string().trim().min(1).max(TEXT_MAX),
   contextRef: z
@@ -46,6 +53,7 @@ export type ProposeOutcome =
 const RATE_KEY = 'ai-navrh'
 const RATE_WINDOW_MINUTES = 1
 const RATE_MAX_REQUESTS = 12
+const RATE_ACTOR = 'admin'
 
 export async function proposeSuggestion(raw: unknown): Promise<ProposeOutcome> {
   const session = await getServerSession(authOptions)
@@ -54,11 +62,12 @@ export async function proposeSuggestion(raw: unknown): Promise<ProposeOutcome> {
   const parsed = proposeInput.safeParse(raw)
   if (!parsed.success) return { ok: false, error: 'Napište, co se má stát (nejvýš 2000 znaků).' }
 
-  const actor = session.user?.email ?? 'admin'
-  if (await isApiRateLimited(RATE_KEY, actor, RATE_WINDOW_MINUTES, RATE_MAX_REQUESTS)) {
+  // Je to jeden admin (R-001), takže se limit počítá na jeden klíč — e-mail
+  // by se tím jen zbytečně zapisoval do `api_requests`.
+  if (await isApiRateLimited(RATE_KEY, RATE_ACTOR, RATE_WINDOW_MINUTES, RATE_MAX_REQUESTS)) {
     return { ok: false, error: 'Moc dotazů za sebou. Zkuste to za chvíli.' }
   }
-  await recordApiRequest(RATE_KEY, actor)
+  await recordApiRequest(RATE_KEY, RATE_ACTOR)
 
   const result = await proposeAction({ text: parsed.data.text, contextRef: parsed.data.contextRef })
   if ('error' in result) return { ok: false, error: result.error }
@@ -93,6 +102,9 @@ export type ApplyOutcomePublic =
 
 export async function applySuggestion(id: string): Promise<ApplyOutcomePublic> {
   await requireAuth()
+  if (!SUGGESTION_ID.safeParse(id).success) {
+    return { ok: false, error: 'Návrh už neplatí. Zkuste to říct znovu.' }
+  }
   if (!(await suggestionsAvailable())) {
     return { ok: false, error: 'Potvrzování návrhů zatím není zapnuté (chybí migrace 110).' }
   }
@@ -127,6 +139,7 @@ export async function applySuggestion(id: string): Promise<ApplyOutcomePublic> {
 
 export async function rejectSuggestion(id: string): Promise<{ ok: boolean }> {
   await requireAuth()
+  if (!SUGGESTION_ID.safeParse(id).success) return { ok: false }
   return { ok: await markRejected(id) }
 }
 
@@ -137,6 +150,7 @@ export async function rejectSuggestion(id: string): Promise<{ ok: boolean }> {
  */
 export async function undoProposedStatus(id: string, previousStatus: ProjectStatus): Promise<{ ok: boolean }> {
   await requireAuth()
+  if (!SUGGESTION_ID.safeParse(id).success) return { ok: false }
   const row = await loadSuggestion(id)
   if (!row || row.status !== 'applied') return { ok: false }
   if (row.suggestion.proposal.kind !== 'update_project_status') return { ok: false }

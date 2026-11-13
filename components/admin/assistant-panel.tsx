@@ -66,6 +66,11 @@ function proposalLines(suggestion: Suggestion): { label: string; value: string }
     case 'send_message':
       return [
         { label: 'Čím', value: p.channel === 'email' ? 'E-mailem' : p.channel === 'sms' ? 'SMS' : 'WhatsAppem' },
+        // Komu to půjde, musí být vidět **vždycky**. V kontextu asistenta
+        // jsou i texty, které psal klient (poznámky, požadavky z portálu),
+        // a ten by mohl modelu podstrčit cizí adresu. Člověk, který potvrzuje,
+        // ji tedy musí mít před očima, ne schovanou v odkazu.
+        { label: 'Komu', value: (p.channel === 'email' ? p.email : p.phone) ?? 'nedoplněno' },
         ...(p.subject ? [{ label: 'Předmět', value: p.subject }] : []),
         { label: 'Text', value: p.body },
       ]

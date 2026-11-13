@@ -746,6 +746,61 @@ všem transakcím zakázky (potřebuje rozhodnutí, neměnit potichu) · `declar
 obousměrná automatika `costs` ↔ `finance_transactions` · dvě sady daňových sazeb ·
 `pdf_data bytea` v řádku faktury.
 
+### AI asistent: navrhne, člověk potvrdí (AD14, R-084, R-100)
+
+Asistent z jedné věty udělá **vyplněný návrh akce**. Nic neprovede sám — provede to server action
+po kliknutí.
+
+**Cesta věty.** `components/admin/assistant-panel.tsx` (pravý panel, visí v `AdminShell`, takže je
+na každé obrazovce) → `proposeSuggestion` v `app/ai-actions.ts` → `lib/ai/propose.ts` →
+`ai_suggestions` (migrace 110). Otevírá ho ⌘K: když hledání nic nenajde, nabídne „Zeptat se
+asistenta" (`components/admin/admin-search.tsx`), a událost na `window` to předá panelu
+(`lib/admin/assistant-open.ts`).
+
+**Kontext si bere server**, ne prohlížeč. Z adresy se odvodí `{kind, id}` (`/dashboard/<id>` je
+zakázka, `/dashboard/startup/<id>` startupový projekt) a `lib/ai/context.ts` podle toho načte data.
+Nikdy nečte `pdf_data`, přihlašovací tabulky, `project_agent_keys`, env ani schéma `ws`.
+
+**Model nekoná.** Odpověď je strukturovaný výstup se Zodem (`lib/ai/suggestion-schema.ts`,
+`z.discriminatedUnion('kind', …)`), **ne nástroje**: vynucené `tool_choice: any|tool` na opus-5-5
+a sonnet-5-5 vrací 400, a hlavně nechceme, aby model zapisoval. Každý návrh nese `confidence`,
+`assumptions` a `missing`, takže panel umí říct „doplň datum" místo aby si datum vymyslel model.
+
+**Potvrzení.** `applySuggestion(id)` → řádek z databáze → Zod re-parse → whitelist executorů
+v `lib/admin/suggestion-apply.ts`, které volají **tytéž server actions jako lidský formulář**.
+Žádná obecná cesta do SQL. Dvojklik hlídá `WHERE status = 'pending'` v UPDATE, nevyřízený návrh
+propadá po sedmi dnech (`expire_ai_suggestions()` z denního cronu `send-reminders`).
+
+| Druh návrhu | Co udělá klik |
+|---|---|
+| `create_lead` | `createLead` — kontakt v Hovorech |
+| `schedule_call` | `createCalendarEvent` — termín + zrcadlený kontakt |
+| `update_project_status` | `setProjectStatus`, toast se „Zpět" |
+| `create_invoice_draft` | **nic nezapíše** — otevře `/dashboard/faktury/nova?zakazka=…` |
+| `add_note` | `addProjectNote` nebo `addLeadNote` |
+| `send_message` | **nic neodešle** — složí `mailto:`/`sms:`/`wa.me` |
+| `none` | nic |
+
+**Co asistent nesmí** (platí i pro každé další rozšíření):
+
+- zapsat cokoli do databáze **bez kliknutí** člověka;
+- odeslat e-mail, SMS ani WhatsApp — zprávu jen připraví do odkazu (R-084);
+- cokoli mazat;
+- sahat na peníze (`finance_transactions`, `declared`, `paid_on`, vystavení faktury) jinak než
+  návrhem konceptu;
+- číst `pdf_data`, přihlašovací tabulky, klíče projektů, proměnné prostředí a `.claude/`;
+- brát text od klienta jako instrukce — vstupy z `client_requests` a portálu jsou **data**
+  (vzor `lib/client-request-ai.ts`, R-069);
+- být dostupný na veřejné routě.
+
+**Modely jsou na jednom místě** — `lib/ai/models.ts`, tři role: `fast` (věta → návrh, odpověď
+asistenta), `smart` (nejednoznačná věta, práce s pamětí), `vision` (čtení PDF faktury). Nikde
+jinde v repu se název modelu psát nesmí, hlídá to `lib/__tests__/ai-models.test.ts`. Hloubka se
+řídí `output_config.effort`, **ne** `thinking.budget_tokens` (na těchto modelech vrací 400).
+
+**Bezpečnost:** `.claude/security/DECISIONS.md` #025 a `STATE.md` → Aplikace. Před AD14 brala
+route `/api/ai-assistant` z prohlížeče `systemPrompt` i celé `messages` bez jediné kontroly.
+
 ### Zdroje poptávek (AD02, R-088)
 
 VIZEON a ALTENO už nejsou dvě firmy. Je to **jeden byznys**, který přijímá poptávky z několika webů, a u zakázky, termínu i leadu se eviduje jen `lead_origin` — odkud poptávka přišla.

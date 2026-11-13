@@ -1196,14 +1196,52 @@ z AD08, pátý byl formulář transakce ve Financích).
 kontaktem a jedním klikem termín; test, že `systemPrompt` z těla požadavku se ignoruje; test,
 že `applySuggestion` odmítne pozměněný `proposal`.
 
-### AD15 — Paměť projektu (M, **migrace 109** společně s AD14)
+**Provedeno 2026-11-13 (AD14)** — čtyři commity, každý s testem; `npm test` 98 souborů /
+1153 testů (3 přeskočené, 43 nových), `npx tsc --noEmit` a `npm run build:check` bez varování. DDL je v **migraci 110**
+(`ai_suggestions` + `expire_ai_suggestions()`). **Aplikovaná: nikde.** Technický popis:
+`docs/admin/AGENTS-ADMIN.md` → „AI asistent: navrhne, člověk potvrdí (AD14)".
+
+Pět odchylek od zadání, všechny vědomé (podrobně R-100 v `memory/memory.md`):
+
+1. **Migrace má číslo 110 a je jen pro AD14.** Prompt psal 105 (tu zabralo AD10) a plán chtěl
+   jednu migraci společnou s AD15. Společná migrace je past: kdyby Kryštof pustil 110 po AD14
+   a AD15 do téhož souboru dopsal další DDL, běhoun (`public.schema_migrations`) by soubor
+   považoval za hotový a nové příkazy by nikdy neproběhly. **AD15 proto jede na 111 a AD16
+   na 112.**
+2. **Tělo požadavku na `/api/ai-assistant` nese i krátkou historii hovoru.** Zadání mělo
+   `{ mode, text, contextRef }`. Konzultanti u startupového projektu jsou ale rozhovor, ne
+   jedna otázka — bez historie by každá další zpráva začínala od nuly. Historie je proto
+   v Zodu: role jen `user`/`assistant`, obsah text do 2000 znaků, nejvýš 20 replik, všechno
+   prochází `redactSensitive()`. Díra, kterou AD14 zavírá, byl **systémový prompt** a neomezené
+   tělo, ne existence historie.
+3. **`create_invoice_draft` a `send_message` nic nezapisují.** Zadání psalo, že executory volají
+   existující server actions. U těchhle dvou by to znamenalo buď vystavit fakturu (a doklad je
+   od AD12 neměnný, R-098 — koncept admin nemá), nebo zprávu odeslat; obojí je na seznamu
+   „asistent nesmí". Executor proto vrací odkaz: předvyplněný formulář faktury, respektive
+   `mailto:`/`sms:`/`wa.me`.
+4. **Sjednocení je zanořené v objektu**, ne v kořeni odpovědi: `{ proposal: discriminatedUnion,
+   confidence, assumptions, missing }`. Strukturovaný výstup si s `anyOf` na nejvyšší úrovni
+   nerozumí všude stejně.
+5. **Expiraci nedostal nový cron.** Volá ji týž denní `send-reminders` — stejně jako opakované
+   náklady v AD13 (Vercel Hobby, R-006).
+
+**Co se našlo mimochodem:** `lib/ws/money/ai.ts` (přijaté faktury ve Workspace) jel taky na opusu
+na tutéž extrakci — přepnuto na sdílený `vision`; a `lib/invoice-ai.ts` i `lib/client-request-ai.ts`
+teď berou model z jednoho místa.
+
+**Neověřeno:** panel ani ⌘K nikdo neviděl v prohlížeči a **živý dotaz na model v tomhle sezení
+neproběhl** (klíč se nepoužil). Nejistý je hlavně tvar strukturovaného výstupu se zanořeným
+sjednocením a čtení cache (`usage.cache_read_input_tokens`) — obojí je potřeba ověřit prvním
+skutečným dotazem.
+
+### AD15 — Paměť projektu (M, **migrace 111** — 109 zabralo AD13, 110 AD14; viz R-100)
 **Cíl:** systém předvyplňuje z historie a pamatuje si kontext, ze kterého staví návrhy.
 **Dvě oddělené vrstvy:**
 1. **Deterministické předvyplnění** — nový `lib/admin/memory/facts.ts`, čistě SQL nad historií,
    **bez AI**, nikdy se neukládá jako text: poslední cena u klienta, obvyklá hodinová sazba, průměrná
    doba dokončení, typický zdroj leadu, poslední položky faktury, poslední kanál kontaktu, typická
    délka termínu. **Tohle plní formuláře.**
-2. **AI shrnutí kontextu** — migrace 109: `project_memory (id, scope CHECK ('project','contact','global'),
+2. **AI shrnutí kontextu** — migrace 111: `project_memory (id, scope CHECK ('project','contact','global'),
    ref_id uuid, kind CHECK ('summary','preference','risk','glossary'), text, source, model, created_at,
    valid_until, confirmed_by text NULL)`. Zapisuje se jen (a) na kliknutí „Uložit do paměti", nebo
    (b) cronem z nových řádků `project_activity`, ale pak `confirmed_by IS NULL` a v UI jako „Návrh
@@ -1218,7 +1256,7 @@ kontaktem a jedním klikem termín; test, že `systemPrompt` z těla požadavku 
   a řádek z `.env` se do paměti nedostanou.
 **Riziko:** střední (osobní údaje) — proto redakce a retence ve stejném sezení, ne později.
 
-### AD16 — Hodnocení, reference a předávací dokument (M, **migrace 111** — 109 zabralo AD13, 110 AD14/AD15)
+### AD16 — Hodnocení, reference a předávací dokument (M, **migrace 112** — 109 AD13, 110 AD14, 111 AD15; viz R-100)
 **Cíl:** dotazník odejde sám a z odpovědí se dá udělat reference na web.
 
 **Dnes:** dotazník se pošle **jen jednou**, při ručním kliknutí „Přidat do dokončených", a když
@@ -1285,9 +1323,9 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (incident se 106 tím uzavřený, `/h/[token]` vrací 404; na testovacím Neonu 106 pořád chybí) |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (107 i 108 podle Kryštofa na produkci; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | **hotovo a nasazeno 2026-11-13** (109 podle Kryštofa na produkci; `WARNING` o duplicitních příjmech nikdo nezkontroloval, v prohlížeči neověřeno; R-099) |
-| AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | nezačato |
-| AD15 | Paměť projektu (facts + project_memory) | M | 110 (s AD14) | AD14 | nezačato |
-| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **111** | AD11, AD12 | nezačato |
+| AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | **hotovo 2026-11-13** (110 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-100) |
+| AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | nezačato |
+| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | nezačato |
 | AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | nezačato |
 | AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | nezačato |
 

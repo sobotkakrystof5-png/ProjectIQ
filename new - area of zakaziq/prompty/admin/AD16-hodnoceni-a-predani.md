@@ -20,8 +20,8 @@ Texty pro klienty **vždy** přes `zakaziq-ux-texty-cs`, marketingové přes `hu
 
 ## Kroky
 
-### 1. Migrace 110
-`migrations/110_hodnoceni_automaticky.sql`: `project_surveys.requested_at`, `reminded_at`
+### 1. Migrace 112
+(110 zabral AD14, 111 AD15 — viz R-100.) `migrations/112_hodnoceni_automaticky.sql`: `project_surveys.requested_at`, `reminded_at`
 (nebo tytéž sloupce na zakázce, podle toho, kde po AD11 dotazník visí — rozhodni a zdůvodni).
 
 ### 2. Dotazník automaticky
@@ -59,5 +59,5 @@ jako z ostatních.
 - `npm test`, `tsc`, build zelené.
 
 ## Konec sezení
-`zakaziq-memory` → Konec sezení. Stav AD16 v plánu, changelog (migrace 110, „aplikována: ne").
+`zakaziq-memory` → Konec sezení. Stav AD16 v plánu, changelog (migrace 112, „aplikována: ne").
 Commit `admin/hodnoceni: dotazník automaticky, reference, předávací dokument`.

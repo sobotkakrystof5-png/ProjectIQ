@@ -16,6 +16,16 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-13 — review: AI asistent (AD14)
+Spouštěč: `web-security-review` před commitem AD14.
+Rozsah: `lib/ai/*` (modely, prompty, kontext, návrh), `lib/admin/suggestions.ts`, `lib/admin/suggestion-apply.ts`, `app/ai-actions.ts`, `app/api/ai-assistant/route.ts`, `components/admin/assistant-panel.tsx`, `migrations/110_ai_navrhy.sql`.
+Výsledek: 2 nálezy k okamžité opravě, obojí opravené ve stejném commitu. Dotčená plocha je celá za přihlášením, žádná veřejná routa nepřibyla.
+Nálezy:
+1. **Panel neukazoval, komu zpráva půjde.** Návrh `send_message` vypisoval kanál, předmět a text, ale ne adresu ani číslo. Kontext asistenta přitom nese texty psané klientem (poznámky, požadavky z portálu) a ten by modelu mohl podstrčit cizí adresu — člověk potvrzující jedním klikem by to neviděl. Opraveno: řádek „Komu" je v návrhu vždycky (`components/admin/assistant-panel.tsx`).
+2. **Identifikátor návrhu nešel přes kontrolu tvaru.** `applySuggestion`, `rejectSuggestion` a `undoProposedStatus` braly `id` z prohlížeče a vkládaly ho do porovnání s `uuid`; neplatný tvar by spadl až v Postgresu (`22P02`) a místo české hlášky by přišla chybová stránka. Táž třída chyby jako známý `/p/<nesmyslný token>`. Opraveno: `z.string().uuid()` před dotazem, s testem na `''`, `abc`, `1' OR '1'='1` a `../../etc/passwd`.
+Opraveno: obě výše; k tomu se rate limit přestal počítat na e-mail admina (zapisoval by ho do `api_requests`) a počítá se na jeden klíč — je to jeden admin (R-001).
+Zůstává: vložená instrukce v kontextu je přijaté riziko (DECISIONS #025) — mitigace je klik člověka, whitelist executorů a viditelný příjemce. `ai_suggestions` nemá retenci; doplní ji AD15 spolu s pamětí projektu. Panel v prohlížeči okem nikdo neviděl a živý dotaz na model v tomhle sezení neproběhl (klíč se nepoužil).
+
 ## 2026-11-13 — nasazení AD00–AD13 na produkci (uzavírá incident se 106)
 Spouštěč: Kryštof pustil migrace na produkčním Neonu a zadal merge + push.
 Rozsah: fast-forward `admin/modernizace` → `main` (`d948400` → `7a15ad2`), produkční deploy na Vercelu, veřejné ověření bez přihlášení.

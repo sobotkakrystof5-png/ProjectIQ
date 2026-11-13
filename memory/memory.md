@@ -2,7 +2,14 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-13 · **AD00–AD13 je na produkci.** Kryštof pustil migrace (ověřeno měřením: 102 i 106 na produkci jsou), agent udělal merge `admin/modernizace` → `main` a push (`7a15ad2`). První produkční build **spadl** na obnovené build cache (`next/font/google` v Turbopacku, 12 chyb), druhý **bez cache** prošel. Tím padl i incident se 106: veřejný dotazník `/h/[token]` vrací zase 404 místo 500. Na produkci je tím pádem poprvé i Workspace, landing page a klientský prostor. · **AD13 hotové: náprava financí** — eurová faktura se přestala sčítat s korunami (nejdůležitější oprava celého plánu: dosud to lezlo do daňového základu) a **nečeká to na migraci** — měna se bez sloupce odvodí z faktury; uložení faktury je **jedna transakce**, „po splatnosti" má jeden výpočet s pražským dneškem, editace fixního nákladu **nemaže historii** a dvojí příjem k zakázce hlídá databáze — zbytek rozhodne člověk („Je tohle ta platba?"). Příjem nese datum platby, ne zápisu. Všechno DDL v **migraci 109 — aplikovaná na produkci 2026-11-13**; R-099 · **AD12 hotové na vlastní větvi `admin/ad12-fakturace`** (souběžně s AD11): admin fakturu vystaví — číslo `YYYYNNN` z databáze, položky, QR platba, PDF se vyrábí při otevření, odběratel z ARES, vystavený doklad je neměnný a opravuje se stornem; příjem vzniká pořád až zaplacením. PDF faktury je nově jedno pro celé repo a při vytažení se v něm našly a opravily čtyři chyby Workspace (patkové písmo místo Dílků, datum bez roku, variabilní symbol s pomlčkou, slepené popisky stran). Migrace 107 neběžela nikde, PDF i formulář ověřené v prohlížeči; R-086, R-098, DECISIONS #023 a #024 · **AD11 hotové v kódu: zakázka je jediná pravda** — `completed_projects` se přejmenovala na archiv, dokončenost je `projects.closed_at`, hodnocení visí na zakázce a detail má průvodku s devíti kroky; změna stavu je jeden klik se „Zpět" (migrace 106, R-097) · **Incident: 106 pustená na produkci před nasazením větve** — veřejný dotazník `/h/[token]` vrací 500, návrat je `scripts/admin-106-zpet.sql` (AUDIT-LOG 2026-11-12) · **AD10 uzavřené a ověřené v prohlížeči** na 390–1440 px; průchod našel a opravil čtyři věci (karta kontaktu neuměla zavolat a přetékala na telefonu, kalendář neukázal kontakt u ručně zapsané události, `updateLead` by spadl na databázi bez migrace 105) · Modernizace adminu: AD00–AD10 hotové (nově kontakt jedním klikem: `tel:`, `sms:`, `mailto:` a WhatsApp se šablonami na každé obrazovce, kde kontakt je — včetně detailu zakázky, kde dosud nebyl ani jeden; přesun termínu v Hovorech posune i kalendář a rezervace z portálu je vidět v Hovorech; migrace 105 nikde neaplikovaná; R-096) · Modernizace adminu: AD00–AD09 hotové (nově jedna entita kontaktu: tabulka `contacts`, obrazovka Kontakty se sloučením duplicit, normalizace telefonů a e-mailů, backfill skript a převod z Hovorů, který už nic neztrácí; migrace 104 jen na testu; R-095) · Modernizace adminu: AD00–AD08 hotové (nově rychlost II: e-maily a oznámení mimo akci přes `after()`, kalendář čte okno místo celé historie a tři nahlášené chyby zadávání času opravené, Finance v GET nezapisují, Framer Motion líně — Hovory a Kalendář o 28 kB lehčí, potvrzení poptávky vypadá okamžitě, PDF faktury s ETagem; R-093, R-094, DECISIONS #022) · 2026-11-11 · AD00–AD07 hotové (nově sdílená tabulka adminu: řazení, filtry a stránkování v adrese, počítá je databáze, a žádný výpis už netahá celou tabulku) (rychlost I: dávkovaný `lib/admin/db.ts` — Dnes 8 kol → 1, detail zakázky 12 dotazů v 5 vlnách → 1 dávka, Klienti bez 11 korelovaných podvýběrů; migrace 103 s indexy; kostra streamem, `staleTimes`, landing bez NextAuth, R-092) na větvi `admin/modernizace` (nově jedna kostra: šířku a hlavičku obrazovky určuje stránka přes `PageShell`/`PageHeader`, jeden systém odznaků v `lib/admin-status.ts` místo deseti palet, R-091) (nově vizuální základ: paleta Dílků na `:root`, Instrument Sans místo Interu, zúžená CSP, portály a toasty adminu přes `components/ui`, `brand-*` → `navy-*`) (ukázková data, evidence migrací, výchozí měření, úklid čtyř modulů, jeden byznys se třemi zdroji poptávek, zrušení Hubu a jedna navigace s měsíčními čísly na Dnes; migrace 100–102 jen na testu) · 2026-11-10 · Plán modernizace admin konzole AD00–AD18 (R-081–R-085, kód se zatím nemění) · Řemeslné skilly třetích stran, impeccable 4.8.2, tasteskill 2.5.1 uživatelsky (R-080) · 2026-11-04 · Incident: produkce bez DB po výměně hesla `neondb_owner`, opraveno (AUDIT-LOG) · 2026-11-03 · Právní texty a provozovatel na webu (R-079) · Review před spuštěním a opravy (R-077, migrace 099 připravená, CI s testy, chybové stránky, Clerk `authorizedParties`, session adminu 12 h) · 2026-11-01 · Klientský prostor, hlášení z Claude Code a nová kostra adminu (R-070–R-073, migrace 092–096 aplikované na produkci, `portal_app` vytvořena, commit 41c6873 pushnutý, Preview Ready) · Požadavky klientů z portálu (R-069) · Preview na testovací DB, 084 na testu i produkci; redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 rozpracováno; produkční migrace 064–091 aplikované; připraven samostatný prázdný testovací Neon projekt · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
+> **Poslední aktualizace:** 2026-11-13 · **AD14 hotové v kódu: AI asistent navrhuje, člověk
+> potvrzuje.** Zavřela se díra, kterou měl admin od začátku — `/api/ai-assistant` brala
+> `systemPrompt` i celé zprávy z prohlížeče bez kontroly. Model teď nedostane žádný nástroj:
+> vrací typovaný návrh, ten leží v `ai_suggestions` (**migrace 110, aplikovaná nikde**) a provede
+> ho až klik člověka přes whitelist executorů volajících tytéž server actions jako lidský
+> formulář. Asistent **neodesílá, nemaže a na peníze nesahá**. Názvy modelů mají jediné místo
+> a přepis faktury slezl z opusu na haiku. **V prohlížeči neověřeno, živý dotaz na model
+> neproběhl.** AD15 jede na migraci **111**, AD16 na **112** (R-100). · **AD00–AD13 je na produkci.** Kryštof pustil migrace (ověřeno měřením: 102 i 106 na produkci jsou), agent udělal merge `admin/modernizace` → `main` a push (`7a15ad2`). První produkční build **spadl** na obnovené build cache (`next/font/google` v Turbopacku, 12 chyb), druhý **bez cache** prošel. Tím padl i incident se 106: veřejný dotazník `/h/[token]` vrací zase 404 místo 500. Na produkci je tím pádem poprvé i Workspace, landing page a klientský prostor. · **AD13 hotové: náprava financí** — eurová faktura se přestala sčítat s korunami (nejdůležitější oprava celého plánu: dosud to lezlo do daňového základu) a **nečeká to na migraci** — měna se bez sloupce odvodí z faktury; uložení faktury je **jedna transakce**, „po splatnosti" má jeden výpočet s pražským dneškem, editace fixního nákladu **nemaže historii** a dvojí příjem k zakázce hlídá databáze — zbytek rozhodne člověk („Je tohle ta platba?"). Příjem nese datum platby, ne zápisu. Všechno DDL v **migraci 109 — aplikovaná na produkci 2026-11-13**; R-099 · **AD12 hotové na vlastní větvi `admin/ad12-fakturace`** (souběžně s AD11): admin fakturu vystaví — číslo `YYYYNNN` z databáze, položky, QR platba, PDF se vyrábí při otevření, odběratel z ARES, vystavený doklad je neměnný a opravuje se stornem; příjem vzniká pořád až zaplacením. PDF faktury je nově jedno pro celé repo a při vytažení se v něm našly a opravily čtyři chyby Workspace (patkové písmo místo Dílků, datum bez roku, variabilní symbol s pomlčkou, slepené popisky stran). Migrace 107 neběžela nikde, PDF i formulář ověřené v prohlížeči; R-086, R-098, DECISIONS #023 a #024 · **AD11 hotové v kódu: zakázka je jediná pravda** — `completed_projects` se přejmenovala na archiv, dokončenost je `projects.closed_at`, hodnocení visí na zakázce a detail má průvodku s devíti kroky; změna stavu je jeden klik se „Zpět" (migrace 106, R-097) · **Incident: 106 pustená na produkci před nasazením větve** — veřejný dotazník `/h/[token]` vrací 500, návrat je `scripts/admin-106-zpet.sql` (AUDIT-LOG 2026-11-12) · **AD10 uzavřené a ověřené v prohlížeči** na 390–1440 px; průchod našel a opravil čtyři věci (karta kontaktu neuměla zavolat a přetékala na telefonu, kalendář neukázal kontakt u ručně zapsané události, `updateLead` by spadl na databázi bez migrace 105) · Modernizace adminu: AD00–AD10 hotové (nově kontakt jedním klikem: `tel:`, `sms:`, `mailto:` a WhatsApp se šablonami na každé obrazovce, kde kontakt je — včetně detailu zakázky, kde dosud nebyl ani jeden; přesun termínu v Hovorech posune i kalendář a rezervace z portálu je vidět v Hovorech; migrace 105 nikde neaplikovaná; R-096) · Modernizace adminu: AD00–AD09 hotové (nově jedna entita kontaktu: tabulka `contacts`, obrazovka Kontakty se sloučením duplicit, normalizace telefonů a e-mailů, backfill skript a převod z Hovorů, který už nic neztrácí; migrace 104 jen na testu; R-095) · Modernizace adminu: AD00–AD08 hotové (nově rychlost II: e-maily a oznámení mimo akci přes `after()`, kalendář čte okno místo celé historie a tři nahlášené chyby zadávání času opravené, Finance v GET nezapisují, Framer Motion líně — Hovory a Kalendář o 28 kB lehčí, potvrzení poptávky vypadá okamžitě, PDF faktury s ETagem; R-093, R-094, DECISIONS #022) · 2026-11-11 · AD00–AD07 hotové (nově sdílená tabulka adminu: řazení, filtry a stránkování v adrese, počítá je databáze, a žádný výpis už netahá celou tabulku) (rychlost I: dávkovaný `lib/admin/db.ts` — Dnes 8 kol → 1, detail zakázky 12 dotazů v 5 vlnách → 1 dávka, Klienti bez 11 korelovaných podvýběrů; migrace 103 s indexy; kostra streamem, `staleTimes`, landing bez NextAuth, R-092) na větvi `admin/modernizace` (nově jedna kostra: šířku a hlavičku obrazovky určuje stránka přes `PageShell`/`PageHeader`, jeden systém odznaků v `lib/admin-status.ts` místo deseti palet, R-091) (nově vizuální základ: paleta Dílků na `:root`, Instrument Sans místo Interu, zúžená CSP, portály a toasty adminu přes `components/ui`, `brand-*` → `navy-*`) (ukázková data, evidence migrací, výchozí měření, úklid čtyř modulů, jeden byznys se třemi zdroji poptávek, zrušení Hubu a jedna navigace s měsíčními čísly na Dnes; migrace 100–102 jen na testu) · 2026-11-10 · Plán modernizace admin konzole AD00–AD18 (R-081–R-085, kód se zatím nemění) · Řemeslné skilly třetích stran, impeccable 4.8.2, tasteskill 2.5.1 uživatelsky (R-080) · 2026-11-04 · Incident: produkce bez DB po výměně hesla `neondb_owner`, opraveno (AUDIT-LOG) · 2026-11-03 · Právní texty a provozovatel na webu (R-079) · Review před spuštěním a opravy (R-077, migrace 099 připravená, CI s testy, chybové stránky, Clerk `authorizedParties`, session adminu 12 h) · 2026-11-01 · Klientský prostor, hlášení z Claude Code a nová kostra adminu (R-070–R-073, migrace 092–096 aplikované na produkci, `portal_app` vytvořena, commit 41c6873 pushnutý, Preview Ready) · Požadavky klientů z portálu (R-069) · Preview na testovací DB, 084 na testu i produkci; redesign aplikace: R-058 až R-063; RD01–RD14 a RD16 hotovo v kódu, RD15 rozpracováno; produkční migrace 064–091 aplikované; připraven samostatný prázdný testovací Neon projekt · S19 částečný živý audit/Preview; S05 základní SEO (R-055); Next 16.4 + React 19 (R-053)
 
 ---
 
@@ -12,7 +19,24 @@
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-13 na **`7a15ad2`** (AD00–AD13 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
-**Modernizace adminu (R-081–R-099), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD13 hotové** — další na řadě je **AD14 (AI asistent, migrace 110**; 109 zabralo AD13, takže AD15 jede s 110 a AD16 má 111). Z migrací této větve (100–109) jsou 100–104 a **107** na testovacím Neonu, 105, 108 a **109 nikde** a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). **Pořadí při nasazení:** aditivní 103, 104, 105, 107, 108 a 109 **před** deployem (bez 107 by evidence faktur vracela chybu), nekompatibilní 102 a 106 **po** něm.
+**Modernizace adminu (R-081–R-100), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`**. **AD00–AD14 hotové** — další na řadě je **AD15 (paměť projektu, migrace 111**; 110 zabral AD14, takže AD16 má 112 — R-100).
+Z AD14: asistent **navrhuje, nekoná**. `/api/ai-assistant` přijímala z prohlížeče `systemPrompt`
+i celé pole `messages` a beze změny je poslala modelu — jediná ochrana bylo přihlášení, model
+natvrdo opus a nic nebylo omezené. Nově jde tělo přes Zod, systémový prompt skládá server podle
+`mode` (`lib/ai/prompts.ts`) a kontext obrazovky si načítá server sám (`lib/ai/context.ts`,
+nikdy `pdf_data`, klíče, přihlašovací tabulky ani schéma `ws`), k tomu rate limit, strop
+`max_tokens` a `redactSensitive()` na vstupu. Věta → návrh jede **strukturovaným výstupem se
+Zodem, ne nástroji**: model vrací typovaný návrh s `confidence`, `assumptions` a `missing`, ten
+se uloží do `ai_suggestions` (**migrace 110**) a při potvrzení posílá prohlížeč **jen `id`** —
+server řádek znovu parsuje a spustí whitelist executorů v `lib/admin/suggestion-apply.ts`, které
+volají tytéž server actions jako lidský formulář. **Žádná obecná cesta do SQL.** Asistent
+neodesílá (zprávu jen složí do `mailto:`/`sms:`/`wa.me`), nic nemaže a fakturu nevystaví (otevře
+předvyplněný formulář). Vstup: ⌘K nabídne „Zeptat se asistenta", když hledání nic nenajde, plus
+pravý panel na každé obrazovce. Názvy modelů mají jediné místo (`lib/ai/models.ts`) a hlídá to
+test — přepis PDF faktury tím slezl z opusu na haiku v adminu i ve Workspace. Odchylky: R-100.
+**V prohlížeči neověřeno a živý dotaz na model v sezení neproběhl** (klíč se nepoužil), takže
+tvar strukturovaného výstupu se zanořeným sjednocením a čtení cache zbývá ověřit prvním
+skutečným dotazem. Z migrací této větve (100–109) jsou 100–104 a **107** na testovacím Neonu, 105, 108 a **109 nikde** a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). **Pořadí při nasazení:** aditivní 103, 104, 105, 107, 108 a 109 **před** deployem (bez 107 by evidence faktur vracela chybu), nekompatibilní 102 a 106 **po** něm.
 Z AD13: `finance_transactions` má **měnu** (`currency`) a bez migrace se měna **odvodí z faktury**
 (`derivedCurrency` v `lib/admin/ledger.ts`), takže eurová faktura přestane plnit korunové součty
 a daňový základ nepřepočteným číslem **hned po nasazení větve**, ne až po 109; měny se nikde
@@ -779,10 +803,51 @@ protože `payment_reviewed_at` existuje až po migraci 109.
 `income_origin`, jinak ji index nehlídá. Duplicity v datech najde
 `node scripts/admin-prijmy-duplicity.mjs` (jen čte); po úklidu se migrace 109 pustí znovu.
 
+### R-100 · Asistent navrhuje, nekoná; migrace 110 je jen pro AD14 (2026-11-13)
+**Rozhodnutí:** pět odchylek od zadání AD14.
+(1) Migrace má číslo **110** (prompt psal 105, to zabralo AD10) a je **jen pro AD14** — plán
+chtěl jednu společnou s AD15. **AD15 tím jede na 111 a AD16 na 112.**
+(2) Tělo požadavku na `/api/ai-assistant` nese kromě `mode`, `text` a `contextRef` i **krátkou
+historii hovoru** (role jen `user`/`assistant`, text do 2000 znaků, nejvýš 20 replik, všechno
+přes `redactSensitive()`).
+(3) `create_invoice_draft` a `send_message` **nic nezapisují ani neodesílají** — vracejí odkaz
+(předvyplněný formulář faktury, `mailto:`/`sms:`/`wa.me`).
+(4) Sjednocení návrhů je **zanořené v objektu** (`{ proposal, confidence, assumptions, missing }`),
+ne v kořeni odpovědi.
+(5) Expirace nevyřízených návrhů **nedostala vlastní cron** — volá ji denní `send-reminders`.
+**Proč:** (1) Společná migrace je past: běhoun vede `public.schema_migrations` podle názvu souboru,
+takže kdyby Kryštof pustil 110 po AD14 a AD15 do téhož souboru dopsalo další DDL, nikdy by
+neproběhlo. (2) Konzultanti u startupového projektu jsou rozhovor, ne jedna otázka; bez historie
+by každá další zpráva začínala od nuly. Díra, kterou AD14 zavírá, byl **systémový prompt** a tělo
+bez jakýchkoli mezí, ne existence historie. (3) Admin žádný koncept faktury nemá a vystavený
+doklad je neměnný (R-098) — jediný bezpečný „koncept" je rozepsaný formulář; odeslání zprávy je
+na seznamu „asistent nesmí" (R-084). (4) Strukturovaný výstup si s `anyOf` na nejvyšší úrovni
+nerozumí všude stejně. (5) Vercel Hobby dovolí cron jednou denně (R-006) a stejně to v AD13
+vyřešily opakované náklady.
+**Důsledek:** `docs/admin/AGENTS-ADMIN.md` → „AI asistent: navrhne, člověk potvrdí (AD14)",
+plán modernizace → AD14 (seznam odchylek), `.claude/security/DECISIONS.md` #025. **Název modelu
+se od teď nikde v repu nepíše** mimo `lib/ai/models.ts` — hlídá to test, který prochází `app`,
+`lib`, `components` a `scripts`. Nový druh návrhu = nová větev v `z.discriminatedUnion` **a**
+executor v `lib/admin/suggestion-apply.ts`; bez executoru se návrh neprovede. Retenci
+`ai_suggestions` doplní AD15 spolu s pamětí projektu.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **AD14 v prohlížeči neověřený a živý dotaz na model neproběhl:** klíč se v sezení
+  nepoužil, takže **tvar strukturovaného výstupu se zanořeným sjednocením**
+  (`{ proposal: discriminatedUnion, … }`) ani čtení cachovaného prefixu
+  (`usage.cache_read_input_tokens` > 0) nikdo neviděl naživo. Projít na 390 / 768 / 1280 / 1440 px:
+  ⌘K s dotazem, který nic nenajde → „Zeptat se asistenta"; panel s větou „zavolat Nováka ve
+  čtvrtek ve dvě" → návrh `schedule_call` → Provést → termín v kalendáři; změna stavu zakázky
+  s toastem „Zpět"; `send_message` (musí být vidět řádek **Komu**); konzultanti u startupového
+  projektu (rozhovor s historií). Jde to až na databázi s **migrací 110** — ta není nikde
+  · od 2026-11-13
+- [ ] **`ai_suggestions` nemá retenci (AD14):** tabulka drží text věty i návrhu natrvalo.
+  `input_text` je sice po `redactSensitive()`, ale může nést jméno nebo telefon klienta,
+  a `public.purge_client_retention` (R-076) o tabulce neví. Doplnit v **AD15** spolu s retencí
+  paměti projektu; počítá s tím DECISIONS #025 · od 2026-11-13
 - [ ] **Doprovodné kroky po migracích nikdo neodškrtl (nasazení 2026-11-13):** (1) po 102
   kontrola `SELECT … WHERE lead_pending` z hlavičky migrace — stará nikdy nepotvrzená poptávka
   se má potvrdit nebo smazat, (2) u 109 `WARNING` o nevytvořeném indexu
@@ -950,6 +1015,56 @@ protože `payment_reviewed_at` existuje až po migraci 109.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-13 (AD14 — AI asistent)
+- **feat** **AD14 hotové v kódu.** Čtyři commity, každý s testem. Technický popis:
+  `docs/admin/AGENTS-ADMIN.md` → „AI asistent: navrhne, člověk potvrdí (AD14)", odchylky v R-100.
+  **DDL je v migraci 110. Aplikovaná: nikde.**
+- **fix** **Zavřená díra v `/api/ai-assistant`.** Route brala z těla požadavku `systemPrompt`
+  **i** celé pole `messages` a beze změny je poslala modelu; jediná ochrana bylo přihlášení,
+  model byl natvrdo opus a nic nebylo omezené — ani délka, ani počet zpráv, ani frekvence. Kdo
+  se dostal k přihlášené záložce admina, měl v ruce model na cizí účet. Nově jde tělo přes Zod
+  (`mode` z výčtu, text do 2000 znaků, odkaz na kontext, nejvýš 20 replik), systémový prompt
+  skládá server podle `mode` (`lib/ai/prompts.ts`) a data projektu si načítá server sám
+  (`lib/ai/context.ts` — bez `pdf_data`, klíčů, přihlašovacích tabulek a schématu `ws`).
+  K tomu rate limit, strop `max_tokens`, `runtime`/`maxDuration` a `redactSensitive()` na vstupu.
+  Soubory: `app/api/ai-assistant/route.ts`, `lib/ai/{assistant,prompts,context,consultants,assistant-limits}.ts`,
+  `components/{AiAssistantModal,AiAssistantsSection}.tsx`.
+- **refactor** **Názvy modelů mají jediné místo** (`lib/ai/models.ts`, role `fast`/`smart`/`vision`).
+  Byly ve čtyřech souborech, dva natvrdo. Přepis PDF faktury tím slezl z opusu na haiku (tatáž
+  extrakce, zlomek ceny) a při nepovedené validaci to jednou zkusí sonnet; totéž se opravilo
+  v `lib/ws/money/ai.ts`, kde přijaté faktury Workspace jely taky na opusu. Model jde přebít
+  proměnnou prostředí (`ADMIN_AI_MODEL_*` v `.env.example`). Že se jinde v repu model nepíše,
+  hlídá `lib/__tests__/ai-models.test.ts`.
+- **feat** **Věta → návrh → klik.** Model nedostane žádný nástroj: vrací typovaný návrh
+  (`messages.parse` + `zodOutputFormat`, `z.discriminatedUnion('kind', …)`) s `confidence`,
+  `assumptions` a `missing`, takže panel umí říct „doplň datum" místo aby si datum vymyslel model.
+  Větu luští haiku a sonnet se ptá jen tehdy, když haiku řekne „nevím" nebo si není jistý.
+  Stabilní prefix (prompt + katalog stavů a akcí) má `cache_control: ephemeral`.
+- **feat** **Potvrzení jedním klikem bez cesty do SQL.** Návrh leží v `ai_suggestions`
+  (migrace 110); prohlížeč při potvrzení posílá **jen `id`**, server si řádek načte a znovu ho
+  prožene týmž schématem — pozměněný návrh nemá kudy projít. Na každý druh je jeden executor
+  volající tutéž server action jako lidský formulář. Co nesmí: `send_message` zprávu jen složí
+  do odkazu, `create_invoice_draft` nic nevystaví ani nezaloží příjem, nic se nemaže, na peníze
+  se nesahá. Záznam se nehádá: buď identifikátor z kontextu, nebo nápověda, která sedí **právě
+  na jeden**. Dvojklik hlídá `WHERE status = 'pending'`, nevyřízený návrh propadá po sedmi dnech
+  z denního cronu `send-reminders`.
+- **feat** **Vstup: ⌘K a pravý panel.** Když hledání nic nenajde, ⌘K nabídne „Zeptat se
+  asistenta" — to je nejčastější okamžik, kdy do něj člověk napsal větu, ne hledaný výraz. Panel
+  visí v kostře, takže je na každé obrazovce, a kontext si bere z adresy (detail zakázky,
+  startupový projekt). Ukazuje přečtené řádky, co si asistent domyslel a co chybí; u změny stavu
+  zakázky nabídne toast „Zpět".
+- **fix** Bezpečnostní review AD14 našlo **dvě věci a obě jsou opravené**: panel neukazoval,
+  **komu** zpráva půjde (poznámka psaná klientem by modelu mohla podstrčit cizí adresu a člověk
+  potvrzující jedním klikem by to neviděl), a identifikátor návrhu z prohlížeče nešel přes
+  kontrolu tvaru, takže neplatná hodnota padala až v Postgresu (`22P02`) místo české hlášky.
+  K tomu se rate limit přestal počítat na e-mail admina. AUDIT-LOG 2026-11-13, DECISIONS #025.
+- **chore** Ověření: `npm test` **98 souborů / 1153 testů** (3 přeskočené), `npx tsc --noEmit`
+  a `npm run build:check` bez varování. **43 nových testů v pěti souborech**
+  (`ai-models`, `ai-asistent-route`, `ai-navrhy`, `ai-executory`, `ai-panel-kontext`).
+  **V prohlížeči neověřeno a živý dotaz na model neproběhl** — klíč se v sezení nepoužil.
+- **decision** **R-100** — pět vědomých odchylek od zadání AD14; nejdůležitější je, že
+  **migrace 110 je jen pro AD14** a AD15 jede na 111, AD16 na 112.
 
 ### 2026-11-13 (nasazení AD00–AD13 na produkci)
 - **chore** **Produkce běží na `7a15ad2`.** Kryštof pustil migrace a dal vědět („všechno nasazené

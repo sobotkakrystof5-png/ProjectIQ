@@ -160,6 +160,15 @@ describe('potvrzení jedním klikem', () => {
     expect(applyProposalSpy).not.toHaveBeenCalled()
   })
 
+  it('identifikátor, který není UUID, skončí českou hláškou, ne pádem', async () => {
+    for (const bogus of ['', 'abc', "1' OR '1'='1", '../../etc/passwd']) {
+      const result = await applySuggestion(bogus)
+      expect(result).toEqual({ ok: false, error: 'Návrh už neplatí. Zkuste to říct znovu.' })
+    }
+    expect(await rejectSuggestion('nenu-uuid')).toEqual({ ok: false })
+    expect(applyProposalSpy).not.toHaveBeenCalled()
+  })
+
   it('odmítnutý návrh už nejde potvrdit', async () => {
     const id = await insert()
     expect(await rejectSuggestion(id)).toEqual({ ok: true })

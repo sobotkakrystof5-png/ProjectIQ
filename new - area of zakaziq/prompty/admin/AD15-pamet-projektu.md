@@ -16,7 +16,8 @@ Soubory: `lib/project-activity.ts:86-93` (`redact()`, `hasRedactionMarker`), `mi
      **bez AI**, nikdy se neukládá jako text. Poslední cena u klienta, obvyklá hodinová sazba,
      průměrná doba dokončení, typický zdroj leadu, poslední položky faktury, poslední kanál kontaktu,
      typická délka termínu. **Tohle plní formuláře.**
-   - **AI shrnutí kontextu** (migrace 105, společná s AD14): `project_memory (id, scope CHECK
+   - **AI shrnutí kontextu** (**migrace 111** — 105 zabralo AD10, 109 AD13, 110 AD14; migrace
+     **není** společná s AD14, viz R-100): `project_memory (id, scope CHECK
      ('project','contact','global'), ref_id uuid, kind CHECK ('summary','preference','risk','glossary'),
      text, source, model, created_at, valid_until, confirmed_by text NULL)`.
 2. **Kdy se zapisuje.** Jen (a) na kliknutí „Uložit do paměti“, nebo (b) cronem z nových řádků
@@ -40,7 +41,8 @@ Soubory: `lib/project-activity.ts:86-93` (`redact()`, `hasRedactionMarker`), `mi
 - Nová faktura i nová zakázka u známého klienta jsou předvyplněné z `facts`.
 - V detailu zakázky je „Paměť“ se zdrojem a platností; nepotvrzené je poznat.
 - Retenční test prochází; test redakce nepropustí klíč ani connection string.
-- Migrace 105 připravená (aplikována: ne), zápis do `.claude/security/` hotový.
+- Migrace **111** připravená (aplikována: ne), zápis do `.claude/security/` hotový.
+- Retence `ai_suggestions` z AD14 doplněná spolu s retencí paměti (DECISIONS #025 ji nechává na AD15).
 
 ## Konec sezení
 `zakaziq-memory` → Konec sezení. Stav AD15 v plánu, changelog, fakta do `AGENTS-ADMIN.md`.
