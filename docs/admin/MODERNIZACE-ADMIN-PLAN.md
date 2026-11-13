@@ -1062,7 +1062,7 @@ nad PGlite), archiv cizích PDF a `syncInvoiceTransaction` mají beze změny cho
    s pomlčkou (překlep `/\\D/` místo `/\D/`). Oba vznikly v S14 a jsou opravené ve sdíleném
    rendereru, takže se to projeví i ve Workspace.
 
-### AD13 — Fakturace: náprava financí (M, **migrace 108**)
+### AD13 — Fakturace: náprava financí (M, **migrace 109** — 108 zabral doplněk AD12)
 **Cíl:** čísla ve financích se nesčítají přes měny a uložení je jedna transakce.
 **Opravit hned:** (1) `finance_transactions.currency` (migrace 108) + součty po měnách — dnes se
 **EUR faktura sčítá s korunami**, což je špatné číslo v daňovém základu; nejnebezpečnější položka
@@ -1246,7 +1246,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (průvodka ověřená v prohlížeči; 106 omylem na produkci, na testu chybí) |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12** na větvi `admin/ad12-fakturace` (migrace 107 nikde neaplikovaná; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
-| AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |
+| AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | nezačato |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **109** | AD05, AD09 | nezačato |
 | AD15 | Paměť projektu (facts + project_memory) | M | 109 (s AD14) | AD14 | nezačato |
 | AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **110** | AD11, AD12 | nezačato |

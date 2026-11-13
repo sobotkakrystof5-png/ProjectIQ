@@ -47,7 +47,7 @@ function formatDay(value: string | null): React.ReactNode {
 }
 
 function isOverdue(invoice: InvoiceRegistryItem, today: string): boolean {
-  return invoice.paid_on === null && invoice.due_on !== null && invoice.due_on < today
+  return invoice.paid_on === null && invoice.cancelled_at === null && invoice.due_on !== null && invoice.due_on < today
 }
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -90,6 +90,7 @@ function columns(today: string): AdminColumn<InvoiceRegistryItem>[] {
               paidOn={invoice.paid_on}
               overdue={overdue}
               todayIso={today}
+              cancelled={invoice.cancelled_at !== null}
             />
             {invoice.duplicate_risk && (
               <Badge

@@ -721,6 +721,10 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 
 ## 3. Otevřené problémy
 
+- [ ] **Migrace 108 nikde (AD12, doplněk):** trigger, který zakáže smazat vystavený doklad.
+  Aditivní, starému buildu neškodí, na produkci patří spolu se 107. Aplikuje Kryštof · od 2026-11-13
+- [ ] **AD13 má nově migraci 109, ne 108:** číslo 108 zabral doplněk AD12. Opraveno v plánu
+  modernizace · od 2026-11-13
 - [ ] **Migrace 106 je na produkci, větev nasazená není (incident 2026-11-12):** produkce běží
   na starém buildu `d948400`, který `completed_projects` čte. Potvrzeno měřením: veřejný dotazník
   `https://www.zakaziq.cz/h/<token>` vrací **500** místo 404; za přihlášením padá `/dashboard/dokoncene`,
@@ -888,6 +892,34 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-13 (AD12 — doplněk z paralelního sezení)
+- **chore** **AD12 vznikla dvakrát.** Dvě sezení ji 2026-11-12 večer dělala souběžně: tahle větev
+  (`admin/ad12-fakturace`, 21:49–22:27) a `admin/modernizace` (22:31–22:40). Obě došly k podobnému
+  návrhu (`admin_invoice_issue`, `admin_settings`, číslo `YYYYNNN`, snímek dodavatele, jeden
+  generátor PDF) a obě samostatně našly tutéž chybu — doklad se tiskl patkovým výchozím písmem,
+  protože tokeny Workspace sahají po proměnné z `next/font`, která v PDF neexistuje.
+  **Kryštof 2026-11-13 rozhodl, že platí tahle větev** (sedí s migrací 107 na testovacím Neonu
+  a je proklikaná naživo); z druhé se přenesly jen rozdíly a její commity se na `admin/modernizace`
+  vracejí revertem. Rozhodnutí R-086 a R-098 existovala v obou verzích pod stejnými čísly —
+  platí znění z téhle větve.
+- **feat** **Vystavený doklad se nemaže** (migrace **108**). 107 uzavřela jen jeho *změnu*;
+  archivní cestou (`deleteInvoice` ve Financích) šel doklad z vlastní řady smazat celý a v číslech
+  by zůstala díra. Trigger `trg_admin_invoice_undeletable` to odmítne, admin hlášku překládá
+  („Vystavenou fakturu nemažeme — číslo by v řadě chybělo. Použijte storno."). Archiv cizích PDF
+  se maže dál. Soubory: `migrations/108_faktura_se_nemaze.sql`,
+  `app/dashboard/finance/invoice-actions.ts`. **Aplikovaná: nikde.**
+- **fix** **Storno přestalo být pohledávkou.** Stornovaná faktura se počítala mezi nezaplacené
+  i „po splatnosti", byla v součtech a šla jedním klikem označit za zaplacenou — tím by se vrátil
+  příjem, který storno odebralo. Nově ji evidence vynechává, má vlastní filtr **Storno**, ve výpisu
+  nese neutrální odznak bez tlačítka a `setInvoicePaid` ji odmítne. Soubory: `lib/admin/invoices.ts`,
+  `lib/invoices.ts`, `app/dashboard/faktury/page.tsx`, `components/admin/invoices/mark-paid.tsx`,
+  `app/dashboard/finance/invoice-actions.ts`.
+- **feat** Krok **Faktura v průvodce zakázky** vede rovnou na `/dashboard/faktury/nova?zakazka=<id>`,
+  ne jen na záložku Fakturace (`lib/admin/journey.ts`).
+- **chore** Ověření: `npx tsc --noEmit`, `npm test` **87 souborů / 1026 testů** (nový
+  `admin-faktura-storno-a-mazani.test.ts` nad PGlite: zákaz mazání, archiv se maže dál, storno
+  mimo pohledávky i součty, „Zaplaceno" odmítnuto), `npm run build:check`.
 
 ### 2026-11-12 (AD12 — ověření naživo na testovací databázi)
 - **chore** **Migrace 107 je na testovacím Neonu** (`rd-test`, se souhlasem Kryštofa; produkce

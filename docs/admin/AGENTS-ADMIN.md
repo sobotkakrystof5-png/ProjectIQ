@@ -316,7 +316,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `project_surveys` | 016, 046, **106** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
-| `invoices` | 053, 056, **107** | Faktury. Archiv cizích PDF (AI přepis, vazba na transakci) **i doklady vystavené tady** (AD12): `direction` (`issued`/`received`), `pdf_generated`, `items`, `issuer` (snímek dodavatele), `client_address`, `supplied_on`, `vat_total`, `number_seq`, `cancelled_at`, `sent_at`. Vystavená tady = `number_seq IS NOT NULL`. Unikátnost čísla je částečná (`WHERE direction='issued'`), aby přijatá faktura mohla nést číslo dodavatele |
+| `invoices` | 053, 056, **107**, **108** | Faktury. Archiv cizích PDF (AI přepis, vazba na transakci) **i doklady vystavené tady** (AD12): `direction` (`issued`/`received`), `pdf_generated`, `items`, `issuer` (snímek dodavatele), `client_address`, `supplied_on`, `vat_total`, `number_seq`, `cancelled_at`, `sent_at`. Vystavená tady = `number_seq IS NOT NULL`. Unikátnost čísla je částečná (`WHERE direction='issued'`), aby přijatá faktura mohla nést číslo dodavatele |
 | `admin_settings` | **107** | Jeden řádek pro celý admin (`id boolean PK CHECK (id)`): `invoice_sequences` (řada čísel po letech) a `issuer_profile` (údaje dodavatele) |
 | `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
 | `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
@@ -634,6 +634,13 @@ Nehotové (vystavení faktury, AD12) nic nepředstírá — odkáže na záložk
 - Nová faktura přes tlačítko nebo přetažením PDF na stránku (AI přepis přes `InvoiceUploadModal`)
 - **Záměrně napříč byznysy** — VIZEON i ALTENO fakturuje jedno IČO pod jedním přiznáním, rozdělený archiv by znamenal hledat doklad na špatném místě
 - Komponenta `InvoiceRegistry.tsx`; data z `getAllInvoices()` v `app/dashboard/finance/invoice-actions.ts` (veškerá logika faktur žije tam, tahle sekce je jen další pohled)
+
+> **Storno a mazání (AD12).** Vystavený doklad (`number_seq IS NOT NULL`) nejde změnit
+> (trigger `trg_admin_invoice_locked`, migrace 107) **ani smazat** (`trg_admin_invoice_undeletable`,
+> migrace 108) — oprava se dělá stornem a novou fakturou, číslo se nerecykluje. Stornovaná faktura
+> zůstává v evidenci, ale **není pohledávka**: nepočítá se mezi nezaplacené, „po splatnosti" ani do
+> součtů, má vlastní filtr **Storno** a `setInvoicePaid` ji odmítne. Archiv cizích PDF se dál mění
+> i maže beze změny.
 
 ### `/dashboard/faktury/[id]`
 - Kompletní přepis jedné faktury: číslo, částka/měna, vystaveno/splatnost/zaplaceno, odběratel + IČO + DIČ, poznámka

@@ -16,6 +16,7 @@ type Zakazka = Parameters<typeof buildJourney>[0]
 const prazdne: JourneyFacts = { schuzka: false, faktura: false, fakturaZaplacena: false, hodnoceni: false }
 
 const zakazka = (over: Partial<Project> = {}): Zakazka => ({
+  id: '11111111-1111-4111-8111-111111111111',
   source: 'manual',
   status: 'new',
   price: null,
@@ -30,6 +31,14 @@ const splneno = (steps: ReturnType<typeof buildJourney>, key: string) =>
   steps.find((s) => s.key === key)?.done
 
 describe('průvodka zakázky', () => {
+  it('krok Faktura vede od AD12 rovnou na vystavení s předvyplněnou zakázkou', () => {
+    const faktura = buildJourney(zakazka({ status: 'done' }), prazdne).find((s) => s.key === 'faktura')
+    expect(faktura?.action).toEqual({
+      label: 'Vystavit fakturu',
+      href: '/dashboard/faktury/nova?zakazka=11111111-1111-4111-8111-111111111111',
+    })
+  })
+
   it('má všech devět kroků v pořadí od poptávky k hodnocení', () => {
     const steps = buildJourney(zakazka(), prazdne)
     expect(steps.map((s) => s.key)).toEqual([...JOURNEY_STEPS])

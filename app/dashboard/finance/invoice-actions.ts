@@ -45,6 +45,8 @@ export interface InvoiceListItem {
   pdf_filename: string | null
   pdf_size: number | null
   has_pdf: boolean
+  /** Storno (AD12): doklad zůstává v evidenci kvůli souvislé řadě, ale neplatí. */
+  cancelled_at: string | null
   /** Odkaz na zakázku v adminu — null u faktury bez zakázky */
   project_href: string | null
   project_client_name: string | null
@@ -101,7 +103,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         SELECT ${INVOICE_COLUMNS}, 0 AS other_income_count
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
-        WHERE i.paid_on IS NULL
+        WHERE i.paid_on IS NULL AND i.cancelled_at IS NULL
         ORDER BY COALESCE(i.due_on, i.issued_on) ASC
         LIMIT ${ARCHIVE_LIMIT}
       `,
@@ -244,12 +246,17 @@ export async function setInvoicePaid(id: string, paidOn: string | null): Promise
     if (!UUID_RE.test(id)) return { error: 'Faktura nenalezena' }
     if (paidOn !== null && !isIsoDate(paidOn)) return { error: 'Neplatné datum zaplacení' }
 
+    // Stornovaný doklad se neplatí — jinak by storno zrušený příjem
+    // (`cancelInvoice`) vzniknul znovu jedním kliknutím ve výpisu.
     const rows = await sql`
       UPDATE invoices SET paid_on = ${paidOn}
-      WHERE id = ${id}
+      WHERE id = ${id} AND cancelled_at IS NULL
       RETURNING project_id::text
     `
-    if (!rows.length) return { error: 'Faktura nenalezena' }
+    if (!rows.length) {
+      const existuje = await sql`SELECT cancelled_at FROM invoices WHERE id = ${id} LIMIT 1`
+      return { error: existuje.length ? 'Stornovaná faktura se nedá označit jako zaplacená.' : 'Faktura nenalezena' }
+    }
 
     await syncInvoiceTransaction(id)
     revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
@@ -270,7 +277,13 @@ export async function deleteInvoice(id: string): Promise<{ error?: string }> {
     await deleteInvoiceRow(id)
     revalidateInvoicePaths(projectId)
     return {}
-  } catch {
+  } catch (err) {
+    // Pojistka z migrace 108: doklad z vlastní řady se nemaže, aby v číslech
+    // nevznikla díra. Oprava se dělá stornem a novou fakturou.
+    const zprava = err instanceof Error ? err.message : ''
+    if (zprava.includes('admin_invoice_undeletable')) {
+      return { error: 'Vystavenou fakturu nemažeme — číslo by v řadě chybělo. Použijte storno.' }
+    }
     return { error: 'Nepodařilo se smazat fakturu' }
   }
 }
