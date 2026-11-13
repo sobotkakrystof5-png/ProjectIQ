@@ -2,7 +2,17 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-13 · **AD16 hotové v kódu: dotazník odchází sám.**
+> **Poslední aktualizace:** 2026-11-13 · **AD17 hotové a ověřené v prohlížeči: denní obrazovky
+> vypadají jako Dílky.** Dnes, detail zakázky, Hovory, Kalendář, Faktury a Finance se
+> překreslily ručně — jedna obrazovka, jeden commit. **Barva v adminu nově něco znamená:**
+> zelená zmizela (Dílky ji nemají), červená zůstala jen pro chybu, stav nese tón
+> z `lib/admin-status.ts`, příjem a výdaj se rozlišují **tvarem** jako v penězích Workspace
+> a devět vlastních odstínů v kalendáři nahradily **tóny termínů `--staff-1…5`**. Hovory se
+> konečně vykreslují z propů místo kopie v `useState` a šipky kalendáře mají jméno pro čtečku
+> (dva otevřené problémy pryč). **Strop zakázaných tříd spadl o polovinu.** Průchod prohlížečem
+> na 390–1440 px našel **devět věcí včetně rozbité hydratace** a všechny jsou opravené;
+> Finance › Podnikání a skutečný detail zakázky ověřit nešlo, protože testovací Neon nemá
+> migraci 106 (R-103). · **AD16 hotové v kódu: dotazník odchází sám.**
 > Dosud se poslal jen při ručním „Přidat do dokončených", takže zakázka mohla skončit zaplacená
 > a klient se nikdy nedočkal; teď odchází po uzavření i po přepnutí na Hotovo s patnáctivteřinovým
 > oknem na „Zpět" a po sedmi dnech odejde **jedna** připomínka. Z hodnocení **se souhlasem** jde
@@ -37,8 +47,29 @@
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-13 na **`7a15ad2`** (AD00–AD13 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
-**Modernizace adminu (R-081–R-101), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`**. **AD00–AD16 hotové** — další na řadě je **AD17 (ruční překreslení denních obrazovek, bez
-migrace)**.
+**Modernizace adminu (R-081–R-103), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`**. **AD00–AD17 hotové** — zbývá poslední **AD18 (doběh sjednocení ve zbylých
+souborech, ruční modály na Radix, přístupnost a měření; bez migrace)**.
+Z AD17: šest denních obrazovek se překreslilo ručně, jedna obrazovka = jeden commit.
+Panel obrazovky je nově **sdílený** (`components/admin/card.tsx` — `Card`, `CardHead`,
+`CARD_CLASS`, `SECTION_LABEL`) a v klidu **plochý**; stín patří podle DESIGN.md jen tomu,
+co plave. **Barva přestala být dekorace** (R-103): stav nese tón z `lib/admin-status.ts`,
+příjem a výdaj se rozlišují **tvarem** (příjem plný, výdaj obrysem — jako
+`components/ws/money/chart.tsx` od S14), kategorie událostí v kalendáři **tóny termínů
+`--staff-1…5`** přes `staffAccent`/`staffTint`, chyba `danger` a „čeká na vás" `signal`.
+Zelená v adminu není nikde, červená jen tam, kde je něco špatně. **Hovory se vykreslují
+z propů** (`revalidatePath` v `app/calls-actions.ts` je tam od začátku), takže kopie
+v `useState` zmizela i s rizikem rozchodu se serverem. Plochy akcí jsou 44 px — nově i řazení
+sloupce, krok měsíce, výsledek hovoru a rozbalení kontaktu (dosud 17 px); ikonová tlačítka
+mají `aria-label`. **Strop zakázaných tříd spadl o polovinu**: `muted-foreground` 589 → 283,
+`rounded-lg|xl|2xl` 396 → 197, `border-border` 269 → 123, duhové barvy 677 → 269, `bg-white`
+176 → 96. **Ověřeno v prohlížeči** (headless Chrome s podepsanou session, 390 / 768 / 1280 /
+1440 px): Dnes, Hovory, Kalendář, Faktury a Finance › Osobní — nikde vodorovné přetečení,
+v konzoli jen známé 404 na `/favicon.ico` a výjimka z vloženého skriptu TradingView. Průchod
+našel **devět věcí a všechny jsou opravené**, nejdůležitější byla **rozbitá hydratace** na
+každé obrazovce s formulářem zakázky: volitelné `as` přidané do sdíleného `SectionLabel`
+servírovalo `p` a v prohlížeči kreslilo `h3`. Změna komponenty Workspace je vrácená.
+**Finance › Podnikání a skutečný detail zakázky ověřené nejsou** — testovací Neon nemá
+migraci 106; detail se procházel na dočasné stránce s fiktivními daty, po průchodu smazané.
 Z AD16: dotazník spokojenosti **odchází sám** (`lib/admin/surveys.ts`) — zařadí ho uzavření
 zakázky i přepnutí na Hotovo/Zaplaceno, jde z `after()` po 15 s (okno na „Zpět") a dvakrát
 odejít nemůže, protože `survey_requested_at` zapisuje týž UPDATE, který zakázku vybere.
@@ -949,10 +980,55 @@ modernizace → AD16 (seznam odchylek), `.claude/security/DECISIONS.md` #027. **
 předávacího dokumentu smí brát hodnotu jen z toho, co v databázi je** — nikdy z modelu (B10).
 Nová cesta, která zakázku uzavře, musí zavolat `sendSurveyRequest`, jinak dotazník neodejde.
 
+### R-103 · Barva v adminu něco znamená, jinak tam není (2026-11-13)
+**Rozhodnutí:** šest odchylek od zadání AD17.
+(1) **`/hub` a `/hub/finance` z promptu neexistují** — Hub zanikl v AD03 (R-087), překreslilo
+se `/dashboard/finance`, obě záložky.
+(2) Kategorie událostí v kalendáři dostaly **tóny termínů `--staff-1…5`** z Dílků, ne vlastní
+paletu; R-091 je nechalo otevřené.
+(3) **Příjem a výdaj se rozlišují tvarem** (příjem plná plocha, výdaj obrys), ne zelenou
+a červenou. Červená zůstává jen pro chybu — bilance v minusu, ztráta, daň k doplacení.
+(4) **`SectionLabel` z `components/ws/brand` se nerozšiřoval.** Volitelné `as` v něm rozbilo
+hydrataci (server `p`, prohlížeč `h3`); admin má místo toho třídu `SECTION_LABEL`
+v `components/admin/card.tsx` a element si volí sám. **Popisek pole je `label` psaný větou**,
+ne mono verzálky.
+(5) **Detail v pravém panelu se nedělal** a **`Money` ani `TimeRange` se nepoužily.**
+(6) **Tři vědomé výjimky z pravidla 44 px:** bloky v kalendáři, odkazy na e-mail a číslo
+faktury uvnitř řádku a skrytý „Přeskočit na obsah".
+**Proč:** (2) DESIGN.md u tónů termínů říká přesně to, co je tu potřeba — rozlišují vlastníky
+termínů a **nikdy** nenesou naléhavost ani chybu; druh události je kategorie, ne stav.
+Devět vlastních odstínů od zelené po fialovou dělalo z kategorií stavy. (3) Dílky zelenou
+nemají a červená je v nich chyba; `components/ws/money/chart.tsx` řeší totéž tvarem od S14.
+(4) Hydratace se rozcházela na každé obrazovce s formulářem zakázky; mono verzálky přes celý
+formulář navíc vypadají jako terminál, zatímco DESIGN.md je vyhrazuje pro data a značky sekcí.
+(5) Detail zakázky je po AD11 celá obrazovka s průvodkou a pěti záložkami — přestavět ji do
+panelu je jiné zadání než překreslení vzhledu; `Money` a `TimeRange` berou měny a čas
+Workspace (`lib/ws/money`, `lib/ws/time`), admin má vlastní `lib/money-currency.ts` a pražský
+čas, takže se použilo `font-num` (totéž písmo). (6) Výška bloku v kalendáři **je** údaj (čas)
+a DESIGN.md hustému rozvrhu vlastní odsazení povoluje; e-mail a číslo faktury v řádku jsou
+texty, ne akce, a vedle nich stojí 44px tlačítka.
+**Důsledek:** `docs/admin/AGENTS-ADMIN.md` → „Denní obrazovky v Dílkách (AD17)", plán
+modernizace → AD17. **Nový panel adminu se kreslí přes `Card`/`CardHead`
+z `components/admin/card.tsx`**, ne vlastním řetězcem tříd; stín do klidového stavu nepatří.
+**Nová barva se nebere z duhy** — stav má tón v `lib/admin-status.ts`, kategorie v kalendáři
+tón termínu, chyba `danger`. Zbývající duhové třídy jsou v osobní části adminu a na `/p`
+a `/h`; uklízí je AD18.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **AD17 — co prohlížeč ověřit nemohl:** Dnes, Hovory, Kalendář, Faktury a Finance ›
+  Osobní jsou proklikané na 390 / 768 / 1280 / 1440 px. Zbývá **Finance › Podnikání**
+  (padá na `column p.closed_at does not exist`) a **skutečný detail zakázky** — obojí chce
+  migraci 106 na testovacím Neonu; detail se procházel jen na dočasné stránce s fiktivními
+  daty. Naživo taky nikdo nezkusil **tisk ani tmavý režim** (admin ho nemá) a chování
+  `mailto:`/`sms:` odkazů v Hovorech na skutečném telefonu (dluh z AD10) · od 2026-11-13
+- [ ] **Osobní část adminu a veřejné stránky zůstaly ve starých třídách (AD17):** po AD17
+  zbývá 283× `muted-foreground`, 197× `rounded-lg|xl|2xl`, 123× `border-border`, 269 duhových
+  barev a 96× `bg-white` — nejvíc v `PersonalProjectEditor`, `StartupProjectEditor`,
+  `/dashboard/profil`, `PerformanceOverview` a na `/p` a `/h`. Je to zadání AD18, ne chyba
+  · od 2026-11-13
 - [ ] **AD16 — co prohlížeč ověřit nemohl:** **tvar pruhu AI leadů a karty předávacího
   dokumentu ověřený je** (dočasná stránka s fiktivními daty, 390–1440 px, po opravě popisku
   u odebrání řádku bez nálezu). Zbývá všechno, co potřebuje **migraci 112** — ta není nikde:
@@ -1061,9 +1137,7 @@ Nová cesta, která zakázku uzavře, musí zavolat `sendSurveyRequest`, jinak d
 - [ ] **AD09 v prohlížeči neověřený:** projít na 390 / 768 / 1280 / 1440 px `/dashboard/kontakty` — tři pohledy (Kontakty, Možné duplicity, Sloučené), hledání podle telefonu zapsaného jinak, **karty místo tabulky pod 640 px** — a kartu kontaktu: uložení údajů (hlavně hláška u telefonu, kterému nejde rozumět, a kolize e-mailu), **Sloučit sem** a jeho „Zpět" v toastu, „Rozdělit zpět" u sloučeného kontaktu. Dál převod kontaktu na zakázku z Hovorů: musí skončit na nové zakázce, mít v ní poznámky z hovorů a navázaný termín v kalendáři · od 2026-11-12
 - [ ] **`notFound()` v adminu vrací 200, ne 404 (zjištěno 2026-11-12):** `/dashboard/<neexistující id>`, `/dashboard/faktury/<id>`, `/dashboard/kontakty/<id>` i neexistující stránka **vykreslí 404 obrazovku, ale se stavem 200**. Je to důsledek streamování kostry (AD06): hlavička odejde dřív, než stránka zjistí, že záznam není. Pro uživatele je to v pořádku (vidí „nenalezeno"), pro monitoring a roboty ne — `/dashboard` je sice `noindex`. Platí pro celý admin, ne jen pro nové obrazovky; opravit s AD18 (přístupnost a kvalita) · od 2026-11-12
 - [ ] **`npm run build:check` při běžícím `next dev` není neškodný (zjištěno 2026-11-12):** `scripts/build-check.sh` tvrdí, že od Next 16 má dev vlastní výstup a `next build` mu ho nepřepíše. V AD08 se ukázalo, že build **přepíše `.next/static`** pod už běžícím `next start` — ten pak servíroval chunky, které na disku nejsou (HTML na ně odkazuje, server vrací 500), a měření balíčku kvůli tomu jednou vyšlo falešně o 18–27 % lépe. Pro měření proto platí: po buildu server **restartovat** a zkontrolovat, že žádný skript z HTML na disku nechybí. `next dev` build **přežije** (ověřeno v AD09: po `build:check` vracel dev server dál 200 na 15 adresách); zbývá tedy jen případ `next start` · `scripts/build-check.sh` · od 2026-11-12
-- [ ] **Ikonová tlačítka v kalendáři nemají přístupný název:** šipky vpřed/vzad v `SmartCalendar` jsou `<button>` jen s SVG, bez `aria-label` — čtečka přečte „tlačítko". Všiml jsem si při řízení prohlížeče (musel jsem je hledat přes sourozence tlačítka „Dnes"). Patří k přístupnosti v **AD17** · `components/SmartCalendar.tsx` · od 2026-11-12
 - [ ] **PDF faktury 200 → 304 ověřené jen unit testem (AD08):** na testovací databázi žádná faktura PDF nemá (`demo-seed` ho nepřikládá, route správně vrací 404), takže skutečné 304 v DevTools nikdo neviděl. Ověřit s fakturou, která `pdf_data` má · `app/api/invoices/[id]/pdf/route.ts` · od 2026-11-12
-- [ ] **`LeadsTable` drží kopii serverových dat v `useState`** a synchronizuje ji ručně po každé akci. `useOptimistic` z AD08 na tom nic nemění. Rozchod je možný (jiná záložka, cizí změna) a stránka se po každé akci zbytečně vykreslí na serveru nadarmo. Odstranit při přepsání obrazovky v **AD17** — vykreslovat z propů · `components/LeadsTable.tsx` · od 2026-11-12
 - [ ] **Ostatní `void createNotification(…)` zůstávají plovoucí:** AD08 opravil `app/actions.ts` a `lib/web-leads.ts`, ale `app/portal-actions.ts` (4×), `app/klient/projekt/[id]/actions.ts` (3×) a `app/api/cron/send-reminders/route.ts` (4×) dál spouštějí zápis bez `await` i bez `after()`. U cronu to nehrozí (čeká na `Promise.allSettled`), u portálu se oznámení může ztratit · od 2026-11-12
 - [ ] **AD06 v prohlížeči neověřený:** 22 adresářů adminu, pět záložek detailu zakázky a `?strana=2` u Klientů vracejí 200 přes podepsanou session a obsah v HTML sedí, ale okem to nikdo neviděl. Projít hlavně: **kostlivce** (`loading.tsx` — nesmí se po načtení nic přeskládat), **odznaky v menu**, které teď doskakují až po kostře, **stránkování Klientů** a **landing bez NextAuth** (přihlášený admin musí v hlavičce `/` pořád vidět „Do administrace") · od 2026-11-11
 - [ ] **Trigramové indexy zatím nic nezrychlují (AD06):** `pg_trgm` a čtyři GIN indexy v migraci 103 jsou příprava pro hledání v databázi (AD07). ⌘K dnes prochází jen názvy stránek v prohlížeči. Kdyby se AD07 rozhodlo hledat jinak (full-text), indexy zrušit — nesou cenu při každém zápisu · od 2026-11-11
@@ -1155,6 +1229,50 @@ Nová cesta, která zakázku uzavře, musí zavolat `sendSurveyRequest`, jinak d
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-13 (AD17 — překreslení denních obrazovek)
+- **feat** **AD17 hotové a ověřené v prohlížeči.** Sedm commitů: jedna obrazovka na commit
+  a sedmý s opravami z průchodu. **Bez migrace.** Technický popis:
+  `docs/admin/AGENTS-ADMIN.md` → „Denní obrazovky v Dílkách (AD17)", odchylky v R-103.
+- **feat** **Sdílený panel adminu** `components/admin/card.tsx` (`Card`, `CardHead`,
+  `CARD_CLASS`, `SECTION_LABEL`). Každá obrazovka si dosud panel psala sama jako
+  `rounded-2xl border border-border bg-white p-6 shadow-sm` — pokaždé o kousek jinak. Panel je
+  v klidu **plochý**: stín patří podle DESIGN.md jen tomu, co plave.
+- **feat** **Barva přestala být dekorace.** Zmizela zelená (Dílky ji nemají) a červená zůstala
+  jen pro chybu. Výsledek hovoru, hodnocení klienta, zdraví financí i stav faktury jedou přes
+  tóny z `lib/admin-status.ts`; **příjem a výdaj se rozlišují tvarem** (příjem plný, výdaj
+  obrysem) jako v penězích Workspace; **kategorie událostí v kalendáři dostaly tóny termínů
+  `--staff-1…5`** místo devíti vlastních odstínů od zelené po fialovou (R-091 je nechalo
+  otevřené). Finance byly nejbarevnější obrazovka adminu — zelené příjmy, červené výdaje,
+  modrá bilance, fialová změna.
+- **fix** **Hovory se vykreslují z propů**, ne z kopie v `useState` (otevřený problém z AD08).
+  Kopie se mohla se serverem rozejít a každá akce vykreslovala stránku na serveru nadarmo;
+  všechny akce v `app/calls-actions.ts` přitom volají `revalidatePath`.
+- **fix** **Přístupnost:** šipky kalendáře dostaly `aria-label` (otevřený problém z AD10)
+  a popisek se mění podle zobrazení; ikonové akce v řádku taky. Plochy 44 px nově u řazení
+  sloupce, kroku měsíce, výsledku hovoru, rozbalení kontaktu (dosud 17 px), „Zaplaceno"
+  a „Vrátit", chipů ve scénářích a položek menu.
+- **fix** **Průchod prohlížečem našel devět věcí a všechny jsou opravené.** Headless Chrome
+  s podepsanou session, 390 / 768 / 1280 / 1440 px: (1) Dnes přetékalo na telefonu o 53 px,
+  (2) Faktury o 147 px (šest filtrů širších než okno), (3) Finance o 11 px, (4) karty výpisů
+  roztáhl dlouhý popis, (5) telefon v Hovorech se lámal na čtyři řádky, (6) **hydratace se
+  rozcházela** na každé obrazovce s formulářem zakázky — přidané `as` u sdíleného
+  `SectionLabel` servírovalo `p` a v prohlížeči `h3`; změna komponenty Workspace je vrácená,
+  (7) popisky polí byly mono verzálky, (8) Faktury měly dvě hlavní akce vedle sebe,
+  (9) „Savings rate" byl jediný anglický popisek v adminu.
+- **chore** Detail zakázky se procházel na **dočasné stránce s fiktivními daty** mimo
+  `/dashboard` (postup z AD11), po průchodu smazané — testovací Neon nemá migraci 106.
+  **Finance › Podnikání a skutečný detail zakázky ověřené nejsou** (`column p.closed_at does
+  not exist`).
+- **chore** **Strop zakázaných tříd spadl o polovinu** proti stavu po AD07:
+  `muted-foreground` 589 → **283**, `rounded-lg|xl|2xl` 396 → **197**, `border-border`
+  269 → **123**, duhové barvy 677 → **269**, `bg-white` 176 → **96**. Co zbývá, je v osobní
+  části adminu a na veřejných `/p` a `/h` — to uklízí AD18.
+- **chore** Ověření: `npm test` 102 souborů / 1208 testů, `npx tsc --noEmit`,
+  `npm run build:check` a `node scripts/sync-agent-context.mjs --check` bez varování.
+  V konzoli zbyly dvě známé věci, ani jedna z AD17: 404 na `/favicon.ico` a výjimka
+  z vloženého skriptu TradingView na Financích.
+- **decision** **R-103** — šest vědomých odchylek od zadání AD17.
 
 ### 2026-11-13 (AD16 — hodnocení, reference, předání)
 - **feat** **AD16 hotové v kódu.** Čtyři commity, každý s testem. Technický popis:

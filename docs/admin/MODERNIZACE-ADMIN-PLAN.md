@@ -1368,6 +1368,47 @@ v pravém panelu, nejvýš 2 kliky z Dnes, `AccentHeading` / `SectionLabel` / `M
 spadl; průchod s přihlášením na 390/768/1280/1440 px.
 **Riziko:** střední — běží v produkci, jedna obrazovka = jeden commit.
 
+**Hotovo 2026-11-13.** Šest commitů, jedna obrazovka na commit, plus sedmý s opravami
+z průchodu. Technický popis: `docs/admin/AGENTS-ADMIN.md` → „Denní obrazovky v Dílkách (AD17)".
+
+**Co se udělalo:**
+- **Sdílený panel adminu** `components/admin/card.tsx` — `Card`, `CardHead`, `CARD_CLASS`
+  a `SECTION_LABEL`. Panel v klidu je plochý (DESIGN.md → Elevation: stín patří jen tomu,
+  co plave). Nahradil opisovaný řetězec `rounded-2xl border border-border bg-white p-6 shadow-sm`.
+- **Barvy přestaly být dekorace.** Zmizela zelená (Dílky ji nemají) a červená zůstala jen
+  pro chybu: výsledek hovoru, hodnocení klienta a zdraví financí jedou přes tóny
+  z `lib/admin-status.ts`, příjem a výdaj se rozlišují **tvarem** jako v penězích Workspace
+  (příjem plný, výdaj obrysem), kategorie událostí v kalendáři tóny termínů `--staff-1…5`.
+- **`LeadsTable` se vykresluje z propů**, ne z kopie v `useState` (otevřený problém z AD08).
+- **Plochy a přístupnost:** řazení sloupců, krok měsíce, výsledek hovoru, rozbalení kontaktu,
+  „Zaplaceno"/„Vrátit", chipy ve scénářích a položky menu mají 44 px; šipky kalendáře
+  a ikonové akce dostaly `aria-label` (otevřený problém z AD10).
+- **Strop zakázaných tříd spadl** proti stavu po AD07: `muted-foreground` 589 → 283,
+  `rounded-lg|xl|2xl` 396 → 197, `border-border` 269 → 123, duhové barvy 677 → 269,
+  `bg-white` 176 → 96.
+
+**Odchylky od zadání (R-103):**
+1. **`/hub` a `/hub/finance` z promptu neexistují** — Hub zanikl v AD03 (R-087). Překreslilo se
+   `/dashboard/finance`, obě záložky.
+2. **`SectionLabel` z Dílků se nerozšiřoval.** Volitelné `as` v něm rozbilo hydrataci
+   (server `p`, prohlížeč `h3`); admin má místo toho třídu `SECTION_LABEL` a element si volí sám.
+3. **Popisky polí nejsou mono verzálky**, ale `text-sm font-medium` jako ve Workspace.
+   Mono je podle DESIGN.md pro data a značky sekcí.
+4. **Detail v pravém panelu se nedělal.** Detail zakázky je po AD11 celá obrazovka s průvodkou
+   a záložkami; překreslit ji do panelu je jiné zadání než překreslení vzhledu.
+5. **`Money` a `TimeRange` se nepoužily** — berou měny a čas Workspace (`lib/ws/money`,
+   `lib/ws/time`); admin má vlastní `lib/money-currency.ts` a pražský čas. Použilo se `font-num`,
+   tedy totéž písmo.
+6. **Tři vědomé výjimky z pravidla 44 px:** bloky v kalendáři (výška je čas), odkazy na e-mail
+   a číslo faktury uvnitř řádku (texty, ne akce) a skrytý odkaz „Přeskočit na obsah".
+
+**Ověřeno v prohlížeči** (headless Chrome, podepsaná session, 390 / 768 / 1280 / 1440 px):
+Dnes, Hovory, Kalendář, Faktury a Finance › Osobní. Nikde vodorovné přetečení. Průchod našel
+devět věcí a všechny jsou opravené (seznam v changelogu paměti).
+**Neověřeno:** Finance › Podnikání a skutečný detail zakázky — testovací Neon nemá migraci 106
+(`column p.closed_at does not exist`). Detail se proto procházel na dočasné stránce s fiktivními
+daty mimo `/dashboard`, po průchodu smazané.
+
 ### AD18 — Dokončení sjednocení a ověření (M, bez migrace)
 Doběh ve zbylých souborech: `text-muted-foreground` → `text-quiet` (1057×), `bg-white` → `bg-surface`
 (302×), `rounded-xl|2xl|lg` → `rounded-chip|box|panel` (710×), duhové `bg-{barva}-NNN` → tóny
@@ -1401,7 +1442,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | **hotovo 2026-11-13** (110 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-100) |
 | AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | **hotovo 2026-11-13** (111 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-101) |
 | AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | **hotovo 2026-11-13** (112 aplikovaná nikde; v prohlížeči neověřeno, PDF ověřené okem; R-102) |
-| AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | nezačato |
+| AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | **hotovo 2026-11-13** (ověřeno v prohlížeči 390–1440 px kromě Financí › Podnikání a skutečného detailu zakázky — testovací Neon nemá 106; R-103) |
 | AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | nezačato |
 
 **Úklid jde první a není to libovůle:** AD01 až AD03 smažou nebo sloučí to, co by AD04 jinak
@@ -1588,14 +1629,18 @@ nad `app/dashboard`, `app/p`, `app/h`, `app/(auth)`, `app/globals.css`, `compone
 Test tvrdí „nejvýš strop", takže úklid nikdy neblokuje, ale návrat staré třídy ano.
 **Po každém sezení snížit na naměřenou hodnotu.**
 
-| Třída | Strop po AD04 (2026-11-11) | Po AD05 | Po AD07 (2026-11-11) | Po AD17 |
+| Třída | Strop po AD04 (2026-11-11) | Po AD05 | Po AD07 (2026-11-11) | Po AD17 (2026-11-13) |
 |---|---|---|---|---|
-| `muted-foreground` | 743 | 691 | 589 | — |
-| `rounded-lg\|xl\|2xl` | 463 | 434 | 396 | — |
-| `border-border` | 335 | 314 | 269 | — |
-| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | 755 | 677 | — |
-| `bg-white` | 211 | 199 | 176 | — |
+| `muted-foreground` | 743 | 691 | 589 | **283** |
+| `rounded-lg\|xl\|2xl` | 463 | 434 | 396 | **197** |
+| `border-border` | 335 | 314 | 269 | **123** |
+| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | 755 | 677 | **269** |
+| `bg-white` | 211 | 199 | 176 | **96** |
 | `brand-*` | **0** | 0 | 0 | 0 |
+
+Po AD17 zbývá nejvíc v tom, co se překreslovat nemělo: osobní část (`PersonalProjectEditor`,
+`StartupProjectEditor`, `/dashboard/profil`, `PerformanceOverview`) a veřejné stránky
+`/p` a `/h`. To je práce pro AD18.
 
 Z AD07 ubylo 78 duhových tříd a asi stovka šedých: zmizely celé soubory
 `CompletedProjectsTable`, `InvoiceRegistry`, `CostsManager`, `WaitlistSection`

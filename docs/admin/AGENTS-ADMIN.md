@@ -910,6 +910,54 @@ Zakázka z AI leadu jde **stejnou cestou jako z ostatních**: lead se přepíše
 a `communication_strategy` jsou **odhad modelu o skutečném člověku**: v poznámce jsou označené
 jako odhad, vykreslují se jen jako text a klientovi neodcházejí.
 
+### Denní obrazovky v Dílkách (AD17, R-103)
+
+Dnes, detail zakázky, Hovory, Kalendář, Faktury a Finance se překreslily ručně. Co z toho
+platí pro každou další práci na vzhledu adminu:
+
+**Panel obrazovky je `components/admin/card.tsx`.** `Card` (plocha), `CardHead` (nadpis
+a věta, k čemu panel je), `CARD_CLASS` (tytéž třídy pro komponenty, které si plochu kreslí
+samy, například `MemoryCard`) a `SECTION_LABEL` (štítek sekce — JetBrains Mono, verzálky).
+Panel je **v klidu plochý**: stín patří podle `DESIGN.md` → Elevation jen tomu, co plave.
+`SECTION_LABEL` je třída, ne komponenta, právě proto, aby si každé místo zvolilo správný
+element: nadpis panelu `h2`, nadpis uvnitř `h3`, popisek údaje v `dl` jeho `dt`.
+**Popisek formulářového pole je `label` a píše se větou** (`text-sm font-medium`) — mono
+verzálky jsou pro data a značky sekcí, ne pro formulář.
+
+> `SectionLabel` z `components/ws/brand` **nerozšiřovat o `as`.** Zkoušelo se to a rozbilo
+> to hydrataci: server poslal `p`, prohlížeč vykreslil `h3`. Od toho je `SECTION_LABEL`.
+
+**Barva v adminu něco znamená, jinak tam není.** Zelená zmizela (Dílky ji nemají), červená
+zůstala jen pro chybu:
+
+| Co | Jak se to kreslí |
+|---|---|
+| stav (hovor zvednut, hodnocení klienta, zdraví financí, faktura) | tón z `lib/admin-status.ts` přes `toneVariant` a `components/ui/badge.tsx` |
+| příjem × výdaj | **tvarem**: příjem plná plocha, výdaj obrys — stejně jako `components/ws/money/chart.tsx` |
+| druh události v kalendáři | tóny termínů `--staff-1…5` přes `staffAccent`/`staffTint` z `lib/ws/staff-colors.ts`; blokace je tichá navy |
+| chyba, ztráta, minus | token `danger` |
+| „čeká to na vás" | `signal` — a nic jiného (R-091) |
+
+Mapování druhů událostí na tóny je v `components/SmartCalendar.tsx` (`CHANNEL_TONE`,
+`KIND_TONE`). Barva se vkládá **stylem**, ne třídou: tokeny jsou CSS proměnné a plocha
+bloku je jejich nádech přes `color-mix`.
+
+**Výpis se vykresluje z propů.** `LeadsTable` si řádky kopíroval do `useState` a po každé
+akci kopii ručně dorovnával — kopie se mohla se serverem rozejít. Každá akce
+v `app/calls-actions.ts` volá `revalidatePath`, takže nové řádky přijdou shora;
+`useOptimistic` drží změnu jen po dobu transakce.
+
+**Plocha akce je 44 px.** Platí i pro řazení sloupce, krok měsíce a ikonové akce v řádku
+(ikona uvnitř zůstává drobná). Tři výjimky jsou vědomé: bloky v kalendáři (výška je čas,
+`DESIGN.md` hustému rozvrhu vlastní odsazení povoluje), odkaz na e-mail a číslo faktury
+uvnitř řádku (texty, ne akce — vedle nich stojí 44px tlačítka) a skrytý „Přeskočit na obsah".
+Ikonové tlačítko bez textu **musí** mít `aria-label`.
+
+**Na co si dát pozor na telefonu:** položka mřížky má výchozí `min-width: auto`, takže bez
+`min-w-0` roztáhne dlouhý text stránku přes okno; `truncate` na řádkovém `span` nedělá nic
+(musí být blok); pilulkový přepínač s víc než čtyřmi položkami potřebuje `overflow-x-auto`.
+Všechny tři chyby průchod AD17 našel a opravil.
+
 ### Zdroje poptávek (AD02, R-088)
 
 VIZEON a ALTENO už nejsou dvě firmy. Je to **jeden byznys**, který přijímá poptávky z několika webů, a u zakázky, termínu i leadu se eviduje jen `lead_origin` — odkud poptávka přišla.
@@ -943,15 +991,19 @@ Všechno, co se u zdroje liší, je v `lib/lead-origins.ts`. **Přidání dalš�
 
 ---
 
-## Stavy zakázky — barevné odlišení
+## Stavy zakázky — tóny
 
-| Status | Hodnota v DB | Barva | Kdy použít |
-|--------|-------------|-------|------------|
-| Nová | `new` | Modrá | Zakázka přijata, zatím nezačato |
-| V řešení | `in_progress` | Žlutá / oranžová | Aktivně pracuji |
-| Čeká na schválení | `review` | Fialová | Čekám na feedback klienta |
-| Hotovo | `done` | Zelená | Práce dokončena, čeká se na platbu |
-| Zaplaceno | `paid` | Tmavě zelená | Platba přijata, zakázka uzavřena |
+Od AD05 nese barva **naléhavost, ne druh** (R-091). Odstíny se nikde nepíšou ručně: tón je
+v `lib/admin-status.ts`, vykresluje ho `components/ui/badge.tsx`. Duhové barvy z doby před
+AD05 (modrá „nová", fialová „čeká na schválení", zelená „hotovo") už v adminu nejsou.
+
+| Status | Hodnota v DB | Tón | Kdy použít |
+|--------|-------------|-----|------------|
+| Nová | `new` | `signal` — čeká na vás | Zakázka přijata, zatím nezačato |
+| V řešení | `in_progress` | `info` — běží | Aktivně pracuji |
+| Čeká na schválení | `review` | `signal` — čeká na vás | Čekám na feedback klienta |
+| Hotovo | `done` | `info` — běží | Práce dokončena, čeká se na platbu |
+| Zaplaceno | `paid` | `success` — uzavřeno | Platba přijata, zakázka uzavřena |
 
 ---
 
