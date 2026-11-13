@@ -121,6 +121,26 @@ session: 22 adresářů, pět záložek detailu a `?strana=2` vracejí 200). Z A
 
 **Externí služby (ověřeno 2026-11-03):** Clerk: produkční instance `zakaziq.cz` má DNS, SSL i poštu hotové (`clerk deploy status` = `oauth_pending`); chybí vlastní Google OAuth klient, webhook, `force_organization_selection=false` v produkci (neověřeno) a produkční klíče ve Vercelu, aplikace dál běží na dev instanci. Resend: doména ověřená, `WS_EMAIL_FROM` a `RESEND_WEBHOOK_SECRET` ve Vercel Production, webhook vypnutý do nasazení; doručení zatím nikdo nezkusil. Stripe jen sandbox, live mód a produkční webhook chybí. DNS u WEDOS: 5 CNAME Clerku a `_dmarc` (`p=none`, bez `rua`) existují, chybí CAA (už jde přidat, certifikáty Clerku jsou vydané) a SPF apexu.
 
+**Nasazení AD00–AD13 na produkci — pořadí, na kterém jsme se dohodli (2026-11-13):**
+Kryštof pustí migrace, pak dá vědět a agent udělá merge + push; produkční připojení se stahuje
+z Vercelu (`vercel env pull .env.production.local --environment=production`), běhoun je
+`node scripts/apply-migration.js <soubor> --env .env.production.local` (idempotentní, vede
+`public.schema_migrations`, kterou si sám založí).
+
+1. **Před deployem** (vše aditivní, starému buildu `d948400` neškodí; 107 je nutná, bez ní by
+   nový build neukázal evidenci faktur): `103_admin_indexy`, `104_kontakty`,
+   `105_propojeni_kalendar_hovory`, `107_fakturace_vystavovani`, `108_faktura_se_nemaze`,
+   `109_finance_meny_a_naklady`. U 109 hlídat `WARNING` o nevytvořeném indexu (= duplicitní
+   příjmy v datech → `node scripts/admin-prijmy-duplicity.mjs`, úklid, migraci pustit znovu).
+   Po 104 ještě `node scripts/admin-contacts-backfill.mjs` (nejdřív bez `--ano`).
+2. **Merge `admin/modernizace` → `main` a push** (dělá agent na výslovné zadání). Tím se zároveň
+   spraví incident se 106: veřejný dotazník `/h/[token]` přestane vracet 500.
+3. **Po deployi:** `102_jeden_inbox_poptavek` (přejmenování `business` → `lead_origin` je
+   nekompatibilní se starým buildem) a kontrola `SELECT … WHERE lead_pending` z hlavičky migrace.
+4. **Před krokem 1** pustit `node scripts/export-before-drop.mjs --ano` proti produkci, pokud se
+   bude aplikovat 100/101 (`DROP TABLE` je nevratný, R-089) — ty v tomhle pořadí nejsou, protože
+   nejsou potřeba k funkci a mazání počká.
+
 **Další krok:** blokující věci před spuštěním. Kryštof: aktivace Stripe live, provozovatel do Stripe (Public details, šablona faktury), migrace 097–099 na produkci, Google OAuth klient pro Clerk, pilotní klient a podpora (D4, D6, D7), Vercel Pro, test obnovy Neonu, DNS CAA, SPF a `rua` v DMARC. Agent: admin po Next 16 s daty (V2), klientský prostor v prohlížeči, scénáře Stripe sandboxu, zkušební e-maily do tří klientů, telefon 390 px a RD15. Pořadí v `docs/workspace/LAUNCH-PLAN.md`. Merge a produkční deploy jen se souhlasem Kryštofa.
 
 **Prostředí agentů:** `AGENTS.md` + `docs/AGENTS-REFERENCE.md` (R-047), skilly a bezpečnost synchronizované do `.agents/` (R-046, `docs/CODEX.md`); řemeslné skilly třetích stran jsou uživatelské mimo repo, dostupnost ověřuj (R-080).
