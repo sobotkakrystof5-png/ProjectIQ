@@ -13,6 +13,12 @@ import { renderHandoverPdf } from '@/lib/invoice-pdf/handover'
  *
  * `proxy.ts` hlídá jen `/dashboard` — na `/api` nesahá, takže přihlášení
  * tady není pojistka navíc, ale jediná ochrana: dokument nese údaje klienta.
+ *
+ * Proč **POST** a ne GET: vystavení dokumentu **zapisuje** datum předání.
+ * Zápis na GET by šel vyvolat obrázkem na cizí stránce, kterou si přihlášený
+ * admin otevře — a zápisy při vykreslení GET rušil už AD08. Formulář s
+ * `target="_blank"` otevře PDF v nové záložce stejně jako odkaz a shodný
+ * `Origin` drží tutéž ochranu, jakou má odeslání faktury.
  */
 
 export const runtime = 'nodejs'
@@ -21,10 +27,21 @@ export const maxDuration = 60
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
+function sameOrigin(req: NextRequest): boolean {
+  const origin = req.headers.get('origin')
+  if (!origin) return false
+  try {
+    return new URL(origin).origin === new URL(req.url).origin
+  } catch {
+    return false
+  }
+}
+
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const params = await props.params
   const session = await getServerSession(authOptions)
   if (!session) return new NextResponse('Neautorizovaný přístup', { status: 401 })
+  if (!sameOrigin(req)) return new NextResponse('Neplatný požadavek', { status: 403 })
   if (!UUID.test(params.id)) return new NextResponse('Zakázka nenalezena', { status: 404 })
 
   const data = await loadHandoverForPdf(params.id)

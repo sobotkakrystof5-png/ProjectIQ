@@ -136,13 +136,18 @@ export function HandoverCard({
         <Button type="button" onClick={uloz} disabled={pending || !available || prazdny}>
           {pending ? 'Ukládám…' : 'Uložit'}
         </Button>
+        {/*
+          Formulář, ne odkaz: vystavení zapisuje datum předání, a zápis nepatří
+          na GET (AD08). `target="_blank"` otevře PDF v nové záložce stejně jako
+          odkaz a prohlížeč to nebere jako vyskočné okno.
+        */}
         {ulozeno && (
-          <Button asChild variant="outline">
-            <a href={`/api/projects/${projectId}/predani`} target="_blank" rel="noopener noreferrer">
+          <form method="post" action={`/api/projects/${projectId}/predani`} target="_blank">
+            <Button type="submit" variant="outline">
               <FileText size={16} strokeWidth={1.75} aria-hidden="true" />
               Otevřít PDF
-            </a>
-          </Button>
+            </Button>
+          </form>
         )}
         <p className="text-xs text-muted-foreground">
           {issuedAt ? `Naposledy vystaveno ${formatDate(issuedAt)}.` : 'Zatím nevystaveno.'}

@@ -22,6 +22,13 @@ vi.mock('@/lib/db', () => ({ sql: (...args: unknown[]) => sqlMock(...args) }))
 vi.mock('@/lib/admin/invoice-issue', () => ({ loadIssuedInvoiceForPdf: (...a: unknown[]) => loadIssuedMock(...a) }))
 vi.mock('@/lib/invoice-pdf/render', () => ({ renderInvoicePdf: (...a: unknown[]) => renderMock(...a) }))
 vi.mock('@/lib/email', () => ({ sendInvoiceEmail: (...a: unknown[]) => sendMock(...a) }))
+// Předávací dokument (AD16) — přikládá se jen na zaškrtnutí.
+const handoverMock = vi.fn()
+const handoverRenderMock = vi.fn()
+const adminDbMock = vi.fn()
+vi.mock('@/lib/admin/handover', () => ({ loadHandoverForPdf: (...a: unknown[]) => handoverMock(...a) }))
+vi.mock('@/lib/invoice-pdf/handover', () => ({ renderHandoverPdf: (...a: unknown[]) => handoverRenderMock(...a) }))
+vi.mock('@/lib/admin/db', () => ({ adminDb: (...a: unknown[]) => adminDbMock(...a) }))
 vi.mock('@/lib/api-auth', () => ({ getClientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/api-rate-limit', () => ({
   isApiRateLimited: (...a: unknown[]) => limitedMock(...a),
@@ -57,16 +64,24 @@ beforeEach(() => {
   sendMock.mockReset().mockResolvedValue(true)
   sqlMock.mockReset().mockResolvedValue([])
   limitedMock.mockReset().mockResolvedValue(false)
+  adminDbMock.mockReset().mockResolvedValue([{ project_id: '22222222-2222-4222-8222-222222222222' }])
+  handoverMock.mockReset().mockResolvedValue({
+    doc: { summary: 'Hotovo.', items: [], access: [], maintenance: { included: [], excluded: [] }, note: '' },
+    projectTitle: 'Web', clientName: 'Jan Novák', issuerName: 'Kryštof Sobotka',
+    issuedOn: '2026-11-13', filename: 'predani-web-2026-11-13.pdf',
+  })
+  handoverRenderMock.mockReset().mockResolvedValue(Buffer.from('%PDF-1.4 predani'))
 })
 
 describe('POST /api/invoices/[id]/email', () => {
   it('pošle fakturu s PDF v příloze a zapíše, že odešla', async () => {
     const res = await POST(request({ to: 'klient@example.cz' }), { params })
     expect(res.status).toBe(200)
-    const [opts] = sendMock.mock.calls[0] as [{ to: string; subject: string; pdf: { filename: string } }]
+    const [opts] = sendMock.mock.calls[0] as [{ to: string; subject: string; pdfs: { filename: string }[] }]
     expect(opts.to).toBe('klient@example.cz')
     expect(opts.subject).toBe('Faktura 2026001')
-    expect(opts.pdf.filename).toBe('faktura-2026001.pdf')
+    // Bez zaškrtnutí jde v příloze jen faktura — předávací dokument až na požádání (AD16).
+    expect(opts.pdfs.map((pdf) => pdf.filename)).toEqual(['faktura-2026001.pdf'])
     // `sent_at` se zapíše až po úspěšném odeslání
     expect(sqlMock).toHaveBeenCalledTimes(1)
   })
@@ -125,6 +140,25 @@ describe('POST /api/invoices/[id]/email', () => {
     renderMock.mockRejectedValue(new Error('chromium_missing'))
     const res = await POST(request({ to: 'klient@example.cz' }), { params })
     expect(res.status).toBe(503)
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('p\u0159ed\u00e1vac\u00ed dokument v p\u0159\u00edloze (AD16)', () => {
+  it('p\u0159ilo\u017e\u00ed se, kdy\u017e si o to \u010dlov\u011bk \u0159ekne', async () => {
+    const res = await POST(request({ to: 'klient@example.cz', predani: true }), { params })
+    expect(res.status).toBe(200)
+    const [opts] = sendMock.mock.calls[0] as [{ pdfs: { filename: string }[] }]
+    expect(opts.pdfs.map((pdf) => pdf.filename)).toEqual([
+      'faktura-2026001.pdf',
+      'predani-web-2026-11-13.pdf',
+    ])
+  })
+
+  it('nevypln\u011bn\u00fd dokument e-mail zastav\u00ed, a\u0165 klient nedostane polovinu', async () => {
+    handoverMock.mockResolvedValue(null)
+    const res = await POST(request({ to: 'klient@example.cz', predani: true }), { params })
+    expect(res.status).toBe(400)
     expect(sendMock).not.toHaveBeenCalled()
   })
 })

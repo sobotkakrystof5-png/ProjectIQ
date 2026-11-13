@@ -578,3 +578,57 @@ Mimo bezpečnost, ale ze stejného průchodu: prohlédnutý doklad odhalil, že 
 - CSP, hlavičky ani veřejné vstupy se nemění. `POST /api/public/invoices` zůstal beze změny
   chování (bearer klíč, rate limit, Zod) a nově ho pokrývají testy včetně odmítnutí souboru,
   který není PDF.
+
+## 2026-11-13 — review AD16 (dotazník, reference, předávací dokument, AI leady)
+
+**Rozsah:** `migrations/112_hodnoceni_a_predani.sql`, `lib/admin/{surveys,reference,handover,handover-schema,agent-leads}.ts`,
+`lib/invoice-pdf/{render,handover}.ts`, `app/{closed-actions,handover-actions,agent-leads-actions}.ts`,
+`app/actions.ts` (`setProjectStatus`), `app/api/projects/[id]/predani/route.ts`,
+`app/api/invoices/[id]/email/route.ts`, `app/api/cron/send-reminders/route.ts`,
+`components/{SurveyForm,HodnoceniDashboard}.tsx`, `components/admin/{handover-card,agent-leads-strip}.tsx`,
+`lib/feedback-schema.ts`, `next.config.mjs`.
+
+**Jeden nález, opravený; jedno vylepšení mimochodem.**
+
+- **Opraveno — zápis na GET.** `/api/projects/[id]/predani` původně vracela PDF na `GET`
+  a přitom **zapisovala** `handover_issued_at`. Přihlášenému adminovi by to šlo vyvolat
+  obrázkem na cizí stránce (`<img src=…>`) a je to přesně ta třída, kterou AD08 rušila
+  jinde ve Financích. Route je teď **POST** se shodným `Origin` (tatáž ochrana jako
+  u odesílání faktury) a karta ji volá formulářem s `target="_blank"`, takže klik
+  vypadá stejně. Pokryto testem (401 bez přihlášení, 403 z cizí stránky).
+- **Doplněno mimochodem:** `/api/invoices/*/email` chyběla v `outputFileTracingIncludes`.
+  Routa od AD12 pouští Chromium, takže odeslání faktury s PDF by na produkci spadlo na
+  chybějící binárce — lokálně se to nepozná. Doplněno spolu s cestou nové PDF routy.
+
+Co se kontrolovalo a je v pořádku:
+
+- **Nové server actions** (`saveProjectHandover`, `convertAgentLeadToCall/ToProject`,
+  `dismissAgentLead`, `restoreAgentLead`) začínají `requireAuth()`, ověřují tvar id proti
+  UUID (cizí adresa tak nekončí chybou databáze se stavem 500) a pracují jen přes
+  parametry. Zakázka z AI leadu se zakládá **stávající** cestou `convertLeadToProject`,
+  takže nevznikla druhá cesta do `projects` s vlastními pravidly.
+- **Skládání SQL:** jediné textové fragmenty jsou konstanty z repa (`ELIGIBLE`, `FINISHED`
+  v `surveys.ts`, `open` v `agent-leads.ts`). Nic z požadavku do textu dotazu nevstupuje.
+- **Předávací dokument nepustí tajný údaj.** Každý text projde `redactSensitive()`
+  a dokument, ve kterém se cokoli našlo, se **neuloží celý** (stejně jako paměť,
+  DECISIONS #026) — PDF odchází klientovi do schránky, takže heslo v něm je únik,
+  ne překlep. Do PDF se všechny hodnoty vkládají jen escapované (`escapeHtml`), doklad
+  má vlastní `Content-Security-Policy` v hlavičce dokumentu a Chromium běží bez
+  JavaScriptu a bez sítě (`logo: null`, povolené jen `data:` URL).
+- **Dotazník nemůže odejít dvakrát ani cizímu.** Cíl vybírá a zamyká týž `UPDATE`
+  (`survey_requested_at`), příjemcem je vždy `projects.client_email` daného řádku
+  a text se skládá na serveru. Připomínka má strop na běh (20), okno stáří (60 dnů)
+  a klientovi říká, že další už nepřijde.
+- **AI leady:** `summary` a `communication_strategy` jsou odhad modelu o skutečném
+  člověku. Vykreslují se jako text (React escapuje), v poznámce v Hovorech jsou
+  označené „odhad, ne fakt" a klientovi neodcházejí. `communication_strategy` se čte
+  přes Zod se stropy délek, ne jak přijde z jsonb.
+- **Souhlas se zveřejněním je nově dobrovolný** (`consent` už není `z.literal(true)`).
+  Je to zlepšení, ne oslabení: dosud si ho formulář vynutil jako podmínku odeslání,
+  takže „se souhlasem" neznamenalo nic. Reference se bez něj nenabídne (test).
+- CSP, hlavičky ani veřejné vstupy se nemění. Žádná nová závislost, žádná nová env,
+  žádné `NEXT_PUBLIC_`, žádný `dangerouslySetInnerHTML`.
+
+Ověřeno: `npx tsc --noEmit`, `npm run build:check`, `npm test`. **Obrazovky adminu
+v prohlížeči okem neověřené**, migrace 112 neběžela nikde; vzhled PDF ověřený na
+vyrobeném dokumentu (jedna strana A4).
