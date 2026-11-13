@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from '@/components/ui/toast'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Check, Pencil, Plus, ShieldAlert, X } from 'lucide-react'
 import {
   approveActivity,
@@ -38,8 +40,10 @@ const SOURCE_LABELS: Record<ActivityItem['source'], string> = {
   system: 'Automaticky',
 }
 
+// Pole Dílků: bílá plocha, rádius 12 px, výška 44 px (DESIGN.md → Inputs).
+// `textarea` si výšku přebíjí vlastní třídou.
 const fieldClass =
-  'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-100'
+  'w-full rounded-chip border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink transition-colors placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
 
 /** Koncepty ke schválení a publikovaná osa. Klient vidí jen publikované. */
 export function ProjectActivityPanel({ projectId, items }: { projectId: string; items: ActivityItem[] }) {
@@ -69,17 +73,12 @@ export function ProjectActivityPanel({ projectId, items }: { projectId: string; 
       {drafts.length > 0 && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-foreground">Ke schválení ({drafts.length})</p>
+            <p className="text-sm font-medium text-ink">Ke schválení ({drafts.length})</p>
             {approvable.length > 1 && (
-              <button
-                type="button"
-                onClick={approveAll}
-                disabled={isPending}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-navy-700 px-3 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-50"
-              >
-                <Check size={14} strokeWidth={1.5} />
+              <Button onClick={approveAll} disabled={isPending}>
+                <Check size={16} strokeWidth={1.5} aria-hidden="true" />
                 Schválit vše
-              </button>
+              </Button>
             )}
           </div>
           <ul className="space-y-3">
@@ -93,34 +92,26 @@ export function ProjectActivityPanel({ projectId, items }: { projectId: string; 
       {composing ? (
         <ComposeForm projectId={projectId} onDone={() => setComposing(false)} />
       ) : (
-        <button
-          type="button"
-          onClick={() => setComposing(true)}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-navy-700 hover:bg-navy-50"
-        >
-          <Plus size={14} strokeWidth={1.5} />
+        <Button variant="outline" onClick={() => setComposing(true)}>
+          <Plus size={16} strokeWidth={1.5} aria-hidden="true" />
           Napsat zprávu pro klienta
-        </button>
+        </Button>
       )}
 
       <div>
-        <p className="mb-2 text-sm font-medium text-foreground">Co klient vidí</p>
+        <p className="mb-2 text-sm font-medium text-ink">Co klient vidí</p>
         {published.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Zatím nic. Zprávu, kterou schválíte, uvidí klient ve svém přehledu.
-          </p>
+          <p className="text-sm text-quiet">Zatím nic. Zprávu, kterou schválíte, uvidí klient ve svém přehledu.</p>
         ) : (
           <ul className="space-y-3">
             {published.map((item) => (
-              <li key={item.id} className="rounded-xl border border-border bg-white p-4">
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-navy-100 bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
-                    {ACTIVITY_KIND_LABELS[item.kind]}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{formatDate(item.publishedAt ?? item.createdAt)}</span>
+              <li key={item.id} className="rounded-chip border border-navy-100 bg-surface p-4">
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                  <Badge>{ACTIVITY_KIND_LABELS[item.kind]}</Badge>
+                  <span className="font-num text-xs text-quiet">{formatDate(item.publishedAt ?? item.createdAt)}</span>
                 </div>
-                <p className="text-sm font-medium text-foreground">{item.title}</p>
-                <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{item.body}</p>
+                <p className="text-sm font-medium text-ink">{item.title}</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-ink">{item.body}</p>
               </li>
             ))}
           </ul>
@@ -169,52 +160,41 @@ function DraftCard({ item }: { item: ActivityItem }) {
   }
 
   return (
-    <li className={cn('rounded-xl border bg-white p-4', item.containsSensitive ? 'border-amber-300' : 'border-border')}>
-      <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-navy-100 bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
-          {ACTIVITY_KIND_LABELS[item.kind]}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {SOURCE_LABELS[item.source]} · {formatDate(item.createdAt)}
+    <li
+      className={cn(
+        'rounded-chip border bg-surface p-4',
+        // Čárkovaná teplá hrana = „čeká to na vás" (DESIGN.md → Signature blocks).
+        item.containsSensitive ? 'border-dashed border-signal-line' : 'border-navy-100',
+      )}
+    >
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <Badge>{ACTIVITY_KIND_LABELS[item.kind]}</Badge>
+        <span className="text-xs text-quiet">
+          {SOURCE_LABELS[item.source]} · <span className="font-num">{formatDate(item.createdAt)}</span>
         </span>
       </div>
-      <p className="text-sm font-medium text-foreground">{item.title}</p>
-      <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{item.body}</p>
+      <p className="text-sm font-medium text-ink">{item.title}</p>
+      <p className="mt-0.5 whitespace-pre-wrap text-sm text-ink">{item.body}</p>
       {item.containsSensitive && (
-        <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <p className="mt-2 flex items-start gap-1.5 rounded-chip bg-signal-bg px-3 py-2 text-xs text-signal-ink">
           <ShieldAlert size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
           Zpráva obsahovala něco, co vypadá jako tajný údaj nebo soukromá cesta, a bylo to zakryto.
           Upravte ji a značku [skryto] odstraňte, jinak ji nejde schválit.
         </p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={approve}
-          disabled={isPending || item.containsSensitive}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-navy-700 px-3 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-40"
-        >
-          <Check size={14} strokeWidth={1.5} />
+        <Button onClick={approve} disabled={isPending || item.containsSensitive}>
+          <Check size={16} strokeWidth={1.5} aria-hidden="true" />
           Schválit
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          disabled={isPending}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-50"
-        >
-          <Pencil size={14} strokeWidth={1.5} />
+        </Button>
+        <Button variant="outline" onClick={() => setEditing(true)} disabled={isPending}>
+          <Pencil size={16} strokeWidth={1.5} aria-hidden="true" />
           Upravit
-        </button>
-        <button
-          type="button"
-          onClick={reject}
-          disabled={isPending}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-        >
-          <X size={14} strokeWidth={1.5} />
+        </Button>
+        <Button variant="ghost" onClick={reject} disabled={isPending} className="text-quiet hover:text-danger">
+          <X size={16} strokeWidth={1.5} aria-hidden="true" />
           Zamítnout
-        </button>
+        </Button>
       </div>
     </li>
   )
@@ -244,9 +224,9 @@ function ComposeForm({ projectId, item, onDone }: { projectId?: string; item?: A
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border border-border bg-navy-50/40 p-4">
+    <form onSubmit={submit} className="space-y-3 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
       <div>
-        <label htmlFor={`act-kind-${item?.id ?? 'new'}`} className="mb-1 block text-xs font-medium text-muted-foreground">
+        <label htmlFor={`act-kind-${item?.id ?? 'new'}`} className="mb-1.5 block text-xs font-medium text-quiet">
           Druh
         </label>
         <select
@@ -263,7 +243,7 @@ function ComposeForm({ projectId, item, onDone }: { projectId?: string; item?: A
         </select>
       </div>
       <div>
-        <label htmlFor={`act-title-${item?.id ?? 'new'}`} className="mb-1 block text-xs font-medium text-muted-foreground">
+        <label htmlFor={`act-title-${item?.id ?? 'new'}`} className="mb-1.5 block text-xs font-medium text-quiet">
           Nadpis
         </label>
         <input
@@ -276,7 +256,7 @@ function ComposeForm({ projectId, item, onDone }: { projectId?: string; item?: A
         />
       </div>
       <div>
-        <label htmlFor={`act-body-${item?.id ?? 'new'}`} className="mb-1 block text-xs font-medium text-muted-foreground">
+        <label htmlFor={`act-body-${item?.id ?? 'new'}`} className="mb-1.5 block text-xs font-medium text-quiet">
           Co se stalo a co to pro vás znamená
         </label>
         <textarea
@@ -285,26 +265,18 @@ function ComposeForm({ projectId, item, onDone }: { projectId?: string; item?: A
           onChange={(e) => setBody(e.target.value)}
           maxLength={ACTIVITY_BODY_MAX}
           rows={4}
-          className={fieldClass}
+          className={cn(fieldClass, 'leading-relaxed')}
           placeholder="Pište srozumitelně pro klienta, bez technických detailů."
         />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="inline-flex min-h-[44px] items-center rounded-lg bg-navy-700 px-4 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={isPending}>
           {item ? 'Uložit' : 'Uložit jako koncept'}
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="inline-flex min-h-[44px] items-center rounded-lg px-4 text-sm font-medium text-muted-foreground hover:bg-navy-50"
-        >
+        </Button>
+        <Button variant="ghost" onClick={onDone} className="text-quiet">
           Zrušit
-        </button>
+        </Button>
       </div>
     </form>
   )

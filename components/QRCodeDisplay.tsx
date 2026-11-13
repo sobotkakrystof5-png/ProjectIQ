@@ -22,7 +22,7 @@ export function QRCodeDisplay({ url }: QRCodeDisplayProps) {
 
   return (
     <div className="inline-flex flex-col items-center gap-2">
-      <div className="p-3 bg-white border border-gray-100 rounded-xl">
+      <div className="p-3 bg-surface border border-gray-100 rounded-chip">
         <QRCodeSVG
           value={url}
           size={140}

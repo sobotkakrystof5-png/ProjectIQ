@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { deleteProject } from '@/app/actions'
 import { Trash2, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface DeleteButtonProps {
   projectId: string
@@ -27,11 +28,10 @@ export function DeleteButton({ projectId }: DeleteButtonProps) {
     <button
       onClick={handleDelete}
       disabled={isPending}
-      className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg transition-colors ${
-        confirm
-          ? 'bg-red-600 text-white hover:bg-red-700'
-          : 'text-red-500 border border-red-200 hover:bg-red-50'
-      } disabled:opacity-50`}
+      className={cn(
+        'inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-[15px] font-semibold transition-colors disabled:opacity-50',
+        confirm ? 'bg-danger text-white hover:bg-danger/90' : 'border border-danger/30 text-danger hover:bg-danger/5',
+      )}
     >
       {isPending ? (
         <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />

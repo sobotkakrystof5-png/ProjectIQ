@@ -34,15 +34,15 @@ function SlotDetailModal({ slot, clientName, onClose }: { slot: ConsultationSlot
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+          className="bg-surface rounded-box shadow-2xl w-full max-w-md overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
-          <div className="brand-gradient px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center justify-between bg-navy-800 px-5 py-4">
             <span className="text-white font-semibold text-sm">Detail konzultace</span>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-chip text-navy-200 hover:text-white hover:bg-surface/10 transition-colors"
             >
               <X size={15} strokeWidth={1.5} />
             </button>
@@ -50,30 +50,30 @@ function SlotDetailModal({ slot, clientName, onClose }: { slot: ConsultationSlot
 
           <div className="p-5 space-y-4">
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Klient</p>
-              <p className="text-sm font-medium text-foreground">{clientName}</p>
+              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Klient</p>
+              <p className="text-sm font-medium text-ink">{clientName}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Datum a čas</p>
-              <p className="text-sm text-foreground">{formatPragueDateTime(new Date(slot.scheduled_at).toISOString())}</p>
+              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Datum a čas</p>
+              <p className="text-sm text-ink">{formatPragueDateTime(new Date(slot.scheduled_at).toISOString())}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Kanál</p>
-              <p className="text-sm text-foreground">
+              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Kanál</p>
+              <p className="text-sm text-ink">
                 {CHANNEL_LABELS[slot.channel as ConsultationChannel] ?? slot.channel}
                 {slot.channel === 'other' && slot.channel_other_text ? ` — ${slot.channel_other_text}` : ''}
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Přání klienta</p>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{slot.client_wish}</p>
+              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Přání klienta</p>
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{slot.client_wish}</p>
             </div>
             {slot.meeting_link && slot.meeting_link !== '#' && (
               <a
                 href={slot.meeting_link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 brand-gradient text-white text-sm font-semibold py-2.5 rounded-xl w-full hover:opacity-90 transition-opacity"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-navy-700 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800"
               >
                 <ExternalLink size={14} strokeWidth={1.5} />
                 Připojit se k hovoru
@@ -98,7 +98,7 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
         <div className="w-10 h-10 rounded-full bg-navy-50 flex items-center justify-center mb-3">
           <CalendarDays size={18} strokeWidth={1.5} className="text-navy-400" />
         </div>
-        <p className="text-sm text-muted-foreground">Žádné rezervované konzultace.</p>
+        <p className="text-sm text-quiet">Žádné rezervované konzultace.</p>
       </div>
     )
   }
@@ -134,14 +134,14 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
           type="button"
           onClick={prevMonth}
           disabled={!canPrev}
-          className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-chip text-quiet hover:bg-navy-50 hover:text-navy-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft size={16} strokeWidth={1.5} />
         </button>
-        <span className="text-sm font-semibold text-foreground">
+        <span className="text-sm font-semibold text-ink">
           {MONTHS_CZ[viewMonth - 1]} {viewYear}
         </span>
-        <button type="button" onClick={nextMonth} className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 transition-colors">
+        <button type="button" onClick={nextMonth} className="p-1.5 rounded-chip text-quiet hover:bg-navy-50 hover:text-navy-800 transition-colors">
           <ChevronRight size={16} strokeWidth={1.5} />
         </button>
       </div>
@@ -149,7 +149,7 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
       {/* Weekday header */}
       <div className="grid grid-cols-7 mb-1">
         {WEEKDAYS_CZ.map(d => (
-          <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground uppercase py-1">{d}</div>
+          <div key={d} className="text-center text-[10px] font-semibold text-quiet uppercase py-1">{d}</div>
         ))}
       </div>
 
@@ -170,14 +170,14 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
             <div
               key={i}
               className={cn(
-                'min-h-[52px] p-1 rounded-lg border transition-colors',
+                'min-h-[52px] p-1 rounded-chip border transition-colors',
                 daySlots.length > 0 ? 'border-navy-200 bg-navy-50' : 'border-transparent bg-transparent',
                 isToday && 'ring-1 ring-navy-300',
               )}
             >
               <span className={cn(
                 'block text-xs font-medium text-center mb-0.5',
-                isToday ? 'text-navy-700' : 'text-muted-foreground',
+                isToday ? 'text-navy-700' : 'text-quiet',
               )}>
                 {dayNum}
               </span>
@@ -202,7 +202,7 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
 
       {/* Upcoming list */}
       <div className="mt-5 space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Nadcházející</p>
+        <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-3">Nadcházející</p>
         {slots
           .filter(s => new Date(s.scheduled_at) >= new Date())
           .sort((a, b) => +new Date(a.scheduled_at) - +new Date(b.scheduled_at))
@@ -212,19 +212,19 @@ export function ConsultationCalendar({ slots, clientName }: Props) {
               key={slot.id}
               type="button"
               onClick={() => setDetailSlot(slot)}
-              className="w-full text-left flex items-start gap-3 bg-white border border-border rounded-xl px-4 py-3 hover:border-navy-200 hover:bg-navy-50 transition-colors"
+              className="w-full text-left flex items-start gap-3 bg-surface border border-navy-100 rounded-chip px-4 py-3 hover:border-navy-200 hover:bg-navy-50 transition-colors"
             >
-              <div className="w-9 h-9 rounded-lg brand-gradient flex flex-col items-center justify-center shrink-0">
+              <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-chip bg-navy-700">
                 {(() => {
                   const p = utcToPrague(new Date(slot.scheduled_at))
-                  return <span className="text-white text-[11px] font-bold leading-none">{p.hour}:00</span>
+                  return <span className="font-num text-[11px] font-bold leading-none text-white">{p.hour}:00</span>
                 })()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{clientName}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{formatPragueDateTime(new Date(slot.scheduled_at).toISOString())}</p>
+                <p className="text-sm font-medium text-ink truncate">{clientName}</p>
+                <p className="text-xs text-quiet mt-0.5">{formatPragueDateTime(new Date(slot.scheduled_at).toISOString())}</p>
               </div>
-              <span className="text-xs text-muted-foreground shrink-0 self-center">
+              <span className="text-xs text-quiet shrink-0 self-center">
                 {CHANNEL_LABELS[slot.channel as ConsultationChannel] ?? slot.channel}
               </span>
             </button>

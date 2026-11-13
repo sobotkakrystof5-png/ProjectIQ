@@ -72,63 +72,63 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
   }
 
   return (
-    <article className={cn('rounded-xl border border-border bg-white p-4 shadow-sm', !open && 'opacity-70')}>
+    <article className={cn('rounded-chip border border-navy-100 bg-surface p-4 shadow-sm', !open && 'opacity-70')}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Link href={request.projectHref} className="text-sm font-semibold text-foreground hover:underline">
+        <Link href={request.projectHref} className="text-sm font-semibold text-ink hover:underline">
           {request.clientName}
         </Link>
         <span className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-medium text-navy-700">
           {request.originLabel}
         </span>
         {request.kind && (
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-quiet">
             {REQUEST_KIND_LABELS[request.kind]}
           </span>
         )}
         {request.source === 'voice' && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1 text-[11px] text-quiet">
             <Mic size={11} strokeWidth={1.5} /> hlasem
           </span>
         )}
-        <time className="ml-auto text-xs text-muted-foreground">{formatDateTime(request.createdAt)}</time>
+        <time className="ml-auto text-xs text-quiet">{formatDateTime(request.createdAt)}</time>
       </header>
 
       <div className="mt-3 space-y-2">
         {request.summary ? (
-          <p className="text-sm leading-relaxed text-foreground">{request.summary}</p>
+          <p className="text-sm leading-relaxed text-ink">{request.summary}</p>
         ) : (
-          <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+          <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap">
             {request.aiStatus === 'pending' ? 'Shrnutí se připravuje, mezitím je tady původní text:\n\n' : ''}
             {request.rawText}
           </p>
         )}
         {request.unclear && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          <p className="rounded-chip border border-dashed border-signal-line bg-signal-bg px-3 py-2 text-xs leading-relaxed text-signal-ink">
             <strong className="font-semibold">Nejasné, zeptejte se klienta:</strong> {request.unclear}
           </p>
         )}
         {request.aiStatus === 'failed' && (
-          <p className="text-xs text-muted-foreground">Shrnutí se nepodařilo vytvořit, zadání vychází z původního textu.</p>
+          <p className="text-xs text-quiet">Shrnutí se nepodařilo vytvořit, zadání vychází z původního textu.</p>
         )}
       </div>
 
       <button
         type="button"
         onClick={() => setShowRaw(v => !v)}
-        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-quiet hover:text-ink"
         aria-expanded={showRaw}
       >
         <ChevronDown size={12} strokeWidth={1.5} className={cn('transition-transform', showRaw && 'rotate-180')} />
         Původní text a zadání pro Claude Code
       </button>
       {showRaw && (
-        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-foreground">
+        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-chip bg-muted/60 p-3 text-xs leading-relaxed text-ink">
           {request.prompt}
         </pre>
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-600">
+        <p role="alert" className="mt-2 text-xs text-danger">
           {error}
         </p>
       )}
@@ -149,7 +149,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
         <button
           type="button"
           onClick={copyPrompt}
-          className="inline-flex min-h-[40px] items-center gap-2 rounded-lg brand-gradient px-3.5 text-sm font-medium text-white shadow-sm hover:opacity-90"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800"
         >
           {copied ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
           {copied ? 'Zkopírováno' : 'Kopírovat zadání'}
@@ -159,7 +159,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
             type="button"
             onClick={copyCommand}
             title="Spusťte v repozitáři projektu. Zadání si nejdřív přečtěte."
-            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium text-foreground hover:bg-navy-50"
+            className="inline-flex min-h-[40px] items-center gap-2 rounded-chip border border-navy-100 px-3.5 text-sm font-medium text-ink hover:bg-navy-50"
           >
             {copiedCommand ? <Check size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
             {copiedCommand ? 'Zkopírováno' : 'Příkaz pro terminál'}
@@ -171,7 +171,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
               type="button"
               disabled={isPending}
               onClick={() => changeStatus('done')}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-60"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-chip border border-navy-100 px-3 text-sm font-medium text-ink hover:bg-navy-50 disabled:opacity-60"
             >
               <Check size={14} strokeWidth={1.5} /> Hotovo
             </button>
@@ -179,7 +179,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
               type="button"
               disabled={isPending}
               onClick={() => changeStatus('dismissed')}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 text-sm text-muted-foreground hover:text-foreground disabled:opacity-60"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-chip px-3 text-sm text-quiet hover:text-ink disabled:opacity-60"
             >
               <X size={14} strokeWidth={1.5} /> Zahodit
             </button>
@@ -189,7 +189,7 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
             type="button"
             disabled={isPending}
             onClick={() => changeStatus('new')}
-            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-60"
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-chip border border-navy-100 px-3 text-sm font-medium text-ink hover:bg-navy-50 disabled:opacity-60"
           >
             <RotateCcw size={14} strokeWidth={1.5} /> Vrátit mezi nové
           </button>

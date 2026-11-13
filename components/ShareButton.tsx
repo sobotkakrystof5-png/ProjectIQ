@@ -31,7 +31,7 @@ export function ShareButton({ token, className, variant = 'full' }: ShareButtonP
         )}
         title="Kopírovat klientský odkaz"
       >
-        {copied ? <Check size={16} strokeWidth={1.5} className="text-emerald-500" /> : <Link2 size={16} strokeWidth={1.5} />}
+        {copied ? <Check size={16} strokeWidth={1.5} className="text-navy-700" /> : <Link2 size={16} strokeWidth={1.5} />}
       </button>
     )
   }
@@ -46,8 +46,8 @@ export function ShareButton({ token, className, variant = 'full' }: ShareButtonP
     >
       {copied ? (
         <>
-          <Check size={14} strokeWidth={1.5} className="text-emerald-500" />
-          <span className="text-emerald-600">Zkopírováno</span>
+          <Check size={14} strokeWidth={1.5} className="text-navy-700" />
+          <span className="text-navy-700">Zkopírováno</span>
         </>
       ) : (
         <>

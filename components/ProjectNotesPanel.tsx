@@ -61,19 +61,19 @@ export function ProjectNotesPanel({
 
   return (
     <div className="space-y-5">
-      <div className="bg-slate-50 border border-border rounded-xl p-4 space-y-3">
+      <div className="bg-slate-50 border border-navy-100 rounded-chip p-4 space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative sm:w-56 shrink-0">
-            <User size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <User size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-quiet pointer-events-none" />
             <input
-              className="w-full text-sm border border-border rounded-md pl-8 pr-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500 bg-white"
+              className="w-full text-sm border border-navy-100 rounded-md pl-8 pr-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500 bg-surface"
               placeholder="Kdo zapisuje"
               value={author}
               onChange={e => setAuthor(e.target.value)}
             />
           </div>
           <textarea
-            className="flex-1 text-sm border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none bg-white"
+            className="flex-1 text-sm border border-navy-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none bg-surface"
             placeholder="Co se řešilo na schůzce / hovoru s klientem… (Ctrl/Cmd+Enter pro rychlé uložení)"
             rows={3}
             value={content}
@@ -87,7 +87,7 @@ export function ProjectNotesPanel({
           />
         </div>
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-quiet">
             <span>Uloží se se stavem zakázky:</span>
             <span className="font-semibold text-navy-700 tabular-nums">{currentProgress}%</span>
           </div>
@@ -102,31 +102,31 @@ export function ProjectNotesPanel({
       </div>
 
       {sorted.length === 0 ? (
-        <p className="text-sm text-muted-foreground/70">Zatím žádné poznámky ze schůzek či hovorů.</p>
+        <p className="text-sm text-quiet/70">Zatím žádné poznámky ze schůzek či hovorů.</p>
       ) : (
         <div className="columns-1 lg:columns-2 gap-4">
           {sorted.map(note => (
             <div
               key={note.id}
-              className="break-inside-avoid mb-4 border border-border rounded-xl p-4 bg-white group/note"
+              className="break-inside-avoid mb-4 border border-navy-100 rounded-chip p-4 bg-surface group/note"
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground min-w-0">
-                  <User size={12} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-ink min-w-0">
+                  <User size={12} strokeWidth={1.5} className="text-quiet shrink-0" />
                   <span className="truncate">{note.author}</span>
                 </div>
                 <button
                   onClick={() => handleDelete(note.id)}
                   disabled={isPending}
-                  className="opacity-0 group-hover/note:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity disabled:opacity-40 shrink-0"
+                  className="shrink-0 text-quiet opacity-0 transition-opacity hover:text-danger group-hover/note:opacity-100 disabled:opacity-40"
                   title="Smazat poznámku"
                 >
                   <Trash2 size={12} strokeWidth={1.5} />
                 </button>
               </div>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap mb-3">{note.content}</p>
-              <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/60">
-                <span className="text-[11px] text-muted-foreground">{formatDateTime(note.created_at)}</span>
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap mb-3">{note.content}</p>
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-navy-100/60">
+                <span className="text-[11px] text-quiet">{formatDateTime(note.created_at)}</span>
                 {note.progress_snapshot !== null && (
                   <ProgressBar value={note.progress_snapshot} className="w-24" />
                 )}

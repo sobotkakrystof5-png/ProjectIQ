@@ -7,6 +7,8 @@ import { STATUS_LABELS, STATUS_ORDER, type InvoiceAiExtract, type Project, type 
 import { cn } from '@/lib/utils'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { ChevronDown, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { SectionLabel } from '@/components/ws/brand'
 import {
   InvoiceFields, emptyInvoiceForm, validateInvoiceForm, invoiceFormToFormData,
   type InvoiceFormState,
@@ -255,9 +257,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          {error}
-        </div>
+        <p className="rounded-chip border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</p>
       )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -361,15 +361,15 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
           </div>
           {progressChanged && (
             <div className="mt-3">
-              <label className="text-xs font-medium text-amber-700 uppercase tracking-wide block mb-1.5">
+              <SectionLabel as="h3" className="mb-1.5 text-signal-ink">
                 Co jsi udělal? ({originalProgress}% → {form.progress}%) *
-              </label>
+              </SectionLabel>
               <textarea
                 value={form.progressNote}
                 onChange={e => set('progressNote', e.target.value)}
                 placeholder="Popiš co jsi udělal, v jaké fázi projekt je..."
                 rows={3}
-                className={cn(inputCls, 'resize-none border-amber-300 focus:ring-amber-500')}
+                className={cn(inputCls, 'resize-none border-signal-line')}
               />
             </div>
           )}
@@ -434,7 +434,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
               by jinak spadl do jiného daňového roku (AD13). */}
           {form.paid && (
             <div className="flex flex-wrap items-center gap-3">
-              <label htmlFor="paid_on" className="text-sm text-muted-foreground">
+              <label htmlFor="paid_on" className="text-sm text-quiet">
                 Peníze dorazily
               </label>
               <input
@@ -444,7 +444,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                 onChange={e => set('paid_on', e.target.value)}
                 className={cn(inputCls, 'w-auto min-h-11')}
               />
-              <span className="text-xs text-muted-foreground">prázdné = dnes</span>
+              <span className="text-xs text-quiet">prázdné = dnes</span>
             </div>
           )}
 
@@ -462,7 +462,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
               <label htmlFor="invoiced_on_ico" className="text-sm text-foreground cursor-pointer">
                 Fakturováno na IČO
               </label>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="mt-0.5 text-xs text-quiet">
                 Příjmy z této zakázky spadnou do přiznané linie a do daňové kalkulačky.
                 {project && ' Změna přerovná i příjmy, které už ze zakázky vznikly.'}
               </p>
@@ -470,8 +470,8 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
           </div>
 
           {/* Záloha */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+          <div className="space-y-3 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
+            <SectionLabel as="h3">
               Záloha{(() => {
                 const price = Number(form.price)
                 const deposit = Number(depositAmount)
@@ -481,7 +481,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                 }
                 return ' — 30 % z ceny (auto)'
               })()}
-            </p>
+            </SectionLabel>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -495,10 +495,10 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                 min={0}
                 className={inputCls}
               />
-              <span className="text-sm text-amber-700 font-medium shrink-0">Kč</span>
+              <span className="shrink-0 text-sm font-medium text-quiet">Kč</span>
             </div>
             {!depositManuallySet && form.price !== '' && Number(form.price) > 0 && (
-              <p className="text-xs text-amber-600">Automaticky 30 % — změnou pole přepíšeš</p>
+              <p className="text-xs text-quiet">Automaticky 30 % — změnou pole přepíšeš</p>
             )}
             <div className="flex items-center gap-3">
               <input
@@ -506,15 +506,15 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                 id="deposit_paid"
                 checked={form.deposit_paid}
                 onChange={e => set('deposit_paid', e.target.checked)}
-                className="w-4 h-4 accent-amber-600"
+                className="h-4 w-4 accent-navy-700"
               />
-              <label htmlFor="deposit_paid" className="text-sm text-amber-800 cursor-pointer">
+              <label htmlFor="deposit_paid" className="cursor-pointer text-sm text-ink">
                 Záloha zaplacena
               </label>
             </div>
             {form.deposit_paid && (
               <div className="flex flex-wrap items-center gap-3">
-                <label htmlFor="deposit_paid_on" className="text-sm text-amber-800">
+                <label htmlFor="deposit_paid_on" className="text-sm text-ink">
                   Záloha dorazila
                 </label>
                 <input
@@ -524,7 +524,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                   onChange={e => set('deposit_paid_on', e.target.value)}
                   className={cn(inputCls, 'w-auto min-h-11')}
                 />
-                <span className="text-xs text-amber-600">prázdné = dnes</span>
+                <span className="text-xs text-quiet">prázdné = dnes</span>
               </div>
             )}
           </div>
@@ -539,7 +539,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                 id="addToCompleted"
                 checked={form.addToCompleted}
                 onChange={e => set('addToCompleted', e.target.checked)}
-                className="w-4 h-4 accent-emerald-600"
+                className="h-4 w-4 accent-navy-700"
               />
               <label htmlFor="addToCompleted" className="text-sm text-foreground cursor-pointer">
                 Zakázka je už hotová — rovnou ji uzavřít
@@ -547,8 +547,8 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
             </div>
 
             {form.addToCompleted && (
-              <div className="mt-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-4">
-                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Uzavření zakázky</p>
+              <div className="mt-4 space-y-4 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
+                <SectionLabel as="h3">Uzavření zakázky</SectionLabel>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="Druh zakázky">
                     <div className="relative">
@@ -560,7 +560,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                         <option value="client">Zakázka pro klienta</option>
                         <option value="personal">Vlastní projekt bez klienta</option>
                       </select>
-                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-quiet" />
                     </div>
                   </Field>
 
@@ -584,7 +584,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                           <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
-                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-quiet" />
                     </div>
                   </Field>
 
@@ -614,7 +614,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
                 id="attachInvoice"
                 checked={attachInvoice}
                 onChange={e => setAttachInvoice(e.target.checked)}
-                className="w-4 h-4 accent-emerald-600"
+                className="h-4 w-4 accent-navy-700"
               />
               <label htmlFor="attachInvoice" className="text-sm text-foreground cursor-pointer">
                 Přiložit fakturu
@@ -622,8 +622,8 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
             </div>
 
             {attachInvoice && (
-              <div className="mt-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-3">
-                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Faktura k zakázce</p>
+              <div className="mt-4 space-y-3 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
+                <SectionLabel as="h3">Faktura k zakázce</SectionLabel>
                 <InvoiceFields
                   value={invoiceForm}
                   onChange={setInvoiceForm}
@@ -644,33 +644,26 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="brand-gradient flex items-center gap-2 text-white text-sm font-medium px-5 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {isPending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
+        <Button type="submit" disabled={isPending}>
+          {isPending && <Loader2 size={16} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />}
           {project ? 'Uložit změny' : 'Přidat zakázku'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="text-sm text-muted-foreground px-5 py-2.5 rounded-lg hover:bg-muted transition-colors"
-        >
+        </Button>
+        <Button variant="ghost" onClick={() => router.back()} className="text-quiet">
           Zrušit
-        </button>
+        </Button>
       </div>
     </form>
   )
 }
 
+// Pole Dílků (DESIGN.md → Inputs): bílá plocha, rádius 12 px, navy okraj při zaostření.
 const inputCls =
-  'w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-white'
+  'w-full rounded-chip border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink transition-colors placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
+      <SectionLabel as="h3">{label}</SectionLabel>
       {children}
     </div>
   )

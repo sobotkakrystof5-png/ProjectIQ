@@ -58,31 +58,31 @@ export function AgentKeyPanel({ projectId, active, envBlock, claudeMdBlock, conf
   }
 
   const btn =
-    'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-navy-50 disabled:opacity-50'
+    'inline-flex min-h-[44px] items-center gap-1.5 rounded-chip border border-navy-100 px-3 text-sm font-medium text-ink hover:bg-navy-50 disabled:opacity-50'
 
   return (
     <div className="space-y-4">
       {!configured && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <p className="rounded-chip bg-signal-bg px-3 py-2 text-xs text-signal-ink">
           Chybí nastavení AGENT_KEY_PEPPER, klíč zatím nejde vytvořit.
         </p>
       )}
 
       {active ? (
-        <p className="text-sm text-foreground">
+        <p className="text-sm text-ink">
           Platný klíč <span className="font-mono">{active.prefixMask}</span>, vytvořený {formatDate(active.createdAt)}
           {active.lastUsedAt ? `, naposledy použitý ${formatDate(active.lastUsedAt)}` : ', zatím nepoužitý'}.
         </p>
       ) : (
-        <p className="text-sm text-muted-foreground">Projekt zatím nemá klíč. Hlášení z Claude Code jde posílat až s ním.</p>
+        <p className="text-sm text-quiet">Projekt zatím nemá klíč. Hlášení z Claude Code jde posílat až s ním.</p>
       )}
 
       {shownKey && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <p className="mb-2 text-xs font-medium text-amber-900">
+        <div className="rounded-chip border border-dashed border-signal-line bg-signal-bg p-3">
+          <p className="mb-2 text-xs font-medium text-signal-ink">
             Zkopírujte si klíč teď. Podruhé už se neukáže.
           </p>
-          <code className="block break-all rounded-lg bg-white px-3 py-2 font-mono text-xs text-foreground">{shownKey}</code>
+          <code className="block break-all rounded-chip bg-surface px-3 py-2 font-mono text-xs text-ink">{shownKey}</code>
           <button type="button" onClick={() => copy(shownKey, 'Klíč zkopírován.')} className={`${btn} mt-2`}>
             <Copy size={14} strokeWidth={1.5} />
             Zkopírovat klíč
@@ -90,7 +90,7 @@ export function AgentKeyPanel({ projectId, active, envBlock, claudeMdBlock, conf
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={issue} disabled={isPending || !configured} className={btn}>
@@ -107,7 +107,7 @@ export function AgentKeyPanel({ projectId, active, envBlock, claudeMdBlock, conf
           Zkopírovat nastavení pro Claude Code
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-quiet">
         Klíč umí jen uložit koncept hlášení do tohoto projektu. Nic nečte a nic nezveřejní, to děláte vy schválením.
       </p>
     </div>

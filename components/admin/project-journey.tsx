@@ -54,7 +54,7 @@ export function ProjectJourney({
   return (
     <section aria-label="Průvodka zakázky" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Kde zakázka je</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-quiet">Kde zakázka je</h2>
         <p className="font-num text-xs text-quiet">
           {hotovo} z {steps.length} kroků
         </p>

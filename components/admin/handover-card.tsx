@@ -59,16 +59,16 @@ export function HandoverCard({
 
   return (
     <div className={className}>
-      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-quiet">
         Předávací dokument
       </h2>
-      <p className="mb-5 text-xs text-muted-foreground">
+      <p className="mb-5 text-xs text-quiet">
         Co klient dostal, kde to má a co je v ceně údržby. Vyrobí se z toho PDF, které můžete
         poslat spolu s fakturou. Hesla sem nepište — pošlete je zvlášť.
       </p>
 
       {!available && (
-        <p className="mb-4 rounded-box border border-navy-100 bg-navy-50 px-3 py-2 text-xs text-muted-foreground">
+        <p className="mb-4 rounded-box border border-navy-100 bg-navy-50 px-3 py-2 text-xs text-quiet">
           Uložit ho zatím nejde — na databázi chybí migrace 112.
         </p>
       )}
@@ -149,7 +149,7 @@ export function HandoverCard({
             </Button>
           </form>
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-quiet">
           {issuedAt ? `Naposledy vystaveno ${formatDate(issuedAt)}.` : 'Zatím nevystaveno.'}
         </p>
       </div>
@@ -181,7 +181,7 @@ function PairList({
     <section className="flex flex-col gap-2">
       <div>
         <h3 className="text-sm font-medium text-ink">{title}</h3>
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p className="text-xs text-quiet">{hint}</p>
       </div>
       {rows.map((row, index) => (
         <div key={index} className="flex flex-col gap-2 sm:flex-row">

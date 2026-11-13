@@ -8,6 +8,7 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
+import { Card, CardHead, CARD_CLASS } from '@/components/admin/card'
 import { ClientMessagesEditor } from '@/components/ClientMessagesEditor'
 import { FeedbackFeed } from '@/components/FeedbackFeed'
 import { ConsultationCalendar } from '@/components/ConsultationCalendar'
@@ -64,8 +65,6 @@ export function parseTab(value: string | undefined): DetailTab {
   return DETAIL_TABS.find((t) => t === value) ?? 'prehled'
 }
 
-const card = 'rounded-2xl border border-border bg-white p-6 shadow-sm'
-const h2 = 'mb-1.5 text-sm font-semibold uppercase tracking-wider text-muted-foreground'
 
 async function appBaseUrl(): Promise<string> {
   return (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
@@ -161,9 +160,9 @@ export async function ProjectDetailView({
         />
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-5 shadow-sm sm:p-6">
+      <Card>
         <ProjectJourney projectId={project.id} steps={journey} status={project.status as ProjectStatus} />
-      </div>
+      </Card>
 
       <nav aria-label="Části zakázky" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <ul className="flex min-w-max gap-1 border-b border-navy-100">
@@ -261,19 +260,22 @@ async function OverviewTab({ project }: { project: Project }) {
 
   return (
     <>
-      <div className={card} id="editace-zakazky">
-        <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Editace zakázky</h2>
+      <Card id="editace-zakazky">
+        <CardHead title="Editace zakázky" />
         <ProjectForm project={project} />
-      </div>
+      </Card>
 
       {/* Paměť zakázky (AD15): čísla z historie klienta a věty, které si k ní někdo zapsal. */}
-      <MemoryCard scope="project" refId={project.id} className={card} />
+      <MemoryCard scope="project" refId={project.id} className={CARD_CLASS} />
 
       {/* Předávací dokument (AD16). */}
       <HandoverBlock project={project} />
 
-      <div className={card}>
-        <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Sdílet s klientem</h2>
+      <Card>
+        <CardHead
+          title="Sdílet s klientem"
+          hint="Pošlete klientovi odkaz. Bez registrace uvidí aktuální stav zakázky."
+        />
         <div className="flex flex-col items-start gap-6 sm:flex-row">
           <QRCodeDisplay url={publicUrl} />
           {/*
@@ -282,34 +284,31 @@ async function OverviewTab({ project }: { project: Project }) {
             přes okno. Ve `sm:` řádku šířku dál určuje `flex-1`.
           */}
           <div className="w-full min-w-0 flex-1">
-            <p className="mb-3 text-sm text-muted-foreground">
-              Pošlete klientovi odkaz. Bez registrace uvidí aktuální stav zakázky.
-            </p>
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2">
+            <div className="mb-3 flex items-center gap-2 rounded-chip border border-navy-100 bg-navy-50 px-3 py-2">
               <span className="flex-1 truncate font-mono text-xs text-navy-600">{publicUrl}</span>
             </div>
             <ShareButton token={project.public_token} />
           </div>
         </div>
-      </div>
+      </Card>
 
-      <div className={card}>
-        <h2 className={h2}>{project.closed_at ? 'Uzavřená zakázka' : 'Uzavřít zakázku'}</h2>
+      <Card>
+        <CardHead title={project.closed_at ? 'Uzavřená zakázka' : 'Uzavřít zakázku'} />
         {project.closed_at ? (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-quiet">
                 Uzavřeno <span className="font-num">{formatDate(project.closed_at)}</span>. Zakázka se počítá do přehledu
                 výkonnosti na Profilu.
               </p>
               <ReopenProjectButton projectId={project.id} status={project.status as ProjectStatus} />
             </div>
             {/* Co se stalo s dotazníkem (AD16) — ať je poznat, jestli už odešel. */}
-            <p className="text-xs text-muted-foreground">{surveyState(project)}</p>
+            <p className="text-xs text-quiet">{surveyState(project)}</p>
           </div>
         ) : (
           <>
-            <p className="mb-4 text-xs text-muted-foreground">
+            <p className="mb-4 text-xs text-quiet">
               Hotová zakázka se započítá do přehledu výkonnosti a klientovi za chvíli odejde poděkování
               s dotazníkem. Uzavření i e-mail jde vzít zpět.
             </p>
@@ -320,13 +319,12 @@ async function OverviewTab({ project }: { project: Project }) {
             />
           </>
         )}
-      </div>
+      </Card>
 
-      <div className={card}>
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Nebezpečná zóna</h2>
-        <p className="mb-4 text-xs text-muted-foreground">Smazání zakázky je nevratné.</p>
+      <Card>
+        <CardHead title="Nebezpečná zóna" hint="Smazání zakázky je nevratné." />
         <DeleteButton projectId={project.id} />
-      </div>
+      </Card>
     </>
   )
 }
@@ -336,7 +334,7 @@ async function HandoverBlock({ project }: { project: Project }) {
   const state = await loadHandover(project.id)
   if (!state) return null
   return (
-    <div className={card}>
+    <Card>
       <HandoverCard
         projectId={project.id}
         initial={state.doc}
@@ -344,7 +342,7 @@ async function HandoverBlock({ project }: { project: Project }) {
         available={state.available}
         saved={state.saved}
       />
-    </div>
+    </Card>
   )
 }
 
@@ -353,19 +351,19 @@ async function ActivityTab({ project }: { project: Project }) {
   const baseUrl = await appBaseUrl()
   return (
     <>
-      <div className={card}>
-        <h2 className={h2}>Aktivita</h2>
-        <p className="mb-5 text-xs text-muted-foreground">
-          Zprávy o tom, co se na zakázce udělalo. Klient vidí jen ty, které schválíte.
-        </p>
+      <Card>
+        <CardHead
+          title="Aktivita"
+          hint="Zprávy o tom, co se na zakázce udělalo. Klient vidí jen ty, které schválíte."
+        />
         <ProjectActivityPanel projectId={project.id} items={items} />
-      </div>
+      </Card>
 
-      <div className={card}>
-        <h2 className={h2}>Napojení Claude Code</h2>
-        <p className="mb-5 text-xs text-muted-foreground">
-          Po dokončené práci pošle Claude Code hlášení jako koncept. Postup je v docs/klientsky-prostor/NAPOJENI-CLAUDE-CODE.md.
-        </p>
+      <Card>
+        <CardHead
+          title="Napojení Claude Code"
+          hint="Po dokončené práci pošle Claude Code hlášení jako koncept. Postup je v docs/klientsky-prostor/NAPOJENI-CLAUDE-CODE.md."
+        />
         <AgentKeyPanel
           projectId={project.id}
           active={key ? { prefixMask: maskAgentKey(key.prefix), createdAt: key.createdAt, lastUsedAt: key.lastUsedAt } : null}
@@ -373,7 +371,7 @@ async function ActivityTab({ project }: { project: Project }) {
           claudeMdBlock={buildClaudeMdBlock()}
           configured={isAgentKeyConfigured()}
         />
-      </div>
+      </Card>
     </>
   )
 }
@@ -413,12 +411,12 @@ function RequestsTab({ project, rows: raw }: { project: Project; rows: AdminRow[
 
   if (cards.length === 0) {
     return (
-      <div className={card}>
-        <h2 className={h2}>Požadavky klienta</h2>
-        <p className="text-sm text-muted-foreground">
+      <Card>
+        <CardHead title="Požadavky klienta" />
+        <p className="text-sm text-quiet">
           Klient zatím nic nenapsal. Požadavky přijdou z jeho odkazu na přehled zakázky.
         </p>
-      </div>
+      </Card>
     )
   }
   return (
@@ -442,31 +440,33 @@ function MessagesTab({ project, rows }: { project: Project; rows: AdminRow[][] }
   return (
     <>
       {portalThread && (
-        <div className={card}>
-          <h2 className={h2}>Zprávy v klientském prostoru</h2>
-          <p className="mb-5 text-xs text-muted-foreground">
-            Klient vám píše ze svého přihlášeného prostoru. Vaše odpověď se mu ukáže tam.
-          </p>
+        <Card>
+          <CardHead
+            title="Zprávy v klientském prostoru"
+            hint="Klient vám píše ze svého přihlášeného prostoru. Vaše odpověď se mu ukáže tam."
+          />
           <PortalReplyPanel projectId={project.id} messages={portalThread} />
-        </div>
+        </Card>
       )}
 
-      <div className={card}>
-        <h2 className={h2}>Vzkazy pro klienta</h2>
-        <p className="mb-5 text-xs text-muted-foreground">
-          Klient je uvidí na svém přehledu. Interní poznámky v editaci zakázky klient nevidí.
-        </p>
+      <Card>
+        <CardHead
+          title="Vzkazy pro klienta"
+          hint="Klient je uvidí na svém přehledu. Interní poznámky v editaci zakázky klient nevidí."
+        />
         <ClientMessagesEditor
           projectId={project.id}
           publicToken={project.public_token}
           messages={messages}
         />
-      </div>
+      </Card>
 
       {progressUpdates.length > 0 && (
-        <div className={card}>
-          <h2 className={h2}>Historie postupu</h2>
-          <p className="mb-5 text-xs text-muted-foreground">Vidí i klient na svém přehledu.</p>
+        <Card>
+          <CardHead
+            title="Historie postupu"
+            hint="Vidí i klient na svém přehledu."
+          />
           <ul className="space-y-3">
             {progressUpdates.map((u, i) => (
               <li key={u.id} className="relative flex gap-3">
@@ -479,37 +479,39 @@ function MessagesTab({ project, rows }: { project: Project; rows: AdminRow[][] }
                     <span className="rounded-full border border-navy-100 bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
                       {u.progress_from}% → {u.progress_to}%
                     </span>
-                    <span className="text-xs text-muted-foreground">{formatDate(u.created_at)}</span>
+                    <span className="text-xs text-quiet">{formatDate(u.created_at)}</span>
                   </div>
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{u.description}</p>
                 </div>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
 
-      <div className={card}>
-        <h2 className={h2}>Zpětná vazba klienta</h2>
-        <p className="mb-5 text-xs text-muted-foreground">NPS hodnocení a poznámky odeslané klientem přes klientský portál.</p>
+      <Card>
+        <CardHead
+          title="Zpětná vazba klienta"
+          hint="NPS hodnocení a poznámky odeslané klientem přes klientský portál."
+        />
         <FeedbackFeed feedbacks={feedbacks} clientName={project.client_name} />
-      </div>
+      </Card>
 
-      <div className={card}>
-        <h2 className={h2}>Konzultace</h2>
-        <p className="mb-5 text-xs text-muted-foreground">
-          Termíny rezervované klientem. Kliknutím zobrazíte detail a odkaz na hovor.
-        </p>
+      <Card>
+        <CardHead
+          title="Konzultace"
+          hint="Termíny rezervované klientem. Kliknutím zobrazíte detail a odkaz na hovor."
+        />
         <ConsultationCalendar slots={slots} clientName={project.client_name} />
-      </div>
+      </Card>
 
-      <div className={cn(card, 'max-w-none')}>
-        <h2 className={h2}>Poznámky ze schůzek a hovorů</h2>
-        <p className="mb-5 text-xs text-muted-foreground">
-          Jen pro vás, klient je nikdy neuvidí. Stav zakázky se sem jen zrcadlí, měníte ho v Editaci zakázky na záložce Přehled.
-        </p>
+      <Card className="max-w-none">
+        <CardHead
+          title="Poznámky ze schůzek a hovorů"
+          hint="Jen pro vás, klient je nikdy neuvidí. Stav zakázky se sem jen zrcadlí, měníte ho v Editaci zakázky na záložce Přehled."
+        />
         <ProjectNotesPanel projectId={project.id} initialNotes={notes} currentProgress={project.progress} />
-      </div>
+      </Card>
     </>
   )
 }
@@ -535,7 +537,7 @@ async function BillingTab({ project }: { project: Project }) {
   const [invoices, costs] = await Promise.all([getProjectInvoices(project.id), getProjectCosts(project.id)])
   return (
     <>
-      <div className={card}>
+      <Card>
         <InvoiceArchive
           data={invoices}
           todayIso={getPragueTodayISO()}
@@ -548,15 +550,15 @@ async function BillingTab({ project }: { project: Project }) {
           description="Doklady k téhle zakázce. PDF stačí přetáhnout kamkoliv na tuhle kartu, AI z něj vyplní pole. Zaplacená faktura založí příjem v přiznané linii."
           paidLabel="Zaplacené"
         />
-      </div>
+      </Card>
 
-      <div className={card}>
-        <h2 className={h2}>Náklady zakázky</h2>
-        <p className="mb-5 text-xs text-muted-foreground">
-          Skutečné náklady se promítají do cash flow ve Financích. Odhad v editaci zakázky je jen orientační.
-        </p>
+      <Card>
+        <CardHead
+          title="Náklady zakázky"
+          hint="Skutečné náklady se promítají do cash flow ve Financích. Odhad v editaci zakázky je jen orientační."
+        />
         <ProjectCosts costs={costs} projectId={project.id} />
-      </div>
+      </Card>
     </>
   )
 }
