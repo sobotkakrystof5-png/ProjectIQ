@@ -791,10 +791,13 @@ protože `payment_reviewed_at` existuje až po migraci 109.
   `node scripts/admin-contacts-backfill.mjs` (nejdřív bez `--ano`) — bez něj je obrazovka
   Kontakty prázdná. Agent na produkční DB nedosáhne, dělá Kryštof · od 2026-11-13
 - [ ] **Které migrace na produkci opravdu běžely, ví jen Kryštof:** řekl „všechno nasazené"
-  a měřením je prokázané jen 102 a 106 (`/h/<token>` vrací 404 místo 500). Zvlášť ověřit
+  a měřením je zvenku prokázané jen 102 a 106 (`/h/<token>` vrací 404 místo 500). Zvlášť ověřit
   **100 a 101** (`DROP TABLE`, nevratné — R-089 chce napřed `node scripts/export-before-drop.mjs --ano`)
-  a **097–099** z Workspace. Nejjednodušší kontrola: `SELECT * FROM public.schema_migrations ORDER BY 1`
-  · od 2026-11-13
+  a **097–099** z Workspace. Hotová kontrola je
+  **`node scripts/admin-stav-produkce.mjs --env .env.production.local`** (jen čte): vypíše evidenci
+  migrací, co z 109 v databázi opravdu je, příjmy po letech a měnách (tedy i to, o kolik se
+  daňový základ lišil starým kódem) a doprovodné kroky. Agent produkční připojení nemá — stažení
+  `vercel env pull` prostředí zamítlo, pouští to Kryštof · od 2026-11-13
 - [ ] **Produkční build spadne na obnovené build cache (zjištěno 2026-11-13):** první deploy
   commitu `7a15ad2` skončil 12 chybami `Module not found: Can't resolve
   '@vercel/turbopack-next/internal/font/google/font'` z `next/font/google`, přestože lokální build
@@ -963,6 +966,13 @@ protože `payment_reviewed_at` existuje až po migraci 109.
   „Restored build cache from previous deployment". Deploy **bez cache** prošel beze změny jediného
   řádku („Skipping build cache, deployment was triggered without cache"). Kód za to nemohl,
   zapsané v Otevřených problémech.
+- **chore** Nový čtecí skript **`scripts/admin-stav-produkce.mjs`**: řekne, co z plánu je
+  na dané databázi doopravdy (evidence migrací, objekty jednotlivých migrací, celé 109 po
+  položkách), vypíše **příjmy po letech a měnách** — tedy korunový základ proti součtu všech měn,
+  což je přesně ta chyba, kterou AD13 opravilo — a připomene doprovodné kroky (backfill kontaktů,
+  `lead_pending`, duplicitní příjmy). Odzkoušený na testovací databázi, kde správně ukázal, že
+  105, 106, 108 a 109 tam nejsou. Vznikl proto, že agent na produkční připojení nedosáhne, a tak
+  „migrace jsou venku" jinak zůstává jen něčí slovo.
 - **chore** Ověření po nasazení, veřejně a bez přihlášení: `/` 200 (landing), `/login` 200,
   `/podminky` a `/ochrana-udaju` 200, `/h/<token>` 404, `/p/<token>` 404, `/dashboard` 307 na
   `/login`, `/api/cron/send-reminders` 401, veřejná API 405 na GET, `/w/prihlaseni`
