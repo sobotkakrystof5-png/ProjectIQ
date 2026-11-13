@@ -801,6 +801,60 @@ jinde v repu se název modelu psát nesmí, hlídá to `lib/__tests__/ai-models.
 **Bezpečnost:** `.claude/security/DECISIONS.md` #025 a `STATE.md` → Aplikace. Před AD14 brala
 route `/api/ai-assistant` z prohlížeče `systemPrompt` i celé `messages` bez jediné kontroly.
 
+### Paměť projektu: fakta a věty zvlášť (AD15, R-085)
+
+Paměť adminu má **dvě vrstvy a nemíchají se**. Kdo na ni sáhne, musí vědět, do které.
+
+| | **Fakta** | **Paměť** |
+|---|---|---|
+| Kde | `lib/admin/memory/facts.ts` | `project_memory` (migrace 111), `lib/admin/memory/store.ts` |
+| Co to je | spočítané z historie, čistě SQL | věta, kterou napsal člověk nebo model |
+| Ukládá se | **nikdy** — počítá se znovu | ano, se zdrojem, platností a potvrzením |
+| Plní formuláře | **ano, jen ona** | nikdy |
+| Do promptu | `<fakta>` jako kompaktní JSON | `<pamet>`, nepotvrzené označené |
+
+Důvod toho dělení je jediný: do předvyplněného pole se nesmí dostat text, který napsal model —
+jinak se vymyšlený údaj tváří jako historický fakt (B10).
+
+**Fakta** se počítají za **rodinu kontaktu** (on sám + co je do něj sloučené, R-095) jednou
+dávkou: poslední cena, obvyklá hodinová sazba (`price / time_invested`), průměrná doba do
+uzavření, typický zdroj poptávky, položky poslední faktury, poslední kanál konzultace a obvyklá
+délka schůzky. Bez kontaktu spočítají totéž za celé podnikání za poslední dva roky. `contact_id`
+přišel s migrací 104, `closed_at` a `time_invested` se 106, `items` se 107 — proto `batchTolerant`:
+na databázi bez migrace fakt prostě není, nic nepadá.
+
+Co se tím předvyplňuje:
+- `/dashboard/new?kontakt=<id>` — jméno, e-mail, telefon, druh práce a poslední cena
+  (`lib/admin/memory/prefill.ts`; odkaz „Nová zakázka" je na kartě kontaktu);
+- `/dashboard/faktury/nova?zakazka=<id>` — **popis položky** z poslední faktury téhož klienta
+  (`loadIssueDraft` → `suggestItems`). Dřív se opisoval pokaždé znovu.
+
+**Paměť** se zapisuje dvěma cestami a jen dvěma:
+1. kliknutím „Uložit do paměti" (`app/memory-actions.ts`) — rovnou potvrzené;
+2. denním cronem `send-reminders` (`lib/admin/memory/drafts.ts`, nejvýš 5 zakázek za běh) ze zpráv
+   o práci — vždycky `confirmed_by IS NULL`, v UI „Návrh paměti" s Potvrdit / Zahodit.
+
+Nepotvrzená paměť **se používá**, jen je všude poznat a platí 90 dnů. Potvrzená platí tři roky od
+posledního pohybu (R-076) — platnost **prodlužuje** denní úklid podle poslední změny zakázky,
+zprávy o práci a požadavku klienta, stejně jako to počítá migrace 098.
+
+**Co se do paměti nepustí:** text projde `redactSensitive()` z `lib/project-activity.ts` a když se
+v něm něco zakrylo, uložení se **odmítne celé** — na rozdíl od zprávy o práci, kterou jde ještě
+ručně opravit, se paměť čte potichu do promptu. Strop 600 znaků.
+
+**Mazání.** `ref_id` je polymorfní (podle `scope` míří do `projects`, do `contacts`, nebo nikam),
+takže cizí klíč to neuhlídá. Dělají to **triggery** `trg_projects_forget_memory`
+a `trg_contacts_forget_memory` — a pro jistotu to opakuje denní úklid
+`public.purge_memory_retention()` z cronu `client-retention`. Tatáž funkce maže návrhy asistenta
+starší 90 dnů (dluh z AD14).
+
+**Značky rámců** (`<kontext>`, `<fakta>`, `<pamet>`, `<veta>`, `<zpravy>`) se čistí **z hodnoty**,
+ne z hotového textu — `lib/ai/markers.ts`. Do AD15 se čistil hotový text, takže si rámec mazal sám
+sebe a k modelu se žádný `<kontext>` nedostal.
+
+**Bezpečnost:** `.claude/security/DECISIONS.md` #026. V adminu **není** cesta k exportu údajů
+kontaktu, takže řádky paměti zatím nejsou v žádném exportu; výmaz pokrytý je.
+
 ### Zdroje poptávek (AD02, R-088)
 
 VIZEON a ALTENO už nejsou dvě firmy. Je to **jeden byznys**, který přijímá poptávky z několika webů, a u zakázky, termínu i leadu se eviduje jen `lead_origin` — odkud poptávka přišla.

@@ -2,7 +2,16 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-13 · **AD14 hotové v kódu: AI asistent navrhuje, člověk
+> **Poslední aktualizace:** 2026-11-13 · **AD15 hotové v kódu: paměť projektu ve dvou vrstvách.**
+> Formuláře se předvyplňují z **faktů** — čísel spočítaných z historie klienta (poslední cena,
+> obvyklá sazba, položky poslední faktury), která se nikdy neukládají jako text, takže do pole
+> nemůže vstoupit věta od modelu. Vedle toho stojí **paměť** (`project_memory`, **migrace 111,
+> aplikovaná nikde**): věty se zdrojem, platností a potvrzením; nepotvrzený návrh z denního cronu
+> je označený a platí 90 dnů, potvrzené tři roky od posledního pohybu. Klíč ani connection string
+> se do paměti neuloží vůbec a smazání zakázky i kontaktu ji bere s sebou triggerem. Retenci
+> dostaly i návrhy asistenta z AD14. Mimochodem se našlo, že rámec `<kontext>` z AD14 se
+> **k modelu nikdy nedostal** — čistil se až hotový text, takže si mazal sám sebe. **V prohlížeči
+> neověřeno, živý dotaz na model neproběhl.** AD16 jede na migraci **112** (R-101). · **AD14 hotové v kódu: AI asistent navrhuje, člověk
 > potvrzuje.** Zavřela se díra, kterou měl admin od začátku — `/api/ai-assistant` brala
 > `systemPrompt` i celé zprávy z prohlížeče bez kontroly. Model teď nedostane žádný nástroj:
 > vrací typovaný návrh, ten leží v `ai_suggestions` (**migrace 110, aplikovaná nikde**) a provede
@@ -19,7 +28,27 @@
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-13 na **`7a15ad2`** (AD00–AD13 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
-**Modernizace adminu (R-081–R-100), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`**. **AD00–AD14 hotové** — další na řadě je **AD15 (paměť projektu, migrace 111**; 110 zabral AD14, takže AD16 má 112 — R-100).
+**Modernizace adminu (R-081–R-101), stav po sezení 2026-11-13:** běží na větvi **`admin/modernizace`**. **AD00–AD15 hotové** — další na řadě je **AD16 (hodnocení a reference, migrace 112** — R-100).
+Z AD15: paměť adminu má **dvě vrstvy a nemíchají se** (R-085). **Fakta** (`lib/admin/memory/facts.ts`)
+se počítají čistě SQL nad historií klienta — poslední cena, obvyklá hodinová sazba
+(`price / time_invested`), průměrná doba do uzavření, typický zdroj poptávky, položky poslední
+faktury, poslední kanál konzultace, obvyklá délka schůzky — a počítají se za **rodinu kontaktu**
+(R-095). Nikdy se neukládají jako text a **jen ony plní formuláře**: `/dashboard/new?kontakt=<id>`
+(odkaz „Nová zakázka" je na kartě kontaktu) a popis položky v nové faktuře, který se do AD15
+u stálého klienta opisoval pokaždé znovu. **Paměť** (`project_memory`, **migrace 111**) jsou věty
+se zdrojem, platností a potvrzením; do formulářů se nedostane nikdy, do promptu jde jako `<pamet>`
+s označením, co není potvrzené. Zapisuje se dvěma cestami: kliknutím „Uložit do paměti" (rovnou
+potvrzené) a denním cronem `send-reminders` ze zpráv o práci (nejvýš pět zakázek za běh, **vždy**
+`confirmed_by IS NULL`). Nepotvrzené platí 90 dnů, potvrzené tři roky od posledního pohybu a tu
+platnost **prodlužuje** denní úklid. Do paměti se **neuloží text, ve kterém `redactSensitive()`
+cokoli našlo** — ne jen text se značkou; smazání zakázky i kontaktu bere paměť s sebou
+**triggerem** (polymorfní `ref_id` nejde přes FK) a `public.purge_memory_retention()` z cronu
+`client-retention` uklízí prošlé, osiřelé a **návrhy asistenta starší 90 dnů** (dluh z AD14).
+Mimochodem se opravila chyba z AD14: `escapeContext` čistil značky až nad hotovým textem, takže
+smazal i rámec, který tam vložil `block()` — **modelu se žádný `<kontext>` nikdy nedostal**, i když
+na něm prompt stavěl obranu proti vložené instrukci. Nově čistí značky `lib/ai/markers.ts`
+z jednotlivé hodnoty. Odchylky: R-101. **V prohlížeči neověřeno a živý dotaz na model neproběhl**,
+takže návrhy paměti z cronu nikdo neviděl naživo; jde to až na databázi s migrací 111.
 Z AD14: asistent **navrhuje, nekoná**. `/api/ai-assistant` přijímala z prohlížeče `systemPrompt`
 i celé pole `messages` a beze změny je poslala modelu — jediná ochrana bylo přihlášení, model
 natvrdo opus a nic nebylo omezené. Nově jde tělo přes Zod, systémový prompt skládá server podle
@@ -831,10 +860,50 @@ se od teď nikde v repu nepíše** mimo `lib/ai/models.ts` — hlídá to test, 
 executor v `lib/admin/suggestion-apply.ts`; bez executoru se návrh neprovede. Retenci
 `ai_suggestions` doplní AD15 spolu s pamětí projektu.
 
+### R-101 · Paměť se neuloží děravá a mazání hlídá databáze (2026-11-13)
+**Rozhodnutí:** šest odchylek od zadání AD15.
+(1) Do paměti se **neuloží text, ve kterém `redactSensitive()` cokoli našlo** — ne jen text
+se značkou `[skryto]`.
+(2) Smazání zakázky i kontaktu bere paměť s sebou **triggerem v databázi**
+(`trg_projects_forget_memory`, `trg_contacts_forget_memory`), ne úklidem v akci mazání.
+(3) `valid_until` se **zapisuje** (90 dnů návrh, 3 roky potvrzené) a potvrzeným řádkům ho pak
+**prodlužuje** denní úklid podle posledního pohybu; nepočítá se při čtení.
+(4) Úklid visí na cronu **`client-retention`**, ne na „`/api/cron/admin-denne` z AD08" — ten
+nikdy nevznikl.
+(5) Návrhy paměti dělá denní **`send-reminders`**, taky bez vlastního cronu.
+(6) **Řádky paměti nejsou v exportu údajů** — admin žádný export údajů kontaktu nemá.
+**Proč:** (1) Zprávu o práci jde před schválením ještě ručně opravit; paměť se čte **potichu**
+do promptu asistenta, takže je bezpečnější ji nemít než mít ji s dírou po zakrytém úseku.
+(2) Cest ke smazání je víc než jedna a **výmaz kontaktu v adminu zatím vůbec neexistuje**
+(otevřený problém z AD09) — trigger platí i pro ruční SQL při žádosti GDPR, což je dnes jediná
+skutečná cesta. Cizí klíč to neumí: `ref_id` míří podle `scope` do dvou různých tabulek.
+(3) Počítat „poslední pohyb" při každém čtení paměti by znamenalo stejný dotaz jako v migraci
+098 na každé otevření obrazovky. (4) a (5) Vercel Hobby dovolí jeden běh cronu denně (R-006)
+a obojí patří k běhu, který už existuje. (6) Všechen kód GDPR exportu je ve Workspace
+(`lib/ws/gdpr.ts`); postavit ho pro admin je samostatná práce (AD16/KP10), **výmaz** pokrytý je.
+**Důsledek:** `docs/admin/AGENTS-ADMIN.md` → „Paměť projektu: fakta a věty zvlášť (AD15)",
+plán modernizace → AD15 (seznam odchylek), `.claude/security/DECISIONS.md` #026. **Nové
+předvyplnění formuláře smí brát hodnotu jen z `lib/admin/memory/facts.ts`** — nikdy
+z `project_memory`; jinak se vymyšlený údaj od modelu začne tvářit jako historický fakt (B10).
+Nová tabulka s osobními údaji navázaná polymorfně = trigger, ne spoléhání na akci mazání.
+Při AD16 (migrace 112) nezapomenout, že `project_memory` do retence patří a `purge_client_retention`
+z migrace 098 o ní **neví** — úklid paměti dělá `purge_memory_retention` z migrace 111.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **AD15 v prohlížeči neověřený:** migrace 111 **není nikde**, takže paměť nikdo neviděl.
+  Projít na 390 / 768 / 1280 / 1440 px: karta kontaktu (blok „Co víme z historie", Uložit do
+  paměti, odmítnutí textu s klíčem), detail zakázky (sekce Paměť, „O klientovi", Potvrdit
+  i Zahodit u návrhu), **`/dashboard/new?kontakt=<id>`** (předvyplněné jméno, telefon, druh práce
+  a cena) a **nová faktura ze zakázky** (předvyplněný **popis položky** z minula). Naživo nikdo
+  nezkusil ani návrhy paměti z denního cronu (`lib/admin/memory/drafts.ts`) — ty chtějí klíč
+  k modelu, zprávy o práci u otevřené zakázky a běh `send-reminders` · od 2026-11-13
+- [ ] **Řádky paměti nejsou v žádném exportu údajů (AD15):** admin export údajů kontaktu vůbec
+  nemá (všechen kód GDPR exportu je ve Workspace, `lib/ws/gdpr.ts`). Výmaz pokrytý je — triggery
+  `trg_projects_forget_memory` a `trg_contacts_forget_memory` plus denní úklid. Doplnit spolu
+  s výmazem kontaktu na žádost (AD16/KP10) · DECISIONS #026 · od 2026-11-13
 - [ ] **AD14 v prohlížeči neověřený a živý dotaz na model neproběhl:** klíč se v sezení
   nepoužil, takže **tvar strukturovaného výstupu se zanořeným sjednocením**
   (`{ proposal: discriminatedUnion, … }`) ani čtení cachovaného prefixu
@@ -844,10 +913,6 @@ executor v `lib/admin/suggestion-apply.ts`; bez executoru se návrh neprovede. R
   s toastem „Zpět"; `send_message` (musí být vidět řádek **Komu**); konzultanti u startupového
   projektu (rozhovor s historií). Jde to až na databázi s **migrací 110** — ta není nikde
   · od 2026-11-13
-- [ ] **`ai_suggestions` nemá retenci (AD14):** tabulka drží text věty i návrhu natrvalo.
-  `input_text` je sice po `redactSensitive()`, ale může nést jméno nebo telefon klienta,
-  a `public.purge_client_retention` (R-076) o tabulce neví. Doplnit v **AD15** spolu s retencí
-  paměti projektu; počítá s tím DECISIONS #025 · od 2026-11-13
 - [ ] **Doprovodné kroky po migracích nikdo neodškrtl (nasazení 2026-11-13):** (1) po 102
   kontrola `SELECT … WHERE lead_pending` z hlavičky migrace — stará nikdy nepotvrzená poptávka
   se má potvrdit nebo smazat, (2) u 109 `WARNING` o nevytvořeném indexu
@@ -917,7 +982,7 @@ executor v `lib/admin/suggestion-apply.ts`; bez executoru se návrh neprovede. R
   (`convertLeadToProject`) a nově z okna kalendáře (`createCalendarEvent`). Ručně zapsaný hovor
   tak na kartě kontaktu nebude. Doplnit s AD17, nebo až bude jasné, jak se má chovat překlep
   v telefonu (nový kontakt vs. návrh sloučení) · od 2026-11-12
-- [ ] **Výmaz kontaktu na žádost GDPR neexistuje (AD09):** `contacts` drží jméno, telefon, e-mail a poznámku, ale `public.purge_client_retention` (R-076) o tabulce neví a admin žádnou cestu výmazu nemá. Při žádosti je od teď potřeba smazat i kontakt. Není to nová kategorie údajů (kontakt je odvozený z leadů a zakázek), ale patří to k AD16/KP10 · `.claude/security/AUDIT-LOG.md` 2026-11-12 · od 2026-11-12
+- [ ] **Výmaz kontaktu na žádost GDPR neexistuje (AD09):** `contacts` drží jméno, telefon, e-mail a poznámku, ale `public.purge_client_retention` (R-076) o tabulce neví a admin žádnou cestu výmazu nemá. Při žádosti je od teď potřeba smazat i kontakt. Není to nová kategorie údajů (kontakt je odvozený z leadů a zakázek), ale patří to k AD16/KP10. **Od AD15 platí:** smazání kontaktu si paměť uklidí samo (trigger z migrace 111), chybí dál jen samotná cesta k výmazu a export · `.claude/security/AUDIT-LOG.md` 2026-11-12 · od 2026-11-12
 - [ ] **AD09 v prohlížeči neověřený:** projít na 390 / 768 / 1280 / 1440 px `/dashboard/kontakty` — tři pohledy (Kontakty, Možné duplicity, Sloučené), hledání podle telefonu zapsaného jinak, **karty místo tabulky pod 640 px** — a kartu kontaktu: uložení údajů (hlavně hláška u telefonu, kterému nejde rozumět, a kolize e-mailu), **Sloučit sem** a jeho „Zpět" v toastu, „Rozdělit zpět" u sloučeného kontaktu. Dál převod kontaktu na zakázku z Hovorů: musí skončit na nové zakázce, mít v ní poznámky z hovorů a navázaný termín v kalendáři · od 2026-11-12
 - [ ] **`notFound()` v adminu vrací 200, ne 404 (zjištěno 2026-11-12):** `/dashboard/<neexistující id>`, `/dashboard/faktury/<id>`, `/dashboard/kontakty/<id>` i neexistující stránka **vykreslí 404 obrazovku, ale se stavem 200**. Je to důsledek streamování kostry (AD06): hlavička odejde dřív, než stránka zjistí, že záznam není. Pro uživatele je to v pořádku (vidí „nenalezeno"), pro monitoring a roboty ne — `/dashboard` je sice `noindex`. Platí pro celý admin, ne jen pro nové obrazovky; opravit s AD18 (přístupnost a kvalita) · od 2026-11-12
 - [ ] **`npm run build:check` při běžícím `next dev` není neškodný (zjištěno 2026-11-12):** `scripts/build-check.sh` tvrdí, že od Next 16 má dev vlastní výstup a `next build` mu ho nepřepíše. V AD08 se ukázalo, že build **přepíše `.next/static`** pod už běžícím `next start` — ten pak servíroval chunky, které na disku nejsou (HTML na ně odkazuje, server vrací 500), a měření balíčku kvůli tomu jednou vyšlo falešně o 18–27 % lépe. Pro měření proto platí: po buildu server **restartovat** a zkontrolovat, že žádný skript z HTML na disku nechybí. `next dev` build **přežije** (ověřeno v AD09: po `build:check` vracel dev server dál 200 na 15 adresách); zbývá tedy jen případ `next start` · `scripts/build-check.sh` · od 2026-11-12
@@ -1015,6 +1080,48 @@ executor v `lib/admin/suggestion-apply.ts`; bez executoru se návrh neprovede. R
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-13 (AD15 — paměť projektu)
+- **feat** **AD15 hotové v kódu.** Technický popis: `docs/admin/AGENTS-ADMIN.md` → „Paměť
+  projektu: fakta a věty zvlášť (AD15)", odchylky v R-101. **DDL je v migraci 111. Aplikovaná:
+  nikde.**
+- **feat** **Fakta z historie plní formuláře** (`lib/admin/memory/facts.ts`). Čistě SQL, bez AI,
+  nikdy se neukládají jako text: poslední cena u klienta, obvyklá hodinová sazba
+  (`price / time_invested`), průměrná doba do uzavření, typický zdroj poptávky, položky poslední
+  faktury, poslední kanál konzultace a obvyklá délka schůzky. Počítají se za **rodinu kontaktu**
+  (on sám + sloučené zápisy, R-095) **jednou dávkou** a na databázi bez migrace 104/106/107 se
+  jen nespočítají, nic nepadá. Předvyplňuje se tím `/dashboard/new?kontakt=<id>` (nový odkaz
+  „Nová zakázka" na kartě kontaktu) a **popis položky** v nové faktuře — ten se u stálého klienta
+  opisoval pokaždé znovu (zjištěno při průchodu AD12).
+- **feat** **Paměť jako druhá, oddělená vrstva** (`project_memory`, migrace 111). Věta se zdrojem
+  (`manual` / `activity` / `assistant`), druhem, platností a potvrzením. Do formulářů se
+  **nedostane nikdy**, do promptu asistenta jde jako `<pamet>` a nepotvrzené nese značku.
+  V detailu zakázky a na kartě kontaktu je sekce Paměť s blokem „Co víme z historie", u návrhů
+  odznak „Návrh paměti" + Potvrdit / Zahodit.
+- **feat** **Návrhy paměti ze zpráv o práci** (`lib/admin/memory/drafts.ts`) v denním cronu
+  `send-reminders`: nejvýš pět zakázek za běh, strukturovaný výstup se Zodem, žádné nástroje,
+  výsledek **vždy** `confirmed_by IS NULL`. „Nic si nepamatuj" je platná odpověď.
+- **fix** **Klíč ani connection string se do paměti neuloží.** Text jde přes `redactSensitive()`
+  a když se v něm **cokoli zakrylo**, uložení se odmítne celé — paměť se čte potichu do promptu,
+  takže děravá věta je horší než žádná. Strop 600 znaků, druh i rozsah z výčtu.
+- **fix** **Mazání a retence.** Polymorfní `ref_id` nejde přes cizí klíč, takže smazání zakázky
+  i kontaktu bere paměť s sebou **triggerem**; `public.purge_memory_retention()` z denního cronu
+  `client-retention` prodlouží platnost potvrzené paměti podle posledního pohybu (R-076), smaže
+  prošlé a osiřelé a **návrhy asistenta starší 90 dnů** — tím je vyřízený dluh z AD14
+  (DECISIONS #025).
+- **fix** **Rámce se k modelu nikdy nedostaly (chyba z AD14).** `escapeContext` čistil značky až
+  nad hotovým textem, takže smazal i `<kontext>`, který tam vložil `block()` — systémový prompt
+  přitom na tom rámci stavěl obranu proti vložené instrukci. Nově čistí `lib/ai/markers.ts`
+  **jednotlivou hodnotu** (`clean`, `factsForPrompt`, `memoryForPrompt`, přepis zpráv o práci,
+  věta v `propose.ts`) a rámec zůstává.
+- **fix** Bezpečnostní review AD15 našlo **tři věci a všechny jsou opravené**: výše zmíněné
+  rámce, `revalidatePath` dostával cestu složenou z neověřeného řetězce z prohlížeče, a
+  `/dashboard/new` po přidání předvyplnění četla data klienta bez `requireAuth()`.
+  AUDIT-LOG 2026-11-13, DECISIONS #026.
+- **chore** Ověření: `npm test` **99 souborů / 1176 testů** (3 přeskočené, **23 nových**
+  v `lib/__tests__/pamet-projektu.test.ts`), `npx tsc --noEmit` a `npm run build:check` bez
+  varování. **V prohlížeči neověřeno a živý dotaz na model neproběhl.**
+- **decision** **R-101** — šest vědomých odchylek od zadání AD15.
 
 ### 2026-11-13 (AD14 — AI asistent)
 - **feat** **AD14 hotové v kódu.** Čtyři commity, každý s testem. Technický popis:

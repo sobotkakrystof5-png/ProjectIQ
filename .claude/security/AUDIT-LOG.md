@@ -16,6 +16,17 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-13 — review: paměť projektu (AD15)
+Spouštěč: `web-security-review` před commitem AD15.
+Rozsah: `migrations/111_pamet_projektu.sql`, `lib/admin/memory/*` (facts, store, drafts, prefill, types), `app/memory-actions.ts`, `app/dashboard/new/page.tsx`, `components/admin/memory/*`, `lib/ai/{context,markers,prompts,propose}.ts`, crony `client-retention` a `send-reminders`.
+Výsledek: 3 nálezy, všechny opravené ve stejném commitu. Žádná veřejná routa nepřibyla, celá plocha je za přihlášením.
+Nálezy:
+1. **Rámce `<kontext>` se zahazovaly samy sobě (chyba z AD14).** `escapeContext` běžel až nad hotovým textem, takže smazal i značku, kterou tam vložil `block()` — modelu se tedy žádný `<kontext>` nikdy nedostal, přestože systémový prompt o něm mluvil a stavěl na něm obranu proti vložené instrukci. Opraveno: značky se čistí **z hodnoty** (`lib/ai/markers.ts`, voláno z `clean()`, `factsForPrompt`, `memoryForPrompt` a přepisu zpráv o práci), rámec zůstává. Pokryto testem „značku vloženou do poznámky zahodí, aby rámec nešlo zavřít".
+2. **`revalidatePath` dostával řetězec z prohlížeče.** `confirmMemoryRow` a `discardMemoryRow` berou `scope` a `refId` jen kvůli obnovení obrazovky a vkládaly je do cesty bez kontroly. Opraveno: do adresy se pustí až UUID, jinak se obnovuje `/dashboard`.
+3. **`/dashboard/new` nově čte data klienta, ale neověřovala přihlášení.** Dokud to byl prázdný formulář, stačila ochrana v `proxy.ts`. Opraveno: `await requireAuth()` i na stránce.
+Opraveno: všechny tři výše; k tomu paměť odmítá uložit text, ve kterém se něco zakrylo (ne jen označit), a `purge_memory_retention` má `REVOKE ALL ... FROM PUBLIC`.
+Zůstává: vložená instrukce se nově může v paměti **udržet** přes denní cron — přijaté riziko s mitigacemi v DECISIONS #026 (redakce, značka `nepotvrzeno`, 90 dnů, model nekoná). V adminu pořád není cesta k exportu ani výmazu údajů kontaktu na žádost GDPR; výmaz paměti sám řeší trigger, export ne. **V prohlížeči neověřeno a živý dotaz na model neproběhl** — migrace 111 není nikde aplikovaná.
+
 ## 2026-11-13 — review: AI asistent (AD14)
 Spouštěč: `web-security-review` před commitem AD14.
 Rozsah: `lib/ai/*` (modely, prompty, kontext, návrh), `lib/admin/suggestions.ts`, `lib/admin/suggestion-apply.ts`, `app/ai-actions.ts`, `app/api/ai-assistant/route.ts`, `components/admin/assistant-panel.tsx`, `migrations/110_ai_navrhy.sql`.

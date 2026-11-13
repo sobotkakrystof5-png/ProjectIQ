@@ -1256,6 +1256,48 @@ skutečným dotazem.
   a řádek z `.env` se do paměti nedostanou.
 **Riziko:** střední (osobní údaje) — proto redakce a retence ve stejném sezení, ne později.
 
+**Provedeno 2026-11-13 (AD15)** — `npm test` 99 souborů / 1176 testů (3 přeskočené, 23 nových),
+`npx tsc --noEmit` a `npm run build:check` bez varování. DDL je v **migraci 111**
+(`project_memory`, dva triggery, `public.purge_memory_retention()`). **Aplikovaná: nikde.**
+Technický popis: `docs/admin/AGENTS-ADMIN.md` → „Paměť projektu: fakta a věty zvlášť (AD15)".
+
+Obě vrstvy stojí tak, jak plán chtěl: `lib/admin/memory/facts.ts` počítá z historie a **jen ono**
+plní formuláře (`/dashboard/new?kontakt=`, popis položky v nové faktuře), `project_memory` drží
+věty a do formulářů se nedostane. Asistent dostává obojí zvlášť — `<fakta>` jako JSON ve
+stabilním tvaru, `<pamet>` s označením, co není potvrzené.
+
+Šest odchylek od zadání, všechny vědomé (podrobně R-101 v `memory/memory.md`):
+
+1. **Zakrytý text se neuloží vůbec**, ne jen „neschválí". Zadání chtělo odmítnout text
+   s `REDACTION_MARK`; paměť odmítá i text, ve kterém `redactSensitive()` **cokoli našlo**.
+   Zpráva o práci jde ještě ručně opravit, než ji někdo schválí — paměť se čte potichu do promptu,
+   takže je bezpečnější ji nemít než mít ji děravou.
+2. **Smazání řeší trigger v databázi, ne akce mazání.** Zadání psalo „úklid musí být ve funkci
+   i v akci mazání". Jenže cest ke smazání je víc než jedna a **výmaz kontaktu v adminu zatím
+   vůbec neexistuje** (otevřený problém z AD09); trigger `AFTER DELETE` na `projects`
+   a `contacts` platí pro všechny, i pro ruční SQL při žádosti GDPR. Denní úklid to pro jistotu
+   opakuje nad osiřelými řádky.
+3. **`valid_until` se zapisuje a pak prodlužuje**, ne počítá z `last_seen_at` při čtení. Při
+   zápisu je to 90 dnů (návrh) nebo tři roky (potvrzené); denní úklid pak potvrzeným řádkům
+   nastaví „poslední pohyb + 3 roky" podle téhož výpočtu, jaký dělá migrace 098. Jinak by se
+   pohyb musel počítat při každém čtení paměti.
+4. **Úklid visí na cronu `client-retention`**, ne na „`/api/cron/admin-denne` z AD08" — ten
+   nevznikl. Je to tatáž otázka („co už si nemáme pamatovat") a tentýž denní běh.
+5. **Návrhy paměti dělá denní `send-reminders`**, taky bez vlastního cronu (Vercel Hobby, R-006),
+   nejvýš pět zakázek za běh.
+6. **Řádky paměti nejsou v exportu údajů** — admin žádný export údajů kontaktu nemá (všechen
+   kód GDPR exportu je ve Workspace). Zůstává jako otevřený problém pro AD16/KP10; **výmaz**
+   pokrytý je.
+
+**Co se našlo mimochodem:** rámce `<kontext>` se k modelu **nikdy nedostaly**. `escapeContext`
+z AD14 čistil značky až nad hotovým textem, takže smazal i tu, kterou tam vložil `block()` —
+systémový prompt přitom na rámci stavěl obranu proti vložené instrukci. Opraveno v
+`lib/ai/markers.ts`: značky se čistí z hodnoty, rámec zůstává. Pokryto testem.
+
+**Neověřeno:** v prohlížeči nikdo nic neviděl a **živý dotaz na model neproběhl**. Návrhy paměti
+z cronu tím pádem nikdo nevyzkoušel naživo. Jde to až na databázi s **migrací 111**.
+
+
 ### AD16 — Hodnocení, reference a předávací dokument (M, **migrace 112** — 109 AD13, 110 AD14, 111 AD15; viz R-100)
 **Cíl:** dotazník odejde sám a z odpovědí se dá udělat reference na web.
 
@@ -1324,7 +1366,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (107 i 108 podle Kryštofa na produkci; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | **hotovo a nasazeno 2026-11-13** (109 podle Kryštofa na produkci; `WARNING` o duplicitních příjmech nikdo nezkontroloval, v prohlížeči neověřeno; R-099) |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | **hotovo 2026-11-13** (110 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-100) |
-| AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | nezačato |
+| AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | **hotovo 2026-11-13** (111 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-101) |
 | AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | nezačato |
 | AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | nezačato |
 | AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | nezačato |
