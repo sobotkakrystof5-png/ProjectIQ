@@ -13,6 +13,7 @@
  */
 
 import { CONSULT_PROFILES, type ConsultMode } from '@/lib/ai/consultants'
+import { STATUS_LABELS, STATUS_ORDER } from '@/lib/types'
 
 /**
  * Společná pravidla pro každý prompt asistenta.
@@ -62,3 +63,23 @@ Pravidla pro vyplnění:
 - Co jsi odvodil z kontextu nebo z běžného významu ("ve čtvrtek" = nejbližší čtvrtek), napiš do "assumptions".
 - "confidence" je tvoje jistota od 0 do 1. Když váháš mezi dvěma druhy, dej "none" a do "assumptions" napiš proč.
 - Datum piš vždy jako YYYY-MM-DD, čas jako HH:MM ve 24hodinovém tvaru, pražský čas.`
+
+/**
+ * Katalog, který se k větě nepřidává, ale stojí ve stabilním prefixu — mění
+ * se jen s nasazením, takže ho jde číst z cache. Dává modelu slovník: jak se
+ * jmenují stavy zakázky a co která akce znamená.
+ */
+export function proposeCatalogue(): string {
+  const statuses = STATUS_ORDER.map((status) => `- "${status}" = ${STATUS_LABELS[status]}`).join('\n')
+  return `Stavy zakázky (hodnota = jak se jmenuje česky):
+${statuses}
+
+Druhy návrhů a co s nimi člověk udělá jedním klikem:
+- "create_lead" → zapíše se kontakt do Hovorů.
+- "schedule_call" → vznikne termín v kalendáři a kontakt v Hovorech.
+- "update_project_status" → zakázka se posune do jiného stavu.
+- "create_invoice_draft" → otevře se předvyplněný formulář faktury; nic se nevystaví.
+- "add_note" → poznámka se přidá k zakázce nebo ke kontaktu.
+- "send_message" → otevře se předvyplněná zpráva; odeslání zůstává na člověku.
+- "none" → nic se nestane.`
+}

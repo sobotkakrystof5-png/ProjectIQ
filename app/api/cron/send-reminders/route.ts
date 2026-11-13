@@ -6,6 +6,7 @@ import {
   generateRecurringCashFlowTransactionsInternal,
   generateRecurringCostTransactionsInternal,
 } from '@/lib/recurring-transactions'
+import { expireOldSuggestions } from '@/lib/admin/suggestions'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -194,9 +195,13 @@ export async function GET(req: NextRequest) {
   // Cash-flow se sem přidalo v AD08: dřív ho zakládal **render** stránky
   // Finance, takže vznikaly při prohlížení a vůbec ne, když se tam nikdo
   // nepodíval. Chyba jednoho generátoru nesmí zastavit připomínky.
+  // Nevyřízené návrhy asistenta po sedmi dnech propadají (AD14): kontext,
+  // ze kterého vznikly, už neplatí a kliknutím by vznikl termín na dávno
+  // minulé datum. Vlastní cron se kvůli jednomu UPDATE nezakládá (R-006).
   await Promise.all([
     generateRecurringCostTransactionsInternal().catch(() => {}),
     generateRecurringCashFlowTransactionsInternal().catch(() => {}),
+    expireOldSuggestions().catch(() => 0),
   ])
 
   const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, errors: 0 }
