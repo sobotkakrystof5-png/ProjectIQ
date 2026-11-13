@@ -238,6 +238,22 @@ function tabQueries(tab: DetailTab, projectId: string): AdminQuery[] {
   return []
 }
 
+/**
+ * Věta o dotazníku pod uzavřenou zakázkou (AD16). Bez migrace 112 jsou
+ * razítka `undefined` — pak se řekne jen to, co platí i bez ní.
+ */
+function surveyState(project: Project): string {
+  if (project.project_type === 'personal') return 'Vlastní projekt — dotazník se neposlílá.'
+  if (!project.client_email) return 'Zakázka nemá e-mail, dotazník neměl kam odejít.'
+  if (project.survey_requested_at) {
+    const základ = `Dotazník odešel ${formatDate(project.survey_requested_at)}.`
+    return project.survey_reminded_at
+      ? `${základ} Připomínka ${formatDate(project.survey_reminded_at)} — další už neodejde.`
+      : `${základ} Když klient neodpoví, za týden odejde jedna připomínka.`
+  }
+  return 'Dotazník klientovi za chvíli odejde.'
+}
+
 async function OverviewTab({ project }: { project: Project }) {
   const publicUrl = getPublicUrl(project.public_token)
 
@@ -275,18 +291,22 @@ async function OverviewTab({ project }: { project: Project }) {
       <div className={card}>
         <h2 className={h2}>{project.closed_at ? 'Uzavřená zakázka' : 'Uzavřít zakázku'}</h2>
         {project.closed_at ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Uzavřeno <span className="font-num">{formatDate(project.closed_at)}</span>. Zakázka se počítá do přehledu
-              výkonnosti na Profilu.
-            </p>
-            <ReopenProjectButton projectId={project.id} status={project.status as ProjectStatus} />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Uzavřeno <span className="font-num">{formatDate(project.closed_at)}</span>. Zakázka se počítá do přehledu
+                výkonnosti na Profilu.
+              </p>
+              <ReopenProjectButton projectId={project.id} status={project.status as ProjectStatus} />
+            </div>
+            {/* Co se stalo s dotazníkem (AD16) — ať je poznat, jestli už odešel. */}
+            <p className="text-xs text-muted-foreground">{surveyState(project)}</p>
           </div>
         ) : (
           <>
             <p className="mb-4 text-xs text-muted-foreground">
-              Hotová zakázka se započítá do přehledu výkonnosti a klientovi odejde poděkování s dotazníkem.
-              Uzavření jde vzít zpět.
+              Hotová zakázka se započítá do přehledu výkonnosti a klientovi za chvíli odejde poděkování
+              s dotazníkem. Uzavření i e-mail jde vzít zpět.
             </p>
             <CloseProjectButton
               projectId={project.id}

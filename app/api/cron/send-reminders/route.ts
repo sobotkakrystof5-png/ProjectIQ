@@ -8,6 +8,7 @@ import {
 } from '@/lib/recurring-transactions'
 import { expireOldSuggestions } from '@/lib/admin/suggestions'
 import { proposeMemoryDrafts } from '@/lib/admin/memory/drafts'
+import { remindPendingSurveys } from '@/lib/admin/surveys'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -199,16 +200,19 @@ export async function GET(req: NextRequest) {
   // Nevyřízené návrhy asistenta po sedmi dnech propadají (AD14): kontext,
   // ze kterého vznikly, už neplatí a kliknutím by vznikl termín na dávno
   // minulé datum. Vlastní cron se kvůli jednomu UPDATE nezakládá (R-006).
-  await Promise.all([
+  // Jedna připomínka dotazníku po sedmi dnech (AD16). Vlastní cron taky ne —
+  // je to jeden dotaz a den je přesně ta přesnost, kterou připomínka chce.
+  const [, , , , surveys] = await Promise.all([
     generateRecurringCostTransactionsInternal().catch(() => {}),
     generateRecurringCashFlowTransactionsInternal().catch(() => {}),
     expireOldSuggestions().catch(() => 0),
     // Návrhy paměti ze zpráv o práci (AD15). Nepotvrzené, nejvýš pět zakázek
     // za běh; bez klíče k modelu nebo bez migrace 111 se neudělá nic.
     proposeMemoryDrafts().catch(() => ({ checked: 0, created: 0 })),
+    remindPendingSurveys().catch(() => ({ sent: 0, failed: 0 })),
   ])
 
-  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, errors: 0 }
+  const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, surveys: surveys.sent, errors: surveys.failed }
 
   const dayBeforeResults = await Promise.allSettled(dayBeforeSlots.map(async (slot) => {
     await sendConsultationReminder(slot, 'day_before')

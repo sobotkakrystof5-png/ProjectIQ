@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import { getSurveyUrl } from '@/lib/utils'
-import { sendBrandedEmail } from '@/lib/email'
+import { SURVEY_SEND_DELAY_MS, sendSurveyRequest } from '@/lib/admin/surveys'
 import { projectPath } from '@/lib/lead-origins'
 import { STATUS_ORDER, type ProjectStatus, type ProjectType } from '@/lib/types'
 
@@ -58,18 +57,16 @@ export async function closeProject(projectId: string, extra: CloseProjectExtra):
   }
 
   const rows = await sql`
-    SELECT client_name, client_email, description, status, closed_at, estimated_costs, survey_token
+    SELECT client_name, description, status, closed_at, estimated_costs
     FROM projects WHERE id = ${projectId} LIMIT 1
   `
   if (!rows.length) throw new Error('Zakázka nenalezena')
   const p = rows[0] as {
     client_name: string
-    client_email: string | null
     description: string | null
     status: ProjectStatus
     closed_at: string | null
     estimated_costs: number | null
-    survey_token: string
   }
   if (p.closed_at) throw new Error('Tahle zakázka je už uzavřená.')
 
@@ -89,24 +86,17 @@ export async function closeProject(projectId: string, extra: CloseProjectExtra):
     WHERE id = ${projectId}
   `
 
-  // Děkovný e-mail s dotazníkem — jen u klientské zakázky s e-mailem.
-  // Odkaz vede na `projects.survey_token` (migrace 106 ho přebrala z archivu,
-  // takže starší odeslané odkazy platí dál).
-  if (extra.project_type === 'client' && p.client_email) {
-    const to = p.client_email
-    const token = p.survey_token
-    const name = p.client_name
-    after(async () => {
-      await sendBrandedEmail({
-        to,
-        subject: 'Děkuji za spolupráci – ZakazIQ',
-        heading: 'Děkuji za spolupráci!',
-        intro: `Dobrý den, ${name}, zakázka je hotová a moc vám děkuji za spolupráci — byla mi potěšením. Budu rád, když si najdete chvilku a vyplníte krátký dotazník spokojenosti. Pomůže mi to zlepšovat mé služby a zabere jen pár minut. Na konci můžete napsat i referenci, kterou se mnou chcete sdílet.`,
-        fields: [{ label: 'Zakázka', value: title }],
-        ctas: [{ label: 'Vyplnit dotazník spokojenosti', href: getSurveyUrl(token) }],
-      })
-    })
-  }
+  // Dotazník odchází sám (AD16). Nečeká se na něj a jde **po odkladu**:
+  // než uplyne, stihne „Zpět" zakázku otevřít a `sendSurveyRequest` pak
+  // podmínku „zakázka skončila" už nenajde splněnou. Odkaz vede na
+  // `projects.survey_token` (migrace 106 ho přebrala z archivu, takže starší
+  // odeslané odkazy platí dál).
+  after(async () => {
+    await new Promise((resolve) => setTimeout(resolve, SURVEY_SEND_DELAY_MS))
+    // Bez migrace 112 chybí zámek proti dvojímu odeslání; uzavření je ale
+    // jediná cesta, která dotazník posílala i před AD16, takže posílá dál.
+    await sendSurveyRequest(projectId, { fallbackWithoutColumn: true })
+  })
 
   let skippedCostsDueToExisting = false
 

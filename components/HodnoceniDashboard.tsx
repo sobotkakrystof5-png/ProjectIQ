@@ -137,6 +137,24 @@ function SurveyResult({
   )
 }
 
+/**
+ * Co se s dotazníkem děje (AD16). Odkaz se už nemusí kopírovat ručně —
+ * připomínka odchází sama po sedmi dnech. Tlačítka pod větou zůstávají
+ * pro případ, že se klient ozývá jinudy.
+ */
+function waitingText(project: ClosedProject): string {
+  if (project.survey_requested_at) {
+    const základ = `Dotazník odešel ${formatDay(project.survey_requested_at)}.`
+    return project.survey_reminded_at
+      ? `${základ} Připomínka ${formatDay(project.survey_reminded_at)} — další už neodejde.`
+      : `${základ} Když klient neodpoví, za týden odejde jedna připomínka.`
+  }
+  return 'Dotazník zatím neodešel. Odkaz můžeš poslat i ručně.'
+}
+
+const formatDay = (value: string) =>
+  new Date(value).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
+
 export function HodnoceniDashboard({ projects, surveys }: Props) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [localSurveys, setLocalSurveys] = useState<ProjectSurvey[]>(surveys)
@@ -228,10 +246,7 @@ export function HodnoceniDashboard({ projects, surveys }: Props) {
                   />
                 ) : (
                   <div className="border-t border-border px-5 py-5 space-y-3 bg-slate-50/60">
-                    <p className="text-sm text-muted-foreground">
-                      Klient zatím dotazník nevyplnil. Odkaz mu byl odeslán emailem při dokončení zakázky —
-                      můžeš ho zkopírovat a poslat znovu.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{waitingText(project)}</p>
                     <div className="flex items-center gap-2">
                       <CopyButton text={getSurveyUrl(project.survey_token)} label="Kopírovat odkaz na dotazník" />
                       <a

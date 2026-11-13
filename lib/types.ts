@@ -46,6 +46,15 @@ export interface Project {
   company: string | null
   /** Klíč veřejného dotazníku `/h/<token>`. */
   survey_token: string
+  /**
+   * Kdy klientovi odešel dotazník a kdy se jednou připomnělo (migrace 112,
+   * AD16). Nepovinné: bez migrace sloupce nejsou a admin běží dál.
+   */
+  survey_requested_at?: string | Date | null
+  survey_reminded_at?: string | Date | null
+  /** Předávací dokument „co bylo dodané“ (migrace 112, AD16). */
+  handover?: unknown
+  handover_issued_at?: string | Date | null
   created_at: string | Date | null
   updated_at: string | Date | null
 }
@@ -222,6 +231,9 @@ export interface ClosedProject {
   project_type: ProjectType
   survey_token: string
   client_email: string | null
+  /** Kdy dotazník odešel a kdy se připomnělo (AD16); bez migrace 112 null. */
+  survey_requested_at?: string | null
+  survey_reminded_at?: string | null
 }
 
 export interface ProjectSurvey {

@@ -25,7 +25,12 @@ export const CLOSED_COLUMNS = `id::text,
   coalesce(price, 0)::float AS amount, deposit_amount::float AS deposit_amount,
   difficulty, time_invested::float AS time_invested,
   estimated_hours::float AS estimated_hours, project_type,
-  survey_token::text, client_email`
+  survey_token::text, client_email,
+  -- Razítka dotazníku (AD16) přes to_jsonb, ne přímo: bez migrace 112
+  -- sloupce neexistují a přímý odkaz by shodil celý přehled. Takhle vyjde
+  -- NULL a obrazovka se chová jako dřív.
+  to_jsonb(projects) ->> 'survey_requested_at' AS survey_requested_at,
+  to_jsonb(projects) ->> 'survey_reminded_at'  AS survey_reminded_at`
 
 const SURVEY_COLUMNS = `id::text, project_id::text, completed_project_id::text,
   rating_cooperation, rating_speed, rating_design, rating_functionality,

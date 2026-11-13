@@ -5,10 +5,11 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import { getPublicUrl, getSurveyUrl } from '@/lib/utils'
+import { getPublicUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, STATUS_ORDER, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
+import { sendSurveyRequest } from '@/lib/admin/surveys'
 import {
   LEAD_ORIGINS, LEADS_INBOX_PATH, DEFAULT_LEAD_ORIGIN, adminEmail, projectPath, toLeadOrigin,
   type LeadOrigin,
@@ -559,12 +560,18 @@ export async function setProjectStatus(
     const ctas: EmailCta[] = []
     if (p.project_url) ctas.push({ label: 'Zobrazit živou verzi', href: p.project_url })
     ctas.push({ label: 'Otevřít přehled projektu', href: getPublicUrl(p.public_token), primary: false })
+    // „Hotovo" a „Zaplaceno" jsou konec práce — tam místo zprávy o změně
+    // stavu odchází děkovný e-mail s dotazníkem (AD16). Dvě zprávy během
+    // patnácti vteřin by byly jen hluk; když dotazník neodejde (už odešel,
+    // vlastní projekt, zakázka bez e-mailu), pošle se obvyklá zpráva.
+    const finishing = status === 'done' || status === 'paid'
     after(async () => {
       await new Promise((resolve) => setTimeout(resolve, STAGE_EMAIL_DELAY_MS))
       const current = await sql`SELECT status, progress FROM projects WHERE id = ${projectId} LIMIT 1`
       const now = current[0] as { status: ProjectStatus; progress: number } | undefined
       // Zakázka mezitím zmizela, nebo se stav vrátil („Zpět") — e-mail neodejde.
       if (!now || now.status !== status) return
+      if (finishing && (await sendSurveyRequest(projectId))) return
       await sendBrandedEmail({
         to,
         subject: 'Aktualizace vašeho projektu – ZakazIQ',

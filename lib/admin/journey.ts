@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/utils'
 import type { Project, ProjectStatus } from '@/lib/types'
 
 /**
@@ -61,11 +62,32 @@ export function journeySqlText(): string {
       EXISTS (SELECT 1 FROM project_surveys WHERE project_id = $1) AS hodnoceni`
 }
 
+/**
+ * Co se s dotazníkem stalo (AD16). Razítka jsou na zakázce, ne
+ * v `project_surveys` — ta tabulka vznikne až odpovědí klienta.
+ */
+function surveyWaiting(
+  project: Partial<Pick<Project, 'survey_requested_at' | 'survey_reminded_at'>> & Pick<Project, 'closed_at'>,
+): string {
+  if (project.survey_requested_at) {
+    const odeslan = `Dotazník odešel ${formatDate(project.survey_requested_at)}.`
+    return project.survey_reminded_at
+      ? `${odeslan} Připomínka ${formatDate(project.survey_reminded_at)} — další už neposlílám.`
+      : `${odeslan} Čeká se na odpověď, za týden odejde připomínka.`
+  }
+  if (project.closed_at) return 'Dotazník klientovi za chvíli odejde.'
+  return 'Dotazník odejde sám, až zakázku uzavřete.'
+}
+
 /** Pořadí stavů — „práce" je splněná i tehdy, když je zakázka dál. */
 const AFTER: Record<ProjectStatus, number> = { new: 0, in_progress: 1, review: 2, done: 3, paid: 4 }
 
 export function buildJourney(
-  project: Pick<Project, 'id' | 'source' | 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid' | 'closed_at'>,
+  project: Pick<
+    Project,
+    'id' | 'source' | 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid' | 'closed_at'
+  > &
+    Partial<Pick<Project, 'survey_requested_at' | 'survey_reminded_at'>>,
   facts: JourneyFacts,
 ): JourneyStep[] {
   const stage = AFTER[project.status] ?? 0
@@ -141,9 +163,7 @@ export function buildJourney(
       label: LABELS.hodnoceni,
       done: facts.hodnoceni,
       rank: AFTER.paid,
-      waiting: project.closed_at
-        ? 'Dotazník klientovi odešel, čeká se na odpověď.'
-        : 'Dotazník odejde sám, až zakázku uzavřete.',
+      waiting: surveyWaiting(project),
     },
   ]
 
