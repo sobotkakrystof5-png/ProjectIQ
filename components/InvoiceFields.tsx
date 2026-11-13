@@ -109,8 +109,8 @@ export function invoiceFormToFormData(
 }
 
 const inputClass =
-  'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
-const labelClass = 'text-xs font-medium text-muted-foreground block mb-1'
+  'w-full rounded-chip border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink transition-colors placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
+const labelClass = 'text-xs font-medium text-quiet block mb-1'
 
 export function InvoiceFields({
   value,
@@ -206,7 +206,7 @@ export function InvoiceFields({
   return (
     <div className="relative space-y-3" {...dropProps}>
       {isOver && (
-        <div className="absolute -inset-2 z-10 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/95 text-sm font-medium text-emerald-700 pointer-events-none">
+        <div className="pointer-events-none absolute -inset-2 z-10 flex items-center justify-center gap-2 rounded-chip border-2 border-dashed border-navy-300 bg-navy-50/95 text-sm font-medium text-navy-900">
           <UploadCloud size={16} strokeWidth={1.5} />
           Pusť PDF — vyplní se samo
         </div>
@@ -241,7 +241,7 @@ export function InvoiceFields({
               value={value.currency}
               onChange={e => set('currency', e.target.value)}
               disabled={disabled}
-              className="text-sm border border-border rounded-lg px-2 py-2 bg-white shrink-0"
+              className="text-sm border border-navy-100 rounded-chip px-2 py-2 bg-surface shrink-0"
             >
               {INVOICE_CURRENCIES.map(c => (
                 <option key={c}>{c}</option>
@@ -306,7 +306,7 @@ export function InvoiceFields({
       </div>
 
       {/* Datum zaplacení je jediné pole, které hýbe daněmi — ať je to vidět. */}
-      <p className="text-xs text-muted-foreground -mt-1">
+      <p className="text-xs text-quiet -mt-1">
         {value.paid_on
           ? 'Zaplacená faktura zakládá příjem v přiznané linii k datu zaplacení.'
           : 'Bez data zaplacení je faktura pohledávka a do daňového základu nevstupuje.'}
@@ -370,10 +370,10 @@ export function InvoiceFields({
           className="hidden"
         />
         {file ? (
-          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-            <FileText size={14} strokeWidth={1.5} className="text-emerald-600 shrink-0" />
-            <span className="text-sm text-foreground truncate flex-1">{file.name}</span>
-            <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+          <div className="flex items-center gap-2 rounded-chip border border-navy-100 bg-navy-50/60 px-3 py-2">
+            <FileText size={14} strokeWidth={1.5} className="shrink-0 text-navy-500" />
+            <span className="text-sm text-ink truncate flex-1">{file.name}</span>
+            <span className="text-xs text-quiet shrink-0 tabular-nums">
               {(file.size / 1024 / 1024).toFixed(1)} MB
             </span>
             <button
@@ -383,20 +383,20 @@ export function InvoiceFields({
                 if (fileInputRef.current) fileInputRef.current.value = ''
               }}
               disabled={disabled}
-              className="p-0.5 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+              className="shrink-0 p-0.5 text-quiet transition-colors hover:text-danger"
             >
               <X size={14} strokeWidth={1.5} />
             </button>
           </div>
         ) : existingPdfName ? (
-          <div className="flex items-center gap-2 bg-muted/40 border border-border rounded-lg px-3 py-2">
-            <FileText size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
-            <span className="text-sm text-foreground truncate flex-1">{existingPdfName}</span>
+          <div className="flex items-center gap-2 bg-muted/40 border border-navy-100 rounded-chip px-3 py-2">
+            <FileText size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
+            <span className="text-sm text-ink truncate flex-1">{existingPdfName}</span>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="text-xs text-emerald-700 hover:underline shrink-0"
+              className="shrink-0 text-xs text-navy-700 hover:underline"
             >
               Nahradit
             </button>
@@ -405,7 +405,7 @@ export function InvoiceFields({
                 type="button"
                 onClick={onRemoveExistingPdf}
                 disabled={disabled}
-                className="p-0.5 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                className="shrink-0 p-0.5 text-quiet transition-colors hover:text-danger"
               >
                 <X size={14} strokeWidth={1.5} />
               </button>
@@ -416,7 +416,7 @@ export function InvoiceFields({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="w-full flex items-center justify-center gap-2 border border-dashed border-border rounded-lg px-3 py-3 text-sm text-muted-foreground hover:border-emerald-400 hover:text-emerald-700 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-chip border border-dashed border-navy-200 px-3 py-3 text-sm text-quiet transition-colors hover:border-navy-400 hover:text-navy-700"
           >
             <Paperclip size={14} strokeWidth={1.5} />
             Přetáhni sem PDF nebo vyber ze souborů (max {MAX_PDF_LABEL})
@@ -429,7 +429,7 @@ export function InvoiceFields({
             type="button"
             onClick={() => runAiParse()}
             disabled={disabled || isParsing}
-            className="w-full flex items-center justify-center gap-2 mt-2 px-3 py-2 text-sm font-medium text-emerald-700 border border-emerald-200 bg-emerald-50/60 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50"
+            className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50 disabled:opacity-50"
           >
             {isParsing ? (
               <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
@@ -441,7 +441,7 @@ export function InvoiceFields({
         )}
 
         {parseError && (
-          <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+          <div className="mt-2 flex items-start gap-2 rounded-chip border border-dashed border-signal-line bg-signal-bg px-3 py-2 text-xs text-signal-ink">
             <AlertCircle size={13} strokeWidth={1.5} className="shrink-0 mt-0.5" />
             <span>{parseError}</span>
           </div>

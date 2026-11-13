@@ -14,7 +14,9 @@ import { IssuedInvoiceActions } from '@/components/admin/invoices/issued-actions
 import { PaymentMatch } from '@/components/admin/invoices/payment-match'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
-import { formatDate, formatDateTime } from '@/lib/utils'
+import { cn, formatDate, formatDateTime } from '@/lib/utils'
+import { Card as AdminCard } from '@/components/admin/card'
+import { SectionLabel } from '@/components/ws/brand'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { isInvoiceOverdue } from '@/lib/invoice-status'
 import { loadHandover } from '@/lib/admin/handover'
@@ -37,23 +39,24 @@ function formatFileSize(bytes: number | null) {
 function Field({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
   return (
     <div>
-      <dt className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</dt>
-      <dd className={`text-sm text-foreground mt-0.5 ${mono ? 'tabular-nums' : ''}`}>
-        {value && value.trim() !== '' ? value : <span className="text-muted-foreground">—</span>}
+      <SectionLabel as="h3" className="text-[11px]">{label}</SectionLabel>
+      <dd className={cn('mt-0.5 text-sm text-ink', mono && 'font-num tabular-nums')}>
+        {value && value.trim() !== '' ? value : <span className="text-quiet">—</span>}
       </dd>
     </div>
   )
 }
 
+/** Panel detailu faktury: plocha Dílků a štítek sekce místo vlastního nadpisu. */
 function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="bg-white border border-border rounded-2xl p-5">
-      <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-4">
+    <AdminCard className="p-5">
+      <SectionLabel as="h2" className="mb-4 flex items-center gap-2 normal-case tracking-normal">
         {icon}
         {title}
-      </h2>
+      </SectionLabel>
       {children}
-    </section>
+    </AdminCard>
   )
 }
 
@@ -206,7 +209,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
             </Card>
           )}
 
-          <Card title="Údaje z faktury" icon={<FileText size={14} strokeWidth={1.5} className="text-emerald-600" />}>
+          <Card title="Údaje z faktury" icon={<FileText size={14} strokeWidth={1.5} className="text-navy-500" />}>
             <dl className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-4">
               <Field label="Číslo faktury" value={invoice.invoice_number} mono />
               <Field label="Částka" value={formatAmount(invoice.amount, invoice.currency)} mono />
@@ -218,19 +221,19 @@ export default async function InvoiceDetailPage(props: PageProps) {
               <Field label="IČO" value={invoice.client_ico} mono />
               <Field label="DIČ" value={invoice.client_dic} mono />
             </dl>
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-4 pt-4 border-t border-navy-100">
               <Field label="Poznámka" value={invoice.note} />
             </div>
           </Card>
 
           {invoice.has_pdf ? (
-            <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-emerald-600" />}>
+            <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-navy-500" />}>
               <div className="flex items-center gap-2 flex-wrap mb-3">
-                <span className="text-sm text-foreground truncate">
+                <span className="text-sm text-ink truncate">
                   {invoice.pdf_filename ?? `faktura-${invoice.invoice_number}.pdf`}
                 </span>
                 {invoice.pdf_size !== null && (
-                  <span className="text-xs text-muted-foreground tabular-nums">
+                  <span className="font-num text-xs tabular-nums text-quiet">
                     {formatFileSize(invoice.pdf_size)}
                   </span>
                 )}
@@ -238,7 +241,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   href={pdfHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition-colors"
+                  className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
                 >
                   <ExternalLink size={11} strokeWidth={1.5} />
                   Otevřít v novém okně
@@ -248,23 +251,23 @@ export default async function InvoiceDetailPage(props: PageProps) {
               <object
                 data={pdfHref}
                 type="application/pdf"
-                className="w-full h-[600px] rounded-xl border border-border bg-muted/30 hidden sm:block"
+                className="w-full h-[600px] rounded-chip border border-navy-100 bg-muted/30 hidden sm:block"
               >
-                <p className="text-sm text-muted-foreground p-4">
+                <p className="text-sm text-quiet p-4">
                   Náhled PDF tenhle prohlížeč nezobrazí — otevři doklad odkazem výš.
                 </p>
               </object>
             </Card>
           ) : invoice.issued ? (
-            <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-emerald-600" />}>
+            <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-navy-500" />}>
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="truncate text-sm text-foreground">faktura-{invoice.invoice_number}.pdf</span>
+                <span className="truncate text-sm text-ink">faktura-{invoice.invoice_number}.pdf</span>
                 <span className="text-xs text-quiet">vyrobí se při otevření</span>
                 <a
                   href={pdfHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100"
+                  className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
                 >
                   <ExternalLink size={11} strokeWidth={1.5} />
                   Otevřít v novém okně
@@ -281,8 +284,8 @@ export default async function InvoiceDetailPage(props: PageProps) {
               </object>
             </Card>
           ) : (
-            <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-muted-foreground" />}>
-              <p className="text-sm text-muted-foreground">
+            <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-navy-500" />}>
+              <p className="text-sm text-quiet">
                 K faktuře není přiložené PDF. Přes „Upravit" ho jde doplnit — AI z něj rovnou
                 přečte údaje.
               </p>
@@ -294,9 +297,9 @@ export default async function InvoiceDetailPage(props: PageProps) {
           <Card title="Zakázka" icon={<ExternalLink size={14} strokeWidth={1.5} className="text-navy-600" />}>
             {invoice.project_href ? (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">{invoice.project_client_name}</p>
+                <p className="text-sm font-medium text-ink">{invoice.project_client_name}</p>
                 {invoice.project_description && (
-                  <p className="text-sm text-muted-foreground">{invoice.project_description}</p>
+                  <p className="text-sm text-quiet">{invoice.project_description}</p>
                 )}
                 <Link
                   href={invoice.project_href}
@@ -319,13 +322,13 @@ export default async function InvoiceDetailPage(props: PageProps) {
                 předvyplní se odběratel i částka.
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-quiet">
                 Faktura není navázaná na žádnou zakázku. Přes „Upravit" ji jde přiřadit.
               </p>
             )}
           </Card>
 
-          <Card title="Přiznaná linie" icon={<Landmark size={14} strokeWidth={1.5} className="text-emerald-600" />}>
+          <Card title="Přiznaná linie" icon={<Landmark size={14} strokeWidth={1.5} className="text-navy-500" />}>
             {invoice.ledger ? (
               <div className="space-y-3">
                 <dl className="space-y-3">
@@ -337,14 +340,14 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   />
                   <Field label="Kategorie" value={invoice.ledger.category} />
                 </dl>
-                <p className="text-xs text-muted-foreground border-t border-border pt-3">
+                <p className="text-xs text-quiet border-t border-navy-100 pt-3">
                   {invoice.ledger.owned_by_invoice
                     ? `Příjem založila tahle faktura (kategorie „${INVOICE_INCOME_CATEGORY}"). Smazání faktury ho z ledgeru odebere.`
                     : 'Příjem už měla v ledgeru zakázka — faktura ho jen zastupuje. Smazání faktury ho nechá být.'}
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-quiet">
                 Bez data zaplacení je faktura pohledávka — do daňového základu nevstupuje a
                 v přiznané linii nemá žádný příjem.
               </p>
@@ -353,27 +356,27 @@ export default async function InvoiceDetailPage(props: PageProps) {
 
           {/* U faktury vystavené tady se žádné PDF nečetlo — karta by jen mátla (AD12). */}
           {!invoice.issued && (
-          <Card title="Co z PDF přečetla AI" icon={<Sparkles size={14} strokeWidth={1.5} className="text-emerald-600" />}>
+          <Card title="Co z PDF přečetla AI" icon={<Sparkles size={14} strokeWidth={1.5} className="text-navy-500" />}>
             {extracted.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-quiet">
                 U téhle faktury není uložený AI přepis — údaje byly vyplněné ručně.
               </p>
             ) : (
               <div className="space-y-2">
                 {extracted.map(row => (
                   <div key={row.label} className="flex items-start justify-between gap-3 text-sm">
-                    <span className="text-muted-foreground shrink-0">{row.label}</span>
+                    <span className="text-quiet shrink-0">{row.label}</span>
                     <span className="text-right min-w-0">
-                      <span className="text-foreground break-words">{row.ai}</span>
+                      <span className="text-ink break-words">{row.ai}</span>
                       {row.differs && (
-                        <span className="block text-[11px] text-amber-700 mt-0.5">
+                        <span className="mt-0.5 block text-[11px] text-signal-ink">
                           ručně upraveno na „{row.saved ?? '—'}"
                         </span>
                       )}
                     </span>
                   </div>
                 ))}
-                <p className="text-xs text-muted-foreground border-t border-border pt-3 mt-3">
+                <p className="text-xs text-quiet border-t border-navy-100 pt-3 mt-3">
                   Surový výstup přepisu pro dohledatelnost. Platí vždy uložené údaje výše, ne tenhle
                   přepis.
                 </p>
@@ -382,7 +385,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
           </Card>
           )}
 
-          <div className="text-xs text-muted-foreground px-1 space-y-0.5">
+          <div className="text-xs text-quiet px-1 space-y-0.5">
             <p>Přidáno do evidence {formatDateTime(invoice.created_at)}</p>
             {invoice.updated_at && <p>Naposledy upraveno {formatDateTime(invoice.updated_at)}</p>}
           </div>

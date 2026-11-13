@@ -46,24 +46,24 @@ function InvoiceRow({
   const client = invoice.client_name ?? invoice.project_client_name
 
   return (
-    <div className="flex items-center gap-2.5 py-2 px-2.5 hover:bg-muted/40 rounded-lg group transition-colors">
-      <FileText size={13} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
+    <div className="flex items-center gap-2.5 py-2 px-2.5 hover:bg-muted/40 rounded-chip group transition-colors">
+      <FileText size={13} strokeWidth={1.5} className="text-quiet shrink-0" />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-foreground">{invoice.invoice_number}</span>
-          {client && <span className="text-xs text-muted-foreground truncate">{client}</span>}
+          <span className="text-sm font-medium text-ink">{invoice.invoice_number}</span>
+          {client && <span className="text-xs text-quiet truncate">{client}</span>}
           {invoice.project_href && (
             <Link
               href={invoice.project_href}
-              className="hidden sm:inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full hover:text-foreground transition-colors"
+              className="hidden sm:inline-flex items-center gap-1 text-[10px] text-quiet bg-muted px-1.5 py-0.5 rounded-full hover:text-ink transition-colors"
             >
               <ExternalLink size={9} strokeWidth={1.5} />
               Zakázka
             </Link>
           )}
           {overdue && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">
+            <span className="inline-flex items-center gap-1 rounded-full bg-danger/10 px-1.5 py-0.5 text-[10px] font-medium text-danger">
               <Clock size={9} strokeWidth={1.5} />
               Po splatnosti
             </span>
@@ -71,14 +71,14 @@ function InvoiceRow({
           {invoice.duplicate_risk && (
             <span
               title="Zakázka má v ledgeru i vlastní příjem (např. zálohu). Zkontroluj, že se stejné peníze nezapočítaly dvakrát."
-              className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-signal-line bg-signal-bg px-1.5 py-0.5 text-[10px] font-medium text-signal-ink"
             >
               <AlertTriangle size={9} strokeWidth={1.5} />
               Zkontrolovat příjem
             </span>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground mt-0.5">
+        <p className="text-[11px] text-quiet mt-0.5">
           Vystaveno {formatDate(invoice.issued_on)}
           {invoice.paid_on
             ? ` · Zaplaceno ${formatDate(invoice.paid_on)}`
@@ -91,22 +91,22 @@ function InvoiceRow({
           href={`/api/invoices/${invoice.id}/pdf`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10px] text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-1.5 py-0.5 rounded-full hover:bg-emerald-100 transition-colors shrink-0"
+          className="shrink-0 rounded-full bg-navy-100 px-1.5 py-0.5 text-[10px] font-medium text-navy-900 transition-colors hover:bg-navy-200"
         >
           PDF
         </a>
       ) : (
-        <span className="text-[10px] text-muted-foreground shrink-0 hidden sm:inline">bez PDF</span>
+        <span className="text-[10px] text-quiet shrink-0 hidden sm:inline">bez PDF</span>
       )}
 
-      <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">
+      <span className="text-sm font-semibold text-ink shrink-0 tabular-nums">
         {formatAmount(invoice.amount, invoice.currency)}
       </span>
 
       <button
         onClick={() => onEdit(invoice)}
         disabled={isPending}
-        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-foreground transition-all disabled:opacity-30 shrink-0"
+        className="opacity-0 group-hover:opacity-100 p-1 text-quiet hover:text-ink transition-all disabled:opacity-30 shrink-0"
         title="Upravit fakturu"
       >
         <Pencil size={13} strokeWidth={1.5} />
@@ -114,7 +114,7 @@ function InvoiceRow({
       <button
         onClick={() => onDelete(invoice)}
         disabled={isPending}
-        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-red-500 transition-all disabled:opacity-30 shrink-0"
+        className="shrink-0 p-1 text-quiet opacity-0 transition-all hover:text-danger group-hover:opacity-100 disabled:opacity-30"
         title="Smazat fakturu"
       >
         <Trash2 size={13} strokeWidth={1.5} />
@@ -178,24 +178,24 @@ export function InvoiceArchive({
   return (
     <div className="relative space-y-4" {...dropProps}>
       {isOver && (
-        <div className="absolute -inset-3 z-20 flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/95 pointer-events-none">
-          <UploadCloud size={20} strokeWidth={1.5} className="text-emerald-600" />
-          <span className="text-sm font-medium text-emerald-700">Pusť fakturu sem</span>
-          <span className="text-xs text-emerald-600">PDF přečte AI a předvyplní pole</span>
+        <div className="pointer-events-none absolute -inset-3 z-20 flex flex-col items-center justify-center gap-1.5 rounded-chip border-2 border-dashed border-navy-300 bg-navy-50/95">
+          <UploadCloud size={20} strokeWidth={1.5} className="text-navy-600" />
+          <span className="text-sm font-medium text-navy-900">Pusť fakturu sem</span>
+          <span className="text-xs text-quiet">PDF přečte AI a předvyplní pole</span>
         </div>
       )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <FileText size={14} strokeWidth={1.5} className="text-emerald-600" />
+          <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+            <FileText size={14} strokeWidth={1.5} className="text-navy-500" />
             {title}
           </h3>
-          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+          {description && <p className="text-xs text-quiet mt-0.5">{description}</p>}
         </div>
         <button
           onClick={() => setModal({})}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
         >
           <Plus size={14} strokeWidth={1.5} />
           Nahrát fakturu
@@ -203,7 +203,7 @@ export function InvoiceArchive({
       </div>
 
       {empty ? (
-        <p className="text-xs text-muted-foreground py-3">
+        <p className="text-xs text-quiet py-3">
           Zatím žádné faktury. Přetáhni sem PDF odkudkoliv — přečte ho AI — nebo fakturu zadej ručně.
         </p>
       ) : (
@@ -211,15 +211,15 @@ export function InvoiceArchive({
           {/* Zaplacené — tyhle peníze jsou v daňovém základu */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <span className="text-[11px] font-medium text-quiet uppercase tracking-wide">
                 {paidLabel ?? `Zaplacené · ${data.year}`}
               </span>
-              <span className="text-xs font-semibold text-emerald-700 tabular-nums">
+              <span className="font-num text-xs font-semibold tabular-nums text-ink">
                 {formatAmount(data.paidTotal, 'CZK')}
               </span>
             </div>
             {data.paid.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-1.5">
+              <p className="text-xs text-quiet py-1.5">
                 {paidLabel ? 'Žádná zaplacená faktura' : `Žádná zaplacená faktura v ${data.year}`}
               </p>
             ) : (
@@ -241,18 +241,18 @@ export function InvoiceArchive({
           {/* Pohledávky — mimo daňový základ, napříč roky */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <span className="text-[11px] font-medium text-quiet uppercase tracking-wide">
                 Pohledávky · mimo daňový základ
                 {data.overdueCount > 0 && (
-                  <span className="text-red-600 normal-case"> · {data.overdueCount} po splatnosti</span>
+                  <span className="normal-case text-danger"> · {data.overdueCount} po splatnosti</span>
                 )}
               </span>
-              <span className="text-xs font-semibold text-amber-700 tabular-nums">
+              <span className="font-num text-xs font-semibold tabular-nums text-signal-ink">
                 {formatAmount(data.outstandingTotal, 'CZK')}
               </span>
             </div>
             {data.outstanding.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-1.5">Žádná nezaplacená faktura</p>
+              <p className="text-xs text-quiet py-1.5">Žádná nezaplacená faktura</p>
             ) : (
               <div className="space-y-0.5">
                 {data.outstanding.map(invoice => (
@@ -272,7 +272,7 @@ export function InvoiceArchive({
       )}
 
       {isPending && (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-center gap-1.5 text-xs text-quiet">
           <Loader2 size={12} strokeWidth={1.5} className="animate-spin" />
           Ukládám…
         </p>

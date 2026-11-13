@@ -46,7 +46,7 @@ export function InvoiceDetailActions({
       <button
         onClick={() => setEditing(true)}
         disabled={isPending}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-foreground bg-white border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-40"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50 disabled:opacity-40"
       >
         <Pencil size={14} strokeWidth={1.5} />
         Upravit
@@ -54,7 +54,7 @@ export function InvoiceDetailActions({
       <button
         onClick={handleDelete}
         disabled={isPending}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 bg-white border border-border rounded-lg hover:bg-red-50 hover:border-red-200 transition-colors disabled:opacity-40"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-danger/30 bg-surface px-4 text-sm font-semibold text-danger transition-colors hover:bg-danger/5 disabled:opacity-40"
       >
         {isPending ? (
           <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
