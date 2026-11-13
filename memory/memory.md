@@ -985,8 +985,9 @@ protože `payment_reviewed_at` existuje až po migraci 109.
   „Peníze dorazily" a „Záloha dorazila" (`projects.paid_on`, `deposit_paid_on`; prázdné = dnes).
 - **chore** **Testy na cesty, které žádné neměly:** `parseInvoiceForm`, `updateInvoiceRow`,
   `syncInvoiceTransaction`, adopce platby, `costs-actions`, `recurring-transactions`
-  a `POST /api/public/invoices`. Pět nových souborů, 66 testů. Celkem `npm test`
-  **93 souborů / 1103 testů**, `npx tsc --noEmit` a `npm run build:check` bez varování.
+  a `POST /api/public/invoices`, včetně „Zpět" po převzetí platby (převzatý příjem zůstane
+  zakázce, vlastní zmizí). Pět nových souborů, 68 testů. Celkem `npm test`
+  **93 souborů / 1106 testů**, `npx tsc --noEmit` a `npm run build:check` bez varování.
   **Obrazovky v prohlížeči neověřené** (migrace 109 není ani na testu).
 - **decision** **R-099** — šest vědomých odchylek od zadání AD13 (hlavně rozsah unikátního
   indexu a to, že migrace na duplicitách nepadá).

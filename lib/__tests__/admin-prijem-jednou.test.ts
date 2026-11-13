@@ -41,6 +41,7 @@ import {
   getInvoiceDetail,
   getPaymentCandidates,
   keepPaymentsSeparate,
+  setInvoicePaid,
 } from '@/app/dashboard/finance/invoice-actions'
 import { resetIssuingReadyForTests } from '@/lib/admin/invoice-issue'
 import { getPragueTodayISO } from '@/lib/prague-time'
@@ -389,6 +390,53 @@ describe('„Je tohle ta platba?"', () => {
 
     const vysledek = await adoptPayment(id, cizi.id)
     expect(vysledek.error).toBeTruthy()
+  })
+
+  it('„Zpět" po převzetí nechá příjem zakázce — nemaže cizí peníze', async () => {
+    const project = await zakazkaSPrijmy([
+      { amount: 12000, date: `${letos}-02-01`, deposit: true },
+      { amount: 12000, date: `${letos}-03-01` },
+    ])
+    const { id } = await insertInvoice(
+      invoice({ project_id: project, amount: 12000, paid_on: `${letos}-03-10` }),
+      null,
+    )
+    const kandidati = await getPaymentCandidates(id)
+    const vybrany = kandidati.find((k) => !k.deposit)!
+    await adoptPayment(id, vybrany.id)
+
+    // Zpět = vrácení mezi pohledávky. Převzatý příjem patří zakázce,
+    // takže se **nemaže**, jen se rozváže.
+    expect(await setInvoicePaid(id, null)).toEqual({})
+
+    const ledger = await rows<{ id: string }>(
+      `SELECT id::text FROM finance_transactions WHERE source_project_id = $1`,
+      [project],
+    )
+    expect(ledger.map((r) => r.id)).toContain(vybrany.id)
+    expect(ledger).toHaveLength(2)
+
+    const [inv] = await rows<{ finance_transaction_id: string | null; payment_origin: string | null; payment_reviewed_at: string | null }>(
+      `SELECT finance_transaction_id::text, payment_origin, payment_reviewed_at::text FROM invoices WHERE id = $1`,
+      [id],
+    )
+    expect(inv).toEqual({ finance_transaction_id: null, payment_origin: null, payment_reviewed_at: null })
+  })
+
+  it('„Zpět" u vlastního příjmu faktury ho naopak odstraní', async () => {
+    const { id } = await insertInvoice(invoice({ amount: 4000, paid_on: `${letos}-03-10` }), null)
+    const [pred] = await rows<{ payment_origin: string }>(
+      `SELECT payment_origin FROM invoices WHERE id = $1`,
+      [id],
+    )
+    expect(pred.payment_origin).toBe('created')
+
+    expect(await setInvoicePaid(id, null)).toEqual({})
+    const [count] = await rows<{ n: number }>(
+      `SELECT count(*)::int AS n FROM finance_transactions WHERE source_invoice_id = $1`,
+      [id],
+    )
+    expect(count.n).toBe(0)
   })
 
   it('nesmyslné id se do databáze nedostane', async () => {
