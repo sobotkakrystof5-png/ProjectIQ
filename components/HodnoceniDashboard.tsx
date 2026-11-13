@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { deleteProjectSurvey } from '@/app/closed-actions'
 import { getSurveyUrl, cn } from '@/lib/utils'
+import { buildReference, referenceAsJson, referenceAsText, surveyAverage } from '@/lib/admin/reference'
 import { SURVEY_CATEGORIES, type ClosedProject, type ProjectSurvey } from '@/lib/types'
 
 interface Props {
@@ -47,22 +48,20 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   )
 }
 
-function surveyAverage(s: ProjectSurvey): number {
-  const sum = SURVEY_CATEGORIES.reduce((acc, c) => acc + (s[c.key] as number), 0)
-  return sum / SURVEY_CATEGORIES.length
-}
-
 function SurveyResult({
   survey,
-  projectTitle,
+  project,
   onDelete,
   isDeleting,
 }: {
   survey: ProjectSurvey
-  projectTitle: string
+  project: ClosedProject
   onDelete: () => void
   isDeleting: boolean
 }) {
+  const projectTitle = project.title
+  // Bez souhlasu klienta se reference nenabídne vůbec (AD16).
+  const reference = useMemo(() => buildReference(survey, project), [survey, project])
   const avg = surveyAverage(survey)
 
   const fullText = useMemo(() => {
@@ -113,12 +112,35 @@ function SurveyResult({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               <Quote size={13} strokeWidth={1.5} className="text-navy-500" />
-              Reference
+              Co klient napsal
             </div>
             <CopyButton text={survey.reference_text} label="Kopírovat" />
           </div>
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{survey.reference_text}</p>
         </div>
+      )}
+
+      {reference ? (
+        <div className="bg-white border border-border rounded-lg p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <ShieldCheck size={13} strokeWidth={1.5} className="text-emerald-600" />
+              Reference na web
+            </div>
+            <div className="flex items-center gap-2">
+              <CopyButton text={referenceAsText(reference)} label="Kopírovat text" />
+              <CopyButton text={referenceAsJson(reference)} label="Kopírovat pro web" />
+            </div>
+          </div>
+          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{referenceAsText(reference)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Na web to patří tak, jak to klient napsal. Nic k tomu nedoplňuj.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Klient zveřejnění neodsouhlasil — jako referenci to použít nejde.
+        </p>
       )}
 
       <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -240,7 +262,7 @@ export function HodnoceniDashboard({ projects, surveys }: Props) {
                 survey ? (
                   <SurveyResult
                     survey={survey}
-                    projectTitle={project.title}
+                    project={project}
                     onDelete={() => handleDelete(survey.id)}
                     isDeleting={isPending && deletingId === survey.id}
                   />

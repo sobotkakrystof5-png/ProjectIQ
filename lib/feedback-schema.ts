@@ -26,7 +26,10 @@ export const surveySchema = z.object({
   rating_reliability: rating,
   rating_flexibility: rating,
   reference_text: z.string().max(3000).optional(),
-  consent: z.literal(true, { message: 'Pro odeslání je nutné potvrdit souhlas.' }),
+  // Souhlas se zveřejněním je od AD16 **dobrovolný**: klient smí spolupráci
+  // ohodnotit a zveřejnění odmítnout. Jinak by „se souhlasem“ nic neznamenalo —
+  // podmínkou odeslání by si ho vynutil formulář u každého.
+  consent: z.boolean().default(false),
 })
 
 export type FeedbackInput = z.infer<typeof feedbackSchema>

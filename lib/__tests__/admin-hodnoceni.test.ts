@@ -28,6 +28,7 @@ vi.mock('@/lib/email', () => ({
 
 import { setAdminDbForTests } from '@/lib/admin/db'
 import { remindPendingSurveys, sendSurveyRequest, SURVEY_REMINDER_DAYS } from '@/lib/admin/surveys'
+import { buildReference, canUseAsReference, referenceAsJson, referenceAsText } from '@/lib/admin/reference'
 import { pgliteAdminDriver } from './helpers/admin-pglite'
 
 /** Jen to, na co dotazník sahá. */
@@ -230,5 +231,47 @@ describe('bez migrace 112', () => {
     expect(sent).toHaveLength(1)
 
     expect(await remindPendingSurveys()).toEqual({ sent: 0, failed: 0 })
+  })
+})
+
+describe('reference pro web', () => {
+  const survey = {
+    id: 'a', project_id: 'b', completed_project_id: null,
+    rating_cooperation: 5, rating_speed: 5, rating_design: 4,
+    rating_functionality: 5, rating_reliability: 5, rating_flexibility: 4,
+    reference_text: '  Web byl hotov\u00fd d\u0159\u00edv, ne\u017e jsme \u010dekali.  ',
+    consent: true,
+    created_at: '2026-11-13T08:30:00.000Z',
+  }
+  const project = { client_name: 'Jan Nov\u00e1k', company: 'Kav\u00e1rna U lipy' }
+
+  it('bez souhlasu se nenab\u00eddne', () => {
+    expect(canUseAsReference({ consent: false })).toBe(false)
+    expect(buildReference({ ...survey, consent: false }, project)).toBeNull()
+  })
+
+  it('nese jm\u00e9no, firmu, hv\u011bzdi\u010dky i text klienta', () => {
+    const snippet = buildReference(survey, project)!
+    expect(snippet.name).toBe('Jan Nov\u00e1k')
+    expect(snippet.company).toBe('Kav\u00e1rna U lipy')
+    expect(snippet.rating).toBe(4.7)
+    expect(snippet.stars).toBe(5)
+    expect(snippet.text).toBe('Web byl hotov\u00fd d\u0159\u00edv, ne\u017e jsme \u010dekali.')
+    expect(snippet.date).toBe('2026-11-13')
+  })
+
+  it('text klienta se nep\u0159episuje a hv\u011bzdi\u010dky jdou s n\u00edm', () => {
+    const text = referenceAsText(buildReference(survey, project)!)
+    expect(text).toContain('Web byl hotov\u00fd d\u0159\u00edv, ne\u017e jsme \u010dekali.')
+    expect(text).toContain('Jan Nov\u00e1k, Kav\u00e1rna U lipy')
+    expect(text).toContain('\u2605\u2605\u2605\u2605\u2605 4.7 / 5')
+  })
+
+  it('hodnocen\u00ed bez textu je po\u0159\u00e1d reference, jen bez cit\u00e1tu', () => {
+    const snippet = buildReference({ ...survey, reference_text: '   ' }, { client_name: 'Jan', company: null })!
+    expect(snippet.text).toBeNull()
+    expect(snippet.company).toBeNull()
+    expect(referenceAsText(snippet).startsWith('\u2014 Jan')).toBe(true)
+    expect(JSON.parse(referenceAsJson(snippet)).text).toBeNull()
   })
 })

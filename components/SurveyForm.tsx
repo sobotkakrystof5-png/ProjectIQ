@@ -76,16 +76,12 @@ export function SurveyForm({ token }: SurveyFormProps) {
       setError('Ohodnoťte prosím všechny oblasti hvězdičkami.')
       return
     }
-    if (!consent) {
-      setError('Pro odeslání je nutné potvrdit souhlas.')
-      return
-    }
     setError(null)
     startTransition(async () => {
       const res = await submitSurvey(token, {
         ...ratings,
         reference_text: reference || undefined,
-        consent: true,
+        consent,
       })
       if (res.success) setSubmitted(true)
       else setError(res.error ?? 'Nepodařilo se odeslat dotazník.')
@@ -153,9 +149,8 @@ export function SurveyForm({ token }: SurveyFormProps) {
           className="w-4 h-4 mt-0.5 accent-navy-700 shrink-0"
         />
         <span className="text-xs text-muted-foreground leading-relaxed">
-          Souhlasím, že mé odpovědi mohou být využity pro zkvalitňování služeb a zveřejněny
-          (např. jako reference) na webu vizeon.cz a souvisejících materiálech, a že s nimi
-          může být dále nakládáno.
+          Souhlasím, aby moje hodnocení posloužilo jako reference na webu vizeon.cz.
+          Nepovinné — bez zaškrtnutí dotazník klidně odešlete, nikde ho nezveřejním.
         </span>
       </label>
 
