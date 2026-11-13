@@ -18,7 +18,7 @@ export default function TaxLimitWatch({ income }: { income: number }) {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Gauge size={15} className="text-navy-600" strokeWidth={1.5} />
-        <h4 className="text-sm font-semibold text-foreground">Hlídač limitů</h4>
+        <h4 className="text-sm font-semibold text-ink">Hlídač limitů</h4>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -33,44 +33,44 @@ export default function TaxLimitWatch({ income }: { income: number }) {
           return (
             <div
               key={t.key}
-              className={`rounded-xl border p-4 ${
+              className={`rounded-chip border p-4 ${
                 exceeded
-                  ? 'border-amber-200 bg-amber-50'
+                  ? 'border-signal-line bg-signal-bg'
                   : near
-                    ? 'border-amber-100 bg-white'
-                    : 'border-border bg-white'
+                    ? 'border-signal-line/50 bg-surface'
+                    : 'border-navy-100 bg-surface'
               }`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs font-semibold uppercase tracking-wide text-quiet">
                   {t.label}
                 </p>
                 {exceeded ? (
-                  <AlertTriangle size={14} className="text-amber-600 shrink-0" strokeWidth={1.5} />
+                  <AlertTriangle size={14} className="text-signal-ink shrink-0" strokeWidth={1.5} />
                 ) : (
-                  <CheckCircle2 size={14} className="text-emerald-500 shrink-0" strokeWidth={1.5} />
+                  <CheckCircle2 size={14} className="text-navy-600 shrink-0" strokeWidth={1.5} />
                 )}
               </div>
 
-              <p className="text-lg font-bold text-foreground tabular-nums leading-none">
+              <p className="text-lg font-bold text-ink tabular-nums leading-none">
                 {fmt(t.limit)} Kč
               </p>
 
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden my-2.5">
                 <div
                   className={`h-full transition-all duration-500 ${
-                    exceeded ? 'bg-amber-500' : near ? 'bg-amber-400' : 'bg-emerald-400'
+                    exceeded ? 'bg-signal-line' : near ? 'bg-signal' : 'bg-navy-600'
                   }`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
 
-              <p className={`text-xs font-medium ${exceeded ? 'text-amber-700' : 'text-foreground'}`}>
+              <p className={`text-xs font-medium ${exceeded ? 'text-signal-ink' : 'text-ink'}`}>
                 {exceeded
                   ? `Překročeno o ${fmt(income - t.limit)} Kč`
                   : `Do hranice ti zbývá ${fmt(remaining)} Kč`}
               </p>
-              <p className="text-xs text-muted-foreground mt-1 leading-snug">{t.consequence}</p>
+              <p className="text-xs text-quiet mt-1 leading-snug">{t.consequence}</p>
             </div>
           )
         })}

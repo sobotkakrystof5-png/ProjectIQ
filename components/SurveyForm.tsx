@@ -40,7 +40,7 @@ function StarRating({
               strokeWidth={1.5}
               className={cn(
                 'transition-colors',
-                active ? 'fill-amber-400 text-amber-400' : 'text-slate-300',
+                active ? 'fill-navy-700 text-navy-700' : 'text-navy-200',
               )}
             />
           </button>
@@ -91,11 +91,11 @@ export function SurveyForm({ token }: SurveyFormProps) {
   if (submitted) {
     return (
       <div className="flex flex-col items-center gap-3 py-8 text-center">
-        <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-          <CheckCircle2 size={28} strokeWidth={1.5} className="text-emerald-600" />
+        <div className="w-14 h-14 rounded-full bg-navy-50 border border-navy-100 flex items-center justify-center">
+          <CheckCircle2 size={28} strokeWidth={1.5} className="text-navy-700" />
         </div>
-        <p className="font-semibold text-foreground">Děkuji za vyplnění dotazníku!</p>
-        <p className="text-sm text-muted-foreground max-w-sm">
+        <p className="font-semibold text-ink">Děkuji za vyplnění dotazníku!</p>
+        <p className="text-sm text-quiet max-w-sm">
           Vaše odpovědi byly úspěšně odeslány. Velmi si vaší zpětné vazby vážím.
         </p>
       </div>
@@ -108,9 +108,9 @@ export function SurveyForm({ token }: SurveyFormProps) {
         {SURVEY_CATEGORIES.map(cat => (
           <div
             key={cat.key}
-            className="flex items-center justify-between gap-3 border-b border-border/60 pb-3 last:border-0 last:pb-0"
+            className="flex items-center justify-between gap-3 border-b border-navy-100/60 pb-3 last:border-0 last:pb-0"
           >
-            <span className="text-sm font-medium text-foreground">{cat.label}</span>
+            <span className="text-sm font-medium text-ink">{cat.label}</span>
             <StarRating
               value={ratings[cat.key]}
               onChange={v => setRating(cat.key, v)}
@@ -121,7 +121,7 @@ export function SurveyForm({ token }: SurveyFormProps) {
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+        <label className="text-xs font-semibold text-quiet uppercase tracking-wider mb-2 block">
           Reference (nepovinné)
         </label>
         <textarea
@@ -132,8 +132,8 @@ export function SurveyForm({ token }: SurveyFormProps) {
           disabled={isPending}
           placeholder="Napište referenci na naši spolupráci — co se vám líbilo, jak jste byli spokojeni…"
           className={cn(
-            'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
-            'placeholder-muted-foreground bg-white resize-none',
+            'w-full border border-navy-100 rounded-chip px-3 py-2.5 text-sm text-ink',
+            'placeholder:text-quiet bg-surface resize-none',
             'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
             isPending && 'opacity-50',
           )}
@@ -148,20 +148,20 @@ export function SurveyForm({ token }: SurveyFormProps) {
           disabled={isPending}
           className="w-4 h-4 mt-0.5 accent-navy-700 shrink-0"
         />
-        <span className="text-xs text-muted-foreground leading-relaxed">
+        <span className="text-xs text-quiet leading-relaxed">
           Souhlasím, aby moje hodnocení posloužilo jako reference na webu vizeon.cz.
           Nepovinné — bez zaškrtnutí dotazník klidně odešlete, nikde ho nezveřejním.
         </span>
       </label>
 
-      {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+      {error && <p className="text-xs text-danger font-medium">{error}</p>}
 
       <button
         type="submit"
         disabled={isPending}
         className={cn(
           'w-full flex items-center justify-center gap-2',
-          'brand-gradient text-white text-sm font-semibold py-3 rounded-lg shadow-sm',
+          'brand-gradient text-white text-sm font-semibold py-3 rounded-chip shadow-sm',
           'hover:opacity-90 transition-opacity disabled:opacity-50',
         )}
       >

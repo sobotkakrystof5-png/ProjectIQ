@@ -18,7 +18,7 @@ export function ProgressBar({ value, className, showLabel = true }: ProgressBarP
         />
       </div>
       {showLabel && (
-        <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">{clamped}%</span>
+        <span className="text-xs text-quiet tabular-nums w-8 text-right">{clamped}%</span>
       )}
     </div>
   )

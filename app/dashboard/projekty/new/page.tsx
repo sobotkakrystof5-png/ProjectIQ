@@ -60,7 +60,7 @@ export default function NewPersonalProjectPage() {
         {/* Název */}
         <div>
           <label className="block text-sm font-medium text-ink mb-1.5">
-            Název projektu <span className="text-red-500">*</span>
+            Název projektu <span className="text-danger">*</span>
           </label>
           <input
             type="text"
@@ -75,7 +75,7 @@ export default function NewPersonalProjectPage() {
         {/* Segment */}
         <div>
           <label className="block text-sm font-medium text-ink mb-1.5">
-            Segment / Kategorie <span className="text-red-500">*</span>
+            Segment / Kategorie <span className="text-danger">*</span>
           </label>
           <select
             value={segment}
@@ -103,7 +103,7 @@ export default function NewPersonalProjectPage() {
         {/* Problém */}
         <div>
           <label className="block text-sm font-medium text-ink mb-1.5">
-            Problém, který projekt řeší <span className="text-red-500">*</span>
+            Problém, který projekt řeší <span className="text-danger">*</span>
           </label>
           <textarea
             value={problem}
@@ -124,7 +124,7 @@ export default function NewPersonalProjectPage() {
             type="button"
             onClick={() => setMonetization(v => !v)}
             className={`relative w-11 h-6 rounded-full transition-colors ${
-              monetization ? 'bg-navy-600' : 'bg-muted-foreground/20'
+              monetization ? 'bg-navy-600' : 'bg-navy-200'
             }`}
           >
             <span

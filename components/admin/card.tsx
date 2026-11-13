@@ -3,8 +3,8 @@ import { cn } from '@/lib/utils'
 /**
  * Pracovní panel adminu (AD17).
  *
- * Dřív si ho každá obrazovka psala sama jako `rounded-2xl border border-border
- * bg-white p-6 shadow-sm` — pokaždé o kousek jinak. Dílky mají pro plochu
+ * Dřív si ho každá obrazovka psala sama jako `rounded-box border border-navy-100
+ * bg-surface p-6 shadow-sm` — pokaždé o kousek jinak. Dílky mají pro plochu
  * v klidu **plochý** panel (DESIGN.md → Elevation & Depth: stín patří jen
  * tomu, co plave — menu, dialogu, věrnostní kartě), tichý okraj `navy-100`
  * a rádius 20 px.

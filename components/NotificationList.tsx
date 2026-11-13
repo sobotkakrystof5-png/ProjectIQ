@@ -11,20 +11,23 @@ import { cn } from '@/lib/utils'
 import type { Notification } from '@/app/dashboard/notifications/page'
 import type { NotificationType } from '@/lib/notifications'
 
+/** Druh oznámení je kategorie, ne stav — tón proto nenese (R-091). */
+const ICON = 'text-navy-600 bg-navy-50'
+
 const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: string; label: string }> = {
-  consultation_booked:   { icon: Calendar,         color: 'text-blue-600 bg-blue-50',    label: 'Nová rezervace' },
-  feedback_submitted:    { icon: Star,              color: 'text-amber-600 bg-amber-50',  label: 'Hodnocení NPS' },
-  survey_submitted:      { icon: ClipboardList,     color: 'text-purple-600 bg-purple-50', label: 'Dotazník' },
-  web_lead:              { icon: Inbox,             color: 'text-green-600 bg-green-50',  label: 'Poptávka z webu' },
+  consultation_booked:   { icon: Calendar,         color: ICON,    label: 'Nová rezervace' },
+  feedback_submitted:    { icon: Star,              color: ICON,  label: 'Hodnocení NPS' },
+  survey_submitted:      { icon: ClipboardList,     color: ICON, label: 'Dotazník' },
+  web_lead:              { icon: Inbox,             color: ICON,  label: 'Poptávka z webu' },
   // Staré řádky před sloučením inboxů (AD02) — nové se s těmito typy nezakládají.
-  vizeon_booking:        { icon: Inbox,             color: 'text-green-600 bg-green-50',  label: 'Poptávka z vizeon.cz' },
-  alteno_booking:        { icon: Inbox,             color: 'text-amber-600 bg-amber-50',  label: 'Poptávka z alteno.cz' },
-  project_status_changed:{ icon: ArrowRightLeft,    color: 'text-indigo-600 bg-indigo-50', label: 'Stav zakázky' },
-  reminder_upcoming:     { icon: Bell,              color: 'text-orange-600 bg-orange-50', label: 'Připomínka' },
-  agent_lead_received:   { icon: Sparkles,          color: 'text-teal-600 bg-teal-50',    label: 'AI lead' },
-  invoice_received:      { icon: FileText,          color: 'text-emerald-600 bg-emerald-50', label: 'Nová faktura' },
-  client_request_received: { icon: MessageSquarePlus, color: 'text-sky-600 bg-sky-50', label: 'Požadavek klienta' },
-  activity_draft:        { icon: ClipboardList,     color: 'text-violet-600 bg-violet-50', label: 'Hlášení ke schválení' },
+  vizeon_booking:        { icon: Inbox,             color: ICON,  label: 'Poptávka z vizeon.cz' },
+  alteno_booking:        { icon: Inbox,             color: ICON,  label: 'Poptávka z alteno.cz' },
+  project_status_changed:{ icon: ArrowRightLeft,    color: ICON, label: 'Stav zakázky' },
+  reminder_upcoming:     { icon: Bell,              color: ICON, label: 'Připomínka' },
+  agent_lead_received:   { icon: Sparkles,          color: ICON,    label: 'AI lead' },
+  invoice_received:      { icon: FileText,          color: ICON, label: 'Nová faktura' },
+  client_request_received: { icon: MessageSquarePlus, color: ICON, label: 'Požadavek klienta' },
+  activity_draft:        { icon: ClipboardList,     color: ICON, label: 'Hlášení ke schválení' },
 }
 
 function timeAgo(iso: string): string {
@@ -79,36 +82,36 @@ function NotificationItem({ n, onRead }: { n: Notification; onRead: (id: string)
     <div
       onClick={handleClick}
       className={cn(
-        'flex items-start gap-3 px-4 py-3.5 rounded-xl border transition-colors',
+        'flex items-start gap-3 px-4 py-3.5 rounded-chip border transition-colors',
         n.link ? 'cursor-pointer hover:bg-navy-50/50' : 'cursor-default',
         n.read
-          ? 'bg-white border-border'
+          ? 'bg-surface border-navy-100'
           : 'bg-navy-50/30 border-navy-200',
       )}
     >
-      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5', meta.color)}>
+      <div className={cn('w-9 h-9 rounded-chip flex items-center justify-center shrink-0 mt-0.5', meta.color)}>
         <Icon size={16} strokeWidth={1.5} />
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className={cn('text-sm leading-snug', n.read ? 'text-foreground' : 'text-foreground font-semibold')}>
+          <p className={cn('text-sm leading-snug', n.read ? 'text-ink' : 'text-ink font-semibold')}>
             {n.title}
           </p>
           <div className="flex items-center gap-1.5 shrink-0">
             {!n.read && <span className="w-2 h-2 rounded-full bg-navy-500 shrink-0" />}
-            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{timeAgo(n.created_at)}</span>
+            <span className="text-[11px] text-quiet whitespace-nowrap">{timeAgo(n.created_at)}</span>
           </div>
         </div>
         {n.body && (
-          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
+          <p className="text-xs text-quiet mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
         )}
         <div className="flex items-center gap-2 mt-1">
           <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full', meta.color)}>
             {meta.label}
           </span>
           {n.link && (
-            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+            <span className="text-[10px] text-quiet flex items-center gap-0.5">
               <ExternalLink size={9} strokeWidth={1.5} />
               otevřít
             </span>
@@ -142,12 +145,12 @@ export function NotificationList({ notifications }: { notifications: Notificatio
 
   if (notifications.length === 0) {
     return (
-      <div className="bg-white border border-border rounded-2xl p-12 text-center">
-        <div className="w-12 h-12 bg-navy-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+      <div className="bg-surface border border-navy-100 rounded-box p-12 text-center">
+        <div className="w-12 h-12 bg-navy-50 rounded-box flex items-center justify-center mx-auto mb-3">
           <Bell size={20} strokeWidth={1.5} className="text-navy-400" />
         </div>
-        <p className="font-medium text-foreground">Zatím žádná oznámení</p>
-        <p className="text-sm text-muted-foreground mt-1">Aktivity klientů se zobrazí zde</p>
+        <p className="font-medium text-ink">Zatím žádná oznámení</p>
+        <p className="text-sm text-quiet mt-1">Aktivity klientů se zobrazí zde</p>
       </div>
     )
   }
@@ -156,7 +159,7 @@ export function NotificationList({ notifications }: { notifications: Notificatio
     <div className="space-y-5">
       {unreadCount > 0 && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-quiet">
             {unreadCount} nepřečtených
           </span>
           <button
@@ -173,7 +176,7 @@ export function NotificationList({ notifications }: { notifications: Notificatio
 
       {groups.map(group => (
         <div key={group.label}>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+          <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-2 px-1">
             {group.label}
           </p>
           <div className="space-y-1.5">

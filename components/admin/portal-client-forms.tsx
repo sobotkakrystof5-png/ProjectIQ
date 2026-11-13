@@ -15,11 +15,11 @@ import {
 import { formatDateTime } from '@/lib/utils'
 
 const field =
-  'min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-100'
+  'min-h-[44px] w-full rounded-chip border border-navy-100 bg-surface px-3 text-sm focus:border-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-100'
 const btn =
-  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-4 text-sm font-medium disabled:opacity-50'
+  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-chip px-4 text-sm font-medium disabled:opacity-50'
 const primary = `${btn} bg-navy-700 text-white hover:bg-navy-800`
-const quiet = `${btn} border border-border text-foreground hover:bg-navy-50`
+const quiet = `${btn} border border-navy-100 text-ink hover:bg-navy-50`
 
 export function CreateClientForm() {
   const router = useRouter()
@@ -42,7 +42,7 @@ export function CreateClientForm() {
       <label className="sr-only" htmlFor="portal-client-name">Název firmy</label>
       <input id="portal-client-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} placeholder="Název firmy klienta" className={field} />
       <button type="submit" disabled={pending} className={primary}>Založit klienta</button>
-      {error && <p className="text-sm text-red-600 sm:self-center">{error}</p>}
+      {error && <p className="text-sm text-danger sm:self-center">{error}</p>}
     </form>
   )
 }
@@ -77,7 +77,7 @@ export function LinkProjectForm({ clientId, options }: { clientId: string; optio
         ))}
       </select>
       <button type="submit" disabled={pending || !projectId} className={primary}>Propojit</button>
-      {error && <p className="text-sm text-red-600 sm:self-center">{error}</p>}
+      {error && <p className="text-sm text-danger sm:self-center">{error}</p>}
     </form>
   )
 }
@@ -134,11 +134,11 @@ export function InviteForm({ clientId }: { clientId: string }) {
     <div className="space-y-3">
       <form onSubmit={submit} className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="invite-email">E-mail (nepovinné, pozvánka pak půjde použít jen s ním)</label>
+          <label className="mb-1 block text-xs font-medium text-quiet" htmlFor="invite-email">E-mail (nepovinné, pozvánka pak půjde použít jen s ním)</label>
           <input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} placeholder="jana@firma.cz" />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="invite-role">Role</label>
+          <label className="mb-1 block text-xs font-medium text-quiet" htmlFor="invite-role">Role</label>
           <select id="invite-role" value={role} onChange={(e) => setRole(e.target.value as 'owner' | 'member')} className={field}>
             <option value="member">Člen</option>
             <option value="owner">Vlastník</option>
@@ -146,13 +146,13 @@ export function InviteForm({ clientId }: { clientId: string }) {
         </div>
         <button type="submit" disabled={pending} className={`${primary} sm:self-end`}>Vytvořit pozvánku</button>
       </form>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       {link && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <p className="mb-2 text-xs font-medium text-amber-900">
+        <div className="rounded-chip border border-signal-line bg-signal-bg p-3">
+          <p className="mb-2 text-xs font-medium text-signal-ink">
             Zkopírujte odkaz a pošlete ho klientovi. Podruhé se neukáže. Platí do {formatDateTime(link.expiresAt)}, jde použít jednou.
           </p>
-          <code className="block break-all rounded-lg bg-white px-3 py-2 font-mono text-xs">{link.url}</code>
+          <code className="block break-all rounded-chip bg-surface px-3 py-2 font-mono text-xs">{link.url}</code>
           <button type="button" onClick={copy} className={`${quiet} mt-2`}>
             <Copy size={14} strokeWidth={1.5} /> Zkopírovat odkaz
           </button>

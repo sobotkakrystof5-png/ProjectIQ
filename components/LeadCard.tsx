@@ -90,21 +90,21 @@ export function LeadCard({ lead }: { lead: WebLead }) {
   const linkCls = 'hover:text-navy-800 transition-colors'
 
   return (
-    <div className="bg-white border border-border rounded-xl p-5 space-y-4">
+    <div className="bg-surface border border-navy-100 rounded-chip p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-foreground text-base">{lead.client_name}</h3>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+            <h3 className="font-semibold text-ink text-base">{lead.client_name}</h3>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-navy-50 text-navy-700 border border-navy-100">
               {cfg.domain ?? cfg.name}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">Poptávka přijata {formatCreated(lead.created_at)}</p>
+          <p className="text-xs text-quiet mt-0.5">Poptávka přijata {formatCreated(lead.created_at)}</p>
         </div>
         <button
           onClick={handleDelete}
           disabled={deleting || confirming}
-          className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
+          className="p-1.5 text-quiet hover:text-danger hover:bg-danger/5 rounded-chip transition-colors disabled:opacity-40"
           title="Smazat poptávku"
         >
           {deleting ? <Loader2 size={16} strokeWidth={1.5} className="animate-spin" /> : <Trash2 size={16} strokeWidth={1.5} />}
@@ -113,7 +113,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
         {lead.client_email && (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-quiet">
             <Mail size={14} strokeWidth={1.5} className={iconCls} />
             <a href={mailtoHref(lead.client_email) ?? `mailto:${lead.client_email}`} className={`${linkCls} truncate`}>
               {lead.client_email}
@@ -121,7 +121,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
           </div>
         )}
         {lead.client_phone && (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-quiet">
             <Phone size={14} strokeWidth={1.5} className={iconCls} />
             <a href={telHref(lead.client_phone) ?? `tel:${lead.client_phone}`} className={linkCls}>
               {formatPhone(lead.client_phone) ?? lead.client_phone}
@@ -129,13 +129,13 @@ export function LeadCard({ lead }: { lead: WebLead }) {
           </div>
         )}
         {lead.service_type && (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-quiet">
             <Briefcase size={14} strokeWidth={1.5} className={iconCls} />
             <span>{lead.service_type}</span>
           </div>
         )}
         {lead.consultation_at && (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-quiet">
             <Calendar size={14} strokeWidth={1.5} className={iconCls} />
             <span>Konzultace: {formatDate(lead.consultation_at)}</span>
           </div>
@@ -143,7 +143,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
       </div>
 
       {lead.description && (
-        <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+        <div className="flex items-start gap-2 text-sm text-quiet bg-muted/30 rounded-chip p-3">
           <MessageSquare size={14} strokeWidth={1.5} className={`mt-0.5 ${iconCls}`} />
           <p className="leading-relaxed">{lead.description}</p>
         </div>
@@ -160,7 +160,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
         <button
           onClick={handleConfirm}
           disabled={confirming || deleting}
-          className="brand-gradient flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity disabled:opacity-60"
+          className="brand-gradient flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-chip shadow-sm hover:opacity-90 transition-opacity disabled:opacity-60"
         >
           {confirming ? (
             <Loader2 size={15} strokeWidth={1.5} className="animate-spin" />
@@ -169,7 +169,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
           )}
           {confirming ? 'Potvrzeno' : 'Potvrdit jako zakázku'}
         </button>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-quiet mt-2">
           Odešle klientovi e-mail o zahájení zakázky a přesune ji do zakázek.
         </p>
       </div>

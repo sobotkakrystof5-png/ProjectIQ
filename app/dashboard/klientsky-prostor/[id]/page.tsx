@@ -18,7 +18,7 @@ import { formatDate, formatDateTime } from '@/lib/utils'
 export const dynamic = 'force-dynamic'
 
 const STATE_LABELS = { open: 'Čeká', used: 'Použitá', revoked: 'Zrušená', expired: 'Prošlá' } as const
-const card = 'rounded-2xl border border-border bg-white p-5'
+const card = 'rounded-box border border-navy-100 bg-surface p-5'
 
 export default async function PortalClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -42,9 +42,9 @@ export default async function PortalClientPage({ params }: { params: Promise<{ i
       />
 
       <section className={card}>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Zakázky v prostoru klienta</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink">Zakázky v prostoru klienta</h2>
         {detail.projects.length === 0 ? (
-          <p className="mb-3 text-sm text-muted-foreground">Zatím žádná. Klient po přihlášení uvidí jen zakázky, které sem propojíte.</p>
+          <p className="mb-3 text-sm text-quiet">Zatím žádná. Klient po přihlášení uvidí jen zakázky, které sem propojíte.</p>
         ) : (
           <ul className="mb-4 space-y-2">
             {detail.projects.map((p) => (
@@ -62,16 +62,16 @@ export default async function PortalClientPage({ params }: { params: Promise<{ i
       </section>
 
       <section className={card}>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Členové</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink">Členové</h2>
         {detail.members.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nikdo se zatím nepřihlásil. Pošlete pozvánku níže.</p>
+          <p className="text-sm text-quiet">Nikdo se zatím nepřihlásil. Pošlete pozvánku níže.</p>
         ) : (
           <ul className="space-y-2">
             {detail.members.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-3">
                 <span className="min-w-0 text-sm">
                   <span className="block truncate font-medium">{m.name ?? m.email ?? 'Bez jména'}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
+                  <span className="block truncate text-xs text-quiet">
                     {m.email} · {m.role === 'owner' ? 'Vlastník' : 'Člen'} · od {formatDate(m.created_at)}
                   </span>
                 </span>
@@ -83,20 +83,20 @@ export default async function PortalClientPage({ params }: { params: Promise<{ i
       </section>
 
       <section className={card}>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Pozvánky</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink">Pozvánky</h2>
         {!isInviteConfigured() && (
-          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p className="mb-3 rounded-chip bg-signal-bg px-3 py-2 text-xs text-signal-ink">
             Chybí nastavení PORTAL_INVITE_PEPPER, pozvánku zatím nejde vytvořit.
           </p>
         )}
         <InviteForm clientId={detail.client.id} />
         {detail.invites.length > 0 && (
-          <ul className="mt-4 space-y-2 border-t border-border pt-4">
+          <ul className="mt-4 space-y-2 border-t border-navy-100 pt-4">
             {detail.invites.map((i) => (
               <li key={i.id} className="flex items-center justify-between gap-3 text-sm">
                 <span className="min-w-0">
                   <span className="block truncate">{i.email ?? 'Bez vazby na e-mail'}</span>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="block text-xs text-quiet">
                     {STATE_LABELS[i.state]} · platí do {formatDateTime(i.expires_at)}
                   </span>
                 </span>

@@ -26,7 +26,7 @@ export function ShareButton({ token, className, variant = 'full' }: ShareButtonP
       <button
         onClick={handleCopy}
         className={cn(
-          'p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors',
+          'p-1.5 rounded-md text-quiet hover:text-quiet hover:bg-navy-50 transition-colors',
           className
         )}
         title="Kopírovat klientský odkaz"
@@ -40,7 +40,7 @@ export function ShareButton({ token, className, variant = 'full' }: ShareButtonP
     <button
       onClick={handleCopy}
       className={cn(
-        'inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors',
+        'inline-flex items-center gap-1.5 text-sm text-quiet hover:text-ink transition-colors',
         className
       )}
     >

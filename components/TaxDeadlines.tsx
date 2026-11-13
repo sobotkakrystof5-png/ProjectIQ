@@ -34,15 +34,15 @@ function DeadlineRow({ deadline, todayIso }: { deadline: TaxDeadline; todayIso: 
 
   return (
     <div className="flex items-start gap-3 py-3 px-3">
-      <div className={`shrink-0 w-14 text-center rounded-lg py-1.5 ${
-        urgent ? 'bg-red-50 ring-1 ring-red-200' : soon ? 'bg-amber-50 ring-1 ring-amber-200' : 'bg-muted'
+      <div className={`shrink-0 w-14 text-center rounded-chip py-1.5 ${
+        urgent ? 'bg-danger/5 ring-1 ring-danger/30' : soon ? 'bg-signal-bg ring-1 ring-signal-line' : 'bg-navy-50'
       }`}>
         <p className={`text-base font-bold leading-none tabular-nums ${
-          urgent ? 'text-red-700' : soon ? 'text-amber-700' : 'text-foreground'
+          urgent ? 'text-danger' : soon ? 'text-signal-ink' : 'text-ink'
         }`}>
           {deadline.date.slice(8)}
         </p>
-        <p className="text-[10px] text-muted-foreground mt-0.5">
+        <p className="text-[10px] text-quiet mt-0.5">
           {new Date(Number(deadline.date.slice(0, 4)), Number(deadline.date.slice(5, 7)) - 1, 1)
             .toLocaleDateString('cs-CZ', { month: 'short' })}
         </p>
@@ -50,23 +50,23 @@ function DeadlineRow({ deadline, todayIso }: { deadline: TaxDeadline; todayIso: 
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground ring-1 ring-border">
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-quiet ring-1 ring-border">
             {TAX_AUTHORITY_LABELS[deadline.authority]}
           </span>
           <span className={`text-[11px] font-medium ${
-            urgent ? 'text-red-700' : soon ? 'text-amber-700' : 'text-muted-foreground'
+            urgent ? 'text-danger' : soon ? 'text-signal-ink' : 'text-quiet'
           }`}>
             {countdownLabel(days)}
           </span>
         </div>
 
-        <p className="text-sm font-medium text-foreground leading-snug">{deadline.title}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{deadline.description}</p>
+        <p className="text-sm font-medium text-ink leading-snug">{deadline.title}</p>
+        <p className="text-xs text-quiet mt-0.5 leading-relaxed">{deadline.description}</p>
 
         <div className="flex items-center gap-2 flex-wrap mt-1.5">
-          <span className="text-[11px] text-muted-foreground">{formatDate(deadline.date)}</span>
+          <span className="text-[11px] text-quiet">{formatDate(deadline.date)}</span>
           {deadline.shifted && (
-            <span className="text-[11px] text-muted-foreground/80">
+            <span className="text-[11px] text-quiet/80">
               (zákonné {formatDate(deadline.statutoryDate)} padlo na víkend nebo svátek)
             </span>
           )}
@@ -74,7 +74,7 @@ function DeadlineRow({ deadline, todayIso }: { deadline: TaxDeadline; todayIso: 
             href={deadline.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1 text-[11px] text-quiet hover:text-ink transition-colors"
           >
             <ExternalLink size={9} strokeWidth={1.5} />
             Zdroj
@@ -102,12 +102,12 @@ export function TaxDeadlines({ todayIso }: { todayIso: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-navy-50 rounded-chip flex items-center justify-center">
             <CalendarClock size={15} className="text-navy-600" strokeWidth={1.5} />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-foreground">Daňové termíny</h3>
-            <p className="text-xs text-muted-foreground">Přiznání a přehledy pro ČSSZ a zdravotní pojišťovnu</p>
+            <h3 className="text-base font-semibold text-ink">Daňové termíny</h3>
+            <p className="text-xs text-quiet">Přiznání a přehledy pro ČSSZ a zdravotní pojišťovnu</p>
           </div>
         </div>
 
@@ -117,10 +117,10 @@ export function TaxDeadlines({ todayIso }: { todayIso: string }) {
               key={r}
               type="button"
               onClick={() => setRoute(r)}
-              className={`px-2.5 py-1.5 text-xs rounded-lg transition-colors ${
+              className={`px-2.5 py-1.5 text-xs rounded-chip transition-colors ${
                 r === route
                   ? 'bg-navy-600 text-white font-medium'
-                  : 'text-muted-foreground hover:bg-muted border border-border'
+                  : 'text-quiet hover:bg-muted border border-navy-100'
               }`}
             >
               {TAX_FILING_ROUTE_LABELS[r]}
@@ -130,7 +130,7 @@ export function TaxDeadlines({ todayIso }: { todayIso: string }) {
       </div>
 
       {nearest !== null && nearest <= 30 && (
-        <div className="flex items-start gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+        <div className="flex items-start gap-2 text-xs bg-signal-bg border border-signal-line text-signal-ink rounded-chip px-3 py-2">
           <AlertTriangle size={13} strokeWidth={1.5} className="shrink-0 mt-0.5" />
           <span>
             Nejbližší termín je {countdownLabel(nearest)}: <strong>{deadlines[0].title}</strong>.
@@ -138,13 +138,13 @@ export function TaxDeadlines({ todayIso }: { todayIso: string }) {
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-white divide-y divide-border">
+      <div className="rounded-chip border border-navy-100 bg-surface divide-y divide-navy-100">
         {deadlines.map(d => (
           <DeadlineRow key={`${d.id}-${d.date}`} deadline={d} todayIso={todayIso} />
         ))}
       </div>
 
-      <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-slate-50 border border-border rounded-lg px-3 py-2 leading-relaxed">
+      <div className="flex items-start gap-2 text-[11px] text-quiet bg-navy-50 border border-navy-100 rounded-chip px-3 py-2 leading-relaxed">
         <Info size={12} strokeWidth={1.5} className="shrink-0 mt-0.5" />
         <span>
           Termíny se počítají ze zákonných lhůt a posouvají se na nejbližší pracovní den.

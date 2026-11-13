@@ -27,14 +27,14 @@ export function SummaryBar({ projects }: SummaryBarProps) {
         value={String(active)}
       />
       <StatCard
-        icon={<TrendingUp size={17} strokeWidth={1.5} className="text-emerald-600" />}
-        iconBg="bg-emerald-50"
+        icon={<TrendingUp size={17} strokeWidth={1.5} className="text-navy-600" />}
+        iconBg="bg-navy-50"
         label="Celkový objem"
         value={formatCurrency(totalRevenue)}
       />
       <StatCard
-        icon={<AlertCircle size={17} strokeWidth={1.5} className="text-amber-600" />}
-        iconBg="bg-amber-50"
+        icon={<AlertCircle size={17} strokeWidth={1.5} className="text-signal-ink" />}
+        iconBg="bg-signal-bg"
         label="Nezaplaceno"
         value={formatCurrency(unpaid)}
       />
@@ -44,12 +44,12 @@ export function SummaryBar({ projects }: SummaryBarProps) {
 
 function StatCard({ icon, iconBg, label, value }: { icon: React.ReactNode; iconBg: string; label: string; value: string }) {
   return (
-    <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
-      <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center mb-3`}>
+    <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
+      <div className={`w-8 h-8 ${iconBg} rounded-chip flex items-center justify-center mb-3`}>
         {icon}
       </div>
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <p className="text-lg font-semibold text-foreground tabular-nums leading-tight">{value}</p>
+      <p className="text-xs text-quiet mb-1">{label}</p>
+      <p className="text-lg font-semibold text-ink tabular-nums leading-tight">{value}</p>
     </div>
   )
 }

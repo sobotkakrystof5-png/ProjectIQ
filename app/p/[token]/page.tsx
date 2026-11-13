@@ -79,7 +79,7 @@ export default async function ClientPortalPage(props: PageProps) {
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg">
-          <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="bg-surface rounded-box border border-navy-100 shadow-sm overflow-hidden">
 
             {/* Brand header */}
             <div className="brand-gradient px-4 pt-6 pb-5 sm:px-6 sm:pt-7 sm:pb-6">
@@ -94,7 +94,7 @@ export default async function ClientPortalPage(props: PageProps) {
                 <div className="shrink-0 mt-0.5">
                   <StatusBadge
                     status={project.status as ProjectStatus}
-                    className="bg-white/95 text-navy-800 ring-white/60 font-semibold text-sm px-3 py-1 shadow-sm"
+                    className="bg-surface/95 text-navy-800 ring-white/60 font-semibold text-sm px-3 py-1 shadow-sm"
                   />
                 </div>
               </div>
@@ -105,7 +105,7 @@ export default async function ClientPortalPage(props: PageProps) {
               {/* Progress */}
               <div>
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Proces projektu</span>
+                  <span className="text-xs font-semibold text-quiet uppercase tracking-wider">Proces projektu</span>
                   <span className="text-sm font-bold text-navy-800">{project.progress}%</span>
                 </div>
                 <div className="h-2.5 bg-navy-50 rounded-full overflow-hidden border border-navy-100">
@@ -122,7 +122,7 @@ export default async function ClientPortalPage(props: PageProps) {
                   href={project.project_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+                  className="flex items-center justify-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-chip shadow-sm hover:opacity-90 transition-opacity"
                 >
                   <ExternalLink size={14} strokeWidth={1.5} />
                   Zobrazit živou verzi projektu
@@ -132,8 +132,8 @@ export default async function ClientPortalPage(props: PageProps) {
               {/* Focus */}
               {project.focus && (
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">O projektu</p>
-                  <p className="text-sm text-foreground leading-relaxed">{project.focus}</p>
+                  <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-2">O projektu</p>
+                  <p className="text-sm text-ink leading-relaxed">{project.focus}</p>
                 </div>
               )}
 
@@ -142,7 +142,7 @@ export default async function ClientPortalPage(props: PageProps) {
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <TrendingUp size={13} strokeWidth={1.5} className="text-navy-500" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <p className="text-xs font-semibold text-quiet uppercase tracking-wider">
                       {activityRows.length > 0 ? 'Co se dělo' : 'Historie postupu'}
                     </p>
                   </div>
@@ -161,9 +161,9 @@ export default async function ClientPortalPage(props: PageProps) {
                               <span className="text-xs font-semibold text-navy-700 bg-navy-50 border border-navy-100 rounded-full px-2 py-0.5">
                                 {entry.progress.progress_from}% → {entry.progress.progress_to}%
                               </span>
-                              <span className="text-xs text-muted-foreground">{formatDate(entry.progress.created_at)}</span>
+                              <span className="text-xs text-quiet">{formatDate(entry.progress.created_at)}</span>
                             </div>
-                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{entry.progress.description}</p>
+                            <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{entry.progress.description}</p>
                           </div>
                         ) : (
                           <div className="pb-3 flex-1">
@@ -171,10 +171,10 @@ export default async function ClientPortalPage(props: PageProps) {
                               <span className="text-xs font-semibold text-navy-700 bg-navy-50 border border-navy-100 rounded-full px-2 py-0.5">
                                 {ACTIVITY_KIND_LABELS[entry.activity.kind]}
                               </span>
-                              <span className="text-xs text-muted-foreground">{formatDate(entry.activity.published_at)}</span>
+                              <span className="text-xs text-quiet">{formatDate(entry.activity.published_at)}</span>
                             </div>
-                            <p className="text-sm font-medium text-foreground leading-relaxed">{entry.activity.title}</p>
-                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap mt-0.5">{entry.activity.body}</p>
+                            <p className="text-sm font-medium text-ink leading-relaxed">{entry.activity.title}</p>
+                            <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap mt-0.5">{entry.activity.body}</p>
                           </div>
                         )}
                       </li>
@@ -188,13 +188,13 @@ export default async function ClientPortalPage(props: PageProps) {
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare size={13} strokeWidth={1.5} className="text-navy-500" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vzkazy od manažera</p>
+                    <p className="text-xs font-semibold text-quiet uppercase tracking-wider">Vzkazy od manažera</p>
                   </div>
                   <ul className="space-y-2.5">
                     {messages.map(msg => (
-                      <li key={msg.id} className="bg-navy-50 border border-navy-100 rounded-xl px-4 py-3">
-                        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                        <p className="text-xs text-muted-foreground mt-1.5">
+                      <li key={msg.id} className="bg-navy-50 border border-navy-100 rounded-chip px-4 py-3">
+                        <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-xs text-quiet mt-1.5">
                           {formatDate(msg.created_at)}
                         </p>
                       </li>
@@ -204,31 +204,31 @@ export default async function ClientPortalPage(props: PageProps) {
               )}
 
               {/* Meta */}
-              <div className="flex flex-wrap gap-4 pt-4 border-t border-border">
+              <div className="flex flex-wrap gap-4 pt-4 border-t border-navy-100">
                 {project.deadline && (
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-sm text-quiet">
                     <Calendar size={14} strokeWidth={1.5} className="text-navy-500" />
-                    <span>Deadline: <strong className="text-foreground font-medium">{formatDate(project.deadline)}</strong></span>
+                    <span>Deadline: <strong className="text-ink font-medium">{formatDate(project.deadline)}</strong></span>
                   </div>
                 )}
                 {project.updated_at && (
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-sm text-quiet">
                     <RefreshCw size={14} strokeWidth={1.5} className="text-navy-500" />
-                    <span>Aktualizováno: <strong className="text-foreground font-medium">{formatDate(project.updated_at)}</strong></span>
+                    <span>Aktualizováno: <strong className="text-ink font-medium">{formatDate(project.updated_at)}</strong></span>
                   </div>
                 )}
               </div>
 
               {/* ── Client actions ── */}
-              <div className="space-y-4 pt-2 border-t border-border">
+              <div className="space-y-4 pt-2 border-t border-navy-100">
                 {/* Požadavek / změna */}
                 <ClientRequestBlock token={params.token} voiceEnabled={isTranscriptionConfigured()} />
 
                 {/* Feedback */}
-                <div className="pt-4 border-t border-border">
+                <div className="pt-4 border-t border-navy-100">
                   <div className="flex items-center gap-2 mb-3">
                     <Star size={13} strokeWidth={1.5} className="text-navy-500" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vaše zpětná vazba</p>
+                    <p className="text-xs font-semibold text-quiet uppercase tracking-wider">Vaše zpětná vazba</p>
                   </div>
                   <FeedbackBlock token={params.token} />
                 </div>
@@ -241,7 +241,7 @@ export default async function ClientPortalPage(props: PageProps) {
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-2.5 mt-6">
-            <div className="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center shadow-md">
+            <div className="w-8 h-8 brand-gradient rounded-chip flex items-center justify-center shadow-md">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
                 <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.55" />
@@ -250,7 +250,7 @@ export default async function ClientPortalPage(props: PageProps) {
               </svg>
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Powered by</span>
+              <span className="text-[10px] text-quiet uppercase tracking-widest">Powered by</span>
               <span className="text-sm font-bold text-navy-800 leading-none">ZakazIQ</span>
             </div>
           </div>

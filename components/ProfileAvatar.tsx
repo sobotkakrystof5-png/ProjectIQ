@@ -6,7 +6,7 @@ export function ProfileAvatar({ initials }: { initials: string }) {
   const [imgFailed, setImgFailed] = useState(false)
 
   return (
-    <div className="relative w-20 h-20 rounded-2xl overflow-hidden shadow-sm shrink-0">
+    <div className="relative w-20 h-20 rounded-box overflow-hidden shadow-sm shrink-0">
       <div className="absolute inset-0 brand-gradient flex items-center justify-center">
         <span className="text-white font-bold text-xl tracking-tight">{initials}</span>
       </div>

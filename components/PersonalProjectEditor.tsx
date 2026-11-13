@@ -543,7 +543,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
             <label className={labelCls}>Monetizace</label>
             <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/40 rounded-chip">
               <span className="text-sm text-ink">{monetization ? 'Ano' : 'Ne'}</span>
-              <button type="button" onClick={() => setMonetization(v => !v)} className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-navy-600' : 'bg-muted-foreground/20'}`}>
+              <button type="button" onClick={() => setMonetization(v => !v)} className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-navy-600' : 'bg-navy-200'}`}>
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface rounded-full shadow transition-transform ${monetization ? 'translate-x-5' : ''}`} />
               </button>
             </div>

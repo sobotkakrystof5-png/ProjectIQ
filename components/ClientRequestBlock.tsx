@@ -135,11 +135,11 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
   if (submitted) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-          <CheckCircle2 size={22} strokeWidth={1.5} className="text-emerald-600" />
+        <div className="w-12 h-12 rounded-full bg-navy-50 border border-navy-100 flex items-center justify-center">
+          <CheckCircle2 size={22} strokeWidth={1.5} className="text-navy-700" />
         </div>
-        <p className="font-semibold text-foreground text-sm">Požadavek jsme přijali.</p>
-        <p className="text-xs text-muted-foreground max-w-xs">Ozveme se vám. Další můžete poslat kdykoli.</p>
+        <p className="font-semibold text-ink text-sm">Požadavek jsme přijali.</p>
+        <p className="text-xs text-quiet max-w-xs">Ozveme se vám. Další můžete poslat kdykoli.</p>
         <button
           type="button"
           onClick={() => {
@@ -161,7 +161,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="flex items-center gap-2">
         <MessageSquarePlus size={13} strokeWidth={1.5} className="text-navy-500" />
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Máte požadavek nebo změnu?</p>
+        <p className="text-xs font-semibold text-quiet uppercase tracking-wider">Máte požadavek nebo změnu?</p>
       </div>
 
       <textarea
@@ -174,15 +174,15 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
         rows={4}
         disabled={voice !== 'idle'}
         placeholder="Napište, co byste chtěli změnit nebo doplnit…"
-        className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-navy-300 disabled:opacity-60"
+        className="w-full rounded-chip border border-navy-100 bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-quiet/70 focus:outline-none focus:ring-2 focus:ring-navy-300 disabled:opacity-60"
       />
 
       {fromVoice && voice === 'idle' && (
-        <p className="text-xs text-muted-foreground">Text vznikl z vaší nahrávky. Zkontrolujte ho prosím, než ho odešlete.</p>
+        <p className="text-xs text-quiet">Text vznikl z vaší nahrávky. Zkontrolujte ho prosím, než ho odešlete.</p>
       )}
 
       {error && (
-        <p role="alert" className="text-xs text-red-600">
+        <p role="alert" className="text-xs text-danger">
           {error}
         </p>
       )}
@@ -194,10 +194,10 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
             onClick={voice === 'recording' ? stopRecording : startRecording}
             disabled={busy}
             className={cn(
-              'inline-flex min-h-[44px] items-center gap-2 rounded-lg border px-3.5 text-sm font-medium transition-colors disabled:opacity-60',
+              'inline-flex min-h-[44px] items-center gap-2 rounded-chip border px-3.5 text-sm font-medium transition-colors disabled:opacity-60',
               voice === 'recording'
-                ? 'border-red-300 bg-red-50 text-red-700'
-                : 'border-border bg-white text-foreground hover:bg-navy-50',
+                ? 'border-danger/30 bg-danger/5 text-danger'
+                : 'border-navy-100 bg-surface text-ink hover:bg-navy-50',
             )}
           >
             {voice === 'recording' ? (
@@ -218,7 +218,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
         <button
           type="submit"
           disabled={busy || voice === 'recording' || text.trim().length < 3}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-lg brand-gradient px-4 text-sm font-medium text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-chip brand-gradient px-4 text-sm font-medium text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {isPending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
           Odeslat požadavek
@@ -226,7 +226,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
       </div>
 
       {canRecord && (
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
+        <p className="text-[11px] leading-relaxed text-quiet">
           Nahrávku převede na text služba OpenAI. Nahrávku neukládáme, uložíme jen text, který odešlete.
         </p>
       )}

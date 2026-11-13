@@ -29,7 +29,7 @@ export default async function SurveyPage(props: PageProps) {
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg">
-          <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="bg-surface rounded-box border border-navy-100 shadow-sm overflow-hidden">
             {/* Brand header */}
             <div className="brand-gradient px-6 pt-7 pb-6">
               <p className="text-xs font-medium text-navy-200 uppercase tracking-wider mb-1.5">
@@ -45,11 +45,11 @@ export default async function SurveyPage(props: PageProps) {
             <div className="px-6 py-6">
               {alreadyDone ? (
                 <div className="flex flex-col items-center gap-3 py-8 text-center">
-                  <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-                    <CheckCircle2 size={28} strokeWidth={1.5} className="text-emerald-600" />
+                  <div className="w-14 h-14 rounded-full bg-navy-50 border border-navy-100 flex items-center justify-center">
+                    <CheckCircle2 size={28} strokeWidth={1.5} className="text-navy-700" />
                   </div>
-                  <p className="font-semibold text-foreground">Dotazník už byl vyplněn</p>
-                  <p className="text-sm text-muted-foreground max-w-sm">
+                  <p className="font-semibold text-ink">Dotazník už byl vyplněn</p>
+                  <p className="text-sm text-quiet max-w-sm">
                     Děkuji za vyplnění dotazníku a za vaši spolupráci.
                   </p>
                 </div>
@@ -57,7 +57,7 @@ export default async function SurveyPage(props: PageProps) {
                 <>
                   <div className="flex items-center gap-2 mb-5">
                     <ClipboardList size={14} strokeWidth={1.5} className="text-navy-500" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <p className="text-xs font-semibold text-quiet uppercase tracking-wider">
                       Ohodnoťte spolupráci (1–5 hvězdiček)
                     </p>
                   </div>
@@ -69,7 +69,7 @@ export default async function SurveyPage(props: PageProps) {
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-2.5 mt-6">
-            <div className="w-8 h-8 brand-gradient rounded-lg flex items-center justify-center shadow-md">
+            <div className="w-8 h-8 brand-gradient rounded-chip flex items-center justify-center shadow-md">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
                 <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.55" />
@@ -78,7 +78,7 @@ export default async function SurveyPage(props: PageProps) {
               </svg>
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Powered by</span>
+              <span className="text-[10px] text-quiet uppercase tracking-widest">Powered by</span>
               <span className="text-sm font-bold text-navy-800 leading-none">ZakazIQ</span>
             </div>
           </div>

@@ -22,7 +22,7 @@ export function QRCodeDisplay({ url }: QRCodeDisplayProps) {
 
   return (
     <div className="inline-flex flex-col items-center gap-2">
-      <div className="p-3 bg-surface border border-gray-100 rounded-chip">
+      <div className="p-3 bg-surface border border-navy-100 rounded-chip">
         <QRCodeSVG
           value={url}
           size={140}
@@ -36,7 +36,7 @@ export function QRCodeDisplay({ url }: QRCodeDisplayProps) {
       </div>
       <button
         onClick={handleDownload}
-        className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        className="inline-flex items-center gap-1.5 text-xs text-quiet hover:text-quiet transition-colors"
       >
         <Download size={13} strokeWidth={1.5} />
         Stáhnout QR

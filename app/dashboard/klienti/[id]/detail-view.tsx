@@ -13,10 +13,10 @@ import { ContactActions } from '@/components/admin/contact-actions'
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="bg-white border border-border rounded-2xl p-4 space-y-3">
+    <section className="bg-surface border border-navy-100 rounded-box p-4 space-y-3">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {hint && <p className="text-[12px] text-muted-foreground mt-0.5">{hint}</p>}
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        {hint && <p className="text-[12px] text-quiet mt-0.5">{hint}</p>}
       </div>
       {children}
     </section>
@@ -25,9 +25,9 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="bg-white border border-border rounded-xl px-4 py-3">
-      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className="text-sm font-semibold text-foreground mt-0.5">{value}</p>
+    <div className="bg-surface border border-navy-100 rounded-chip px-4 py-3">
+      <p className="text-[11px] font-medium text-quiet uppercase tracking-wide">{label}</p>
+      <p className="text-sm font-semibold text-ink mt-0.5">{value}</p>
     </div>
   )
 }
@@ -66,19 +66,19 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
       </div>
 
       <Section title="Byznysy" hint="Klíče a prompt: stejné jako Nastavení › Napojený web u klienta. Nový tajný klíč zneplatní starý.">
-        <ul className="divide-y divide-border">
+        <ul className="divide-y divide-navy-100">
           {client.businessesList.map((b) => (
             <li key={b.id} className="py-3 first:pt-0 last:pb-0 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
+                  <p className="text-sm font-semibold text-ink">
                     {b.name}
-                    {b.archived && <span className="ml-2 text-[11px] font-medium text-muted-foreground">archivovaný</span>}
+                    {b.archived && <span className="ml-2 text-[11px] font-medium text-quiet">archivovaný</span>}
                   </p>
-                  <p className="text-[12px] text-muted-foreground">
+                  <p className="text-[12px] text-quiet">
                     {b.industry} · <span className="font-mono">{b.slug}</span> ·{' '}
                     {b.webUsedAt ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-700">
+                      <span className="inline-flex items-center gap-1 text-ink">
                         <Globe size={12} strokeWidth={1.5} />
                         web poslal poptávku {ago(b.webUsedAt)}
                       </span>
@@ -112,13 +112,13 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
               <li key={i} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span className="min-w-0 truncate">
                   {m.name ?? m.email ?? 'bez jména'}
-                  {m.name && m.email && <span className="text-muted-foreground"> · {m.email}</span>}
+                  {m.name && m.email && <span className="text-quiet"> · {m.email}</span>}
                 </span>
                 <span className="flex items-center gap-2">
                   {/* Napsat klientovi jedním klikem (AD10). Telefon na členy
                       Workspace nemáme — ten zůstává jen u klientů adminu. */}
                   <ContactActions variant="compact" email={m.email} />
-                  <span className="text-[11px] text-muted-foreground shrink-0">{m.role === 'owner' ? 'vlastník' : 'pracovník'}</span>
+                  <span className="text-[11px] text-quiet shrink-0">{m.role === 'owner' ? 'vlastník' : 'pracovník'}</span>
                 </span>
               </li>
             ))}
@@ -129,13 +129,13 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
 
       <Section title="Historie" hint="Posledních 30 záznamů z auditu účtu.">
         {client.audit.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Zatím nic.</p>
+          <p className="text-sm text-quiet">Zatím nic.</p>
         ) : (
           <ul className="space-y-1.5">
             {client.audit.map((a, i) => (
               <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
                 <span>{AUDIT_LABEL[a.action] ?? a.action}</span>
-                <span className="text-[12px] text-muted-foreground tabular-nums">
+                <span className="text-[12px] text-quiet tabular-nums">
                   {formatDateTime(a.at)} · {a.actor === 'admin' || a.actor.startsWith('admin:') ? 'admin' : 'klient'}
                 </span>
               </li>

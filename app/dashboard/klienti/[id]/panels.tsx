@@ -6,8 +6,8 @@ import { Copy, KeyRound, Mail } from 'lucide-react'
 import { generateWebKeysAction, resendInviteAction } from '../actions'
 import type { WebKeysResult } from '@/lib/ws/admin/web-keys'
 
-const INPUT = 'w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500'
-const BUTTON = 'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-border rounded-lg bg-white hover:bg-muted transition-colors disabled:opacity-60'
+const INPUT = 'w-full text-sm border border-navy-100 rounded-chip px-3 py-2 bg-surface focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500'
+const BUTTON = 'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-navy-100 rounded-chip bg-surface hover:bg-muted transition-colors disabled:opacity-60'
 
 function CopyField({ label, value, multiline = false, secret = false }: { label: string; value: string; multiline?: boolean; secret?: boolean }) {
   const copy = () => {
@@ -19,7 +19,7 @@ function CopyField({ label, value, multiline = false, secret = false }: { label:
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
+        <span className="text-[12px] font-medium text-quiet">{label}</span>
         <button type="button" onClick={copy} className="inline-flex items-center gap-1 text-[12px] font-medium text-navy-700 hover:underline">
           <Copy size={12} strokeWidth={1.5} />
           Kopírovat
@@ -28,7 +28,7 @@ function CopyField({ label, value, multiline = false, secret = false }: { label:
       {multiline ? (
         <textarea readOnly value={value} rows={8} className={`${INPUT} font-mono text-[12px]`} />
       ) : (
-        <input readOnly value={value} className={`${INPUT} font-mono text-[12px] ${secret ? 'bg-amber-50' : ''}`} />
+        <input readOnly value={value} className={`${INPUT} font-mono text-[12px] ${secret ? 'bg-signal-bg' : ''}`} />
       )}
     </div>
   )
@@ -57,8 +57,8 @@ export function WebKeysPanel({ accountId, businessId, hasSecret }: { accountId: 
 
   if (keys) {
     return (
-      <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-3">
-        <p className="text-[12px] text-amber-800">
+      <div className="space-y-3 rounded-chip border border-signal-line bg-signal-bg/60 p-3">
+        <p className="text-[12px] text-signal-ink">
           Tajný klíč se ukazuje jen teď. Ulož ho do env webu jako <code className="font-mono">ZAKAZIQ_KEY</code>, nikam jinam.
         </p>
         <CopyField label="Tajný klíč" value={keys.secretKey} secret />
@@ -71,12 +71,12 @@ export function WebKeysPanel({ accountId, businessId, hasSecret }: { accountId: 
 
   if (confirm && hasSecret) {
     return (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-        <p className="text-[12px] text-amber-800 flex-1 min-w-[200px]">Byznys už tajný klíč má. Nový ho hned zneplatní — web s tím starým přestane posílat poptávky.</p>
+      <div className="flex flex-wrap items-center gap-2 rounded-chip border border-signal-line bg-signal-bg p-3">
+        <p className="text-[12px] text-signal-ink flex-1 min-w-[200px]">Byznys už tajný klíč má. Nový ho hned zneplatní — web s tím starým přestane posílat poptávky.</p>
         <button type="button" onClick={run} disabled={pending} className={BUTTON}>
           {pending ? 'Vytvářím…' : 'Vyměnit klíč'}
         </button>
-        <button type="button" onClick={() => setConfirm(false)} className="text-sm text-muted-foreground hover:underline">
+        <button type="button" onClick={() => setConfirm(false)} className="text-sm text-quiet hover:underline">
           Zpět
         </button>
       </div>

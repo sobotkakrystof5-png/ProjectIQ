@@ -19,21 +19,21 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <Link
       href={projectPath(project.id)}
-      className="group block bg-white border border-border rounded-xl p-5 hover:border-navy-200 hover:shadow-md transition-all duration-200"
+      className="group block bg-surface border border-navy-100 rounded-chip p-5 hover:border-navy-200 hover:shadow-md transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <h3 className="font-semibold text-foreground truncate transition-colors group-hover:text-navy-800">
+          <h3 className="font-semibold text-ink truncate transition-colors group-hover:text-navy-800">
             {project.client_name}
           </h3>
           {project.description && (
-            <p className="text-sm text-muted-foreground truncate mt-0.5">{project.description}</p>
+            <p className="text-sm text-quiet truncate mt-0.5">{project.description}</p>
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {fromWeb && origin.domain && (
             <div
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-navy-50 text-navy-700 border border-navy-100"
               title={`Poptávka z ${origin.domain}`}
             >
               <Globe size={11} strokeWidth={1.5} />
@@ -46,19 +46,19 @@ export function ProjectCard({ project }: ProjectCardProps) {
       </div>
 
       {project.focus && (
-        <p className="text-xs text-muted-foreground mb-3 line-clamp-2 leading-relaxed">{project.focus}</p>
+        <p className="text-xs text-quiet mb-3 line-clamp-2 leading-relaxed">{project.focus}</p>
       )}
 
       <ProgressBar value={project.progress} className="mb-4" />
 
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="flex items-center gap-4 text-xs text-quiet">
         {project.price !== null && (
           <div className="flex items-center gap-1">
             <CreditCard size={12} strokeWidth={1.5} />
-            <span className={project.paid ? 'text-emerald-600 font-medium' : ''}>
+            <span className={project.paid ? 'font-medium text-ink' : ''}>
               {formatCurrency(project.price)}
             </span>
-            {project.paid && <BadgeCheck size={12} strokeWidth={1.5} className="text-emerald-500" />}
+            {project.paid && <BadgeCheck size={12} strokeWidth={1.5} className="text-navy-700" />}
           </div>
         )}
         {project.deadline && (

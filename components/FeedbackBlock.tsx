@@ -34,11 +34,11 @@ export function FeedbackBlock({ token }: FeedbackBlockProps) {
   if (submitted) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-          <CheckCircle2 size={22} strokeWidth={1.5} className="text-emerald-600" />
+        <div className="w-12 h-12 rounded-full bg-navy-50 border border-navy-100 flex items-center justify-center">
+          <CheckCircle2 size={22} strokeWidth={1.5} className="text-navy-700" />
         </div>
-        <p className="font-semibold text-foreground text-sm">Děkujeme za vaši zpětnou vazbu!</p>
-        <p className="text-xs text-muted-foreground max-w-xs">Vaše hodnocení bylo úspěšně odesláno.</p>
+        <p className="font-semibold text-ink text-sm">Děkujeme za vaši zpětnou vazbu!</p>
+        <p className="text-xs text-quiet max-w-xs">Vaše hodnocení bylo úspěšně odesláno.</p>
       </div>
     )
   }
@@ -47,7 +47,7 @@ export function FeedbackBlock({ token }: FeedbackBlockProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center gap-2 mb-1">
         <Star size={13} strokeWidth={1.5} className="text-navy-500" />
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vaše hodnocení</p>
+        <p className="text-xs font-semibold text-quiet uppercase tracking-wider">Vaše hodnocení</p>
       </div>
 
       <NpsRating value={nps} onChange={v => { setNps(v); setError(null) }} disabled={isPending} />
@@ -60,15 +60,15 @@ export function FeedbackBlock({ token }: FeedbackBlockProps) {
         rows={3}
         disabled={isPending}
         className={cn(
-          'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
-          'placeholder-muted-foreground bg-white resize-none',
+          'w-full border border-navy-100 rounded-chip px-3 py-2.5 text-sm text-ink',
+          'placeholder:text-quiet bg-surface resize-none',
           'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
           isPending && 'opacity-50',
         )}
       />
 
       {error && (
-        <p className="text-xs text-red-600 font-medium">{error}</p>
+        <p className="text-xs text-danger font-medium">{error}</p>
       )}
 
       <button
@@ -76,7 +76,7 @@ export function FeedbackBlock({ token }: FeedbackBlockProps) {
         disabled={isPending}
         className={cn(
           'w-full flex items-center justify-center gap-2',
-          'brand-gradient text-white text-sm font-semibold py-2.5 rounded-lg shadow-sm',
+          'brand-gradient text-white text-sm font-semibold py-2.5 rounded-chip shadow-sm',
           'hover:opacity-90 transition-opacity disabled:opacity-50',
         )}
       >

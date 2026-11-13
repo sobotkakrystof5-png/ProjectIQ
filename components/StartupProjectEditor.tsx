@@ -427,7 +427,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <button
                 type="button"
                 onClick={() => setMonetization(v => !v)}
-                className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-navy-600' : 'bg-muted-foreground/20'}`}
+                className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-navy-600' : 'bg-navy-200'}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface rounded-full shadow transition-transform ${monetization ? 'translate-x-5' : ''}`} />
               </button>
