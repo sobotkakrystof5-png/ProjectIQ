@@ -20,9 +20,9 @@ const MONTHS_FULL = [
 const QUICK_AMOUNTS = [1000, 5000, 10000, 25000, 50000]
 
 const TONE_STYLE: Record<Tone, string> = {
-  good: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  bad: 'bg-red-50 border-red-200 text-red-800',
+  good: 'bg-navy-50 border-navy-200 text-navy-900',
+  warning: 'bg-signal-bg border-signal-line text-signal-ink',
+  bad: 'bg-danger/5 border-danger/30 text-danger',
 }
 
 const TONE_ICON: Record<Tone, typeof CheckCircle2> = {
@@ -119,19 +119,19 @@ function DeltaCard({
   formatValue?: (n: number) => string
 }) {
   return (
-    <div className={`rounded-xl p-3 ${bg}`}>
+    <div className={`rounded-chip p-3 ${bg}`}>
       <div className="flex items-center gap-1.5 mb-1.5">
         {icon}
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-xs text-quiet">{label}</span>
       </div>
-      <p className="text-xs text-muted-foreground line-through decoration-1 decoration-muted-foreground/50">
+      <p className="text-xs text-quiet line-through decoration-1 decoration-quiet/50">
         {formatValue(before)}
       </p>
-      <p className={`text-base font-semibold tabular-nums ${valueColor ?? 'text-foreground'}`}>
+      <p className={`text-base font-semibold tabular-nums ${valueColor ?? 'text-ink'}`}>
         {formatValue(after)}
       </p>
       {deltaText && (
-        <p className={`text-[11px] font-medium mt-0.5 ${deltaColor ?? 'text-muted-foreground'}`}>{deltaText}</p>
+        <p className={`text-[11px] font-medium mt-0.5 ${deltaColor ?? 'text-quiet'}`}>{deltaText}</p>
       )}
     </div>
   )
@@ -140,7 +140,7 @@ function DeltaCard({
 function VerdictBanner({ verdict }: { verdict: { tone: Tone; title: string; body: string } }) {
   const Icon = TONE_ICON[verdict.tone]
   return (
-    <div className={`flex items-start gap-3 rounded-xl border p-4 ${TONE_STYLE[verdict.tone]}`}>
+    <div className={`flex items-start gap-3 rounded-chip border p-4 ${TONE_STYLE[verdict.tone]}`}>
       <Icon size={18} strokeWidth={1.5} className="shrink-0 mt-0.5" />
       <div>
         <p className="text-sm font-semibold">{verdict.title}</p>
@@ -213,30 +213,30 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
   }, [scenario, amountNum, overview])
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
+    <div className="bg-surface border border-navy-100 rounded-box p-6 space-y-5">
       {/* Header */}
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} strokeWidth={1.5} className="text-emerald-600" />
-          <h2 className="text-base font-semibold text-foreground">Co kdyby analýza</h2>
+          <Sparkles size={16} strokeWidth={1.5} className="text-navy-600" />
+          <h2 className="text-base font-semibold text-ink">Co kdyby analýza</h2>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-quiet">
           Zadej částku a hned uvidíš, jak jedno rozhodnutí ovlivní tvůj byznys — tento měsíc, celkově i za rok dopředu
         </p>
       </div>
 
       {/* Controls */}
-      <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">
+      <div className="bg-muted/30 border border-navy-100 rounded-chip p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Vztáhnout k</span>
-          <div className="flex gap-1 bg-white border border-border rounded-full p-0.5">
+          <span className="text-xs font-medium text-quiet">Vztáhnout k</span>
+          <div className="flex gap-1 bg-surface border border-navy-100 rounded-full p-0.5">
             {(['month', 'all'] as const).map(p => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
                 className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
-                  period === p ? 'bg-slate-700 text-white' : 'text-muted-foreground hover:text-foreground'
+                  period === p ? 'bg-navy-700 text-white' : 'text-quiet hover:text-ink'
                 }`}
               >
                 {p === 'month' ? 'Tento měsíc' : 'Celkově'}
@@ -251,12 +251,12 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
               key={s}
               type="button"
               onClick={() => setScenario(s)}
-              className={`flex-1 py-2.5 text-sm font-medium rounded-lg border transition-colors flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2.5 text-sm font-medium rounded-chip border transition-colors flex items-center justify-center gap-1.5 ${
                 scenario === s
                   ? s === 'income'
-                    ? 'bg-emerald-500 text-white border-emerald-500'
-                    : 'bg-red-500 text-white border-red-500'
-                  : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
+                    ? 'border-navy-700 bg-navy-700 text-white'
+                    : 'border-navy-700 bg-navy-700 text-white'
+                  : 'bg-surface text-quiet border-navy-100 hover:border-foreground/20'
               }`}
             >
               {s === 'income' ? <TrendingUp size={14} strokeWidth={2} /> : <TrendingDown size={14} strokeWidth={2} />}
@@ -266,7 +266,7 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
         </div>
 
         <div>
-          <label className="text-xs font-medium text-muted-foreground block mb-1">Částka (Kč)</label>
+          <label className="text-xs font-medium text-quiet block mb-1">Částka (Kč)</label>
           <input
             type="number"
             min="0"
@@ -274,7 +274,7 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
             value={amount}
             onChange={e => setAmount(e.target.value)}
             placeholder="10000"
-            className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            className="w-full rounded-chip border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink transition-colors focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
           />
         </div>
 
@@ -286,8 +286,8 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
               onClick={() => setAmount(String(q))}
               className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
                 amountNum === q
-                  ? 'bg-slate-700 text-white border-slate-700'
-                  : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
+                  ? 'border-navy-700 bg-navy-700 text-white'
+                  : 'bg-surface text-quiet border-navy-100 hover:border-foreground/20'
               }`}
             >
               {q.toLocaleString('cs-CZ')} Kč
@@ -301,10 +301,10 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
               key={r}
               type="button"
               onClick={() => setRecurrence(r)}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 text-xs font-medium rounded-chip border transition-colors flex items-center justify-center gap-1.5 ${
                 recurrence === r
-                  ? 'bg-slate-600 text-white border-slate-600'
-                  : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
+                  ? 'border-navy-700 bg-navy-700 text-white'
+                  : 'bg-surface text-quiet border-navy-100 hover:border-foreground/20'
               }`}
             >
               {r === 'onetime' ? <Tag size={11} strokeWidth={2} /> : <RefreshCw size={11} strokeWidth={2} />}
@@ -316,38 +316,38 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
 
       {/* Primary impact (this month or all-time, per period toggle) */}
       <div className="space-y-2">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+        <p className="text-[11px] font-medium text-quiet uppercase tracking-wide">
           {period === 'month' ? `Dopad na tento měsíc · ${formatMonth(summary.month)}` : 'Dopad na celkové hospodaření · za celou dobu'}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <DeltaCard
             icon={
               scenario === 'income'
-                ? <TrendingUp size={14} strokeWidth={1.5} className="text-emerald-600" />
-                : <TrendingDown size={14} strokeWidth={1.5} className="text-red-500" />
+                ? <TrendingUp size={14} strokeWidth={1.5} className="text-navy-600" />
+                : <TrendingDown size={14} strokeWidth={1.5} className="text-quiet" />
             }
             label={scenario === 'income' ? 'Objem příjmů' : 'Objem výdajů'}
             before={primary.volumeBefore}
             after={primary.volumeAfter}
-            bg={scenario === 'income' ? 'bg-emerald-50' : 'bg-red-50'}
+            bg={scenario === 'income' ? 'bg-navy-50' : 'border border-navy-100'}
             deltaText={primary.volumePct !== null ? formatPct(primary.volumePct) : 'nový zdroj'}
           />
           <DeltaCard
-            icon={<Scale size={14} strokeWidth={1.5} className={primary.newNet >= 0 ? 'text-blue-600' : 'text-red-500'} />}
+            icon={<Scale size={14} strokeWidth={1.5} className={primary.newNet >= 0 ? 'text-navy-600' : 'text-danger'} />}
             label="Bilance (zisk/ztráta)"
             before={primary.baseNet}
             after={primary.newNet}
-            bg={primary.newNet >= 0 ? 'bg-blue-50' : 'bg-red-50'}
-            valueColor={primary.newNet >= 0 ? 'text-emerald-600' : 'text-red-500'}
+            bg={primary.newNet >= 0 ? 'bg-navy-50' : 'bg-danger/5'}
+            valueColor={primary.newNet >= 0 ? 'text-ink' : 'text-danger'}
             deltaText={`${primary.netDelta >= 0 ? '+' : ''}${formatAmount(primary.netDelta)}${primary.netPct !== null ? ` (${formatPct(primary.netPct)})` : ''}`}
-            deltaColor={primary.netDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}
+            deltaColor={primary.netDelta >= 0 ? 'text-ink' : 'text-danger'}
           />
           <DeltaCard
-            icon={<Percent size={14} strokeWidth={1.5} className="text-purple-600" />}
+            icon={<Percent size={14} strokeWidth={1.5} className="text-navy-600" />}
             label="Míra úspor"
             before={primary.savingsRateBefore ?? 0}
             after={primary.savingsRateAfter ?? 0}
-            bg="bg-purple-50"
+            bg="border border-navy-100"
             formatValue={n => `${Math.round(n)} %`}
           />
         </div>
@@ -357,8 +357,8 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
 
       {/* Annual impact (recurring only) */}
       {recurrence === 'monthly' && (
-        <div className="space-y-2 pt-2 border-t border-border">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide pt-3 flex items-center gap-1.5">
+        <div className="space-y-2 pt-2 border-t border-navy-100">
+          <p className="text-[11px] font-medium text-quiet uppercase tracking-wide pt-3 flex items-center gap-1.5">
             <RefreshCw size={11} strokeWidth={1.5} />
             Výhled na příštích 12 měsíců při pravidelném opakování
           </p>
@@ -366,30 +366,30 @@ export function ScenarioSection({ summary, overview, allTime }: Props) {
             <DeltaCard
               icon={
                 scenario === 'income'
-                  ? <TrendingUp size={14} strokeWidth={1.5} className="text-emerald-600" />
-                  : <TrendingDown size={14} strokeWidth={1.5} className="text-red-500" />
+                  ? <TrendingUp size={14} strokeWidth={1.5} className="text-navy-600" />
+                  : <TrendingDown size={14} strokeWidth={1.5} className="text-quiet" />
               }
               label={scenario === 'income' ? 'Roční objem příjmů' : 'Roční objem výdajů'}
               before={annual.volumeBefore}
               after={annual.volumeAfter}
-              bg={scenario === 'income' ? 'bg-emerald-50' : 'bg-red-50'}
+              bg={scenario === 'income' ? 'bg-navy-50' : 'border border-navy-100'}
               deltaText={annual.volumePct !== null ? formatPct(annual.volumePct) : 'nový zdroj'}
             />
             <DeltaCard
-              icon={<Scale size={14} strokeWidth={1.5} className={annual.newSavings12m >= 0 ? 'text-blue-600' : 'text-red-500'} />}
+              icon={<Scale size={14} strokeWidth={1.5} className={annual.newSavings12m >= 0 ? 'text-navy-600' : 'text-danger'} />}
               label="Roční bilance"
               before={annual.baseSavings12m}
               after={annual.newSavings12m}
-              bg={annual.newSavings12m >= 0 ? 'bg-blue-50' : 'bg-red-50'}
-              valueColor={annual.newSavings12m >= 0 ? 'text-emerald-600' : 'text-red-500'}
+              bg={annual.newSavings12m >= 0 ? 'bg-navy-50' : 'bg-danger/5'}
+              valueColor={annual.newSavings12m >= 0 ? 'text-ink' : 'text-danger'}
               deltaText={`${annual.netDelta >= 0 ? '+' : ''}${formatAmount(annual.netDelta)}${annual.netPct !== null ? ` (${formatPct(annual.netPct)})` : ''}`}
-              deltaColor={annual.netDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}
+              deltaColor={annual.netDelta >= 0 ? 'text-ink' : 'text-danger'}
             />
           </div>
 
           <VerdictBanner verdict={annual.verdict} />
 
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+          <p className="text-[11px] text-quiet flex items-center gap-1">
             <Info size={11} strokeWidth={1.5} />
             Roční základ vychází ze skutečných dat za posledních 12 měsíců.
           </p>

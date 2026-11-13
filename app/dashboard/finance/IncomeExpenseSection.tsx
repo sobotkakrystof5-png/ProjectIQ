@@ -23,6 +23,11 @@ import {
   INCOME_CATEGORIES, EXPENSE_CATEGORIES,
   LIFE_AREAS, AREA_LABELS, type LifeArea,
 } from './finance-constants'
+import { cn } from '@/lib/utils'
+
+/** Pole Dílků: rádius 12 px, navy okraj při zaostření (DESIGN.md → Inputs). */
+const fieldClass =
+  'w-full rounded-chip border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink transition-colors placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
 
 const MONTHS_FULL = [
   'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
@@ -69,32 +74,32 @@ function RecurringRowItem({
   isPending: boolean
 }) {
   return (
-    <div className="flex items-center gap-2.5 py-2 px-2.5 bg-muted/20 hover:bg-muted/40 rounded-lg group transition-colors">
-      <RefreshCw size={11} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
+    <div className="flex items-center gap-2.5 py-2 px-2.5 bg-muted/20 hover:bg-muted/40 rounded-chip group transition-colors">
+      <RefreshCw size={11} strokeWidth={1.5} className="text-quiet shrink-0" />
       <div className="min-w-0 flex-1">
-        <span className="text-sm font-medium text-foreground">{row.label}</span>
+        <span className="text-sm font-medium text-ink">{row.label}</span>
         {row.description && (
-          <span className="text-xs text-muted-foreground ml-2 truncate">{row.description}</span>
+          <span className="text-xs text-quiet ml-2 truncate">{row.description}</span>
         )}
       </div>
       {row.area && <AreaBadge area={row.area} />}
       {row.source === 'cost' ? (
         <Link
           href="/dashboard/naklady"
-          className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full hover:text-foreground transition-colors shrink-0"
+          className="hidden sm:flex items-center gap-1 text-[10px] text-quiet bg-muted px-1.5 py-0.5 rounded-full hover:text-ink transition-colors shrink-0"
         >
           <ExternalLink size={9} strokeWidth={1.5} />
           Náklady zakázek
         </Link>
       ) : null}
-      <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">
+      <span className="text-sm font-semibold text-ink shrink-0 tabular-nums">
         {formatAmount(row.amount)}
       </span>
       {row.source === 'cashflow' ? (
         <button
           onClick={() => onDelete(row.id)}
           disabled={isPending}
-          className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-red-500 transition-all disabled:opacity-30 shrink-0"
+          className="shrink-0 p-1 text-quiet opacity-0 transition-all hover:text-danger group-hover:opacity-100 disabled:opacity-30"
         >
           <Trash2 size={13} strokeWidth={1.5} />
         </button>
@@ -122,20 +127,20 @@ function ColumnSection({
       {/* Jednorázové */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <Tag size={11} strokeWidth={1.5} className="text-muted-foreground" />
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          <Tag size={11} strokeWidth={1.5} className="text-quiet" />
+          <span className="text-[11px] font-medium text-quiet uppercase tracking-wide">
             Jednorázové · {formatMonth(currentMonth)}
           </span>
         </div>
         {oneTimeItems.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-2">Žádné položky tento měsíc</p>
+          <p className="text-xs text-quiet py-2">Žádné položky tento měsíc</p>
         ) : (
           <div className="space-y-0.5">
             {oneTimeItems.map(t => (
-              <div key={t.id} className="flex items-center gap-2.5 py-2 px-2.5 hover:bg-muted/40 rounded-lg group transition-colors">
+              <div key={t.id} className="flex items-center gap-2.5 py-2 px-2.5 hover:bg-muted/40 rounded-chip group transition-colors">
                 <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium text-foreground">{t.category}</span>
-                  {t.note && <span className="text-xs text-muted-foreground ml-2 truncate">{t.note}</span>}
+                  <span className="text-sm font-medium text-ink">{t.category}</span>
+                  {t.note && <span className="text-xs text-quiet ml-2 truncate">{t.note}</span>}
                 </div>
                 {t.type === 'income' && (
                   <button
@@ -147,24 +152,25 @@ function ColumnSection({
                         ? 'Přiznaný příjem — klikni pro přeřazení do nepřiznané linie'
                         : 'Nepřiznaný příjem — klikni pro označení jako fakturováno na IČO'
                     }
-                    className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 transition-colors disabled:opacity-40 ${
+                    className={cn(
+                      'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors disabled:opacity-40',
                       t.declared
-                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
-                        : 'bg-slate-50 text-slate-400 ring-1 ring-slate-200 hover:text-slate-600 opacity-0 group-hover:opacity-100'
-                    }`}
+                        ? 'bg-navy-700 text-white hover:bg-navy-800'
+                        : 'bg-navy-50 text-quiet opacity-0 hover:bg-navy-100 group-hover:opacity-100',
+                    )}
                   >
                     IČO
                   </button>
                 )}
                 {t.area && <AreaBadge area={t.area} />}
-                <span className="text-xs text-muted-foreground shrink-0">{formatDate(t.date)}</span>
+                <span className="text-xs text-quiet shrink-0">{formatDate(t.date)}</span>
                 {/* Vlastní měna řádku (migrace 109) — eurová faktura se nesmí
                     tvářit jako koruny jen proto, že je v témže seznamu. */}
-                <span className="text-sm font-semibold text-foreground shrink-0 tabular-nums">{formatAmount(t.amount, t.currency)}</span>
+                <span className="text-sm font-semibold text-ink shrink-0 tabular-nums">{formatAmount(t.amount, t.currency)}</span>
                 <button
                   onClick={() => onDeleteTransaction(t.id)}
                   disabled={isPending}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-red-500 transition-all disabled:opacity-30 shrink-0"
+                  className="shrink-0 p-1 text-quiet opacity-0 transition-all hover:text-danger group-hover:opacity-100 disabled:opacity-30"
                 >
                   <Trash2 size={13} strokeWidth={1.5} />
                 </button>
@@ -177,11 +183,11 @@ function ColumnSection({
       {/* Měsíčně */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <RefreshCw size={11} strokeWidth={1.5} className="text-muted-foreground" />
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Měsíčně</span>
+          <RefreshCw size={11} strokeWidth={1.5} className="text-quiet" />
+          <span className="text-[11px] font-medium text-quiet uppercase tracking-wide">Měsíčně</span>
         </div>
         {monthlyItems.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-2">Žádné opakované položky</p>
+          <p className="text-xs text-quiet py-2">Žádné opakované položky</p>
         ) : (
           <div className="space-y-0.5">
             {monthlyItems.map(row => (
@@ -194,11 +200,11 @@ function ColumnSection({
       {/* Ročně */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <RefreshCw size={11} strokeWidth={1.5} className="text-muted-foreground" />
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Ročně</span>
+          <RefreshCw size={11} strokeWidth={1.5} className="text-quiet" />
+          <span className="text-[11px] font-medium text-quiet uppercase tracking-wide">Ročně</span>
         </div>
         {annualItems.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-2">Žádné opakované položky</p>
+          <p className="text-xs text-quiet py-2">Žádné opakované položky</p>
         ) : (
           <div className="space-y-0.5">
             {annualItems.map(row => (
@@ -219,43 +225,50 @@ function MonthSummaryBar({ summary }: { summary: MonthSummary }) {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <div className="bg-emerald-50 rounded-xl p-3">
-        <div className="flex items-center gap-1.5 mb-1">
-          <TrendingUp size={14} strokeWidth={1.5} className="text-emerald-600" />
-          <span className="text-xs text-muted-foreground">Příjmy celkem</span>
+      {/*
+        Dlaždice byly čtyři barevné plochy — zelená, červená, modrá, fialová —
+        a barva neříkala nic než „tohle je jiná dlaždice". Dílky zelenou nemají
+        a červená je vyhrazená pro chybu (R-091, DESIGN.md). Příjem a výdaj
+        rozlišuje tvar jako ve Workspace: příjem plný, výdaj obrysem. Červená
+        zůstává jen tam, kde je bilance opravdu v minusu.
+      */}
+      <div className="rounded-chip bg-navy-50 p-3">
+        <div className="mb-1 flex items-center gap-1.5">
+          <TrendingUp size={14} strokeWidth={1.5} className="text-navy-600" />
+          <span className="text-xs text-quiet">Příjmy celkem</span>
         </div>
-        <p className="text-base font-semibold text-foreground tabular-nums">{formatAmount(income)}</p>
+        <p className="font-num text-base font-semibold tabular-nums text-ink">{formatAmount(income)}</p>
       </div>
 
-      <div className="bg-red-50 rounded-xl p-3">
-        <div className="flex items-center gap-1.5 mb-1">
-          <TrendingDown size={14} strokeWidth={1.5} className="text-red-500" />
-          <span className="text-xs text-muted-foreground">Výdaje celkem</span>
+      <div className="rounded-chip border border-navy-100 p-3">
+        <div className="mb-1 flex items-center gap-1.5">
+          <TrendingDown size={14} strokeWidth={1.5} className="text-quiet" />
+          <span className="text-xs text-quiet">Výdaje celkem</span>
         </div>
-        <p className="text-base font-semibold text-foreground tabular-nums">{formatAmount(expense)}</p>
+        <p className="font-num text-base font-semibold tabular-nums text-ink">{formatAmount(expense)}</p>
       </div>
 
-      <div className={`rounded-xl p-3 ${net >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
-        <div className="flex items-center gap-1.5 mb-1">
-          <Scale size={14} strokeWidth={1.5} className={net >= 0 ? 'text-blue-600' : 'text-red-500'} />
-          <span className="text-xs text-muted-foreground">Bilance</span>
+      <div className={cn('rounded-chip p-3', net >= 0 ? 'bg-navy-50' : 'bg-danger/5')}>
+        <div className="mb-1 flex items-center gap-1.5">
+          <Scale size={14} strokeWidth={1.5} className={net >= 0 ? 'text-navy-600' : 'text-danger'} />
+          <span className="text-xs text-quiet">Bilance</span>
         </div>
-        <p className={`text-base font-semibold tabular-nums ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+        <p className={cn('font-num text-base font-semibold tabular-nums', net >= 0 ? 'text-ink' : 'text-danger')}>
           {net >= 0 ? '+' : ''}{formatAmount(net)}
         </p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">
+        <p className="mt-0.5 text-[11px] text-quiet">
           Míra úspor: {savingsRate === null ? '—' : `${Math.round(savingsRate)} %`}
         </p>
       </div>
 
-      <div className="bg-purple-50 rounded-xl p-3">
-        <div className="flex items-center gap-1.5 mb-1">
+      <div className="rounded-chip border border-navy-100 p-3">
+        <div className="mb-1 flex items-center gap-1.5">
           {netChange >= 0
-            ? <ArrowUpRight size={14} strokeWidth={1.5} className="text-emerald-600" />
-            : <ArrowDownRight size={14} strokeWidth={1.5} className="text-red-500" />}
-          <span className="text-xs text-muted-foreground">Meziměsíční změna</span>
+            ? <ArrowUpRight size={14} strokeWidth={1.5} className="text-navy-600" />
+            : <ArrowDownRight size={14} strokeWidth={1.5} className="text-danger" />}
+          <span className="text-xs text-quiet">Meziměsíční změna</span>
         </div>
-        <p className={`text-base font-semibold tabular-nums ${netChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+        <p className={cn('font-num text-base font-semibold tabular-nums', netChange >= 0 ? 'text-ink' : 'text-danger')}>
           {netChange >= 0 ? '+' : ''}{formatAmount(netChange)}
           {netChangePct !== null && (
             <span className="text-xs font-medium ml-1">
@@ -263,7 +276,7 @@ function MonthSummaryBar({ summary }: { summary: MonthSummary }) {
             </span>
           )}
         </p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">
+        <p className="text-[11px] text-quiet mt-0.5">
           vs. {formatMonth(prevMonth)}: {prevNet >= 0 ? '+' : ''}{formatAmount(prevNet)}
         </p>
       </div>
@@ -417,12 +430,12 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
   const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
+    <div className="bg-surface border border-navy-100 rounded-box p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Wallet size={16} strokeWidth={1.5} className="text-emerald-600" />
-          <h2 className="text-base font-semibold text-foreground">Příjmy &amp; Výdaje</h2>
+          <Wallet size={16} strokeWidth={1.5} className="text-navy-500" />
+          <h2 className="text-base font-semibold text-ink">Příjmy &amp; Výdaje</h2>
         </div>
         <div className="flex items-center gap-2">
           {/*
@@ -443,7 +456,7 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
           </button>
           <button
             onClick={() => setShowForm(f => !f)}
-            className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-1.5 transition-colors"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
           >
             <Plus size={13} strokeWidth={2} />
             Přidat
@@ -453,12 +466,12 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
 
       {/* Month picker */}
       <div className="flex items-center justify-center gap-3">
-        <button onClick={() => navigateMonth('prev')} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
-          <ChevronLeft size={16} strokeWidth={1.5} className="text-muted-foreground" />
+        <button onClick={() => navigateMonth('prev')} className="p-1.5 hover:bg-muted rounded-chip transition-colors">
+          <ChevronLeft size={16} strokeWidth={1.5} className="text-quiet" />
         </button>
-        <span className="text-sm font-semibold text-foreground w-36 text-center">{formatMonth(currentMonth)}</span>
-        <button onClick={() => navigateMonth('next')} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
-          <ChevronRight size={16} strokeWidth={1.5} className="text-muted-foreground" />
+        <span className="text-sm font-semibold text-ink w-36 text-center">{formatMonth(currentMonth)}</span>
+        <button onClick={() => navigateMonth('next')} className="p-1.5 hover:bg-muted rounded-chip transition-colors">
+          <ChevronRight size={16} strokeWidth={1.5} className="text-quiet" />
         </button>
       </div>
 
@@ -467,20 +480,19 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
 
       {/* Add form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
           <div className="flex gap-2">
             {(['income', 'expense'] as const).map(t => (
               <button
                 key={t}
                 type="button"
                 onClick={() => handleTypeChange(t)}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                className={cn(
+                  'inline-flex min-h-11 flex-1 items-center justify-center rounded-full border text-sm font-semibold transition-colors',
                   type === t
-                    ? t === 'income'
-                      ? 'bg-emerald-500 text-white border-emerald-500'
-                      : 'bg-red-500 text-white border-red-500'
-                    : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
-                }`}
+                    ? 'border-navy-700 bg-navy-700 text-white'
+                    : 'border-input bg-surface text-quiet hover:border-navy-300',
+                )}
               >
                 {t === 'income' ? 'Příjem' : 'Výdaj'}
               </button>
@@ -493,11 +505,12 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
                 key={String(passive)}
                 type="button"
                 onClick={() => setIsPassive(passive)}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors flex items-center justify-center gap-1.5 ${
+                className={cn(
+                  'inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border text-xs font-semibold transition-colors',
                   isPassive === passive
-                    ? 'bg-slate-700 text-white border-slate-700'
-                    : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
-                }`}
+                    ? 'border-navy-700 bg-navy-700 text-white'
+                    : 'border-input bg-surface text-quiet hover:border-navy-300',
+                )}
               >
                 {passive
                   ? <><RefreshCw size={11} strokeWidth={2} /> Opakovaný</>
@@ -514,11 +527,12 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
                   key={f}
                   type="button"
                   onClick={() => setFrequency(f)}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  className={cn(
+                    'inline-flex min-h-11 flex-1 items-center justify-center rounded-full border text-xs font-semibold transition-colors',
                     frequency === f
-                      ? 'bg-slate-600 text-white border-slate-600'
-                      : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
-                  }`}
+                      ? 'border-navy-700 bg-navy-700 text-white'
+                      : 'border-input bg-surface text-quiet hover:border-navy-300',
+                  )}
                 >
                   {f === 'monthly' ? 'Měsíčně' : 'Ročně'}
                 </button>
@@ -528,17 +542,17 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Kategorie</label>
+              <label className="text-xs font-medium text-quiet block mb-1">Kategorie</label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value)}
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className={fieldClass}
               >
                 {categories.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Částka (Kč)</label>
+              <label className="text-xs font-medium text-quiet block mb-1">Částka (Kč)</label>
               <input
                 type="number"
                 min="0.01"
@@ -547,18 +561,18 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
                 required
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className={fieldClass}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Oblast</label>
+              <label className="text-xs font-medium text-quiet block mb-1">Oblast</label>
               <select
                 value={area}
                 onChange={e => setArea(e.target.value)}
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className={fieldClass}
               >
                 <option value="">— bez oblasti —</option>
                 {LIFE_AREAS.map(a => (
@@ -567,57 +581,55 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Popis</label>
+              <label className="text-xs font-medium text-quiet block mb-1">Popis</label>
               <input
                 type="text"
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Volitelně..."
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className={fieldClass}
               />
             </div>
           </div>
 
           {!isPassive && (
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Datum</label>
+              <label className="text-xs font-medium text-quiet block mb-1">Datum</label>
               <input
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 required
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className={fieldClass}
               />
             </div>
           )}
 
           {type === 'income' && !isPassive && (
-            <div className="border border-border rounded-lg overflow-hidden">
+            <div className="border border-navy-100 rounded-chip overflow-hidden">
               <div className="grid grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setDeclared(false)}
-                  className={`py-2 text-sm transition-colors ${
-                    !declared
-                      ? 'bg-slate-100 text-foreground font-medium'
-                      : 'bg-white text-muted-foreground hover:bg-muted/50'
-                  }`}
+                  className={cn(
+                    'min-h-11 text-sm transition-colors',
+                    !declared ? 'bg-navy-100 font-semibold text-ink' : 'bg-surface text-quiet hover:bg-navy-50',
+                  )}
                 >
                   Nepřiznaný
                 </button>
                 <button
                   type="button"
                   onClick={() => setDeclared(true)}
-                  className={`py-2 text-sm transition-colors ${
-                    declared
-                      ? 'bg-emerald-50 text-emerald-700 font-medium'
-                      : 'bg-white text-muted-foreground hover:bg-muted/50'
-                  }`}
+                  className={cn(
+                    'min-h-11 text-sm transition-colors',
+                    declared ? 'bg-navy-700 font-semibold text-white' : 'bg-surface text-quiet hover:bg-navy-50',
+                  )}
                 >
                   Přiznaný (na IČO)
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground px-3 py-2 border-t border-border bg-muted/20 leading-snug">
+              <p className="text-xs text-quiet px-3 py-2 border-t border-navy-100 bg-muted/20 leading-snug">
                 {declared
                   ? 'Půjde do daňového přiznání a započítá se do daňové kalkulačky.'
                   : 'Zůstane mimo daňový základ — v přehledu Podnikání ho najdeš v nepřiznané linii.'}
@@ -626,14 +638,14 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
           )}
 
           {type === 'expense' && area === 'byznys' && (
-            <div className="flex items-start gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <div className="flex items-start gap-2 rounded-chip border border-navy-100 bg-navy-50 px-3 py-2 text-xs text-navy-900">
               <AlertCircle size={13} className="shrink-0 mt-0.5" strokeWidth={1.5} />
               Byznys výdaj bude automaticky přidán do sekce Náklady a přepočítán v Kalkulačce výdělků.
             </div>
           )}
 
           {formError && (
-            <div className="flex items-center gap-2 text-red-600 text-xs">
+            <div className="flex items-center gap-2 text-xs text-danger">
               <AlertCircle size={12} strokeWidth={2} />
               {formError}
             </div>
@@ -643,14 +655,14 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
             <button
               type="button"
               onClick={() => { setShowForm(false); setFormError(null) }}
-              className="flex-1 py-2 text-sm text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-input text-sm font-semibold text-quiet transition-colors hover:bg-navy-50"
             >
               Zrušit
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-navy-700 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
             >
               {isSubmitting && <Loader2 size={14} className="animate-spin" />}
               {isPassive ? 'Uložit opakovanou' : 'Uložit'}
@@ -664,10 +676,10 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <ArrowUpCircle size={15} strokeWidth={1.5} className="text-emerald-600" />
-              <h3 className="text-sm font-semibold text-foreground">Příjmy</h3>
+              <ArrowUpCircle size={15} strokeWidth={1.5} className="text-navy-600" />
+              <h3 className="text-sm font-semibold text-ink">Příjmy</h3>
             </div>
-            <span className="text-sm font-semibold text-emerald-600 tabular-nums">
+            <span className="font-num text-sm font-semibold tabular-nums text-ink">
               +{formatAmount(incomeOneTimeTotal)}
             </span>
           </div>
@@ -683,13 +695,13 @@ export function IncomeExpenseSection({ transactions, currentMonth, recurringItem
           />
         </div>
 
-        <div className="space-y-3 lg:border-l lg:border-border lg:pl-6">
+        <div className="space-y-3 lg:border-l lg:border-navy-100 lg:pl-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <ArrowDownCircle size={15} strokeWidth={1.5} className="text-red-500" />
-              <h3 className="text-sm font-semibold text-foreground">Výdaje</h3>
+              <ArrowDownCircle size={15} strokeWidth={1.5} className="text-quiet" />
+              <h3 className="text-sm font-semibold text-ink">Výdaje</h3>
             </div>
-            <span className="text-sm font-semibold text-red-500 tabular-nums">
+            <span className="font-num text-sm font-semibold tabular-nums text-quiet">
               −{formatAmount(expenseOneTimeTotal)}
             </span>
           </div>

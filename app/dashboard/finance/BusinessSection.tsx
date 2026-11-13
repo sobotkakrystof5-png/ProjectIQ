@@ -36,21 +36,21 @@ function LineCard({
 
   return (
     <div
-      className={`rounded-xl border p-4 ${
-        declared ? 'border-emerald-200 bg-emerald-50/50' : 'border-border bg-white'
+      className={`rounded-chip border p-4 ${
+        declared ? 'border-navy-200 bg-navy-50' : 'border-navy-100 bg-surface'
       }`}
     >
       <div className="flex items-center gap-2 mb-3">
         {icon}
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">{title}</p>
-          <p className="text-xs text-muted-foreground leading-snug">{subtitle}</p>
+          <p className="text-sm font-semibold text-ink">{title}</p>
+          <p className="text-xs text-quiet leading-snug">{subtitle}</p>
         </div>
       </div>
 
       <p
         className={`text-2xl font-bold tabular-nums leading-none ${
-          declared ? 'text-emerald-700' : 'text-foreground'
+          declared ? 'text-navy-900' : 'text-ink'
         }`}
       >
         {formatAmount(line.income)}
@@ -58,19 +58,19 @@ function LineCard({
 
       <div className="mt-3 space-y-1.5 text-xs">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-muted-foreground">Zakázky v příjmech</span>
-          <span className="font-medium text-foreground tabular-nums">
+          <span className="text-quiet">Zakázky v příjmech</span>
+          <span className="font-medium text-ink tabular-nums">
             {projectsLabel(line.projectCount)}
             {line.transactionCount !== line.projectCount && (
-              <span className="text-muted-foreground font-normal"> · {line.transactionCount} transakcí</span>
+              <span className="text-quiet font-normal"> · {line.transactionCount} transakcí</span>
             )}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-muted-foreground">Nezaplacené zakázky</span>
+          <span className="text-quiet">Nezaplacené zakázky</span>
           <span
             className={`font-medium tabular-nums ${
-              line.outstanding > 0 ? 'text-amber-700' : 'text-muted-foreground'
+              line.outstanding > 0 ? 'text-signal-ink' : 'text-quiet'
             }`}
           >
             {formatAmount(line.outstanding)}
@@ -106,12 +106,12 @@ export function BusinessSection({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-chip bg-navy-700">
             <Briefcase size={15} strokeWidth={1.5} className="text-white" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground">Příjmy z podnikání</h2>
-            <p className="text-xs text-muted-foreground">Podle data zaplacení, ne vystavení faktury</p>
+            <h2 className="text-base font-semibold text-ink">Příjmy z podnikání</h2>
+            <p className="text-xs text-quiet">Podle data zaplacení, ne vystavení faktury</p>
           </div>
         </div>
 
@@ -121,10 +121,10 @@ export function BusinessSection({
               key={y}
               href={`/dashboard/finance?tab=podnikani&year=${y}`}
               scroll={false}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              className={`px-3 py-1.5 text-sm rounded-chip transition-colors ${
                 y === summary.year
-                  ? 'bg-emerald-600 text-white font-medium'
-                  : 'text-muted-foreground hover:bg-muted border border-border'
+                  ? 'bg-navy-700 font-semibold text-white'
+                  : 'text-quiet hover:bg-muted border border-navy-100'
               }`}
             >
               {y}
@@ -139,21 +139,21 @@ export function BusinessSection({
           title="Přiznané"
           subtitle="Fakturováno na IČO — jde do přiznání"
           tone="declared"
-          icon={<FileCheck2 size={16} className="text-emerald-600 shrink-0" strokeWidth={1.5} />}
+          icon={<FileCheck2 size={16} className="shrink-0 text-navy-500" strokeWidth={1.5} />}
         />
         <LineCard
           line={summary.undeclared}
           title="Nepřiznané"
           subtitle="Mimo daňový základ"
           tone="undeclared"
-          icon={<EyeOff size={16} className="text-muted-foreground shrink-0" strokeWidth={1.5} />}
+          icon={<EyeOff size={16} className="text-quiet shrink-0" strokeWidth={1.5} />}
         />
       </div>
 
-      <div className="flex items-start gap-2 text-xs text-muted-foreground bg-slate-50 border border-border rounded-lg px-3 py-2">
+      <div className="flex items-start gap-2 rounded-chip border border-navy-100 bg-navy-50/60 px-3 py-2 text-xs text-quiet">
         <AlertCircle size={13} className="shrink-0 mt-0.5" strokeWidth={1.5} />
         <span>
-          Celkový příjem za {summary.year}: <strong className="text-foreground">{formatAmount(summary.total)}</strong>{' '}
+          Celkový příjem za {summary.year}: <strong className="text-ink">{formatAmount(summary.total)}</strong>{' '}
           — součet obou linií v korunách. Do daní níže vstupuje jen přiznaná část.
           {summary.declared.outstanding + summary.undeclared.outstanding > 0 &&
             ' Nezaplacené zakázky se počítají napříč roky: dokud peníze nedorazí, nepatří žádnému.'}
@@ -163,7 +163,7 @@ export function BusinessSection({
       {/* Cizí měna stojí vedle korun, ne v nich: kurz nikde neukládáme, takže
           převod by byl vymyšlené číslo (R-048). Do daní nevstupuje. */}
       {summary.foreign.length > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+        <div className="flex items-start gap-2 rounded-chip border border-dashed border-signal-line bg-signal-bg px-3 py-2 text-xs text-signal-ink">
           <AlertCircle size={13} className="mt-0.5 shrink-0" strokeWidth={1.5} />
           <span>
             Navíc v jiné měně:{' '}
@@ -175,7 +175,7 @@ export function BusinessSection({
 
       {/* Archiv faktur je podsekce přiznané linie — faktura je doklad k příjmu,
           který do téhle linie spadá. Samostatná stránka by ten vztah rozbila. */}
-      <div className="border-t border-border pt-6">
+      <div className="border-t border-navy-100 pt-6">
         <InvoiceArchive
           data={invoices}
           todayIso={todayIso}
@@ -184,16 +184,16 @@ export function BusinessSection({
         />
       </div>
 
-      <div className="border-t border-border pt-6">
+      <div className="border-t border-navy-100 pt-6">
         <TaxCalculator defaultIncome={summary.declared.income} year={summary.year} />
       </div>
 
       {/* Termíny a novinky jdou až za čísla: napřed kolik, pak dokdy a co je nového. */}
-      <div className="border-t border-border pt-6">
+      <div className="border-t border-navy-100 pt-6">
         <TaxDeadlines todayIso={todayIso} />
       </div>
 
-      <div className="border-t border-border pt-6">
+      <div className="border-t border-navy-100 pt-6">
         <TaxNewsBlock data={taxNews} />
       </div>
     </div>

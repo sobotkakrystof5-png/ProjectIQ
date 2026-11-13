@@ -7,23 +7,25 @@ import {
 } from 'lucide-react'
 import type { BusinessOverview } from './byznys-actions'
 import { foreignLabel } from '@/lib/money-currency'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(n)
 }
 
 const STAT_BG: Record<'green' | 'red' | 'blue' | 'purple', string> = {
-  green: 'bg-emerald-50',
-  red: 'bg-red-50',
-  blue: 'bg-blue-50',
-  purple: 'bg-purple-50',
+  green: 'bg-navy-50',
+  red: 'border border-navy-100',
+  blue: 'bg-navy-50',
+  purple: 'border border-navy-100',
 }
 
 const STAT_TEXT: Record<'green' | 'red' | 'blue' | 'purple', string> = {
-  green: 'text-emerald-700',
-  red: 'text-red-600',
-  blue: 'text-blue-700',
-  purple: 'text-purple-700',
+  green: 'text-ink',
+  red: 'text-danger',
+  blue: 'text-ink',
+  purple: 'text-ink',
 }
 
 function StatCard({
@@ -36,13 +38,13 @@ function StatCard({
   accent: 'green' | 'red' | 'blue' | 'purple'
 }) {
   return (
-    <div className={`${STAT_BG[accent]} rounded-xl p-4`}>
+    <div className={`${STAT_BG[accent]} rounded-chip p-4`}>
       <div className="flex items-center gap-1.5 mb-1.5">
         {icon}
-        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-xs text-quiet font-medium uppercase tracking-wide">{label}</span>
       </div>
       <p className={`text-2xl font-bold leading-none ${STAT_TEXT[accent]}`}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-1.5">{sub}</p>}
+      {sub && <p className="text-xs text-quiet mt-1.5">{sub}</p>}
     </div>
   )
 }
@@ -73,45 +75,45 @@ export function BusinessCalculator({ overview }: Props) {
   }, [extraAmount, extraType, income, profit, annualFixedCosts])
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
+    <div className="bg-surface border border-navy-100 rounded-box p-6 space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-navy-50 rounded-chip flex items-center justify-center">
             <Calculator size={15} className="text-navy-600" strokeWidth={1.5} />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground">Výkonnost podnikání</h2>
-            <p className="text-xs text-muted-foreground">Zakázky a byznys příjmy vs. reálné náklady</p>
+            <h2 className="text-base font-semibold text-ink">Výkonnost podnikání</h2>
+            <p className="text-xs text-quiet">Zakázky a byznys příjmy vs. reálné náklady</p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
-          <BadgeCheck size={12} strokeWidth={1.5} />
+        <Badge variant="confirmed">
+          <BadgeCheck size={12} strokeWidth={1.5} aria-hidden="true" />
           Reálná data
-        </span>
+        </Badge>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
-          icon={<TrendingUp size={14} strokeWidth={1.5} className="text-blue-600" />}
+          icon={<TrendingUp size={14} strokeWidth={1.5} className="text-navy-600" />}
           label="Příjmy"
           value={`${fmt(income)} Kč`}
           accent="blue"
         />
         <StatCard
-          icon={<TrendingDown size={14} strokeWidth={1.5} className="text-red-500" />}
+          icon={<TrendingDown size={14} strokeWidth={1.5} className="text-quiet" />}
           label="Výdaje"
           value={`${fmt(expenses)} Kč`}
           accent="red"
         />
         <StatCard
-          icon={<Scale size={14} strokeWidth={1.5} className={profit >= 0 ? 'text-emerald-600' : 'text-red-500'} />}
+          icon={<Scale size={14} strokeWidth={1.5} className={profit >= 0 ? 'text-navy-600' : 'text-danger'} />}
           label="Zisk / Ztráta"
           value={`${profit >= 0 ? '+' : ''}${fmt(profit)} Kč`}
           sub={profit < 0 ? 'Ve ztrátě' : undefined}
           accent={profit >= 0 ? 'green' : 'red'}
         />
         <StatCard
-          icon={<Percent size={14} strokeWidth={1.5} className="text-purple-600" />}
+          icon={<Percent size={14} strokeWidth={1.5} className="text-navy-600" />}
           label="Marže"
           value={`${marginPct.toFixed(1)} %`}
           accent={marginPct >= 0 ? 'purple' : 'red'}
@@ -120,23 +122,23 @@ export function BusinessCalculator({ overview }: Props) {
 
       {/* Příjem v jiné měně se do korunových dlaždic nepočítá (R-048, AD13). */}
       {overview.foreign.length > 0 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-quiet">
           Mimo tahle čísla je ještě{' '}
-          <strong className="text-foreground">{foreignLabel(overview.foreign)}</strong> — jiná měna se ke korunám
+          <strong className="text-ink">{foreignLabel(overview.foreign)}</strong> — jiná měna se ke korunám
           nepřičítá.
         </p>
       )}
 
       {/* Co kdyby simulace */}
-      <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">
+      <div className="bg-muted/30 border border-navy-100 rounded-chip p-4 space-y-3">
         <div className="flex items-center gap-2">
           <TrendingUp size={14} strokeWidth={1.5} className="text-navy-600" />
-          <h3 className="text-sm font-semibold text-foreground">Co kdybych vydělal navíc...</h3>
+          <h3 className="text-sm font-semibold text-ink">Co kdybych vydělal navíc...</h3>
         </div>
 
         <div className="flex gap-2">
           <div className="flex-1">
-            <label className="text-xs font-medium text-muted-foreground block mb-1">Dodatečný příjem (Kč)</label>
+            <label className="text-xs font-medium text-quiet block mb-1">Dodatečný příjem (Kč)</label>
             <input
               type="number"
               min="0"
@@ -144,7 +146,7 @@ export function BusinessCalculator({ overview }: Props) {
               value={extraAmount}
               onChange={e => setExtraAmount(e.target.value)}
               placeholder="0"
-              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500"
+              className="w-full text-sm border border-navy-100 rounded-chip px-3 py-2 bg-surface focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-500"
             />
           </div>
           <div className="flex gap-1.5 items-end">
@@ -153,10 +155,10 @@ export function BusinessCalculator({ overview }: Props) {
                 key={t}
                 type="button"
                 onClick={() => setExtraType(t)}
-                className={`h-[38px] px-3 text-xs font-medium rounded-lg border transition-colors ${
+                className={`h-[38px] px-3 text-xs font-medium rounded-chip border transition-colors ${
                   extraType === t
                     ? 'bg-navy-700 text-white border-navy-700'
-                    : 'bg-white text-muted-foreground border-border hover:border-foreground/20'
+                    : 'bg-surface text-quiet border-navy-100 hover:border-foreground/20'
                 }`}
               >
                 {t === 'monthly' ? 'Měsíčně' : 'Jednorázově'}
@@ -166,23 +168,23 @@ export function BusinessCalculator({ overview }: Props) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white border border-border rounded-lg p-3">
-            <p className="text-xs text-muted-foreground mb-1">Nový zisk / ztráta</p>
-            <p className={`text-lg font-bold ${whatIf.newProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+          <div className="bg-surface border border-navy-100 rounded-chip p-3">
+            <p className="text-xs text-quiet mb-1">Nový zisk / ztráta</p>
+            <p className={cn('font-num text-lg font-bold', whatIf.newProfit >= 0 ? 'text-ink' : 'text-danger')}>
               {fmt(whatIf.newProfit)} Kč
             </p>
           </div>
-          <div className="bg-white border border-border rounded-lg p-3">
-            <p className="text-xs text-muted-foreground mb-1">Nová marže</p>
-            <p className="text-lg font-bold text-foreground">{whatIf.newMarginPct.toFixed(1)} %</p>
+          <div className="bg-surface border border-navy-100 rounded-chip p-3">
+            <p className="text-xs text-quiet mb-1">Nová marže</p>
+            <p className="text-lg font-bold text-ink">{whatIf.newMarginPct.toFixed(1)} %</p>
           </div>
         </div>
 
         {annualFixedCosts > 0 && (
-          <div className={`flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${
+          <div className={`flex items-start gap-2 text-xs rounded-chip px-3 py-2 ${
             whatIf.missingMonthly > 0
-              ? 'text-amber-700 bg-amber-50 border border-amber-200'
-              : 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+              ? 'border border-dashed border-signal-line bg-signal-bg text-signal-ink'
+              : 'border border-navy-100 bg-navy-50 text-navy-900'
           }`}
           >
             {whatIf.missingMonthly > 0

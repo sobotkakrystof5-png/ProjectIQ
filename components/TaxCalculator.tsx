@@ -25,20 +25,20 @@ function Row({
 }) {
   const color =
     accent === 'green'
-      ? 'text-emerald-700'
+      ? 'text-ink'
       : accent === 'red'
-        ? 'text-red-600'
+        ? 'text-danger'
         : accent === 'amber'
-          ? 'text-amber-700'
-          : 'text-foreground'
+          ? 'text-signal-ink'
+          : 'text-ink'
 
   return (
     <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
       <div className="min-w-0">
-        <p className={`text-sm ${strong ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+        <p className={`text-sm ${strong ? 'font-semibold text-ink' : 'text-quiet'}`}>
           {label}
         </p>
-        {hint && <p className="text-xs text-muted-foreground/80 mt-0.5 leading-snug">{hint}</p>}
+        {hint && <p className="text-xs text-quiet/80 mt-0.5 leading-snug">{hint}</p>}
       </div>
       <p className={`text-sm tabular-nums whitespace-nowrap ${strong ? 'font-bold' : 'font-medium'} ${color}`}>
         {value}
@@ -72,19 +72,19 @@ export default function TaxCalculator({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-navy-50 rounded-chip flex items-center justify-center">
             <Calculator size={15} className="text-navy-600" strokeWidth={1.5} />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-foreground">Daně a odvody</h3>
-            <p className="text-xs text-muted-foreground">
+            <h3 className="text-base font-semibold text-ink">Daně a odvody</h3>
+            <p className="text-xs text-quiet">
               Rok {year} · vedlejší činnost (student) · 60% paušál · neplátce DPH
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <label htmlFor="tax-income" className="text-xs text-muted-foreground whitespace-nowrap">
+          <label htmlFor="tax-income" className="text-xs text-quiet whitespace-nowrap">
             Přiznaný příjem
           </label>
           <div className="relative">
@@ -96,9 +96,9 @@ export default function TaxCalculator({
               inputMode="numeric"
               value={raw}
               onChange={e => setRaw(e.target.value)}
-              className="w-36 text-sm border border-border rounded-md px-2 py-1.5 pr-8 text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-navy-500"
+              className="w-36 text-sm border border-navy-100 rounded-md px-2 py-1.5 pr-8 text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-navy-500"
             />
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-quiet pointer-events-none">
               Kč
             </span>
           </div>
@@ -107,7 +107,7 @@ export default function TaxCalculator({
               type="button"
               onClick={() => setRaw(String(Math.max(0, Math.round(defaultIncome))))}
               title="Vrátit částku z ledgeru"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="p-1.5 rounded-md text-quiet hover:text-ink hover:bg-muted transition-colors"
             >
               <RotateCcw size={14} strokeWidth={1.5} />
             </button>
@@ -116,13 +116,13 @@ export default function TaxCalculator({
       </div>
 
       {edited && (
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <p className="rounded-chip border border-dashed border-signal-line bg-signal-bg px-3 py-2 text-xs text-signal-ink">
           Počítáš s ručně zadanou částkou, ne s příjmem z ledgeru ({fmt(Math.round(defaultIncome))} Kč).
         </p>
       )}
 
       {r.overLumpSumCap && (
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
+        <p className="flex items-start gap-2 rounded-chip border border-dashed border-signal-line bg-signal-bg px-3 py-2 text-xs text-signal-ink">
           <AlertTriangle size={14} className="shrink-0 mt-0.5" strokeWidth={1.5} />
           <span>
             Příjem přesáhl 2 000 000 Kč — 60% paušál už nelze uplatnit a vzniká povinná registrace
@@ -132,7 +132,7 @@ export default function TaxCalculator({
       )}
 
       {!r.ratesMatchYear && (
-        <p className="text-xs text-muted-foreground bg-slate-50 border border-border rounded-lg px-3 py-2 flex items-start gap-2">
+        <p className="flex items-start gap-2 rounded-chip border border-navy-100 bg-navy-50/60 px-3 py-2 text-xs text-quiet">
           <Info size={14} className="shrink-0 mt-0.5" strokeWidth={1.5} />
           <span>
             Pro rok {year} nejsou v aplikaci vlastní sazby — počítá se sazbami roku {r.ratesYear}.
@@ -141,27 +141,27 @@ export default function TaxCalculator({
       )}
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1.5">
+        <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
+          <p className="text-xs text-quiet font-medium uppercase tracking-wide mb-1.5">
             Odvody celkem
           </p>
-          <p className="text-2xl font-bold text-red-600 leading-none tabular-nums">
+          <p className="font-num text-2xl font-bold leading-none tabular-nums text-danger">
             {fmt(r.totalLevies)} Kč
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-quiet mt-1">
             efektivní zdanění {(r.effectiveRate * 100).toFixed(1).replace('.', ',')} %
           </p>
         </div>
-        <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1.5">
+        <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
+          <p className="text-xs text-quiet font-medium uppercase tracking-wide mb-1.5">
             Zbyde ti
           </p>
-          <p className="text-2xl font-bold text-emerald-700 leading-none tabular-nums">
+          <p className="font-num text-2xl font-bold leading-none tabular-nums text-ink">
             {fmt(r.net)} Kč
           </p>
-          <p className="text-xs text-muted-foreground mt-1">příjem po odvodech</p>
+          <p className="text-xs text-quiet mt-1">příjem po odvodech</p>
         </div>
-        <div className="bg-navy-50 border border-navy-100 rounded-xl p-4 shadow-sm">
+        <div className="bg-navy-50 border border-navy-100 rounded-chip p-4 shadow-sm">
           <p className="text-xs text-navy-700 font-medium uppercase tracking-wide mb-1.5">
             Měsíční rezerva
           </p>
@@ -172,7 +172,7 @@ export default function TaxCalculator({
         </div>
       </div>
 
-      <div className="bg-white border border-border rounded-xl overflow-hidden divide-y divide-border">
+      <div className="bg-surface border border-navy-100 rounded-chip overflow-hidden divide-y divide-navy-100">
         <Row
           label="Příjem"
           value={`${fmt(r.income)} Kč`}
@@ -218,7 +218,7 @@ export default function TaxCalculator({
 
       <TaxLimitWatch income={income} />
 
-      <p className="text-xs text-muted-foreground leading-relaxed">{TAX_BASIS_NOTE}</p>
+      <p className="text-xs text-quiet leading-relaxed">{TAX_BASIS_NOTE}</p>
     </div>
   )
 }

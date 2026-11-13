@@ -56,7 +56,7 @@ export function TradingViewChart({
   return (
     <div
       ref={containerRef}
-      className="tradingview-widget-container w-full rounded-xl overflow-hidden border border-border"
+      className="tradingview-widget-container w-full rounded-chip overflow-hidden border border-navy-100"
       style={{ height }}
     />
   )
@@ -106,7 +106,7 @@ export function TradingViewMiniChart({
   return (
     <div
       ref={containerRef}
-      className="tradingview-widget-container w-full rounded-xl overflow-hidden border border-border"
+      className="tradingview-widget-container w-full rounded-chip overflow-hidden border border-navy-100"
       style={{ height }}
     />
   )

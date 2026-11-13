@@ -1,6 +1,8 @@
 'use client'
 
 import { Activity, TrendingUp, TrendingDown, Wallet, Percent } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { toneVariant, type AdminTone } from '@/lib/admin-status'
 import type { FinanceHealthOverview } from './finance-actions'
 
 const MONTHS_SHORT = ['Led', 'Úno', 'Bře', 'Dub', 'Kvě', 'Čer', 'Čec', 'Srp', 'Zář', 'Říj', 'Lis', 'Pro']
@@ -19,23 +21,23 @@ const HEALTH_LABEL: Record<string, string> = {
   bad: 'Ve ztrátě',
 }
 
-const HEALTH_STYLE: Record<string, string> = {
-  good: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-  warning: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  bad: 'bg-red-50 text-red-600 ring-1 ring-red-200',
-}
+/**
+ * Jak si stojíš: tři stavy přes pět tónů adminu (R-091). „V plusu" je
+ * uzavřený stav (success), „Pozor na výdaje" čeká na vás (signal),
+ * „Ve ztrátě" je chyba (danger).
+ */
+const HEALTH_TONE: Record<string, AdminTone> = { good: 'success', warning: 'signal', bad: 'danger' }
 
-const HEALTH_DOT: Record<string, string> = {
-  good: 'bg-emerald-500',
-  warning: 'bg-amber-500',
-  bad: 'bg-red-500',
-}
-
+/**
+ * Plocha dlaždice. Dílky mají jednu paletu, takže čtyři odstíny pro čtyři
+ * dlaždice nemají co rozlišovat — příjem je plný, výdaj obrysem, jako
+ * v penězích Workspace.
+ */
 const BG: Record<string, string> = {
-  emerald: 'bg-emerald-50',
-  red: 'bg-red-50',
-  blue: 'bg-blue-50',
-  purple: 'bg-purple-50',
+  emerald: 'bg-navy-50',
+  red: 'border border-navy-100',
+  blue: 'bg-navy-50',
+  purple: 'border border-navy-100',
 }
 
 function SummaryCard({
@@ -47,12 +49,12 @@ function SummaryCard({
   color: string
 }) {
   return (
-    <div className={`${BG[color]} rounded-xl p-3`}>
+    <div className={`${BG[color]} rounded-chip p-3`}>
       <div className="flex items-center gap-1.5 mb-1">
         {icon}
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-xs text-quiet">{label}</span>
       </div>
-      <p className="text-base font-semibold text-foreground tabular-nums">{value}</p>
+      <p className="text-base font-semibold text-ink tabular-nums">{value}</p>
     </div>
   )
 }
@@ -63,13 +65,13 @@ function RatioBar({ income, expense }: { income: number; expense: number }) {
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex items-center justify-between text-xs text-quiet">
         <span>Příjmy : Výdaje (12 měsíců)</span>
         <span className="tabular-nums">{Math.round(incomePct)} % : {Math.round(100 - incomePct)} %</span>
       </div>
       <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-muted">
-        <div className="h-full bg-emerald-400 transition-all duration-500" style={{ width: `${incomePct}%` }} />
-        <div className="h-full bg-red-400 transition-all duration-500" style={{ width: `${100 - incomePct}%` }} />
+        <div className="h-full bg-navy-600 transition-all duration-500" style={{ width: `${incomePct}%` }} />
+        <div className="h-full bg-navy-200 transition-all duration-500" style={{ width: `${100 - incomePct}%` }} />
       </div>
     </div>
   )
@@ -81,14 +83,14 @@ function BarChart({ data }: { data: FinanceHealthOverview['trend'] }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-4 mb-1">
-        <span className="text-xs font-medium text-foreground">Posledních 6 měsíců</span>
+        <span className="text-xs font-medium text-ink">Posledních 6 měsíců</span>
         <div className="flex items-center gap-3 ml-auto">
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block" />
+          <span className="flex items-center gap-1 text-[10px] text-quiet">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-navy-600" />
             Příjmy
           </span>
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" />
+          <span className="flex items-center gap-1 text-[10px] text-quiet">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-navy-200" />
             Výdaje
           </span>
         </div>
@@ -104,17 +106,17 @@ function BarChart({ data }: { data: FinanceHealthOverview['trend'] }) {
             <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
               <div className="w-full flex items-end justify-center gap-0.5" style={{ height: '96px' }}>
                 <div
-                  className="flex-1 bg-emerald-400 rounded-t transition-all duration-500"
+                  className="flex-1 rounded-t bg-navy-600 transition-all duration-500"
                   style={{ height: `${incomeH}%` }}
                   title={`Příjmy: ${formatAmount(m.income)}`}
                 />
                 <div
-                  className="flex-1 bg-red-400 rounded-t transition-all duration-500"
+                  className="flex-1 rounded-t bg-navy-200 transition-all duration-500"
                   style={{ height: `${expenseH}%` }}
                   title={`Výdaje: ${formatAmount(m.expense)}`}
                 />
               </div>
-              <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
+              <span className="text-[10px] text-quiet leading-none">{label}</span>
             </div>
           )
         })}
@@ -131,39 +133,37 @@ export function FinanceHealthSection({ overview }: Props) {
   const { income12m, expense12m, savings12m, savingsRate, health, trend } = overview
 
   return (
-    <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
+    <div className="bg-surface border border-navy-100 rounded-box p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Activity size={16} strokeWidth={1.5} className="text-emerald-600" />
-          <h2 className="text-base font-semibold text-foreground">Jak si stojíš</h2>
+          <Activity size={16} strokeWidth={1.5} className="text-navy-500" />
+          <h2 className="text-base font-semibold text-ink">Jak si stojíš</h2>
         </div>
-        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${HEALTH_STYLE[health]}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${HEALTH_DOT[health]}`} />
-          {HEALTH_LABEL[health]}
-        </span>
+        {/* Odznak sám nese tón, tečka navíc by na tmavé pilulce zanikla. */}
+        <Badge variant={toneVariant(HEALTH_TONE[health] ?? 'neutral')}>{HEALTH_LABEL[health]}</Badge>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard
-          icon={<TrendingUp size={14} strokeWidth={1.5} className="text-emerald-600" />}
+          icon={<TrendingUp size={14} strokeWidth={1.5} className="text-navy-600" />}
           label="Příjmy (12 měs.)"
           value={formatAmount(income12m)}
           color="emerald"
         />
         <SummaryCard
-          icon={<TrendingDown size={14} strokeWidth={1.5} className="text-red-500" />}
+          icon={<TrendingDown size={14} strokeWidth={1.5} className="text-quiet" />}
           label="Výdaje (12 měs.)"
           value={formatAmount(expense12m)}
           color="red"
         />
         <SummaryCard
-          icon={<Wallet size={14} strokeWidth={1.5} className={savings12m >= 0 ? 'text-blue-600' : 'text-red-500'} />}
+          icon={<Wallet size={14} strokeWidth={1.5} className={savings12m >= 0 ? 'text-navy-600' : 'text-danger'} />}
           label="Úspory (12 měs.)"
           value={formatAmount(savings12m)}
           color={savings12m >= 0 ? 'blue' : 'red'}
         />
         <SummaryCard
-          icon={<Percent size={14} strokeWidth={1.5} className="text-purple-600" />}
+          icon={<Percent size={14} strokeWidth={1.5} className="text-navy-600" />}
           label="Savings rate"
           value={`${Math.round(savingsRate)} %`}
           color="purple"
