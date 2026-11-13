@@ -54,10 +54,12 @@ const nextConfig = {
   // PDF potřebuje skutečnou cestu k binárkám, bundler balíček nesmí přemístit.
   serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
   outputFileTracingIncludes: {
-    // lib/ws/money/pdf.ts čte písma a tokeny za běhu přes readFile (152 kB).
-    '/**': ['./lib/ws/money/assets/**/*', './app/ws-tokens.css'],
+    // lib/invoice-pdf/render.ts čte písma a tokeny za běhu přes readFile (152 kB).
+    '/**': ['./lib/invoice-pdf/assets/**/*', './app/ws-tokens.css'],
     // Chromium jen tam, kde vzniká PDF faktury.
     '/api/ws/*/faktury/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Admin: faktura vystavená v adminu nemá uložené PDF, vyrábí se při stažení (AD12).
+    '/api/invoices/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/z/*/faktura/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/ucet/export': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/*/faktury': ['./node_modules/@sparticuz/chromium/bin/**/*'],

@@ -12,6 +12,12 @@ import {
 } from '@/lib/invoices'
 import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { isIsoDate } from '@/lib/prague-time'
+import {
+  cancelInvoice, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, saveIssuerProfile,
+  type IssuerSettings,
+} from '@/lib/admin/invoice-issue'
+import { issueInvoiceSchema, issuerProfileSchema } from '@/lib/admin/invoice-issue-schema'
+import { lookupIco } from '@/lib/ares'
 import type { InvoiceAiExtract } from '@/lib/types'
 
 /**
@@ -39,6 +45,8 @@ export interface InvoiceListItem {
   pdf_filename: string | null
   pdf_size: number | null
   has_pdf: boolean
+  /** Storno (AD12): doklad zůstává v evidenci kvůli souvislé řadě, ale neplatí. */
+  cancelled_at: string | null
   /** Odkaz na zakázku v adminu — null u faktury bez zakázky */
   project_href: string | null
   project_client_name: string | null
@@ -95,7 +103,7 @@ export async function getInvoices(year: number): Promise<InvoiceArchiveData> {
         SELECT ${INVOICE_COLUMNS}, 0 AS other_income_count
         FROM invoices i
         LEFT JOIN projects p ON p.id = i.project_id
-        WHERE i.paid_on IS NULL
+        WHERE i.paid_on IS NULL AND i.cancelled_at IS NULL
         ORDER BY COALESCE(i.due_on, i.issued_on) ASC
         LIMIT ${ARCHIVE_LIMIT}
       `,
@@ -238,12 +246,17 @@ export async function setInvoicePaid(id: string, paidOn: string | null): Promise
     if (!UUID_RE.test(id)) return { error: 'Faktura nenalezena' }
     if (paidOn !== null && !isIsoDate(paidOn)) return { error: 'Neplatné datum zaplacení' }
 
+    // Stornovaný doklad se neplatí — jinak by storno zrušený příjem
+    // (`cancelInvoice`) vzniknul znovu jedním kliknutím ve výpisu.
     const rows = await sql`
       UPDATE invoices SET paid_on = ${paidOn}
-      WHERE id = ${id}
+      WHERE id = ${id} AND cancelled_at IS NULL
       RETURNING project_id::text
     `
-    if (!rows.length) return { error: 'Faktura nenalezena' }
+    if (!rows.length) {
+      const existuje = await sql`SELECT cancelled_at FROM invoices WHERE id = ${id} LIMIT 1`
+      return { error: existuje.length ? 'Stornovaná faktura se nedá označit jako zaplacená.' : 'Faktura nenalezena' }
+    }
 
     await syncInvoiceTransaction(id)
     revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
@@ -264,7 +277,13 @@ export async function deleteInvoice(id: string): Promise<{ error?: string }> {
     await deleteInvoiceRow(id)
     revalidateInvoicePaths(projectId)
     return {}
-  } catch {
+  } catch (err) {
+    // Pojistka z migrace 108: doklad z vlastní řady se nemaže, aby v číslech
+    // nevznikla díra. Oprava se dělá stornem a novou fakturou.
+    const zprava = err instanceof Error ? err.message : ''
+    if (zprava.includes('admin_invoice_undeletable')) {
+      return { error: 'Vystavenou fakturu nemažeme — číslo by v řadě chybělo. Použijte storno.' }
+    }
     return { error: 'Nepodařilo se smazat fakturu' }
   }
 }
@@ -321,6 +340,20 @@ export interface InvoiceLedgerEntry {
   owned_by_invoice: boolean
 }
 
+/**
+ * Faktura vystavená v adminu (AD12). U nahraného dokladu je `null` — archiv
+ * položky ani dodavatele nemá, a dokud nedoběhne migrace 107, nemá je nikdo.
+ */
+export interface IssuedInvoiceDetail {
+  items: { description: string; quantity: number; unitPrice: number; vatRate: number }[]
+  issuer: { name: string; address: string; ico: string; dic: string; bank: string; vatPayer: boolean }
+  client_address: string | null
+  supplied_on: string | null
+  vat_total: number | null
+  cancelled_at: string | null
+  sent_at: string | null
+}
+
 /** Faktura se vším, co je o ní uloženo — včetně surového AI přepisu a vazby na ledger. */
 export interface InvoiceDetail extends InvoiceRegistryItem {
   ai_extracted: InvoiceAiExtract | null
@@ -330,6 +363,8 @@ export interface InvoiceDetail extends InvoiceRegistryItem {
   /** Kontakt ze zakázky (AD10) — nezaplacenou fakturu jde urgovat odsud. */
   project_client_phone: string | null
   project_client_email: string | null
+  /** Vyplněné jen u faktury vystavené tady; nahraný archiv má `null` (AD12). */
+  issued: IssuedInvoiceDetail | null
 }
 
 export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null> {
@@ -395,5 +430,119 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
     ...toRegistryItem(registryRow),
     ai_extracted, created_at, updated_at, ledger,
     project_client_phone, project_client_email,
+    issued: await loadIssuedPart(id),
   }
+}
+
+/**
+ * Část dokladu, kterou má jen faktura vystavená tady. Samostatný dotaz
+ * schválně: dokud nedoběhne migrace 107, ty sloupce v databázi nejsou
+ * a hlavní dotaz by na nich spadl (AD12).
+ */
+async function loadIssuedPart(id: string): Promise<IssuedInvoiceDetail | null> {
+  if (!(await isIssuingReady())) return null
+  const rows = await sql`
+    SELECT items, issuer, client_address, supplied_on::text,
+           vat_total::float AS vat_total, cancelled_at::text, sent_at::text
+    FROM invoices
+    WHERE id = ${id} AND number_seq IS NOT NULL
+    LIMIT 1
+  `
+  const row = rows[0] as (IssuedInvoiceDetail & { items: unknown; issuer: unknown }) | undefined
+  if (!row) return null
+  return {
+    items: (row.items as IssuedInvoiceDetail['items']) ?? [],
+    issuer: row.issuer as IssuedInvoiceDetail['issuer'],
+    client_address: row.client_address,
+    supplied_on: row.supplied_on,
+    vat_total: row.vat_total,
+    cancelled_at: row.cancelled_at,
+    sent_at: row.sent_at,
+  }
+}
+
+// ─── Vystavování faktur (AD12) ───────────────────────────────────────────────
+
+/**
+ * Vystavení je **oddělená cesta** od archivu: nejde přes `parseInvoiceForm`
+ * ani `insertInvoice`, protože doklad vzniká v databázi (`admin_invoice_issue`)
+ * i s číslem z řady. Archiv cizích PDF, AI přepis a `syncInvoiceTransaction`
+ * se tím nemění ani o řádek.
+ *
+ * Příjem z vystavené faktury vzniká až zaplacením (`setInvoicePaid` výš) —
+ * daňová evidence jede na hotovostním principu (R-011).
+ */
+
+export async function getIssuerSettings(): Promise<IssuerSettings> {
+  await requireAuth()
+  return loadIssuerProfile()
+}
+
+export async function saveIssuer(raw: unknown): Promise<{ error?: string }> {
+  await requireAuth()
+  const parsed = issuerProfileSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Údaje dodavatele nejsou úplné.' }
+  try {
+    await saveIssuerProfile(parsed.data)
+    revalidatePath('/dashboard/faktury')
+    return {}
+  } catch {
+    return { error: 'Profil se nepodařilo uložit. Zkuste to prosím znovu.' }
+  }
+}
+
+export async function issueNewInvoice(raw: unknown): Promise<{ error?: string; id?: string; number?: string }> {
+  await requireAuth()
+
+  const parsed = issueInvoiceSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Něco ve faktuře nesedí.' }
+
+  const { profile, configured } = await loadIssuerProfile()
+  if (!configured) return { error: 'Nejdřív vyplňte údaje dodavatele v Profilu dodavatele.' }
+  if (!profile.vatPayer && parsed.data.items.some(i => i.vatRate !== 0)) {
+    return { error: 'Nejste plátce DPH, takže položky musí mít sazbu 0 %.' }
+  }
+
+  try {
+    const { id, number } = await issueInvoice(parsed.data, profile)
+    revalidateInvoicePaths(parsed.data.projectId)
+    return { id, number }
+  } catch (err) {
+    return { error: issueErrorMessage(err) }
+  }
+}
+
+/** Storno: vystavený doklad se nepřepisuje, opravuje se novou fakturou. */
+export async function cancelIssuedInvoice(id: string): Promise<{ error?: string }> {
+  await requireAuth()
+  if (!UUID_RE.test(id)) return { error: 'Faktura nenalezena' }
+  try {
+    const rows = await sql`SELECT project_id::text FROM invoices WHERE id = ${id} AND number_seq IS NOT NULL LIMIT 1`
+    if (!rows.length) return { error: 'Stornovat jde jen fakturu vystavenou tady.' }
+    await cancelInvoice(id)
+    // Stornovaná faktura nesmí zůstat v ledgeru jako příjem; `paid_on` je pryč,
+    // takže `syncInvoiceTransaction` smaže transakci, kterou sama založila,
+    // a převzatý příjem zakázky jen rozváže.
+    await syncInvoiceTransaction(id)
+    revalidateInvoicePaths((rows[0] as { project_id: string | null }).project_id)
+    return {}
+  } catch (err) {
+    return { error: issueErrorMessage(err) }
+  }
+}
+
+/**
+ * Odběratel podle IČO z ARES (R-086). Selhání nikdy neblokuje fakturu —
+ * vrátí se hláška a formulář zůstane vyplnitelný ručně.
+ */
+export async function lookupCompany(ico: string): Promise<{
+  subject?: { name: string; address: string; ico: string; dic: string }
+  error?: string
+}> {
+  await requireAuth()
+  const result = await lookupIco(typeof ico === 'string' ? ico : '')
+  if (result.status === 'ok') return { subject: result.subject }
+  if (result.status === 'invalid') return { error: 'Tohle IČO neexistuje — zkontrolujte číslice.' }
+  if (result.status === 'not_found') return { error: 'V rejstříku jsem firmu s tímhle IČO nenašel.' }
+  return { error: 'Rejstřík teď neodpovídá. Vyplňte odběratele ručně.' }
 }

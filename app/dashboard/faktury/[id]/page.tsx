@@ -4,11 +4,13 @@ import { invoiceTone, toneVariant } from '@/lib/admin-status'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ArrowLeft, FileText, ExternalLink, Sparkles, AlertTriangle, Clock, Landmark, Paperclip,
+  ArrowLeft, Ban, FileText, ExternalLink, Sparkles, AlertTriangle, Clock, Landmark, Paperclip,
 } from 'lucide-react'
+import { itemTotals } from '@/lib/invoice-pdf/totals'
 import { getInvoiceDetail, getInvoiceProjectOptions } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceDetail } from '@/app/dashboard/finance/invoice-actions'
 import { InvoiceDetailActions } from '@/components/InvoiceDetailActions'
+import { IssuedInvoiceActions } from '@/components/admin/invoices/issued-actions'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { INVOICE_INCOME_CATEGORY } from '@/lib/invoice-constants'
 import { formatDate, formatDateTime } from '@/lib/utils'
@@ -114,7 +116,18 @@ export default async function InvoiceDetailPage(props: PageProps) {
               <Badge variant={toneVariant(invoiceTone(Boolean(invoice.paid_on), overdue))}>
                 {invoice.paid_on ? 'Zaplaceno' : overdue ? <><Clock size={10} strokeWidth={1.5} aria-hidden="true" />Po splatnosti</> : 'Pohledávka'}
               </Badge>
-              <InvoiceDetailActions invoice={invoice} projects={projects} />
+              {/* Vystavený doklad se neupravuje ani nemaže — opravuje se stornem (AD12). */}
+              {invoice.issued ? (
+                <IssuedInvoiceActions
+                  id={invoice.id}
+                  number={invoice.invoice_number}
+                  defaultEmail={invoice.project_client_email}
+                  cancelled={invoice.issued.cancelled_at !== null}
+                  sentAt={invoice.issued.sent_at}
+                />
+              ) : (
+                <InvoiceDetailActions invoice={invoice} projects={projects} />
+              )}
             </>
           }
         />
@@ -130,8 +143,53 @@ export default async function InvoiceDetailPage(props: PageProps) {
         </div>
       )}
 
+      {invoice.issued?.cancelled_at && (
+        <div className="flex items-start gap-2.5 rounded-chip border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink">
+          <Ban size={15} strokeWidth={1.5} className="mt-0.5 shrink-0 text-danger" aria-hidden="true" />
+          <span>
+            Faktura je stornovaná ({formatDate(invoice.issued.cancelled_at.slice(0, 10))}). V přiznání
+            nefiguruje; oprava se dělá novou fakturou.
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         <div className="lg:col-span-2 space-y-5">
+          {invoice.issued && (
+            <Card title="Položky" icon={<FileText size={14} strokeWidth={1.5} className="text-navy-600" />}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-quiet">
+                    <th className="pb-2 font-medium">Popis</th>
+                    <th className="pb-2 text-right font-medium">Počet</th>
+                    <th className="pb-2 text-right font-medium">Cena za kus</th>
+                    {invoice.issued.issuer.vatPayer && <th className="pb-2 text-right font-medium">DPH</th>}
+                    <th className="pb-2 text-right font-medium">Celkem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.issued.items.map((item, index) => (
+                    <tr key={index} className="border-t border-navy-100">
+                      <td className="py-2 pr-2">{item.description}</td>
+                      <td className="py-2 text-right tabular-nums">{item.quantity}</td>
+                      <td className="py-2 text-right tabular-nums">{formatAmount(item.unitPrice, invoice.currency)}</td>
+                      {invoice.issued!.issuer.vatPayer && <td className="py-2 text-right tabular-nums">{item.vatRate} %</td>}
+                      <td className="py-2 text-right tabular-nums">{formatAmount(itemTotals(item).total, invoice.currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-4 border-t border-navy-100 pt-3 text-right text-sm font-semibold text-ink">
+                Celkem {formatAmount(invoice.amount, invoice.currency)}
+              </p>
+              <p className="mt-3 text-xs text-quiet">
+                Dodavatel: {invoice.issued.issuer.name}, IČO {invoice.issued.issuer.ico}
+                {invoice.issued.issuer.vatPayer ? `, DIČ ${invoice.issued.issuer.dic}` : ' — neplátce DPH'}
+                {invoice.issued.sent_at ? ` · odesláno ${formatDate(invoice.issued.sent_at.slice(0, 10))}` : ''}
+              </p>
+            </Card>
+          )}
+
           <Card title="Údaje z faktury" icon={<FileText size={14} strokeWidth={1.5} className="text-emerald-600" />}>
             <dl className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-4">
               <Field label="Číslo faktury" value={invoice.invoice_number} mono />
@@ -181,6 +239,31 @@ export default async function InvoiceDetailPage(props: PageProps) {
                 </p>
               </object>
             </Card>
+          ) : invoice.issued ? (
+            <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-emerald-600" />}>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm text-foreground">faktura-{invoice.invoice_number}.pdf</span>
+                <span className="text-xs text-quiet">vyrobí se při otevření</span>
+                <a
+                  href={pdfHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100"
+                >
+                  <ExternalLink size={11} strokeWidth={1.5} />
+                  Otevřít v novém okně
+                </a>
+              </div>
+              <object
+                data={pdfHref}
+                type="application/pdf"
+                className="hidden h-[600px] w-full rounded-box border border-navy-100 bg-navy-50/40 sm:block"
+              >
+                <p className="p-4 text-sm text-quiet">
+                  Náhled PDF tenhle prohlížeč nezobrazí — otevři doklad odkazem výš.
+                </p>
+              </object>
+            </Card>
           ) : (
             <Card title="PDF dokladu" icon={<Paperclip size={14} strokeWidth={1.5} className="text-muted-foreground" />}>
               <p className="text-sm text-muted-foreground">
@@ -213,6 +296,12 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   context={{ projectName: invoice.project_client_name }}
                 />
               </div>
+            ) : invoice.issued ? (
+              // Vystavený doklad se neupravuje, takže odkaz na „Upravit" by lhal.
+              <p className="text-sm text-quiet">
+                Faktura není navázaná na žádnou zakázku. Příště ji vystavte přímo ze zakázky —
+                předvyplní se odběratel i částka.
+              </p>
             ) : (
               <p className="text-sm text-muted-foreground">
                 Faktura není navázaná na žádnou zakázku. Přes „Upravit" ji jde přiřadit.
@@ -246,6 +335,8 @@ export default async function InvoiceDetailPage(props: PageProps) {
             )}
           </Card>
 
+          {/* U faktury vystavené tady se žádné PDF nečetlo — karta by jen mátla (AD12). */}
+          {!invoice.issued && (
           <Card title="Co z PDF přečetla AI" icon={<Sparkles size={14} strokeWidth={1.5} className="text-emerald-600" />}>
             {extracted.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -273,6 +364,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
               </div>
             )}
           </Card>
+          )}
 
           <div className="text-xs text-muted-foreground px-1 space-y-0.5">
             <p>Přidáno do evidence {formatDateTime(invoice.created_at)}</p>

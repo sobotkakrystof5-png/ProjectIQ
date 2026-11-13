@@ -1038,7 +1038,31 @@ tabulka `admin_settings (id boolean PK DEFAULT true CHECK (id), invoice_sequence
 nad PGlite), archiv cizích PDF a `syncInvoiceTransaction` mají beze změny chování vlastní test.
 **Riziko: vysoké** (peníze). Archiv se nedotkne, vystavování je oddělená cesta.
 
-### AD13 — Fakturace: náprava financí (M, **migrace 108**)
+**Provedeno 2026-11-12 (R-086, R-098), s těmito odchylkami od zadání:**
+1. **Dvě osy místo `kind`** podle upřesnění výš: `direction` (`issued`/`received`) a
+   `pdf_generated`. Číslo řady drží `number_seq`, a „vystavené tady" se pozná podle
+   `number_seq IS NOT NULL` — ne podle `kind`.
+2. **Sloupce navíc proti plánu:** `client_address` (odběratel na dokladu potřebuje adresu;
+   archiv ji nikdy neměl, protože byla v nahraném PDF), `cancelled_at` a `sent_at`.
+3. **PDF se neukládá.** Plán mluvil o vystavení a PDF, ale doklad je neměnný, takže z týchž dat
+   vznikne vždy totéž — bajty by v databázi jen zabíraly místo. Vyrábí se při otevření,
+   opakované otevření drží ETag z obsahu dokladu.
+4. **Neměnnost + storno** místo „měnit jde `status`": admin `invoices` žádný `status` nemá,
+   stav se odvozuje z `paid_on` a `cancelled_at`.
+5. **Odolnost vůči nenasazené migraci:** `isIssuingReady()` (jeden dotaz na studený start)
+   drží admin funkční i na databázi bez 107 — vystavování se prostě neukáže. Stejný vzor jako
+   `42883` v AD10.
+6. **Detail zakázky se nesahal.** `components/admin/project-detail-view.tsx` si drží souběžné
+   sezení AD11; vystavit fakturu k zakázce jde odkazem `/dashboard/faktury/nova?zakazka=<id>`,
+   tlačítko do průvodky doplní AD11 nebo AD16.
+7. **Test souběhu:** PGlite má jedno spojení, takže skutečné paralelní transakce otestovat nejde.
+   Testuje se, co souběh musí přežít — `GREATEST` z uložené řady i z tabulky (ztracený zápis
+   do nastavení) a unikátní index na `number_seq` jako poslední pojistka pod zámkem.
+8. **Našlo se mimochodem:** PDF ve Workspace tisklo datum bez roku a variabilní symbol
+   s pomlčkou (překlep `/\\D/` místo `/\D/`). Oba vznikly v S14 a jsou opravené ve sdíleném
+   rendereru, takže se to projeví i ve Workspace.
+
+### AD13 — Fakturace: náprava financí (M, **migrace 109** — 108 zabral doplněk AD12)
 **Cíl:** čísla ve financích se nesčítají přes měny a uložení je jedna transakce.
 **Opravit hned:** (1) `finance_transactions.currency` (migrace 108) + součty po měnách — dnes se
 **EUR faktura sčítá s korunami**, což je špatné číslo v daňovém základu; nejnebezpečnější položka
@@ -1221,8 +1245,8 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (průvodka ověřená v prohlížeči; 106 omylem na produkci, na testu chybí) |
-| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | nezačato |
-| AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |
+| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12** na větvi `admin/ad12-fakturace` (migrace 107 nikde neaplikovaná; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
+| AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | nezačato |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **109** | AD05, AD09 | nezačato |
 | AD15 | Paměť projektu (facts + project_memory) | M | 109 (s AD14) | AD14 | nezačato |
 | AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **110** | AD11, AD12 | nezačato |

@@ -170,6 +170,37 @@ export async function sendPlainEmail(opts: { to: string; subject: string; text: 
   }
 }
 
+/**
+ * Faktura klientovi s PDF v příloze (AD12).
+ *
+ * Posílá se **jen na kliknutí**, nikdy automaticky při vystavení: fakturu si
+ * chce Kryštof před odesláním přečíst. Text píše odesílatel, tady se jen
+ * doplní obálka a příloha.
+ */
+export async function sendInvoiceEmail(opts: {
+  to: string
+  subject: string
+  text: string
+  pdf: { filename: string; content: Buffer }
+}): Promise<boolean> {
+  const mailer = await getTransporter()
+  if (!mailer) return false
+  try {
+    await mailer.transporter.sendMail({
+      from: mailer.from,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      html: buildPlainLayout(opts.text),
+      attachments: [{ filename: opts.pdf.filename, content: opts.pdf.content, contentType: 'application/pdf' }],
+    })
+    return true
+  } catch (err) {
+    console.error('[Email] Selhání odesílání faktury:', err)
+    return false
+  }
+}
+
 /** Nejvíc položek v souhrnném e-mailu o aktivitě; zbytek je na portálu. */
 export const ACTIVITY_DIGEST_MAX_ITEMS = 5
 

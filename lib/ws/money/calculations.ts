@@ -1,4 +1,8 @@
-import type { InvoiceItem, TaxSettings } from './schema'
+import type { TaxSettings } from './schema'
+
+// Součty položek jsou od AD12 sdílené s adminem — jedny haléře, jedno
+// zaokrouhlení, stejný postup jako `admin_invoice_issue` v migraci 107.
+export { itemTotals, invoiceTotal } from '@/lib/invoice-pdf/totals'
 
 // Sazby ověřeny 2026-10-10; zdroje jsou v docs/workspace/MONEY.md.
 // Originály adminu se nepoužívají: obsahují staré pravidlo DPH za 12 měsíců.
@@ -7,16 +11,6 @@ export const RATES = { year:2026, taxBase:0.15, taxUpper:0.23, upperThreshold:48
  socialSideBase:5387, socialMaxBase:2350416, sideThreshold:117521, sideReduction:9794,
  health:0.135, healthShare:0.5, healthMinBase:24483.5,
  flatTax:[9162,16745,27139], vatLimit:2000000, vatImmediate:2536500 } as const
-export function itemTotals(item: InvoiceItem) {
- const net = Math.round(item.quantity * Math.round(item.unitPrice*100))
- const vat = Math.round(net * item.vatRate / 100)
- return { net:net/100, vat:vat/100, total:(net+vat)/100 }
-}
-export function invoiceTotal(items: InvoiceItem[]) {
- const total = items.reduce((sum,i)=>sum+Math.round(itemTotals(i).total*100),0)
- if (!Number.isSafeInteger(total)||total>999999999999) throw new Error('money_amount_too_large')
- return total/100
-}
 export type MoneyEntry = { kind:'income'|'expense'; amount:number; currency:string; day:string; category?:string }
 export function currencyTotals(entries: MoneyEntry[]) {
  const totals: Record<string,{income:number;expense:number;balance:number}> = {}
