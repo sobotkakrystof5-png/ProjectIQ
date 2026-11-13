@@ -28,28 +28,19 @@ function StatCard({
   label: string
   value: string
   sub?: string
-  accent?: 'green' | 'red' | 'blue' | 'amber' | 'default'
+  accent?: 'strong' | 'danger' | 'default'
   icon?: React.ReactNode
 }) {
-  const color =
-    accent === 'green'
-      ? 'text-emerald-700'
-      : accent === 'red'
-        ? 'text-red-600'
-        : accent === 'blue'
-          ? 'text-navy-700'
-          : accent === 'amber'
-            ? 'text-amber-600'
-            : 'text-foreground'
+  const color = accent === 'strong' ? 'text-navy-700' : accent === 'danger' ? 'text-danger' : 'text-ink'
 
   return (
-    <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+    <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
       <div className="flex items-center gap-1.5 mb-1.5">
         {icon}
-        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
+        <p className="text-xs text-quiet font-medium uppercase tracking-wide">{label}</p>
       </div>
       <p className={`text-2xl font-bold ${color} leading-none`}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-quiet mt-1">{sub}</p>}
     </div>
   )
 }
@@ -59,8 +50,8 @@ function SectionHeader({ icon, title, sub }: { icon: React.ReactNode; title: str
     <div className="flex items-center gap-2 mb-3">
       {icon}
       <div>
-        <h4 className="text-sm font-semibold text-foreground">{title}</h4>
-        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+        <h4 className="text-sm font-semibold text-ink">{title}</h4>
+        {sub && <p className="text-xs text-quiet">{sub}</p>}
       </div>
     </div>
   )
@@ -82,7 +73,7 @@ function DifficultyVsTime({ projects }: { projects: ClosedProject[] }) {
     return (
       <div>
         <SectionHeader icon={<Gauge size={14} className="text-navy-500" strokeWidth={1.5} />} title="Náročnost vs. skutečný čas" />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-quiet">
           Zatím žádná zakázka nemá vyplněný odpracovaný čas — nemá se s čím porovnávat.
         </p>
       </div>
@@ -113,11 +104,11 @@ function DifficultyVsTime({ projects }: { projects: ClosedProject[] }) {
 
       <div className="grid grid-cols-3 gap-2 mb-4">
         {bucketAvg.map(b => (
-          <div key={b.label} className="bg-slate-50 border border-border rounded-lg px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">{b.label}</p>
-            <p className="text-sm font-semibold text-foreground">
+          <div key={b.label} className="bg-navy-50 border border-navy-100 rounded-chip px-3 py-2">
+            <p className="text-[11px] text-quiet">{b.label}</p>
+            <p className="text-sm font-semibold text-ink">
               {b.avg != null ? `${fmt(b.avg)} h` : '—'}
-              {b.count > 0 && <span className="text-xs text-muted-foreground font-normal"> · {b.count}×</span>}
+              {b.count > 0 && <span className="text-xs text-quiet font-normal"> · {b.count}×</span>}
             </p>
           </div>
         ))}
@@ -128,18 +119,18 @@ function DifficultyVsTime({ projects }: { projects: ClosedProject[] }) {
           <div key={r.id} className="flex items-center gap-2.5">
             <span className={cn(
               'inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold shrink-0',
-              r.difficulty <= 3 ? 'bg-emerald-100 text-emerald-700' : r.difficulty <= 6 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+              r.difficulty <= 3 ? 'bg-navy-50 text-navy-700' : r.difficulty <= 6 ? 'bg-navy-100 text-navy-900' : 'bg-navy-700 text-white'
             )}>
               {r.difficulty}
             </span>
-            <span className="text-xs text-muted-foreground truncate w-32 shrink-0" title={r.title}>{r.title}</span>
-            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+            <span className="text-xs text-quiet truncate w-32 shrink-0" title={r.title}>{r.title}</span>
+            <div className="flex-1 h-2 bg-navy-50 rounded-full overflow-hidden">
               <div
                 className="h-full bg-navy-400 rounded-full"
                 style={{ width: `${Math.max(4, (r.hours / maxHours) * 100)}%` }}
               />
             </div>
-            <span className="text-xs font-medium text-foreground w-14 text-right shrink-0">{fmt(r.hours)} h</span>
+            <span className="text-xs font-medium text-ink w-14 text-right shrink-0">{fmt(r.hours)} h</span>
           </div>
         ))}
       </div>
@@ -147,7 +138,7 @@ function DifficultyVsTime({ projects }: { projects: ClosedProject[] }) {
       {rows.length > 6 && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="mt-2 flex items-center gap-1 text-xs text-quiet hover:text-ink transition-colors"
         >
           <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
           {expanded ? 'Zobrazit méně' : `Zobrazit všech ${rows.length}`}
@@ -174,7 +165,7 @@ function EstimateVsReality({ projects }: { projects: ClosedProject[] }) {
     return (
       <div>
         <SectionHeader icon={<Target size={14} className="text-navy-500" strokeWidth={1.5} />} title="Odhad vs. realita" />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-quiet">
           Zatím žádná zakázka nemá vyplněný odhad z doby zadání. Přidej ho příště v okně „Dokončit zakázku&rdquo;
           nebo rovnou tady v tabulce — příští odchylka se ukáže zde.
         </p>
@@ -192,8 +183,8 @@ function EstimateVsReality({ projects }: { projects: ClosedProject[] }) {
         sub={`${rows.length} ${rows.length === 1 ? 'zakázka s odhadem' : rows.length < 5 ? 'zakázky s odhadem' : 'zakázek s odhadem'}`}
       />
 
-      <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border text-sm ${
-        avgDeltaPct > 5 ? 'bg-red-50 border-red-200 text-red-700' : avgDeltaPct < -5 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-border text-foreground'
+      <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-chip border text-sm ${
+        avgDeltaPct > 5 ? 'bg-navy-100 border-navy-200 text-ink' : 'bg-navy-50 border-navy-100 text-ink'
       }`}>
         {avgDeltaPct > 0 ? <ArrowUpRight size={14} strokeWidth={1.5} /> : <ArrowDownRight size={14} strokeWidth={1.5} />}
         <span>
@@ -204,12 +195,12 @@ function EstimateVsReality({ projects }: { projects: ClosedProject[] }) {
       <div className="space-y-2">
         {rows.slice(0, 5).map(r => (
           <div key={r.id} className="flex items-center justify-between gap-2 text-sm">
-            <span className="text-foreground truncate" title={r.title}>{r.title}</span>
+            <span className="text-ink truncate" title={r.title}>{r.title}</span>
             <span className="flex items-center gap-2 shrink-0 tabular-nums">
-              <span className="text-muted-foreground text-xs">{fmt(r.estimate)} h → {fmt(r.actual)} h</span>
+              <span className="text-quiet text-xs">{fmt(r.estimate)} h → {fmt(r.actual)} h</span>
               <span className={cn(
                 'text-xs font-semibold px-1.5 py-0.5 rounded-full',
-                r.deltaPct > 5 ? 'bg-red-50 text-red-600' : r.deltaPct < -5 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                r.deltaPct > 5 ? 'bg-navy-100 text-ink' : r.deltaPct < -5 ? 'border border-navy-200 text-ink' : 'bg-navy-50 text-quiet'
               )}>
                 {r.deltaPct >= 0 ? '+' : ''}{fmt(r.deltaPct)} %
               </span>
@@ -238,7 +229,7 @@ function TrendOverTime({ projects }: { projects: ClosedProject[] }) {
     return (
       <div>
         <SectionHeader icon={<Sparkles size={14} className="text-navy-500" strokeWidth={1.5} />} title="Vývoj v čase" />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-quiet">
           Potřebuješ aspoň dvě zakázky s vyplněnou částkou i časem, aby se dal ukázat trend hodinové sazby.
         </p>
       </div>
@@ -273,7 +264,7 @@ function TrendOverTime({ projects }: { projects: ClosedProject[] }) {
         sub="Hodinová sazba klientských zakázek chronologicky"
       />
 
-      <div className="bg-slate-50 border border-border rounded-lg p-3">
+      <div className="bg-navy-50 border border-navy-100 rounded-chip p-3">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-28" preserveAspectRatio="none">
           <polyline points={polyline} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-navy-500" vectorEffect="non-scaling-stroke" />
           {points.map((p, i) => (
@@ -282,13 +273,13 @@ function TrendOverTime({ projects }: { projects: ClosedProject[] }) {
             </circle>
           ))}
         </svg>
-        <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+        <div className="flex items-center justify-between text-xs text-quiet mt-1">
           <span>{fmt(min)} Kč/h nejnižší</span>
           <span>{fmt(max)} Kč/h nejvyšší</span>
         </div>
       </div>
 
-      <div className={`flex items-center gap-1.5 mt-2 text-xs ${trendUp ? 'text-emerald-700' : 'text-red-600'}`}>
+      <div className={`flex items-center gap-1.5 mt-2 text-xs ${trendUp ? 'text-ink' : 'text-quiet'}`}>
         {trendUp ? <ArrowUpRight size={13} strokeWidth={1.5} /> : <ArrowDownRight size={13} strokeWidth={1.5} />}
         <span>
           Posledních {half} v průměru {fmt(recentAvg)} Kč/h oproti {fmt(olderAvg)} Kč/h dřív
@@ -309,8 +300,8 @@ function ClientSatisfaction({ projects, surveys }: { projects: ClosedProject[]; 
   if (answered.length === 0) {
     return (
       <div>
-        <SectionHeader icon={<Star size={14} className="text-amber-500" strokeWidth={1.5} />} title="Spokojenost klientů" />
-        <p className="text-sm text-muted-foreground">
+        <SectionHeader icon={<Star size={14} className="fill-navy-700 text-navy-700" strokeWidth={1.5} />} title="Spokojenost klientů" />
+        <p className="text-sm text-quiet">
           Zatím žádný klient nevyplnil dotazník spokojenosti.{' '}
           <span className="text-quiet">Dotazník se posílá e-mailem při uzavření zakázky.</span>
         </p>
@@ -327,21 +318,21 @@ function ClientSatisfaction({ projects, surveys }: { projects: ClosedProject[]; 
   return (
     <div>
       <SectionHeader
-        icon={<Star size={14} className="text-amber-500" strokeWidth={1.5} />}
+        icon={<Star size={14} className="fill-navy-700 text-navy-700" strokeWidth={1.5} />}
         title="Spokojenost klientů"
         sub={`${answered.length} z ${projects.length} ${projects.length === 1 ? 'zakázky' : 'zakázek'} ohodnoceno`}
       />
 
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-2xl font-bold text-amber-600">{overallAvg.toFixed(1)}</span>
-        <span className="text-sm text-muted-foreground">/ 5 průměr napříč kategoriemi</span>
+        <span className="font-num text-2xl font-bold text-ink">{overallAvg.toFixed(1)}</span>
+        <span className="text-sm text-quiet">/ 5 průměr napříč kategoriemi</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mb-3">
         {perCategory.map(c => (
           <div key={c.label} className="flex items-center justify-between gap-2 text-xs">
-            <span className="text-muted-foreground">{c.label}</span>
-            <span className="font-medium text-foreground">{c.avg.toFixed(1)}/5</span>
+            <span className="text-quiet">{c.label}</span>
+            <span className="font-medium text-ink">{c.avg.toFixed(1)}/5</span>
           </div>
         ))}
       </div>
@@ -379,12 +370,12 @@ export default function PerformanceOverview({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-navy-50 rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-navy-50 rounded-chip flex items-center justify-center">
           <TrendingUp size={15} className="text-navy-600" strokeWidth={1.5} />
         </div>
         <div>
-          <h3 className="text-base font-semibold text-foreground">Výkonnost</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="text-base font-semibold text-ink">Výkonnost</h3>
+          <p className="text-xs text-quiet">
             {/* Klientské zakázky, ne všechny řádky — osobní projekty s nulovou
                 částkou by hodinovou sazbu jen zkreslily. */}
             Celkem {clientProjects.length}{' '}
@@ -403,7 +394,7 @@ export default function PerformanceOverview({
           label="Hodinová sazba"
           value={clientHours > 0 ? `${fmt(grossHourlyRate)} Kč/h` : '—'}
           sub="klientské příjmy / čas klientů"
-          accent="blue"
+          accent="strong"
           icon={<TrendingUp size={12} className="text-navy-500" strokeWidth={1.5} />}
         />
         <StatCard
@@ -415,22 +406,22 @@ export default function PerformanceOverview({
           label="Celkový čas"
           value={totalHours > 0 ? `${fmt(totalHours)} h` : '—'}
           sub="klientské i osobní projekty"
-          icon={<Clock size={12} className="text-muted-foreground" strokeWidth={1.5} />}
+          icon={<Clock size={12} className="text-quiet" strokeWidth={1.5} />}
         />
       </div>
 
       {clientProjects.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
             <DifficultyVsTime projects={clientProjects} />
           </div>
-          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
             <EstimateVsReality projects={clientProjects} />
           </div>
-          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
             <TrendOverTime projects={clientProjects} />
           </div>
-          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm">
             <ClientSatisfaction projects={clientProjects} surveys={surveys} />
           </div>
         </div>

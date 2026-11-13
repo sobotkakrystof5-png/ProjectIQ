@@ -76,19 +76,19 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-navy-600 bg-navy-50 hover:bg-navy-100 border border-navy-200 rounded-xl transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-navy-600 bg-navy-50 hover:bg-navy-100 border border-navy-200 rounded-chip transition-colors"
         >
           <Plus size={14} strokeWidth={1.5} />
           Zaznamenat změnu
         </button>
       ) : (
-        <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">
+        <div className="bg-muted/30 border border-navy-100 rounded-chip p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">Nový záznam</span>
+            <span className="text-sm font-medium text-ink">Nový záznam</span>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="text-muted-foreground hover:text-foreground text-xs"
+              className="text-quiet hover:text-ink text-xs"
             >
               Zrušit
             </button>
@@ -96,20 +96,20 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Datum</label>
+              <label className="block text-xs font-medium text-quiet mb-1">Datum</label>
               <input
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                className="w-full px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Typ změny</label>
+              <label className="block text-xs font-medium text-quiet mb-1">Typ změny</label>
               <select
                 value={type}
                 onChange={e => setType(e.target.value as ChangeType)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                className="w-full px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               >
                 {CHANGE_TYPES.map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
@@ -119,19 +119,19 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Popis změny</label>
+            <label className="block text-xs font-medium text-quiet mb-1">Popis změny</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
               placeholder="Co konkrétně bylo uděláno?"
-              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors resize-none"
+              className="w-full px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors resize-none"
             />
           </div>
 
           {/* Progress change */}
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+            <label className="block text-xs font-medium text-quiet mb-1">
               Posun v postupu projektu (volitelné)
             </label>
             <div className="flex items-center gap-2">
@@ -142,9 +142,9 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                 placeholder="Bylo %"
                 min={0}
                 max={100}
-                className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                className="w-24 px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               />
-              <ArrowRight size={14} strokeWidth={1.5} className="text-muted-foreground shrink-0" />
+              <ArrowRight size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
               <input
                 type="number"
                 value={progressTo}
@@ -152,10 +152,10 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                 placeholder="Nyní %"
                 min={0}
                 max={100}
-                className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                className="w-24 px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               />
               {progressDiff !== null && (
-                <span className={`text-sm font-semibold ${progressDiff > 0 ? 'text-emerald-600' : progressDiff < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                <span className={`text-sm font-semibold ${progressDiff === 0 ? 'text-quiet' : 'text-ink'}`}>
                   {progressDiff > 0 ? '+' : ''}{progressDiff} %
                 </span>
               )}
@@ -166,7 +166,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
             type="button"
             onClick={handleAdd}
             disabled={submitting || !description.trim()}
-            className="w-full py-2.5 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-40 transition-colors"
+            className="w-full py-2.5 bg-navy-600 text-white text-sm font-medium rounded-chip hover:bg-navy-700 disabled:opacity-40 transition-colors"
           >
             {submitting ? 'Ukládá se…' : 'Uložit záznam'}
           </button>
@@ -175,7 +175,7 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
 
       {/* Timeline */}
       {entries.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3">Zatím žádné záznamy. Začni dokumentovat změny projektu.</p>
+        <p className="text-sm text-quiet py-3">Zatím žádné záznamy. Začni dokumentovat změny projektu.</p>
       ) : (
         <div className="relative">
           {/* Vertical line */}
@@ -192,20 +192,20 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                   {/* Dot */}
                   <div className="absolute -left-6 top-2 w-3.5 h-3.5 rounded-full border-2 border-white bg-navy-400 shadow-sm" />
 
-                  <div className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
+                  <div className="bg-surface border border-navy-100 rounded-chip p-3.5 shadow-sm">
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={badgeVariants({ variant: toneVariant(CHANGE_TYPE_TONE[entry.change_type as ChangeType]) })}>
                           {CHANGE_TYPE_LABELS[entry.change_type as ChangeType] ?? entry.change_type}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-quiet">
                           {new Date(entry.change_date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </span>
                         {diff !== null && (
-                          <span className={`text-xs font-semibold ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                          <span className={`text-xs font-semibold ${diff === 0 ? 'text-quiet' : 'text-ink'}`}>
                             {entry.progress_from} % → {entry.progress_to} %
                             {' '}
-                            <span className="text-muted-foreground font-normal">
+                            <span className="text-quiet font-normal">
                               ({diff > 0 ? '+' : ''}{diff} %)
                             </span>
                           </span>
@@ -215,12 +215,12 @@ export function StartupChangelog({ projectId, initialEntries }: Props) {
                         type="button"
                         onClick={() => handleDelete(entry.id)}
                         disabled={deletingId === entry.id}
-                        className="p-1 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100 shrink-0 ml-2"
+                        className="p-1 text-quiet hover:text-danger hover:bg-danger/5 rounded-chip transition-colors opacity-0 group-hover:opacity-100 shrink-0 ml-2"
                       >
                         <Trash2 size={12} strokeWidth={1.5} />
                       </button>
                     </div>
-                    <p className="text-sm text-foreground leading-relaxed">{entry.description}</p>
+                    <p className="text-sm text-ink leading-relaxed">{entry.description}</p>
                   </div>
                 </div>
               )

@@ -10,10 +10,12 @@ interface NpsRatingProps {
 }
 
 function scoreClass(n: number, active: boolean): string {
-  if (!active) return 'border-gray-200 bg-gray-50 text-gray-400'
-  if (n <= 6) return 'border-red-300 bg-red-50 text-red-700'
-  if (n <= 8) return 'border-amber-300 bg-amber-50 text-amber-700'
-  return 'border-emerald-400 bg-emerald-50 text-emerald-700'
+  // Škála roste tmavostí, ne odstínem (R-091): Dílky nemají zelenou a červená
+  // patří chybě, ne nízké známce.
+  if (!active) return 'border-navy-100 bg-navy-50 text-quiet'
+  if (n <= 6) return 'border-navy-200 bg-navy-50 text-navy-700'
+  if (n <= 8) return 'border-navy-300 bg-navy-100 text-navy-900'
+  return 'border-navy-700 bg-navy-700 text-white'
 }
 
 export function NpsRating({ value, onChange, disabled }: NpsRatingProps) {
@@ -32,7 +34,7 @@ export function NpsRating({ value, onChange, disabled }: NpsRatingProps) {
               type="button"
               disabled={disabled}
               className={cn(
-                'flex-1 h-9 text-sm font-semibold border rounded-lg',
+                'flex-1 h-9 text-sm font-semibold border rounded-chip',
                 'transition-all duration-150 select-none',
                 scoreClass(n, isActive),
                 !isActive && 'hover:border-navy-300 hover:bg-navy-50 hover:text-navy-700',
@@ -49,7 +51,7 @@ export function NpsRating({ value, onChange, disabled }: NpsRatingProps) {
           )
         })}
       </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
+      <div className="flex justify-between text-xs text-quiet">
         <span>Nejhorší</span>
         <span>Nejlepší</span>
       </div>

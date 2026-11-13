@@ -61,7 +61,7 @@ export function ProjectNotesPanel({
 
   return (
     <div className="space-y-5">
-      <div className="bg-slate-50 border border-navy-100 rounded-chip p-4 space-y-3">
+      <div className="bg-navy-50 border border-navy-100 rounded-chip p-4 space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative sm:w-56 shrink-0">
             <User size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-quiet pointer-events-none" />

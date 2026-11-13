@@ -88,12 +88,12 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
     <div className="space-y-3">
       {/* Stats */}
       {items.length > 0 && (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 text-xs text-quiet">
           <span>{counts.idea} nápadů</span>
-          <span className="text-border">·</span>
-          <span className="text-amber-600">{counts.in_progress} v řešení</span>
-          <span className="text-border">·</span>
-          <span className="text-emerald-600">{counts.done} hotovo</span>
+          <span className="text-navy-200">·</span>
+          <span>{counts.in_progress} v řešení</span>
+          <span className="text-navy-200">·</span>
+          <span className="text-ink">{counts.done} hotovo</span>
         </div>
       )}
 
@@ -102,7 +102,7 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
         {items.map(item => (
           <div
             key={item.id}
-            className="flex items-start gap-3 py-2.5 px-3.5 bg-muted/30 rounded-xl group"
+            className="flex items-start gap-3 py-2.5 px-3.5 bg-muted/30 rounded-chip group"
           >
             {/* Status badge (clickable to cycle) */}
             <button
@@ -123,17 +123,17 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(item.id); if (e.key === 'Escape') setEditingId(null) }}
                   autoFocus
-                  className="flex-1 px-2.5 py-1.5 text-sm border border-navy-400 rounded-lg bg-white focus:outline-none"
+                  className="flex-1 px-2.5 py-1.5 text-sm border border-navy-400 rounded-chip bg-surface focus:outline-none"
                 />
-                <button type="button" onClick={() => handleSaveEdit(item.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
+                <button type="button" onClick={() => handleSaveEdit(item.id)} className="rounded-chip p-1 text-navy-700 hover:bg-navy-50">
                   <Check size={14} strokeWidth={1.5} />
                 </button>
-                <button type="button" onClick={() => setEditingId(null)} className="p-1 text-muted-foreground hover:bg-muted rounded">
+                <button type="button" onClick={() => setEditingId(null)} className="p-1 text-quiet hover:bg-muted rounded">
                   <X size={14} strokeWidth={1.5} />
                 </button>
               </div>
             ) : (
-              <span className={`flex-1 text-sm leading-relaxed ${item.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+              <span className={`flex-1 text-sm leading-relaxed ${item.status === 'done' ? 'text-quiet line-through' : 'text-ink'}`}>
                 {item.content}
               </span>
             )}
@@ -144,7 +144,7 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
                 <button
                   type="button"
                   onClick={() => handleStartEdit(item)}
-                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                  className="p-1.5 text-quiet hover:text-ink hover:bg-muted rounded-chip transition-colors"
                 >
                   <Pencil size={12} strokeWidth={1.5} />
                 </button>
@@ -152,7 +152,7 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
                   type="button"
                   onClick={() => handleDelete(item.id)}
                   disabled={loadingId === item.id}
-                  className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-1.5 text-quiet hover:text-danger hover:bg-danger/5 rounded-chip transition-colors"
                 >
                   <Trash2 size={12} strokeWidth={1.5} />
                 </button>
@@ -161,7 +161,7 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
 
             {/* Date */}
             {editingId !== item.id && (
-              <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5">
+              <span className="text-[10px] text-quiet/60 shrink-0 mt-0.5">
                 {new Date(item.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
               </span>
             )}
@@ -177,13 +177,13 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
           onChange={e => setNewText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
           placeholder="Přidat nápad na zlepšení…"
-          className="flex-1 px-3.5 py-2 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+          className="flex-1 px-3.5 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={adding || !newText.trim()}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-40 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-navy-600 text-white text-sm font-medium rounded-chip hover:bg-navy-700 disabled:opacity-40 transition-colors"
         >
           <Plus size={14} strokeWidth={1.5} />
           Přidat

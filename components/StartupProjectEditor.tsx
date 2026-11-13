@@ -56,23 +56,23 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-white border border-border rounded-2xl overflow-hidden">
+    <div className="bg-surface border border-navy-100 rounded-box overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-muted-foreground">{icon}</span>
-          <span className="font-medium text-foreground text-sm">{title}</span>
+          <span className="text-quiet">{icon}</span>
+          <span className="font-medium text-ink text-sm">{title}</span>
         </div>
         {open
-          ? <ChevronUp size={15} strokeWidth={1.5} className="text-muted-foreground" />
-          : <ChevronDown size={15} strokeWidth={1.5} className="text-muted-foreground" />
+          ? <ChevronUp size={15} strokeWidth={1.5} className="text-quiet" />
+          : <ChevronDown size={15} strokeWidth={1.5} className="text-quiet" />
         }
       </button>
       {open && (
-        <div className="px-5 pb-5 border-t border-border pt-4 space-y-4">
+        <div className="px-5 pb-5 border-t border-navy-100 pt-4 space-y-4">
           {children}
         </div>
       )}
@@ -82,9 +82,9 @@ function Section({
 
 // ─── Field primitives ─────────────────────────────────────────────────────────
 
-const inputCls = 'w-full px-3.5 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors'
+const inputCls = 'w-full px-3.5 py-2.5 text-sm border border-navy-100 rounded-chip bg-background text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors'
 const textareaCls = `${inputCls} resize-none`
-const labelCls = 'block text-sm font-medium text-foreground mb-1.5'
+const labelCls = 'block text-sm font-medium text-ink mb-1.5'
 
 // ─── CalcCard ─────────────────────────────────────────────────────────────────
 
@@ -92,19 +92,19 @@ function CalcCard({ label, value, sub, highlight }: {
   label: string; value: string; sub?: string; highlight?: 'positive' | 'negative'
 }) {
   return (
-    <div className={`rounded-xl p-3.5 ${
-      highlight === 'positive' ? 'bg-emerald-50 border border-emerald-200'
-      : highlight === 'negative' ? 'bg-red-50 border border-red-200'
+    <div className={`rounded-chip p-3.5 ${
+      highlight === 'positive' ? 'bg-navy-50 border border-navy-100'
+      : highlight === 'negative' ? 'bg-danger/5 border border-danger/30'
       : 'bg-muted/40'
     }`}>
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className="text-xs text-quiet mb-1">{label}</p>
       <p className={`text-base font-semibold ${
-        highlight === 'positive' ? 'text-emerald-700'
-        : highlight === 'negative' ? 'text-red-600'
-        : 'text-foreground'
+        highlight === 'positive' ? 'text-ink'
+        : highlight === 'negative' ? 'text-danger'
+        : 'text-ink'
       }`}>{value}</p>
       {sub && <p className={`text-xs mt-0.5 ${
-        highlight === 'negative' ? 'text-red-400' : 'text-muted-foreground'
+        highlight === 'negative' ? 'text-danger' : 'text-quiet'
       }`}>{sub}</p>}
     </div>
   )
@@ -116,7 +116,7 @@ function MiniBarChart({ data, currency }: { data: number[]; currency: string }) 
   const max = Math.max(...data, 1)
   return (
     <div>
-      <p className="text-xs text-muted-foreground mb-2">📈 Jak roste příjem v průběhu roku</p>
+      <p className="text-xs text-quiet mb-2">📈 Jak roste příjem v průběhu roku</p>
       <div className="flex items-end gap-1 h-16">
         {data.map((v, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
@@ -126,7 +126,7 @@ function MiniBarChart({ data, currency }: { data: number[]; currency: string }) 
               title={`Měsíc ${i + 1}: ${formatCurrency(v, currency)}`}
             />
             {(i === 0 || i === 5 || i === 11) && (
-              <span className="text-[9px] text-muted-foreground">{i + 1}</span>
+              <span className="text-[9px] text-quiet">{i + 1}</span>
             )}
           </div>
         ))}
@@ -319,11 +319,11 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
   return (
     <div className="space-y-3">
       {/* Sticky save bar */}
-      <div className="flex items-center justify-between py-3 px-5 bg-white border border-border rounded-2xl">
+      <div className="flex items-center justify-between py-3 px-5 bg-surface border border-navy-100 rounded-box">
         <div className="flex items-center gap-2.5">
           <Badge variant={toneVariant(STARTUP_PHASE_TONE[currentPhase.value])}>{currentPhase.label}</Badge>
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <span className="tabular-nums font-medium text-foreground">{progress} %</span>
+          <div className="flex items-center gap-1.5 text-sm text-quiet">
+            <span className="tabular-nums font-medium text-ink">{progress} %</span>
             <span>hotovo</span>
           </div>
         </div>
@@ -333,7 +333,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 text-quiet hover:text-danger hover:bg-danger/5 rounded-chip transition-colors"
                 title="Smazat projekt"
               >
                 <Trash2 size={15} strokeWidth={1.5} />
@@ -342,7 +342,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 type="button"
                 onClick={handleArchive}
                 disabled={archiving}
-                className="p-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                className="rounded-chip p-2 text-quiet transition-colors hover:bg-navy-50 hover:text-ink"
                 title="Archivovat projekt"
               >
                 {archiving
@@ -354,7 +354,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy-600 text-white text-sm font-medium rounded-chip hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {saving
                   ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
@@ -365,12 +365,12 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-red-600 font-medium">Opravdu smazat?</span>
+              <span className="text-sm text-danger font-medium">Opravdu smazat?</span>
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-danger text-white text-sm font-medium rounded-chip hover:bg-danger disabled:opacity-50 transition-colors"
               >
                 {deleting && <Loader2 size={12} strokeWidth={1.5} className="animate-spin" />}
                 Smazat
@@ -378,7 +378,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
-                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="px-3 py-1.5 text-sm text-quiet hover:text-ink transition-colors"
               >
                 Zrušit
               </button>
@@ -396,12 +396,12 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         onToggle={() => toggle('basic')}
       >
         <div>
-          <label className={labelCls}>Název projektu <span className="text-red-500">*</span></label>
+          <label className={labelCls}>Název projektu <span className="text-danger">*</span></label>
           <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputCls} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className={labelCls}>Segment / Kategorie <span className="text-red-500">*</span></label>
+            <label className={labelCls}>Segment / Kategorie <span className="text-danger">*</span></label>
             <select
               value={segmentSelect}
               onChange={e => setSegmentSelect(e.target.value)}
@@ -422,20 +422,20 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           </div>
           <div className="flex flex-col justify-center">
             <label className={labelCls}>Monetizace</label>
-            <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/40 rounded-xl">
-              <span className="text-sm text-foreground">{monetization ? 'Ano' : 'Ne'}</span>
+            <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/40 rounded-chip">
+              <span className="text-sm text-ink">{monetization ? 'Ano' : 'Ne'}</span>
               <button
                 type="button"
                 onClick={() => setMonetization(v => !v)}
                 className={`relative w-10 h-5 rounded-full transition-colors ${monetization ? 'bg-navy-600' : 'bg-muted-foreground/20'}`}
               >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${monetization ? 'translate-x-5' : ''}`} />
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface rounded-full shadow transition-transform ${monetization ? 'translate-x-5' : ''}`} />
               </button>
             </div>
           </div>
         </div>
         <div>
-          <label className={labelCls}>Problém, který projekt řeší <span className="text-red-500">*</span></label>
+          <label className={labelCls}>Problém, který projekt řeší <span className="text-danger">*</span></label>
           <textarea
             value={problem}
             onChange={e => setProblem(e.target.value)}
@@ -474,7 +474,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-foreground">Celkový postup projektu</label>
+            <label className="text-sm font-medium text-ink">Celkový postup projektu</label>
             <span className="text-sm font-semibold text-navy-700 tabular-nums">{progress} %</span>
           </div>
           <input
@@ -519,7 +519,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         open={open.has('calc')}
         onToggle={() => toggle('calc')}
       >
-        <p className="text-xs text-muted-foreground -mt-1">
+        <p className="text-xs text-quiet -mt-1">
           Zadej čísla a kalkulačka sama spočítá, jestli projekt dává smysl.
         </p>
 
@@ -539,12 +539,12 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               <select
                 value={currency}
                 onChange={e => setCurrency(e.target.value)}
-                className="px-3 py-2.5 text-sm border border-border rounded-xl bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                className="px-3 py-2.5 text-sm border border-navy-100 rounded-chip bg-background text-ink focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
               >
                 {STARTUP_CURRENCIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Vývoj, marketing, domény, nástroje…</p>
+            <p className="text-xs text-quiet mt-1">Vývoj, marketing, domény, nástroje…</p>
           </div>
 
           <div>
@@ -557,7 +557,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               min={0}
               className={inputCls}
             />
-            <p className="text-xs text-muted-foreground mt-1">Kolik lidí bude produkt používat?</p>
+            <p className="text-xs text-quiet mt-1">Kolik lidí bude produkt používat?</p>
           </div>
 
           <div>
@@ -573,18 +573,18 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 step="0.1"
                 className={`${inputCls} pr-8`}
               />
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-quiet pointer-events-none">%</span>
             </div>
             {payingUsers > 0
               ? <p className="text-xs text-navy-600 font-medium mt-1">= {payingUsers} platících zákazníků</p>
-              : <p className="text-xs text-muted-foreground mt-1">Typicky 2–10 % uživatelů platí</p>
+              : <p className="text-xs text-quiet mt-1">Typicky 2–10 % uživatelů platí</p>
             }
           </div>
         </div>
 
         {/* ── Jak zákazníci platí? ── */}
         <div>
-          <p className="text-sm font-medium text-foreground mb-2">Jak zákazníci platí?</p>
+          <p className="text-sm font-medium text-ink mb-2">Jak zákazníci platí?</p>
           <div className="grid grid-cols-2 gap-2">
             {([
               { key: 'saas' as const, title: 'Opakovaně', sub: 'jako Netflix nebo Spotify' },
@@ -594,16 +594,16 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                 key={m.key}
                 type="button"
                 onClick={() => setMonetizationModel(m.key)}
-                className={`px-4 py-3.5 rounded-xl border text-left transition-all ${
+                className={`px-4 py-3.5 rounded-chip border text-left transition-all ${
                   monetizationModel === m.key
                     ? 'border-navy-500 bg-navy-50 shadow-sm'
-                    : 'border-border hover:border-navy-200 hover:bg-muted/30'
+                    : 'border-navy-100 hover:border-navy-200 hover:bg-muted/30'
                 }`}
               >
-                <p className={`text-sm font-medium ${monetizationModel === m.key ? 'text-navy-700' : 'text-foreground'}`}>
+                <p className={`text-sm font-medium ${monetizationModel === m.key ? 'text-navy-700' : 'text-ink'}`}>
                   {m.title}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">{m.sub}</p>
+                <p className="text-xs text-quiet mt-0.5">{m.sub}</p>
               </button>
             ))}
           </div>
@@ -613,11 +613,11 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         {monetizationModel === 'saas' ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-foreground">Typy předplatného</p>
+              <p className="text-sm font-medium text-ink">Typy předplatného</p>
               <button
                 type="button"
                 onClick={addTier}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-navy-600 bg-navy-50 hover:bg-navy-100 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-navy-600 bg-navy-50 hover:bg-navy-100 rounded-chip transition-colors"
               >
                 <Plus size={12} strokeWidth={2} />
                 Přidat plán
@@ -625,28 +625,28 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
             </div>
 
             {pricingTiers.length === 0 && (
-              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center">
-                <p className="text-sm text-muted-foreground">Zatím žádný plán.</p>
-                <p className="text-xs text-muted-foreground mt-1">Klikni na „Přidat plán" a nastav první typ předplatného (např. Free, Pro, Business).</p>
+              <div className="border-2 border-dashed border-navy-100 rounded-chip p-6 text-center">
+                <p className="text-sm text-quiet">Zatím žádný plán.</p>
+                <p className="text-xs text-quiet mt-1">Klikni na „Přidat plán" a nastav první typ předplatného (např. Free, Pro, Business).</p>
               </div>
             )}
 
             {pricingTiers.map((tier, tierIdx) => (
-              <div key={tier.id} className="border border-border rounded-xl overflow-hidden">
+              <div key={tier.id} className="border border-navy-100 rounded-chip overflow-hidden">
                 {/* Tier header */}
-                <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b border-border">
-                  <GripVertical size={14} strokeWidth={1.5} className="text-muted-foreground/40 shrink-0" />
+                <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b border-navy-100">
+                  <GripVertical size={14} strokeWidth={1.5} className="text-quiet/40 shrink-0" />
                   <input
                     type="text"
                     value={tier.name}
                     onChange={e => updateTier(tier.id, { name: e.target.value })}
                     placeholder={`Plán ${tierIdx + 1} (např. Free, Pro, Business)`}
-                    className="flex-1 text-sm font-medium bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
+                    className="flex-1 text-sm font-medium bg-transparent border-none outline-none text-ink placeholder:text-quiet"
                   />
                   <button
                     type="button"
                     onClick={() => removeTier(tier.id)}
-                    className="p-1 text-muted-foreground hover:text-red-500 transition-colors rounded"
+                    className="p-1 text-quiet hover:text-danger transition-colors rounded"
                   >
                     <X size={13} strokeWidth={1.5} />
                   </button>
@@ -656,7 +656,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                   {/* Prices + users */}
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Měsíční cena ({currency})</label>
+                      <label className="block text-xs text-quiet mb-1">Měsíční cena ({currency})</label>
                       <input
                         type="number"
                         value={tier.monthlyPrice || ''}
@@ -664,11 +664,11 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                         placeholder="0"
                         min={0}
                         step="0.01"
-                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                        className="w-full px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Roční cena ({currency})</label>
+                      <label className="block text-xs text-quiet mb-1">Roční cena ({currency})</label>
                       <input
                         type="number"
                         value={tier.annualPrice || ''}
@@ -676,18 +676,18 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                         placeholder="0"
                         min={0}
                         step="0.01"
-                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                        className="w-full px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Zákazníků</label>
+                      <label className="block text-xs text-quiet mb-1">Zákazníků</label>
                       <input
                         type="number"
                         value={tier.users || ''}
                         onChange={e => updateTier(tier.id, { users: parseInt(e.target.value) || 0 })}
                         placeholder="0"
                         min={0}
-                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                        className="w-full px-3 py-2 text-sm border border-navy-100 rounded-chip bg-background text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                       />
                     </div>
                   </div>
@@ -695,7 +695,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                   {/* Benefits */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs text-muted-foreground">Co plán zahrnuje</label>
+                      <label className="text-xs text-quiet">Co plán zahrnuje</label>
                       <button
                         type="button"
                         onClick={() => addBenefit(tier.id)}
@@ -705,23 +705,23 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                       </button>
                     </div>
                     {tier.benefits.length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">Žádné výhody — klikni „+ Přidat výhodu"</p>
+                      <p className="text-xs text-quiet italic">Žádné výhody — klikni „+ Přidat výhodu"</p>
                     )}
                     <div className="space-y-1.5">
                       {tier.benefits.map((benefit, bIdx) => (
                         <div key={bIdx} className="flex items-center gap-2">
-                          <span className="text-muted-foreground text-xs shrink-0">✓</span>
+                          <span className="text-quiet text-xs shrink-0">✓</span>
                           <input
                             type="text"
                             value={benefit}
                             onChange={e => updateBenefit(tier.id, bIdx, e.target.value)}
                             placeholder="Výhoda (např. Neomezené projekty)"
-                            className="flex-1 px-2.5 py-1.5 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
+                            className="flex-1 px-2.5 py-1.5 text-sm border border-navy-100 rounded-chip bg-background text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-500/30 focus:border-navy-500 transition-colors"
                           />
                           <button
                             type="button"
                             onClick={() => removeBenefit(tier.id, bIdx)}
-                            className="p-1 text-muted-foreground hover:text-red-500 transition-colors rounded shrink-0"
+                            className="p-1 text-quiet hover:text-danger transition-colors rounded shrink-0"
                           >
                             <X size={11} strokeWidth={1.5} />
                           </button>
@@ -752,14 +752,14 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
               step="0.01"
               className={inputCls}
             />
-            <p className="text-xs text-muted-foreground mt-1">Zákazník zaplatí jednou a produkt vlastní</p>
+            <p className="text-xs text-quiet mt-1">Zákazník zaplatí jednou a produkt vlastní</p>
           </div>
         )}
 
         {/* ── Výsledky: Opakované platby ── */}
         {calcResults.type === 'saas' && calcResults.mrr > 0 && (
           <div className="space-y-3 pt-1">
-            <div className="bg-gradient-to-br from-navy-50 to-violet-50 border border-navy-100 rounded-xl p-4">
+            <div className="bg-gradient-to-br from-navy-50 to-violet-50 border border-navy-100 rounded-chip p-4">
               <p className="text-sm text-navy-800 leading-relaxed">
                 💡 S <strong>{calcResults.totalPayingUsers} platícími zákazníky</strong> budeš vydělávat{' '}
                 <strong>{formatCurrency(calcResults.mrr, currency)} každý měsíc</strong>.
@@ -805,12 +805,12 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         {/* ── Výsledky: Jednorázový prodej ── */}
         {calcResults.type === 'onetime' && calcResults.totalRevenue > 0 && (
           <div className="space-y-3 pt-1">
-            <div className={`border rounded-xl p-4 ${
+            <div className={`border rounded-chip p-4 ${
               calcResults.netProfit >= 0
                 ? 'bg-gradient-to-br from-navy-50 to-violet-50 border-navy-100'
-                : 'bg-red-50 border-red-100'
+                : 'bg-danger/5 border-danger/30'
             }`}>
-              <p className={`text-sm leading-relaxed ${calcResults.netProfit >= 0 ? 'text-navy-800' : 'text-red-700'}`}>
+              <p className={`text-sm leading-relaxed ${calcResults.netProfit >= 0 ? 'text-navy-800' : 'text-danger'}`}>
                 {calcResults.netProfit >= 0
                   ? <>💡 Prodáš-li <strong>{payingUsers} zákazníkům</strong>, celkem vyděláš <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>. Po odečtení investice ti zbyde čistý zisk <strong>{formatCurrency(calcResults.netProfit, currency)}</strong>.</>
                   : <>⚠️ Při <strong>{payingUsers} zákaznících</strong> vydělá projekt <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>, ale investice ještě není pokryta — budeš ve ztrátě <strong>{formatCurrency(Math.abs(calcResults.netProfit), currency)}</strong>. Zkus zvýšit cenu nebo počet zákazníků.</>
@@ -915,7 +915,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
             placeholder="postgresql://…@….neon.tech/neondb?sslmode=require"
             className={inputCls}
           />
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-quiet">
             Neon DB connection string pro waitlist prelaunch stránky. Po uložení se zobrazí záložka Waitlist.
           </p>
         </div>
@@ -962,7 +962,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy-600 text-white text-sm font-medium rounded-xl hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy-600 text-white text-sm font-medium rounded-chip hover:bg-navy-700 disabled:opacity-50 transition-colors shadow-sm"
         >
           {saving
             ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />

@@ -121,13 +121,13 @@ function StatCard({
   icon: React.ReactNode; iconBg: string; label: string; value: string; sub?: string
 }) {
   return (
-    <div className="bg-white border border-border rounded-xl p-4 shadow-sm flex flex-col gap-1">
-      <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center mb-2`}>
+    <div className="bg-surface border border-navy-100 rounded-chip p-4 shadow-sm flex flex-col gap-1">
+      <div className={`w-8 h-8 ${iconBg} rounded-chip flex items-center justify-center mb-2`}>
         {icon}
       </div>
-      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      <p className="text-xl font-semibold text-foreground tabular-nums leading-tight">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      <p className="text-xs text-quiet font-medium">{label}</p>
+      <p className="text-xl font-semibold text-ink tabular-nums leading-tight">{value}</p>
+      {sub && <p className="text-xs text-quiet">{sub}</p>}
     </div>
   )
 }
@@ -136,12 +136,12 @@ function PipelineBar({ label, count, total, color }: { label: string; count: num
   const pct = total === 0 ? 0 : Math.round((count / total) * 100)
   return (
     <div className="flex items-center gap-3">
-      <div className="w-28 text-xs text-muted-foreground shrink-0">{label}</div>
+      <div className="w-28 text-xs text-quiet shrink-0">{label}</div>
       <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
         <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="w-10 text-right text-xs font-semibold text-foreground tabular-nums">{count}</div>
-      <div className="w-7 text-right text-xs text-muted-foreground tabular-nums">{pct}%</div>
+      <div className="w-10 text-right text-xs font-semibold text-ink tabular-nums">{count}</div>
+      <div className="w-7 text-right text-xs text-quiet tabular-nums">{pct}%</div>
     </div>
   )
 }
@@ -149,8 +149,8 @@ function PipelineBar({ label, count, total, color }: { label: string; count: num
 function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <div className="text-muted-foreground">{icon}</div>
-      <h2 className="text-sm font-semibold text-foreground tracking-tight uppercase text-[11px] letter-spacing-wider">
+      <div className="text-quiet">{icon}</div>
+      <h2 className="text-sm font-semibold text-ink tracking-tight uppercase text-[11px] letter-spacing-wider">
         {title}
       </h2>
     </div>
@@ -184,11 +184,7 @@ export default async function ProfilPage() {
     : feedback.avg_nps >= 7 ? 'Pasivní'
     : 'Kritik'
 
-  const npsColor =
-    feedback.avg_nps === null ? 'text-muted-foreground'
-    : feedback.avg_nps >= 9 ? 'text-emerald-600'
-    : feedback.avg_nps >= 7 ? 'text-amber-600'
-    : 'text-red-600'
+  const npsColor = feedback.avg_nps === null ? 'text-quiet' : 'text-ink'
 
   const overallRating = surveys.avg_overall !== null ? Number(surveys.avg_overall) : null
   const overallStars = overallRating !== null ? Math.round(overallRating) : 0
@@ -220,19 +216,19 @@ export default async function ProfilPage() {
                     key={i}
                     size={14}
                     strokeWidth={1.5}
-                    className={i <= overallStars ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/30'}
+                    className={i <= overallStars ? 'fill-navy-700 text-navy-700' : 'text-navy-200'}
                   />
                 ))}
               </div>
-              <span className="text-sm font-semibold text-foreground tabular-nums">
+              <span className="text-sm font-semibold text-ink tabular-nums">
                 {overallRating.toFixed(1)}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-quiet">
                 / 5 · průměr z {surveys.total} {surveys.total === 1 ? 'hodnocení' : 'hodnocení'}
               </span>
             </div>
           ) : (
-            <p className="mt-3 text-xs text-muted-foreground">Zatím žádné hodnocení z dotazníků</p>
+            <p className="mt-3 text-xs text-quiet">Zatím žádné hodnocení z dotazníků</p>
           )}
         </div>
       </div>
@@ -249,35 +245,35 @@ export default async function ProfilPage() {
             sub={`z ${projects.total} celkem`}
           />
           <StatCard
-            icon={<CheckCircle2 size={16} strokeWidth={1.5} className="text-emerald-600" />}
-            iconBg="bg-emerald-50"
+            icon={<CheckCircle2 size={16} strokeWidth={1.5} className="text-navy-600" />}
+            iconBg="bg-navy-50"
             label="Dokončeno / Zaplaceno"
             value={String(closedCount)}
             sub={`${projects.done_count} hotovo · ${projects.paid_count} zaplaceno`}
           />
           <StatCard
-            icon={<Users size={16} strokeWidth={1.5} className="text-violet-600" />}
-            iconBg="bg-violet-50"
+            icon={<Users size={16} strokeWidth={1.5} className="text-navy-600" />}
+            iconBg="bg-navy-50"
             label="Unikátní klienti"
             value={String(uniqueClients)}
             sub={`${activeCount} aktivních`}
           />
           <StatCard
-            icon={<TrendingUp size={16} strokeWidth={1.5} className="text-emerald-600" />}
-            iconBg="bg-emerald-50"
+            icon={<TrendingUp size={16} strokeWidth={1.5} className="text-navy-600" />}
+            iconBg="bg-navy-50"
             label="Celkový objem"
             value={formatCurrency(Number(projects.total_price))}
             sub="součet cen všech zakázek"
           />
           <StatCard
-            icon={<Wallet size={16} strokeWidth={1.5} className="text-emerald-700" />}
-            iconBg="bg-emerald-50"
+            icon={<Wallet size={16} strokeWidth={1.5} className="text-navy-600" />}
+            iconBg="bg-navy-50"
             label="Přijato plateb"
             value={formatCurrency(Number(projects.paid_price))}
           />
           <StatCard
-            icon={<AlertCircle size={16} strokeWidth={1.5} className="text-amber-600" />}
-            iconBg="bg-amber-50"
+            icon={<AlertCircle size={16} strokeWidth={1.5} className="text-signal-ink" />}
+            iconBg="bg-signal-bg"
             label="Čeká na platbu"
             value={formatCurrency(Number(projects.unpaid_price))}
             sub="zakázky ve stavu Hotovo"
@@ -286,20 +282,20 @@ export default async function ProfilPage() {
       </div>
 
       {/* Pipeline — stav zakázek */}
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">
         <SectionHeader icon={<CircleDot size={14} strokeWidth={1.5} />} title="Pipeline zakázek" />
         <div className="space-y-3">
-          <PipelineBar label={STATUS_LABELS.new} count={projects.new_count} total={projects.total} color="bg-blue-400" />
-          <PipelineBar label={STATUS_LABELS.in_progress} count={projects.in_progress_count} total={projects.total} color="bg-amber-400" />
-          <PipelineBar label={STATUS_LABELS.review} count={projects.review_count} total={projects.total} color="bg-violet-400" />
-          <PipelineBar label={STATUS_LABELS.done} count={projects.done_count} total={projects.total} color="bg-emerald-400" />
-          <PipelineBar label={STATUS_LABELS.paid} count={projects.paid_count} total={projects.total} color="bg-emerald-700" />
+          <PipelineBar label={STATUS_LABELS.new} count={projects.new_count} total={projects.total} color="bg-navy-200" />
+          <PipelineBar label={STATUS_LABELS.in_progress} count={projects.in_progress_count} total={projects.total} color="bg-navy-300" />
+          <PipelineBar label={STATUS_LABELS.review} count={projects.review_count} total={projects.total} color="bg-navy-400" />
+          <PipelineBar label={STATUS_LABELS.done} count={projects.done_count} total={projects.total} color="bg-navy-600" />
+          <PipelineBar label={STATUS_LABELS.paid} count={projects.paid_count} total={projects.total} color="bg-navy-700" />
         </div>
-        <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-          <span>Celkem zakázek: <strong className="text-foreground">{projects.total}</strong></span>
+        <div className="mt-4 pt-3 border-t border-navy-100 flex items-center justify-between text-xs text-quiet">
+          <span>Celkem zakázek: <strong className="text-ink">{projects.total}</strong></span>
           {projects.total > 0 && (
             <span>
-              Úspěšnost (done+paid): <strong className="text-foreground">
+              Úspěšnost (done+paid): <strong className="text-ink">
                 {Math.round((closedCount / projects.total) * 100)} %
               </strong>
             </span>
@@ -309,35 +305,35 @@ export default async function ProfilPage() {
 
       {/* Finance + Náklady */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+        <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">
           <SectionHeader icon={<TrendingUp size={14} strokeWidth={1.5} />} title="Dokončené projekty (archiv)" />
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Počet projektů</span>
+              <span className="text-sm text-quiet">Počet projektů</span>
               <span className="text-sm font-semibold tabular-nums">{completed.total}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Celkové výnosy</span>
-              <span className="text-sm font-semibold tabular-nums text-emerald-700">
+              <span className="text-sm text-quiet">Celkové výnosy</span>
+              <span className="text-sm font-semibold tabular-nums text-ink">
                 {formatCurrency(Number(completed.revenue))}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+        <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">
           <SectionHeader icon={<Receipt size={14} strokeWidth={1.5} />} title="Náklady" />
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Průměrné měsíční náklady</span>
-              <span className="text-sm font-semibold tabular-nums text-red-600">
+              <span className="text-sm text-quiet">Průměrné měsíční náklady</span>
+              <span className="text-sm font-semibold tabular-nums text-danger">
                 {formatCurrency(Number(costs.monthly_costs))}
               </span>
             </div>
             {Number(costs.monthly_costs) > 0 && Number(completed.revenue) > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Roční náklady (odhad)</span>
-                <span className="text-sm font-semibold tabular-nums text-red-500">
+                <span className="text-sm text-quiet">Roční náklady (odhad)</span>
+                <span className="text-sm font-semibold tabular-nums text-danger">
                   {formatCurrency(Number(costs.monthly_costs) * 12)}
                 </span>
               </div>
@@ -347,31 +343,31 @@ export default async function ProfilPage() {
       </div>
 
       {/* Vizeon */}
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">
         <SectionHeader icon={<Inbox size={14} strokeWidth={1.5} />} title="Vizeon poptávky" />
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-foreground tabular-nums">{vizeon.total}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Celkem poptávek</p>
+            <p className="text-2xl font-bold text-ink tabular-nums">{vizeon.total}</p>
+            <p className="text-xs text-quiet mt-0.5">Celkem poptávek</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-emerald-700 tabular-nums">{vizeon.confirmed}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Potvrzeno</p>
+            <p className="font-num text-2xl font-bold text-ink tabular-nums">{vizeon.confirmed}</p>
+            <p className="text-xs text-quiet mt-0.5">Potvrzeno</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-amber-600 tabular-nums">{vizeon.pending}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Čeká na potvrzení</p>
+            <p className="font-num text-2xl font-bold text-signal-ink tabular-nums">{vizeon.pending}</p>
+            <p className="text-xs text-quiet mt-0.5">Čeká na potvrzení</p>
           </div>
         </div>
         {conversionRate !== null && (
-          <div className="mt-4 pt-3 border-t border-border">
+          <div className="mt-4 pt-3 border-t border-navy-100">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Konverzní poměr (potvrzeno / celkem)</span>
-              <span className="font-semibold text-foreground">{conversionRate} %</span>
+              <span className="text-quiet">Konverzní poměr (potvrzeno / celkem)</span>
+              <span className="font-semibold text-ink">{conversionRate} %</span>
             </div>
             <div className="mt-1.5 bg-muted rounded-full h-1.5 overflow-hidden">
               <div
-                className="h-full bg-emerald-500 rounded-full"
+                className="h-full bg-navy-700 rounded-full"
                 style={{ width: `${conversionRate}%` }}
               />
             </div>
@@ -381,29 +377,29 @@ export default async function ProfilPage() {
 
       {/* Konzultace + NPS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+        <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">
           <SectionHeader icon={<CalendarCheck size={14} strokeWidth={1.5} />} title="Konzultace" />
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Celkem rezervací</span>
+              <span className="text-sm text-quiet">Celkem rezervací</span>
               <span className="text-sm font-semibold tabular-nums">{consultations.total}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Proběhlé</span>
+              <span className="text-sm text-quiet">Proběhlé</span>
               <span className="text-sm font-semibold tabular-nums">{consultations.past}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Nadcházející</span>
+              <span className="text-sm text-quiet">Nadcházející</span>
               <span className="text-sm font-semibold tabular-nums text-navy-700">{consultations.upcoming}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+        <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">
           <SectionHeader icon={<Star size={14} strokeWidth={1.5} />} title="NPS hodnocení" />
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Průměrné NPS</span>
+              <span className="text-sm text-quiet">Průměrné NPS</span>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-semibold tabular-nums">
                   {feedback.avg_nps !== null ? Number(feedback.avg_nps).toFixed(1) : '—'}
@@ -414,7 +410,7 @@ export default async function ProfilPage() {
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Počet hodnocení</span>
+              <span className="text-sm text-quiet">Počet hodnocení</span>
               <span className="text-sm font-semibold tabular-nums">{feedback.total}</span>
             </div>
             {feedback.avg_nps !== null && (
@@ -422,14 +418,14 @@ export default async function ProfilPage() {
                 <div className="bg-muted rounded-full h-1.5 overflow-hidden">
                   <div
                     className={`h-full rounded-full ${
-                      Number(feedback.avg_nps) >= 9 ? 'bg-emerald-500'
-                      : Number(feedback.avg_nps) >= 7 ? 'bg-amber-400'
-                      : 'bg-red-400'
+                      Number(feedback.avg_nps) >= 9 ? 'bg-navy-700'
+                      : Number(feedback.avg_nps) >= 7 ? 'bg-navy-500'
+                      : 'bg-navy-300'
                     }`}
                     style={{ width: `${(Number(feedback.avg_nps) / 10) * 100}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                <div className="flex justify-between text-[10px] text-quiet mt-1">
                   <span>0</span><span>10</span>
                 </div>
               </div>
@@ -454,7 +450,7 @@ export default async function ProfilPage() {
       )}
 
       {/* Rychlé odkazy */}
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">
         <SectionHeader icon={<ArrowRight size={14} strokeWidth={1.5} />} title="Rychlé přístupy" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
@@ -470,7 +466,7 @@ export default async function ProfilPage() {
             <a
               key={href}
               href={href}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-navy-50 hover:border-navy-200 transition-colors"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-chip border border-navy-100 text-sm text-quiet hover:text-ink hover:bg-navy-50 hover:border-navy-200 transition-colors"
             >
               {icon}
               <span className="truncate">{label}</span>
