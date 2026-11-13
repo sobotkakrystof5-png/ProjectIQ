@@ -201,14 +201,19 @@ function PairList({
             aria-label={`${title} — doplnění`}
             className="sm:flex-1"
           />
+          {/*
+            Na telefonu stojí řádek pod sebou a sám křížek pod dvěma poli neprozradí,
+            co vlastně odebere — proto tam má popisek a drží se u pravého okraje.
+          */}
           <Button
             type="button"
             variant="ghost"
-            size="icon"
             onClick={() => onChange(rows.filter((_, i) => i !== index))}
             aria-label={`Odebrat řádek ${index + 1}`}
+            className="self-end sm:w-11 sm:self-auto sm:px-0"
           >
             <X size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span className="sm:hidden">Odebrat</span>
           </Button>
         </div>
       ))}

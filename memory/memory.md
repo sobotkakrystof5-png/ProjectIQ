@@ -10,8 +10,8 @@
 > konečně něco znamená. Klient dostává **předávací dokument** „co bylo dodané" (PDF touž cestou
 > jako faktura, do kterého se heslo neuloží) a **AI leady z `vizeon-lead-agent` jsou poprvé
 > vidět** — od migrace 052 se ukládaly a v celém repu k nim vedl jediný řádek.
-> Review našlo zápis na GET u PDF routy, je opravený (POST + `Origin`). **V prohlížeči
-> neověřeno, migrace 112 neběžela nikde**; vzhled PDF ověřený okem (R-102). · **AD15 hotové v kódu: paměť projektu ve dvou vrstvách.**
+> Review našlo zápis na GET u PDF routy, je opravený (POST + `Origin`). **Migrace 112 neběžela
+> nikde**, takže v prohlížeči je ověřený jen tvar nových obrazovek a vzhled PDF (R-102). · **AD15 hotové v kódu: paměť projektu ve dvou vrstvách.**
 > Formuláře se předvyplňují z **faktů** — čísel spočítaných z historie klienta (poslední cena,
 > obvyklá sazba, položky poslední faktury), která se nikdy neukládají jako text, takže do pole
 > nemůže vstoupit věta od modelu. Vedle toho stojí **paměť** (`project_memory`, **migrace 111,
@@ -54,8 +54,9 @@ a vystavení plní krok „Předáno" v průvodce. **AI leady** (`agent_leads`) 
 Hovory seřazené podle skóre; zakázka z nich vzniká stejnou cestou jako z ostatních kontaktů
 a shrnutí od modelu je všude označené jako odhad. Bezpečnostní review našlo **jednu věc**:
 PDF routa zapisovala na GET, teď je to POST se shodným `Origin` (DECISIONS #027).
-**V prohlížeči neověřeno a migrace 112 není nikde**; vzhled PDF ověřený okem na vyrobeném
-dokumentu.
+**Migrace 112 není nikde**, takže v prohlížeči je ověřený jen **tvar** pruhu AI leadů a karty
+předávacího dokumentu (dočasná stránka s fiktivními daty, 390–1440 px — našla a opravila
+nejasné odebírání řádku na telefonu) a vzhled PDF okem na vyrobeném dokumentu.
 Z AD15: paměť adminu má **dvě vrstvy a nemíchají se** (R-085). **Fakta** (`lib/admin/memory/facts.ts`)
 se počítají čistě SQL nad historií klienta — poslední cena, obvyklá hodinová sazba
 (`price / time_invested`), průměrná doba do uzavření, typický zdroj poptávky, položky poslední
@@ -952,13 +953,14 @@ Nová cesta, která zakázku uzavře, musí zavolat `sendSurveyRequest`, jinak d
 
 ## 3. Otevřené problémy
 
-- [ ] **AD16 v prohlížeči neověřený:** migrace 112 **není nikde**. Projít na 390 / 768 / 1280 /
-  1440 px: uzavření zkušební zakázky (dotazník má odejít až po 15 s, „Zpět" ho musí zrušit),
-  věta o dotazníku u uzavřené zakázky a na `/dashboard/profil`, blok **Reference na web**
-  (jen u hodnocení se souhlasem), karta **Předávací dokument** (přidávání řádků, odmítnutí
-  textu s heslem, Otevřít PDF) a pruh **AI leadů** nad Hovory včetně „Udělat zakázku".
-  Naostro nikdo nezkusil ani připomínku z denního cronu — chce to zakázku s odeslaným
-  dotazníkem starším sedmi dnů · od 2026-11-13
+- [ ] **AD16 — co prohlížeč ověřit nemohl:** **tvar pruhu AI leadů a karty předávacího
+  dokumentu ověřený je** (dočasná stránka s fiktivními daty, 390–1440 px, po opravě popisku
+  u odebrání řádku bez nálezu). Zbývá všechno, co potřebuje **migraci 112** — ta není nikde:
+  uzavření zkušební zakázky (dotazník má odejít až po 15 s a „Zpět" ho musí zrušit), věta
+  o dotazníku u zakázky a na `/dashboard/profil`, blok **Reference na web** u hodnocení se
+  souhlasem, **uložení** dokumentu včetně odmítnutí textu s heslem, **Otevřít PDF** z karty
+  a příloha u e-mailu s fakturou. Naostro nikdo nezkusil ani připomínku z denního cronu —
+  chce to zakázku s odeslaným dotazníkem starším sedmi dnů · od 2026-11-13
 - [ ] **AI leady nikdo neviděl na skutečných datech (AD16):** `agent_leads` je na testovacím
   Neonu prázdná a na produkci do ní posílá `vizeon-lead-agent`. Až se větev nasadí, zkontrolovat,
   jestli se pruh naplní a jestli `communication_strategy` ze skutečného payloadu sedí na schéma
@@ -1193,9 +1195,15 @@ Nová cesta, která zakázku uzavře, musí zavolat `sendSurveyRequest`, jinak d
   odeslání faktury s PDF by na produkci spadlo na chybějícím Chromiu (dluh z AD12).
 - **chore** Ověření: `npm test` **102 souborů / 1208 testů** (3 přeskočené, **30 nových**
   v `admin-hodnoceni`, `admin-ai-leady` a `predani-route`), `npx tsc --noEmit` a
-  `npm run build:check` bez varování. **V prohlížeči neověřeno**; vzhled PDF ověřený okem
-  na vyrobeném dokumentu (jedna strana A4) a faktura po vytažení společného rendereru vypadá
-  stejně jako dřív.
+  `npm run build:check` bez varování. Vzhled PDF ověřený **okem** na vyrobeném dokumentu
+  (jedna strana A4) a faktura po vytažení společného rendereru vypadá stejně jako dřív.
+- **chore** **Pruh AI leadů a karta předávacího dokumentu ověřené v prohlížeči** (dočasná
+  stránka s fiktivními daty mimo `/dashboard`, po průchodu smazaná — postup z AD11): headless
+  Chrome, 390 / 768 / 1280 / 1440 px. Nikde vodorovné přetečení, všechny akční plochy 44 px,
+  v konzoli zbývá jen známé 404 na `/favicon.ico`. Průchod našel **jednu věc a je opravená**:
+  na telefonu stál křížek pro odebrání řádku sám pod dvěma poli a nebylo poznat, co odebere —
+  teď má popisek „Odebrat" a drží se u pravého okraje. **Zbytek AD16 v prohlížeči ověřený
+  není** — potřebuje migraci 112.
 - **decision** **R-102** — osm vědomých odchylek od zadání AD16.
 
 ### 2026-11-13 (AD15 — paměť projektu)
