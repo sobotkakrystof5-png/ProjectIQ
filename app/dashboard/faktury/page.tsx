@@ -1,6 +1,4 @@
-import Link from 'next/link'
-import { AlertTriangle, FilePlus2, Paperclip } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { AlertTriangle, Paperclip } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav, Toolbar } from '@/components/ws/app/toolbar'
 import { DataTable, type AdminColumn } from '@/components/admin/data-table'
@@ -48,7 +46,7 @@ function formatDay(value: string | null): React.ReactNode {
 }
 
 function isOverdue(invoice: InvoiceRegistryItem, today: string): boolean {
-  return invoice.paid_on === null && invoice.cancelled_at === null && invoice.due_on !== null && invoice.due_on < today
+  return invoice.paid_on === null && invoice.due_on !== null && invoice.due_on < today
 }
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -91,7 +89,6 @@ function columns(today: string): AdminColumn<InvoiceRegistryItem>[] {
               paidOn={invoice.paid_on}
               overdue={overdue}
               todayIso={today}
-              cancelled={invoice.cancelled_at !== null}
             />
             {invoice.duplicate_risk && (
               <Badge
@@ -176,23 +173,7 @@ export default async function FakturyPage(props: {
         title="Faktury"
         subtitle="Evidence všech faktur. Klikněte na fakturu pro údaje a PDF."
         subtitleFont="sans"
-        action={
-          <>
-            <Link
-              href="/dashboard/faktury/nastaveni"
-              className="min-h-11 px-3 py-3 text-sm text-quiet transition-colors hover:text-ink"
-            >
-              Fakturační údaje
-            </Link>
-            <NewInvoiceButton projects={screen.projects} />
-            <Button asChild>
-              <Link href="/dashboard/faktury/nova">
-                <FilePlus2 size={15} strokeWidth={1.75} aria-hidden />
-                Vystavit fakturu
-              </Link>
-            </Button>
-          </>
-        }
+        action={<NewInvoiceButton projects={screen.projects} />}
       />
 
       <InvoiceDropZone projects={screen.projects}>
@@ -264,17 +245,9 @@ export default async function FakturyPage(props: {
               title: screen.grandTotal === 0 ? 'Zatím žádná faktura' : 'Nic neodpovídá filtru',
               description:
                 screen.grandTotal === 0
-                  ? 'Vystavte první fakturu, nebo sem přetáhněte hotové PDF — přečte ho AI a předvyplní pole.'
+                  ? 'Přetáhněte sem PDF odkudkoli — přečte ho AI a předvyplní pole. Nebo fakturu zadejte ručně.'
                   : 'Zkuste jiný rok, stav nebo hledaný výraz.',
-              action:
-                screen.grandTotal === 0 ? (
-                  <Button asChild>
-                    <Link href="/dashboard/faktury/nova">
-                      <FilePlus2 size={15} strokeWidth={1.75} aria-hidden />
-                      Vystavit fakturu
-                    </Link>
-                  </Button>
-                ) : undefined,
+              action: screen.grandTotal === 0 ? <NewInvoiceButton projects={screen.projects} /> : undefined,
             }}
           />
         </div>

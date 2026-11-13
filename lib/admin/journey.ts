@@ -65,7 +65,7 @@ export function journeySqlText(): string {
 const AFTER: Record<ProjectStatus, number> = { new: 0, in_progress: 1, review: 2, done: 3, paid: 4 }
 
 export function buildJourney(
-  project: Pick<Project, 'id' | 'source' | 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid' | 'closed_at'>,
+  project: Pick<Project, 'source' | 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid' | 'closed_at'>,
   facts: JourneyFacts,
 ): JourneyStep[] {
   const stage = AFTER[project.status] ?? 0
@@ -126,8 +126,7 @@ export function buildJourney(
       label: LABELS.faktura,
       done: facts.faktura,
       rank: AFTER.done,
-      // Od AD12 se faktura vystaví rovnou, ne jen odkáže na záložku.
-      action: { label: 'Vystavit fakturu', href: `/dashboard/faktury/nova?zakazka=${project.id}` },
+      action: { label: 'Otevřít fakturaci', href: '?zalozka=fakturace' },
     },
     {
       key: 'zaplaceno',

@@ -1221,7 +1221,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD09 | Jedna entita kontaktu | M–L | **104** | AD06 | **hotovo 2026-11-12** (migrace jen na testu, v prohlížeči neověřeno) |
 | AD10 | Klikací kontakt, šablony, kalendář ↔ hovory | M | **105** | AD09 | **hotovo 2026-11-12** (ověřeno v prohlížeči 390–1440 px; migrace 105 nikde neaplikovaná, rezervace z portálu naživo neposlaná) |
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12** (průvodka ověřená v prohlížeči; 106 omylem na produkci, na testu chybí) |
-| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12** (rozvržení ověřené v prohlížeči na dočasné stránce; 107 neaplikovaná nikde, takže na datech nevyzkoušené — R-086, R-098) |
+| AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | nezačato |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **108** | AD12 | nezačato |
 | AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **109** | AD05, AD09 | nezačato |
 | AD15 | Paměť projektu (facts + project_memory) | M | 109 (s AD14) | AD14 | nezačato |
@@ -1509,8 +1509,5 @@ Zakázané třídy (ukazatel z AD04 h): `muted-foreground` 1057 · `rounded-xl|2
 mění R-081 v části „Hub v rozsahu"), **R-088** (Alteno není byznys, ale zdroj poptávky; tři weby
 do jednoho inboxu — mění R-008), **R-089** (Škola, Sport, Plány a Šablony se mažou včetně tabulek),
 **R-090** (Dokončené se slučují do zakázky, hodnocení automaticky, předávací dokument).
-**Zapsáno v AD12:** **R-086** (ARES jako nová vnější závislost, ověřený endpoint, výpadek nezdrží
-fakturu) a **R-098** (odchylky AD12: dvě osy `direction` + `pdf_generated` místo `kind`, číslo
-`YYYYNNN`, neměnnost v databázi, storno, PDF až při prvním otevření, jeden generátor pro admin
-i Workspace, e-mail bez `after()`). Bezpečnost: `.claude/security/DECISIONS.md` #023.
+**Zbývá:** **R-086** (ARES jako nová vnější závislost) se zapíše až v AD12.
 Technická fakta průběžně do `docs/admin/AGENTS-ADMIN.md`, changelog a stav po každém sezení.

@@ -58,10 +58,6 @@ const nextConfig = {
     '/**': ['./lib/ws/money/assets/**/*', './app/ws-tokens.css'],
     // Chromium jen tam, kde vzniká PDF faktury.
     '/api/ws/*/faktury/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
-    // Admin od AD12 vystavuje faktury taky — bez tohohle řádku by PDF
-    // spadlo až na produkci, lokálně se bere Chrome z disku.
-    '/api/invoices/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
-    '/api/invoices/*/odeslat': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/z/*/faktura/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/ucet/export': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/*/faktury': ['./node_modules/@sparticuz/chromium/bin/**/*'],

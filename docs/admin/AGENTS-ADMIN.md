@@ -316,8 +316,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `project_surveys` | 016, 046, **106** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
-| `invoices` | 053, 056, **107** | Faktury. Dvě cesty v jedné tabulce: **archiv** cizích PDF (AI přepis, `pdf_generated = false`) a **doklad vystavený tady** (`pdf_generated = true`: `items`, `issuer`, `number_seq`, `supplied_on`, `vat_total`). `direction` = `issued` (náš příjem) / `received` (přijatá faktura, zavede AD13). `cancelled_at` = storno. Vystavený doklad hlídají triggery `admin_invoice_freeze` a `admin_invoice_no_delete` |
-| `admin_settings` | **107** | Jeden řádek pro celou aplikaci (`id boolean PK CHECK (id)`): `issuer_profile` (fakturační údaje dodavatele) a `invoice_sequences` (poslední pořadí faktury v roce). Zámek na tomhle řádku přiděluje čísla |
+| `invoices` | 053, 056 | Archiv faktur (PDF, AI přepis, vazba na transakci) |
 | `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
 | `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
 | `finance_transactions` | 019, 026, 027, 054 | Finance a daně — transakce; `declared` = přiznaná linie (fakturováno na IČO) |
@@ -414,8 +413,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `app/notification-actions.ts` | Notifikace (přečteno) |
 | `app/project-notes-actions.ts` | Log schůzek u zakázky |
 | `app/dashboard/finance/finance-actions.ts` | Transakce, měsíční agregace, opakované cash-flow, příjmy z byznysu |
-| `app/dashboard/finance/invoice-actions.ts` | **Archiv faktur** a jejich vazba na ledger (sdílené jádro v `lib/invoices.ts`) |
-| `app/dashboard/faktury/actions.ts` | **Vystavování faktur (AD12)**: vystavení, fakturační údaje, dotaz do ARESu, storno (jádro v `lib/admin/invoicing.ts`) |
+| `app/dashboard/finance/invoice-actions.ts` | **Veškerá logika faktur** (sdílené jádro v `lib/invoices.ts`) |
 | `app/dashboard/finance/tax-news-actions.ts` | Novinky z legislativy |
 | `app/dashboard/finance/byznys-actions.ts` | Výkonnost podnikání (příjmy, výdaje, zisk, marže) pro kalkulačku ve Financích |
 | `app/dashboard/startup/startup-actions.ts` | Startup projekty (+ waitlist, launch email přes Resend) |
@@ -449,9 +447,8 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
-| `POST /api/invoices/[id]/odeslat` | session + `Sec-Fetch-Site` | Odeslání vystavené faktury e-mailem s přílohou (AD12). Jen na kliknutí, odpověď až po odeslání; stornovanou fakturu odmítne |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
-| `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury. U dokladu vystaveného v adminu (`pdf_generated`) se PDF **vyrobí při prvním otevření** (Chromium) a uloží k dokladu, dál se servíruje jako nahraný soubor. `ETag` z `md5(pdf_data)`, při shodě 304 **bez čtení bajtů** (AD08). `Cache-Control: private, max-age=0, must-revalidate` — `private` nikdy neruš (DECISIONS #022). `X-Frame-Options: SAMEORIGIN` z `next.config.mjs` neměň (DECISIONS #004). |
+| `GET /api/invoices/[id]/pdf` | session (kontrola v route — proxy `/api` nehlídá) | PDF faktury. `ETag` z `md5(pdf_data)`, při shodě 304 **bez čtení bajtů** (AD08). `Cache-Control: private, max-age=0, must-revalidate` — `private` nikdy neruš (DECISIONS #022). `X-Frame-Options: SAMEORIGIN` z `next.config.mjs` neměň (DECISIONS #004). |
 | `POST /api/ai-assistant` | session | AI asistenti (Anthropic) |
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
 | `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
@@ -626,7 +623,7 @@ dávce** jako hlavička detailu. Logika je čistá funkce, takže se testuje bez
 
 Pod osou je **jedno** tlačítko na první nesplněný krok. Kroky „práce" a „předáno" mění stav
 jedním klikem (`setProjectStatus`), ostatní vedou odkazem tam, kde se to dodělá.
-Krok „Faktura" vede od AD12 rovnou na vystavení s předvyplněnou zakázkou.
+Nehotové (vystavení faktury, AD12) nic nepředstírá — odkáže na záložku Fakturace.
 
 ### `/dashboard/faktury`
 - **Evidence všech vystavených faktur** — archiv dokladů, řazený podle data vystavení a seskupený po rocích
@@ -636,16 +633,9 @@ Krok „Faktura" vede od AD12 rovnou na vystavení s předvyplněnou zakázkou.
 - **Záměrně napříč byznysy** — VIZEON i ALTENO fakturuje jedno IČO pod jedním přiznáním, rozdělený archiv by znamenal hledat doklad na špatném místě
 - Komponenta `InvoiceRegistry.tsx`; data z `getAllInvoices()` v `app/dashboard/finance/invoice-actions.ts` (veškerá logika faktur žije tam, tahle sekce je jen další pohled)
 
-### `/dashboard/faktury/nova` a `/dashboard/faktury/nastaveni` (AD12)
-- **Vystavení faktury**: výběr zakázky předvyplní odběratele (z kontaktu a z jeho poslední faktury) i částku (cena zakázky minus zaplacená záloha), položky s počtem a cenou, splatnost +14 dní s rychlou volbou, měna, poznámka. IČO doplní odběratele z ARESu (R-086); výpadek rejstříku nic neblokuje
-- Z detailu zakázky vede „Vystavit fakturu" s `?zakazka=<id>`
-- **Fakturační údaje** (`/nastaveni`) jsou jeden profil dodavatele pro celou aplikaci; na dokladu zůstane jejich **snímek**, takže pozdější změna adresy nebo účtu starší faktury nepřepíše. Bez IČO, jména a adresy formulář vystavení nepustí
-- Čísla přiděluje databáze (`admin_invoice_issue`), ne aplikace; formát `YYYYNNN` (R-098)
-
 ### `/dashboard/faktury/[id]`
 - Kompletní přepis jedné faktury: číslo, částka/měna, vystaveno/splatnost/zaplaceno, odběratel + IČO + DIČ, poznámka
-- Náhled přiloženého PDF (`<object>` + odkaz na `/api/invoices/[id]/pdf`), vazba na zakázku, úprava a smazání — **jen u archivního dokladu**
-- U faktury vystavené v adminu je místo úprav karta **Položky** a akce Stáhnout PDF · Poslat e-mailem · Stornovat. Změnit ani smazat ji nejde (odmítne to databáze); oprava = storno a nová faktura
+- Náhled přiloženého PDF (`<object>` + odkaz na `/api/invoices/[id]/pdf`), vazba na zakázku, úprava a smazání
 - **Přiznaná linie** — jestli faktura v ledgeru příjem založila, nebo jen převzala ten od zakázky (`owned_by_invoice`); bez `paid_on` žádný nemá
 - **Co z PDF přečetla AI** — surový `ai_extracted` pro dohledatelnost; pole, kde se uložená hodnota od přepisu liší, jsou označená jako ručně upravená. Platí vždy uložené údaje, ne přepis
 - Data z `getInvoiceDetail()`; akce v `InvoiceDetailActions.tsx`

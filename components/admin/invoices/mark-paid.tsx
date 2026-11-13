@@ -21,15 +21,12 @@ export function PaidCell({
   paidOn,
   overdue,
   todayIso,
-  cancelled = false,
 }: {
   invoiceId: string
   paidOn: string | null
   overdue: boolean
   /** Dnešek v Praze — spočítaný na serveru, ať nezáleží na zóně prohlížeče. */
   todayIso: string
-  /** Stornovaný doklad (AD12) se neplatí ani nevymáhá — zbývá jen stav. */
-  cancelled?: boolean
 }) {
   const [optimisticPaidOn, setOptimisticPaidOn] = useOptimistic<string | null, string | null>(
     paidOn,
@@ -58,8 +55,6 @@ export function PaidCell({
       }
     })
   }
-
-  if (cancelled) return <Badge variant="neutral">Storno</Badge>
 
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
