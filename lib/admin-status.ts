@@ -123,3 +123,19 @@ export const BILLING_ACCESS_TONE: Record<BillingAccess, AdminTone> = {
   grace: 'signal',
   read_only: 'danger',
 }
+
+/**
+ * Priorita AI leadu (AD16). Vysoká čeká na vás, střední běží, nízká je
+ * kategorie — tón nese naléhavost, ne druh (R-091).
+ */
+export const AGENT_LEAD_PRIORITY_TONE: Record<'LOW' | 'MEDIUM' | 'HIGH', AdminTone> = {
+  HIGH: 'signal',
+  MEDIUM: 'info',
+  LOW: 'neutral',
+}
+
+export const AGENT_LEAD_PRIORITY_LABEL: Record<'LOW' | 'MEDIUM' | 'HIGH', string> = {
+  HIGH: 'Vysoká priorita',
+  MEDIUM: 'Střední priorita',
+  LOW: 'Nízká priorita',
+}

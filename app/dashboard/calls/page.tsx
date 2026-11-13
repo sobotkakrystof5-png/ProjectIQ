@@ -2,8 +2,10 @@ import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
 import { Pagination } from '@/components/admin/pagination'
 import LeadsTable from '@/components/LeadsTable'
+import { AgentLeadsStrip } from '@/components/admin/agent-leads-strip'
 import ProjectCalculator from '@/components/ProjectCalculator'
 import { LEAD_SORT, loadCallsScreen } from '@/lib/admin/leads'
+import { loadAgentLeads } from '@/lib/admin/agent-leads'
 import { flipDir, parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
 
 // Hovory (AD07): řazení, stránka i pohled jsou v adrese, takže přežijí
@@ -25,7 +27,9 @@ export default async function CallsPage(props: {
     pageSize: 50,
     tiebreak: 'l.created_at',
   })
-  const screen = await loadCallsScreen(params, waiting)
+  // AI leady z vizeon-lead-agent visí v pruhu nad výpisem (AD16) — dosud se
+  // jen ukládaly a nikdo je neviděl.
+  const [screen, agentLeads] = await Promise.all([loadCallsScreen(params, waiting), loadAgentLeads()])
   const links = tableLinks(PATH, searchParams)
 
   // Funkce se do klientské komponenty poslat nedá, proto se odkazy na řazení
@@ -71,6 +75,8 @@ export default async function CallsPage(props: {
             },
           ]}
         />
+
+        <AgentLeadsStrip rows={agentLeads.rows} total={agentLeads.total} />
 
         <LeadsTable
           // Po změně řazení nebo stránky se vykreslí nové řádky, ne ty

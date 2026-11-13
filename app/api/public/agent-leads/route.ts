@@ -90,6 +90,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     type: 'agent_lead_received',
     title: `Nový AI lead (${analysis.priority}, ${analysis.lead_score}/100)`,
     body: `${client.name}${client.company ? ` — ${client.company}` : ''}\n${analysis.summary}`,
+    // Od AD16 je kam kliknout: lead visí v pruhu nad Hovory.
+    link: '/dashboard/calls',
   })
 
   return NextResponse.json({ success: true, lead: rows[0] }, { status: 201 })
