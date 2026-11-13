@@ -175,7 +175,7 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
               Zrušit úpravy
             </button>
           )}
-          <button type="button" onClick={save} disabled={pending} className="px-4 py-2 text-sm font-medium brand-gradient text-white rounded-chip hover:opacity-90 disabled:opacity-60">
+          <button type="button" onClick={save} disabled={pending} className="px-4 py-2 text-sm font-medium bg-navy-700 text-white rounded-chip hover:opacity-90 disabled:opacity-60">
             {pending ? 'Ukládám…' : news ? 'Uložit změny' : 'Uložit koncept'}
           </button>
         </div>

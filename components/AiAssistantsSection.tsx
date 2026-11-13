@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ConsultantIcon } from '@/components/ConsultantIcon'
 import { AiAssistantModal } from '@/components/AiAssistantModal'
 import { CONSULT_MODES, CONSULT_PROFILES, type ConsultMode } from '@/lib/ai/consultants'
 
@@ -41,11 +42,11 @@ export function AiAssistantsSection({ projectId, projectName }: Props) {
                 onClick={() => setMode(key)}
                 className="group min-h-[44px] text-left bg-surface border border-navy-100 rounded-panel p-4 transition-all hover:border-navy-300 hover:shadow-md"
               >
-                <div className="text-2xl mb-2" aria-hidden="true">{profile.icon}</div>
+                <div className="mb-2 text-navy-600"><ConsultantIcon icon={profile.icon} size={20} /></div>
                 <h3 className="font-medium text-ink text-sm mb-1">{profile.name}</h3>
                 <p className="text-xs text-quiet leading-relaxed">{profile.description}</p>
                 <div className="mt-3 pt-3 border-t border-navy-100">
-                  <span className="text-xs font-semibold text-navy-700">Zeptat se →</span>
+                  <span className="text-xs font-semibold text-navy-700">Zeptat se</span>
                 </div>
               </button>
             )

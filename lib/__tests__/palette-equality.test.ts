@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'fs'
 import path from 'path'
-import config from '@/tailwind.config'
 
-// Pojistka proti rozjetí palet (AD04, R-081). `brand-*` v tailwind.config.ts je literální
-// hex a používají ho dosud nepřepsané obrazovky adminu, `navy-*` se kompiluje na
-// rgb(var(--navy-…)) z app/tokens-dilky.css. Dokud obě existují vedle sebe, musí mít
-// stejné hodnoty — jinak by přejmenování brand- → navy- změnilo barvy.
+// Pojistka, že paleta Dílků má jedno místo (AD04, R-081). Literální `brand-*`
+// v tailwind.config.ts zmizela v AD18 spolu s poslední třídou, která ji používala;
+// zůstat musí, že hodnoty žijí jen v app/tokens-dilky.css na `:root`, takže platí
+// i tam, kde není `data-app` (/login, /p, /h).
 
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
@@ -25,7 +24,6 @@ function tokensFromCss() {
 
 describe('paleta Dílků', () => {
   const css = tokensFromCss()
-  const brand = (config.theme?.extend?.colors as { brand: Record<string, string> }).brand
 
   it('tokens-dilky.css je na :root, ne jen v [data-app]', () => {
     const file = withoutComments(readFileSync(path.join(process.cwd(), 'app/tokens-dilky.css'), 'utf8'))
@@ -45,13 +43,12 @@ describe('paleta Dílků', () => {
     }
   })
 
-  it.each(SHADES)('brand-%s === --navy-%s', (shade) => {
-    expect(css[shade]).toBeDefined()
-    expect(css[shade]).toBe(brand[shade].toLowerCase())
+  it('paleta má všech 11 odstínů a žádný navíc', () => {
+    expect(Object.keys(css).sort()).toEqual([...SHADES].sort())
   })
 
-  it('zná všech 11 odstínů z obou stran', () => {
-    expect(Object.keys(css).sort()).toEqual([...SHADES].sort())
-    expect(Object.keys(brand).sort()).toEqual([...SHADES].sort())
+  it('literální brand-* v tailwind.config.ts už není (AD18)', () => {
+    const tw = readFileSync(path.join(process.cwd(), 'tailwind.config.ts'), 'utf8')
+    expect(tw).not.toMatch(/\bbrand:\s*\{/)
   })
 })

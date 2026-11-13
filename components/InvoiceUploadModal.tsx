@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
 import {
   InvoiceFields, emptyInvoiceForm, validateInvoiceForm, invoiceFormToFormData,
   type InvoiceFormState,
 } from '@/components/InvoiceFields'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import type { InvoiceAiExtract } from '@/lib/types'
 import { createInvoice, updateInvoice } from '@/app/dashboard/finance/invoice-actions'
 import type { InvoiceListItem, InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
@@ -88,75 +90,52 @@ export function InvoiceUploadModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-start sm:items-center justify-center p-3 sm:p-6 overflow-y-auto"
-      onClick={onClose}
-    >
-      <form
-        onSubmit={handleSubmit}
-        onClick={e => e.stopPropagation()}
-        className="bg-white border border-border rounded-2xl shadow-lg w-full max-w-xl my-auto"
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="text-base font-semibold text-foreground">
-            {invoice ? 'Upravit fakturu' : 'Nová faktura'}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X size={18} strokeWidth={1.5} />
-          </button>
-        </div>
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent className="max-w-xl p-0">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader className="border-b border-navy-100 px-5 py-4">
+            <DialogTitle className="text-base">{invoice ? 'Upravit fakturu' : 'Nová faktura'}</DialogTitle>
+          </DialogHeader>
 
-        <div className="px-5 py-4">
-          <InvoiceFields
-            value={form}
-            onChange={setForm}
-            file={file}
-            onFileChange={f => {
-              setFile(f)
-              if (f) setRemovePdf(false)
-              // Přepis patří ke konkrétnímu souboru — po výměně PDF by
-              // uložený výstup AI odkazoval na dokument, který tu už není.
-              setAiExtracted(null)
-            }}
-            onAiExtracted={setAiExtracted}
-            existingPdfName={existingPdfName}
-            onRemoveExistingPdf={() => setRemovePdf(true)}
-            projects={projects}
-            disabled={isSaving}
-            autoParse={!invoice}
-          />
+          <div className="px-5 py-4">
+            <InvoiceFields
+              value={form}
+              onChange={setForm}
+              file={file}
+              onFileChange={f => {
+                setFile(f)
+                if (f) setRemovePdf(false)
+                // Přepis patří ke konkrétnímu souboru — po výměně PDF by
+                // uložený výstup AI odkazoval na dokument, který tu už není.
+                setAiExtracted(null)
+              }}
+              onAiExtracted={setAiExtracted}
+              existingPdfName={existingPdfName}
+              onRemoveExistingPdf={() => setRemovePdf(true)}
+              projects={projects}
+              disabled={isSaving}
+              autoParse={!invoice}
+            />
 
-          {error && (
-            <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3">
-              <AlertCircle size={14} strokeWidth={1.5} className="shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
+            {error && (
+              <div role="alert" className="mt-3 flex items-start gap-2 rounded-chip border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+                <AlertCircle size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSaving}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
-          >
-            Zrušit
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-          >
-            {isSaving && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
-            {invoice ? 'Uložit' : 'Přidat fakturu'}
-          </button>
-        </div>
-      </form>
-    </div>
+          <DialogFooter className="items-center border-t border-navy-100 px-5 py-4">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving}>
+              Zrušit
+            </Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
+              {invoice ? 'Uložit' : 'Přidat fakturu'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

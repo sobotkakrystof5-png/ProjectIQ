@@ -76,8 +76,8 @@ export function FeedbackBlock({ token }: FeedbackBlockProps) {
         disabled={isPending}
         className={cn(
           'w-full flex items-center justify-center gap-2',
-          'brand-gradient text-white text-sm font-semibold py-2.5 rounded-chip shadow-sm',
-          'hover:opacity-90 transition-opacity disabled:opacity-50',
+          'bg-navy-700 text-white text-sm font-semibold py-2.5 rounded-chip shadow-sm',
+          'hover:bg-navy-800 transition-colors disabled:opacity-50',
         )}
       >
         {isPending

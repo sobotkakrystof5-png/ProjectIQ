@@ -160,7 +160,7 @@ export function LeadCard({ lead }: { lead: WebLead }) {
         <button
           onClick={handleConfirm}
           disabled={confirming || deleting}
-          className="brand-gradient flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-chip shadow-sm hover:opacity-90 transition-opacity disabled:opacity-60"
+          className="bg-navy-700 flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-chip shadow-sm hover:bg-navy-800 transition-colors disabled:opacity-60"
         >
           {confirming ? (
             <Loader2 size={15} strokeWidth={1.5} className="animate-spin" />

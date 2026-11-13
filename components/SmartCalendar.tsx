@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'framer-motion'
 import {
-  ChevronLeft, ChevronRight, Plus, X, ExternalLink,
+  ChevronLeft, ChevronRight, Plus, ExternalLink,
   CalendarDays, Phone, Monitor, Video, MessageSquare,
   CalendarPlus, Lock, Trash2, Clock, Flag,
   Building2, User, Mail, MessageCircle, Coins,
@@ -14,6 +14,13 @@ import {
   CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS,
   type ConsultationChannel, type CalendarEventType, type LeadActionType, type LeadStatus,
 } from '@/lib/types'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { AdminEventModal } from './AdminEventModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -325,208 +332,182 @@ function EventDetailModal({
   }
 
   return (
-    <AnimatePresence>
-      <m.div
-        key="backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <m.div
-          key="card"
-          initial={{ opacity: 0, scale: 0.96, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-          className="w-full max-w-sm overflow-hidden rounded-box bg-surface shadow-2xl"
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Coloured header strip */}
-          <div className="h-1.5" style={style.dot} />
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent className="max-w-sm overflow-hidden p-0">
+        {/* Tón termínu — jediná barva, kterou okno nese (R-103) */}
+        <div className="h-1.5" style={style.dot} />
 
-          <div className="p-5">
-            {/* Header row */}
-            <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="p-5">
+          <DialogHeader className="mb-4">
+            <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold" style={style.pill}>
+              {event.kind === 'consultation' && event.channel && (
+                <ChannelIcon channel={event.channel} />
+              )}
+              {event.kind === 'deadline' && <Flag size={10} strokeWidth={1.5} />}
+              {event.kind === 'block' && <Lock size={10} strokeWidth={1.5} />}
+              <span>{event.sublabel}</span>
+            </div>
+            <DialogTitle className="text-base leading-tight">{event.label}</DialogTitle>
+            <DialogDescription className="sr-only">Detail záznamu v kalendáři</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            {/* Date / time */}
+            <div className="flex items-start gap-2.5">
+              <Clock size={14} strokeWidth={1.5} className="text-quiet mt-0.5 shrink-0" />
               <div>
-                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-semibold" style={style.pill}>
-                  {event.kind === 'consultation' && event.channel && (
-                    <ChannelIcon channel={event.channel} />
-                  )}
-                  {event.kind === 'deadline' && <Flag size={10} strokeWidth={1.5} />}
-                  {event.kind === 'block' && <Lock size={10} strokeWidth={1.5} />}
-                  <span>{event.sublabel}</span>
-                </div>
-                <h3 className="font-semibold text-ink text-base leading-tight">{event.label}</h3>
+                <p className="text-ink font-medium">
+                  {event.allDay
+                    ? formatShortDate(event.startsAt)
+                    : `${formatShortDate(event.startsAt)}, ${formatTime(event.startsAt)} – ${formatTime(event.endsAt)}`
+                  }
+                </p>
               </div>
+            </div>
+
+            {/* Kontakt u ručně zapsané události (AD10) */}
+            {contact && (
+              <div className="space-y-2.5 rounded-chip border border-navy-100 bg-navy-50/60 p-3">
+                {contact.name !== null && contact.name !== '' && (
+                  <div className="flex items-center gap-2.5">
+                    <Building2 size={14} strokeWidth={1.5} className="shrink-0 text-quiet" />
+                    <span className="text-ink">{contact.name}</span>
+                  </div>
+                )}
+                <ContactActions
+                  phone={contact.phone}
+                  email={contact.email}
+                  context={{ at: event.startsAt, projectName: event.label }}
+                />
+              </div>
+            )}
+
+            {/* Kontakt z Hovorů */}
+            {lead && (
+              <div className="space-y-2.5 rounded-chip border border-navy-100 bg-navy-50/60 p-3">
+                {lead.contactName && (
+                  <div className="flex items-center gap-2.5">
+                    <Building2 size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
+                    <span className="text-ink">{lead.companyName}</span>
+                  </div>
+                )}
+                {!lead.contactName && lead.companyName && (
+                  <div className="flex items-center gap-2.5">
+                    <User size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
+                    <span className="text-quiet">Kontaktní osoba není vyplněná</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <Badge variant={toneVariant(LEAD_STATUS_TONE[lead.status])}>
+                    {LEAD_STATUS_LABELS[lead.status]}
+                  </Badge>
+                  {lead.estimatedValue != null && (
+                    <span className="inline-flex items-center gap-1 text-xs text-quiet">
+                      <Coins size={12} strokeWidth={1.5} />
+                      {lead.estimatedValue.toLocaleString('cs-CZ')} Kč
+                    </span>
+                  )}
+                </div>
+
+                {/* Volat, SMS, e-mail, WhatsApp i šablony z jednoho místa (AD10). */}
+                <ContactActions
+                  phone={lead.phone}
+                  email={lead.email}
+                  context={{ at: event.startsAt }}
+                  emptyHint="Kontakt nemá vyplněný telefon ani e-mail."
+                />
+
+                {lead.notes && (
+                  <div>
+                    <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">Poznámky ke kontaktu</p>
+                    <p className="text-ink leading-relaxed whitespace-pre-wrap">{lead.notes}</p>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* Client wish */}
+            {event.meta.clientWish && (
+              <div>
+                <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">Přání klienta</p>
+                <p className="text-ink leading-relaxed whitespace-pre-wrap">{event.meta.clientWish}</p>
+              </div>
+            )}
+
+            {/* Client email */}
+            {event.meta.clientEmail && (
+              <div>
+                <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">E-mail klienta</p>
+                <a
+                  href={mailtoHref(event.meta.clientEmail) ?? `mailto:${event.meta.clientEmail}`}
+                  className="text-navy-700 hover:underline"
+                >
+                  {event.meta.clientEmail}
+                </a>
+              </div>
+            )}
+
+            {/* Description */}
+            {event.meta.description && (
+              <div>
+                <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">
+                  {lead ? 'Co je v plánu' : 'Poznámka'}
+                </p>
+                <p className="text-ink leading-relaxed whitespace-pre-wrap">{event.meta.description}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 mt-5">
+            {event.meta.meetingLink && event.meta.meetingLink !== '#' && (
+              <a
+                href={event.meta.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-navy-700 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+              >
+                <ExternalLink size={13} strokeWidth={1.5} />
+                Připojit se
+              </a>
+            )}
+
+            {event.meta.projectId && event.kind === 'consultation' && (
+              <a
+                href={`/dashboard/${event.meta.projectId}`}
+                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
+              >
+                Detail zakázky
+              </a>
+            )}
+
+            {event.kind === 'call' && (
+              <a
+                href={lead ? `/dashboard/calls?lead=${lead.id}` : '/dashboard/calls'}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
+              >
+                <ExternalLink size={13} strokeWidth={1.5} />
+                Otevřít hovory
+              </a>
+            )}
+
+            {isManualEvent && (
               <button
                 type="button"
-                onClick={onClose}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-chip text-quiet transition-colors hover:bg-navy-50"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-danger/30 text-danger transition-colors hover:bg-danger/5 disabled:opacity-50"
+                aria-label="Smazat událost"
               >
-                <X size={15} strokeWidth={1.5} />
+                <Trash2 size={14} strokeWidth={1.5} />
               </button>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              {/* Date / time */}
-              <div className="flex items-start gap-2.5">
-                <Clock size={14} strokeWidth={1.5} className="text-quiet mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-ink font-medium">
-                    {event.allDay
-                      ? formatShortDate(event.startsAt)
-                      : `${formatShortDate(event.startsAt)}, ${formatTime(event.startsAt)} – ${formatTime(event.endsAt)}`
-                    }
-                  </p>
-                </div>
-              </div>
-
-              {/* Kontakt u ručně zapsané události (AD10) */}
-              {contact && (
-                <div className="space-y-2.5 rounded-chip border border-navy-100 bg-navy-50/60 p-3">
-                  {contact.name !== null && contact.name !== '' && (
-                    <div className="flex items-center gap-2.5">
-                      <Building2 size={14} strokeWidth={1.5} className="shrink-0 text-quiet" />
-                      <span className="text-ink">{contact.name}</span>
-                    </div>
-                  )}
-                  <ContactActions
-                    phone={contact.phone}
-                    email={contact.email}
-                    context={{ at: event.startsAt, projectName: event.label }}
-                  />
-                </div>
-              )}
-
-              {/* Kontakt z Hovorů */}
-              {lead && (
-                <div className="space-y-2.5 rounded-chip border border-navy-100 bg-navy-50/60 p-3">
-                  {lead.contactName && (
-                    <div className="flex items-center gap-2.5">
-                      <Building2 size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
-                      <span className="text-ink">{lead.companyName}</span>
-                    </div>
-                  )}
-                  {!lead.contactName && lead.companyName && (
-                    <div className="flex items-center gap-2.5">
-                      <User size={14} strokeWidth={1.5} className="text-quiet shrink-0" />
-                      <span className="text-quiet">Kontaktní osoba není vyplněná</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <Badge variant={toneVariant(LEAD_STATUS_TONE[lead.status])}>
-                      {LEAD_STATUS_LABELS[lead.status]}
-                    </Badge>
-                    {lead.estimatedValue != null && (
-                      <span className="inline-flex items-center gap-1 text-xs text-quiet">
-                        <Coins size={12} strokeWidth={1.5} />
-                        {lead.estimatedValue.toLocaleString('cs-CZ')} Kč
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Volat, SMS, e-mail, WhatsApp i šablony z jednoho místa (AD10). */}
-                  <ContactActions
-                    phone={lead.phone}
-                    email={lead.email}
-                    context={{ at: event.startsAt }}
-                    emptyHint="Kontakt nemá vyplněný telefon ani e-mail."
-                  />
-
-                  {lead.notes && (
-                    <div>
-                      <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">Poznámky ke kontaktu</p>
-                      <p className="text-ink leading-relaxed whitespace-pre-wrap">{lead.notes}</p>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* Client wish */}
-              {event.meta.clientWish && (
-                <div>
-                  <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">Přání klienta</p>
-                  <p className="text-ink leading-relaxed whitespace-pre-wrap">{event.meta.clientWish}</p>
-                </div>
-              )}
-
-              {/* Client email */}
-              {event.meta.clientEmail && (
-                <div>
-                  <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">E-mail klienta</p>
-                  <a
-                    href={mailtoHref(event.meta.clientEmail) ?? `mailto:${event.meta.clientEmail}`}
-                    className="text-navy-700 hover:underline"
-                  >
-                    {event.meta.clientEmail}
-                  </a>
-                </div>
-              )}
-
-              {/* Description */}
-              {event.meta.description && (
-                <div>
-                  <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">
-                    {lead ? 'Co je v plánu' : 'Poznámka'}
-                  </p>
-                  <p className="text-ink leading-relaxed whitespace-pre-wrap">{event.meta.description}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 mt-5">
-              {event.meta.meetingLink && event.meta.meetingLink !== '#' && (
-                <a
-                  href={event.meta.meetingLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-navy-700 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
-                >
-                  <ExternalLink size={13} strokeWidth={1.5} />
-                  Připojit se
-                </a>
-              )}
-
-              {event.meta.projectId && event.kind === 'consultation' && (
-                <a
-                  href={`/dashboard/${event.meta.projectId}`}
-                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
-                >
-                  Detail zakázky
-                </a>
-              )}
-
-              {event.kind === 'call' && (
-                <a
-                  href={lead ? `/dashboard/calls?lead=${lead.id}` : '/dashboard/calls'}
-                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
-                >
-                  <ExternalLink size={13} strokeWidth={1.5} />
-                  Otevřít hovory
-                </a>
-              )}
-
-              {isManualEvent && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-danger/30 text-danger transition-colors hover:bg-danger/5 disabled:opacity-50"
-                  aria-label="Smazat událost"
-                >
-                  <Trash2 size={14} strokeWidth={1.5} />
-                </button>
-              )}
-            </div>
+            )}
           </div>
-        </m.div>
-      </m.div>
-    </AnimatePresence>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -1227,20 +1208,18 @@ export function SmartCalendar({
       )}
 
       {/*
-        AnimatePresence je **tady**, ne uvnitř modalu (AD08). Dřív modal
-        nikdy neodmountoval, takže se `useState` inicializátory spustily jen
-        při prvním načtení stránky a formulář navždy držel „dnes 10:00".
-        Klik na slot v 11:00 se do něj nepropsal.
+        Modal se mountuje až při otevření (AD08). Dřív nikdy neodmountoval,
+        takže se `useState` inicializátory spustily jen při prvním načtení
+        stránky a formulář navždy držel „dnes 10:00"; klik na slot v 11:00
+        se do něj nepropsal. Animaci si od AD18 řeší Radix sám.
       */}
-      <AnimatePresence>
-        {createModal.open && (
-          <AdminEventModal
-            onClose={handleCreateClose}
-            defaultDate={createModal.date}
-            defaultHour={createModal.hour}
-          />
-        )}
-      </AnimatePresence>
+      {createModal.open && (
+        <AdminEventModal
+          onClose={handleCreateClose}
+          defaultDate={createModal.date}
+          defaultHour={createModal.hour}
+        />
+      )}
     </div>
   )
 }

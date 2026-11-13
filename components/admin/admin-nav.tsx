@@ -3,7 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu } from 'lucide-react'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import {
   ADMIN_MOBILE_TABS,
   ADMIN_NAV,
@@ -138,30 +145,15 @@ export function AdminMobileTabs({ counts }: { counts: AdminCounts }) {
         </ul>
       </nav>
 
-      {open && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Celá nabídka">
-          <button
-            type="button"
-            aria-label="Zavřít nabídku"
-            className="absolute inset-0 bg-navy-950/40"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-panel bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-ink">Nabídka</p>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="flex h-11 w-11 items-center justify-center rounded-chip text-quiet hover:bg-navy-50"
-                aria-label="Zavřít"
-              >
-                <X size={18} strokeWidth={1.5} />
-              </button>
-            </div>
-            <AdminNavList counts={counts} onNavigate={() => setOpen(false)} />
-          </div>
-        </div>
-      )}
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom))] lg:hidden">
+          <SheetHeader>
+            <SheetTitle className="text-sm">Nabídka</SheetTitle>
+            <SheetDescription className="sr-only">Všechny obrazovky administrace</SheetDescription>
+          </SheetHeader>
+          <AdminNavList counts={counts} onNavigate={() => setOpen(false)} />
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

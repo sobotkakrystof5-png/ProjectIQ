@@ -484,7 +484,7 @@ function LeadRow({
           <div className="flex flex-col gap-0.5">
             <span className={cn('font-num text-sm font-medium', isOverdue ? 'text-danger' : 'text-ink')}>
               {formattedDateTime}
-              {isOverdue && ' ⚠'}
+              {isOverdue && <span className="ml-1 font-sans text-xs font-semibold">po termínu</span>}
             </span>
           </div>
         ) : (

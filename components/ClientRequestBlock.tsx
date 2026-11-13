@@ -218,7 +218,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
         <button
           type="submit"
           disabled={busy || voice === 'recording' || text.trim().length < 3}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-chip brand-gradient px-4 text-sm font-medium text-white shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-chip bg-navy-700 px-4 text-sm font-medium text-white shadow-sm hover:bg-navy-800 transition-colors disabled:opacity-50"
         >
           {isPending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
           Odeslat požadavek

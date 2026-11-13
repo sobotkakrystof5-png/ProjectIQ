@@ -37,7 +37,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 brand-gradient rounded-box flex items-center justify-center shadow-md mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-navy-600 to-navy-800 rounded-box flex items-center justify-center shadow-md mb-4">
             <svg width="22" height="22" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.9" />
               <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.5" />
@@ -91,7 +91,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isPending}
-              className="w-full flex items-center justify-center gap-2 brand-gradient text-white text-sm font-medium py-2.5 rounded-chip shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50 mt-2"
+              className="w-full flex items-center justify-center gap-2 bg-navy-700 text-white text-sm font-medium py-2.5 rounded-chip shadow-sm hover:bg-navy-800 transition-colors disabled:opacity-50 mt-2"
             >
               {isPending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
               Přihlásit se

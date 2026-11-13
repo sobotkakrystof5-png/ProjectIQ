@@ -20,46 +20,52 @@ export const CONSULT_MODES = [
 
 export type ConsultMode = (typeof CONSULT_MODES)[number]
 
-export type ConsultProfile = { icon: string; name: string; description: string }
+/** `icon` je název ikony z Lucide, vykresluje ho `components/ConsultantIcon.tsx`.
+ *  Emoji Dílky nemají a tenhle číselník čte i server, takže se sem komponenta nevejde. */
+export type ConsultProfile = { icon: ConsultIcon; name: string; description: string }
+
+export type ConsultIcon =
+  | 'megaphone' | 'newspaper' | 'rocket' | 'coins'
+  | 'palette' | 'chart' | 'settings' | 'handshake'
 
 export const CONSULT_PROFILES: Record<ConsultMode, ConsultProfile> = {
   marketing: {
-    icon: '📣',
+    icon: 'megaphone',
     name: 'Marketingový stratég',
     description: 'Pomáhá s propagací, obsahovou strategií a růstem',
   },
   pr: {
-    icon: '📰',
+    icon: 'newspaper',
     name: 'PR a komunikace',
     description: 'Tiskové zprávy, mediální strategie, budování značky',
   },
   launch: {
-    icon: '🚀',
+    icon: 'rocket',
     name: 'Spuštění produktu',
     description: 'Plánování spuštění, cesta na trh, Product Hunt',
   },
   business: {
-    icon: '💰',
+    icon: 'coins',
     name: 'Byznys poradce',
     description: 'Byznysová rozhodnutí, ceny, partnerství, růst',
   },
   design: {
-    icon: '🎨',
+    icon: 'palette',
     name: 'Grafický designér',
     description: 'Identita značky, vizuální styl, doporučení k rozhraní',
   },
   finance: {
-    icon: '📊',
+    icon: 'chart',
     name: 'Finanční analytik',
     description: 'Finanční odhady, jednotková ekonomika, investice',
   },
   operations: {
-    icon: '⚙️',
+    icon: 'settings',
     name: 'Chod firmy',
     description: 'Procesy, automatizace, chod firmy a týmu',
   },
   coo: {
-    icon: '🤝',
+    icon: 'handshake',
     name: 'Vaše pravá ruka',
     description: 'Sleduje rozhodnutí, plány a změny projektu',
   },

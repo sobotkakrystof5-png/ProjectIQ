@@ -44,7 +44,7 @@ export function InviteClientForm({ industries }: { industries: { key: string; la
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium brand-gradient text-white rounded-chip hover:opacity-90 transition-opacity shrink-0"
+        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-navy-700 text-white rounded-chip hover:bg-navy-800 transition-colors shrink-0"
       >
         <UserPlus size={15} strokeWidth={1.5} />
         Pozvat klienta
@@ -88,7 +88,7 @@ export function InviteClientForm({ industries }: { industries: { key: string; la
         <button
           type="submit"
           disabled={pending}
-          className="px-4 py-2 text-sm font-medium brand-gradient text-white rounded-chip hover:opacity-90 disabled:opacity-60 transition-opacity"
+          className="px-4 py-2 text-sm font-medium bg-navy-700 text-white rounded-chip hover:bg-navy-800 disabled:opacity-60 transition-colors"
         >
           {pending ? 'Zakládám…' : 'Založit a pozvat'}
         </button>

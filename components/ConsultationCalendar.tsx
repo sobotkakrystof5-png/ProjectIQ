@@ -1,8 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { AnimatePresence, m } from 'framer-motion'
-import { ChevronLeft, ChevronRight, X, ExternalLink, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink, CalendarDays } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { formatPragueDateTime, utcToPrague, toMondayFirst, getDaysInMonth, getMonthStartOffset } from '@/lib/prague-time'
 import { CHANNEL_LABELS } from '@/lib/types'
 import type { ConsultationSlot, ConsultationChannel } from '@/lib/types'
@@ -19,70 +26,51 @@ interface Props {
   clientName: string
 }
 
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1 text-sm font-medium text-ink">{label}</p>
+      {children}
+    </div>
+  )
+}
+
+/** Detail rezervované konzultace. Od AD18 Radix dialog (focus trap, Escape). */
 function SlotDetailModal({ slot, clientName, onClose }: { slot: ConsultationSlot; clientName: string; onClose: () => void }) {
   return (
-    <AnimatePresence>
-      <m.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <m.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-surface rounded-box shadow-2xl w-full max-w-md overflow-hidden"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between bg-navy-800 px-5 py-4">
-            <span className="text-white font-semibold text-sm">Detail konzultace</span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-chip text-navy-200 hover:text-white hover:bg-surface/10 transition-colors"
-            >
-              <X size={15} strokeWidth={1.5} />
-            </button>
-          </div>
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-base">Detail konzultace</DialogTitle>
+          <DialogDescription className="sr-only">Údaje k rezervovanému termínu</DialogDescription>
+        </DialogHeader>
 
-          <div className="p-5 space-y-4">
-            <div>
-              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Klient</p>
-              <p className="text-sm font-medium text-ink">{clientName}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Datum a čas</p>
-              <p className="text-sm text-ink">{formatPragueDateTime(new Date(slot.scheduled_at).toISOString())}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Kanál</p>
-              <p className="text-sm text-ink">
-                {CHANNEL_LABELS[slot.channel as ConsultationChannel] ?? slot.channel}
-                {slot.channel === 'other' && slot.channel_other_text ? ` — ${slot.channel_other_text}` : ''}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-quiet uppercase tracking-wider mb-1">Přání klienta</p>
-              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{slot.client_wish}</p>
-            </div>
-            {slot.meeting_link && slot.meeting_link !== '#' && (
-              <a
-                href={slot.meeting_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-navy-700 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800"
-              >
-                <ExternalLink size={14} strokeWidth={1.5} />
-                Připojit se k hovoru
-              </a>
-            )}
-          </div>
-        </m.div>
-      </m.div>
-    </AnimatePresence>
+        <Row label="Klient">
+          <p className="text-sm font-medium text-ink">{clientName}</p>
+        </Row>
+        <Row label="Datum a čas">
+          <p className="font-num text-sm text-ink">{formatPragueDateTime(new Date(slot.scheduled_at).toISOString())}</p>
+        </Row>
+        <Row label="Kanál">
+          <p className="text-sm text-ink">
+            {CHANNEL_LABELS[slot.channel as ConsultationChannel] ?? slot.channel}
+            {slot.channel === 'other' && slot.channel_other_text ? ` — ${slot.channel_other_text}` : ''}
+          </p>
+        </Row>
+        <Row label="Přání klienta">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{slot.client_wish}</p>
+        </Row>
+
+        {slot.meeting_link && slot.meeting_link !== '#' && (
+          <Button asChild className="w-full">
+            <a href={slot.meeting_link} target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={14} strokeWidth={1.5} />
+              Připojit se k hovoru
+            </a>
+          </Button>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 

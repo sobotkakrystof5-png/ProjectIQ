@@ -31,7 +31,7 @@ export default async function SurveyPage(props: PageProps) {
         <div className="w-full max-w-lg">
           <div className="bg-surface rounded-box border border-navy-100 shadow-sm overflow-hidden">
             {/* Brand header */}
-            <div className="brand-gradient px-6 pt-7 pb-6">
+            <div className="bg-navy-900 px-6 pt-7 pb-6">
               <p className="text-xs font-medium text-navy-200 uppercase tracking-wider mb-1.5">
                 Dotazník spokojenosti
               </p>
@@ -69,7 +69,7 @@ export default async function SurveyPage(props: PageProps) {
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-2.5 mt-6">
-            <div className="w-8 h-8 brand-gradient rounded-chip flex items-center justify-center shadow-md">
+            <div className="w-8 h-8 bg-gradient-to-br from-navy-600 to-navy-800 rounded-chip flex items-center justify-center shadow-md">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
                 <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.55" />

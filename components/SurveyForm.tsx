@@ -161,8 +161,8 @@ export function SurveyForm({ token }: SurveyFormProps) {
         disabled={isPending}
         className={cn(
           'w-full flex items-center justify-center gap-2',
-          'brand-gradient text-white text-sm font-semibold py-3 rounded-chip shadow-sm',
-          'hover:opacity-90 transition-opacity disabled:opacity-50',
+          'bg-navy-700 text-white text-sm font-semibold py-3 rounded-chip shadow-sm',
+          'hover:bg-navy-800 transition-colors disabled:opacity-50',
         )}
       >
         {isPending

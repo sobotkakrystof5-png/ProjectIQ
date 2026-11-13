@@ -476,7 +476,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
           type="button"
           onClick={handlePublish}
           disabled={publishing}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-navy-600 text-white text-sm font-medium rounded-chip hover:opacity-90 disabled:opacity-50 transition-all shadow-sm shrink-0 ml-4"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-navy-700 text-white text-sm font-medium rounded-chip hover:bg-navy-800 disabled:opacity-50 transition-all shadow-sm shrink-0 ml-4"
         >
           {publishing
             ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
@@ -630,7 +630,7 @@ export function PersonalProjectEditor({ project, improvements, changelog }: Prop
           </div>
           <input type="range" min={0} max={100} value={progress} onChange={e => setProgress(Number(e.target.value))} className="w-full accent-navy-600" />
           <div className="mt-1.5 h-2 bg-muted rounded-full overflow-hidden">
-            <div className="h-full brand-gradient rounded-full transition-all" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-navy-700 rounded-full transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
       </Section>

@@ -1,8 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { m } from 'framer-motion'
-import { X, Loader2, CalendarPlus, Lock } from 'lucide-react'
+import { Loader2, CalendarPlus, Lock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { createCalendarEvent } from '@/app/calendar-actions'
 import { cn } from '@/lib/utils'
 import { getPragueTodayISO, parsePragueDatetimeLocalToISO } from '@/lib/prague-time'
@@ -16,10 +23,12 @@ interface AdminEventModalProps {
 }
 
 /*
- * Modal se **mountuje až při otevření** a `<AnimatePresence>` je nad ním
- * v SmartCalendar (AD08). Dokud byl uvnitř, komponenta se nikdy neodmountovala:
- * `useState` inicializátory níž se spustily jedinkrát při načtení stránky
- * a formulář pak navždy nabízel „dnes 10:00", ať se kliklo na jakýkoli slot.
+ * Modal se **mountuje až při otevření** (AD08). Dokud byl pořád v DOM,
+ * komponenta se nikdy neodmountovala: `useState` inicializátory níž se spustily
+ * jedinkrát při načtení stránky a formulář pak navždy nabízel „dnes 10:00",
+ * ať se kliklo na jakýkoli slot.
+ *
+ * Od AD18 je okno Radix dialog — focus trap, `Escape` a `aria-modal` zadarmo.
  */
 
 function toLocalDatetimeValue(date: string, hour: number): string {
@@ -117,207 +126,174 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
     'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-surface'
 
   return (
-    <>
-      <m.div
-        key="backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm"
-        onClick={() => close(false)}
-      />
+    <Dialog open onOpenChange={open => { if (!open) close(false) }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-600" aria-hidden="true" />
+            Přidat do kalendáře
+          </DialogTitle>
+          <DialogDescription>Událost nebo blokace v diáři. Termín se hlídá proti kolizi.</DialogDescription>
+        </DialogHeader>
 
-      <m.div
-        key="panel"
-        initial={{ opacity: 0, y: 32, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 24, scale: 0.97 }}
-        transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-      >
-        <div
-          // `max-h-[90vh]` + rolování: na telefonu se formulář nevejde a
-          // `overflow-hidden` samotné odřízlo tlačítko Uložit (AD08).
-          className="pointer-events-auto w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-box shadow-2xl"
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between bg-navy-800 px-5 py-4">
-            <div className="flex items-center gap-2.5">
-              <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-200" />
-              <span className="text-white font-semibold text-sm">Přidat do kalendáře</span>
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Event type selector */}
+        <div className="grid grid-cols-2 gap-2">
+          {EVENT_TYPES.map(({ id, label, description: desc, icon: Icon }) => (
             <button
+              key={id}
               type="button"
-              onClick={() => close(false)}
-              className="p-1.5 rounded-chip text-navy-200 hover:text-white hover:bg-surface/10 transition-colors"
-              aria-label="Zavřít"
+              onClick={() => setEventType(id)}
+              className={cn(
+                'flex flex-col items-start gap-1 p-3 rounded-chip border text-left transition-all duration-150',
+                eventType === id
+                  ? 'border-navy-400 bg-navy-50'
+                  : 'border-navy-100 bg-surface hover:border-navy-200 hover:bg-navy-50/50',
+              )}
             >
-              <X size={15} strokeWidth={1.5} />
+              <div className="flex items-center gap-1.5">
+                <Icon
+                  size={13}
+                  strokeWidth={1.5}
+                  className={eventType === id ? 'text-navy-700' : 'text-quiet'}
+                />
+                <span className={cn(
+                  'text-xs font-semibold',
+                  eventType === id ? 'text-navy-800' : 'text-ink',
+                )}>
+                  {label}
+                </span>
+              </div>
+              <span className="text-[11px] text-quiet leading-snug">{desc}</span>
             </button>
+          ))}
+        </div>
+
+        {/* Title */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-ink">
+            Název *
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder={eventType === 'block' ? 'Např. Nedostupný' : 'Např. Schůzka s partnerem'}
+            maxLength={120}
+            className={inputCls}
+            autoFocus
+          />
+        </div>
+
+        {/* Times */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-ink">
+              Začátek *
+            </label>
+            <input
+              type="datetime-local"
+              value={startsAt}
+              onChange={e => handleStartsAtChange(e.target.value)}
+              className={inputCls}
+            />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-ink">
+              Konec *
+            </label>
+            <input
+              type="datetime-local"
+              value={endsAt}
+              min={startsAt}
+              onChange={e => setEndsAt(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-5 space-y-4">
-            {/* Event type selector */}
+        {/* Kontakt (AD10) — jen u událostí, blokace se nezrcadlí */}
+        {eventType === 'manual' && (
+          <div className="flex flex-col gap-2 rounded-chip border border-navy-100 bg-navy-50/40 p-3">
+            <p className="text-sm font-medium text-ink">
+              Kontakt (nepovinné)
+            </p>
+            <p className="text-[11px] leading-snug text-quiet">
+              Doplňte telefon nebo e-mail a z Hovorů i z kalendáře pak zavoláte jedním klikem.
+            </p>
+            <input
+              type="text"
+              value={contactName}
+              onChange={e => setContactName(e.target.value)}
+              placeholder="Jméno"
+              maxLength={120}
+              className={inputCls}
+            />
             <div className="grid grid-cols-2 gap-2">
-              {EVENT_TYPES.map(({ id, label, description: desc, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setEventType(id)}
-                  className={cn(
-                    'flex flex-col items-start gap-1 p-3 rounded-chip border text-left transition-all duration-150',
-                    eventType === id
-                      ? 'border-navy-400 bg-navy-50'
-                      : 'border-navy-100 bg-surface hover:border-navy-200 hover:bg-navy-50/50',
-                  )}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Icon
-                      size={13}
-                      strokeWidth={1.5}
-                      className={eventType === id ? 'text-navy-700' : 'text-quiet'}
-                    />
-                    <span className={cn(
-                      'text-xs font-semibold',
-                      eventType === id ? 'text-navy-800' : 'text-ink',
-                    )}>
-                      {label}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-quiet leading-snug">{desc}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Title */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-quiet uppercase tracking-wide">
-                Název *
-              </label>
               <input
-                type="text"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder={eventType === 'block' ? 'Např. Nedostupný' : 'Např. Schůzka s partnerem'}
-                maxLength={120}
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="Telefon"
+                maxLength={40}
                 className={inputCls}
-                autoFocus
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="E-mail"
+                maxLength={200}
+                className={inputCls}
               />
             </div>
+          </div>
+        )}
 
-            {/* Times */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-quiet uppercase tracking-wide">
-                  Začátek *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={e => handleStartsAtChange(e.target.value)}
-                  className={inputCls}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-quiet uppercase tracking-wide">
-                  Konec *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={endsAt}
-                  min={startsAt}
-                  onChange={e => setEndsAt(e.target.value)}
-                  className={inputCls}
-                />
-              </div>
-            </div>
+        {/* Description (only for manual events) */}
+        {eventType === 'manual' && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-ink">
+              Poznámka (nepovinné)
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="Detail nebo připomínka…"
+              className={cn(inputCls, 'resize-none')}
+            />
+          </div>
+        )}
 
-            {/* Kontakt (AD10) — jen u událostí, blokace se nezrcadlí */}
-            {eventType === 'manual' && (
-              <div className="flex flex-col gap-2 rounded-chip border border-navy-100 bg-navy-50/40 p-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-quiet">
-                  Kontakt (nepovinné)
-                </p>
-                <p className="text-[11px] leading-snug text-quiet">
-                  Doplňte telefon nebo e-mail a z Hovorů i z kalendáře pak zavoláte jedním klikem.
-                </p>
-                <input
-                  type="text"
-                  value={contactName}
-                  onChange={e => setContactName(e.target.value)}
-                  placeholder="Jméno"
-                  maxLength={120}
-                  className={inputCls}
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    placeholder="Telefon"
-                    maxLength={40}
-                    className={inputCls}
-                  />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="E-mail"
-                    maxLength={200}
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-            )}
+        {error && (
+          <p className="rounded-chip border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-medium text-danger">
+            {error}
+          </p>
+        )}
 
-            {/* Description (only for manual events) */}
-            {eventType === 'manual' && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-quiet uppercase tracking-wide">
-                  Poznámka (nepovinné)
-                </label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  rows={2}
-                  maxLength={500}
-                  placeholder="Detail nebo připomínka…"
-                  className={cn(inputCls, 'resize-none')}
-                />
-              </div>
-            )}
-
-            {error && (
-              <p className="rounded-chip border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-medium text-danger">
-                {error}
-              </p>
-            )}
-
-            <div className="flex gap-2 pt-1">
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-navy-700 px-5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
-              >
-                {isPending
-                  ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
-                  : 'Uložit událost'
-                }
-              </button>
-              <button
-                type="button"
-                onClick={() => close(false)}
-                className="inline-flex min-h-11 items-center rounded-full border border-input px-5 text-[15px] font-semibold text-ink transition-colors hover:bg-navy-50"
-              >
-                Zrušit
-              </button>
-            </div>
-          </form>
+        <div className="flex gap-2 pt-1">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-navy-700 px-5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
+          >
+            {isPending
+              ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
+              : 'Uložit událost'
+            }
+          </button>
+          <button
+            type="button"
+            onClick={() => close(false)}
+            className="inline-flex min-h-11 items-center rounded-full border border-input px-5 text-[15px] font-semibold text-ink transition-colors hover:bg-navy-50"
+          >
+            Zrušit
+          </button>
         </div>
-      </m.div>
-    </>
+      </form>
+      </DialogContent>
+    </Dialog>
   )
 }

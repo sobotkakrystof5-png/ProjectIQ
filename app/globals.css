@@ -46,11 +46,6 @@
 }
 
 @layer utilities {
-  /* Dočasný alias: stejné hexy jako dřív, jen z tokenů. Zbylé obrazovky ho používají
-     44×, smaže se v AD18 spolu s posledními `brand-*`. */
-  .brand-gradient {
-    background: linear-gradient(135deg, rgb(var(--navy-800)) 0%, rgb(var(--navy-700)) 100%);
-  }
   .card-hover {
     @apply transition-all duration-200 hover:shadow-md hover:border-navy-200;
   }

@@ -41,7 +41,7 @@ export function PersonalProjectCard({ project }: Props) {
         </div>
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
           <div
-            className="h-full brand-gradient rounded-full transition-all"
+            className="h-full bg-navy-700 rounded-full transition-all"
             style={{ width: `${project.progress}%` }}
           />
         </div>

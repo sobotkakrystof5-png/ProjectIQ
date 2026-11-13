@@ -6,9 +6,16 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
-  X, ChevronLeft, ChevronRight, Phone, Monitor, Video,
+  ChevronLeft, ChevronRight, Phone, Monitor, Video,
   MessageSquare, Loader2, CheckCircle2, CalendarDays, HelpCircle,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { submitConsultation } from '@/app/portal-actions'
 import {
   getPragueNow, getHourSlots, pragueSlotToISO, isSlotPast, isDayPast,
@@ -81,18 +88,18 @@ function MonthCalendar({
           type="button"
           onClick={onPrevMonth}
           disabled={!canPrev}
-          className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 rounded-chip text-quiet hover:bg-navy-50 hover:text-navy-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           aria-label="Předchozí měsíc"
         >
           <ChevronLeft size={16} strokeWidth={1.5} />
         </button>
-        <span className="text-sm font-semibold text-foreground">
+        <span className="text-sm font-semibold text-ink">
           {MONTHS_CZ[viewMonth - 1]} {viewYear}
         </span>
         <button
           type="button"
           onClick={onNextMonth}
-          className="p-1.5 rounded-lg text-muted-foreground hover:bg-navy-50 hover:text-navy-800 transition-colors"
+          className="p-1.5 rounded-chip text-quiet hover:bg-navy-50 hover:text-navy-800 transition-colors"
           aria-label="Následující měsíc"
         >
           <ChevronRight size={16} strokeWidth={1.5} />
@@ -102,7 +109,7 @@ function MonthCalendar({
       {/* Weekday labels */}
       <div className="grid grid-cols-7 mb-1">
         {WEEKDAYS_CZ.map(d => (
-          <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground uppercase py-1">
+          <div key={d} className="text-center text-[10px] font-semibold text-quiet uppercase py-1">
             {d}
           </div>
         ))}
@@ -131,12 +138,12 @@ function MonthCalendar({
               disabled={isPast}
               onClick={() => onSelectDate({ year: viewYear, month: viewMonth, day: dayNum })}
               className={cn(
-                'aspect-square flex items-center justify-center text-sm rounded-lg transition-all duration-150 font-medium',
-                isPast && 'text-gray-300 cursor-not-allowed',
+                'aspect-square flex items-center justify-center text-sm rounded-chip transition-all duration-150 font-medium',
+                isPast && 'cursor-not-allowed text-navy-200',
                 !isPast && isWeekend && !isSelected && 'text-navy-600 hover:bg-navy-50',
-                !isPast && !isWeekend && !isSelected && 'text-foreground hover:bg-navy-50 hover:text-navy-800',
+                !isPast && !isWeekend && !isSelected && 'text-ink hover:bg-navy-50 hover:text-navy-800',
                 isToday && !isSelected && 'ring-1 ring-navy-300',
-                isSelected && 'brand-gradient text-white shadow-sm scale-110',
+                isSelected && 'bg-navy-700 text-white shadow-sm scale-110',
               )}
               aria-label={`${dayNum}. ${viewMonth}. ${viewYear}`}
             >
@@ -165,7 +172,7 @@ function TimeSlotPicker({
 
   return (
     <div>
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+      <p className="mb-2.5 text-sm font-medium text-ink">
         Dostupné časy
       </p>
       <div className="grid grid-cols-4 gap-1.5">
@@ -182,10 +189,10 @@ function TimeSlotPicker({
               disabled={disabled}
               onClick={() => !disabled && onSelectHour(h)}
               className={cn(
-                'py-2 text-xs font-semibold rounded-lg border transition-all duration-150',
-                disabled && 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed line-through',
+                'py-2 text-xs font-semibold rounded-chip border transition-all duration-150',
+                disabled && 'cursor-not-allowed border-navy-100 bg-navy-50 text-navy-200 line-through',
                 !disabled && !isSelected && 'border-navy-100 bg-navy-50 text-navy-700 hover:border-navy-400 hover:bg-navy-100',
-                isSelected && 'brand-gradient text-white border-transparent shadow-sm',
+                isSelected && 'bg-navy-700 text-white border-transparent shadow-sm',
               )}
               title={booked ? 'Obsazeno' : past ? 'Uplynulý čas' : `${h}:00`}
             >
@@ -211,15 +218,15 @@ function SuccessScreen({ onClose }: { onClose: () => void }) {
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', damping: 12, stiffness: 200, delay: 0.1 }}
-        className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-5"
+        className="w-16 h-16 rounded-full bg-navy-50 border border-navy-100 flex items-center justify-center mb-5"
       >
-        <CheckCircle2 size={28} strokeWidth={1.5} className="text-emerald-600" />
+        <CheckCircle2 size={28} strokeWidth={1.5} className="text-navy-700" />
       </motion.div>
       <motion.h2
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25 }}
-        className="text-xl font-semibold text-foreground mb-2"
+        className="text-xl font-semibold text-ink mb-2"
       >
         Konzultace rezervována
       </motion.h2>
@@ -227,7 +234,7 @@ function SuccessScreen({ onClose }: { onClose: () => void }) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-8"
+        className="text-sm text-quiet leading-relaxed max-w-xs mb-8"
       >
         Děkujeme za váš projevený zájem. Potvrzení obdržíte e-mailem
         a na konzultaci se důkladně připravíme.
@@ -238,7 +245,7 @@ function SuccessScreen({ onClose }: { onClose: () => void }) {
         transition={{ delay: 0.45 }}
         type="button"
         onClick={onClose}
-        className="brand-gradient text-white text-sm font-semibold px-6 py-2.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+        className="bg-navy-700 text-white text-sm font-semibold px-6 py-2.5 rounded-chip shadow-sm hover:bg-navy-800 transition-colors"
       >
         Zavřít
       </motion.button>
@@ -313,227 +320,191 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
   })
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={handleClose}
-          />
+    <Dialog open={isOpen} onOpenChange={open => { if (!open) handleClose() }}>
+      <DialogContent className="flex max-h-[92dvh] max-w-xl flex-col gap-0 p-0 sm:max-h-[85vh]">
+        <DialogHeader className="shrink-0 border-b border-navy-100 px-5 py-4">
+          <DialogTitle className="flex items-center gap-2.5 text-base">
+            <CalendarDays size={17} strokeWidth={1.5} className="text-navy-600" aria-hidden="true" />
+            Rezervovat konzultaci
+          </DialogTitle>
+          <DialogDescription className="sr-only">Vyberte si den, čas a způsob spojení.</DialogDescription>
+        </DialogHeader>
 
-          {/* Panel */}
-          <motion.div
-            key="panel"
-            initial={{ opacity: 0, y: 40, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.97 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 sm:inset-0 z-50 flex sm:items-center sm:justify-center p-0 sm:p-4 pointer-events-none"
-          >
-            <div
-              className="pointer-events-auto w-full sm:max-w-xl bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[85vh]"
-              onClick={e => e.stopPropagation()}
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <AnimatePresence mode="wait">
+          {success ? (
+            <SuccessScreen key="success" onClose={handleClose} />
+          ) : (
+            <motion.form
+              key="form"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onSubmit={onSubmit}
+              className="p-5 space-y-5"
             >
-              {/* Header */}
-              <div className="brand-gradient px-5 py-4 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <CalendarDays size={17} strokeWidth={1.5} className="text-navy-200" />
-                  <span className="text-white font-semibold text-sm">Rezervovat konzultaci</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="p-1.5 rounded-lg text-navy-200 hover:text-white hover:bg-white/10 transition-colors"
-                  aria-label="Zavřít"
-                >
-                  <X size={16} strokeWidth={1.5} />
-                </button>
+              {/* Calendar */}
+              <div className="bg-navy-50 border border-navy-100 rounded-chip p-4">
+                <MonthCalendar
+                  viewYear={viewYear}
+                  viewMonth={viewMonth}
+                  selectedDate={selectedDate}
+                  bookedSlots={bookedSlots}
+                  onSelectDate={d => { setSelectedDate(d); setSelectedHour(null); setSlotError(null) }}
+                  onPrevMonth={prevMonth}
+                  onNextMonth={nextMonth}
+                />
               </div>
 
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto">
-                <AnimatePresence mode="wait">
-                  {success ? (
-                    <SuccessScreen key="success" onClose={handleClose} />
-                  ) : (
-                    <motion.form
-                      key="form"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onSubmit={onSubmit}
-                      className="p-5 space-y-5"
-                    >
-                      {/* Calendar */}
-                      <div className="bg-navy-50 border border-navy-100 rounded-xl p-4">
-                        <MonthCalendar
-                          viewYear={viewYear}
-                          viewMonth={viewMonth}
-                          selectedDate={selectedDate}
-                          bookedSlots={bookedSlots}
-                          onSelectDate={d => { setSelectedDate(d); setSelectedHour(null); setSlotError(null) }}
-                          onPrevMonth={prevMonth}
-                          onNextMonth={nextMonth}
-                        />
-                      </div>
+              {/* Time slots */}
+              <AnimatePresence>
+                {selectedDate && (
+                  <motion.div
+                    key="timeslots"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <TimeSlotPicker
+                      date={selectedDate}
+                      bookedSlots={bookedSlots}
+                      selectedHour={selectedHour}
+                      onSelectHour={h => { setSelectedHour(h); setSlotError(null) }}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                      {/* Time slots */}
-                      <AnimatePresence>
-                        {selectedDate && (
-                          <motion.div
-                            key="timeslots"
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                          >
-                            <TimeSlotPicker
-                              date={selectedDate}
-                              bookedSlots={bookedSlots}
-                              selectedHour={selectedHour}
-                              onSelectHour={h => { setSelectedHour(h); setSlotError(null) }}
-                            />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+              {slotError && (
+                <p className="text-xs text-danger font-medium">{slotError}</p>
+              )}
 
-                      {slotError && (
-                        <p className="text-xs text-red-600 font-medium">{slotError}</p>
-                      )}
+              {/* Description */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-ink">
+                  Co potřebujete zlepšit / jaké je vaše přání?
+                </label>
+                <textarea
+                  {...register('clientWish')}
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="Popište, co konkrétně potřebujete probrat…"
+                  className={cn(
+                    'w-full border border-navy-100 rounded-chip px-3 py-2.5 text-sm text-ink',
+                    'placeholder:text-quiet bg-surface resize-none',
+                    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
+                    errors.clientWish && 'border-danger/30 ring-1 ring-danger/30',
+                  )}
+                />
+                {errors.clientWish && (
+                  <p className="text-xs text-danger mt-1">{errors.clientWish.message}</p>
+                )}
+              </div>
 
-                      {/* Description */}
-                      <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
-                          Co potřebujete zlepšit / jaké je vaše přání?
-                        </label>
-                        <textarea
-                          {...register('clientWish')}
-                          rows={3}
-                          maxLength={1000}
-                          placeholder="Popište, co konkrétně potřebujete probrat…"
-                          className={cn(
-                            'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
-                            'placeholder-muted-foreground bg-white resize-none',
-                            'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
-                            errors.clientWish && 'border-red-300 ring-1 ring-red-200',
-                          )}
-                        />
-                        {errors.clientWish && (
-                          <p className="text-xs text-red-600 mt-1">{errors.clientWish.message}</p>
-                        )}
-                      </div>
+              {/* Client email */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-ink">
+                  Váš e-mail (pro potvrzení rezervace)
+                </label>
+                <input
+                  type="email"
+                  {...register('clientEmail')}
+                  placeholder="vas@email.cz"
+                  className={cn(
+                    'w-full border border-navy-100 rounded-chip px-3 py-2.5 text-sm text-ink',
+                    'placeholder:text-quiet bg-surface',
+                    'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
+                    errors.clientEmail && 'border-danger/30 ring-1 ring-danger/30',
+                  )}
+                />
+                {errors.clientEmail && (
+                  <p className="text-xs text-danger mt-1">{errors.clientEmail.message}</p>
+                )}
+              </div>
 
-                      {/* Client email */}
-                      <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
-                          Váš e-mail (pro potvrzení rezervace)
-                        </label>
-                        <input
-                          type="email"
-                          {...register('clientEmail')}
-                          placeholder="vas@email.cz"
-                          className={cn(
-                            'w-full border border-border rounded-lg px-3 py-2.5 text-sm text-foreground',
-                            'placeholder-muted-foreground bg-white',
-                            'focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow',
-                            errors.clientEmail && 'border-red-300 ring-1 ring-red-200',
-                          )}
-                        />
-                        {errors.clientEmail && (
-                          <p className="text-xs text-red-600 mt-1">{errors.clientEmail.message}</p>
-                        )}
-                      </div>
-
-                      {/* Channel */}
-                      <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
-                          Preferovaný komunikační kanál
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {CHANNELS.map(ch => {
-                            const Icon = ch.icon
-                            const isActive = selectedChannel === ch.id
-                            return (
-                              <label
-                                key={ch.id}
-                                className={cn(
-                                  'flex items-center gap-3 px-3.5 py-3 rounded-xl border cursor-pointer',
-                                  'transition-all duration-150 select-none',
-                                  isActive
-                                    ? 'border-navy-400 bg-navy-50 text-navy-800'
-                                    : 'border-border bg-white text-muted-foreground hover:border-navy-200 hover:bg-navy-50',
-                                )}
-                              >
-                                <input
-                                  type="radio"
-                                  value={ch.id}
-                                  {...register('channel')}
-                                  className="sr-only"
-                                />
-                                <Icon
-                                  size={16}
-                                  strokeWidth={1.5}
-                                  className={isActive ? 'text-navy-600' : 'text-muted-foreground'}
-                                />
-                                <span className="text-sm font-medium">{ch.label}</span>
-                              </label>
-                            )
-                          })}
-                        </div>
-                        {errors.channel && (
-                          <p className="text-xs text-red-600 mt-1">{errors.channel.message}</p>
-                        )}
-                        {selectedChannel === 'other' && (
-                          <div className="mt-2">
-                            <input
-                              type="text"
-                              placeholder="Napište, co vám vyhovuje…"
-                              {...register('channelOtherText')}
-                              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-border bg-white placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-navy-300"
-                            />
-                            {errors.channelOtherText && (
-                              <p className="text-xs text-red-600 mt-1">{errors.channelOtherText.message}</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {serverError && (
-                        <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-lg px-3 py-2.5">
-                          {serverError}
-                        </p>
-                      )}
-
-                      {/* Submit */}
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
+              {/* Channel */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-ink">
+                  Preferovaný komunikační kanál
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {CHANNELS.map(ch => {
+                    const Icon = ch.icon
+                    const isActive = selectedChannel === ch.id
+                    return (
+                      <label
+                        key={ch.id}
                         className={cn(
-                          'w-full flex items-center justify-center gap-2 brand-gradient',
-                          'text-white text-sm font-semibold py-3 rounded-xl shadow-sm',
-                          'hover:opacity-90 transition-opacity disabled:opacity-60',
+                          'flex items-center gap-3 px-3.5 py-3 rounded-chip border cursor-pointer',
+                          'transition-all duration-150 select-none',
+                          isActive
+                            ? 'border-navy-400 bg-navy-50 text-navy-800'
+                            : 'border-navy-100 bg-surface text-quiet hover:border-navy-200 hover:bg-navy-50',
                         )}
                       >
-                        {isSubmitting
-                          ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Rezervuji…</>
-                          : 'Potvrdit rezervaci'
-                        }
-                      </button>
-                    </motion.form>
-                  )}
-                </AnimatePresence>
+                        <input
+                          type="radio"
+                          value={ch.id}
+                          {...register('channel')}
+                          className="sr-only"
+                        />
+                        <Icon
+                          size={16}
+                          strokeWidth={1.5}
+                          className={isActive ? 'text-navy-600' : 'text-quiet'}
+                        />
+                        <span className="text-sm font-medium">{ch.label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                {errors.channel && (
+                  <p className="text-xs text-danger mt-1">{errors.channel.message}</p>
+                )}
+                {selectedChannel === 'other' && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      placeholder="Napište, co vám vyhovuje…"
+                      {...register('channelOtherText')}
+                      className="w-full px-3.5 py-2.5 text-sm rounded-chip border border-navy-100 bg-surface placeholder:text-quiet/60 focus:outline-none focus:ring-2 focus:ring-navy-300"
+                    />
+                    {errors.channelOtherText && (
+                      <p className="text-xs text-danger mt-1">{errors.channelOtherText.message}</p>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+
+              {serverError && (
+                <p className="text-xs text-danger font-medium bg-danger/5 border border-danger/30 rounded-chip px-3 py-2.5">
+                  {serverError}
+                </p>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2 bg-navy-700',
+                  'text-white text-sm font-semibold py-3 rounded-chip shadow-sm',
+                  'hover:bg-navy-800 transition-colors disabled:opacity-60',
+                )}
+              >
+                {isSubmitting
+                  ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Rezervuji…</>
+                  : 'Potvrdit rezervaci'
+                }
+              </button>
+            </motion.form>
+          )}
+        </AnimatePresence>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -82,7 +82,7 @@ export default async function ClientPortalPage(props: PageProps) {
           <div className="bg-surface rounded-box border border-navy-100 shadow-sm overflow-hidden">
 
             {/* Brand header */}
-            <div className="brand-gradient px-4 pt-6 pb-5 sm:px-6 sm:pt-7 sm:pb-6">
+            <div className="bg-navy-900 px-4 pt-6 pb-5 sm:px-6 sm:pt-7 sm:pb-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-navy-200 uppercase tracking-wider mb-1.5">Projekt pro</p>
@@ -110,7 +110,7 @@ export default async function ClientPortalPage(props: PageProps) {
                 </div>
                 <div className="h-2.5 bg-navy-50 rounded-full overflow-hidden border border-navy-100">
                   <div
-                    className="h-full rounded-full brand-gradient transition-all duration-700"
+                    className="h-full rounded-full bg-navy-700 transition-all duration-700"
                     style={{ width: `${project.progress}%` }}
                   />
                 </div>
@@ -122,7 +122,7 @@ export default async function ClientPortalPage(props: PageProps) {
                   href={project.project_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 brand-gradient text-white text-sm font-medium px-4 py-2.5 rounded-chip shadow-sm hover:opacity-90 transition-opacity"
+                  className="flex items-center justify-center gap-2 bg-navy-700 text-white text-sm font-medium px-4 py-2.5 rounded-chip shadow-sm hover:bg-navy-800 transition-colors"
                 >
                   <ExternalLink size={14} strokeWidth={1.5} />
                   Zobrazit živou verzi projektu
@@ -241,7 +241,7 @@ export default async function ClientPortalPage(props: PageProps) {
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-2.5 mt-6">
-            <div className="w-8 h-8 brand-gradient rounded-chip flex items-center justify-center shadow-md">
+            <div className="w-8 h-8 bg-gradient-to-br from-navy-600 to-navy-800 rounded-chip flex items-center justify-center shadow-md">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
                 <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.55" />

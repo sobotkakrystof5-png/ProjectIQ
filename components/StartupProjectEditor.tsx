@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronUp, Loader2, Archive, Trash2,
   ExternalLink, Save, Info, BookOpen, Calculator,
   Lightbulb, StickyNote, Link2, Rocket, TrendingUp, Users,
-  Plus, X, GripVertical,
+  Plus, X, GripVertical, Check,
 } from 'lucide-react'
 import {
   STARTUP_PHASES, STARTUP_SEGMENTS, STARTUP_CURRENCIES,
@@ -116,12 +116,12 @@ function MiniBarChart({ data, currency }: { data: number[]; currency: string }) 
   const max = Math.max(...data, 1)
   return (
     <div>
-      <p className="text-xs text-quiet mb-2">📈 Jak roste příjem v průběhu roku</p>
+      <p className="text-xs text-quiet mb-2">Jak roste příjem v průběhu roku</p>
       <div className="flex items-end gap-1 h-16">
         {data.map((v, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
             <div
-              className="w-full brand-gradient rounded-sm transition-all"
+              className="w-full bg-navy-700 rounded-sm transition-all"
               style={{ height: `${(v / max) * 52}px` }}
               title={`Měsíc ${i + 1}: ${formatCurrency(v, currency)}`}
             />
@@ -487,7 +487,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           />
           <div className="mt-1.5 h-2 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full brand-gradient rounded-full transition-all"
+              className="h-full bg-navy-700 rounded-full transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -526,7 +526,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         {/* ── Vstupní čísla ── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className={labelCls}>💸 Kolik investuješ?</label>
+            <label className={labelCls}>Kolik investuješ?</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -548,7 +548,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           </div>
 
           <div>
-            <label className={labelCls}>👥 Celkem uživatelů</label>
+            <label className={labelCls}>Celkem uživatelů</label>
             <input
               type="number"
               value={totalUsers}
@@ -561,7 +561,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           </div>
 
           <div>
-            <label className={labelCls}>💳 Z toho platících</label>
+            <label className={labelCls}>Z toho platících</label>
             <div className="relative">
               <input
                 type="number"
@@ -710,7 +710,7 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
                     <div className="space-y-1.5">
                       {tier.benefits.map((benefit, bIdx) => (
                         <div key={bIdx} className="flex items-center gap-2">
-                          <span className="text-quiet text-xs shrink-0">✓</span>
+                          <Check size={12} strokeWidth={1.5} className="shrink-0 text-quiet" aria-hidden="true" />
                           <input
                             type="text"
                             value={benefit}
@@ -759,9 +759,9 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
         {/* ── Výsledky: Opakované platby ── */}
         {calcResults.type === 'saas' && calcResults.mrr > 0 && (
           <div className="space-y-3 pt-1">
-            <div className="bg-gradient-to-br from-navy-50 to-violet-50 border border-navy-100 rounded-chip p-4">
+            <div className="bg-navy-50 border border-navy-100 rounded-chip p-4">
               <p className="text-sm text-navy-800 leading-relaxed">
-                💡 S <strong>{calcResults.totalPayingUsers} platícími zákazníky</strong> budeš vydělávat{' '}
+                S <strong>{calcResults.totalPayingUsers} platícími zákazníky</strong> budeš vydělávat{' '}
                 <strong>{formatCurrency(calcResults.mrr, currency)} každý měsíc</strong>.
                 {calcResults.breakEven !== null && (
                   <>
@@ -807,13 +807,13 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           <div className="space-y-3 pt-1">
             <div className={`border rounded-chip p-4 ${
               calcResults.netProfit >= 0
-                ? 'bg-gradient-to-br from-navy-50 to-violet-50 border-navy-100'
+                ? 'bg-navy-50 border-navy-100'
                 : 'bg-danger/5 border-danger/30'
             }`}>
               <p className={`text-sm leading-relaxed ${calcResults.netProfit >= 0 ? 'text-navy-800' : 'text-danger'}`}>
                 {calcResults.netProfit >= 0
-                  ? <>💡 Prodáš-li <strong>{payingUsers} zákazníkům</strong>, celkem vyděláš <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>. Po odečtení investice ti zbyde čistý zisk <strong>{formatCurrency(calcResults.netProfit, currency)}</strong>.</>
-                  : <>⚠️ Při <strong>{payingUsers} zákaznících</strong> vydělá projekt <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>, ale investice ještě není pokryta — budeš ve ztrátě <strong>{formatCurrency(Math.abs(calcResults.netProfit), currency)}</strong>. Zkus zvýšit cenu nebo počet zákazníků.</>
+                  ? <>Prodáš-li <strong>{payingUsers} zákazníkům</strong>, celkem vyděláš <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>. Po odečtení investice ti zbyde čistý zisk <strong>{formatCurrency(calcResults.netProfit, currency)}</strong>.</>
+                  : <>Při <strong>{payingUsers} zákaznících</strong> vydělá projekt <strong>{formatCurrency(calcResults.totalRevenue, currency)}</strong>, ale investice ještě není pokryta — budeš ve ztrátě <strong>{formatCurrency(Math.abs(calcResults.netProfit), currency)}</strong>. Zkus zvýšit cenu nebo počet zákazníků.</>
                 }
               </p>
             </div>

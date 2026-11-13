@@ -7,7 +7,7 @@ export function ProfileAvatar({ initials }: { initials: string }) {
 
   return (
     <div className="relative w-20 h-20 rounded-box overflow-hidden shadow-sm shrink-0">
-      <div className="absolute inset-0 brand-gradient flex items-center justify-center">
+      <div className="absolute inset-0 bg-gradient-to-br from-navy-600 to-navy-800 flex items-center justify-center">
         <span className="text-white font-bold text-xl tracking-tight">{initials}</span>
       </div>
       {!imgFailed && (
