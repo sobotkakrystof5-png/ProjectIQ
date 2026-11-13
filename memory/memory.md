@@ -799,9 +799,10 @@ protože `payment_reviewed_at` existuje až po migraci 109.
   commitu `7a15ad2` skončil 12 chybami `Module not found: Can't resolve
   '@vercel/turbopack-next/internal/font/google/font'` z `next/font/google`, přestože lokální build
   téhož commitu prošel; log začínal „Restored build cache from previous deployment". Deploy
-  **bez cache** prošel beze změny kódu. Kdyby se to opakovalo: ve Vercelu Redeploy s vypnutou
-  cache, nebo `VERCEL_FORCE_NO_BUILD_CACHE=1`. Pořádně to prošetřit, až bude čas — cache se tím
-  jen obchází · od 2026-11-13
+  **bez cache** prošel beze změny kódu. **Hned následující build (jen dokumentace) prošel zase
+  s cache**, takže to vypadá na jednorázově poškozenou cache po starém buildu `d948400`, ne na
+  trvalou vadu. Kdyby se to opakovalo: ve Vercelu Redeploy s vypnutou cache, nebo
+  `VERCEL_FORCE_NO_BUILD_CACHE=1` · od 2026-11-13
 - [ ] **AD13 v prohlížeči neověřené:** migrace 109 je od 2026-11-13 na produkci, takže to jde projít rovnou tam (opatrně, jsou to ostrá data). Projít na
   390 / 768 / 1280 / 1440 px: Finance › Podnikání (řádek cizí měny u příjmů i u výkonnosti),
   Dnes (řádek „mimo součet"), detail faktury s **„Je tohle ta platba?"** (přiřazení, „Ne, byly
