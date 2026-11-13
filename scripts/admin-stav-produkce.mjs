@@ -63,7 +63,11 @@ async function existujeTabulka(tabulka) {
   return r.length > 0
 }
 async function existujeFunkce(jmeno) {
-  const r = await sql.query(`SELECT 1 FROM pg_proc WHERE proname=$1`, [jmeno])
+  const r = await sql.query(
+    `SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = $1`,
+    [jmeno],
+  )
   return r.length > 0
 }
 async function existujeIndex(jmeno) {
