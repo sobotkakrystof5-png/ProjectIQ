@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { Badge } from '@/components/ui/badge'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { ContactForm } from '@/components/admin/contacts/contact-form'
 import { MergeButton, UnmergeButton } from '@/components/admin/contacts/merge-actions'
+import { MemoryCard } from '@/components/admin/memory/memory-card'
 import { loadContactDetail, type ContactOccurrence } from '@/lib/admin/contacts'
 import { formatDate } from '@/lib/utils'
 import { nameKey } from '@/lib/contacts/normalize'
@@ -91,12 +92,25 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
         Zavolat a napsat rovnou z karty (AD10). Karta kontaktu je jediná
         obrazovka, která je o člověku celá — a jako jediná to do AD10 neuměla.
       */}
-      <ContactActions
-        phone={contact.phone}
-        email={contact.email}
-        context={{ projectName: contact.company ?? contact.display_name }}
-        emptyHint="Kontakt nemá telefon ani e-mail. Doplňte je v Údajích a zavoláte jedním klikem."
-      />
+      <div className="flex flex-wrap items-center gap-3">
+        <ContactActions
+          phone={contact.phone}
+          email={contact.email}
+          context={{ projectName: contact.company ?? contact.display_name }}
+          emptyHint="Kontakt nemá telefon ani e-mail. Doplňte je v Údajích a zavoláte jedním klikem."
+        />
+        {/*
+          Nová zakázka odsud, ne z prázdného formuláře (AD15): s `?kontakt=`
+          se předvyplní jméno, kontakt, druh práce i poslední cena.
+        */}
+        <Link
+          href={`/dashboard/new?kontakt=${contact.id}`}
+          className="inline-flex min-h-11 items-center gap-2 rounded-chip border border-navy-200 px-4 text-sm font-medium text-ink transition-colors hover:bg-navy-50"
+        >
+          <Plus size={15} strokeWidth={1.75} aria-hidden />
+          Nová zakázka
+        </Link>
+      </div>
 
       {contact.merged_into !== null && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-box border border-navy-100 bg-navy-50 px-4 py-3">
@@ -130,6 +144,9 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
       */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-8">
+          {/* Paměť kontaktu (AD15): co o něm víme z historie a co si k němu někdo zapsal. */}
+          <MemoryCard scope="contact" refId={contact.id} />
+
           <Section
             title="Kde se objevuje"
             hint="Zakázky, hovory a dokončená práce, které patří k tomuhle člověku."

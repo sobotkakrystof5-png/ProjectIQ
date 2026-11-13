@@ -15,6 +15,7 @@ import { ProjectNotesPanel } from '@/components/ProjectNotesPanel'
 import { DeleteButton } from '@/components/DeleteButton'
 import { CloseProjectButton, ReopenProjectButton } from '@/components/admin/close-project'
 import { ProjectJourney } from '@/components/admin/project-journey'
+import { MemoryCard } from '@/components/admin/memory/memory-card'
 import { InvoiceArchive } from '@/components/InvoiceArchive'
 import { ProjectCosts } from '@/components/admin/costs/project-costs'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
@@ -246,6 +247,9 @@ async function OverviewTab({ project }: { project: Project }) {
         <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Editace zakázky</h2>
         <ProjectForm project={project} />
       </div>
+
+      {/* Paměť zakázky (AD15): čísla z historie klienta a věty, které si k ní někdo zapsal. */}
+      <MemoryCard scope="project" refId={project.id} className={card} />
 
       <div className={card}>
         <h2 className="mb-5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Sdílet s klientem</h2>

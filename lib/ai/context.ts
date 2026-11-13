@@ -1,6 +1,9 @@
 import 'server-only'
 import { adminDb, q, batchTolerant } from '@/lib/admin/db'
+import { stripMarkers } from '@/lib/ai/markers'
 import { redactSensitive } from '@/lib/project-activity'
+import { contactOfLead, contactOfProject, factsForPrompt, loadFacts } from '@/lib/admin/memory/facts'
+import { memoryForPrompt } from '@/lib/admin/memory/store'
 import { STATUS_LABELS } from '@/lib/types'
 import type { ProjectStatus } from '@/lib/types'
 
@@ -39,17 +42,14 @@ function clean(value: unknown): string | null {
   if (value === null || value === undefined) return null
   const text = String(value).trim()
   if (!text) return null
-  return redactSensitive(text).text
+  // Pořadí: nejdřív zakrýt tajné, pak zahodit značky rámce. Obojí se dělá
+  // nad jednotlivou hodnotou — hotový rámec si to zahodit nesmí.
+  return stripMarkers(redactSensitive(text).text)
 }
 
 function block(lines: (string | null)[]): string {
   const body = lines.filter(Boolean).join('\n').slice(0, CONTEXT_MAX)
   return body ? `<kontext>\n${body}\n</kontext>` : ''
-}
-
-/** Značka v datech by mohla kontext zavřít a vložit vlastní instrukce (vzor z `lib/client-request-ai.ts`). */
-function escapeContext(text: string): string {
-  return text.replace(/<\/?kontext>/gi, '')
 }
 
 async function startupContext(id: string): Promise<AiContext> {
@@ -163,6 +163,34 @@ async function leadContext(id: string): Promise<AiContext> {
   return { text: block(lines), label: `Kontakt: ${clean(l.company_name) ?? 'bez názvu'}` }
 }
 
+/**
+ * Dvě vrstvy paměti k témuž kontextu (AD15, R-085).
+ *
+ * `<fakta>` jsou spočítaná z historie — čísla, kterým se dá věřit.
+ * `<pamet>` jsou věty, které napsal člověk nebo model; nepotvrzené nesou
+ * značku. Pořadí je schválně tohle: nejdřív doložené, pak domněnky.
+ *
+ * Selhání se spolkne — asistent má poradit i tehdy, když paměť zrovna není
+ * (chybí migrace 111, chybí 104 a tím `contact_id`).
+ */
+async function memoryBlocks(ref: ContextRef): Promise<string> {
+  try {
+    if (ref.kind === 'startup') return await memoryForPrompt('global', null)
+
+    const contactId =
+      ref.kind === 'project' ? await contactOfProject(ref.id) : await contactOfLead(ref.id)
+    const [facts, own, aboutContact] = await Promise.all([
+      loadFacts(contactId),
+      ref.kind === 'project' ? memoryForPrompt('project', ref.id) : Promise.resolve(''),
+      contactId === null ? Promise.resolve('') : memoryForPrompt('contact', contactId),
+    ])
+    return [factsForPrompt(facts), own, aboutContact].filter(Boolean).join('\n')
+  } catch (err) {
+    console.error('[ai-context] paměť se nenačetla:', err instanceof Error ? err.name : 'unknown')
+    return ''
+  }
+}
+
 export function isContextRef(value: unknown): value is ContextRef {
   if (!value || typeof value !== 'object') return false
   const ref = value as { kind?: unknown; id?: unknown }
@@ -184,7 +212,9 @@ export async function loadAiContext(ref: ContextRef | null | undefined): Promise
         : ref.kind === 'project'
           ? await projectContext(ref.id)
           : await leadContext(ref.id)
-    return { ...loaded, text: escapeContext(loaded.text) }
+    if (loaded.text === '') return loaded
+    const extras = await memoryBlocks(ref)
+    return { ...loaded, text: extras === '' ? loaded.text : `${loaded.text}\n${extras}` }
   } catch (err) {
     console.error('[ai-context] načtení kontextu selhalo:', err instanceof Error ? err.name : 'unknown')
     return EMPTY_CONTEXT

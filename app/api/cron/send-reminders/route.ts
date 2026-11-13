@@ -7,6 +7,7 @@ import {
   generateRecurringCostTransactionsInternal,
 } from '@/lib/recurring-transactions'
 import { expireOldSuggestions } from '@/lib/admin/suggestions'
+import { proposeMemoryDrafts } from '@/lib/admin/memory/drafts'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -202,6 +203,9 @@ export async function GET(req: NextRequest) {
     generateRecurringCostTransactionsInternal().catch(() => {}),
     generateRecurringCashFlowTransactionsInternal().catch(() => {}),
     expireOldSuggestions().catch(() => 0),
+    // Návrhy paměti ze zpráv o práci (AD15). Nepotvrzené, nejvýš pět zakázek
+    // za běh; bez klíče k modelu nebo bez migrace 111 se neudělá nic.
+    proposeMemoryDrafts().catch(() => ({ checked: 0, created: 0 })),
   ])
 
   const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, errors: 0 }

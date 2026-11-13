@@ -4,6 +4,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { aiModel, isAiConfigured } from '@/lib/ai/models'
 import { PROPOSE_PROMPT, proposeCatalogue } from '@/lib/ai/prompts'
 import { loadAiContext, type ContextRef } from '@/lib/ai/context'
+import { stripMarkers } from '@/lib/ai/markers'
 import { suggestionSchema, CONFIDENCE_FLOOR, type Suggestion } from '@/lib/ai/suggestion-schema'
 import { redactSensitive } from '@/lib/project-activity'
 import { getPragueTodayISO } from '@/lib/prague-time'
@@ -68,11 +69,6 @@ async function callModel(
   }
 }
 
-/** Značka ve větě by mohla rámec zavřít a vložit vlastní instrukce. */
-function escapeSentence(text: string): string {
-  return text.replace(/<\/?veta>/gi, '')
-}
-
 export async function proposeAction(input: {
   text: string
   contextRef?: ContextRef | null
@@ -80,7 +76,7 @@ export async function proposeAction(input: {
   if (!isAiConfigured()) return { error: 'Asistent není nakonfigurovaný.' }
 
   // Zakrytí dřív, než věta odejde k modelu i než se uloží do `ai_suggestions`.
-  const text = escapeSentence(redactSensitive(input.text).text).trim()
+  const text = stripMarkers(redactSensitive(input.text).text).trim()
   if (!text) return { error: 'Napište, co se má stát.' }
 
   const context = (await loadAiContext(input.contextRef ?? null)).text
