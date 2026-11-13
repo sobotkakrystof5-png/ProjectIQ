@@ -12,7 +12,7 @@
 
 **Admin konzole (produkce):** VIZEON `/dashboard`, ALTENO `/alteno`, portál `/p/[token]`, Hub `/hub`; deploy z `main`, produkce běží na starém buildu `d948400`. Popis: `docs/admin/AGENTS-ADMIN.md`. Na větvi `ws/redesign-app` (nenasazeno) má admin novou kostru (R-071), Dnes, detail zakázky se záložkami a správu klientských prostorů; na `admin/modernizace` navíc úklid z AD01.
 
-**Modernizace adminu (R-081–R-098), stav po sezení 2026-11-12:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD11 hotové**; **AD12 (vystavování faktur, migrace 107) je hotové na větvi `admin/ad12-fakturace`**, která už má `admin/modernizace` v sobě sloučenou a čeká na merge — další na řadě je AD13 (náprava financí, migrace 108). Z migrací této větve (100–107) jsou 100–104 a **107** na testovacím Neonu, 105 nikde a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). Vystavení faktury je ověřené naživo: proklikané v prohlížeči proti testovací databázi (2 s, PDF 132 kB) a souběh dvěma spojeními (2026001/2026002, bez díry).
+**Modernizace adminu (R-081–R-098), stav po sezení 2026-11-12:** běží na větvi **`admin/modernizace`** (založená z `ws/redesign-app`, protože `main` se ještě nenasazoval — viz Další krok). **AD00–AD11 hotové**; **AD12 (vystavování faktur, migrace 107 + 108) je hotové a 2026-11-13 sloučené do `admin/modernizace`** — další na řadě je AD13 (náprava financí, migrace **109**; 108 zabral doplněk AD12). Z migrací této větve (100–107) jsou 100–104 a **107** na testovacím Neonu, 105 nikde a **106 omylem na produkci** (viz Otevřené problémy a AUDIT-LOG). Vystavení faktury je ověřené naživo: proklikané v prohlížeči proti testovací databázi (2 s, PDF 132 kB) a souběh dvěma spojeními (2026001/2026002, bez díry).
 Z AD11: dokončenost je **stav zakázky**, ne vlastní záznam. `completed_projects` byla plná kopie
 zakázky s vlastní cenou a `createCompletedProject` k ní uměl vložit příjem nezávisle na tom,
 jestli zakázka svůj příjem už má — odtud riziko dvojího započtení. **Migrace 106** tabulku
@@ -892,6 +892,22 @@ vypnout; je to pojistka proti omylu, ne proti záměru.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-13 (AD12 — sloučení a průchod na testovací databázi)
+- **chore** **AD12 sloučená do `admin/modernizace`** (`ed2b084`). Druhá, souběžně vzniklá verze
+  z `admin/modernizace` je vrácená revertem (`daf8240`); její rozdíly jsou přenesené v `145b1a1`.
+  Historie se nepřepisovala.
+- **chore** **Průchod přihlášeným adminem proti testovacímu Neonu** (headless Chrome, podepsaná
+  session): `/dashboard/faktury/dodavatel` drží uložené údaje · `/dashboard/faktury/nova?zakazka=…`
+  předvyplní odběratele i částku ze zakázky (16 000 Kč = cena 24 000 minus zaplacená záloha) ·
+  vystavení **194 ms** (první běh 1,6 s) · PDF z routy **200, 131 kB, 533 ms**, druhé otevření
+  **304 za 37 ms** · storno dvěma kliky s potvrzením. **Ověřilo se i přenesené chování:**
+  stornovaná faktura **zmizela z nezaplacených** a je ve filtru **Storno**. V konzoli jen známé
+  404 na `/favicon.ico`. Na testovací databázi tím zůstaly dvě zkušební faktury (**2026005**
+  platná, **2026006** stornovaná) u ukázkové zakázky „Kavárna Ukázková".
+- **chore** Drobnost z průchodu: formulář **nepředvyplňuje popis položky** (částku a odběratele
+  ano), takže bez vypsání popisu tlačítko „Vystavit fakturu" mlčí — brání to prohlížečová
+  validace. Není to chyba, jen to stojí za zmínku, až se bude obrazovka překreslovat v AD17.
 
 ### 2026-11-13 (AD12 — doplněk z paralelního sezení)
 - **chore** **AD12 vznikla dvakrát.** Dvě sezení ji 2026-11-12 večer dělala souběžně: tahle větev
