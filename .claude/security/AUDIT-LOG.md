@@ -16,6 +16,34 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-14 — review: dokončení sjednocení a modály (AD18)
+Spouštěč: `web-security-review` před commitem AD18.
+Rozsah: 70 změněných souborů — třídy a barvy v osobní části adminu, na `/login`, `/p`, `/h`
+a v oznámeních; převod sedmi ručně psaných modálů `fixed inset-0` na `components/ui/{dialog,sheet}.tsx`
+(`BookingModal` na veřejném portálu, `AdminEventModal`, detail události v `SmartCalendar`,
+`ConsultationCalendar`, `InvoiceUploadModal`, `PortfolioEmailModal`, `AiAssistantModal`)
+plus spodní nabídka a ⌘K v kostře; `:focus-visible` a `prefers-reduced-motion` v `app/globals.css`;
+smazání `.brand-gradient` a palety `brand` z `tailwind.config.ts`.
+Výsledek: **bez nálezu.** Změny jsou prezentační: nepřibyla veřejná routa, server action ani
+route handler, nic nečte `request`, `searchParams` ani `process.env`, nepřibylo jediné
+`dangerouslySetInnerHTML` a validace vstupů se nikde nedotkla.
+Nálezy: žádné. Prověřeno zvlášť:
+1. **`BookingModal` je na veřejném `/p/[token]`** — vyměnila se jen překryvná vrstva.
+   Odeslání jde dál přes `submitConsultation` (Zod na serveru, limity délek), `meeting_link`
+   skládá server z validovaného kanálu (`generateMeetingLink`), takže do `href` nemůže
+   vstoupit text od klienta. Všechny externí odkazy mají `rel="noopener noreferrer"`.
+2. **CSP se nemění.** Radix sahá na inline styly a `react-remove-scroll` vkládá `<style>`;
+   `style-src` má `'self' 'unsafe-inline'` už od S02, takže není co povolovat. Ověřeno
+   i empiricky: v konzoli při otevřených oknech nebyla jediná blokace (zbývá známé 404
+   na `/favicon.ico`).
+3. **Focus trap je nově skutečný.** Do AD18 šlo z otevřeného okna vyjet tabulátorem na
+   stránku pod ním. Radix drží focus uvnitř, okolí dostane `aria-hidden` (ověřeno: s otevřeným
+   ⌘K je `aria-hidden` i `<main>`) a `Escape` zavírá. Není to bezpečnostní nález, ale je to
+   ta samá třída problému — ovládání, které se chová jinak, než vypadá.
+Opraveno: nic k opravě; commity `328431d`, `da3d2ef`, `1a55b97`, `32c785c`, `b714c50`.
+Zůstává: `confirm()` před smazáním události v kalendáři (`components/SmartCalendar.tsx`) —
+nativní dialog místo „Zpět" v toastu, jak chce `AGENTS.md`. Je to UX dluh, ne bezpečnostní.
+
 ## 2026-11-13 — review: paměť projektu (AD15)
 Spouštěč: `web-security-review` před commitem AD15.
 Rozsah: `migrations/111_pamet_projektu.sql`, `lib/admin/memory/*` (facts, store, drafts, prefill, types), `app/memory-actions.ts`, `app/dashboard/new/page.tsx`, `components/admin/memory/*`, `lib/ai/{context,markers,prompts,propose}.ts`, crony `client-retention` a `send-reminders`.

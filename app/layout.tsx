@@ -6,6 +6,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'ZakazIQ',
   description: 'Správa freelance zakázek — jednoduchá a přehledná',
+  // Bez tohohle hledal prohlížeč /favicon.ico a na každé stránce adminu, /login,
+  // /p i /h vracel 404 (AD18). Landing i /w si ikony přepisují ve svém layoutu.
+  icons: { icon: '/ikony/ikona.svg', apple: '/ikony/apple-touch-icon.png' },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
