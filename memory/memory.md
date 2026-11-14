@@ -15,7 +15,7 @@
 > animoval dál). **Konzole je poprvé úplně čistá** — `/favicon.ico` 404 zmizelo s ikonou
 > v kořenovém layoutu. **Měření:** AD18 je na JavaScriptu nula (±0,3 kB); 50–80 kB, které
 > admin od AD08 přibral, přinesla sezení AD09–AD17 (R-104).
-> **Zbývá nasazení:** 27 commitů na `admin/modernizace` není pushnutých a migrace 110–112
+> **Zbývá nasazení:** 29 commitů na `admin/modernizace` není pushnutých a migrace 110–112
 > (asistent, paměť, dotazník) nejsou nikde aplikované.
 >
 > Starší záznamy: changelog `archiv/2026-11.md` a `archiv/2026-10.md`, průběh modernizace
@@ -30,7 +30,7 @@
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-13 na **`7a15ad2`** (AD00–AD13 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
 **Modernizace adminu (R-081–R-104) — hotová 2026-11-14.** Všech devatenáct sezení
-**AD00–AD18** je v kódu na větvi **`admin/modernizace`** (27 commitů, **nepushnutých**).
+**AD00–AD18** je v kódu na větvi **`admin/modernizace`** (29 commitů, **nepushnutých**).
 AD00–AD13 jsou od 2026-11-13 na produkci (`7a15ad2`); **AD14–AD18 ne**. Co která fáze udělala
 a s jakými odchylkami, je v `docs/admin/MODERNIZACE-ADMIN-PLAN.md` → sekce 6 (stav) a 11
 (měření); jak se admin chová a kam se co píše, v `docs/admin/AGENTS-ADMIN.md`. Rozhodnutí
@@ -106,7 +106,7 @@ běží jen AD00–AD13. Zbývá:
    `vercel env pull .env.production.local --environment=production` +
    `node scripts/apply-migration.js <soubor> --env .env.production.local`.
 2. **Agent udělá merge `admin/modernizace` → `main` a push** — až na výslovný souhlas.
-   Je to produkční deploy. Větev je 27 commitů před `main`, opačně 0, takže je to
+   Je to produkční deploy. Větev je 29 commitů před `main`, opačně 0, takže je to
    fast-forward. **Kdyby build spadl na `next/font/google`, je to poškozená build cache**
    (otevřený problém z 2026-11-13) — Redeploy bez cache to spraví.
 3. **Po nasazení** doběhnou doprovodné kroky z 2026-11-13, které nikdo neodškrtl:
