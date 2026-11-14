@@ -53,6 +53,7 @@
 |-------|-----------|
 | Zjistit, na čem se naposledy pracovalo | `memory.md` → Aktuální stav, Changelog |
 | Pochopit, proč je něco udělané „divně" | `memory.md` → Rozhodnutí; pak komentář v kódu / migraci |
+| Modální okno, panel zprava, viditelný focus, vypnutý pohyb | `components/ui/{dialog,sheet}.tsx`, `components/ui/portal.tsx`, `app/globals.css` (`:focus-visible`, `prefers-reduced-motion`), `docs/admin/AGENTS-ADMIN.md` → Dokončení sjednocení (AD18), R-104 |
 | Vzhled denních obrazovek adminu (panel, štítek sekce, tóny, plochy 44 px) | `components/admin/card.tsx`, `lib/admin-status.ts`, `components/ui/{badge,button}.tsx`, barvy kalendáře `components/SmartCalendar.tsx` (`CHANNEL_TONE`, `KIND_TONE`) + `lib/ws/staff-colors.ts`, `docs/admin/AGENTS-ADMIN.md` → Denní obrazovky v Dílkách, R-103 (AD17) |
 | Výpis v adminu (řazení, stránkování, filtry) | `lib/admin-table.ts`, `components/admin/{data-table,pagination,table-search}.tsx`, dotazy `lib/admin/{completed,invoices,costs,leads,projects,waitlist}.ts` (AD07) |
 | Kontakty (jeden člověk, jeden řádek; sloučení duplicit) | `lib/contacts/{normalize,group}.ts`, `lib/admin/contacts.ts`, `app/contacts-actions.ts`, `app/dashboard/kontakty/`, `components/admin/contacts/`, `scripts/admin-contacts-backfill.mjs`, migrace 104, R-095 (AD09) |
