@@ -470,7 +470,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
                       type="text"
                       placeholder="Napište, co vám vyhovuje…"
                       {...register('channelOtherText')}
-                      className="w-full px-3.5 py-2.5 text-sm rounded-chip border border-navy-100 bg-surface placeholder:text-quiet/60 focus:outline-none focus:ring-2 focus:ring-navy-300"
+                      className="w-full px-3.5 py-2.5 text-sm rounded-chip border border-navy-100 bg-surface placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-300"
                     />
                     {errors.channelOtherText && (
                       <p className="text-xs text-danger mt-1">{errors.channelOtherText.message}</p>

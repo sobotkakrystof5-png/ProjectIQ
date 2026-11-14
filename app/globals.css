@@ -43,6 +43,28 @@
   input[type='range']::-webkit-slider-thumb {
     @apply bg-navy-800;
   }
+
+  /* Viditelný focus pro celé repo (AD18). Komponenty z components/ui mají vlastní
+     `focus-visible:ring-*`; tohle je pro ruční <button> a <a> v adminu, na /login,
+     /p a /h, kde se dosud spoléhalo na výchozí obrys prohlížeče. Pole, která si
+     outline vypínají a kreslí vlastní prstenec, mají vyšší specificitu a vyhrávají. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--navy-700));
+    outline-offset: 2px;
+  }
+
+  /* Kdo si vypnul animace v systému, nemá je vidět nikde — ne jen ve Workspace
+     (app/ws-tokens.css). Admin animuje přes Framer Motion, Radix a pulz kostlivců. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {

@@ -161,7 +161,7 @@ export function StartupImprovements({ projectId, initialItems }: Props) {
 
             {/* Date */}
             {editingId !== item.id && (
-              <span className="text-[10px] text-quiet/60 shrink-0 mt-0.5">
+              <span className="text-[10px] text-quiet shrink-0 mt-0.5">
                 {new Date(item.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' })}
               </span>
             )}

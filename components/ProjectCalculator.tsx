@@ -238,7 +238,7 @@ function CalcPanel({ presets, addons }: { presets: Preset[]; addons: { name: str
                       <td className="px-2 py-2">
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="rounded-chip p-1 text-quiet/60 transition-colors hover:text-danger"
+                          className="rounded-chip p-1 text-quiet transition-colors hover:text-danger"
                         >
                           <Trash2 size={13} strokeWidth={1.5} />
                         </button>

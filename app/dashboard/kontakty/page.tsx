@@ -13,7 +13,7 @@ import { formatDate } from '@/lib/utils'
 
 const PATH = '/dashboard/kontakty'
 
-const dash = <span className="text-quiet/50">—</span>
+const dash = <span className="text-quiet">—</span>
 
 const VIEWS: { value: ContactView; label: string }[] = [
   { value: 'aktivni', label: 'Kontakty' },

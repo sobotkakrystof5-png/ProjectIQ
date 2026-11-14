@@ -76,7 +76,7 @@ const COLUMNS: AdminColumn<ClientRow>[] = [
       ) : client.web === 'ready' ? (
         <span className="text-quiet">založeno</span>
       ) : (
-        <span className="text-quiet/50">—</span>
+        <span className="text-quiet">—</span>
       ),
   },
 ]

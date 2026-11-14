@@ -325,7 +325,7 @@ function CompanyCell({
         {noteCount > 0 && (
           <span
             title={lastNote ? `${noteCount}× poznámka — naposledy: ${lastNote.content}` : `${noteCount}× poznámka`}
-            className="flex shrink-0 items-center gap-0.5 text-quiet/70"
+            className="flex shrink-0 items-center gap-0.5 text-quiet"
           >
             <StickyNote size={11} strokeWidth={1.5} />
             <span className="text-[11px]">{noteCount}</span>
@@ -397,7 +397,7 @@ function ValueCell({ lead }: { lead: ClientLead }) {
           {Number(lead.estimated_value).toLocaleString('cs-CZ')} Kč
         </span>
       ) : (
-        <span className="text-quiet/60">—</span>
+        <span className="text-quiet">—</span>
       )}
     </td>
   )
@@ -473,11 +473,11 @@ function LeadRow({
       <td className="px-3 py-2.5">
         {lead.next_action_type
           ? <ActionTypeBadge type={lead.next_action_type} />
-          : <span className="text-quiet/60">—</span>
+          : <span className="text-quiet">—</span>
         }
       </td>
       <td className="px-3 py-2.5">
-        <span className="text-sm text-ink">{lead.next_action ?? <span className="text-quiet/60">—</span>}</span>
+        <span className="text-sm text-ink">{lead.next_action ?? <span className="text-quiet">—</span>}</span>
       </td>
       <td className="px-3 py-2.5">
         {formattedDateTime ? (
@@ -488,7 +488,7 @@ function LeadRow({
             </span>
           </div>
         ) : (
-          <span className="text-quiet/60">—</span>
+          <span className="text-quiet">—</span>
         )}
       </td>
       <ValueCell lead={lead} />
@@ -786,7 +786,7 @@ function WaitingRow({
         {lastNote ? (
           <span className="block max-w-[200px] truncate text-sm text-quiet">{lastNote.content}</span>
         ) : (
-          <span className="text-quiet/60">—</span>
+          <span className="text-quiet">—</span>
         )}
       </td>
       <ValueCell lead={lead} />

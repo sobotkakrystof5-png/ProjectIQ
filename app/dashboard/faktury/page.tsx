@@ -42,7 +42,7 @@ function sums(totals: CurrencyTotal[], pick: (t: CurrencyTotal) => number): stri
 }
 
 function formatDay(value: string | null): React.ReactNode {
-  if (!value) return <span className="text-quiet/50">—</span>
+  if (!value) return <span className="text-quiet">—</span>
   const [y, m, d] = value.split('-').map(Number)
   return <span className="font-num">{new Date(y, m - 1, d).toLocaleDateString('cs-CZ')}</span>
 }

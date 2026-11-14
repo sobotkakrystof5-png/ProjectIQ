@@ -57,7 +57,7 @@ const COLUMNS: AdminColumn<CostRow>[] = [
           {cost.project_client_name ?? 'Zakázka'}
         </Link>
       ) : (
-        <span className="text-quiet/50">—</span>
+        <span className="text-quiet">—</span>
       ),
   },
   {

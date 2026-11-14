@@ -38,7 +38,7 @@ function Row({
         <p className={`text-sm ${strong ? 'font-semibold text-ink' : 'text-quiet'}`}>
           {label}
         </p>
-        {hint && <p className="text-xs text-quiet/80 mt-0.5 leading-snug">{hint}</p>}
+        {hint && <p className="text-xs text-quiet mt-0.5 leading-snug">{hint}</p>}
       </div>
       <p className={`text-sm tabular-nums whitespace-nowrap ${strong ? 'font-bold' : 'font-medium'} ${color}`}>
         {value}

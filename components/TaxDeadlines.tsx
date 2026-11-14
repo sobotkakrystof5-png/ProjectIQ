@@ -66,7 +66,7 @@ function DeadlineRow({ deadline, todayIso }: { deadline: TaxDeadline; todayIso: 
         <div className="flex items-center gap-2 flex-wrap mt-1.5">
           <span className="text-[11px] text-quiet">{formatDate(deadline.date)}</span>
           {deadline.shifted && (
-            <span className="text-[11px] text-quiet/80">
+            <span className="text-[11px] text-quiet">
               (zákonné {formatDate(deadline.statutoryDate)} padlo na víkend nebo svátek)
             </span>
           )}

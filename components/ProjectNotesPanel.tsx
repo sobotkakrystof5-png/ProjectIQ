@@ -102,7 +102,7 @@ export function ProjectNotesPanel({
       </div>
 
       {sorted.length === 0 ? (
-        <p className="text-sm text-quiet/70">Zatím žádné poznámky ze schůzek či hovorů.</p>
+        <p className="text-sm text-quiet">Zatím žádné poznámky ze schůzek či hovorů.</p>
       ) : (
         <div className="columns-1 lg:columns-2 gap-4">
           {sorted.map(note => (

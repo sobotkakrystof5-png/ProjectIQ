@@ -21,7 +21,7 @@ const COLUMNS: AdminColumn<WaitlistEntry>[] = [
     header: 'Jméno',
     sortable: true,
     mobile: 'title',
-    cell: (entry) => entry.name ?? <span className="text-quiet/50">—</span>,
+    cell: (entry) => entry.name ?? <span className="text-quiet">—</span>,
   },
   { key: 'email', header: 'E-mail', sortable: true, cell: (entry) => <span className="break-all">{entry.email}</span> },
   {

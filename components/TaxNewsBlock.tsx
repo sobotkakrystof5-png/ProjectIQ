@@ -168,7 +168,7 @@ export function TaxNewsBlock({ data }: { data: TaxNewsData }) {
         <div className="flex flex-col items-center gap-2 text-center py-8 px-4 rounded-chip border border-dashed border-navy-100 bg-surface">
           <Inbox size={20} strokeWidth={1.5} className="text-quiet" />
           <p className="text-sm text-quiet">Zatím žádné novinky.</p>
-          <p className="text-xs text-quiet/80 max-w-sm leading-relaxed">
+          <p className="text-xs text-quiet max-w-sm leading-relaxed">
             Kanály se stahují jednou týdně. Tlačítkem „Načíst teď" je stáhneš hned.
           </p>
         </div>

@@ -174,7 +174,7 @@ export function ClientRequestBlock({ token, submit, transcribeUrl, voiceEnabled 
         rows={4}
         disabled={voice !== 'idle'}
         placeholder="Napište, co byste chtěli změnit nebo doplnit…"
-        className="w-full rounded-chip border border-navy-100 bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-quiet/70 focus:outline-none focus:ring-2 focus:ring-navy-300 disabled:opacity-60"
+        className="w-full rounded-chip border border-navy-100 bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-quiet focus:outline-none focus:ring-2 focus:ring-navy-300 disabled:opacity-60"
       />
 
       {fromVoice && voice === 'idle' && (
