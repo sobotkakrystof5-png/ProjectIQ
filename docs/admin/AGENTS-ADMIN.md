@@ -958,6 +958,71 @@ Ikonové tlačítko bez textu **musí** mít `aria-label`.
 (musí být blok); pilulkový přepínač s víc než čtyřmi položkami potřebuje `overflow-x-auto`.
 Všechny tři chyby průchod AD17 našel a opravil.
 
+### Dokončení sjednocení: modály a přístupnost (AD18)
+
+Poslední sezení modernizace. Co z něj platí pro každou další práci na adminu:
+
+**Modální okno se nekreslí ručně.** Překryvnou vrstvu umí jedině
+`components/ui/dialog.tsx` (okno) a `components/ui/sheet.tsx` (panel zprava, na telefonu
+zespodu). Do AD18 bylo v repu sedm vlastních vrstev `fixed inset-0`: rezervace z portálu,
+přidání události, detail události, detail konzultace, faktura v archivu, zpráva kontaktu
+a asistent — plus spodní nabídka a ⌘K v kostře. Žádná z nich nedržela focus uvnitř, takže
+se z otevřeného okna dalo tabulátorem vyjet na stránku pod ním, a `Escape` fungoval jen
+někde. Radix to řeší za nás:
+
+- focus zůstane uvnitř a po zavření se vrátí tam, odkud se okno otevřelo,
+- `Escape` a klik mimo zavírají,
+- zbytek stránky dostane `aria-hidden` (ověřeno: s otevřeným ⌘K je `aria-hidden` i `<main>`)
+  a `body` se zamkne proti rolování. **`aria-modal` Radix záměrně nenastavuje** — `aria-hidden`
+  na okolí je přesnější a čtečka nemá, kam by z okna odešla. Nehledat ho v testech.
+
+Okno vzniká jako `<Dialog open onOpenChange={…}><DialogContent>`; `DialogTitle` je povinný
+(bez něj Radix píše varování do konzole) a `DialogDescription` jedna věta, k čemu okno je —
+`className="sr-only"` tam, kde by byla na obrazovce zbytečná. `DialogContent` si kreslí
+vlastní zavírací tlačítko, takže vlastní „×" do záhlaví nepatří. `PortalContainerProvider`
+z `AdminRoot` (AD04) drží obsah okna uvnitř `data-app="admin"`, aby v něm platily tokeny.
+
+**Viditelný focus má celé repo.** `app/globals.css` dává `:focus-visible` obrys 2 px
+`navy-700` s odsazením 2 px. Pole, která si outline vypínají a kreslí vlastní prstenec
+(`focus:outline-none focus:ring-2`), mají vyšší specificitu a vyhrávají — pravidlo je pro
+ruční `<button>` a `<a>`, kde se dosud spoléhalo na výchozí obrys prohlížeče.
+
+**`prefers-reduced-motion` platí všude**, ne jen uvnitř `data-app="ws"`: `app/globals.css`
+srazí animace a přechody na 0,01 ms. Admin animuje přes Framer Motion, Radix a pulz
+kostlivců, takže dokud bylo pravidlo jen ve `ws-tokens.css`, kdo si pohyb v systému vypnul,
+viděl ho dál. Ověřeno v prohlížeči: s `prefers-reduced-motion: reduce` neběží na Dnes ani
+v otevřeném ⌘K jediná animace.
+
+**Barvy a tvary jsou dojednané, zbývá je jen držet.** Strop zakázaných tříd je **nula**
+(`components/admin/__tests__/admin-classes.test.ts`): žádné `muted-foreground`, `bg-white`,
+`rounded-lg|xl|2xl`, duhové ani šedé škály Tailwindu, žádné `brand-*` a `.brand-gradient`.
+Gradient v adminu zůstal jedinému, komu podle `DESIGN.md` patří — **logu**
+(`bg-gradient-to-br from-navy-600 to-navy-800`); tlačítka a ukazatele postupu jsou plná
+`navy-700`. **Emoji v rozhraní nejsou** a test to hlídá u každého `.tsx`; výjimka je text
+e-mailu, který admin posílá ven (`app/dashboard/startup/startup-actions.ts`) — to je obsah
+od člověka.
+
+Co se z barev rozhodlo mimo denní obrazovky (R-103 je nechal otevřené):
+
+| Co | Jak se to kreslí |
+|---|---|
+| škála (NPS 1–10, náročnost zakázky, průměr hodnocení) | roste **tmavostí** navy, ne odstínem |
+| trychtýř zakázek na Profilu | `navy-200` → `navy-700`, čím dál v cestě, tím tmavší |
+| hvězdičky hodnocení | plné `navy-700`, prázdné `navy-200` |
+| potvrzení („Děkujeme", „Rezervováno") | `navy-50` plocha a zatržítko `navy-700`, ne zelená |
+| „blíží se limit obratu", „termín daně", nepotvrzená novinka, tajný klíč webu | `signal-*` — čeká to na vás |
+| druh oznámení ve zvonku | **žádná barva** — je to kategorie, nese ji ikona a popisek |
+
+**Plocha akce je 44 px i tady.** AD18 dorovnal odhlášení v panelu (16 px), odkaz na logo
+(32 px), štítky a tlačítka v editoru novinek (20–36 px), „Pozvat klienta" (36 px) a pole
+i tlačítko na `/login` (40–42 px). Vědomé výjimky jsou dvě: skrytý „Přeskočit na obsah"
+a **odkaz v řádku výpisu** (jméno kontaktu, číslo faktury, název účtu) — je to text, ne
+akce, a klikací plocha řádku je větší.
+
+**Popisek pole je `label` psaný větou** (`text-sm font-medium text-ink`). Mono verzálky
+patří datům a značkám sekcí; AD18 je dorovnal v přihlášení, editoru novinek, oknech
+kalendáře, rezervace a faktury.
+
 ### Zdroje poptávek (AD02, R-088)
 
 VIZEON a ALTENO už nejsou dvě firmy. Je to **jeden byznys**, který přijímá poptávky z několika webů, a u zakázky, termínu i leadu se eviduje jen `lead_origin` — odkud poptávka přišla.

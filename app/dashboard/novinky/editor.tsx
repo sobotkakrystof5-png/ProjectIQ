@@ -101,7 +101,7 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
               aria-checked={tag === t}
               onClick={() => setTag(t)}
               className={cn(
-                'px-3 py-1.5 text-sm rounded-full border transition-colors',
+                'inline-flex min-h-11 items-center rounded-full border px-4 text-sm transition-colors',
                 tag === t ? 'bg-navy-800 text-white border-navy-800' : 'bg-surface text-quiet border-navy-100 hover:bg-muted',
               )}
             >
@@ -111,28 +111,28 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
         </div>
 
         <label className="block space-y-1">
-          <span className="flex justify-between text-[12px] font-medium text-quiet">
+          <span className="flex justify-between text-sm font-medium text-ink">
             Nadpis <span className="tabular-nums">{title.length} / {NEWS_LIMITS.title}</span>
           </span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={NEWS_LIMITS.title} className={INPUT} />
         </label>
 
         <label className="block space-y-1">
-          <span className="flex justify-between text-[12px] font-medium text-quiet">
+          <span className="flex justify-between text-sm font-medium text-ink">
             Krátký text <span className="tabular-nums">{body.length} / {NEWS_LIMITS.body}</span>
           </span>
           <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={NEWS_LIMITS.body} rows={6} className={INPUT} />
         </label>
 
         <label className="block space-y-1">
-          <span className="text-[12px] font-medium text-quiet">Odkaz (nepovinný, https://)</span>
+          <span className="text-sm font-medium text-ink">Odkaz (nepovinný, https://)</span>
           <input value={link} onChange={(e) => setLink(e.target.value)} maxLength={NEWS_LIMITS.link} placeholder="https://www.zakaziq.cz/…" className={INPUT} />
         </label>
 
         <div className="space-y-1">
-          <span className="text-[12px] font-medium text-quiet">Obrázek (nepovinný, PNG/JPEG/WebP do 600 kB)</span>
+          <span className="text-sm font-medium text-ink">Obrázek (nepovinný, PNG/JPEG/WebP do 600 kB)</span>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-navy-100 rounded-chip bg-surface hover:bg-muted cursor-pointer">
+            <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-chip border border-navy-100 bg-surface px-4 text-sm font-medium hover:bg-muted">
               <ImagePlus size={14} strokeWidth={1.5} />
               {image.preview ? 'Vyměnit obrázek' : 'Nahrát obrázek'}
               <input type="file" accept={IMAGE_TYPES.join(',')} className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
@@ -141,7 +141,7 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
               <button
                 type="button"
                 onClick={() => setImage({ action: 'remove', preview: null })}
-                className="inline-flex items-center gap-1 text-sm text-quiet hover:text-danger"
+                className="inline-flex min-h-11 items-center gap-1 px-2 text-sm text-quiet hover:text-danger"
               >
                 <Trash2 size={14} strokeWidth={1.5} />
                 Odebrat
@@ -151,7 +151,7 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
         </div>
 
         <div className="rounded-chip border border-navy-100 bg-muted/30 p-3 space-y-2">
-          <button type="button" onClick={() => setGuide((g) => !g)} className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-800">
+          <button type="button" onClick={() => setGuide((g) => !g)} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-800">
             <Sparkles size={14} strokeWidth={1.5} />
             Učesat text
             {hints.length > 0 && (
@@ -171,11 +171,11 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           {news && (
-            <button type="button" onClick={() => router.push('/dashboard/novinky')} className="px-3 py-2 text-sm text-quiet hover:underline">
+            <button type="button" onClick={() => router.push('/dashboard/novinky')} className="inline-flex min-h-11 items-center px-3 text-sm text-quiet hover:underline">
               Zrušit úpravy
             </button>
           )}
-          <button type="button" onClick={save} disabled={pending} className="px-4 py-2 text-sm font-medium bg-navy-700 text-white rounded-chip hover:opacity-90 disabled:opacity-60">
+          <button type="button" onClick={save} disabled={pending} className="inline-flex min-h-11 items-center rounded-chip bg-navy-700 px-4 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-60">
             {pending ? 'Ukládám…' : news ? 'Uložit změny' : 'Uložit koncept'}
           </button>
         </div>
@@ -190,7 +190,7 @@ export function NewsEditor({ news, fontClassName }: { news: EditorNews | null; f
               role="tab"
               aria-selected={tab === t}
               onClick={() => setTab(t)}
-              className={cn('px-3 py-1.5 text-sm rounded-chip', tab === t ? 'bg-surface border border-navy-100 font-medium' : 'text-quiet hover:bg-muted')}
+              className={cn('inline-flex min-h-11 items-center rounded-chip px-4 text-sm', tab === t ? 'border border-navy-100 bg-surface font-medium' : 'text-quiet hover:bg-muted')}
             >
               {t === 'app' ? 'V aplikaci' : 'V e-mailu'}
             </button>

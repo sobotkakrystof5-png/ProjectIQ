@@ -1443,7 +1443,7 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | **hotovo 2026-11-13** (111 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-101) |
 | AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | **hotovo 2026-11-13** (112 aplikovaná nikde; v prohlížeči neověřeno, PDF ověřené okem; R-102) |
 | AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | **hotovo 2026-11-13** (ověřeno v prohlížeči 390–1440 px kromě Financí › Podnikání a skutečného detailu zakázky — testovací Neon nemá 106; R-103) |
-| AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | nezačato |
+| AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | **hotovo 2026-11-14** (strop tříd na nule, sedm modálů na Radixu, průchod klávesnicí a 390–1440 px ověřený; `/dashboard/profil` padá na chybějící migraci 106 na testovacím Neonu) |
 
 **Úklid jde první a není to libovůle:** AD01 až AD03 smažou nebo sloučí to, co by AD04 jinak
 přepisoval a AD17 překresloval. Každá obrazovka smazaná v AD01 je obrazovka, kterou nikdo nemusí
@@ -1629,18 +1629,31 @@ nad `app/dashboard`, `app/p`, `app/h`, `app/(auth)`, `app/globals.css`, `compone
 Test tvrdí „nejvýš strop", takže úklid nikdy neblokuje, ale návrat staré třídy ano.
 **Po každém sezení snížit na naměřenou hodnotu.**
 
-| Třída | Strop po AD04 (2026-11-11) | Po AD05 | Po AD07 (2026-11-11) | Po AD17 (2026-11-13) |
-|---|---|---|---|---|
-| `muted-foreground` | 743 | 691 | 589 | **283** |
-| `rounded-lg\|xl\|2xl` | 463 | 434 | 396 | **197** |
-| `border-border` | 335 | 314 | 269 | **123** |
-| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | 755 | 677 | **269** |
-| `bg-white` | 211 | 199 | 176 | **96** |
-| `brand-*` | **0** | 0 | 0 | 0 |
+| Třída | Strop po AD04 (2026-11-11) | Po AD05 | Po AD07 (2026-11-11) | Po AD17 (2026-11-13) | **Po AD18 (2026-11-14)** |
+|---|---|---|---|---|---|
+| `muted-foreground` | 743 | 691 | 589 | 283 | **0** |
+| `rounded-lg\|xl\|2xl` | 463 | 434 | 396 | 197 | **0** |
+| `border-border` | 335 | 314 | 269 | 123 | **1** |
+| duhové `bg\|text\|border\|ring-{barva}-NNN` | 927 | 755 | 677 | 269 | **0** |
+| `bg-white` | 211 | 199 | 176 | 96 | **0** |
+| šedé škály (`gray`, `slate`, `zinc`, `neutral`, `stone`) | — | — | — | 41 | **0** |
+| `brand-*` | **0** | 0 | 0 | 0 | **0** |
 
-Po AD17 zbývá nejvíc v tom, co se překreslovat nemělo: osobní část (`PersonalProjectEditor`,
-`StartupProjectEditor`, `/dashboard/profil`, `PerformanceOverview`) a veřejné stránky
-`/p` a `/h`. To je práce pro AD18.
+Jediný zbylý `border-border` je `@apply border-border` v základní vrstvě `app/globals.css` —
+výchozí barva okraje pro celé repo, která se řídí motivem (AD04 ji tam nechal záměrně).
+Třída v žádném `.tsx` není.
+
+**Rozsah se v AD18 zúžil, a je to oprava, ne úhyb.** Test měřil `components/*.tsx`, ale `*`
+v gitovém pathspecu zabírá i lomítko, takže do počtu padaly i `components/{ws,marketing,ui}`.
+Bílá v nich **je správně**: bílé tlačítko v hero, dílky loga, razítko věrnostní karty, palec
+přepínače — to jsou bílé plochy na tmavém, ne nepřepsané karty. Komentář u testu to tvrdil
+od AD04, pathspec to ale nedělal.
+
+AD18 kromě tříd uklidil i to, co do „staré vizuální vrstvy" patří a nikdo to nepočítal:
+`.brand-gradient` (44×) i literální paletu `brand` v `tailwind.config.ts`, gradienty
+`from-violet-*` a **emoji v rozhraní** (ikony konzultantů, popisky v kalkulačce startupu →
+Lucide). Test to od teď hlídá: nula u všech skupin, žádný ručně psaný `fixed inset-0`
+a žádné emoji v `.tsx`.
 
 Z AD07 ubylo 78 duhových tříd a asi stovka šedých: zmizely celé soubory
 `CompletedProjectsTable`, `InvoiceRegistry`, `CostsManager`, `WaitlistSection`
@@ -1664,19 +1677,35 @@ součet skriptů, které jsou v HTML stránky, gzip spočítaný z souborů na d
 (`node scripts/bundle-stats.mjs --server http://localhost:3000 --cookie …`).
 Společné pro každou stránku: **168,6 kB gzip** (7 souborů).
 
-| Trasa | JS před (AD00) | JS po (AD06) | JS po (AD08) |
-|---|---|---|---|
-| `/login` | 226,2 kB | 226,2 kB | 226,2 kB |
-| `/` (landing) | 267,0 kB | **251,5 kB** | 251,3 kB |
-| `/dashboard` (Dnes) | 234,4 kB | 245,2 kB | 245,7 kB |
-| `/dashboard/zakazky` | 237,0 kB | 249,9 kB | 249,1 kB |
-| `/dashboard/calls` | 278,1 kB | 291,5 kB | **263,8 kB** |
-| `/dashboard/calendar` | 274,4 kB | 287,6 kB | **260,6 kB** |
-| `/dashboard/faktury` | 241,4 kB | 254,4 kB | 254,8 kB |
-| `/dashboard/naklady` | 239,3 kB | 252,7 kB | 267,5 kB |
-| `/dashboard/finance` (dřív `/hub/finance`) | 255,6 kB | 273,9 kB | 274,7 kB |
-| `/dashboard/poptavky` | — | 250,1 kB | 250,6 kB |
-| `/hub`, `/alteno` | 230,3 / 238,0 kB | zrušeno (AD02, AD03) | — |
+| Trasa | JS před (AD00) | JS po (AD06) | JS po (AD08) | Před AD18 (`cabe01c`) | **Po AD18 (`32c785c`)** |
+|---|---|---|---|---|---|
+| `/login` | 226,2 kB | 226,2 kB | 226,2 kB | 226,4 kB | **226,3 kB** |
+| `/` (landing) | 267,0 kB | **251,5 kB** | 251,3 kB | 251,5 kB | **248,4 kB** |
+| `/dashboard` (Dnes) | 234,4 kB | 245,2 kB | 245,7 kB | 297,5 kB | **297,8 kB** |
+| `/dashboard/zakazky` | 237,0 kB | 249,9 kB | 249,1 kB | 300,9 kB | **301,2 kB** |
+| `/dashboard/calls` | 278,1 kB | 291,5 kB | **263,8 kB** | 344,5 kB | **344,5 kB** |
+| `/dashboard/calendar` | 274,4 kB | 287,6 kB | **260,6 kB** | 339,4 kB | **339,6 kB** |
+| `/dashboard/faktury` | 241,4 kB | 254,4 kB | 254,8 kB | 305,7 kB | **305,9 kB** |
+| `/dashboard/naklady` | 239,3 kB | 252,7 kB | 267,5 kB | 303,0 kB | **302,8 kB** |
+| `/dashboard/finance` (dřív `/hub/finance`) | 255,6 kB | 273,9 kB | 274,7 kB | 325,5 kB | **325,6 kB** |
+| `/dashboard/poptavky` | — | 250,1 kB | 250,6 kB | 331,0 kB | **331,3 kB** |
+| `/hub`, `/alteno` | 230,3 / 238,0 kB | zrušeno (AD02, AD03) | — | — | — |
+
+**Sloupce AD18** (měřeno 2026-11-14 stejným postupem: `next build`, `next start` na portu 3100,
+`bundle-stats --server --cookie`). Protože mezi AD08 a AD17 nikdo neměřil, změřil se zvlášť
+i stav **před** AD18 — commit `cabe01c` se kvůli tomu přeložil a změřil samostatně, aby šlo
+odlišit, co přidalo AD18 a co devět sezení před ním.
+
+Výsledek: **AD18 je na JavaScriptu nula** (−0,2 až +0,3 kB; landing −3,1 kB, což je přesypání
+společných chunků, ne ubraný kód). Převod sedmi ručně psaných modálů na Radix tedy **nic
+nepřidal** — `@radix-ui/react-dialog` v adminu už byl (dialog nákladů z AD07, ⌘K) a čtyři
+komponenty naopak přestaly importovat `AnimatePresence`.
+
+**Co přidalo 50–80 kB, je AD09–AD17**: Hovory 263,8 → 344,5 kB (+31 %), Kalendář 260,6 → 339,4
+(+30 %), Dnes 245,7 → 297,5 (+21 %), Poptávky 250,6 → 331,0 (+32 %). Jsou to funkce
+(kontakty, fakturace, asistent, paměť, předání, AI leady), ne regrese ve vzhledu — ale strop,
+který AD08 postavil, se mezitím o třetinu zvedl a nikdo si toho nevšiml, protože měření
+nebylo součástí „Hotovo, když" u AD09–AD17. Zapsané v otevřených problémech.
 
 **Sloupec AD08** (měřeno 2026-11-12, `build:check` + `npm start` + `bundle-stats`):
 Framer Motion se přestal stahovat předem (`m` + `LazyMotion` v `AdminRoot`), což sebralo

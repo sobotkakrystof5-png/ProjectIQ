@@ -11,7 +11,7 @@ import { AssistantPanel } from './assistant-panel'
 
 function Logo() {
   return (
-    <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="ZakazIQ, přejít na Dnes">
+    <Link href="/dashboard" className="flex min-h-11 items-center gap-2.5" aria-label="ZakazIQ, přejít na Dnes">
       <span className="flex h-8 w-8 items-center justify-center rounded-tiny bg-navy-700">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.9" />

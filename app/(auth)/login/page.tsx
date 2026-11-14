@@ -60,7 +60,7 @@ export default function LoginPage() {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-quiet uppercase tracking-wide">
+              <label className="text-sm font-medium text-ink">
                 E-mail
               </label>
               <input
@@ -70,12 +70,12 @@ export default function LoginPage() {
                 required
                 autoFocus
                 placeholder="vas@email.cz"
-                className="border border-navy-100 rounded-chip px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-surface"
+                className="min-h-11 rounded-chip border border-navy-100 bg-surface px-3 py-2.5 text-sm transition-shadow focus:border-transparent focus:outline-none focus:ring-2 focus:ring-navy-700"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-quiet uppercase tracking-wide">
+              <label className="text-sm font-medium text-ink">
                 Heslo
               </label>
               <input
@@ -84,14 +84,14 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 placeholder="••••••••"
-                className="border border-navy-100 rounded-chip px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700 focus:border-transparent transition-shadow bg-surface"
+                className="min-h-11 rounded-chip border border-navy-100 bg-surface px-3 py-2.5 text-sm transition-shadow focus:border-transparent focus:outline-none focus:ring-2 focus:ring-navy-700"
               />
             </div>
 
             <button
               type="submit"
               disabled={isPending}
-              className="w-full flex items-center justify-center gap-2 bg-navy-700 text-white text-sm font-medium py-2.5 rounded-chip shadow-sm hover:bg-navy-800 transition-colors disabled:opacity-50 mt-2"
+              className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-chip bg-navy-700 text-sm font-medium text-white shadow-sm transition-colors hover:bg-navy-800 disabled:opacity-50"
             >
               {isPending && <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />}
               Přihlásit se

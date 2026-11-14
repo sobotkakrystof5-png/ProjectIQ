@@ -7,7 +7,7 @@ export function LogoutButton() {
   return (
     <button
       onClick={() => signOut({ callbackUrl: '/login' })}
-      className="flex items-center gap-1.5 text-xs text-quiet hover:text-navy-800 transition-colors"
+      className="flex min-h-11 items-center gap-1.5 text-xs text-quiet transition-colors hover:text-navy-800"
       title="Odhlásit"
     >
       <LogOut size={14} strokeWidth={1.5} />
