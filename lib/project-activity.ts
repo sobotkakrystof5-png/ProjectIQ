@@ -90,6 +90,16 @@ const SENSITIVE_PATTERNS: RegExp[] = [
   /\bgh[pousr]_[A-Za-z0-9]{20,}/g,
   /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
   /\bAKIA[0-9A-Z]{16}\b/g,
+  // Podpisová tajemství webhooků (Stripe, Svix/Clerk, Resend) — `whsec_`
+  /\bwhsec_[A-Za-z0-9+/=_-]{16,}/g,
+  // Resend API klíč
+  /\bre_[A-Za-z0-9_-]{16,}/g,
+  // Google API klíč
+  /\bAIza[0-9A-Za-z_-]{35}\b/g,
+  // Heslo role na Neonu (i mimo connection string, např. ve zprávě „heslo je npg_…")
+  /\bnpg_[A-Za-z0-9]{16,}/g,
+  // Soukromý klíč v PEM: zakryje se celý blok, ne jen hlavička
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
   // Connection stringy s přihlašovacími údaji: schéma://uživatel:heslo@host…
   /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s@/]+@[^\s]+/gi,
   // Řádky z .env: NÁZEV_PROMĚNNÉ=hodnota na začátku řádku

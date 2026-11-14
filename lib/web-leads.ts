@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/admin/db'
 import type { TableParams } from '@/lib/admin-table'
 import { verifyApiKey, getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
+import { readJsonLimited } from '@/lib/security/request-body'
 import { bookingSchemaFor } from '@/types/booking'
 import { webLeadSchemaFor, type WebLeadPayload } from '@/types/web-lead'
 import { pragueWallClockToISO, formatPragueDateTime } from '@/lib/prague-time'
@@ -29,14 +30,25 @@ import type { WebLead } from '@/components/LeadCard'
 const RATE_LIMIT_WINDOW_MINUTES = 1
 const RATE_LIMIT_MAX_REQUESTS = 10
 
+// Poptávka z webu je jméno, kontakt a krátký text. Bez stropu by `req.json()`
+// přečetl, co klíč pošle (Workspace má totéž v lib/ws/intake/http.ts).
+const MAX_BODY_BYTES = 64 * 1024
+
 function allowedOrigins(origin: LeadOrigin): string[] {
   const domain = LEAD_ORIGINS[origin].domain
-  return [...(domain ? [`https://${domain}`] : []), 'http://localhost:3000']
+  // localhost patří do vývoje. V produkci by stránka z localhostu směla čtením
+  // odpovědi ověřovat uhádnutý klíč — zbytečná plocha, nic to tam nepotřebuje.
+  const dev = process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000']
+  return [...(domain ? [`https://${domain}`] : []), ...dev]
 }
 
 function corsHeaders(origin: LeadOrigin, requestOrigin: string | null): HeadersInit {
-  if (!requestOrigin || !allowedOrigins(origin).includes(requestOrigin)) return {}
+  // `Vary: Origin` vždy, i když se origin nepovolí: bez něj může sdílená cache
+  // vrátit Allow-Origin jednoho webu druhému (stejně to má lib/security/embed.ts).
+  const base: Record<string, string> = { Vary: 'Origin' }
+  if (!requestOrigin || !allowedOrigins(origin).includes(requestOrigin)) return base
   return {
+    ...base,
     'Access-Control-Allow-Origin': requestOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
@@ -81,12 +93,13 @@ export function bookingPostHandler(origin: LeadOrigin) {
       return errorResponse(origin, requestOrigin, 401, 'Neplatný API klíč', 'UNAUTHORIZED')
     }
 
-    let body: unknown
-    try {
-      body = await req.json()
-    } catch {
-      return errorResponse(origin, requestOrigin, 400, 'Neplatné JSON tělo požadavku', 'INVALID_BODY')
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok) {
+      return read.reason === 'too-large'
+        ? errorResponse(origin, requestOrigin, 413, 'Tělo požadavku je příliš velké', 'TOO_LARGE')
+        : errorResponse(origin, requestOrigin, 400, 'Neplatné JSON tělo požadavku', 'INVALID_BODY')
     }
+    const body: unknown = read.value
 
     const parsed = schema.safeParse(body)
     if (!parsed.success) {
@@ -201,12 +214,13 @@ export function webLeadPostHandler(origin: LeadOrigin) {
       return fail(401, 'Neplatný nebo chybějící podpis', 'UNAUTHORIZED')
     }
 
-    let body: unknown
-    try {
-      body = await req.json()
-    } catch {
-      return fail(400, 'Neplatné JSON tělo požadavku', 'INVALID_BODY')
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok) {
+      return read.reason === 'too-large'
+        ? fail(413, 'Tělo požadavku je příliš velké', 'TOO_LARGE')
+        : fail(400, 'Neplatné JSON tělo požadavku', 'INVALID_BODY')
     }
+    const body: unknown = read.value
 
     const parsed = schema.safeParse(body)
     if (!parsed.success) {

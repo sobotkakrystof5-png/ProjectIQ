@@ -10,12 +10,16 @@ import { SURVEY_CATEGORIES } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
 import { projectPath, adminEmail } from '@/lib/lead-origins'
 import { clientRequestSchema, REQUEST_KIND_LABELS } from '@/lib/client-requests'
+import { publicToken } from '@/lib/public-token'
 import { summarizeClientRequest } from '@/lib/client-request-ai'
 
 type ActionResult = { success: boolean; error?: string }
 
 async function getProjectByToken(token: string): Promise<{ id: string } | null> {
-  const rows = await sql`SELECT id FROM projects WHERE public_token = ${token} LIMIT 1`
+  // `public_token` je uuid — nesmyslný token nesmí dojít do dotazu (22P02 → 500).
+  const valid = publicToken(token)
+  if (!valid) return null
+  const rows = await sql`SELECT id FROM projects WHERE public_token = ${valid} LIMIT 1`
   const row = rows[0] as { id: string } | undefined
   return row ? { id: row.id } : null
 }
@@ -251,9 +255,11 @@ export async function submitSurvey(
 
   // Dotazník visí od migrace 106 na zakázce, ne na kopii v Dokončených (AD11).
   // Token si zakázka přebrala z archivu, takže dřív odeslané odkazy platí dál.
+  const surveyToken = publicToken(token)
+  if (!surveyToken) return { success: false, error: 'Dotazník nenalezen.' }
   const projectRows = await sql`
     SELECT id, coalesce(nullif(btrim(coalesce(description, '')), ''), client_name) AS title, client_name
-    FROM projects WHERE survey_token = ${token} AND NOT lead_pending LIMIT 1
+    FROM projects WHERE survey_token = ${surveyToken} AND NOT lead_pending LIMIT 1
   `
   const cp = projectRows[0] as { id: string; title: string; client_name: string | null } | undefined
   if (!cp) return { success: false, error: 'Dotazník nenalezen.' }

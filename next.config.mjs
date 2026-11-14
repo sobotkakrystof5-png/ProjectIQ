@@ -20,7 +20,11 @@ const securityHeaders = [
   {
     key: 'Permissions-Policy',
     value:
-      'accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), xr-spatial-tracking=()',
+      // Zakázané je všechno, co aplikace nepoužívá (web-security-setup → baseline).
+      // Výjimka `microphone=(self)` jen na /p a /klient, viz portalPermissionsPolicy.
+      // `publickey-credentials-get` tu schválně NENÍ zakázané — blokovalo by WebAuthn,
+      // kterým může jednou vzniknout dvoufázové ověření adminu (otevřená položka).
+      'accelerometer=(), autoplay=(), bluetooth=(), browsing-topics=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), local-fonts=(), magnetometer=(), microphone=(), midi=(), payment=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()',
   },
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
   { key: 'X-XSS-Protection', value: '0' },

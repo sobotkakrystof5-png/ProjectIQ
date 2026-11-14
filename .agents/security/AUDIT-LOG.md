@@ -660,3 +660,161 @@ Co se kontrolovalo a je v pořádku:
 Ověřeno: `npx tsc --noEmit`, `npm run build:check`, `npm test`. **Obrazovky adminu
 v prohlížeči okem neověřené**, migrace 112 neběžela nikde; vzhled PDF ověřený na
 vyrobeném dokumentu (jedna strana A4).
+
+## 2026-11-14 — audit celého projektu (web-security-audit + web-security-review)
+
+**Spouštěč:** zadání „jak je na tom appka z hlediska bezpečnosti, proveď kompletní analýzu
+od A do Z" (2026-11-14). První úplný průchod všemi bezpečnostními skilly po nasazení celé
+modernizace adminu na produkci (`8210f04`).
+
+**Rozsah:** živý audit `www.zakaziq.cz` skriptem `.claude/security/security-check.sh`; DNS
+a pošta `zakaziq.cz` přímými dotazy včetně autoritativních serverů; code review podle
+`web-security-review` přes celý strom — 37 route handlerů, 47 souborů server actions,
+CSP a `proxy.ts`, `next.config.mjs`, CORS, cookies, nahrávání souborů, skládání SQL,
+rate limity, přesměrování, `redactSensitive()`, CI a historie gitu (311 commitů).
+
+**Výsledek živého auditu:** 30 prošlo / 3 varování / **0 chyb**. Poprvé je zvenku
+ověřený celý sloupec hlaviček na produkci: vynucená CSP s nonce a bez `unsafe-inline`
+i `unsafe-eval` ve `script-src`, HSTS 2 roky s `includeSubDomains`, COOP i CORP
+`same-origin`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`,
+`X-XSS-Protection: 0`, bez `x-powered-by`, TLS 1.0/1.1 odmítnuté, TLS 1.3 ano,
+certifikát platný 63 dní, žádná z 15 typických citlivých cest dostupná, bez výpisu
+adresářů, žádné cookies na landing page.
+
+### Nálezy
+
+**1. Skript auditu hlásil DNS fail-open a ptal se na špatné jméno — opraveno.**
+Dvě vady v `security-check.sh`, obě se projevily právě tady:
+- `dig +short` píše chyby resolveru **na stdout** (`;; connection timed out…`), takže
+  `[[ -n "$(dig +short CAA …)" ]]` čte **nedostupný resolver jako „záznam existuje"**.
+  Kontrola tedy při každé poruše DNS tvrdila OK. Nově `dnsq()` vrací chybu zvlášť,
+  prázdno zvlášť; nedostupný resolver je `[CHYBA]` a `AUDIT_RESOLVER=1.1.1.1` ho obejde.
+- CAA, DNSSEC, SPF a DMARC patří **doméně, ne hostu**. Audit se pouštěl na
+  `www.zakaziq.cz`, což je CNAME na `bfa873afb15bb4ef.vercel-dns-017.com` — dotaz na CAA
+  alias následuje, takže se jako naše CAA vykázala **Vercelovská** (globalsign,
+  letsencrypt, pki.goog, sectigo), a SPF s DMARC vyšly jako chybějící, protože leží na
+  apexu. Sekce 6 teď počítá apex (`AUDIT_APEX` ho přebije), vypisuje, na co se ptala,
+  a varuje, když je apex CNAME.
+
+**2. Skutečný stav DNS `zakaziq.cz` je jiný, než má `STATE.md`** (ověřeno přes 1.1.1.1,
+8.8.8.8 i autoritativní `ns.wedos.net` a parent `a.ns.nic.cz`):
+- **CAA chybí** (apex nemá žádný záznam) → certifikát pro doménu smí vydat kdokoli.
+- **DNSSEC není zapnuté** (parent `.cz` nemá DS).
+- **SPF na apexu chybí.** Pošta přitom běží: Resend má doménu ověřenou, DKIM
+  `resend._domainkey` existuje, odesílací subdoména `send.zakaziq.cz` má vlastní SPF
+  (`v=spf1 ip4:… ~all`) a apex má **MX** (`receive-euw1.forge.rmta.net`), takže doména
+  i přijímá. Workspace ale odesílá z adresy na **apexu** (`WS_EMAIL_FROM`, např.
+  `rezervace@zakaziq.cz`), a pro apex nemá příjemce co ověřit.
+- **DMARC existuje, ale `v=DMARC1; p=none;` bez `rua=`** → nic neblokuje a reporty
+  nikam nechodí. Skript to teď rozlišuje od `p=none` s reporty.
+  Dohromady: podvrhnout e-mail jménem `@zakaziq.cz` jde a nikdo se o tom nedozví.
+  To je přesně nejhorší případ z threat modelu (phishing jménem byznysů klientů).
+  Mimo dosah agenta — DNS spravuje Kryštof u WEDOS.
+
+**3. HSTS `preload` je v hlavičce, ale doména na seznamu není.** `hstspreload.org/api/v2/status`
+vrací pro `zakaziq.cz` i `www.zakaziq.cz` `status: unknown`, `preloadedDomain: ""`.
+Token je tedy bez účinku — první HTTP požadavek z čerstvého prohlížeče jde dál v plainu.
+Tím se uzavírá otevřená otázka u DECISIONS #005 („zděděný `preload`, ověřit stav"):
+**zapsaná není**. Jestli se přihlásit, je rozhodnutí Kryštofa — `includeSubDomains`
++ 2 roky je po zápisu prakticky nevratné a vztáhlo by se i na budoucí subdomény.
+
+**4. Vstup do Workspace je veřejně dosažitelný na dev instanci Clerku — potvrzeno zvenku.**
+`https://www.zakaziq.cz/w/registrace` vrací 200 a stránka načítá
+`ultimate-chimp-4657.clerk.accounts.dev`. Landing na ni vede tlačítkem
+(`components/marketing/content.ts` → `signUp: '/w/registrace'`). Byla to otevřená položka
+„hned"; teď je k ní měření. Rozhodnutí (schovat vstup vs. nechat) je Kryštofovo.
+
+**5. Čtyři veřejné odkazy adminu padaly na 500 místo 404 — opraveno.**
+`projects.public_token` i `survey_token` jsou `uuid`, ale token z adresy šel do dotazu
+neověřený: nesmyslná hodnota = Postgres `22P02` = nezachycená chyba se stavem 500,
+kterou umí vyvolat kdokoli bez přihlášení. Týkalo se `app/p/[token]/page.tsx`,
+`app/h/[token]/page.tsx` a dvou dotazů v `app/portal-actions.ts` (`getProjectByToken`,
+`submitSurvey`). `/api/public/portal/[token]/transcribe` to dělala správně už dřív.
+Nově sdílený `publicToken()` v `lib/public-token.ts` + test. Ověřeno na dev serveru:
+`/p/nesmysl`, `/p/abc' OR '1'='1` i `/h/nesmysl` vracejí **404**. (Uzavírá otevřený
+problém z AD01/AD11 v `memory/memory.md`.)
+
+**6. Pět veřejných JSON routů adminu čtlo tělo bez stropu — opraveno.**
+`req.json()` bez limitu v `app/api/public/{agent-leads,invoices,leads}/route.ts`
+a dvakrát v `lib/web-leads.ts` (objednávka i kontaktní formulář pro vizeon.cz,
+alteno.cz, prvotka.cz). Workspace má na totéž `readJson()` se 64 kB
+(`lib/ws/intake/http.ts`) — admin tu ochranu neměl. Nový `readJsonLimited()`
+v `lib/security/request-body.ts` (nad už existujícím `readBodyLimited`, který zvládá
+i `chunked` bez `content-length`): 64 kB pro leady a poptávky, u faktur z e-mailu
+strop odvozený z `MAX_PDF_BYTES` (base64 +4/3 a rezerva). Kontrola klíče zůstává
+**před** čtením těla, takže neověřený požadavek tělo nikdy nenačte. Pokryto testem
+včetně chunked případu.
+
+**7. `redactSensitive()` pouštěl pět tvarů tajemství — opraveno.** Filtr, kterým jdou
+hlášení z Claude Code, kontext AI asistenta, paměť projektu a předávací dokument,
+neznal `whsec_…` (podpisová tajemství Stripe/Svix/Resend), `re_…` (Resend),
+`AIza…` (Google), `npg_…` (heslo role na Neonu mimo connection string) ani blok
+`-----BEGIN … PRIVATE KEY-----`. Doplněno včetně testů; PEM se zakrývá celý, ne jen
+hlavička.
+
+**8. Drobnosti, opravené:**
+- `lib/web-leads.ts` neposílal `Vary: Origin` (sdílená cache může vrátit
+  `Allow-Origin` jednoho webu druhému) a povoloval `http://localhost:3000`
+  **i v produkci**. Oboje srovnáno s `lib/security/embed.ts`.
+- `themeCookie` (`lib/ws/theme.ts`) se zapisovala bez `Secure`.
+- Název nahraného PDF v adminu (`lib/invoices.ts`) šel do `Content-Disposition`
+  a do přílohy e-mailu bez očištění a bez horní délky; Workspace to dělá
+  (`lib/ws/money/pdf.ts`). Srovnáno.
+- `Permissions-Policy` doplněna o `bluetooth`, `browsing-topics`, `hid`,
+  `idle-detection`, `local-fonts`, `screen-wake-lock` a `serial`.
+  `publickey-credentials-get` **schválně** zakázané není — zavřelo by cestu
+  k dvoufázovému ověření adminu přes WebAuthn.
+
+### Co se kontrolovalo a je v pořádku
+
+- **Secrets:** `NEXT_PUBLIC_` jsou jen `APP_URL` a `CLERK_PUBLISHABLE_KEY` (obojí
+  veřejné záměrně). Historie gitu **přes všech 311 commitů** čistá — každý nález tvaru
+  klíče je zástupná hodnota z dokumentace (`sk_live_abcdef1234567890`,
+  `pk_live_neexistujiciklic000000`). `.env` nikdy nebyl ve verzích, `.gitignore` drží
+  `.env*`, `*.pem`, `*.key`, `.vercel`.
+- **Závislosti:** `npm audit` **0 zranitelností** i s dev závislostmi. (Dřívější
+  vysoké nálezy u Tailwindu 3 z R-056 už nejsou.)
+- **XSS:** tři jediné `dangerouslySetInnerHTML`/`innerHTML` v repu jsou v pořádku —
+  JSON-LD přes `jsonLdString()` escapuje `<` na `<`, skript motivu je konstanta
+  s nonce, TradingView dostává `JSON.stringify` do `script.innerHTML` (obsah skriptu
+  se neparsuje jako HTML). Widget pro cizí weby skládá hodnoty jen přes
+  `JSON.stringify` s escapem `<`, U+2028/9 a vykresluje je `textContent`.
+- **SQL:** žádné `.unsafe(`, `queryRawUnsafe` ani skládání hodnot do textu dotazu.
+  `ORDER BY` se nedá parametrizovat, proto jde z allowlistu v `lib/admin-table.ts`
+  a směr jen `asc`/`desc`; `WHERE` fragmenty v `lib/admin/*.ts` nesou `$n` a hodnoty
+  v `params`.
+- **Autorizace:** všech 37 routů má guard odpovídající svému účelu — `requireAuth`/
+  `getServerSession` (admin), `requireWorkspace`/`loadBusinessScope` (Workspace, včetně
+  `/api/ws/[business]/zmeny`), `getPortalContext` (klientský prostor), podpis Svix
+  (Clerk, Resend), `constructEvent` (Stripe), `isCronAuthorized`/`verifyCronSecret`
+  (crony, oboje fail-closed a `timingSafeEqual`), klíč v hlavičce (veřejná API).
+  Server actions guardují přes společné `prepare()`/`simple()` helpery — jediná bez
+  guardu je `setPrivacyModeAction`, která nastavuje jen cookie vlastního zařízení.
+- **Oddělení účtů:** `/z/[token]/faktura/[id]` je vzorová ukázka — UUID, rate limit,
+  `resolvePortal`, dotazy s `account_id` i `business_id`, vazba `invoice.jobId !== ref.id`,
+  allowlist stavů, `private, no-store`, `nosniff`, `no-referrer`.
+- **CORS:** nikde `*`, nikde `Allow-Credentials`, origin vždy z allowlistu.
+- **Nahrávání:** PDF podle magických bajtů (`%PDF-`) a velikosti, obrázek novinky
+  podle magických bajtů do tří typů (nikdy SVG), audio podle allowlistu typů a délky.
+- **Přesměrování:** jediné dynamické je na adresu ze Stripe, zbytek jsou konstanty.
+  Starší adresy jdou ze seznamu v `lib/legacy-redirects.mjs` jen na vlastní cesty.
+- **CI:** akce připnuté na SHA, `permissions: contents: read`, gitleaks nad celou
+  historií, `npm audit` týdně i při pushi.
+
+**Opraveno:** body 1, 5, 6, 7, 8 — necommitnuto (admin a `main`, commit jen na požádání;
+v repu zároveň pracuje druhé sezení). Ověřeno `npm test` (103 souborů, 1205 testů,
++4 nové), `npx tsc --noEmit`, `npm run build` bez chyb a varování, a na běžícím dev
+serveru hlavičky i stavy 404 u neplatných tokenů.
+
+**Zůstává** (vše s vlastníkem v `STATE.md` → Otevřené položky): DNS — CAA, DNSSEC,
+SPF na apexu a `rua` v DMARC (Kryštof, WEDOS); rozhodnutí o vstupu do Workspace na dev
+Clerku; rozhodnutí o HSTS preload; dvoufázové ověření adminu; samostatná DB role pro
+běh adminu místo vlastníka tabulek s BYPASSRLS; monitoring chyb a **hlášení porušení CSP**
+(politika je vynucená, ale bez `report-to` se o porušení nikdo nedozví); `WS_KEY_PEPPER`
+ve Vercelu (bez něj se IP v `ws.rate_limits` hashují bez pepře, tedy dohledatelně);
+test obnovy zálohy Neonu; CI proměnná `SITE_URL`.
+
+**Poznámka k opakovanému skenu:** po patnácti dotazech na citlivé cesty začal Vercel
+vracet challenge 403 (`Vercel Security Checkpoint`) a druhý běh skriptu kvůli tomu
+vypadal mnohem hůř (10/7/7) a hlásil chybějící `security.txt`, který na produkci je.
+Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.

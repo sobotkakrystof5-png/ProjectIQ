@@ -27,6 +27,14 @@ DOMAIN="${DOMAIN#https://}"
 DOMAIN="${DOMAIN%%/*}"
 URL="https://${DOMAIN}"
 
+# CAA, DNSSEC, SPF a DMARC patří k doméně, ne k hostu. `www` je typicky CNAME
+# na hosting: dotaz na CAA/DS ho následuje a vrátí záznamy cizí domény (u
+# Vercelu `*.vercel-dns-NNN.com`), takže audit `www` hlásil CAA a DNSSEC jako
+# nastavené, i když na apexu nebyly — a naopak SPF/DMARC jako chybějící, protože
+# leží na apexu. Proto se sekce 6 ptá na apex.
+# `AUDIT_APEX` přebije odhad (víc než dvě úrovně, veřejné sufixy typu `co.uk`).
+APEX="${AUDIT_APEX:-${DOMAIN#www.}}"
+
 PASS=0
 FAIL=0
 WARN=0
@@ -40,6 +48,18 @@ info() { echo "  ${B}[INFO]${N} $1"; }
 head1() { echo; echo "${B}=== $1 ===${N}"; }
 
 need() { command -v "$1" >/dev/null 2>&1; }
+
+# `dig +short` píše chyby resolveru na stdout (";; connection timed out…"), takže
+# `[[ -n "$(dig +short …)" ]]` čte nedostupný resolver jako „záznam existuje“ —
+# kontrola selhávala otevřeně. `dnsq` proto vrací 1, když se lookup nepovedl,
+# a prázdno, když záznam prostě není. `AUDIT_RESOLVER` vybere resolver
+# (výchozí systémový; na stroji bez funkčního resolveru nastav např. 1.1.1.1).
+dnsq() {
+  local type="$1" name="$2" out
+  out="$(dig +short ${AUDIT_RESOLVER:+@"$AUDIT_RESOLVER"} "$type" "$name" 2>/dev/null)" || return 1
+  grep -q '^;;' <<<"$out" && return 1
+  printf '%s' "$out"
+}
 
 # `timeout` is not part of macOS by default. Prefer GNU coreutils when present,
 # but keep the checks usable on a stock Mac where stdin EOF bounds s_client.
@@ -304,14 +324,38 @@ fi
 head1 "6. DNS a e-mail"
 
 if need dig; then
-  CAA="$(dig +short CAA "$DOMAIN" 2>/dev/null)"
-  [[ -n "$CAA" ]] && ok "CAA záznam nastaven" || warn "Chybí CAA záznam"
+  info "DNS se čte pro apex ${APEX} (host: ${DOMAIN}); jiný apex přebij AUDIT_APEX="
 
-  DS="$(dig +short DS "$DOMAIN" 2>/dev/null)"
-  [[ -n "$DS" ]] && ok "DNSSEC (DS záznam) nalezen" || warn "DNSSEC není zapnuté"
+  # Jeden dotaz navíc: bez funkčního resolveru nemá smysl tvrdit nic.
+  if ! dnsq NS "$APEX" >/dev/null; then
+    bad "DNS dotazy neprošly (resolver nedostupný) — CAA, DNSSEC, SPF ani DMARC nelze posoudit; zkus AUDIT_RESOLVER=1.1.1.1"
+  else
 
-  SPF="$(dig +short TXT "$DOMAIN" 2>/dev/null | grep -i 'v=spf1')"
-  if [[ -n "$SPF" ]]; then
+  # CNAME na apexu by znamenal, že CAA i DS odpovídají za cíl aliasu, ne za nás.
+  APEX_CNAME="$(dnsq CNAME "$APEX" || true)"
+  [[ -n "$APEX_CNAME" ]] && warn "${APEX} je CNAME na ${APEX_CNAME%.} — CAA a DNSSEC níž patří cíli aliasu, ne této doméně"
+
+  if CAA="$(dnsq CAA "$APEX")"; then
+    [[ -n "$CAA" ]] && ok "CAA záznam nastaven (${APEX})" || warn "Chybí CAA záznam pro ${APEX} (kdokoli smí vydat certifikát)"
+  else
+    warn "CAA pro ${APEX} nelze zjistit (dotaz selhal)"
+  fi
+
+  # DS vydává nadřazená zóna; autoritativní server domény ho nemá.
+  if DS="$(dnsq DS "$APEX")"; then
+    [[ -n "$DS" ]] && ok "DNSSEC (DS záznam) nalezen (${APEX})" || warn "DNSSEC není zapnuté pro ${APEX}"
+  else
+    warn "DNSSEC pro ${APEX} nelze zjistit (dotaz selhal)"
+  fi
+
+  if APEX_TXT="$(dnsq TXT "$APEX")"; then
+    SPF="$(grep -i 'v=spf1' <<<"$APEX_TXT" || true)"
+  else
+    SPF="LOOKUP_FAILED"
+  fi
+  if [[ "$SPF" == "LOOKUP_FAILED" ]]; then
+    warn "SPF pro ${APEX} nelze zjistit (dotaz selhal)"
+  elif [[ -n "$SPF" ]]; then
     if [[ "$SPF" == *"-all"* ]]; then
       ok "SPF s tvrdým -all"
     elif [[ "$SPF" == *"~all"* ]]; then
@@ -320,20 +364,32 @@ if need dig; then
       warn "SPF bez all mechanismu: ${SPF}"
     fi
   else
-    warn "Chybí SPF záznam (kdokoliv může spoofovat e-maily z domény)"
+    warn "Chybí SPF záznam pro ${APEX} (kdokoli může podvrhnout e-mail z domény)"
   fi
 
-  DMARC="$(dig +short TXT "_dmarc.${DOMAIN}" 2>/dev/null | grep -i 'v=DMARC1')"
-  if [[ -n "$DMARC" ]]; then
+  if DMARC_TXT="$(dnsq TXT "_dmarc.${APEX}")"; then
+    DMARC="$(grep -i 'v=DMARC1' <<<"$DMARC_TXT" || true)"
+  else
+    DMARC="LOOKUP_FAILED"
+  fi
+  if [[ "$DMARC" == "LOOKUP_FAILED" ]]; then
+    warn "DMARC pro _dmarc.${APEX} nelze zjistit (dotaz selhal)"
+  elif [[ -n "$DMARC" ]]; then
     if [[ "$DMARC" == *"p=reject"* ]]; then
       ok "DMARC p=reject"
     elif [[ "$DMARC" == *"p=quarantine"* ]]; then
       warn "DMARC p=quarantine, cílem je p=reject"
     else
-      warn "DMARC p=none, jen monitoruje"
+      if [[ "$DMARC" == *"rua="* ]]; then
+        warn "DMARC p=none, jen monitoruje (reporty chodí, cílem je p=reject)"
+      else
+        warn "DMARC p=none bez rua= — nic neblokuje a reporty nikam nechodí"
+      fi
     fi
   else
-    warn "Chybí DMARC záznam"
+    warn "Chybí DMARC záznam pro _dmarc.${APEX}"
+  fi
+
   fi
 else
   info "dig není nainstalováno, DNS testy přeskočeny"

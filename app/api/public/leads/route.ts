@@ -3,7 +3,11 @@ import { revalidatePath } from 'next/cache'
 import { sql } from '@/lib/db'
 import { verifyApiKey, getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
+import { readJsonLimited } from '@/lib/security/request-body'
 import { n8nLeadSchema } from '@/types/leads'
+
+// Lead z chatbota je krátký text.
+const MAX_BODY_BYTES = 64 * 1024
 
 const ENDPOINT = 'n8n_lead'
 const RATE_LIMIT_WINDOW_MINUTES = 1
@@ -25,12 +29,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return errorResponse(401, 'Neplatný API klíč', 'UNAUTHORIZED')
   }
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return errorResponse(400, 'Neplatné JSON tělo požadavku', 'INVALID_BODY')
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too-large'
+      ? errorResponse(413, 'Tělo požadavku je příliš velké', 'TOO_LARGE')
+      : errorResponse(400, 'Neplatné JSON tělo požadavku', 'INVALID_BODY')
   }
+  const body: unknown = read.value
 
   const parsed = n8nLeadSchema.safeParse(body)
   if (!parsed.success) {

@@ -30,3 +30,24 @@ export async function readBodyLimited(
   }
   return { ok: true, bytes }
 }
+
+/**
+ * Tělo jako JSON s pevným stropem. `req.json()` přečte, co pošle klient — bez
+ * stropu je veřejná routa cesta k vyčerpání paměti funkce. Workspace to má přes
+ * `readJson()` v `lib/ws/intake/http.ts` (64 kB); tohle je totéž pro veřejná
+ * API adminu, aby se limit nepsal na každé routě znovu.
+ *
+ * `'too-large'` = tělo přes limit (413), `'invalid'` = není to JSON (400).
+ */
+export async function readJsonLimited(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; value: unknown } | { ok: false; reason: 'too-large' | 'invalid' }> {
+  const bounded = await readBodyLimited(request, maxBytes)
+  if (!bounded.ok) return { ok: false, reason: 'too-large' }
+  try {
+    return { ok: true, value: JSON.parse(Buffer.from(bounded.bytes).toString('utf8')) as unknown }
+  } catch {
+    return { ok: false, reason: 'invalid' }
+  }
+}

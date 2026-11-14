@@ -30,6 +30,11 @@ describe('redactSensitive', () => {
       'Token ghp_abcdefghijklmnopqrstuvwxyz0123 jsme otočili.',
       'zk_agent_Ab12Cd34Ef_abcdefghijklmnopqrstuvwxyz012345 je v prostředí.',
       'AWS klíč AKIAABCDEFGHIJKLMNOP je venku.',
+      // Doplněno auditem 2026-11-14: tyhle tvary filtr dřív pustil dál.
+      'Podpis webhooku whsec_AbCdEf0123456789XyZ nastav ve Vercelu.',
+      'Resend klíč re_AbCdEf0123456789XyZ už neplatí.',
+      'Maps klíč AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz0123456 je v konfiguraci.',
+      'Heslo role je npg_AbCdEf0123456789 a nikomu ho nedávej.',
     ]
     for (const sample of samples) {
       const r = redactSensitive(sample)
@@ -58,6 +63,19 @@ describe('redactSensitive', () => {
     expect(r.text).not.toContain('DATABASE_URL')
     expect(r.text).not.toContain('STRIPE_SECRET_KEY')
     expect(r.text).toContain('Hotovo.')
+  })
+
+  it('zakryje celý blok soukromého klíče, ne jen hlavičku', () => {
+    const pem = [
+      '-----BEGIN RSA PRIVATE KEY-----',
+      'MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu',
+      '-----END RSA PRIVATE KEY-----',
+    ].join('\n')
+    const r = redactSensitive(`Klíč serveru:\n${pem}\nTím to je.`)
+    expect(r.found).toBe(true)
+    expect(r.text).not.toContain('MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu')
+    expect(r.text).not.toContain('BEGIN RSA PRIVATE KEY')
+    expect(r.text).toContain('Tím to je.')
   })
 
   it('zakryje cesty v domovské složce', () => {

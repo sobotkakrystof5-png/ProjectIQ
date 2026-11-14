@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { FeedbackBlock } from '@/components/FeedbackBlock'
 import { BookingCTA } from '@/components/BookingCTA'
 import { ClientRequestBlock } from '@/components/ClientRequestBlock'
+import { publicToken } from '@/lib/public-token'
 import { isTranscriptionConfigured } from '@/lib/transcribe'
 import { formatDate } from '@/lib/utils'
 import { ACTIVITY_KIND_LABELS, buildTimeline, type TimelineActivity } from '@/lib/project-activity'
@@ -19,10 +20,13 @@ interface PageProps {
 
 export default async function ClientPortalPage(props: PageProps) {
   const params = await props.params
+  // `public_token` je uuid: neplatný tvar je 404, ne spadlý dotaz (22P02).
+  const token = publicToken(params.token)
+  if (!token) notFound()
   const projectRows = await sql`
     SELECT id, client_name, description, focus, status, progress, deadline, updated_at, project_url
     FROM projects
-    WHERE public_token = ${params.token}
+    WHERE public_token = ${token}
     LIMIT 1
   `
 

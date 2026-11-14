@@ -20,6 +20,13 @@
 > pokus** (135 s, `fra1`) — tentokrát žádná potíž s cache. Veřejné adresy se chovají, jak mají;
 > **za přihlášením okem nikdo nic neviděl** a to, že 110–112 opravdu běžely, zvenku prokázat
 > nejde.
+> **Bezpečnost:** týž den proběhl **úplný audit od A do Z** (skilly `web-security-audit`
+> a `web-security-review`) — živý sken produkce **30 prošlo / 3 varování / 0 chyb**, code
+> review celého stromu, 0 zranitelností v závislostech a čistá historie gitu přes 311
+> commitů. Opraveno osm věcí v kódu a v auditním skriptu; **nejvážnější zůstává mimo kód:**
+> apex `zakaziq.cz` nemá SPF, DMARC je `p=none` bez reportů, CAA a DNSSEC chybí a HSTS
+> `preload` je v hlavičce, ale doména na seznamu není. Detail `.claude/security/AUDIT-LOG.md`
+> → 2026-11-14, stav `STATE.md`, rozhodnutí o skriptu DECISIONS #028.
 >
 > Starší záznamy: changelog `archiv/2026-11.md` a `archiv/2026-10.md`, průběh modernizace
 > `docs/admin/MODERNIZACE-ADMIN-PLAN.md` → sekce 6, technický popis `docs/admin/AGENTS-ADMIN.md`.
@@ -1068,7 +1075,10 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
 - [ ] **AD07 v prohlížeči neověřený:** 23 adres vrací přes podepsanou session 200 a server nehlásí chybu, ale okem je nikdo neviděl. Projít na 390 / 768 / 1280 / 1440 px: řazení kliknutím do hlavičky (šipka, aria-sort), stránkování, **karty místo tabulky pod 640 px**, nové dialogy u Dokončených a Nákladů (dřív se upravovalo v řádku), hledání ve Fakturách (Enter odešle formulář), waitlist u startupového projektu a Hovory — hlavně rozbalení kontaktu, kde se poznámky teprve dotahují. Drobnost k ověření: na `?page=2` bez řádků se ukáže prázdný stav obrazovky, ne „na téhle stránce nic není" · od 2026-11-11
 - [ ] **AD05 v prohlížeči neověřený:** stránky vracejí 200 přes podepsanou session, ale okem je nikdo neviděl. Projít na 390 / 768 / 1280 / 1440 px: nové šířky (Dokončené a Hovory bez vodorovného posuvníku, Dnes a Kalendář na 1440), hlavičku `PageHeader` (28 px na telefonu, 36 px výš) a nové odznaky — hlavně jestli „Hotovo" a „V řešení" ve stejném tónu `info` nejsou v seznamu zakázek matoucí a jestli `signal` (amber) u „Nová" a „Čeká na schválení" neruší · od 2026-11-11
 - [ ] **AD04 v prohlížeči neověřený:** vzhled sedí podle zkompilovaného CSS a hlaviček, ale okem ho nikdo neviděl (agent nemá heslo adminu, Chrome není připojený). Projít `/dashboard`, `/login` a `/p/[token]` na 390 / 768 / 1280 / 1440 px: ⌘K, zvonek, menu, **toasty a dialogy** (nově se portálují do `AdminRoot`, ne do `<body>`) a konzoli — nesmí hlásit blokaci CSP. Stačí `npm run dev` a přihlášení · od 2026-11-11
-- [ ] **`/p/<nesmyslný token>` vrací lokálně 500 místo 404:** `public_token` je ve `scripts/admin-base-schema.sql` typu `uuid`, takže dotaz spadne na `22P02`. Podle `AUDIT-LOG` 2026-11-04 vrací produkce 404 — základní schéma z AD00 je rekonstrukce tabulek založených ručně v Neon konzoli a **v tomhle bodě se zřejmě liší od produkce**. Ověřit typ sloupce na produkční DB a buď opravit `admin-base-schema.sql`, nebo ošetřit neplatné UUID v `app/p/[token]` (stejná třída chyby jako `/dashboard/[id]` v AD01) · od 2026-11-11
+- [x] ~~**`/p/<nesmyslný token>` vrací lokálně 500 místo 404**~~ — vyřešeno auditem
+  2026-11-14. Tvar tokenu se ověří `publicToken()` (`lib/public-token.ts`), než se dostane
+  do dotazu, takže na typu sloupce už to nestojí; platí pro `/p`, `/h` i obě místa
+  v `app/portal-actions.ts`. Ověřeno na dev serveru (404 pro nesmysl i pro `abc' OR '1'='1`).
 - [ ] **Výpadek 2026-11-04 — dohledat:** ověřit, jestli během výpadku (nejpozději 10:38–14:35) nepropadla poptávka z vizeon.cz nebo alteno.cz (veřejné endpointy vracely chybu); přihlášený `/hub` po opravě ověřit okem · `.claude/security/AUDIT-LOG.md` · od 2026-11-04
 - [ ] **Landing — zbytek auditu R-078:** (1) na telefonu 390 px je v Jak to funguje úsek asi 3 100 px skoro bez obsahu (velké mezery mezi kroky), (2) žádná fotka, (3) ozdoby: tenké a čárkované čáry, stíny v klidu, modrá záře v hero, plovoucí navigace ve tvaru pilulky, (4) 21 velikostí písma a texty pod 13 px, (5) karty Funkce se stejným rámečkem · `components/marketing/` · od 2026-11-03
 - [ ] **Vercel Hobby a komerční provoz:** podle podmínek Vercelu je Hobby jen pro nekomerční osobní použití; placený Workspace potřebuje Pro. Pro zároveň dovolí častější crony (připomínky 2 h předem, rychlejší fronta e-mailů, R-006, R-050) a Observability. Rozhodnutí a platba: Kryštof · před spuštěním · od 2026-11-03
@@ -1159,6 +1169,45 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
   Kryštofově slovu, první skutečná zkouška je denní cron nebo otevření adminu.
 - **chore** **Za přihlášením okem nikdo nic neviděl** a doprovodné kroky po migracích
   (backfill kontaktů, `lead_pending`, duplicitní příjmy) zůstávají neodškrtnuté.
+
+### 2026-11-14 (bezpečnostní audit od A do Z)
+- **fix** **Auditní skript hlásil DNS fail-open.** `dig +short` píše chyby resolveru na
+  stdout, takže `[[ -n "$(dig +short CAA …)" ]]` čtelo `;; connection timed out` jako
+  „záznam existuje" — kontrola při každé poruše DNS tvrdila OK. Druhá vada: CAA, DNSSEC,
+  SPF a DMARC se čtou pro **apex**, ne pro host, na který se audit pustí (`www` je CNAME na
+  Vercel, dotaz na CAA alias následuje). Dohromady dva falešně pozitivní a dva falešně
+  negativní řádky — a `STATE.md` podle nich nesl špatný stav DNS. Soubory:
+  `.claude/security/security-check.sh`, DECISIONS #028.
+- **fix** **Čtyři veřejné odkazy adminu vracely 500 místo 404.** `projects.public_token`
+  i `survey_token` jsou `uuid`, ale token z adresy šel do dotazu neověřený → Postgres
+  `22P02` → nezachycená chyba, kterou umí vyvolat kdokoli bez přihlášení. Nový
+  `publicToken()` + test. Soubory: `lib/public-token.ts`, `app/p/[token]/page.tsx`,
+  `app/h/[token]/page.tsx`, `app/portal-actions.ts`. Ověřeno na dev serveru.
+- **fix** **Pět veřejných JSON routů adminu čtlo tělo bez stropu.** Workspace má na totéž
+  64 kB (`lib/ws/intake/http.ts`), admin ochranu neměl. Nový `readJsonLimited()` nad už
+  existujícím `readBodyLimited` (zvládá i `chunked` bez `content-length`); ověření klíče
+  zůstává **před** čtením těla. Soubory: `lib/security/request-body.ts`,
+  `app/api/public/{agent-leads,invoices,leads}/route.ts`, `lib/web-leads.ts` + testy.
+- **fix** **`redactSensitive()` pouštěl pět tvarů tajemství** — `whsec_` (podpisy
+  Stripe/Svix/Resend), `re_` (Resend), `AIza` (Google), `npg_` (heslo role na Neonu)
+  a blok `-----BEGIN … PRIVATE KEY-----`. Filtrem jde kontext AI asistenta, paměť projektu,
+  hlášení z Claude Code i předávací dokument. Soubory: `lib/project-activity.ts` + testy.
+- **fix** Drobnosti: `lib/web-leads.ts` neposílal `Vary: Origin` a povoloval
+  `http://localhost:3000` i v produkci; cookie motivu se zapisovala bez `Secure`
+  (`lib/ws/theme.ts`); název nahraného PDF v adminu šel do `Content-Disposition`
+  a do přílohy e-mailu bez očištění a délky (`lib/invoices.ts`, Workspace to dělá);
+  `Permissions-Policy` doplněna o `bluetooth`, `browsing-topics`, `hid`,
+  `idle-detection`, `local-fonts`, `screen-wake-lock`, `serial`
+  (`publickey-credentials-get` schválně ne — zavřelo by WebAuthn pro budoucí 2FA).
+- **docs** Zjištěný stav mimo kód (vlastník Kryštof, v `STATE.md` → Otevřené položky):
+  apex **bez SPF** a DMARC `p=none` **bez `rua=`**, přitom doména odesílá z apexu i přijímá
+  (MX Resendu) → podvrhnout e-mail jménem `@zakaziq.cz` jde a nikdo se o tom nedozví;
+  **CAA a DNSSEC chybí**; **HSTS `preload`** je v hlavičce, ale doména na seznamu není
+  (uzavírá otevřenou otázku u DECISIONS #005); `/w/registrace` je veřejně dosažitelná
+  na **dev** instanci Clerku (potvrzeno zvenku).
+- **chore** Ověření: `npm test` 103 souborů / **1205 testů** (+4 nové, 3 přeskočené),
+  `npx tsc --noEmit`, `npm run build` bez chyb a varování, `node scripts/sync-agent-context.mjs --check`.
+  Zápisy: `.claude/security/{AUDIT-LOG,STATE,DECISIONS}.md` (CSP se nemění, do CSP-LOG nic).
 
 ### 2026-11-14 (AD18 — dokončení sjednocení a ověření)
 - **feat** **AD18 hotové, modernizace adminu tím končí.** Pět commitů, **bez migrace**.

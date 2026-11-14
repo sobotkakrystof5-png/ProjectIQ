@@ -153,7 +153,10 @@ export async function readPdfUpload(file: File): Promise<{ pdf: InvoicePdf } | {
   return {
     pdf: {
       base64: buffer.toString('base64'),
-      filename: file.name || 'faktura.pdf',
+      // Název přijde od klienta. Chodí do Content-Disposition a do přílohy
+      // e-mailu, proto bez konců řádků a lomítek a s horní délkou — stejně
+      // jako `readPdf()` ve Workspace (lib/ws/money/pdf.ts).
+      filename: file.name.replace(/[\r\n/\\]/g, '_').slice(0, 120) || 'faktura.pdf',
       size: buffer.byteLength,
     },
   }

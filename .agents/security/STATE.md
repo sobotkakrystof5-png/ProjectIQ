@@ -3,7 +3,7 @@
 > Současný stav. Přepisuje se — historie je v ostatních souborech.
 > Čti na začátku každého sezení, které sahá na hlavičky, CSP, proxy, API nebo vstupy.
 
-**Poslední aktualizace:** 2026-11-13, nasazení AD00–AD13 na produkci (`7a15ad2`): vynucená CSP, COOP/CORP, HSTS, `security.txt` a chybějící `x-powered-by` jsou poprvé ověřené na živém `www.zakaziq.cz`; s adminem se na produkci dostal i Workspace, landing page a klientský prostor. Předchozí: 2026-11-03, review před spuštěním (AUDIT-LOG): Clerk `authorizedParties`, session adminu 12 h, `/r` jen po Checkoutu, předání do Claude Code v režimu plánu, CI s testy
+**Poslední aktualizace:** 2026-11-14, **úplný audit od A do Z** (AUDIT-LOG 2026-11-14): živý sken produkce 30 prošlo / 3 varování / **0 chyb**, code review celého stromu (37 routů, 47 souborů server actions, CSP, CORS, nahrávání, SQL, rate limity, CI, 311 commitů historie). Opraveno: fail-open kontrola DNS v auditním skriptu (DECISIONS #028), 500 místo 404 na čtyřech veřejných odkazech adminu, chybějící strop těla na pěti veřejných JSON routech, pět tvarů tajemství, které pouštěl `redactSensitive()`, `Vary: Origin` a localhost v CORS leadů, `Secure` u cookie motivu, očištění názvu nahraného PDF, širší `Permissions-Policy`. **Skutečný stav DNS je horší, než tu dřív stálo** — viz sekce DNS. Předchozí: 2026-11-13 nasazení modernizace (celá AD00–AD18 je na produkci od 2026-11-14, `8210f04`)
 
 ## Projekt
 
@@ -37,12 +37,12 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 
 | Hlavička | Stav | Poznámka |
 |---|---|---|
-| Strict-Transport-Security | ✅ `max-age=63072000; includeSubDomains; preload` | `preload` zděděný, DECISIONS #005 |
+| Strict-Transport-Security | ✅ `max-age=63072000; includeSubDomains; preload` | `preload` zděděný (DECISIONS #005), ale **doména na seznamu není** — `hstspreload.org` vrací pro apex i www `status: unknown` (ověřeno 2026-11-14), takže token je bez účinku |
 | Content-Security-Policy | ✅ vynucená pro všechny cesty; profily `admin` a `workspace` | DECISIONS #003, #007, #015; živé ověření čeká na Preview |
 | X-Content-Type-Options | ✅ nosniff | |
 | X-Frame-Options | ✅ DENY | mimo `/r/*`, `/embed/*`, `/api/public/v1/*`; PDF faktury `SAMEORIGIN` (DECISIONS #004) |
 | Referrer-Policy | ✅ strict-origin-when-cross-origin | |
-| Permissions-Policy | ✅ vše zakázané (kamera, mikrofon, poloha, platby, USB…); výjimka `microphone=(self)` jen na `/p/*` a `/klient/*` | #018 |
+| Permissions-Policy | ✅ vše zakázané (kamera, mikrofon, poloha, platby, USB, Bluetooth, serial, HID, idle-detection, screen-wake-lock, local-fonts, browsing-topics…); výjimka `microphone=(self)` jen na `/p/*` a `/klient/*` | #018; `publickey-credentials-get` schválně **není** zakázané — zavřelo by WebAuthn pro budoucí 2FA adminu (audit 2026-11-14) |
 | Cross-Origin-Opener-Policy | ✅ same-origin | Clerk popup OAuth by ho porušil — používat přesměrování (S07) |
 | Cross-Origin-Resource-Policy | ✅ same-origin | `cross-origin` pro `/embed/*`, `/api/public/v1/*` a obrázek novinky `/z/novinky/[id]/obrazek` (DECISIONS #013) |
 | X-XSS-Protection | ✅ 0 | |
@@ -69,18 +69,32 @@ Známé výjimky: `style-src 'unsafe-inline'` (DECISIONS #002).
 
 ## DNS a pošta (`zakaziq.cz`)
 
-Doménu spravuje Kryštof (registrátor: doplnit). Vercel API potvrzuje `zakaziq.cz` a `www.zakaziq.cz` jako ověřené domény projektu `project-iq`; produkční nasazení je stále starší `main` (SHA `d9484001`). Živý audit `www.zakaziq.cz` 2026-10-17: HTTPS 308/200, TLS 1.3 a platný certifikát ověřeny; produkce postrádá CSP, COOP a CORP, posílá `x-powered-by: next.js`, SPF a DMARC chybí. Audit hlásil nedostupný `security.txt`, ale soubor je v repu i Preview deploymentu; HTTP odpověď vyžaduje ověření po odblokování Vercel challenge. Přímé DNS dotazy pro apex nevrátily DS/CAA/TXT. Po skenu Vercel dočasně vracel challenge 403; neopakovat hromadné požadavky. Detail v `AUDIT-LOG.md`.
+Doménu spravuje Kryštof, nameservery WEDOS (`ns.wedos.{net,cz,eu,com}`). **Ověřeno
+2026-11-14** přes 1.1.1.1, 8.8.8.8, autoritativní `ns.wedos.net` a parent `a.ns.nic.cz`.
 
-| Položka | Stav | Cíl |
+Dřívější záznamy tady byly nepřesné: audit se pouštěl na `www.zakaziq.cz`, což je CNAME na
+`bfa873afb15bb4ef.vercel-dns-017.com`. Dotaz na CAA alias následuje, takže se jako naše CAA
+vykazovala Vercelovská, a SPF s DMARC vycházely jako chybějící, protože leží na apexu.
+Skript to od DECISIONS #028 dělá správně a pouští se s `AUDIT_RESOLVER=1.1.1.1`, když
+systémový resolver nejede.
+
+| Položka | Stav 2026-11-14 | Cíl |
 |---|---|---|
-| DNSSEC | ⚠️ apex dotaz DS bez záznamu; Vercel domény jsou ověřené | ověřit správu DNS a zapnout DNSSEC |
-| CAA | ⚠️ apex dotaz CAA bez záznamu; audit `www` ukázal CAA odpověď | potvrdit CAA pro apex a potřebné CA |
-| SPF | ❓ | Resend posílá ze subdomény (`send.zakaziq.cz`): MX `send` → `feedback-smtp.eu-west-1.amazonses.com` (10) a TXT `send` = `v=spf1 include:amazonses.com ~all` podle hodnot z Resend dashboardu; kořen domény bez pošty `v=spf1 -all`. Postup `docs/workspace/SETUP.md` → E-maily (S15) |
-| DKIM | ❓ | záznam `resend._domainkey` z Resend dashboardu |
-| DMARC | ❓ | TXT `_dmarc`: začít `v=DMARC1; p=none; rua=mailto:info@vizeon.cz` → po 2–4 týdnech čistých reportů `p=quarantine` → `p=reject` |
-| MX | ❓ | jen pokud bude doména přijímat poštu (Reply-To jde na e-mail klienta, takže nemusí) |
+| DNSSEC | ❌ parent `.cz` nemá DS | zapnout u WEDOS |
+| CAA | ❌ apex bez záznamu — certifikát smí vydat kdokoli | `0 issue "letsencrypt.org"` (+ CA Vercelu) |
+| SPF apex | ❌ **chybí**, přitom doména odesílá i přijímá | `v=spf1 include:amazonses.com -all`, nebo hodnotu z Resend dashboardu podle jejich dnešní MTA |
+| SPF `send` | ✅ `v=spf1 ip4:52.3.252.119 ip4:44.222.39.36 ip4:199.249.231.0/24 ~all` | ponechat podle Resendu |
+| DKIM | ✅ `resend._domainkey` existuje (1024b RSA) | ponechat |
+| DMARC | ⚠️ `v=DMARC1; p=none;` **bez `rua=`** — nic neblokuje a reporty nikam nechodí | doplnit `rua=mailto:info@vizeon.cz`, po 2–4 týdnech čistých reportů `p=quarantine` → `p=reject` |
+| MX | ✅ apex `receive-euw1.forge.rmta.net`, `send` `feedback.forge.rmta.net` (Resend) | doména přijímá poštu, takže apex SPF je povinný |
 
-Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odesílací adresa Workspace `rezervace@zakaziq.cz` (`WS_EMAIL_FROM`); dokud není nastavená, e-maily čekají ve frontě a nic neodchází (S15).
+**Proč to je nejvážnější otevřená věc:** Workspace odesílá z adresy na **apexu**
+(`WS_EMAIL_FROM`, např. `rezervace@zakaziq.cz`). Legitimní pošta projde díky DKIM
+`d=zakaziq.cz` a relaxed alignmentu, ale apex bez SPF a DMARC na `p=none` bez reportů
+znamená, že **podvrhnout e-mail jménem `@zakaziq.cz` jde a nikdo se o tom nedozví**.
+Threat model výše to má jako nejhorší případ: phishing jménem byznysů klientů.
+
+Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar a zjištěný stav.
 
 ## Aplikace
 
@@ -98,18 +112,25 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 - Předání zadání do Claude Code (KP09, úroveň 2): příkaz pro terminál s textem klienta v dočasném souboru přes heredoc s náhodným oddělovačem, bez `$(…)`; test ve skutečném shellu (bash 3.2) potvrdil, že text nic nespustí. Claude Code se spouští s `--permission-mode plan` (od 2026-11-03), takže pokyny vložené do zadání nic nezmění bez schválení plánu člověkem. Plně automatické spuštění z textu klienta se nedělá
 - Poptávky z webů do adminu (AD02, R-088): jedna cesta `lib/web-leads.ts` pro tři zdroje (vizeon.cz, alteno.cz, prvotka.cz). **Každý zdroj má vlastní klíč a vlastní okno rate limitu** (`<zdroj>_booking`, `<zdroj>_lead`) — uniklý klíč z jednoho repa nepustí poptávky za ostatní weby a weby si limit neberou navzájem. Klíče: `VIZEON_API_KEY`, `ALTENO_API_KEY` (objednávka s termínem, `x-api-key`, CORS allowlist podle domény), `ALTENO_LEAD_WEBHOOK_SECRET`, `PRVOTKA_LEAD_WEBHOOK_SECRET` (kontaktní formulář, `x-<zdroj>-lead-signature`, bez CORS hlaviček). Porovnání klíče `timingSafeEqual`, klíč se nikdy neloguje. Zod včetně horních délek u všech polí (doplněno v AD02), tělo jen JSON, SQL vázanými parametry. Staré adresy `/alteno/*` a `/dashboard/vizeon` přesměrovává `next.config.mjs` ze seznamu `lib/legacy-redirects.mjs` — jen na vlastní cesty pod `/dashboard`, ověřeno proti pokusu o odkaz mimo doménu
 - AI asistent adminu (AD14, DECISIONS #025): `/api/ai-assistant` i server actions v `app/ai-actions.ts` jen za přihlášením, tělo přes Zod, **systémový prompt a kontext výhradně ze serveru** (`lib/ai/prompts.ts`, `lib/ai/context.ts`) — dřív šly z prohlížeče bez kontroly. Kontext nečte `pdf_data`, přihlašovací tabulky, `project_agent_keys`, env ani schéma `ws`; je zarámovaný `<kontext>` a prošlý `redactSensitive()`, stejně jako věta uživatele. Model **nekoná**: vrací typovaný návrh (`z.discriminatedUnion`, žádné `tools`), ten leží v `ai_suggestions` (migrace 110) a provede ho až klik člověka — prohlížeč posílá jen `id` ověřené jako UUID, server řádek znovu parsuje a spustí whitelist executorů volajících tytéž server actions jako lidský formulář. Asistent neodesílá (jen skládá `mailto:`/`sms:`/`wa.me`), nic nemaže, nevystavuje faktury ani nezapisuje příjmy a není na žádné veřejné routě. Rate limit 12/min, `max_tokens` a `maxDuration=60`. Názvy modelů jen v `lib/ai/models.ts` (haiku/sonnet místo opusu). Přijaté riziko: vložená instrukce v textech psaných klientem — mitigace je klik člověka, whitelist a viditelný příjemce zprávy v panelu
+- Veřejné odkazy adminu (audit 2026-11-14): token z `/p/[token]` a `/h/[token]` projde `publicToken()` (`lib/public-token.ts`), než se dostane do dotazu — `public_token` i `survey_token` jsou `uuid` a nesmyslná hodnota dřív skončila na Postgres `22P02` se stavem 500. Platí i pro `getProjectByToken()` a `submitSurvey()` v `app/portal-actions.ts`; `/api/public/portal/[token]/transcribe` to dělala správně už dřív
+- Strop těla veřejných vstupů: Workspace `readJson()` 64 kB (`lib/ws/intake/http.ts`), admin od auditu 2026-11-14 `readJsonLimited()` (`lib/security/request-body.ts`) — 64 kB pro `/api/public/{agent-leads,leads}` a oba handlery v `lib/web-leads.ts`, u `/api/public/invoices` strop odvozený z `MAX_PDF_BYTES` (base64 nese PDF). Limit platí i pro `chunked` tělo bez `content-length`; ověření klíče je vždy **před** čtením těla
+- Zakrývání tajemství (`redactSensitive()` v `lib/project-activity.ts`) zná JWT, `Bearer`, `sk-`, `sk|pk|rk_live|test_`, `zk_agent_`, `gh[pousr]_`, `xox[abprs]-`, `AKIA`, connection stringy, řádky `.env`, cesty v domovské složce a od auditu 2026-11-14 i `whsec_`, `re_`, `AIza`, `npg_` a celý blok `-----BEGIN … PRIVATE KEY-----`. Jde jím kontext asistenta, paměť projektu, hlášení z Claude Code i předávací dokument
 - Captcha: žádná, honeypot `website` + rate limit (DECISIONS #010). Turnstile při prvním spamu
 - Secrets: jen env Vercelu, `.env*` v `.gitignore` (kromě vzorů), gitleaks v CI. Historie gitu 2026-10-08 čistá (90 commitů)
 - Objednávací stránka `/r/[slug]` a widget podle slugu jen pro účet, který dokončil Checkout (aspoň jeden řádek `ws.subscriptions`, migrace 099, R-077); po skončeném předplatném poptávky přijímá dál (B5)
 - Session: NextAuth JWT (admin) s platností 12 h (`lib/auth.ts`, od 2026-11-03, dřív výchozích 30 dní), zámek 5 chybných pokusů za 15 min na IP, bez dvoufázového ověření (otevřená položka). Clerk v produkci přijímá jen session tokeny pro `NEXT_PUBLIC_APP_URL` (`authorizedParties`, `lib/security/clerk.ts`, DECISIONS #021), Clerk (Workspace pod `/w` a `/api/ws`, klientský prostor pod `/klient` a `/api/klient` — proxy Clerk jinde nespouští). Cookie `__session` Clerku není HttpOnly (DECISIONS #009)
 - Co je po nasazení 2026-11-13 veřejně dosažitelné (ověřeno zvenku, bez přihlášení): landing `/`, `/login`, `/podminky`, `/robots.txt` a `/.well-known/security.txt` vracejí 200; `/h/<token>` a `/p/<token>` 404 (ne 500); `POST /api/public/prvotka-leads` 401 (fail-closed, klíč ve Vercelu zatím není); `/w/prihlaseni`, `/w/registrace` a `/klient/prihlaseni` 200 s `X-Robots-Tag: noindex, nofollow`; `/r/test` 404. Hlavičky na `/` i `/login`: vynucená CSP s nonce, HSTS 2 roky s `preload`, COOP a CORP `same-origin`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, bez `x-powered-by`. **Registrace do Workspace přitom mluví s dev instancí Clerku** (`connect-src https://ultimate-chimp-4657.clerk.accounts.dev`) a se sandboxem Stripe — viz Otevřené položky
+- Závislosti: `npm audit` **0 zranitelností** i s dev závislostmi (2026-11-14). Historie gitu čistá přes všech **311 commitů** — každý nález tvaru klíče je zástupná hodnota z dokumentace; `.env` nikdy nebyl ve verzích
 - Zálohy: Neon point-in-time restore (podle plánu Neonu) — test obnovy nikdy neproběhl
 
 ## Otevřené položky
 
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
-| Vstup do Workspace je od nasazení veřejně dosažitelný | landing page vede tlačítkem na `/w/registrace` (200) a ta běží na **dev instanci Clerku** a sandboxu Stripe. Cizí člověk si může založit účet, který přepnutí na produkční Clerk nepřežije, a projít „platbou", která nic nestrhne. Buď vstup do Workspace schovat, dokud nebude Clerk i Stripe v produkčním režimu, nebo to vědomě nechat | Kryštof (rozhodnutí) | hned |
+| Vstup do Workspace je veřejně dosažitelný na dev Clerku | **potvrzeno zvenku 2026-11-14:** `/w/registrace` vrací 200 a načítá `ultimate-chimp-4657.clerk.accounts.dev`; landing na ni vede tlačítkem (`components/marketing/content.ts` → `signUp`). Cizí člověk si založí účet, který přepnutí na produkční Clerk nepřežije, a projde „platbou" v sandboxu. Buď vstup schovat, dokud nebude Clerk i Stripe v produkčním režimu, nebo to vědomě nechat | Kryštof (rozhodnutí) | hned |
+| **SPF na apexu a `rua` v DMARC** | nejvážnější otevřená věc z auditu 2026-11-14: apex nemá SPF a DMARC je `p=none` bez reportů, přitom Workspace odesílá z adresy na apexu a doména má MX. Podvrhnout e-mail jménem `@zakaziq.cz` jde a nikdo se o tom nedozví. Hodnoty a cíle v sekci DNS | Kryštof (WEDOS) | hned |
+| **CAA a DNSSEC na apexu** | ověřeno autoritativně 2026-11-14: ani jedno. Bez CAA smí certifikát pro doménu vydat kdokoli | Kryštof (WEDOS) | před spuštěním |
+| Hlášení porušení CSP | politika je od S19 **vynucená** pro všechny cesty, ale bez `report-to`/`report-uri`. Porušení v produkci tedy nikdo nevidí — projeví se rozbitou obrazovkou u uživatele, ne záznamem. Potřebuje routu s limitem a řádek v CSP-LOG; přirozeně to patří k monitoringu chyb níž | Kryštof (rozhodnutí) + Claude | před spuštěním |
 | `DATABASE_URL_WS` do Vercelu (Production + Preview) | migrace `ws` i role `ws_app` jsou na Neonu od 2026-10-09 (ověřeno: bez BYPASSRLS, do `public` nevidí); bez proměnné ve Vercelu Workspace v produkci nemá DB. Roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli | Kryštof | před nasazením `/w` |
 | Clerk produkční instance (`clerk deploy`, `clerk.zakaziq.cz`, produkční klíče, Google OAuth s vlastními údaji) | dev klíče mají limity a dev banner, dev instance nesmí do produkce | Kryštof + Claude | před spuštěním (S19) |
 | Webhook Clerku: endpoint v Clerk dashboardu + `CLERK_WEBHOOK_SECRET` (lokálně i Vercel) | bez něj se nesynchronizují členové a název účtu (route vrací 503) | Kryštof | po prvním nasazení `/w` |
@@ -119,18 +140,18 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 | `WS_KEY_PEPPER` do Vercelu (Production + Preview, jiná hodnota než lokálně) | bez něj tajné klíče webů nejde vytvořit ani ověřit (API 503). Po nastavení už neměnit — změna zneplatní všechny tajné klíče | Kryštof | před nasazením `/w` |
 | Zod 4 sonda `new Function` | hlásí `unsafe-eval` na portálu; Workspace zatím Zod jen na serveru (S07) — `z.config({ jitless: true })` až s prvním formulářem validovaným v prohlížeči | — | S10+ |
 | `security.txt` ✅ | od nasazení 2026-11-13 vrací `https://www.zakaziq.cz/.well-known/security.txt` 200 (canonical na www, R-075). Zbývá hlídat `Expires` (2027-10-01) | Claude | hotovo |
-| DNS `zakaziq.cz` (DNSSEC, CAA, SPF, DKIM, DMARC) + doména v Resendu | bez nich lze posílat poštu jménem domény a e-maily padají do spamu; postup `docs/workspace/SETUP.md` → E-maily (S15) | Kryštof | před nastavením `WS_EMAIL_FROM` |
+| ~~DNS: doména v Resendu, DKIM~~ ✅ | 2026-11-14 ověřeno: doména v Resendu je, `resend._domainkey` existuje, `send.zakaziq.cz` má vlastní SPF a MX. Zbývá apex SPF, CAA, DNSSEC a `rua` — vlastní řádky výše | Claude | hotovo |
 | `WS_EMAIL_FROM` a `RESEND_WEBHOOK_SECRET` do Vercelu (+ endpoint webhooku v Resendu) | 2026-11-01: doména Verified, obě proměnné jen ve Vercel Production (Preview záměrně bez odesílání), webhook v Resendu založený a **vypnutý do nasazení** (platí pro celý účet, dnešní produkce cestu nemá). Zbývá: zapnout webhook při nasazení, DMARC `_dmarc`, klíč s právem jen Sending access pro `zakaziq.cz` | Kryštof + Claude | při nasazení |
 | CI proměnná `SITE_URL` | job `headers` se jinak neprovede | Kryštof | po prvním nasazení Workspace |
 | Dvoufázové ověření adminu (TOTP, nebo admin přes Clerk s MFA) | admin čte data všech klientů rolí vlastníka tabulek; dnes jen heslo + zámek na IP | Kryštof (rozhodnutí) + Claude | před spuštěním |
 | `NEXT_PUBLIC_APP_URL` v Production = `https://www.zakaziq.cz` při nasazení Workspace | `authorizedParties` (DECISIONS #021) bere origin odtud; jiná hodnota = přihlášení přes Clerk v produkci neprojde | Kryštof | při nasazení `/w` |
 | Monitoring chyb (Sentry nebo Vercel Observability) | o chybě po spuštění se jinak nikdo nedozví; Sentry potřebuje záznam v CSP-LOG (`connect-src`); výpadek 2026-11-04 (AUDIT-LOG) se zjistil jen ze screenshotu | Kryštof (rozhodnutí) | před spuštěním |
 | Samostatná DB role pro běh adminu (bez DDL), `neondb_owner` jen na migrace | dnes admin běží rolí vlastníka s BYPASSRLS | Kryštof + Claude | po spuštění |
-| Živý audit produkce | 2026-11-13 po nasazení ručně ověřeno, že CSP (vynucená, s nonce), COOP, CORP, HSTS, `security.txt` i absence `x-powered-by` na živé doméně **sedí**. Zbývá SPF a `rua` v DMARC (DNS) a celý běh skillu `web-security-audit` | Kryštof + Claude | před spuštěním |
+| ~~Živý audit produkce~~ ✅ | 2026-11-14 proběhl celý `web-security-audit` i `web-security-review`: 30 prošlo / 3 varování / 0 chyb, nálezy a opravy v AUDIT-LOG. **Audit nepouštět v cyklu** — po patnácti dotazech na citlivé cesty začne Vercel vracet challenge 403 a druhý běh vypadá falešně mnohem hůř | Claude | hotovo |
 | Chrome/Safari průchod vynucené CSP | Preview build READY; Chrome načetl landing page, ale konzole hlásí chybu konfigurace NextAuth; přihlášení Workspace i Safari čekají na ruční ověření | po doplnění Preview env |
 | Migrace 092–096 na produkci a role `portal_app` (`scripts/portal-create-role.js`), `DATABASE_URL_PORTAL`, `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER` do Vercelu | bez nich nejde vytvořit klíč projektu ani pozvánku a `/klient` nemá DB; roli jen skriptem, nikdy v konzoli (konzolové role obcházejí RLS) | Kryštof | před nasazením klientského prostoru |
 | Přihlášení přes Clerk na `/klient` v prohlížeči | proxy, CSP a pozvánka jsou ověřené jen testy; skutečný průchod (registrace z pozvánky, přihlášení, odhlášení) nikdo neprošel | Kryštof + Claude | před prvním klientem |
-| HSTS preload | zděděné `preload` — ověřit stav na hstspreload.org pro produkční doménu adminu | Kryštof | S19 |
+| HSTS preload — rozhodnout | **zjištěno 2026-11-14:** doména na seznamu **není** (`hstspreload.org` → `status: unknown` pro apex i www), takže zděděný token je bez účinku a první HTTP požadavek z čerstvého prohlížeče jde v plainu. Přihlásit se, nebo token zahodit? Zápis je s `includeSubDomains` a 2 roky prakticky nevratný a vztáhne se i na budoucí subdomény | Kryštof (rozhodnutí) | před spuštěním |
 | Test obnovy zálohy Neonu | zálohu, kterou nikdo neobnovil, nelze brát jako zálohu | Kryštof | před spuštěním |
 
 ## Neměnit bez zeptání
@@ -141,3 +162,6 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar. Odes�
 - `object-src`/`frame-src 'self'` jen na `/dashboard/faktury/*` — nerozšiřovat na celý admin.
 - Pořadí v `proxy.ts`: admin auth → (Clerk) → CSP. Admin přihlášení se nesmí změnit.
 - Workspace nikdy přes `DATABASE_URL` (admin role obchází RLS) — jen `DATABASE_URL_WS` / `lib/ws/db.ts`. RLS na `ws` se nevypíná a politika nikdy `USING (true)`.
+- Kontrola klíče **před** čtením těla ve veřejných API — jinak neověřený požadavek načte tělo do paměti funkce.
+- `publicToken()` před každým dotazem na `public_token`/`survey_token` — bez něj je nesmyslný token 500, ne 404.
+- DNS sekce auditního skriptu selhává **zavřeně** (DECISIONS #028) — nedostupný resolver nesmí znovu vycházet jako „záznam existuje".

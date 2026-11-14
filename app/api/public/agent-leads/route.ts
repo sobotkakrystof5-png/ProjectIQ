@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { verifyBearerApiKey, getClientIp } from '@/lib/api-auth'
+import { readJsonLimited } from '@/lib/security/request-body'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { createNotification } from '@/lib/notifications'
 import { toLeadOrigin } from '@/lib/lead-origins'
 import { agentLeadPayloadSchema } from '@/types/agent-leads'
+
+// Analýza od vizeon-lead-agent je text, ne soubor — 64 kB je víc než dost.
+const MAX_BODY_BYTES = 64 * 1024
 
 // Příjem AI-scorovaných leadů z externího vizeon-lead-agent (Python/FastAPI).
 // Agent na tenhle endpoint posílá už hotový výsledek — žádná AI logika ani
@@ -30,12 +34,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return errorResponse(401, 'Neplatný nebo chybějící API klíč')
   }
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return errorResponse(400, 'Neplatné JSON tělo požadavku')
+  // Strop těla: bez něj `req.json()` přečte, co klíč pošle.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too-large'
+      ? errorResponse(413, 'Tělo požadavku je příliš velké')
+      : errorResponse(400, 'Neplatné JSON tělo požadavku')
   }
+  const body: unknown = read.value
 
   const parsed = agentLeadPayloadSchema.safeParse(body)
   if (!parsed.success) {

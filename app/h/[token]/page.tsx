@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { CheckCircle2, ClipboardList } from 'lucide-react'
 import { sql } from '@/lib/db'
+import { publicToken } from '@/lib/public-token'
 import { SurveyForm } from '@/components/SurveyForm'
 
 export const revalidate = 0
@@ -13,9 +14,12 @@ export default async function SurveyPage(props: PageProps) {
   const params = await props.params
   // Dotazník patří zakázce (migrace 106, AD11). Token se při migraci přenesl
   // z Dokončených, takže odkaz z dřív odeslaného e-mailu funguje dál.
+  // `survey_token` je uuid: neplatný tvar je 404, ne chyba dotazu.
+  const token = publicToken(params.token)
+  if (!token) notFound()
   const rows = await sql`
     SELECT id, coalesce(nullif(btrim(coalesce(description, '')), ''), client_name) AS title, client_name
-    FROM projects WHERE survey_token = ${params.token} AND NOT lead_pending LIMIT 1
+    FROM projects WHERE survey_token = ${token} AND NOT lead_pending LIMIT 1
   `
   if (!rows.length) notFound()
   const cp = rows[0] as { id: string; title: string; client_name: string | null }
