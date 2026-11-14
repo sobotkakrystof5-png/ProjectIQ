@@ -1439,11 +1439,11 @@ z `lib/admin-status.ts` (477×), šedé škály. **9 ručně psaných modálů `
 | AD11 | Dokončené do zakázky, průvodka zakázky | M–L | **106** | AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (incident se 106 tím uzavřený, `/h/[token]` vrací 404; na testovacím Neonu 106 pořád chybí) |
 | AD12 | Fakturace: vystavování, PDF, QR, ARES | L | **107** | AD06, AD09 | **hotovo 2026-11-12**, **nasazeno 2026-11-13** (107 i 108 podle Kryštofa na produkci; PDF i formulář ověřené v prohlížeči, zbytek obrazovek ne; R-086, R-098) |
 | AD13 | Fakturace: měny, transakce, stav, testy | M | **109** | AD12 | **hotovo a nasazeno 2026-11-13** (109 podle Kryštofa na produkci; `WARNING` o duplicitních příjmech nikdo nezkontroloval, v prohlížeči neověřeno; R-099) |
-| AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | **hotovo 2026-11-13** (110 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-100) |
-| AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | **hotovo 2026-11-13** (111 aplikovaná nikde; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-101) |
-| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | **hotovo 2026-11-13** (112 aplikovaná nikde; v prohlížeči neověřeno, PDF ověřené okem; R-102) |
-| AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | **hotovo 2026-11-13** (ověřeno v prohlížeči 390–1440 px kromě Financí › Podnikání a skutečného detailu zakázky — testovací Neon nemá 106; R-103) |
-| AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | **hotovo 2026-11-14** (strop tříd na nule, sedm modálů na Radixu, průchod klávesnicí a 390–1440 px ověřený; `/dashboard/profil` padá na chybějící migraci 106 na testovacím Neonu) |
+| AD14 | AI asistent + oprava `/api/ai-assistant` | M–L | **110** | AD05, AD09 | **hotovo 2026-11-13**, **nasazeno 2026-11-14** (110 podle Kryštofa na produkci; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-100) |
+| AD15 | Paměť projektu (facts + project_memory) | M | **111** (ne 110 — tu zabral AD14, viz R-100) | AD14 | **hotovo 2026-11-13**, **nasazeno 2026-11-14** (111 podle Kryštofa na produkci; v prohlížeči neověřeno, živý dotaz na model neproběhl; R-101) |
+| AD16 | Hodnocení, reference, předávací dokument, AI leady | M | **112** (posun o jedna, R-100) | AD11, AD12 | **hotovo 2026-11-13**, **nasazeno 2026-11-14** (112 podle Kryštofa na produkci; v prohlížeči neověřeno, PDF ověřené okem; R-102) |
+| AD17 | Ruční překreslení denních obrazovek | L | — | AD07, AD10, AD14 | **hotovo 2026-11-13**, **nasazeno 2026-11-14** (ověřeno v prohlížeči 390–1440 px kromě Financí › Podnikání a skutečného detailu zakázky — testovací Neon nemá 106; R-103) |
+| AD18 | Dokončení sjednocení, modály, ověření | M | — | vše | **hotovo a nasazeno 2026-11-14** (strop tříd na nule, sedm modálů na Radixu, průchod klávesnicí a 390–1440 px ověřený; `/dashboard/profil` padá na chybějící migraci 106 na testovacím Neonu) |
 
 **Úklid jde první a není to libovůle:** AD01 až AD03 smažou nebo sloučí to, co by AD04 jinak
 přepisoval a AD17 překresloval. Každá obrazovka smazaná v AD01 je obrazovka, kterou nikdo nemusí

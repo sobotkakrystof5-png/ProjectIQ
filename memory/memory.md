@@ -15,8 +15,11 @@
 > animoval dál). **Konzole je poprvé úplně čistá** — `/favicon.ico` 404 zmizelo s ikonou
 > v kořenovém layoutu. **Měření:** AD18 je na JavaScriptu nula (±0,3 kB); 50–80 kB, které
 > admin od AD08 přibral, přinesla sezení AD09–AD17 (R-104).
-> **Zbývá nasazení:** 29 commitů na `admin/modernizace` není pushnutých a migrace 110–112
-> (asistent, paměť, dotazník) nejsou nikde aplikované.
+> **Celá modernizace je na produkci** (2026-11-14, commit `8210f04`): Kryštof pustil migrace
+> 110–112, merge `admin/modernizace` → `main` byl fast-forward a build prošel **na první
+> pokus** (135 s, `fra1`) — tentokrát žádná potíž s cache. Veřejné adresy se chovají, jak mají;
+> **za přihlášením okem nikdo nic neviděl** a to, že 110–112 opravdu běžely, zvenku prokázat
+> nejde.
 >
 > Starší záznamy: changelog `archiv/2026-11.md` a `archiv/2026-10.md`, průběh modernizace
 > `docs/admin/MODERNIZACE-ADMIN-PLAN.md` → sekce 6, technický popis `docs/admin/AGENTS-ADMIN.md`.
@@ -27,11 +30,11 @@
 
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
 
-**Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-13 na **`7a15ad2`** (AD00–AD13 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
+**Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
 **Modernizace adminu (R-081–R-104) — hotová 2026-11-14.** Všech devatenáct sezení
-**AD00–AD18** je v kódu na větvi **`admin/modernizace`** (29 commitů, **nepushnutých**).
-AD00–AD13 jsou od 2026-11-13 na produkci (`7a15ad2`); **AD14–AD18 ne**. Co která fáze udělala
+**AD00–AD18** je v kódu; větev `admin/modernizace` je sloučená do `main`.
+Od 2026-11-14 je **celá na produkci** (`8210f04`). Co která fáze udělala
 a s jakými odchylkami, je v `docs/admin/MODERNIZACE-ADMIN-PLAN.md` → sekce 6 (stav) a 11
 (měření); jak se admin chová a kam se co píše, v `docs/admin/AGENTS-ADMIN.md`. Rozhodnutí
 jsou R-081 až R-104 níž.
@@ -98,31 +101,42 @@ migrace, pak dá vědět a agent udělá merge + push. Proběhlo takhle:
 Migrace 100 a 101 (`DROP TABLE`, R-089) v tomhle pořadí **nebyly** — nejsou potřeba k funkci
 a před nimi musí proběhnout `node scripts/export-before-drop.mjs --ano`.
 
-**Další krok — nasazení AD14–AD18.** Modernizace adminu je hotová, na produkci z ní ale
-běží jen AD00–AD13. Zbývá:
-1. **Kryštof pustí migrace 110, 111 a 112** (asistent, paměť projektu, dotazník a AI leady).
-   Všechny tři jsou **aditivní**, takže se smí pustit **před** nasazením větve; nic v nich
-   není nekompatibilní se starým buildem. Běhoun:
-   `vercel env pull .env.production.local --environment=production` +
-   `node scripts/apply-migration.js <soubor> --env .env.production.local`.
-2. **Agent udělá merge `admin/modernizace` → `main` a push** — až na výslovný souhlas.
-   Je to produkční deploy. Větev je 29 commitů před `main`, opačně 0, takže je to
-   fast-forward. **Kdyby build spadl na `next/font/google`, je to poškozená build cache**
-   (otevřený problém z 2026-11-13) — Redeploy bez cache to spraví.
-3. **Po nasazení** doběhnou doprovodné kroky z 2026-11-13, které nikdo neodškrtl:
+**Nasazení AD14–AD18 na produkci — hotovo 2026-11-14.** Stejné pořadí jako předtím:
+1. **Migrace 110, 111 a 112 pustil Kryštof** (všechny aditivní, takže směly jít před deployem).
+   Jeho slovy „migrace jsou na produkci". **Zvenku to prokázat nejde** — `ai_suggestions`,
+   `project_memory` ani nové sloupce dotazníku a předání nečte žádná veřejná routa; `/h/<token>`
+   dokazuje jen 102 a 106. První skutečná zkouška je denní cron `send-reminders` nebo otevření
+   adminu. Kontrola na jedno zavolání: `node scripts/admin-stav-produkce.mjs --env .env.production.local`
+   (jen čte; agent na produkční připojení nedosáhne), nebo tytéž dotazy jako SQL do konzole Neonu.
+2. **Merge `admin/modernizace` → `main`** byl fast-forward (`d58e561` → `8210f04`), push proběhl.
+3. **Build prošel na první pokus** (`dpl_H6NV…`, 135 s, region `fra1`, aliasy včetně
+   `www.zakaziq.cz`) — potíž s obnovenou cache z 2026-11-13 se neopakovala.
+4. **Ověřeno po nasazení** (veřejně, bez přihlášení): `/` 200, `/login` 200, `/podminky`
+   a `/ochrana-udaju` 200, `/h/<token>` i `/p/<token>` 404, `/dashboard` a `/dashboard/profil`
+   307 na `/login`, cron 401, `/api/public/leads` i `/api/ai-assistant` 405 na GET,
+   `/w/prihlaseni` a `/klient/prihlaseni` 200, `robots.txt` a `sitemap.xml` 200,
+   **`/ikony/ikona.svg` 200** (nová ikona z AD18). **Za přihlášením okem nikdo nic neviděl.**
+
+**Další krok — ověřit admin na produkci.** Modernizace je nasazená, ale **nikdo ji neviděl
+na skutečných datech za přihlášením**. Konkrétně zbývá:
+1. **Doprovodné kroky po migracích**, které nikdo neodškrtl ani z 13., ani ze 14. listopadu:
    `node scripts/admin-contacts-backfill.mjs` (bez něj jsou Kontakty prázdné), kontrola
-   `lead_pending` a `WARNING` o duplicitních příjmech u 109; stav ukáže
-   `node scripts/admin-stav-produkce.mjs --env .env.production.local` (jen čte).
-4. **Teprve pak jde ověřit to, co lokálně nejde:** `/dashboard/profil`, Finance › Podnikání
-   a skutečný detail zakázky (testovací Neon nemá 106), asistent a paměť naživo a p75 per
-   route z produkce.
+   `lead_pending` z hlavičky 102 a `WARNING` o duplicitních příjmech u 109. Stav ukáže
+   `node scripts/admin-stav-produkce.mjs --env .env.production.local` (jen čte) — pouští Kryštof.
+2. **Průchod přihlášeným adminem na produkci.** Teprve tam jde ověřit, co testovací Neon
+   neumí (nemá 106): `/dashboard/profil`, Finance › Podnikání, skutečný detail zakázky,
+   a dál asistent, paměť projektu, dotazník a AI leady naživo včetně prvního skutečného
+   dotazu na model. Agent to umí projít headless Chromem, ale potřebuje přihlášení
+   k produkci — **zeptat se Kryštofa**, je to ostrá databáze.
+3. **p75 per route z produkce** (Vercel runtime logy / Observability) — plán, sekce 11, má
+   u p75 pořád „Nic". Poprvé to jde změřit.
 
 **Pak teprve spuštění Workspace** (nemění se): Kryštof — aktivace Stripe live, provozovatel
 do Stripe, migrace 097–099 na produkci, Google OAuth klient pro Clerk, pilotní klient
 a podpora (D4, D6, D7), Vercel Pro, test obnovy Neonu, DNS CAA, SPF a `rua` v DMARC. Agent —
 klientský prostor v prohlížeči, scénáře Stripe sandboxu, zkušební e-maily, telefon 390 px
-a RD15. Pořadí v `docs/workspace/LAUNCH-PLAN.md`. Workspace se na produkci dostal spolu
-s adminem, ale vypnutý zůstává tím, co mu chybí (Stripe live, produkční Clerk).
+a RD15. Pořadí v `docs/workspace/LAUNCH-PLAN.md`. Workspace je na produkci spolu s adminem,
+ale vypnutý zůstává tím, co mu chybí (Stripe live, produkční Clerk).
 
 **Prostředí agentů:** `AGENTS.md` + `docs/AGENTS-REFERENCE.md` (R-047), skilly a bezpečnost synchronizované do `.agents/` (R-046, `docs/CODEX.md`); řemeslné skilly třetích stran jsou uživatelské mimo repo, dostupnost ověřuj (R-080).
 
@@ -938,7 +952,7 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
   (dluh z AD10) · od 2026-11-13
 - [ ] **AD16 — co prohlížeč ověřit nemohl:** **tvar pruhu AI leadů a karty předávacího
   dokumentu ověřený je** (dočasná stránka s fiktivními daty, 390–1440 px, po opravě popisku
-  u odebrání řádku bez nálezu). Zbývá všechno, co potřebuje **migraci 112** — ta není nikde:
+  u odebrání řádku bez nálezu). Zbývá všechno, co od 2026-11-14 jde ověřit **na produkci** (112 je podle Kryštofa venku):
   uzavření zkušební zakázky (dotazník má odejít až po 15 s a „Zpět" ho musí zrušit), věta
   o dotazníku u zakázky a na `/dashboard/profil`, blok **Reference na web** u hodnocení se
   souhlasem, **uložení** dokumentu včetně odmítnutí textu s heslem, **Otevřít PDF** z karty
@@ -951,7 +965,7 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
 - [ ] **Předávací dokument nemá vlastní retenci (AD16):** `projects.handover` drží jména
   a adresy administrací, dokud existuje zakázka — `purge_client_retention` (R-076) o něm neví.
   Doplnit spolu s výmazem a exportem údajů kontaktu · DECISIONS #027 · od 2026-11-13
-- [ ] **AD15 v prohlížeči neověřený:** migrace 111 **není nikde**, takže paměť nikdo neviděl.
+- [ ] **AD15 v prohlížeči neověřený:** 111 je od 2026-11-14 na produkci (na testu ne), takže paměť nikdo neviděl.
   Projít na 390 / 768 / 1280 / 1440 px: karta kontaktu (blok „Co víme z historie", Uložit do
   paměti, odmítnutí textu s klíčem), detail zakázky (sekce Paměť, „O klientovi", Potvrdit
   i Zahodit u návrhu), **`/dashboard/new?kontakt=<id>`** (předvyplněné jméno, telefon, druh práce
@@ -969,7 +983,7 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
   ⌘K s dotazem, který nic nenajde → „Zeptat se asistenta"; panel s větou „zavolat Nováka ve
   čtvrtek ve dvě" → návrh `schedule_call` → Provést → termín v kalendáři; změna stavu zakázky
   s toastem „Zpět"; `send_message` (musí být vidět řádek **Komu**); konzultanti u startupového
-  projektu (rozhovor s historií). Jde to až na databázi s **migrací 110** — ta není nikde
+  projektu (rozhovor s historií). Od 2026-11-14 to jde na produkci (110 je podle Kryštofa venku); na testovacím Neonu 110 chybí dál
   · od 2026-11-13
 - [ ] **Doprovodné kroky po migracích nikdo neodškrtl (nasazení 2026-11-13):** (1) po 102
   kontrola `SELECT … WHERE lead_pending` z hlavičky migrace — stará nikdy nepotvrzená poptávka
@@ -1132,6 +1146,19 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-14 (nasazení AD14–AD18 na produkci)
+- **chore** **Produkce běží na `8210f04` — celá modernizace adminu je venku.** Kryštof pustil
+  migrace **110, 111 a 112** (všechny aditivní), merge `admin/modernizace` → `main` byl
+  fast-forward (`d58e561` → `8210f04`) a **build prošel na první pokus** (135 s, `fra1`);
+  potíž s obnovenou cache z 13. 11. se neopakovala. Na produkci je tím poprvé AI asistent,
+  paměť projektu, automatický dotazník, předávací dokument, AI leady i celý nový vzhled.
+- **chore** Ověřeno zvenku bez přihlášení: 17 adres vrací, co má (`/` 200, `/h` a `/p` 404,
+  `/dashboard` 307, cron 401, veřejná API 405 na GET, `/ikony/ikona.svg` 200). **Že 110–112
+  opravdu běžely, zvenku prokázat nejde** — žádná veřejná routa je nečte; stojí to na
+  Kryštofově slovu, první skutečná zkouška je denní cron nebo otevření adminu.
+- **chore** **Za přihlášením okem nikdo nic neviděl** a doprovodné kroky po migracích
+  (backfill kontaktů, `lead_pending`, duplicitní příjmy) zůstávají neodškrtnuté.
 
 ### 2026-11-14 (AD18 — dokončení sjednocení a ověření)
 - **feat** **AD18 hotové, modernizace adminu tím končí.** Pět commitů, **bez migrace**.
