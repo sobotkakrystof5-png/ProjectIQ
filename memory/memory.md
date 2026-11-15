@@ -1275,6 +1275,13 @@ generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-15 (přihlášení do adminu přes Supabase Auth)
+- **fix** **Proč se nešlo přihlásit:** větev `admin/supabase-auth` nebyla pushnutá, takže
+  www.zakaziq.cz běžela pořád na NextAuthu (`46259df`) a heslo ze Supabase tam neplatilo; na
+  Supabase za celou dobu nepřišel jediný pokus (`/token`). Účet v Supabase byl v pořádku.
+- **chore** **Zámek po pěti pokusech zrušen** na přání Kryštofa (DECISIONS #030): zkoušet jde
+  dokola, pokusy se jen zapisují, při limitu Supabase (429) je vlastní hláška. `ADMIN_EMAIL`
+  v Preview nastaven na e-mail účtu v Supabase; v Production úpravu agentovi nepovolilo
+  oprávnění — **musí ověřit Kryštof** v nastavení Vercelu.
 - **feat** **Admin se přihlašuje přes Supabase Auth** (R-105, DECISIONS #029): e-mail, heslo
   a dvoufázové ověření ověřovací aplikací. Rozsah je **jen admin** — Workspace a klientský
   prostor zůstávají na Clerku a **data zůstávají v Neonu**. Nové `lib/supabase/*`, přepsané

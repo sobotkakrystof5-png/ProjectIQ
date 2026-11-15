@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
-import { clientIp, isLockedOut, recordAttempt } from '@/lib/auth'
+import { clientIp, recordAttempt } from '@/lib/auth'
 import { isAdminEmail, supabaseConfigured } from '@/lib/supabase/config'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -12,8 +12,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
  * heslo, a má-li účet zapsanou ověřovací aplikaci, ještě kód z ní.
  *
  * Záměrně se tu nerozlišuje, co bylo špatně (neznámý e-mail × heslo × cizí
- * účet) — jedna hláška pro všechno. Zámek na IP po pěti neúspěších zůstává
- * jako za NextAuthu (DECISIONS #021).
+ * účet) — jedna hláška pro všechno. Zámek na IP aplikace nemá (zrušen
+ * 2026-11-15 na přání Kryštofa, DECISIONS #030): zkoušet jde dokola, pokusy
+ * se jen zapisují do `login_attempts` a hádání hesla brzdí limit Supabase.
  */
 
 export type SignInOutcome =
@@ -28,7 +29,7 @@ const CREDENTIALS = z.object({
 const CODE = z.string().trim().regex(/^\d{6}$/)
 
 const WRONG = 'Nesprávný e-mail nebo heslo'
-const LOCKED = 'Příliš mnoho pokusů. Zkuste to za 15 minut.'
+const SLOW_DOWN = 'Moc pokusů za sebou. Počkejte minutu a zkuste to znovu.'
 const BROKEN = 'Přihlášení teď nefunguje. Zkuste to prosím za chvíli.'
 
 export async function signInAdmin(email: string, password: string): Promise<SignInOutcome> {
@@ -38,8 +39,6 @@ export async function signInAdmin(email: string, password: string): Promise<Sign
   if (!parsed.success) return { ok: false, error: WRONG }
 
   const ip = await clientIp()
-  if (await isLockedOut(ip)) return { ok: false, error: LOCKED }
-
   const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
@@ -48,6 +47,7 @@ export async function signInAdmin(email: string, password: string): Promise<Sign
 
   if (error || !data.user) {
     await recordAttempt(ip, false)
+    if (error?.status === 429) return { ok: false, error: SLOW_DOWN }
     return { ok: false, error: WRONG }
   }
 
@@ -70,8 +70,6 @@ export async function verifyAdminCode(code: string): Promise<SignInOutcome> {
   if (!parsed.success) return { ok: false, error: 'Kód má šest číslic.' }
 
   const ip = await clientIp()
-  if (await isLockedOut(ip)) return { ok: false, error: LOCKED }
-
   const supabase = await createSupabaseServerClient()
   const { data: factors } = await supabase.auth.mfa.listFactors()
   const factor = factors?.totp?.[0]
@@ -80,6 +78,7 @@ export async function verifyAdminCode(code: string): Promise<SignInOutcome> {
   const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code: parsed.data })
   if (error) {
     await recordAttempt(ip, false)
+    if (error.status === 429) return { ok: false, error: SLOW_DOWN }
     return { ok: false, error: 'Kód nesouhlasí. Zkuste ten aktuální z aplikace.' }
   }
 

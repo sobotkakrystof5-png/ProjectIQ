@@ -16,9 +16,6 @@ import { sessionTooOld } from './supabase/session-age'
  * Data zůstávají v Neonu (R-002); Supabase je jen poskytovatel identity.
  */
 
-const MAX_FAILED_ATTEMPTS = 5
-const LOCKOUT_WINDOW_MINUTES = 15
-
 export type AdminSession = {
   email: string
   userId: string
@@ -31,16 +28,7 @@ export async function clientIp(): Promise<string> {
   return value ? value.split(',')[0].trim() : 'unknown'
 }
 
-/** Zámek na IP po pěti neúspěších v patnácti minutách (DECISIONS #021). */
-export async function isLockedOut(ip: string): Promise<boolean> {
-  const rows = await sql`
-    SELECT count(*)::int AS count FROM login_attempts
-    WHERE ip = ${ip} AND success = false
-      AND created_at > now() - interval '1 minute' * ${LOCKOUT_WINDOW_MINUTES}
-  `
-  return (rows[0] as { count: number }).count >= MAX_FAILED_ATTEMPTS
-}
-
+/** Zápis pokusu o přihlášení (jen evidence, nic neblokuje — DECISIONS #030). */
 export async function recordAttempt(ip: string, success: boolean): Promise<void> {
   await sql`INSERT INTO login_attempts (ip, success) VALUES (${ip}, ${success})`
   await sql`DELETE FROM login_attempts WHERE created_at < now() - interval '1 day'`
