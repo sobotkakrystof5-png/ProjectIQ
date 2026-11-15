@@ -53,8 +53,8 @@
 Auth** (projekt `zakaziq`, eu-central-1) — e-mail, heslo a TOTP; zapnutí druhého faktoru je
 v `/dashboard/profil` → Přihlášení. Dovnitř projde jen session s e-mailem `ADMIN_EMAIL`
 (R-001), zapsaný faktor **nelze přeskočit** a zámek na IP po pěti pokusech zůstal. Data se
-nepřesouvají: zůstávají v Neonu (R-002), Supabase drží jen `auth.*`. **Na produkci to není**
-a naživo to nikdo nezkusil — projekt má nula uživatelů. Technický popis: `.claude/security/STATE.md`
+nepřesouvají: zůstávají v Neonu (R-002), Supabase drží jen `auth.*`. **Na produkci je od 2026-11-15**
+a naživo přihlášení zatím nikdo neprošel. **Na produkci od 2026-11-15 (`307ef15`).** Technický popis: `.claude/security/STATE.md`
 → Aplikace, rizika DECISIONS #029.
 
 **Modernizace adminu (R-081–R-104) — hotová 2026-11-14.** Všech devatenáct sezení
@@ -1280,8 +1280,11 @@ generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105
   Supabase za celou dobu nepřišel jediný pokus (`/token`). Účet v Supabase byl v pořádku.
 - **chore** **Zámek po pěti pokusech zrušen** na přání Kryštofa (DECISIONS #030): zkoušet jde
   dokola, pokusy se jen zapisují, při limitu Supabase (429) je vlastní hláška. `ADMIN_EMAIL`
-  v Preview nastaven na e-mail účtu v Supabase; v Production úpravu agentovi nepovolilo
-  oprávnění — **musí ověřit Kryštof** v nastavení Vercelu.
+  nastaven na e-mail účtu v Supabase v Preview i Production.
+- **chore** **Supabase Auth je na produkci** (2026-11-15, `307ef15`, fast-forward `46259df` →
+  `307ef15`, se souhlasem Kryštofa). Ověřeno zvenku: `/login` 200 s novým formulářem,
+  `/api/auth/providers` 404 (NextAuth pryč), `/dashboard` 307, `/` 200. **Přihlášení samo
+  naživo ověřené není** — heslo zná jen Kryštof.
 - **feat** **Admin se přihlašuje přes Supabase Auth** (R-105, DECISIONS #029): e-mail, heslo
   a dvoufázové ověření ověřovací aplikací. Rozsah je **jen admin** — Workspace a klientský
   prostor zůstávají na Clerku a **data zůstávají v Neonu**. Nové `lib/supabase/*`, přepsané
