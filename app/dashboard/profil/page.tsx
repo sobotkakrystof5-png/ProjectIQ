@@ -463,7 +463,7 @@ export default async function ProfilPage() {
             { href: '/dashboard/poptavky', label: 'Poptávky z webů', icon: <Inbox size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/calendar', label: 'Kalendář', icon: <CalendarCheck size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/calls', label: 'Hovory / Leady', icon: <PhoneCall size={14} strokeWidth={1.5} /> },
-            { href: '/dashboard/zakazky?status=uzavrene', label: 'Uzavřené zakázky', icon: <CheckCircle2 size={14} strokeWidth={1.5} /> },
+            { href: '/dashboard/zakazky/dokoncene', label: 'Dokončené zakázky', icon: <CheckCircle2 size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/kontakty', label: 'Kontakty', icon: <Users size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/naklady', label: 'Náklady', icon: <Receipt size={14} strokeWidth={1.5} /> },
             { href: '/dashboard/projekty', label: 'Projekty', icon: <Briefcase size={14} strokeWidth={1.5} /> },

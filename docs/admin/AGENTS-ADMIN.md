@@ -516,6 +516,9 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 ### `/dashboard/calendar`
 - Globální kalendář (Měsíc / Týden / Den) — konzultace, deadliny, plánované hovory z Hovorů
   a ruční události i blokace. Po AD02 bez filtru zdroje.
+- Od R-110 je tentýž `SmartCalendar` i na Dnes (pod úkoly) a v Hovorech
+  (`/dashboard/calls?pohled=kalendar`); obě místa začínají týdnem (`defaultView="week"`)
+  a čtou stejné okno `windowFor(today)` přes `loadCalendarWindow`.
 - Ruční událost nebo blokaci zakládá `AdminEventModal`.
 - **Čte jen okno, ne historii (AD08).** Stránka pošle měsíc kotvy ± 7 dní
   (`windowFor` v `lib/admin/calendar-window.ts`), dotazy jsou v `lib/admin/calendar.ts`
@@ -605,9 +608,12 @@ svůj příjem už má — odtud dvojí započtení. Migrace 106 to rozpletla.
 - **Dotazník** visí na `projects.survey_token` a zapisuje se do `project_surveys.project_id`.
   Token si zakázka při migraci **přebrala z archivu**, takže odkazy z dřív odeslaných
   e-mailů dál fungují. `projects_survey_token_uq` hlídá, že je jedinečný.
-- **Obrazovky Dokončené a Hodnocení zanikly.** Uzavřené zakázky jsou
-  `/dashboard/zakazky?status=uzavrene` (pseudostav `CLOSED_FILTER` v `lib/admin/projects.ts`,
-  ptá se na `closed_at`), vlastní projekty bez klienta `?typ=personal`. Přehled výkonnosti
+- **Obrazovka Hodnocení zanikla.** Dokončené zakázky mají od R-109 (2026-11-15) vlastní
+  výpis `/dashboard/zakazky/dokoncene`; `/dashboard/zakazky` ukazuje jen rozpracované
+  (Nová, V řešení, Čeká na schválení). Dokončená = `closed_at IS NOT NULL OR status IN
+  ('done','paid')` (`ProjectScope` v `lib/admin/projects.ts`, obrazovka
+  `components/admin/projects-list.tsx`). Staré `?status=uzavrene|done|paid` Zakázky
+  přesměrují do Dokončených. Vlastní projekty bez klienta `?typ=personal`. Přehled výkonnosti
   a souhrn hodnocení jsou na `/dashboard/profil` (`lib/admin/closed.ts`). Staré adresy
   přesměrovávají (`lib/legacy-redirects.mjs`).
 - **Zálohy ve výkonnosti byznysu**: `getBusinessOverview` přičítá `deposit_amount` jen
@@ -682,6 +688,19 @@ Pravidla, která drží databáze (migrace 107), ne aplikace:
 - **PDF se neukládá**, vyrábí se při otevření; `pdf_generated` říká, že bajty v `pdf_data` nejsou.
 
 Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a admin se chová jako dřív.
+
+### Zálohy a ruční příjmy v Podnikání (R-110)
+
+- Karta „Zapsat příjem" ve Finance › Podnikání (`app/dashboard/finance/BusinessIncomeForm.tsx`,
+  akce `business-income-actions.ts`): **záloha k zakázce** (víc na jednu zakázku) nebo
+  **jednorázový příjem**. Záloha = `finance_transactions` s `category = 'záloha'`,
+  `source_project_id`, `deposit_transaction`, linie ze zakázky; jednorázový příjem
+  `category = 'jednorázový příjem'`, linie z formuláře. Obojí `area = 'byznys'`.
+- **Doplatek se počítá jedním vzorcem** (`lib/admin/project-payments.ts` → `remainingSql`,
+  `remainingToPay`): cena − vlastní záloha zakázky − ruční zálohy. Používá ho `updateProject`
+  („Peníze dorazily"), Nezaplacené zakázky v Podnikání, souhrn výpisu zakázek a návrh faktury.
+- Záloha vyšší než zbývá se neuloží (`INSERT … SELECT … WHERE`); smazat jde jen ruční příjem,
+  který si nepřevzala faktura. Test `lib/__tests__/admin-zalohy.test.ts`.
 
 ### Náprava financí (AD13, R-099)
 

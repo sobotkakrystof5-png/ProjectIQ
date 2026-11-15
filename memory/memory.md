@@ -1006,6 +1006,40 @@ cookie; hlídá to test, ale jen na vymyšlených claims. Změna `ADMIN_EMAIL` z
 generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105,
 `.claude/security/DECISIONS.md` #029 (doplnění).
 
+### R-109 · Dokončené zakázky mají vlastní položku menu (2026-11-15)
+**Rozhodnutí:** Zakázky (`/dashboard/zakazky`) ukazují jen rozpracovanou práci (Nová,
+V řešení, Čeká na schválení). Hotové a zaplacené zakázky jsou v nové položce menu
+**Dokončené** (`/dashboard/zakazky/dokoncene`) v Práci hned pod Zakázkami. Dokončená =
+`closed_at IS NOT NULL OR status IN ('done','paid')`, stejně jako u dotazníku.
+**Proč:** Kryštof 2026-11-15: zaplacené zakázky se mu míchaly s aktuálními.
+**Důsledek:** mění R-090/R-097 v části „Dokončené mizí z menu" — dokončenost dál je stav
+zakázky (žádná nová tabulka), jen má vlastní výpis. Adresa je pod `/zakazky`, ne
+`/dashboard/dokoncene`: ta měla trvalé přesměrování na `?status=uzavrene`, které si
+prohlížeč mohl uložit; teď vede do Dokončených a Zakázky staré `?status=uzavrene|done|paid`
+přesměrují samy. „Hotovo" bez zaplacení je v Dokončených, souhrn nahoře ukazuje „Nezaplaceno".
+
+### R-110 · Víc záloh na zakázku, ruční příjmy v Podnikání, kalendář na Dnes a v Hovorech (2026-11-15)
+**Rozhodnutí:** (1) Ve Finance › Podnikání jde zapsat **zálohu k zakázce** (libovolně mnoho na
+jednu zakázku) nebo **jednorázový příjem** bez zakázky. Záloha je řádek `finance_transactions`
+s `category = 'záloha'`, `source_project_id`, `deposit_transaction = true`, `area = 'byznys'`,
+`income_origin = 'manual'`; linie (přiznané/nepřiznané) se bere ze zakázky (`invoiced_on_ico`).
+Jednorázový příjem má `category = 'jednorázový příjem'` a linii z formuláře. (2) Zbývá doplatit
+= cena − vlastní záloha zakázky (je-li zaplacená) − ruční zálohy, **všude stejně**
+(`lib/admin/project-payments.ts`): doplatek při „Peníze dorazily", Nezaplacené zakázky
+v Podnikání, souhrn ve výpisu zakázek, částka nové faktury. Linie v Podnikání ukazuje „Z toho
+zálohy". (3) Na Dnes je pod úkoly týdenní kalendář, v Hovorech záložka `?pohled=kalendar`;
+je to tentýž `SmartCalendar` (prop `defaultView`). Rozhodl Kryštof 2026-11-15 (obě doporučené
+varianty).
+**Proč:** klient platí po částech a jediná záloha na zakázce to neuměla; příjem bez zakázky
+nešel v Podnikání zapsat vůbec.
+**Důsledek:** bez migrace — ruční záloha se pozná podle kategorie, ne podle `income_origin`
+(funguje i bez 109). Záloha vyšší než zbývá se neuloží (`INSERT … SELECT … WHERE`). Kontrola
+„má zakázka už vlastní zálohu" v `updateProject` ruční zálohy vynechává, jinak by vlastní zálohu
+zablokovaly. Ruční záloha je kandidát pro „Je tohle ta platba?" u faktury zakázky. Smazat jde
+jen ruční příjem, který si nepřevzala faktura. Nová cesta, která počítá doplatek, musí použít
+`remainingSql`/`remainingToPay`. Opakované příjmy z podnikání se nedělaly (`recurring_cash_flow`
+nemá linii přiznané/nepřiznané).
+
 ---
 
 ## 3. Otevřené problémy
@@ -1273,6 +1307,31 @@ generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-15 (zálohy, ruční příjmy a kalendář)
+- **feat** **Víc záloh na zakázku a ruční příjmy v Podnikání** (R-110): karta „Zapsat
+  příjem" ve Finance › Podnikání (záloha k zakázce / jednorázový příjem, seznam zapsaných
+  letos se smazáním a „Zpět"), linie ukazují „Z toho zálohy", doplatek a nezaplacené částky
+  odečítají ruční zálohy. Soubory: `lib/admin/project-payments.ts`,
+  `app/dashboard/finance/{business-income-actions.ts,BusinessIncomeForm.tsx,BusinessSection.tsx,finance-actions.ts,byznys-actions.ts,page.tsx}`,
+  `app/actions.ts`, `lib/admin/{invoice-issue,projects}.ts`, `components/SummaryBar.tsx`,
+  test `lib/__tests__/admin-zalohy.test.ts` (11 testů). Bez migrace.
+- **feat** **Kalendář na Dnes (týden) a záložka Kalendář v Hovorech** (R-110):
+  `components/SmartCalendar.tsx` (`defaultView`), `app/dashboard/page.tsx`,
+  `app/dashboard/calls/page.tsx`; `app/calendar-actions.ts` obnovuje i `/dashboard`.
+- **chore** Ověřeno: `tsc`, `npm test` (107 souborů / 1247 testů), `npm run build`.
+  **V prohlížeči neověřeno** — přihlášení je od R-105 přes Supabase a testovací Neon nemá 106.
+- **decision** **R-110**.
+
+### 2026-11-15 (Dokončené zakázky zvlášť)
+- **feat** **Dokončené jako vlastní položka menu** (R-109): Zakázky jen rozpracované,
+  hotové a zaplacené v `/dashboard/zakazky/dokoncene` s filtry Hotovo / Zaplaceno, druh
+  a zdroj, řazení podle uzavření. Společná obrazovka `components/admin/projects-list.tsx`,
+  výpis `lib/admin/projects.ts` (`ProjectScope`), ikona v menu, odkaz z Profilu,
+  přesměrování starých adres. Ověřeno: `tsc`, `npm test` (105 souborů / 1226 testů),
+  `npm run build`. **V prohlížeči neověřeno** — testovací Neon nemá migraci 106
+  (`closed_at`), takže výpis tam nejde otevřít.
+- **decision** **R-109**.
 
 ### 2026-11-15 (přihlášení do adminu přes Supabase Auth)
 - **fix** **Proč se nešlo přihlásit:** větev `admin/supabase-auth` nebyla pushnutá, takže

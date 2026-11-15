@@ -3,11 +3,11 @@
 // jedno pro celý admin — Hub zanikl a jeho obrazovky jsou pod /dashboard.
 //
 // „Kontakty“ (AD09) jsou v Práci hned za Hovory: Hovory jsou co se má udělat,
-// Kontakty kdo to je. Od AD11 (R-090) v menu nejsou Dokončené ani Hodnocení —
-// dokončenost je stav zakázky, ne vlastní obrazovka.
+// Kontakty kdo to je. Od AD11 (R-090) v menu není Hodnocení. Dokončené se
+// v R-109 vrátily jako vlastní výpis hotových a zaplacených zakázek.
 
 export type NavIcon =
-  | 'today' | 'projects' | 'requests' | 'inbox'
+  | 'today' | 'projects' | 'done' | 'requests' | 'inbox'
   | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
   | 'personal' | 'startup' | 'bell' | 'profile'
 
@@ -41,15 +41,15 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Práce',
     items: [
       { href: '/dashboard/zakazky', label: 'Zakázky', icon: 'projects', also: ['/dashboard/new'], patterns: [/^\/dashboard\/[0-9a-f]{8}-[0-9a-f-]{27}(\/|$)/i] },
+      // Hotové a zaplacené zakázky odděleně od rozpracovaných (R-109).
+      { href: '/dashboard/zakazky/dokoncene', label: 'Dokončené', icon: 'done' },
       // Jeden inbox pro všechny weby (AD02); staré adresy přesměrují, viz lib/legacy-redirects.mjs.
       { href: '/dashboard/poptavky', label: 'Poptávky z webů', icon: 'inbox', count: 'leads' },
       { href: '/dashboard/pozadavky', label: 'Požadavky klientů', icon: 'requests', count: 'requests' },
       { href: '/dashboard/calls', label: 'Hovory', icon: 'calls' },
       { href: '/dashboard/kontakty', label: 'Kontakty', icon: 'contacts' },
       { href: '/dashboard/calendar', label: 'Kalendář', icon: 'calendar' },
-      // Dokončené a Hodnocení v menu nejsou (AD11, R-090): dokončená zakázka
-      // je zakázka se stavem hotovo/zaplaceno, hodnocení je na ní. Přehled
-      // výkonnosti a souhrn hodnocení jsou na Profilu.
+      // Hodnocení v menu není (AD11, R-090): je na zakázce, souhrn na Profilu.
     ],
   },
   {

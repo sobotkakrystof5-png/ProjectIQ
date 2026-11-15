@@ -56,6 +56,8 @@ export async function getBusinessOverview(): Promise<BusinessOverview> {
           AND NOT EXISTS (
             SELECT 1 FROM finance_transactions t
             WHERE t.source_project_id = p.id AND t.deposit_transaction
+              -- Zálohy z Podnikání (R-110) nejsou vlastní záloha zakázky.
+              AND t.category IS DISTINCT FROM 'záloha'
           )
       `,
       {

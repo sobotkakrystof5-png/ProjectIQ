@@ -967,17 +967,23 @@ export function SmartCalendar({
   initial,
   initialRange,
   today,
+  defaultView = 'month',
 }: {
   initial: CalendarData
   /** Okno, které přišlo se stránkou (AD08). */
   initialRange: DayRange
   /** Dnešní pražský den, 'YYYY-MM-DD' — spočítaný na serveru. */
   today: string
+  /**
+   * Čím kalendář začne. Sekce Kalendář měsícem, Dnes a Hovory týdnem
+   * (R-110). Okno `windowFor(today)` pokrývá aktuální týden vždy.
+   */
+  defaultView?: ViewMode
 }) {
   const router = useRouter()
 
-  const [view, setView] = useState<ViewMode>('month')
-  const [anchor, setAnchor] = useState(() => startOfMonthIso(today))
+  const [view, setView] = useState<ViewMode>(defaultView)
+  const [anchor, setAnchor] = useState(() => (defaultView === 'month' ? startOfMonthIso(today) : today))
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null)
   const [createModal, setCreateModal] = useState<{ open: boolean; date?: string; hour?: number }>({ open: false })
 

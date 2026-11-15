@@ -4,13 +4,21 @@ import { Pagination } from '@/components/admin/pagination'
 import LeadsTable from '@/components/LeadsTable'
 import { AgentLeadsStrip } from '@/components/admin/agent-leads-strip'
 import ProjectCalculator from '@/components/ProjectCalculator'
+import { SmartCalendar } from '@/components/SmartCalendar'
 import { LEAD_SORT, loadCallsScreen } from '@/lib/admin/leads'
 import { loadAgentLeads } from '@/lib/admin/agent-leads'
+import { loadCalendarWindow } from '@/lib/admin/calendar'
+import { windowFor } from '@/lib/admin/calendar-window'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { flipDir, parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
 
 // Hovory (AD07): řazení, stránka i pohled jsou v adrese, takže přežijí
 // reload i tlačítko Zpět. Poznámky se k řádku tahají jen jako náhled,
 // celé až po rozbalení kontaktu.
+//
+// Pohled `?pohled=kalendar` (R-110) ukáže týdenní kalendář s plánovanými
+// hovory, schůzkami a konzultacemi — tentýž, co je v sekci Kalendář.
+// Hovor naplánovaný v tabulce (příští akce) je v kalendáři hned vidět.
 
 const PATH = '/dashboard/calls'
 
@@ -20,6 +28,7 @@ export default async function CallsPage(props: {
   const searchParams = await props.searchParams
   const focusLead = Array.isArray(searchParams.lead) ? searchParams.lead[0] : searchParams.lead
   const waiting = searchParams.pohled === 'cekani'
+  const calendarView = searchParams.pohled === 'kalendar'
 
   const params = parseTableParams(searchParams, {
     allowed: LEAD_SORT,
@@ -27,9 +36,16 @@ export default async function CallsPage(props: {
     pageSize: 50,
     tiebreak: 'l.created_at',
   })
+  const today = getPragueTodayISO()
+  const calendarRange = windowFor(today)
   // AI leady z vizeon-lead-agent visí v pruhu nad výpisem (AD16) — dosud se
-  // jen ukládaly a nikdo je neviděl.
-  const [screen, agentLeads] = await Promise.all([loadCallsScreen(params, waiting), loadAgentLeads()])
+  // jen ukládaly a nikdo je neviděl. Počty v záložkách potřebuje i pohled
+  // kalendáře, proto se výpis čte vždy; kalendář jen na své záložce.
+  const [screen, agentLeads, calendar] = await Promise.all([
+    loadCallsScreen(params, waiting),
+    calendarView ? null : loadAgentLeads(),
+    calendarView ? loadCalendarWindow(calendarRange) : null,
+  ])
   const links = tableLinks(PATH, searchParams)
 
   // Funkce se do klientské komponenty poslat nedá, proto se odkazy na řazení
@@ -43,7 +59,7 @@ export default async function CallsPage(props: {
   )
 
   return (
-    <PageShell width="table" className="gap-10">
+    <PageShell width={calendarView ? 'wide' : 'table'} className="gap-10">
       <div className="flex flex-col gap-5">
         <PageHeader
           title="Hovory"
@@ -63,7 +79,7 @@ export default async function CallsPage(props: {
               key: 'hovory',
               label: 'Hovory',
               href: tableHref(PATH, searchParams, { pohled: null, page: null }),
-              active: !waiting,
+              active: !waiting && !calendarView,
               count: screen.active,
             },
             {
@@ -73,29 +89,43 @@ export default async function CallsPage(props: {
               active: waiting,
               count: screen.waiting,
             },
+            {
+              key: 'kalendar',
+              label: 'Kalendář',
+              href: tableHref(PATH, searchParams, { pohled: 'kalendar', page: null }),
+              active: calendarView,
+            },
           ]}
         />
 
-        <AgentLeadsStrip rows={agentLeads.rows} total={agentLeads.total} />
+        {calendar ? (
+          <SmartCalendar initial={calendar} initialRange={calendarRange} today={today} defaultView="week" />
+        ) : (
+          <>
+            {agentLeads && <AgentLeadsStrip rows={agentLeads.rows} total={agentLeads.total} />}
 
-        <LeadsTable
-          // Po změně řazení nebo stránky se vykreslí nové řádky, ne ty
-          // zapamatované z předchozí stránky.
-          key={`${params.sortKey}-${params.dir}-${params.page}-${waiting ? 'cekani' : 'hovory'}`}
-          initialLeads={screen.rows}
-          waiting={waiting}
-          sortKey={params.sortKey}
-          dir={params.dir}
-          sortLinks={sortLinks}
-          focusLeadId={focusLead}
-        />
+            <LeadsTable
+              // Po změně řazení nebo stránky se vykreslí nové řádky, ne ty
+              // zapamatované z předchozí stránky.
+              key={`${params.sortKey}-${params.dir}-${params.page}-${waiting ? 'cekani' : 'hovory'}`}
+              initialLeads={screen.rows}
+              waiting={waiting}
+              sortKey={params.sortKey}
+              dir={params.dir}
+              sortLinks={sortLinks}
+              focusLeadId={focusLead}
+            />
 
-        <Pagination params={params} total={screen.total} links={links} />
+            <Pagination params={params} total={screen.total} links={links} />
+          </>
+        )}
       </div>
 
-      <div className="border-t border-navy-100 pt-10">
-        <ProjectCalculator />
-      </div>
+      {!calendarView && (
+        <div className="border-t border-navy-100 pt-10">
+          <ProjectCalculator />
+        </div>
+      )}
     </PageShell>
   )
 }

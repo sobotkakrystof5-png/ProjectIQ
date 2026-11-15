@@ -2,20 +2,30 @@ import { Briefcase, TrendingUp, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Project } from '@/lib/types'
 
-export type SummaryProject = Pick<Project, 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid'>
+export type SummaryProject = Pick<Project, 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid'> & {
+  /** Zálohy zapsané z Finance › Podnikání (R-110). */
+  extra_deposits?: number | null
+}
 
 interface SummaryBarProps {
   projects: SummaryProject[]
+  /** Rozpracované zakázky, nebo výpis Dokončených (R-109). */
+  mode?: 'active' | 'finished'
 }
 
-export function SummaryBar({ projects }: SummaryBarProps) {
-  const active = projects.filter(p => p.status !== 'paid' && p.status !== 'done').length
+export function SummaryBar({ projects, mode = 'active' }: SummaryBarProps) {
+  const active = mode === 'finished'
+    ? projects.length
+    : projects.filter(p => p.status !== 'paid' && p.status !== 'done').length
   const totalRevenue = projects.reduce((sum, p) => sum + Number(p.price ?? 0), 0)
   const unpaid = projects
     .filter(p => !p.paid && p.price)
     .reduce((sum, p) => {
-      const alreadyPaid = p.deposit_paid && p.deposit_amount ? Number(p.deposit_amount) : 0
-      return sum + Number(p.price ?? 0) - alreadyPaid
+      // Stejně jako `remainingToPay` (lib/admin/project-payments.ts): vlastní
+      // záloha i zálohy z Podnikání, nikdy pod nulu.
+      const alreadyPaid = (p.deposit_paid && p.deposit_amount ? Number(p.deposit_amount) : 0)
+        + Number(p.extra_deposits ?? 0)
+      return sum + Math.max(0, Number(p.price ?? 0) - alreadyPaid)
     }, 0)
 
   return (
@@ -23,7 +33,7 @@ export function SummaryBar({ projects }: SummaryBarProps) {
       <StatCard
         icon={<Briefcase size={17} strokeWidth={1.5} className="text-navy-600" />}
         iconBg="bg-navy-50"
-        label="Aktivní zakázky"
+        label={mode === 'finished' ? 'Dokončené zakázky' : 'Aktivní zakázky'}
         value={String(active)}
       />
       <StatCard

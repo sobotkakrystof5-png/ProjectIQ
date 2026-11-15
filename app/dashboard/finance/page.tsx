@@ -19,6 +19,7 @@ import { getCosts } from '@/app/costs-actions'
 import { getInvoices, getInvoiceProjectOptions } from './invoice-actions'
 import { getTaxNews } from './tax-news-actions'
 import { getPragueTodayISO } from '@/lib/prague-time'
+import { loadBusinessPaymentsPanel } from '@/lib/admin/project-payments'
 
 type Tab = 'osobni' | 'podnikani'
 
@@ -59,13 +60,13 @@ export default async function FinancePage(
 
   // Výkonnost podnikání (dřív rozcestník /hub/byznys, AD03) patří k Podnikání:
   // jsou to stejné peníze, jen celková a ne daňová optika.
-  const [businessIncome, invoices, projectOptions, taxNews, businessOverview] =
+  const [businessIncome, invoices, projectOptions, taxNews, businessOverview, businessPayments] =
     tab === 'podnikani'
       ? await Promise.all([
           getBusinessIncome(year), getInvoices(year), getInvoiceProjectOptions(), getTaxNews(),
-          getBusinessOverview(),
+          getBusinessOverview(), loadBusinessPaymentsPanel(year),
         ])
-      : [null, null, null, null, null]
+      : [null, null, null, null, null, null]
 
   return (
     <PageShell width="wide" className="gap-8">
@@ -98,6 +99,7 @@ export default async function FinancePage(
             invoices={invoices!}
             projectOptions={projectOptions!}
             taxNews={taxNews!}
+            payments={businessPayments!}
             todayIso={getPragueTodayISO()}
           />
           <div className="border-t border-navy-100 pt-6">

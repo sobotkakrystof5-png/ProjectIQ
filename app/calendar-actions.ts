@@ -111,6 +111,8 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
   }
 
   revalidatePath('/dashboard/calendar')
+  // Kalendář je od R-110 i na Dnes (a „Nejbližší schůzky a hovory").
+  revalidatePath('/dashboard')
   if (mirrorToLeads) {
     revalidatePath('/dashboard/calls')
     revalidatePath('/dashboard/kontakty')
@@ -129,4 +131,5 @@ export async function deleteCalendarEvent(id: string) {
   `
   revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard/calls')
+  revalidatePath('/dashboard')
 }

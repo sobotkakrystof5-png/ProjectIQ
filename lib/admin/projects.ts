@@ -1,23 +1,40 @@
 import 'server-only'
 import { adminDb, batchTolerant, type AdminQuery } from './db'
+import { extraDepositsSql } from './project-payments'
 import type { TableParams } from '@/lib/admin-table'
-import type { Project } from '@/lib/types'
+import type { Project, ProjectStatus } from '@/lib/types'
 import type { SummaryProject } from '@/components/SummaryBar'
 
 /**
- * Seznam zakázek `/dashboard/zakazky` (AD07).
+ * Seznamy zakázek `/dashboard/zakazky` a `/dashboard/zakazky/dokoncene`.
  *
- * Dřív se načetly všechny zakázky a filtr stavu i zdroje se dělal
- * v prohlížeči (`DashboardFilters`). Teď filtruje a stránkuje databáze
- * a čísla u filtrů se počítají ze všech zakázek, ne jen ze zobrazené stránky.
+ * Od AD07 filtruje a stránkuje databáze a čísla u filtrů se počítají ze
+ * všech zakázek, ne jen ze zobrazené stránky.
  *
- * Od AD11 sem patří i to, co bývalo v Dokončených: `?status=uzavrene` ukáže
- * uzavřené zakázky (`closed_at`) a `?typ=personal` vlastní projekty bez
- * klienta. Výchozí pohled je práce pro klienty.
+ * Od 2026-11-15 (R-109) jsou to dva oddělené výpisy: Zakázky ukazují jen
+ * rozpracovanou práci a Dokončené hotové a zaplacené zakázky. `?typ=personal`
+ * ukáže vlastní projekty bez klienta, výchozí pohled je práce pro klienty.
  */
 
-/** Pseudostav ve filtru: není v `projects.status`, ptá se na `closed_at`. */
-export const CLOSED_FILTER = 'uzavrene'
+/** Který výpis: rozpracované, nebo dokončené zakázky. */
+export type ProjectScope = 'active' | 'finished'
+
+/**
+ * Dokončená zakázka: uzavřená, nebo ve stavu hotovo/zaplaceno. Stejná
+ * podmínka jako u dotazníku (`lib/admin/surveys.ts`), aby se zakázka
+ * nepočítala jinde jako hotová a tady jako rozpracovaná.
+ */
+const FINISHED_SQL = `(closed_at IS NOT NULL OR status IN ('done', 'paid'))`
+const SCOPE_SQL: Record<ProjectScope, string> = {
+  active: `NOT ${FINISHED_SQL}`,
+  finished: FINISHED_SQL,
+}
+
+/** Stavy, podle kterých jde ve výpisu filtrovat. */
+export const SCOPE_STATUSES: Record<ProjectScope, ProjectStatus[]> = {
+  active: ['new', 'in_progress', 'review'],
+  finished: ['done', 'paid'],
+}
 
 export const PROJECT_SORT = {
   pridano: { sql: 'created_at', dir: 'desc' as const },
@@ -25,6 +42,9 @@ export const PROJECT_SORT = {
   klient: { sql: 'client_name', dir: 'asc' as const },
   cena: { sql: 'price', dir: 'desc' as const },
   termin: { sql: 'deadline', dir: 'asc' as const },
+  // Dokončené: naposledy uzavřené nahoře; starší zakázka bez `closed_at`
+  // se řadí podle poslední změny.
+  uzavreno: { sql: 'COALESCE(closed_at::timestamptz, updated_at)', dir: 'desc' as const },
 }
 
 /** Kolik zakázek se bere do součtů nahoře. Víc jich v adminu nikdy nebylo. */
@@ -33,39 +53,53 @@ const SUMMARY_LIMIT = 1000
 export type ProjectsScreen = {
   rows: (Project & { lead_origin?: string })[]
   total: number
-  /** Počty podle stavu pro vybraný zdroj (a „all" přes všechny stavy, `uzavrene` zvlášť). */
+  /** Počty podle stavu pro vybraný zdroj a výpis („all" přes všechny jeho stavy). */
   counts: Record<string, number>
-  /** Kolik je zakázek pro klienty a kolik vlastních projektů. */
+  /** Kolik je ve výpisu zakázek pro klienty a kolik vlastních projektů. */
   typeCounts: { client: number; personal: number }
   summary: SummaryProject[]
   /** Kolik nevyřízených požadavků má která zakázka na téhle stránce. */
   openRequests: Record<string, number>
 }
 
-function where(origin: string | null, status: string | null, type: string): { sql: string; params: unknown[] } {
-  const params: unknown[] = [type]
-  const parts = ['NOT lead_pending', 'project_type = $1']
+function where(
+  scope: ProjectScope,
+  origin: string | null,
+  status: string | null,
+  type: string | null,
+): { sql: string; params: unknown[] } {
+  const params: unknown[] = []
+  const parts = ['NOT lead_pending', SCOPE_SQL[scope]]
+  if (type) {
+    params.push(type)
+    parts.push(`project_type = $${params.length}`)
+  }
   if (origin) {
     params.push(origin)
     parts.push(`lead_origin = $${params.length}`)
   }
-  if (status === CLOSED_FILTER) {
-    parts.push('closed_at IS NOT NULL')
-  } else if (status) {
+  if (status) {
     params.push(status)
     parts.push(`status = $${params.length}`)
   }
   return { sql: `WHERE ${parts.join(' AND ')}`, params }
 }
 
+/** Stav z adresy, jen pokud do výpisu patří (jinak bez filtru). */
+export function scopeStatus(scope: ProjectScope, raw: string | null | undefined): ProjectStatus | null {
+  return raw && (SCOPE_STATUSES[scope] as string[]).includes(raw) ? (raw as ProjectStatus) : null
+}
+
 export async function loadProjectsScreen(
+  scope: ProjectScope,
   params: TableParams,
   origin: string | null,
-  status: string | null,
+  status: ProjectStatus | null,
   type: string = 'client',
 ): Promise<ProjectsScreen> {
-  const filter = where(origin, status, type)
-  const originOnly = where(origin, null, type)
+  const filter = where(scope, origin, status, type)
+  const originOnly = where(scope, origin, null, type)
+  const scopeOnly = where(scope, null, null, null)
 
   const page: AdminQuery = {
     text: `SELECT * FROM projects ${filter.sql} ${params.orderBy}
@@ -78,18 +112,18 @@ export async function loadProjectsScreen(
     text: `SELECT status, count(*)::int AS pocet FROM projects ${originOnly.sql} GROUP BY status`,
     params: originOnly.params,
   }
-  // Uzavřené a počty druhů jdou mimo `GROUP BY status` — jeden řádek navíc
-  // v téže dávce, ne další kolo do databáze.
+  // Počty druhů jdou mimo `GROUP BY status` — jeden řádek navíc v téže
+  // dávce, ne další kolo do databáze.
   const extra: AdminQuery = {
     text: `SELECT
-             count(*) FILTER (WHERE closed_at IS NOT NULL AND project_type = $1)::int AS uzavrene,
              count(*) FILTER (WHERE project_type = 'client')::int AS klienti,
              count(*) FILTER (WHERE project_type = 'personal')::int AS vlastni
-           FROM projects WHERE NOT lead_pending`,
-    params: [type],
+           FROM projects ${scopeOnly.sql}`,
+    params: scopeOnly.params,
   }
   const summary: AdminQuery = {
-    text: `SELECT status, price, paid, deposit_amount, deposit_paid
+    text: `SELECT status, price, paid, deposit_amount, deposit_paid,
+                  ${extraDepositsSql('projects')}::float AS extra_deposits
            FROM projects ${originOnly.sql} ORDER BY created_at DESC LIMIT $${originOnly.params.length + 1}`,
     params: [...originOnly.params, SUMMARY_LIMIT],
   }
@@ -102,8 +136,7 @@ export async function loadProjectsScreen(
     byStatus[key] = Number(row.pocet)
     byStatus.all += Number(row.pocet)
   }
-  const extraRow = extraRows[0] as { uzavrene?: number; klienti?: number; vlastni?: number } | undefined
-  byStatus[CLOSED_FILTER] = Number(extraRow?.uzavrene ?? 0)
+  const extraRow = extraRows[0] as { klienti?: number; vlastni?: number } | undefined
   const byType = {
     client: Number(extraRow?.klienti ?? 0),
     personal: Number(extraRow?.vlastni ?? 0),

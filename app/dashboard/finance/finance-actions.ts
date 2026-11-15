@@ -3,6 +3,7 @@
 import { sql } from '@/lib/db'
 import { adminDb, q, type AdminQuery } from '@/lib/admin/db'
 import { toForeignTotals, withLedger, type ForeignTotal } from '@/lib/admin/ledger'
+import { remainingSql } from '@/lib/admin/project-payments'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import {
@@ -442,6 +443,8 @@ export interface IncomeLine {
    * Napříč roky, ne za vybraný rok: dokud peníze nedorazí, nepatří žádnému.
    */
   outstanding: number
+  /** Kolik z příjmů za rok byly zálohy (vlastní záloha zakázky i zálohy z Podnikání). */
+  deposits: number
 }
 
 export interface BusinessIncomeSummary {
@@ -460,7 +463,7 @@ export interface BusinessIncomeSummary {
   foreign: ForeignTotal[]
 }
 
-const EMPTY_LINE: IncomeLine = { income: 0, transactionCount: 0, projectCount: 0, outstanding: 0 }
+const EMPTY_LINE: IncomeLine = { income: 0, transactionCount: 0, projectCount: 0, outstanding: 0, deposits: 0 }
 
 export async function getBusinessIncome(year: number): Promise<BusinessIncomeSummary> {
   await requireAuth()
@@ -478,7 +481,9 @@ export async function getBusinessIncome(year: number): Promise<BusinessIncomeSum
             COUNT(*)::int AS transaction_count,
             -- Po migraci 106 (AD11) visí každý příjem z Dokončených na zakázce,
             -- takže druhá větev COALESCE zmizela.
-            COUNT(DISTINCT source_project_id::text)::int AS project_count
+            COUNT(DISTINCT source_project_id::text)::int AS project_count,
+            -- Zálohy: vlastní záloha zakázky i zálohy zapsané z Podnikání (R-110).
+            COALESCE(SUM(amount) FILTER (WHERE deposit_transaction), 0)::float AS deposits
           FROM finance_transactions
           WHERE user_id IS NULL
             AND type = 'income'
@@ -488,18 +493,22 @@ export async function getBusinessIncome(year: number): Promise<BusinessIncomeSum
         `,
         params: [year],
       },
-      // Zbývá doplatit = cena − už zaplacená záloha. Zakázky obou byznysů
-      // dohromady: je to jedno IČO a jedno daňové přiznání.
-      q`
-        SELECT
-          invoiced_on_ico AS declared,
-          SUM(GREATEST(price - CASE WHEN deposit_paid THEN COALESCE(deposit_amount, 0) ELSE 0 END, 0))::float AS outstanding
-        FROM projects
-        WHERE paid = false
-          AND price IS NOT NULL
-          AND price > 0
-        GROUP BY invoiced_on_ico
-      `,
+      // Zbývá doplatit = cena − vlastní záloha − zálohy zapsané z Podnikání
+      // (R-110, `remainingSql`). Zakázky obou byznysů dohromady: je to jedno
+      // IČO a jedno daňové přiznání.
+      {
+        text: `
+          SELECT
+            p.invoiced_on_ico AS declared,
+            SUM(${remainingSql('p')})::float AS outstanding
+          FROM projects p
+          WHERE p.paid = false
+            AND p.price IS NOT NULL
+            AND p.price > 0
+          GROUP BY p.invoiced_on_ico
+        `,
+        params: [],
+      },
       q`
         SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS year
         FROM finance_transactions
@@ -526,11 +535,12 @@ export async function getBusinessIncome(year: number): Promise<BusinessIncomeSum
     false: { ...EMPTY_LINE },
   }
 
-  for (const row of incomeRows as { declared: boolean; income: number; transaction_count: number; project_count: number }[]) {
+  for (const row of incomeRows as { declared: boolean; income: number; transaction_count: number; project_count: number; deposits: number }[]) {
     const key = row.declared ? 'true' : 'false'
     lines[key].income = row.income
     lines[key].transactionCount = row.transaction_count
     lines[key].projectCount = row.project_count
+    lines[key].deposits = Number(row.deposits ?? 0)
   }
 
   for (const row of outstandingRows as { declared: boolean; outstanding: number }[]) {

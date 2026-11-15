@@ -40,14 +40,19 @@ describe('navigace administrace', () => {
     }
   })
 
-  // AD11 (R-090): dokončenost je stav zakázky, hodnocení je na ní. Obě staré
-  // adresy leží v `notifications.link` a ve starých e-mailech, takže se z nich
-  // nesmí stát 404.
-  it('Dokončené a Hodnocení z menu zmizely, ale jejich adresy vedou dál', () => {
-    expect(allNavItems().map((i) => i.href)).not.toContain('/dashboard/dokoncene')
+  // AD11 (R-090): hodnocení je na zakázce. Dokončené mají od R-109 vlastní
+  // výpis pod Zakázkami. Obě staré adresy leží v `notifications.link`
+  // a ve starých e-mailech, takže se z nich nesmí stát 404.
+  it('staré adresy Dokončených a Hodnocení vedou dál', () => {
     expect(allNavItems().map((i) => i.href)).not.toContain('/dashboard/hodnoceni')
-    expect(resolveLegacyRedirect('/dashboard/dokoncene')).toBe('/dashboard/zakazky?status=uzavrene')
+    expect(resolveLegacyRedirect('/dashboard/dokoncene')).toBe('/dashboard/zakazky/dokoncene')
     expect(resolveLegacyRedirect('/dashboard/hodnoceni')).toBe('/dashboard/profil')
+  })
+
+  it('Dokončené jsou vlastní položka v Práci a nesvítí spolu se Zakázkami (R-109)', () => {
+    expect(ADMIN_NAV.find((g) => g.label === 'Práce')?.items.map((i) => i.label)).toContain('Dokončené')
+    expect(activeHref('/dashboard/zakazky/dokoncene')).toBe('/dashboard/zakazky/dokoncene')
+    expect(activeHref('/dashboard/zakazky')).toBe('/dashboard/zakazky')
   })
 
   it('adresy položek jsou jedinečné', () => {
