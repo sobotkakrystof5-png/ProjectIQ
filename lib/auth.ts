@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { sql } from './db'
 import { createSupabaseServerClient } from './supabase/server'
 import { isAdminEmail, supabaseConfigured } from './supabase/config'
+import { sessionTooOld } from './supabase/session-age'
 
 /**
  * Přihlášení do admin konzole. Od 2026-11-14 ho vede **Supabase Auth**
@@ -67,6 +68,10 @@ export async function loadAdminSession(): Promise<AdminSession | null> {
   const claims = data.claims
   const email = typeof claims.email === 'string' ? claims.email : null
   if (!email || !isAdminEmail(email)) return null
+
+  // Dvanáct hodin od přihlášení a dost — „Time-box user sessions" je
+  // v Supabase placená funkce, tak si strop držíme sami (R-106).
+  if (sessionTooOld(claims)) return null
 
   const aal = typeof claims.aal === 'string' ? claims.aal : null
 

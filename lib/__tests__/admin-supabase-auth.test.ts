@@ -31,6 +31,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 import { loadAdminSession } from '@/lib/auth'
+import { sessionStartedAt, sessionTooOld } from '@/lib/supabase/session-age'
 import { ADMIN_SESSION_MAX_AGE_SECONDS, hardenedCookieOptions } from '@/lib/supabase/cookies'
 import { isAdminEmail } from '@/lib/supabase/config'
 
@@ -73,6 +74,39 @@ describe('kdo se dostane do adminu', () => {
   it('session bez e-mailu neprojde', async () => {
     state.claims = { sub: 'uuid-5', aal: 'aal2' }
     expect(await loadAdminSession()).toBeNull()
+  })
+})
+
+describe('délka session má tvrdý strop (Time-box je v Supabase placený)', () => {
+  const HODINA = 3600
+  const now = Math.floor(Date.now() / 1000)
+  const amr = (...casy: number[]) => casy.map((t) => ({ method: 'password', timestamp: t }))
+
+  it('začátek session je nejstarší čas v amr, ne ten poslední', () => {
+    // password v 10:00, druhý faktor v 10:01 — session začala v 10:00.
+    expect(sessionStartedAt({ amr: [{ method: 'password', timestamp: 1000 }, { method: 'totp', timestamp: 1060 }] })).toBe(1000)
+  })
+
+  it('svěží session projde, dvanáct hodin stará ne', () => {
+    expect(sessionTooOld({ amr: amr(now - HODINA) }, now)).toBe(false)
+    expect(sessionTooOld({ amr: amr(now - 11 * HODINA) }, now)).toBe(false)
+    expect(sessionTooOld({ amr: amr(now - 13 * HODINA) }, now)).toBe(true)
+  })
+
+  it('stará session se do adminu nedostane, ani když je všechno ostatní v pořádku', async () => {
+    state.claims = { email: ADMIN, sub: 'uuid-6', aal: 'aal2', amr: amr(now - 13 * HODINA) }
+    expect(await loadAdminSession()).toBeNull()
+
+    state.claims = { email: ADMIN, sub: 'uuid-6', aal: 'aal2', amr: amr(now - HODINA) }
+    expect(await loadAdminSession()).not.toBeNull()
+  })
+
+  it('bez použitelného amr se strop neuplatní (neodmítne session omylem)', () => {
+    expect(sessionTooOld({}, now)).toBe(false)
+    expect(sessionTooOld({ amr: ['password'] }, now)).toBe(false)
+    expect(sessionTooOld({ amr: [{ method: 'password' }] }, now)).toBe(false)
+    expect(sessionTooOld({ amr: 'password' }, now)).toBe(false)
+    expect(sessionStartedAt({ amr: [{ method: 'password', timestamp: 0 }] })).toBeNull()
   })
 })
 

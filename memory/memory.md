@@ -9,7 +9,7 @@
 > session je zpevněná proti výchozímu stavu `@supabase/ssr` (`httpOnly`, 12 h místo 400 dní)
 > a **CSP se nemění**, protože prohlížeč na Supabase nesahá. **Naživo to nikdo nezkusil:**
 > projekt má nula uživatelů, takže než se někdo přihlásí, musí Kryštof založit účet, doplnit
-> env do Vercelu a vypnout veřejnou registraci (Otevřené problémy). Je to na větvi
+> env do Vercelu a zapnout hook, který zavírá registraci (Otevřené problémy). Je to na větvi
 > `admin/supabase-auth`, ne na produkci.
 >
 > Předchozí: 2026-11-14 · **AD18 hotové — modernizace adminu je dojednaná.**
@@ -980,6 +980,32 @@ ale už jen jako záložní adresa aplikace pro odkazy v e-mailech. Rozhodnutí 
 v tom, čím se admin přihlašuje; jeden admin a žádné role platí dál. Bezpečnostní podrobnosti
 a přijatá rizika: `.claude/security/DECISIONS.md` #029.
 
+### R-106 · Co je v Supabase placené, řeší kód a hook (2026-11-15)
+**Rozhodnutí:** dvě věci, které R-105 nechalo jako „nastavit v dashboardu", jsou v Supabase
+**placené funkce** (Pro) a náš projekt je na Free — Kryštof na to upozornil. Řeší se tedy jinak,
+bez placení:
+1. **Veřejná registrace** se nezavírá přepínačem „Allow new users to sign up", ale **hookem
+   `before_user_created_jen_admin`** (Postgres funkce v Supabase). Běží *před* vložením do
+   `auth.users`, takže cizí účet vůbec nevznikne, a vrací `403 Registrace není povolená`.
+   Zdroj je v repu jako **generátor** `scripts/supabase-auth-sql.mjs`, který SQL vypíše
+   s e-mailem z `ADMIN_EMAIL` — aby e-mail nemusel být natvrdo v gitu.
+2. **Délka session** se nedrží přes „Time-box user sessions", ale v kódu
+   (`lib/supabase/session-age.ts`): strop **12 h od přihlášení** se počítá z `amr`
+   v podepsaných claims a uplatňuje se v `getAdminSession()` i v `proxy.ts`.
+**Proč:** Free plán ty volby nenabízí a platit Pro kvůli dvěma nastavením nemá smysl, když je
+obojí v naší moci. `amr` je pro strop lepší než `iat`: **při obnovení tokenu se nemění**, takže
+nese skutečný čas přihlášení. Cookie (R-105) má taky 12 h, ale ta se každým obnovením
+prodlouží — je to klouzavé okno, zatímco tohle je pevný strop od přihlášení.
+**Důsledek:** hook **v databázi je a je ověřený** proti živé DB (cizí e-mail odmítnut,
+`ADMIN_EMAIL` i velkými písmeny povolen, `security definer` vypnuté podle doporučení Supabase,
+spouštět smí jen `supabase_auth_admin`), ale **musí se ještě zapnout** v Authentication → Hooks
+→ Before User Created; dokud to nikdo neudělá, je to nepoužité SQL a registrace je otevřená.
+Hook je dostupný i na Free (tabulka dostupnosti: „Free, Pro"). Past do budoucna: strop session
+stojí na tom, že Supabase posílá v `amr` čas metody — kdyby to přestal, platí jen klouzavá
+cookie; hlídá to test, ale jen na vymyšlených claims. Změna `ADMIN_EMAIL` znamená pustit
+generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105,
+`.claude/security/DECISIONS.md` #029 (doplnění).
+
 ---
 
 ## 3. Otevřené problémy
@@ -1154,10 +1180,13 @@ a přijatá rizika: `.claude/security/DECISIONS.md` #029.
 - [ ] **Přihlášení přes Supabase nikdo nezkusil naživo (R-105):** projekt `zakaziq` má
   **nula uživatelů**, takže se do adminu nepřihlásí nikdo, dokud účet nevznikne. Zbývá:
   (1) Kryštof založí účet v Supabase (Authentication → Users → Add user, e-mail musí být
-  shodný s `ADMIN_EMAIL`, heslo zná jen on), (2) `SUPABASE_URL` a `SUPABASE_PUBLISHABLE_KEY`
-  do Vercelu (Production i Preview), (3) **vypnout veřejnou registraci** a nastavit `timebox`
-  session na 12 h v dashboardu — kód to neumí a cookie drží platnost jen na straně prohlížeče,
-  (4) pak projít na 390 / 768 / 1280 / 1440 px: přihlášení, zapnutí ověřovací aplikace
+  shodný s `ADMIN_EMAIL`, heslo zná jen on), (2) **ověřit env ve Vercelu** — `SUPABASE_URL`
+  a `SUPABASE_PUBLISHABLE_KEY` tam od integrace Supabase **už jsou, ale jen pro Production**;
+  zkontrolovat, že míří na projekt `awcgvgkeuwgspybwvvpn` (na účtu jsou tři Supabase projekty)
+  a doplnit je pro Preview. Leží tam i `SUPABASE_SERVICE_ROLE_KEY` a `SUPABASE_SECRET_KEY`,
+  které kód nepoužívá — odebrat, (3) **zapnout hook** `before_user_created_jen_admin`
+  v Authentication → Hooks → Before User Created (funkce v databázi už je a je ověřená, R-106;
+  dokud se nezapne, je registrace otevřená), (4) pak projít na 390 / 768 / 1280 / 1440 px: přihlášení, zapnutí ověřovací aplikace
   v Profilu (QR i ruční klíč), druhý krok s kódem, špatný kód, odhlášení a zámek po pěti
   pokusech. `ADMIN_PASSWORD_HASH` a `NEXTAUTH_SECRET` se po ověření můžou z Vercelu odebrat
   · DECISIONS #029 · od 2026-11-15
@@ -1264,6 +1293,17 @@ a přijatá rizika: `.claude/security/DECISIONS.md` #029.
 - **chore** Build poprvé spadl na `next/font/google` a prošel až po smazání `.next` — tedy
   **potvrzení otevřeného problému** o poškozené build cache z 2026-11-13, ne vada téhle změny.
 - **decision** **R-105** — Supabase jen jako poskytovatel identity pro admin; Neon zůstává.
+- **fix** **Dvě věci z R-105 šly jen za Pro, tak se řeší jinak** (R-106, DECISIONS #029
+  doplnění): veřejnou registraci zavírá **hook `before_user_created_jen_admin`** (Postgres
+  funkce, cizí účet vůbec nevznikne → `403`; generátor SQL `scripts/supabase-auth-sql.mjs`,
+  aby e-mail nebyl natvrdo v gitu) a délku session drží **kód** — strop 12 h od přihlášení
+  z `amr` v podepsaných claims (`lib/supabase/session-age.ts`), který se při obnovení tokenu
+  nemění, takže je to pevný strop, ne klouzavé okno jako cookie. Ověřeno proti živé databázi:
+  cizí e-mail odmítnut, `ADMIN_EMAIL` i velkými písmeny povolen, `security definer` vypnuté,
+  spouštět smí jen `supabase_auth_admin`. **Hook se ještě musí zapnout v dashboardu.**
+- **chore** Zjištěno, že **Supabase env ve Vercelu už existuje** (integrace, jen Production) —
+  včetně `SUPABASE_SERVICE_ROLE_KEY`, který kód nepoužívá. Ověřit cílový projekt a klíč odebrat.
+- **decision** **R-106** — co je v Supabase placené, řeší kód a hook.
 
 ### 2026-11-14 (ověření produkce z runtime chyb Vercelu)
 - **chore** **Tři migrace jsou prokázané, ne jen slíbené.** Dotaz na runtime chyby produkce

@@ -3,6 +3,7 @@ import type { NextRequest, NextResponse } from 'next/server'
 
 import { isAdminEmail, supabaseConfigured, supabasePublishableKey, supabaseUrl } from './config'
 import { hardenedCookieOptions } from './cookies'
+import { sessionTooOld } from './session-age'
 
 export type AdminClaims = { email: string; userId: string; aal: string | null }
 
@@ -48,6 +49,7 @@ export async function checkAdminSession(request: NextRequest): Promise<AdminSess
 
   const email = typeof claims?.email === 'string' ? claims.email : null
   if (!claims || !email || !isAdminEmail(email)) return { admin: null, cookiesToSet }
+  if (sessionTooOld(claims)) return { admin: null, cookiesToSet }
 
   return {
     admin: { email, userId: String(claims.sub ?? ''), aal: typeof claims.aal === 'string' ? claims.aal : null },
