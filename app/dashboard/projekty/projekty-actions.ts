@@ -3,8 +3,7 @@
 import { sql } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import type {
   PersonalProject,
   PersonalProjectImprovement,
@@ -13,7 +12,7 @@ import type {
 } from '@/lib/types'
 
 async function requireAuth() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Unauthorized')
 }
 

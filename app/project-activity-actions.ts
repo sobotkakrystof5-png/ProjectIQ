@@ -1,10 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { sql } from '@/lib/db'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { getAdminSession, requireAuth } from '@/lib/auth'
 import { projectPath } from '@/lib/lead-origins'
 import { sendActivityDigestEmail } from '@/lib/email'
 import { getPublicUrl } from '@/lib/utils'
@@ -26,8 +25,8 @@ const idSchema = z.string().uuid()
 const NOT_FOUND = 'Zpráva nebyla nalezena nebo už není koncept.'
 
 async function adminEmail(): Promise<string> {
-  const session = await getServerSession(authOptions)
-  return session?.user?.email ?? 'admin'
+  const session = await getAdminSession()
+  return session?.email ?? 'admin'
 }
 
 interface ProjectRef {

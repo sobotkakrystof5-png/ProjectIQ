@@ -1,19 +1,37 @@
-import type { NextAuthOptions } from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { getServerSession } from 'next-auth'
-import bcrypt from 'bcryptjs'
+import { cache } from 'react'
+import { headers } from 'next/headers'
+
 import { sql } from './db'
+import { createSupabaseServerClient } from './supabase/server'
+import { isAdminEmail, supabaseConfigured } from './supabase/config'
+
+/**
+ * Přihlášení do admin konzole. Od 2026-11-14 ho vede **Supabase Auth**
+ * (e-mail + heslo a k tomu TOTP), dřív to byl NextAuth Credentials — R-105.
+ * Pravidlo jednoho admina z R-001 platí dál: dovnitř se dostane jen session,
+ * jejíž e-mail se rovná `ADMIN_EMAIL`. Kdo se přihlásí jiným účtem (třeba
+ * klient Workspace), nemá v adminu žádná práva.
+ *
+ * Data zůstávají v Neonu (R-002); Supabase je jen poskytovatel identity.
+ */
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_WINDOW_MINUTES = 15
 
-function getClientIp(req?: { headers?: Record<string, string | string[] | undefined> }): string {
-  const fwd = req?.headers?.['x-forwarded-for']
-  const value = Array.isArray(fwd) ? fwd[0] : fwd
+export type AdminSession = {
+  email: string
+  userId: string
+  /** `aal2` = session prošla i druhým faktorem, `aal1` = jen heslo. */
+  aal: string | null
+}
+
+export async function clientIp(): Promise<string> {
+  const value = (await headers()).get('x-forwarded-for')
   return value ? value.split(',')[0].trim() : 'unknown'
 }
 
-async function isLockedOut(ip: string): Promise<boolean> {
+/** Zámek na IP po pěti neúspěších v patnácti minutách (DECISIONS #021). */
+export async function isLockedOut(ip: string): Promise<boolean> {
   const rows = await sql`
     SELECT count(*)::int AS count FROM login_attempts
     WHERE ip = ${ip} AND success = false
@@ -22,49 +40,69 @@ async function isLockedOut(ip: string): Promise<boolean> {
   return (rows[0] as { count: number }).count >= MAX_FAILED_ATTEMPTS
 }
 
-async function recordAttempt(ip: string, success: boolean): Promise<void> {
+export async function recordAttempt(ip: string, success: boolean): Promise<void> {
   await sql`INSERT INTO login_attempts (ip, success) VALUES (${ip}, ${success})`
   await sql`DELETE FROM login_attempts WHERE created_at < now() - interval '1 day'`
 }
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Heslo', type: 'password' },
-      },
-      async authorize(credentials, req) {
-        if (!credentials?.email || !credentials?.password) return null
+/**
+ * Kdo je přihlášený; bez per-request cache (tu přidává `getAdminSession`).
+ * Exportovaná kvůli testům, v aplikaci se volá `getAdminSession()`.
+ *
+ * `null` znamená „do adminu nesmí“ — ať už proto, že
+ * session není, je cizí, nebo nedokončila dvoufázové ověření.
+ *
+ * `getClaims()` ověří podpis JWT proti zveřejněným klíčům projektu (ES256),
+ * takže běžný průchod je lokální a bez volání Supabase. Dotaz na faktory
+ * (jedno volání Supabase) padne jen na session, která druhým faktorem
+ * neprošla — po zapnutí TOTP tedy skoro nikdy.
+ */
+export async function loadAdminSession(): Promise<AdminSession | null> {
+  if (!supabaseConfigured()) return null
 
-        const ip = getClientIp(req)
-        if (await isLockedOut(ip)) return null
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase.auth.getClaims()
+  if (error || !data?.claims) return null
 
-        const adminEmail = process.env.ADMIN_EMAIL
-        const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH
+  const claims = data.claims
+  const email = typeof claims.email === 'string' ? claims.email : null
+  if (!email || !isAdminEmail(email)) return null
 
-        let valid = false
-        if (adminEmail && adminPasswordHash && credentials.email === adminEmail) {
-          valid = await bcrypt.compare(credentials.password, adminPasswordHash)
-        }
+  const aal = typeof claims.aal === 'string' ? claims.aal : null
 
-        await recordAttempt(ip, valid)
-        if (!valid) return null
+  // Kdo má zapsaný druhý faktor, musí ho projít. Jinak by stačilo heslo
+  // a dvoufázové ověření by se dalo obejít tím, že se druhý krok přeskočí.
+  if (aal !== 'aal2') {
+    const { data: factors } = await supabase.auth.mfa.listFactors()
+    if ((factors?.totp?.length ?? 0) > 0) return null
+  }
 
-        return { id: '1', email: adminEmail! }
-      },
-    }),
-  ],
-  // Admin čte data všech klientů (i ws rolí vlastníka tabulek), proto session
-  // nejvýš 12 h místo výchozích 30 dní. Při práci se token průběžně obnovuje.
-  session: { strategy: 'jwt', maxAge: 12 * 60 * 60 },
-  pages: {
-    signIn: '/login',
-  },
+  return { email, userId: String(claims.sub ?? ''), aal }
 }
 
+/** Per-request cache: jedna stránka adminu se ptá na session z mnoha míst. */
+const cachedAdminSession = cache(loadAdminSession)
+
+export type AdminAuthProvider = () => Promise<AdminSession | null>
+
+let provider: AdminAuthProvider = cachedAdminSession
+
+/** Jen pro testy. `null` vrátí skutečné přihlášení přes Supabase. */
+export function setAdminSessionForTests(next: AdminAuthProvider | null): void {
+  provider = next ?? cachedAdminSession
+}
+
+export async function getAdminSession(): Promise<AdminSession | null> {
+  return provider()
+}
+
+/** Kdo akci provedl — do auditu a zpráv. */
+export async function adminActorEmail(): Promise<string> {
+  return (await getAdminSession())?.email ?? 'admin'
+}
+
+/** Pro server actions a route handlery: bez přihlášení se nepokračuje. */
 export async function requireAuth(): Promise<void> {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Neautorizovaný přístup')
 }

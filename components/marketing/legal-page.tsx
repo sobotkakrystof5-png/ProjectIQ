@@ -1,5 +1,4 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { AccentHeading } from '@/components/ws/brand'
 import { Footer } from './footer'
 import { Header } from './header'
@@ -10,7 +9,7 @@ import { LEGAL_VERSION } from './legal'
  * připravil agent podle skutečného chování aplikace, schvaluje je Kryštof.
  */
 export async function LegalPage({ title, intro, children }: { title: string; intro: React.ReactNode; children: React.ReactNode }) {
-  const signedIn = Boolean(await getServerSession(authOptions))
+  const signedIn = Boolean(await getAdminSession())
   return (
     <>
       <Header variant="page" signedIn={signedIn} />

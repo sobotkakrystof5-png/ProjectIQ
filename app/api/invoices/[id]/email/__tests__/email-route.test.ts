@@ -14,10 +14,9 @@ const renderMock = vi.fn()
 const sendMock = vi.fn()
 const sqlMock = vi.fn()
 const limitedMock = vi.fn()
-let session: unknown = { user: { email: 'admin@example.cz' } }
+let session: unknown = { email: 'admin@example.cz' }
 
-vi.mock('next-auth', () => ({ getServerSession: async () => session }))
-vi.mock('@/lib/auth', () => ({ authOptions: {} }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => session }))
 vi.mock('@/lib/db', () => ({ sql: (...args: unknown[]) => sqlMock(...args) }))
 vi.mock('@/lib/admin/invoice-issue', () => ({ loadIssuedInvoiceForPdf: (...a: unknown[]) => loadIssuedMock(...a) }))
 vi.mock('@/lib/invoice-pdf/render', () => ({ renderInvoicePdf: (...a: unknown[]) => renderMock(...a) }))
@@ -58,7 +57,7 @@ const request = (body: unknown, origin: string | null = 'https://admin.test') =>
   }) as unknown as Parameters<typeof POST>[0]
 
 beforeEach(() => {
-  session = { user: { email: 'admin@example.cz' } }
+  session = { email: 'admin@example.cz' }
   loadIssuedMock.mockReset().mockResolvedValue(invoice)
   renderMock.mockReset().mockResolvedValue(Buffer.from('%PDF-1.4 test'))
   sendMock.mockReset().mockResolvedValue(true)

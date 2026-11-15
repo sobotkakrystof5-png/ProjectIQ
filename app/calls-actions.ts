@@ -3,8 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { getAdminSession, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { adminDb, q, type AdminRow } from '@/lib/admin/db'
 import { loadLeadNotes } from '@/lib/admin/leads'
@@ -32,7 +31,7 @@ export type LeadPayload = {
 
 /** Celé poznámky jednoho kontaktu — až když si ho někdo rozklikne (AD07). */
 export async function getLeadNotes(leadId: string): Promise<LeadNote[]> {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return []
   return loadLeadNotes(leadId)
 }

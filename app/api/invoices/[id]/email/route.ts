@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
 import { z } from 'zod'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { sql } from '@/lib/db'
@@ -52,7 +51,7 @@ function sameOrigin(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const params = await props.params
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return NextResponse.json({ error: 'Neautorizovaný přístup' }, { status: 401 })
   if (!sameOrigin(req)) return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 403 })
   if (!UUID.test(params.id)) return NextResponse.json({ error: 'Faktura nenalezena' }, { status: 404 })

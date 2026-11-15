@@ -21,7 +21,7 @@ const notifyMock = vi.fn()
 const rateLimitedMock = vi.fn()
 const apiKeyMock = vi.fn()
 
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => undefined }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => undefined }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 vi.mock('@/lib/db', () => ({
   sql: async (strings: TemplateStringsArray, ...params: unknown[]) => {

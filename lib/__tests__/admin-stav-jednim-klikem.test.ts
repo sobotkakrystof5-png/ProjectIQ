@@ -15,7 +15,7 @@ const sendBrandedMock = vi.fn()
 const afterCallbacks: (() => unknown)[] = []
 
 vi.mock('@/lib/db', () => ({ sql: (...args: unknown[]) => sqlMock(...args) }))
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => undefined }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => undefined }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('next/server', () => ({

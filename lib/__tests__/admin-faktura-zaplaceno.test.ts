@@ -17,7 +17,7 @@ const requireAuthMock = vi.fn()
 const batchMock = vi.fn()
 
 vi.mock('@/lib/db', () => ({ sql: (...args: unknown[]) => sqlMock(...args) }))
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: () => requireAuthMock() }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: () => requireAuthMock() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/admin/db', () => ({
   adminDb: Object.assign(vi.fn(), { batch: (...a: unknown[]) => batchMock(...a) }),

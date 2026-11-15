@@ -1,12 +1,11 @@
 import { PageShell } from '@/components/ws/app/page-header'
-import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import {
   Briefcase, CheckCircle2, Clock, TrendingUp, Wallet,
   AlertCircle, Users, Inbox, PhoneCall, Star, BarChart3,
   Receipt, CalendarCheck, CircleDot, ArrowRight,
 } from 'lucide-react'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
 import { STATUS_LABELS } from '@/lib/types'
@@ -14,6 +13,8 @@ import { ProfileAvatar } from '@/components/ProfileAvatar'
 import PerformanceOverview from '@/components/PerformanceOverview'
 import { HodnoceniDashboard } from '@/components/HodnoceniDashboard'
 import { loadPerformanceScreen } from '@/lib/admin/closed'
+import { TotpCard } from '@/components/admin/totp-card'
+import { totpState } from '@/app/totp-actions'
 
 async function loadStats() {
   const [
@@ -158,14 +159,16 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 }
 
 export default async function ProfilPage() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) redirect('/login')
+
+  const totp = await totpState()
 
   // Dvě nezávislá čtení — souhrn profilu a podklady pro přehled výkonnosti.
   const [stats, performance] = await Promise.all([loadStats(), loadPerformanceScreen()])
   const { projects, vizeon, consultations, feedback, completed, costs, uniqueClients, firstProjectAt, surveys } = stats
 
-  const email = session.user?.email ?? ''
+  const email = session.email ?? ''
   const initials = email.slice(0, 2).toUpperCase()
 
   const activeCount = projects.new_count + projects.in_progress_count + projects.review_count
@@ -448,6 +451,9 @@ export default async function ProfilPage() {
           <HodnoceniDashboard projects={performance.projects} surveys={performance.surveys} />
         </div>
       )}
+
+      {/* Přihlášení a druhý faktor (R-105) */}
+      <TotpCard enabled={totp.enabled} />
 
       {/* Rychlé odkazy */}
       <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">

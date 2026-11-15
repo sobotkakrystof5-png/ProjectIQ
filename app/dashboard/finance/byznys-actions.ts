@@ -2,11 +2,10 @@
 
 import { adminDb, q } from '@/lib/admin/db'
 import { toForeignTotals, withLedger, type ForeignTotal } from '@/lib/admin/ledger'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 
 async function requireAuth() {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) throw new Error('Unauthorized')
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
-import { withAuth, type NextRequestWithAuth } from 'next-auth/middleware'
 import { clerkMiddleware } from '@clerk/nextjs/server'
+import { applyCookies, checkAdminSession } from '@/lib/supabase/proxy'
 import { clerkAuthorizedParties } from '@/lib/security/clerk'
 import { buildCsp, clerkFrontendApiHost, cspProfileFor, createNonce, hasPrefix } from '@/lib/security/csp'
 import { frameAncestorsFor } from '@/lib/security/embed'
@@ -10,8 +10,9 @@ import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH, PORTAL_SIGN_UP_PATH } from '@
 
 /**
  * Jediný proxy (dřív middleware) celého repa; od Next 16 běží na Node runtime. Pořadí:
- *   1. Admin konzole — přihlášení přes NextAuth, chování beze změny
- *      (stejné cesty jako dřív, přesměrování na /api/auth/signin → /login).
+ *   1. Admin konzole — přihlášení přes Supabase Auth (R-105). Session se tu
+ *      obnovuje (jinak by admin po vypršení tokenu vypadl) a cookies jdou na
+ *      tutéž odpověď jako CSP. Kdo není přihlášený jako admin, jde na /login.
  *   2. Workspace (`/w`, `/api/ws`) — Clerk. Běží jen tady, admin a landing page
  *      Clerk vůbec nespouští. Bez přihlášení → `/w/prihlaseni` (kromě
  *      přihlášení a registrace). Účet a organizaci hlídá `requireWorkspace()`.
@@ -70,9 +71,15 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
   if (CLERK_PATHS.some((p) => hasPrefix(pathname, p))) return workspace(req, event)
 
   if (ADMIN_PROTECTED.some((p) => hasPrefix(pathname, p))) {
-    // withAuth(req) vrátí přesměrování na přihlášení, nebo nic, když je session platná.
-    const denied = await withAuth(req as NextRequestWithAuth)
-    if (denied) return denied
+    const { admin, cookiesToSet } = await checkAdminSession(req)
+    if (!admin) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/login'
+      url.search = ''
+      return applyCookies(NextResponse.redirect(url), cookiesToSet)
+    }
+    // Druhý faktor a platnost hlídá ještě `getAdminSession()` na stránce samé.
+    return applyCookies(await withCsp(req), cookiesToSet)
   }
 
   return withCsp(req)

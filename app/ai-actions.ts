@@ -1,8 +1,7 @@
 'use server'
 
-import { getServerSession } from 'next-auth'
 import { z } from 'zod'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { getAdminSession, requireAuth } from '@/lib/auth'
 import { proposeAction } from '@/lib/ai/propose'
 import { suggestionSchema, type Suggestion } from '@/lib/ai/suggestion-schema'
 import { CONTEXT_KINDS } from '@/lib/ai/context'
@@ -56,7 +55,7 @@ const RATE_MAX_REQUESTS = 12
 const RATE_ACTOR = 'admin'
 
 export async function proposeSuggestion(raw: unknown): Promise<ProposeOutcome> {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return { ok: false, error: 'Přihlaste se prosím znovu.' }
 
   const parsed = proposeInput.safeParse(raw)
@@ -75,7 +74,7 @@ export async function proposeSuggestion(raw: unknown): Promise<ProposeOutcome> {
   // Bez migrace 110 se návrh neuloží (`id` je null) — asistent pak poradí,
   // ale potvrzení jedním klikem se nenabídne. Nic se tím nerozbije.
   const id = await saveSuggestion({
-    authorEmail: session.user?.email ?? null,
+    authorEmail: session.email ?? null,
     source: parsed.data.source,
     // Text už prošel `redactSensitive()` v `proposeAction`; tady se ukládá
     // ten samý, který odešel modelu.

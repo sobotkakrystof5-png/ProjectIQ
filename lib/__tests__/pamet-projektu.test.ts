@@ -20,8 +20,7 @@ const read = (file: string) => fs.readFileSync(path.join(ROOT, 'migrations', fil
 
 let db: PGlite
 
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => {} }))
-vi.mock('next-auth', () => ({ getServerSession: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => {} }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
 import { setAdminDbForTests, adminDb } from '@/lib/admin/db'

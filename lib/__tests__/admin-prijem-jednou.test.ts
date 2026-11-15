@@ -23,7 +23,7 @@ const MIGRACE = read('109_finance_meny_a_naklady.sql')
 
 let db: PGlite
 
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => ({ user: { email: 'admin@example.cz' } }) }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 vi.mock('@/lib/db', () => ({
   sql: async (strings: TemplateStringsArray, ...params: unknown[]) => {

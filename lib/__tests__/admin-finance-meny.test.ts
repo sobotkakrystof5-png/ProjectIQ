@@ -18,7 +18,7 @@ const read = (file: string) => fs.readFileSync(path.join(ROOT, 'migrations', fil
 
 let db: PGlite
 
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => ({ user: { email: 'admin@example.cz' } }) }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
 import { setAdminDbForTests, type AdminDriver } from '@/lib/admin/db'

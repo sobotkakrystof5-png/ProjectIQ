@@ -10,10 +10,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const loadMock = vi.fn()
 const renderMock = vi.fn()
-let session: unknown = { user: { email: 'admin@example.cz' } }
+let session: unknown = { email: 'admin@example.cz' }
 
-vi.mock('next-auth', () => ({ getServerSession: async () => session }))
-vi.mock('@/lib/auth', () => ({ authOptions: {} }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => session }))
 vi.mock('@/lib/admin/handover', () => ({ loadHandoverForPdf: (...a: unknown[]) => loadMock(...a) }))
 vi.mock('@/lib/invoice-pdf/handover', () => ({ renderHandoverPdf: (...a: unknown[]) => renderMock(...a) }))
 
@@ -44,7 +43,7 @@ const request = (origin: string | null = 'https://admin.test', id: string = ID) 
   }) as unknown as Parameters<typeof POST>[0]
 
 beforeEach(() => {
-  session = { user: { email: 'admin@example.cz' } }
+  session = { email: 'admin@example.cz' }
   loadMock.mockReset().mockResolvedValue(data)
   renderMock.mockReset().mockResolvedValue(Buffer.from('%PDF-1.4 test'))
 })

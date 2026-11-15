@@ -2,7 +2,17 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-14 · **AD18 hotové — modernizace adminu je dojednaná.**
+> **Poslední aktualizace:** 2026-11-15 · **Admin se přihlašuje přes Supabase Auth** (R-105).
+> E-mail, heslo a dvoufázové ověření ověřovací aplikací; NextAuth, `ADMIN_PASSWORD_HASH`
+> a `bcryptjs` z repa odešly. **Jen admin** — Workspace a klientský prostor zůstávají na
+> Clerku a **data zůstávají v Neonu**, Supabase je jen poskytovatel identity. Cookie se
+> session je zpevněná proti výchozímu stavu `@supabase/ssr` (`httpOnly`, 12 h místo 400 dní)
+> a **CSP se nemění**, protože prohlížeč na Supabase nesahá. **Naživo to nikdo nezkusil:**
+> projekt má nula uživatelů, takže než se někdo přihlásí, musí Kryštof založit účet, doplnit
+> env do Vercelu a vypnout veřejnou registraci (Otevřené problémy). Je to na větvi
+> `admin/supabase-auth`, ne na produkci.
+>
+> Předchozí: 2026-11-14 · **AD18 hotové — modernizace adminu je dojednaná.**
 > Stará vizuální vrstva nezbyla: strop zakázaných tříd je **nula** u všech skupin
 > (`muted-foreground`, `bg-white`, `rounded-lg|xl|2xl`, duhové i šedé škály Tailwindu,
 > `brand-*`), `.brand-gradient` i literální paleta `brand` jsou smazané a gradient zůstal
@@ -38,6 +48,14 @@
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
+
+**Přihlášení do adminu (R-105, od 2026-11-15, větev `admin/supabase-auth`):** vede **Supabase
+Auth** (projekt `zakaziq`, eu-central-1) — e-mail, heslo a TOTP; zapnutí druhého faktoru je
+v `/dashboard/profil` → Přihlášení. Dovnitř projde jen session s e-mailem `ADMIN_EMAIL`
+(R-001), zapsaný faktor **nelze přeskočit** a zámek na IP po pěti pokusech zůstal. Data se
+nepřesouvají: zůstávají v Neonu (R-002), Supabase drží jen `auth.*`. **Na produkci to není**
+a naživo to nikdo nezkusil — projekt má nula uživatelů. Technický popis: `.claude/security/STATE.md`
+→ Aplikace, rizika DECISIONS #029.
 
 **Modernizace adminu (R-081–R-104) — hotová 2026-11-14.** Všech devatenáct sezení
 **AD00–AD18** je v kódu; větev `admin/modernizace` je sloučená do `main`.
@@ -932,6 +950,36 @@ plán modernizace → AD18 a sekce 11. **Nové modální okno jde přes `compone
 do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevejdou: hlídá to
 `components/admin/__tests__/admin-classes.test.ts` se stropem nula.
 
+### R-105 · Přihlášení do adminu vede Supabase Auth, data zůstávají v Neonu (2026-11-15)
+**Rozhodnutí:** admin konzole se přihlašuje přes **Supabase Auth** (projekt `zakaziq`,
+eu-central-1) — e-mail, heslo a dvoufázové ověření ověřovací aplikací (TOTP). NextAuth,
+`ADMIN_PASSWORD_HASH` i závislosti `next-auth` a `bcryptjs` z repa odešly. Kryštof 2026-11-15
+vybral: **jen admin** (Workspace `/w` a klientský prostor `/klient` zůstávají na Clerku),
+**Neon zůstává databází** (Supabase je jen poskytovatel identity, do jeho databáze se nic
+nečte ani nepíše) a **heslo + TOTP** (ne magic link ani Google). Pravidlo jednoho admina
+(R-001) drží `ADMIN_EMAIL`: dovnitř projde jen session, jejíž e-mail se mu rovná, a prázdná
+hodnota nepustí nikoho. Kdo má zapsaný faktor, nemůže ho přeskočit — session s `aal1` se do
+adminu nedostane. Přihlášení i nastavení TOTP běží **výhradně v server actions**, takže
+prohlížeč na Supabase vůbec nesahá, browser klient v repu není a **CSP se nemění**.
+**Proč:** zadání Kryštofa. Zavírá otevřený problém „admin bez dvoufázového ověření" (od
+2026-11-03) bez nové závislosti na TOTP knihovnu a bez správy sdíleného tajemství v naší
+databázi. Admin čte data všech klientů rolí vlastníka tabulek, takže druhý faktor je tam
+potřebnější než kdekoli jinde.
+**Důsledek:** nové `lib/supabase/{config,cookies,server,proxy}.ts`, přepsané `lib/auth.ts`
+(`getAdminSession`, `adminActorEmail`, `requireAuth`, `loadAdminSession`), `app/(auth)/login/`
+se dvěma kroky, `app/totp-actions.ts` + `components/admin/totp-card.tsx` v Profilu, admin část
+`proxy.ts` a 30 upravených call sites. **Dvě pasti, na které se při čtení kódu naráží:**
+(1) `@supabase/ssr` dává cookie ve výchozím stavu `httpOnly: false` a platnost **400 dní** —
+obojí je u konzole s daty klientů krok zpět proti NextAuthu, proto je v `lib/supabase/cookies.ts`
+zpevnění na `httpOnly`, `secure` a 12 h; kdo bude chtít browser klienta Supabase, musí
+`httpOnly` zrušit a přidat `connect-src` do CSP, tedy politiku oslabit. (2) Session se ověřuje
+`getClaims()` (podpis ES256 lokálně, bez volání Supabase), **nikdy `getSession()`** — ten jen
+přečte obsah cookie. Env se čte **ve funkci, ne do konstanty při načtení modulu** (jinak záleží
+na tom, kdy se modul poprvé naimportoval — odhalil to test). `NEXTAUTH_URL` v repu zůstává,
+ale už jen jako záložní adresa aplikace pro odkazy v e-mailech. Rozhodnutí **mění R-001** jen
+v tom, čím se admin přihlašuje; jeden admin a žádné role platí dál. Bezpečnostní podrobnosti
+a přijatá rizika: `.claude/security/DECISIONS.md` #029.
+
 ---
 
 ## 3. Otevřené problémy
@@ -1103,7 +1151,20 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
 - [ ] **Výpadek 2026-11-04 — dohledat:** ověřit, jestli během výpadku (nejpozději 10:38–14:35) nepropadla poptávka z vizeon.cz nebo alteno.cz (veřejné endpointy vracely chybu); přihlášený `/hub` po opravě ověřit okem · `.claude/security/AUDIT-LOG.md` · od 2026-11-04
 - [ ] **Landing — zbytek auditu R-078:** (1) na telefonu 390 px je v Jak to funguje úsek asi 3 100 px skoro bez obsahu (velké mezery mezi kroky), (2) žádná fotka, (3) ozdoby: tenké a čárkované čáry, stíny v klidu, modrá záře v hero, plovoucí navigace ve tvaru pilulky, (4) 21 velikostí písma a texty pod 13 px, (5) karty Funkce se stejným rámečkem · `components/marketing/` · od 2026-11-03
 - [ ] **Vercel Hobby a komerční provoz:** podle podmínek Vercelu je Hobby jen pro nekomerční osobní použití; placený Workspace potřebuje Pro. Pro zároveň dovolí častější crony (připomínky 2 h předem, rychlejší fronta e-mailů, R-006, R-050) a Observability. Rozhodnutí a platba: Kryštof · před spuštěním · od 2026-11-03
-- [ ] **Admin bez dvoufázového ověření:** session je od 2026-11-03 jen 12 h, zámek na IP zůstává; dvoufázové ověření (TOTP s novou závislostí, nebo admin přes Clerk s MFA) potřebuje rozhodnutí · `lib/auth.ts`, DECISIONS #021 · od 2026-11-03
+- [ ] **Přihlášení přes Supabase nikdo nezkusil naživo (R-105):** projekt `zakaziq` má
+  **nula uživatelů**, takže se do adminu nepřihlásí nikdo, dokud účet nevznikne. Zbývá:
+  (1) Kryštof založí účet v Supabase (Authentication → Users → Add user, e-mail musí být
+  shodný s `ADMIN_EMAIL`, heslo zná jen on), (2) `SUPABASE_URL` a `SUPABASE_PUBLISHABLE_KEY`
+  do Vercelu (Production i Preview), (3) **vypnout veřejnou registraci** a nastavit `timebox`
+  session na 12 h v dashboardu — kód to neumí a cookie drží platnost jen na straně prohlížeče,
+  (4) pak projít na 390 / 768 / 1280 / 1440 px: přihlášení, zapnutí ověřovací aplikace
+  v Profilu (QR i ruční klíč), druhý krok s kódem, špatný kód, odhlášení a zámek po pěti
+  pokusech. `ADMIN_PASSWORD_HASH` a `NEXTAUTH_SECRET` se po ověření můžou z Vercelu odebrat
+  · DECISIONS #029 · od 2026-11-15
+- [ ] **Prázdná kopie schématu adminu v Supabase (R-105):** projekt `zakaziq` nese 56 tabulek
+  staršího schématu adminu (ještě se `school_*` a `plan_*`) s **0 řádky** (ověřeno skutečným
+  počítáním, ne odhadem). Svádí k domněnce, že se někde čte odsud; pokus o odstranění byl
+  2026-11-15 zamítnut, takže zůstává · od 2026-11-15
 - [ ] **Monitoring chyb:** žádný (Sentry, Vercel Observability); chybové stránky už jsou, ale o chybě se nikdo nedozví. Sentry potřebuje závislost a záznam v CSP-LOG; výpadek 2026-11-04 se zjistil jen ze screenshotu · od 2026-11-03
 - [ ] **Admin běží rolí vlastníka DB:** `DATABASE_URL` = `neondb_owner` s BYPASSRLS; samostatná role pro běh adminu bez DDL, vlastník jen na migrace · `lib/db.ts`, `lib/ws/admin/db.ts` · od 2026-11-03
 - [ ] **Testy s pevnými daty:** 16 testových souborů míchá pevná data z listopadu 2026 se skutečnými hodinami (`now()`); jak dny projdou, můžou padat jako `ws-email.test.ts` 2026-11-03. Převést na `vi.setSystemTime` nebo data od dneška · `lib/ws/__tests__`, `lib/__tests__` · od 2026-11-03
@@ -1177,6 +1238,32 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-15 (přihlášení do adminu přes Supabase Auth)
+- **feat** **Admin se přihlašuje přes Supabase Auth** (R-105, DECISIONS #029): e-mail, heslo
+  a dvoufázové ověření ověřovací aplikací. Rozsah je **jen admin** — Workspace a klientský
+  prostor zůstávají na Clerku a **data zůstávají v Neonu**. Nové `lib/supabase/*`, přepsané
+  `lib/auth.ts`, dvoukrokové `/login`, zapnutí TOTP v Profilu, admin část `proxy.ts`.
+  Do adminu projde jen session s e-mailem `ADMIN_EMAIL` (R-001) a zapsaný faktor **nelze
+  přeskočit**. Zámek na IP zůstal.
+- **fix** **Cookie se session je zpevněná proti výchozímu stavu `@supabase/ssr`**, který dává
+  `httpOnly: false` (token by přečetl JavaScript, tedy i XSS) a platnost **400 dní**. Admin má
+  `httpOnly: true`, `secure` mimo vývoj, `sameSite: 'lax'` a nejvýš 12 h jako dřív NextAuth.
+- **chore** **CSP se nemění.** Přihlášení i nastavení TOTP běží jen v server actions, takže
+  prohlížeč na Supabase nesahá; QR kreslí balíček `qrcode`, který v repu už byl (R-064), a jde
+  do stránky jako `data:` URL, což `img-src` povoluje. Do `CSP-LOG.md` tedy nic.
+- **refactor** `next-auth`, `bcryptjs` a `@types/bcryptjs` odinstalované, `app/api/auth/[...nextauth]`
+  smazané, 30 call sites převedených na `getAdminSession()` / `adminActorEmail()`, mocky ve
+  20 testech přepsané z `next-auth` na `@/lib/auth`.
+- **fix** Env Supabase se čte **ve funkci, ne do konstanty při načtení modulu** — na Vercelu by
+  to prošlo, ale záleželo by na tom, kdy se modul poprvé naimportoval. Odhalil to nový test.
+- **chore** Ověření: `npx tsc --noEmit` čistý, `npm run build` prošel (bez varování), nový test
+  `lib/__tests__/admin-supabase-auth.test.ts` (10 testů: cizí účet neprojde, faktor se nedá
+  přeskočit, cookie je zpevněná, `next-auth` v repu nezůstal). **Naživo neověřeno** — projekt
+  má nula uživatelů, takže skutečné přihlášení ani druhý faktor nikdo nezkusil (otevřený problém).
+- **chore** Build poprvé spadl na `next/font/google` a prošel až po smazání `.next` — tedy
+  **potvrzení otevřeného problému** o poškozené build cache z 2026-11-13, ne vada téhle změny.
+- **decision** **R-105** — Supabase jen jako poskytovatel identity pro admin; Neon zůstává.
 
 ### 2026-11-14 (ověření produkce z runtime chyb Vercelu)
 - **chore** **Tři migrace jsou prokázané, ne jen slíbené.** Dotaz na runtime chyby produkce

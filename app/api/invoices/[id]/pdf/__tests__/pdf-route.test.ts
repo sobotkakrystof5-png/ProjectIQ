@@ -15,11 +15,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const batchMock = vi.fn()
 const loadIssuedMock = vi.fn()
 const renderMock = vi.fn()
-let session: unknown = { user: { email: 'admin@example.cz' } }
+let session: unknown = { email: 'admin@example.cz' }
 let issuingReady = true
 
-vi.mock('next-auth', () => ({ getServerSession: async () => session }))
-vi.mock('@/lib/auth', () => ({ authOptions: {} }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => session }))
 vi.mock('@/lib/admin/db', () => ({
   adminDb: Object.assign(
     async (strings: TemplateStringsArray, ...values: unknown[]) => batchMock(strings.join('?'), values),
@@ -89,7 +88,7 @@ beforeEach(() => {
   batchMock.mockReset()
   loadIssuedMock.mockReset()
   renderMock.mockReset()
-  session = { user: { email: 'admin@example.cz' } }
+  session = { email: 'admin@example.cz' }
   issuingReady = true
 })
 

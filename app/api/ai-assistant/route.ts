@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { askAssistant, assistantRequestSchema } from '@/lib/ai/assistant'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 
@@ -28,7 +27,7 @@ const RATE_MAX_REQUESTS = 12
 const RATE_KEY = 'ai-assistant'
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Je to jeden admin (R-001), takže se limit počítá na jeden klíč: IP se

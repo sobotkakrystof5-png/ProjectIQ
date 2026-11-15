@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { loadHandoverForPdf } from '@/lib/admin/handover'
 import { renderHandoverPdf } from '@/lib/invoice-pdf/handover'
 
@@ -39,7 +38,7 @@ function sameOrigin(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const params = await props.params
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) return new NextResponse('Neautorizovaný přístup', { status: 401 })
   if (!sameOrigin(req)) return new NextResponse('Neplatný požadavek', { status: 403 })
   if (!UUID.test(params.id)) return new NextResponse('Zakázka nenalezena', { status: 404 })

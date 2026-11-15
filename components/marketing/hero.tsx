@@ -1,5 +1,4 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { AccentHeading } from '@/components/ws/brand'
 import { CTA_LABEL, ROUTES, SUPPORT_FORM_HREF } from './content'
 import { HeroBackdrop } from './hero-backdrop'
@@ -13,7 +12,7 @@ const TRUST = ['14 dní zdarma', 'Kartu zadáte při registraci', 'Poté 249 Kč
 export async function Hero() {
   // Stav přihlášení se čte na serveru (AD06): landing page díky tomu
   // nenačítá NextAuth v prohlížeči a nevolá /api/auth/session.
-  const signedIn = Boolean(await getServerSession(authOptions))
+  const signedIn = Boolean(await getAdminSession())
   return (
     <section aria-label="Úvod" className="relative">
       {/* Společná tmavá plocha drží úvod a příběh pohromadě. */}

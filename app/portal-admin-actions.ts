@@ -1,9 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
 import { z } from 'zod'
-import { authOptions, requireAuth } from '@/lib/auth'
+import { adminActorEmail, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { generateInviteCode, inviteExpiry, InviteConfigError } from '@/lib/portal/invite'
 
@@ -19,7 +18,7 @@ const emailSchema = z.string().trim().toLowerCase().email('Zadejte platný e-mai
 const PATH = '/dashboard/klientsky-prostor'
 
 async function adminEmail(): Promise<string> {
-  return (await getServerSession(authOptions))?.user?.email ?? 'admin'
+  return adminActorEmail()
 }
 
 function appUrl(): string {

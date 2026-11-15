@@ -18,8 +18,7 @@ const ROOT = path.resolve(__dirname, '../..')
 
 let db: PGlite
 
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => undefined }))
-vi.mock('next-auth', () => ({ getServerSession: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => undefined }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 vi.mock('next/navigation', () => ({ redirect: () => {} }))
 vi.mock('@/lib/db', () => ({ sql: async () => [] }))

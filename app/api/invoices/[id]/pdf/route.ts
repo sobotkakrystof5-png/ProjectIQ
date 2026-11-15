@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAdminSession } from '@/lib/auth'
 import { adminDb } from '@/lib/admin/db'
 import { isIssuingReady, loadIssuedInvoiceForPdf } from '@/lib/admin/invoice-issue'
 import { renderInvoicePdf } from '@/lib/invoice-pdf/render'
@@ -54,7 +53,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const params = await props.params
-  const session = await getServerSession(authOptions)
+  const session = await getAdminSession()
   if (!session) {
     return new NextResponse('Neautorizovaný přístup', { status: 401 })
   }

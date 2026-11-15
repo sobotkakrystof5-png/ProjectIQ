@@ -24,7 +24,7 @@ vi.mock('@/lib/db', () => ({
     return (await dbRef.current!.query(text, values)).rows
   },
 }))
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => ({ user: { email: 'admin@example.cz' } }) }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
 const { setAdminDbForTests } = await import('@/lib/admin/db')

@@ -9,11 +9,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * neprojde.
  */
 
-const session = { value: null as { user?: { email?: string } } | null }
+const session = { value: null as { email?: string } | null }
 const created = vi.fn()
 
-vi.mock('next-auth', () => ({ getServerSession: async () => session.value }))
-vi.mock('@/lib/auth', () => ({ authOptions: {} }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => session.value }))
 vi.mock('@/lib/api-rate-limit', () => ({
   isApiRateLimited: async () => false,
   recordApiRequest: async () => {},
@@ -45,7 +44,7 @@ function request(body: unknown): Request {
 
 describe('POST /api/ai-assistant', () => {
   beforeEach(() => {
-    session.value = { user: { email: 'admin@example.cz' } }
+    session.value = { email: 'admin@example.cz' }
     created.mockReset()
     created.mockResolvedValue({ content: [{ type: 'text', text: 'Odpověď.' }] })
     process.env.ANTHROPIC_API_KEY = 'sk-test-klic-jen-pro-test'

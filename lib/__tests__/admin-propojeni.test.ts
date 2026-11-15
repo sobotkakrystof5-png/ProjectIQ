@@ -17,8 +17,7 @@ import { pgliteAdminDriver } from './helpers/admin-pglite'
  */
 
 vi.mock('@/lib/db', () => ({ sql: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ authOptions: {}, requireAuth: async () => undefined }))
-vi.mock('next-auth', () => ({ getServerSession: async () => ({ user: { email: 'admin@example.cz' } }) }))
+vi.mock('@/lib/auth', () => ({ getAdminSession: async () => ({ email: 'admin@example.cz' }), adminActorEmail: async () => 'admin@example.cz', requireAuth: async () => undefined }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('next/server', () => ({ after: (cb: () => unknown) => void cb() }))
