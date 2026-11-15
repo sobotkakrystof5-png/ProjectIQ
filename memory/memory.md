@@ -936,6 +936,17 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
 
 ## 3. Otevřené problémy
 
+- [ ] **Admin neposílá e-maily — Gmail SMTP vrací 535 BadCredentials (zjištěno 2026-11-14
+  z runtime chyb Vercelu):** `[Email] Selhání odesílání: Invalid login: 535-5.7.8 Username and
+  Password not accepted` (`code: 'EAUTH'`, `command: 'AUTH PLAIN'`). Routy
+  `/api/cron/send-reminders` a `/dashboard/[id]`, poprvé **2026-08-18**, naposledy
+  **2026-11-14 08:00** — takže dnešní ranní cron e-mail neposlal. Dopadá na všechno, co admin
+  posílá přes `lib/email.ts` (R-004): připomínky konzultací, zprávy klientům a **automatický
+  dotazník z AD16** (R-102) — ten tedy neodejde, i kdyby migrace 112 na produkci byla.
+  Nejspíš platnost hesla aplikace Gmailu — `lib/email.ts` čte `VIZEON_GMAIL_USER`
+  + `VIZEON_GMAIL_APP_PASSWORD`, záložně `GMAIL_USER` + `GMAIL_APP_PASSWORD` (žádné
+  `EMAIL_PASSWORD` v repu není); vygenerovat nové a vyměnit ve
+  Vercelu. Chyba je zachycená, nic nepadá, jen se nic neodešle · Kryštof · od 2026-11-14
 - [ ] **Admin od AD08 přibral třetinu JavaScriptu a nikdo si toho nevšiml:** Hovory
   263,8 → 344,5 kB gzip (+31 %), Kalendář 260,6 → 339,4 (+30 %), Poptávky 250,6 → 331,0
   (+32 %), Dnes 245,7 → 297,5 (+21 %). Měřeno 2026-11-14 proti commitu `cabe01c`
@@ -999,10 +1010,20 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
   `node scripts/admin-prijmy-duplicity.mjs` a po úklidu se 109 pustí znovu, (3) po 104
   `node scripts/admin-contacts-backfill.mjs` (nejdřív bez `--ano`) — bez něj je obrazovka
   Kontakty prázdná. Agent na produkční DB nedosáhne, dělá Kryštof · od 2026-11-13
-- [ ] **Které migrace na produkci opravdu běžely, ví jen Kryštof:** řekl „všechno nasazené"
-  a měřením je zvenku prokázané jen 102 a 106 (`/h/<token>` vrací 404 místo 500). Zvlášť ověřit
-  **100 a 101** (`DROP TABLE`, nevratné — R-089 chce napřed `node scripts/export-before-drop.mjs --ano`)
-  a **097–099** z Workspace. Hotová kontrola je
+- [ ] **Které migrace na produkci opravdu běžely — část je prokázaná z runtime chyb Vercelu
+  (2026-11-14):** **100, 102 a 106 na produkci jsou**, a to z chyb, které tam nechal *starý* kód,
+  než se nasadila větev: `relation "weight_logs"/"nutrition_logs" does not exist` na `/hub`
+  (11.–12. 11. → **100 proběhla**, tedy `DROP TABLE` z R-089 je nevratně za námi),
+  `column "business" does not exist` na `/dashboard/calendar` (11. 11. → **102**) a 430×
+  `relation "completed_projects" does not exist` na `/h/[token]` (12. 11. 20:20 – 13. 11. 19:15
+  → **106**). Od 13. 11. 19:15 **žádná chyba schématu**, takže nový kód a databáze si nikde
+  neodporují. **110–112 prokázané nejsou:** denní cron je volá s `.catch(…)`
+  (`app/api/cron/send-reminders/route.ts:208–212`), takže chybějící tabulku **spolkne** a do logu
+  nedá nic — čistý log tedy nic nedokazuje. **Kryštof 2026-11-14 potvrdil, že „vše je nasazené"**,
+  tedy i **110–112**, **101** a **097–099** z Workspace; ty tím stojí na jeho slovu, ne na měření.
+  Pozor: u **101** (`DROP TABLE project_blocks`, `block_templates`) chtěl R-089 napřed
+  `node scripts/export-before-drop.mjs --ano` — pokud neproběhl, obsah už zpátky nejde.
+  Hotová kontrola je
   **`node scripts/admin-stav-produkce.mjs --env .env.production.local`** (jen čte): vypíše evidenci
   migrací, co z 109 v databázi opravdu je, příjmy po letech a měnách (tedy i to, o kolik se
   daňový základ lišil starým kódem) a doprovodné kroky. Agent produkční připojení nemá — stažení
@@ -1156,6 +1177,24 @@ do záhlaví nepatří. Nová barva, třída ani emoji z duhy se do adminu nevej
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-14 (ověření produkce z runtime chyb Vercelu)
+- **chore** **Tři migrace jsou prokázané, ne jen slíbené.** Dotaz na runtime chyby produkce
+  (Vercel MCP, 7 dní) ukázal, co tam nechal starý kód před nasazením větve: `weight_logs`
+  a `nutrition_logs` neexistují (**migrace 100**, `DROP TABLE` je nevratně hotový), `business`
+  neexistuje (**102**) a 430× `completed_projects` neexistuje na veřejném `/h/[token]`
+  (**106**; ten dotazník kvůli tomu 23 hodin vracel 500). Od 13. 11. 19:15 **žádná chyba
+  schématu** — nový kód a databáze si nikde neodporují.
+- **docs** **110–112 tím prokázané nejsou** a čistý log cronu je neprokáže: `expireOldSuggestions`,
+  `proposeMemoryDrafts` i `remindPendingSurveys` jsou volané s `.catch(…)`, takže chybějící
+  tabulku spolknou. Zapsáno do otevřených problémů místo dřívější domněnky.
+- **chore** Kryštof na dotaz potvrdil, že **všechny migrace jsou nasazené** — 110–112, 101
+  i 097–099 z Workspace. Měřením zvenku prokázané zůstávají 100, 102 a 106; zbytek je jeho slovo.
+  Doprovodné kroky po migracích (backfill kontaktů, `lead_pending`, duplicitní příjmy u 109)
+  jsou samostatná věc a odškrtnuté nejsou.
+- **fix** **Nalezen tichý výpadek e-mailů:** Gmail SMTP odmítá přihlášení (535 BadCredentials)
+  od 2026-08-18, naposledy dnes v 8:00 z denního cronu. Admin tedy neposílá připomínky, zprávy
+  klientům ani automatický dotazník z AD16. Nový otevřený problém.
 
 ### 2026-11-14 (nasazení AD14–AD18 na produkci)
 - **chore** **Produkce běží na `8210f04` — celá modernizace adminu je venku.** Kryštof pustil
