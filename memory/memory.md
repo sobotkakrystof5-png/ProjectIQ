@@ -1180,11 +1180,17 @@ generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105
 - [ ] **Přihlášení přes Supabase nikdo nezkusil naživo (R-105):** projekt `zakaziq` má
   **nula uživatelů**, takže se do adminu nepřihlásí nikdo, dokud účet nevznikne. Zbývá:
   (1) Kryštof založí účet v Supabase (Authentication → Users → Add user, e-mail musí být
-  shodný s `ADMIN_EMAIL`, heslo zná jen on), (2) **ověřit env ve Vercelu** — `SUPABASE_URL`
-  a `SUPABASE_PUBLISHABLE_KEY` tam od integrace Supabase **už jsou, ale jen pro Production**;
-  zkontrolovat, že míří na projekt `awcgvgkeuwgspybwvvpn` (na účtu jsou tři Supabase projekty)
-  a doplnit je pro Preview. Leží tam i `SUPABASE_SERVICE_ROLE_KEY` a `SUPABASE_SECRET_KEY`,
-  které kód nepoužívá — odebrat, (3) **zapnout hook** `before_user_created_jen_admin`
+  shodný s `ADMIN_EMAIL`, heslo zná jen on), (2) ~~env ve Vercelu~~ **hotovo 2026-11-15**:
+  `SUPABASE_URL` i `SUPABASE_PUBLISHABLE_KEY` jsou pro Production (z integrace Supabase,
+  ověřeno že míří na `awcgvgkeuwgspybwvvpn` a klíč sedí na ten lokální) i pro Preview
+  (doplněno ručně). **Pozor:** `ADMIN_EMAIL` v Production je typu `sensitive`, takže jeho
+  hodnotu **nejde přečíst** — jestli se rovná e-mailu účtu v Supabase, se pozná až prvním
+  přihlášením na produkci; neshoda se projeví jako „Nesprávný e-mail nebo heslo". Devět
+  proměnných `SUPABASE_*` včetně `SUPABASE_SERVICE_ROLE_KEY` spravuje **integrace**
+  (`configurationId`), takže je nemá smysl mazat ručně — buď se nechají, nebo se odpojí celá
+  integrace a URL i klíč se doplní ručně. `ADMIN_PASSWORD_HASH` a `NEXTAUTH_SECRET`
+  **nechat, dokud na produkci běží starý build** — bez nich by se dnešní admin nepřihlásil,
+  (3) **zapnout hook** `before_user_created_jen_admin`
   v Authentication → Hooks → Before User Created (funkce v databázi už je a je ověřená, R-106;
   dokud se nezapne, je registrace otevřená), (4) pak projít na 390 / 768 / 1280 / 1440 px: přihlášení, zapnutí ověřovací aplikace
   v Profilu (QR i ruční klíč), druhý krok s kódem, špatný kód, odhlášení a zámek po pěti
@@ -1304,6 +1310,11 @@ generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105
 - **chore** Zjištěno, že **Supabase env ve Vercelu už existuje** (integrace, jen Production) —
   včetně `SUPABASE_SERVICE_ROLE_KEY`, který kód nepoužívá. Ověřit cílový projekt a klíč odebrat.
 - **decision** **R-106** — co je v Supabase placené, řeší kód a hook.
+- **chore** **Vercel nastavený** (2026-11-15): `SUPABASE_URL` a `SUPABASE_PUBLISHABLE_KEY`
+  doplněné pro **Preview**; Production je má z integrace Supabase a je ověřené, že míří na
+  projekt `awcgvgkeuwgspybwvvpn` a klíč je týž publishable jako lokálně. Hook
+  `before_user_created_jen_admin` je nově **i ve schématu `extensions`**, protože dialog
+  v dashboardu předvyplňuje právě to schéma; obě kopie ověřené proti živé DB.
 
 ### 2026-11-14 (ověření produkce z runtime chyb Vercelu)
 - **chore** **Tři migrace jsou prokázané, ne jen slíbené.** Dotaz na runtime chyby produkce
