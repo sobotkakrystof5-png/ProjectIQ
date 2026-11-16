@@ -2,7 +2,15 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-15 · **Admin se přihlašuje přes Supabase Auth** (R-105).
+> **Poslední aktualizace:** 2026-11-15 · **Veškeré přihlašování přechází na Supabase** (R-107).
+> Fáze F1 je v kódu na větvi `auth/supabase-klient`: klientský prostor `/klient` už nejede
+> na vývojové instanci Clerku, ale na Supabase (e-mail a heslo, účet jen z pozvánky vázané
+> na e-mail, hook registrace u nás). Workspace `/w` (F2) a úklid Clerku (F3) čekají — plán
+> `docs/AUTH-SUPABASE-PLAN.md`. Z auditu portálu přibyla výměna odkazu `/p` a omezení
+> rezervace. **Nenasazeno, neověřeno v prohlížeči;** před nasazením migrace 113 a nastavení
+> v Supabase (hook HTTPS, tajemství, Confirm email, SMTP).
+>
+> Předchozí: 2026-11-15 · **Admin se přihlašuje přes Supabase Auth** (R-105).
 > E-mail, heslo a dvoufázové ověření ověřovací aplikací; NextAuth, `ADMIN_PASSWORD_HASH`
 > a `bcryptjs` z repa odešly. **Jen admin** — Workspace a klientský prostor zůstávají na
 > Clerku a **data zůstávají v Neonu**, Supabase je jen poskytovatel identity. Cookie se
@@ -1044,6 +1052,18 @@ nemá linii přiznané/nepřiznané).
 
 ## 3. Otevřené problémy
 
+- [ ] **Supabase pro `/klient` — nasadit a nastavit (R-107, F1):** kód je na větvi
+  `auth/supabase-klient`, na produkci není. Pořadí: (1) migrace 113 na produkci,
+  (2) v Supabase hook Before User Created přepnout na **HTTPS**
+  `https://www.zakaziq.cz/api/auth/supabase-hook` (Postgres hook z R-106 vypnout),
+  (3) jeho tajemství do Vercelu jako `SUPABASE_AUTH_HOOK_SECRET`, (4) vypnout Confirm email,
+  (5) vlastní SMTP přes Resend (bez něj nedojde odkaz na nové heslo), (6) Redirect URL
+  `/klient/auth/potvrzeni` a `ADMIN_USER_ID` (id účtu adminu) do Vercelu, (7) deploy a průchod pozvánka → přístup → přehled → odhlášení →
+  přihlášení → zapomenuté heslo na 390 a 1280 px. Detail `docs/AUTH-SUPABASE-PLAN.md` → F1
+  · Kryštof · od 2026-11-15
+- [ ] **Workspace a úklid Clerku (R-107, F2 + F3):** nezačato. Před F2 rozhodnout, jestli
+  placený Workspace může běžet na Free projektu Supabase (uspání po týdnu bez provozu,
+  limity e-mailů, sdílený projekt s adminem) · `docs/AUTH-SUPABASE-PLAN.md` · od 2026-11-15
 - [ ] **Admin neposílá e-maily — Gmail SMTP vrací 535 BadCredentials (zjištěno 2026-11-14
   z runtime chyb Vercelu):** `[Email] Selhání odesílání: Invalid login: 535-5.7.8 Username and
   Password not accepted` (`code: 'EAUTH'`, `command: 'AUTH PLAIN'`). Routy
@@ -1062,10 +1082,6 @@ nemá linii přiznané/nepřiznané).
   funkce z AD09–AD17 (kontakty, fakturace, asistent, paměť, předání, AI leady). Chybí
   rozpad, která z nich kolik stojí, a strop v testu, aby se to nedělo potichu. Měření
   patří do „Hotovo, když" u každého dalšího sezení, které přidá klientskou komponentu
-  · od 2026-11-14
-- [ ] **Smazání události v kalendáři se pořád ptá nativním `confirm()`:** `AGENTS.md` chce
-  „akce hned + Zpět v toastu" a admin to tak dělá všude jinde (změna stavu zakázky, sloučení
-  kontaktů, platba faktury). Zůstalo to jediné místo · `components/SmartCalendar.tsx`
   · od 2026-11-14
 - [ ] **p75 z produkce nikdo neměřil:** admin je na produkci od 2026-11-13, takže to
   **poprvé jde** (Vercel runtime logy / Observability). Plán, sekce 11, má u p75 „Nic".
@@ -1307,6 +1323,18 @@ nemá linii přiznané/nepřiznané).
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-16 (kalendář: úprava událostí)
+- **feat** **Vlastní události a blokace v kalendáři jdou upravit** (název, čas, poznámka,
+  kontakt) tlačítkem „Upravit" v detailu; změna se v téže transakci propíše do zrcadleného
+  kontaktu v Hovorech (R-010) a při posunu času se resetují připomínky. Druh (událost ×
+  blokace) se nemění. **Smazání už nepoužívá `confirm()`** — smaže se hned a toast nabídne
+  „Zpět" (obnoví událost i s poznámkami kontaktu); to zavírá otevřený problém z 2026-11-14.
+  Mazat/upravovat tudy jde jen `manual`/`block`; rezervace od klientů, hovory a deadliny mají
+  zdroj jinde (zakázka, Hovory) a detail na ně odkazuje. Soubory: `app/calendar-actions.ts`
+  (`updateCalendarEvent`, `restoreCalendarEvent`, `deleteCalendarEvent` vrací snímek),
+  `components/AdminEventModal.tsx`, `components/SmartCalendar.tsx`. Bez migrace.
+  Ověřeno: `tsc`, testy kalendáře a adminu, SQL v PGlite. **V prohlížeči neověřeno.**
 
 ### 2026-11-15 (zálohy, ruční příjmy a kalendář)
 - **feat** **Víc záloh na zakázku a ruční příjmy v Podnikání** (R-110): karta „Zapsat

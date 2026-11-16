@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { batchTolerant, q, type AdminQuery, type AdminRow } from '@/lib/admin/db'
 import { ProjectForm } from '@/components/ProjectForm'
 import { ShareButton } from '@/components/ShareButton'
+import { PortalLinkRotate } from '@/components/admin/portal-link-rotate'
 import { QRCodeDisplay } from '@/components/QRCodeDisplay'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Badge } from '@/components/ui/badge'
@@ -287,7 +288,13 @@ async function OverviewTab({ project }: { project: Project }) {
             <div className="mb-3 flex items-center gap-2 rounded-chip border border-navy-100 bg-navy-50 px-3 py-2">
               <span className="flex-1 truncate font-mono text-xs text-navy-600">{publicUrl}</span>
             </div>
-            <ShareButton token={project.public_token} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ShareButton token={project.public_token} />
+              <PortalLinkRotate projectId={project.id} />
+            </div>
+            <p className="mt-2 text-xs text-quiet">
+              Odkaz platí, dokud ho nevyměníte. Když se dostane k někomu cizímu, vygenerujte nový.
+            </p>
           </div>
         </div>
       </Card>

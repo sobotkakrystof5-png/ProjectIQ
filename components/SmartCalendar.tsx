@@ -6,10 +6,11 @@ import { AnimatePresence, m } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, Plus, ExternalLink,
   CalendarDays, Phone, Monitor, Video, MessageSquare,
-  CalendarPlus, Lock, Trash2, Clock, Flag,
+  CalendarPlus, Lock, Trash2, Clock, Flag, Pencil,
   Building2, User, Mail, MessageCircle, Coins,
 } from 'lucide-react'
-import { deleteCalendarEvent } from '@/app/calendar-actions'
+import { deleteCalendarEvent, restoreCalendarEvent } from '@/app/calendar-actions'
+import { toast } from '@/components/ui/toast'
 import {
   CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS,
   type ConsultationChannel, type CalendarEventType, type LeadActionType, type LeadStatus,
@@ -21,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { AdminEventModal } from './AdminEventModal'
+import { AdminEventModal, type EditableEvent } from './AdminEventModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Toolbar } from '@/components/ws/app/toolbar'
@@ -91,6 +92,12 @@ interface UnifiedEvent {
      * akce, které nemají kam vést.
      */
     contact?: {
+      name: string | null
+      phone: string | null
+      email: string | null
+    }
+    /** Kontakt pro formulář úpravy — i když je z něj vyplněné jen jméno. */
+    contactDraft?: {
       name: string | null
       phone: string | null
       email: string | null
@@ -238,6 +245,7 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
           e.event_type !== 'block' && (e.contact_phone !== null || e.contact_email !== null)
             ? { name: e.contact_name, phone: e.contact_phone, email: e.contact_email }
             : undefined,
+        contactDraft: { name: e.contact_name, phone: e.contact_phone, email: e.contact_email },
       },
     })
   }
@@ -305,10 +313,12 @@ function EventDetailModal({
   event,
   onClose,
   onDeleted,
+  onEdit,
 }: {
   event: UnifiedEvent
   onClose: () => void
   onDeleted: () => void
+  onEdit: (event: UnifiedEvent) => void
 }) {
   const [deleting, setDeleting] = useState(false)
   const style = getEventStyle(event)
@@ -320,12 +330,28 @@ function EventDetailModal({
   const contact = lead === undefined ? event.meta.contact : undefined
 
   async function handleDelete() {
-    if (!confirm('Smazat tuto událost?')) return
+    // Žádné „opravdu smazat?" — smaže se hned a toast nabídne „Zpět" (AGENTS.md → B9).
     setDeleting(true)
     try {
-      await deleteCalendarEvent(event.id)
+      const snapshot = await deleteCalendarEvent(event.id)
       onDeleted()
       onClose()
+      if (snapshot === null) {
+        toast.error('Událost už neexistuje.')
+        return
+      }
+      toast.success('Událost je smazaná.', {
+        undo: async () => {
+          try {
+            await restoreCalendarEvent(snapshot)
+            onDeleted()
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Smazání se nepodařilo vrátit.')
+          }
+        },
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Událost se nepodařilo smazat.')
     } finally {
       setDeleting(false)
     }
@@ -491,6 +517,17 @@ function EventDetailModal({
                 <ExternalLink size={13} strokeWidth={1.5} />
                 Otevřít hovory
               </a>
+            )}
+
+            {isManualEvent && (
+              <button
+                type="button"
+                onClick={() => onEdit(event)}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-input text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
+              >
+                <Pencil size={13} strokeWidth={1.5} aria-hidden="true" />
+                Upravit
+              </button>
             )}
 
             {isManualEvent && (
@@ -985,7 +1022,7 @@ export function SmartCalendar({
   const [view, setView] = useState<ViewMode>(defaultView)
   const [anchor, setAnchor] = useState(() => (defaultView === 'month' ? startOfMonthIso(today) : today))
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null)
-  const [createModal, setCreateModal] = useState<{ open: boolean; date?: string; hour?: number }>({ open: false })
+  const [createModal, setCreateModal] = useState<{ open: boolean; date?: string; hour?: number; editing?: EditableEvent }>({ open: false })
 
   // Data kalendáře žijí tady, ne v propech: do prohlížeče přijde jen okno
   // kolem dneška a další měsíce se dotahují přes `loadCalendarMonth` (AD08).
@@ -1210,6 +1247,23 @@ export function SmartCalendar({
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
           onDeleted={reloadCurrent}
+          onEdit={ev => {
+            setSelectedEvent(null)
+            setCreateModal({
+              open: true,
+              editing: {
+                id: ev.id,
+                type: ev.kind === 'block' ? 'block' : 'manual',
+                title: ev.label,
+                description: ev.meta.description ?? null,
+                startsAt: ev.startsAt.toISOString(),
+                endsAt: ev.endsAt.toISOString(),
+                contactName: ev.meta.contactDraft?.name ?? null,
+                phone: ev.meta.contactDraft?.phone ?? null,
+                email: ev.meta.contactDraft?.email ?? null,
+              },
+            })
+          }}
         />
       )}
 
@@ -1224,6 +1278,7 @@ export function SmartCalendar({
           onClose={handleCreateClose}
           defaultDate={createModal.date}
           defaultHour={createModal.hour}
+          editing={createModal.editing}
         />
       )}
     </div>

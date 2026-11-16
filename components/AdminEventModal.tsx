@@ -10,9 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { createCalendarEvent } from '@/app/calendar-actions'
+import { createCalendarEvent, updateCalendarEvent } from '@/app/calendar-actions'
 import { cn } from '@/lib/utils'
-import { getPragueTodayISO, parsePragueDatetimeLocalToISO } from '@/lib/prague-time'
+import { getPragueTodayISO, isoToPragueDateAndTime, parsePragueDatetimeLocalToISO } from '@/lib/prague-time'
 import type { CalendarEventType } from '@/lib/types'
 
 interface AdminEventModalProps {
@@ -20,6 +20,26 @@ interface AdminEventModalProps {
   onClose: (saved: boolean) => void
   defaultDate?: string   // 'YYYY-MM-DD' pre-fill the date field
   defaultHour?: number   // pre-fill the start hour
+  /** Úprava existující události — formulář se předvyplní a uloží se jako změna. */
+  editing?: EditableEvent
+}
+
+export type EditableEvent = {
+  id: string
+  type: CalendarEventType
+  title: string
+  description: string | null
+  startsAt: string // ISO
+  endsAt: string   // ISO
+  contactName: string | null
+  phone: string | null
+  email: string | null
+}
+
+/** ISO okamžik → hodnota pro `datetime-local` v pražském čase. */
+function isoToLocalValue(iso: string): string {
+  const { date, time } = isoToPragueDateAndTime(iso)
+  return `${date}T${time.slice(0, 5)}`
 }
 
 /*
@@ -58,19 +78,23 @@ const EVENT_TYPES: { id: CalendarEventType; label: string; description: string; 
   },
 ]
 
-export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEventModalProps) {
+export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: AdminEventModalProps) {
   const today = getPragueTodayISO()
   const initDate = defaultDate ?? today
   const initHour = defaultHour ?? 10
 
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [eventType, setEventType] = useState<CalendarEventType>('manual')
-  const [contactName, setContactName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [startsAt, setStartsAt] = useState(toLocalDatetimeValue(initDate, initHour))
-  const [endsAt, setEndsAt] = useState(toLocalDatetimeValue(initDate, initHour + 1))
+  const [title, setTitle] = useState(editing?.title ?? '')
+  const [description, setDescription] = useState(editing?.description ?? '')
+  const [eventType, setEventType] = useState<CalendarEventType>(editing?.type ?? 'manual')
+  const [contactName, setContactName] = useState(editing?.contactName ?? '')
+  const [phone, setPhone] = useState(editing?.phone ?? '')
+  const [email, setEmail] = useState(editing?.email ?? '')
+  const [startsAt, setStartsAt] = useState(
+    editing ? isoToLocalValue(editing.startsAt) : toLocalDatetimeValue(initDate, initHour),
+  )
+  const [endsAt, setEndsAt] = useState(
+    editing ? isoToLocalValue(editing.endsAt) : toLocalDatetimeValue(initDate, initHour + 1),
+  )
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -102,7 +126,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
     setError(null)
     startTransition(async () => {
       try {
-        await createCalendarEvent({
+        const payload = {
           title: title.trim(),
           description: description.trim() || null,
           starts_at: localDatetimeToISO(startsAt),
@@ -113,7 +137,9 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
           contact_name: eventType === 'manual' ? contactName.trim() || null : null,
           phone: eventType === 'manual' ? phone.trim() || null : null,
           email: eventType === 'manual' ? email.trim() || null : null,
-        })
+        }
+        if (editing) await updateCalendarEvent(editing.id, payload)
+        else await createCalendarEvent(payload)
         close(true)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Chyba serveru.')
@@ -131,14 +157,14 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-600" aria-hidden="true" />
-            Přidat do kalendáře
+            {editing ? 'Upravit v kalendáři' : 'Přidat do kalendáře'}
           </DialogTitle>
-          <DialogDescription>Událost nebo blokace v diáři. Termín se hlídá proti kolizi.</DialogDescription>
+          <DialogDescription>{editing ? 'Změňte, co potřebujete, a uložte. Termín se hlídá proti kolizi.' : 'Událost nebo blokace v diáři. Termín se hlídá proti kolizi.'}</DialogDescription>
         </DialogHeader>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Event type selector */}
-        <div className="grid grid-cols-2 gap-2">
+        {!editing && <div className="grid grid-cols-2 gap-2">
           {EVENT_TYPES.map(({ id, label, description: desc, icon: Icon }) => (
             <button
               key={id}
@@ -167,7 +193,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
               <span className="text-[11px] text-quiet leading-snug">{desc}</span>
             </button>
           ))}
-        </div>
+        </div>}
 
         {/* Title */}
         <div className="flex flex-col gap-1.5">
@@ -281,7 +307,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour }: AdminEven
           >
             {isPending
               ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
-              : 'Uložit událost'
+              : editing ? 'Uložit změny' : 'Uložit událost'
             }
           </button>
           <button
