@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { ensureContact } from '@/lib/admin/contacts'
@@ -41,14 +42,52 @@ type CalendarEventPayload = {
   email?: string | null
 }
 
-export async function createCalendarEvent(payload: CalendarEventPayload) {
-  await requireAuth()
+/** Co se při smazání zapamatuje, aby šlo smazání vzít zpět (toast „Zpět"). */
+export type CalendarEventSnapshot = {
+  title: string
+  description: string | null
+  starts_at: string
+  ends_at: string
+  event_type: 'manual' | 'block'
+  lead: {
+    contact_name: string | null
+    phone: string | null
+    email: string | null
+    next_action: string | null
+    notes: string | null
+    lead_status: string | null
+    estimated_value: number | null
+  } | null
+}
 
+const EDITABLE_TYPES = ['manual', 'block'] as const
+
+function checkPayload(payload: Pick<CalendarEventPayload, 'title' | 'starts_at' | 'ends_at'>) {
   if (!payload.title.trim()) throw new Error('Název je povinný.')
+  if (payload.title.trim().length > 120) throw new Error('Název může mít nejvýš 120 znaků.')
   if (new Date(payload.ends_at) <= new Date(payload.starts_at)) {
     throw new Error('Čas konce musí být po čase začátku.')
   }
+}
 
+function revalidateCalendar(mirrored: boolean) {
+  revalidatePath('/dashboard/calendar')
+  // Kalendář je od R-110 i na Dnes (a „Nejbližší schůzky a hovory").
+  revalidatePath('/dashboard')
+  if (mirrored) {
+    revalidatePath('/dashboard/calls')
+    revalidatePath('/dashboard/kontakty')
+  }
+}
+
+type LeadExtras = {
+  notes?: string | null
+  lead_status?: string | null
+  estimated_value?: number | null
+  next_action?: string | null
+}
+
+async function insertEvent(payload: CalendarEventPayload, extras: LeadExtras = {}) {
   const title = payload.title.trim()
   const description = payload.description?.trim() || null
   const contactName = payload.contact_name?.trim() || null
@@ -86,10 +125,11 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
           INSERT INTO client_leads (
             company_name, contact_name, phone, email,
             next_action, next_action_date, next_action_time, next_action_type,
-            calendar_event_id, contact_id
+            calendar_event_id, contact_id, notes, lead_status, estimated_value
           )
           SELECT ${title}, ${contactName}, ${phone}, ${email},
-                 ${description ?? 'Termín z kalendáře'}, ${date}::date, ${time}::time, 'other', id, ${contactId}
+                 ${extras.next_action ?? description ?? 'Termín z kalendáře'}, ${date}::date, ${time}::time, 'other', id, ${contactId},
+                 ${extras.notes ?? null}, COALESCE(${extras.lead_status ?? null}::text, 'cold'), ${extras.estimated_value ?? null}
           FROM new_event
           RETURNING id, calendar_event_id
         )
@@ -109,24 +149,156 @@ export async function createCalendarEvent(payload: CalendarEventPayload) {
     }
     throw err
   }
-
-  revalidatePath('/dashboard/calendar')
-  if (mirrorToLeads) {
-    revalidatePath('/dashboard/calls')
-    revalidatePath('/dashboard/kontakty')
-  }
+  revalidateCalendar(mirrorToLeads)
 }
 
-export async function deleteCalendarEvent(id: string) {
+export async function createCalendarEvent(payload: CalendarEventPayload) {
+  await requireAuth()
+  checkPayload(payload)
+  await insertEvent(payload)
+}
+
+/**
+ * Úprava vlastní události nebo blokace: název, čas, poznámka a kontakt.
+ * Zrcadlený kontakt v Hovorech se mění **v téže transakci**, takže se
+ * kalendář a Hovory nikdy nerozejdou (R-010). Druh události (událost × blokace)
+ * se nemění — blokace do Hovorů vůbec nepatří.
+ */
+export async function updateCalendarEvent(id: string, payload: CalendarEventPayload) {
+  await requireAuth()
+  checkPayload(payload)
+
+  const title = payload.title.trim()
+  const description = payload.description?.trim() || null
+  const contactName = payload.contact_name?.trim() || null
+  const phone = payload.phone?.trim() || null
+  const email = payload.email?.trim() || null
+  const { date, time } = isoToPragueDateAndTime(payload.starts_at)
+  const contactId =
+    payload.event_type === 'block'
+      ? null
+      : await ensureContact({ name: contactName, email, phone, source: 'manual', seenAt: payload.starts_at })
+
+  let rows: Record<string, unknown>[]
+  try {
+    rows = (await sql`
+      WITH ev AS (
+        UPDATE calendar_events
+        SET title = ${title}, description = ${description},
+            starts_at = ${payload.starts_at}, ends_at = ${payload.ends_at}
+        WHERE id = ${id} AND event_type IN ('manual', 'block')
+        RETURNING id, event_type
+      ),
+      lead AS (
+        UPDATE client_leads SET
+          company_name = ${title},
+          contact_name = ${contactName},
+          phone = ${phone},
+          email = ${email},
+          contact_id = COALESCE(${contactId}::uuid, contact_id),
+          next_action = ${description ?? 'Termín z kalendáře'},
+          reminder_day_before_sent = CASE
+            WHEN next_action_date IS DISTINCT FROM ${date}::date OR next_action_time IS DISTINCT FROM ${time}::time
+            THEN false ELSE reminder_day_before_sent END,
+          reminder_2h_before_sent = CASE
+            WHEN next_action_date IS DISTINCT FROM ${date}::date OR next_action_time IS DISTINCT FROM ${time}::time
+            THEN false ELSE reminder_2h_before_sent END,
+          next_action_date = ${date}::date,
+          next_action_time = ${time}::time,
+          updated_at = now()
+        FROM ev
+        WHERE client_leads.calendar_event_id = ev.id
+        RETURNING client_leads.id
+      )
+      SELECT id, event_type FROM ev
+    `) as Record<string, unknown>[]
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === '23P01') {
+      throw new Error('Tento termín se překrývá s jinou událostí v kalendáři.')
+    }
+    throw err
+  }
+  if (rows.length === 0) throw new Error('Tuhle událost nejde upravit — už neexistuje.')
+  revalidateCalendar(rows[0].event_type !== 'block')
+}
+
+/**
+ * Smaže vlastní událost nebo blokaci a vrátí, co se smazalo, aby toast mohl
+ * nabídnout „Zpět". Rezervace od klientů, hovory a deadliny zakázek se tudy
+ * mazat nedají — mají svůj zdroj (zakázka, Hovory).
+ */
+export async function deleteCalendarEvent(id: string): Promise<CalendarEventSnapshot | null> {
   await requireAuth()
   // Atomicky — dřívější dvojice samostatných DELETE mohla při výpadku mezi
   // nimi smazat lead a nechat viset osiřelou kalendářní událost.
-  await sql`
-    WITH deleted_lead AS (
-      DELETE FROM client_leads WHERE calendar_event_id = ${id} RETURNING id
+  const rows = (await sql`
+    WITH ev AS (
+      DELETE FROM calendar_events
+      WHERE id = ${id} AND event_type IN ('manual', 'block')
+      RETURNING id, title, description, starts_at, ends_at, event_type
+    ),
+    ld AS (
+      DELETE FROM client_leads
+      WHERE calendar_event_id IN (SELECT id FROM ev)
+      RETURNING contact_name, phone, email, next_action, notes, lead_status, estimated_value
     )
-    DELETE FROM calendar_events WHERE id = ${id}
-  `
-  revalidatePath('/dashboard/calendar')
-  revalidatePath('/dashboard/calls')
+    SELECT ev.title, ev.description, ev.starts_at, ev.ends_at, ev.event_type,
+           (SELECT to_jsonb(ld) FROM ld LIMIT 1) AS lead
+    FROM ev
+  `) as Record<string, unknown>[]
+  revalidateCalendar(true)
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return {
+    title: String(r.title),
+    description: (r.description as string | null) ?? null,
+    starts_at: new Date(r.starts_at as string).toISOString(),
+    ends_at: new Date(r.ends_at as string).toISOString(),
+    event_type: r.event_type as 'manual' | 'block',
+    lead: (r.lead as CalendarEventSnapshot['lead']) ?? null,
+  }
+}
+
+const snapshotSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().max(500).nullable(),
+  starts_at: z.string().refine((v) => !Number.isNaN(Date.parse(v))),
+  ends_at: z.string().refine((v) => !Number.isNaN(Date.parse(v))),
+  event_type: z.enum(EDITABLE_TYPES),
+  lead: z
+    .object({
+      contact_name: z.string().max(120).nullable(),
+      phone: z.string().max(40).nullable(),
+      email: z.string().max(200).nullable(),
+      next_action: z.string().max(500).nullable(),
+      notes: z.string().max(5000).nullable(),
+      lead_status: z.string().max(40).nullable(),
+      estimated_value: z.number().nullable(),
+    })
+    .nullable(),
+})
+
+/** „Zpět" po smazání: založí událost znovu, včetně poznámek kontaktu v Hovorech. */
+export async function restoreCalendarEvent(snapshot: CalendarEventSnapshot) {
+  await requireAuth()
+  const s = snapshotSchema.parse(snapshot)
+  checkPayload(s)
+  await insertEvent(
+    {
+      title: s.title,
+      description: s.description,
+      starts_at: s.starts_at,
+      ends_at: s.ends_at,
+      event_type: s.event_type,
+      contact_name: s.lead?.contact_name ?? null,
+      phone: s.lead?.phone ?? null,
+      email: s.lead?.email ?? null,
+    },
+    {
+      notes: s.lead?.notes ?? null,
+      lead_status: s.lead?.lead_status ?? null,
+      estimated_value: s.lead?.estimated_value ?? null,
+      next_action: s.lead?.next_action ?? null,
+    },
+  )
 }

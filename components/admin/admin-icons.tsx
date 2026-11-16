@@ -1,5 +1,5 @@
 import {
-  Bell, Building2, CalendarDays, FileText, Inbox, Layers, Megaphone,
+  Bell, Building2, CalendarDays, CircleCheck, FileText, Inbox, Layers, Megaphone,
   MessageSquarePlus, PhoneCall, Receipt, Rocket, Sun, UserCircle, Users, Wallet, FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
@@ -8,6 +8,7 @@ import type { NavIcon } from '@/lib/admin-nav'
 const ICONS: Record<NavIcon, LucideIcon> = {
   today: Sun,
   projects: FolderOpen,
+  done: CircleCheck,
   requests: MessageSquarePlus,
   inbox: Inbox,
   calendar: CalendarDays,

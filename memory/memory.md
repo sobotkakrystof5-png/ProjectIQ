@@ -2,7 +2,15 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-15 · **Admin se přihlašuje přes Supabase Auth** (R-105).
+> **Poslední aktualizace:** 2026-11-15 · **Veškeré přihlašování přechází na Supabase** (R-107).
+> Fáze F1 je v kódu na větvi `auth/supabase-klient`: klientský prostor `/klient` už nejede
+> na vývojové instanci Clerku, ale na Supabase (e-mail a heslo, účet jen z pozvánky vázané
+> na e-mail, hook registrace u nás). Workspace `/w` (F2) a úklid Clerku (F3) čekají — plán
+> `docs/AUTH-SUPABASE-PLAN.md`. Z auditu portálu přibyla výměna odkazu `/p` a omezení
+> rezervace. **Nenasazeno, neověřeno v prohlížeči;** před nasazením migrace 113 a nastavení
+> v Supabase (hook HTTPS, tajemství, Confirm email, SMTP).
+>
+> Předchozí: 2026-11-15 · **Admin se přihlašuje přes Supabase Auth** (R-105).
 > E-mail, heslo a dvoufázové ověření ověřovací aplikací; NextAuth, `ADMIN_PASSWORD_HASH`
 > a `bcryptjs` z repa odešly. **Jen admin** — Workspace a klientský prostor zůstávají na
 > Clerku a **data zůstávají v Neonu**, Supabase je jen poskytovatel identity. Cookie se
@@ -1006,10 +1014,73 @@ cookie; hlídá to test, ale jen na vymyšlených claims. Změna `ADMIN_EMAIL` z
 generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105,
 `.claude/security/DECISIONS.md` #029 (doplnění).
 
+### R-109 · Dokončené zakázky mají vlastní položku menu (2026-11-15)
+**Rozhodnutí:** Zakázky (`/dashboard/zakazky`) ukazují jen rozpracovanou práci (Nová,
+V řešení, Čeká na schválení). Hotové a zaplacené zakázky jsou v nové položce menu
+**Dokončené** (`/dashboard/zakazky/dokoncene`) v Práci hned pod Zakázkami. Dokončená =
+`closed_at IS NOT NULL OR status IN ('done','paid')`, stejně jako u dotazníku.
+**Proč:** Kryštof 2026-11-15: zaplacené zakázky se mu míchaly s aktuálními.
+**Důsledek:** mění R-090/R-097 v části „Dokončené mizí z menu" — dokončenost dál je stav
+zakázky (žádná nová tabulka), jen má vlastní výpis. Adresa je pod `/zakazky`, ne
+`/dashboard/dokoncene`: ta měla trvalé přesměrování na `?status=uzavrene`, které si
+prohlížeč mohl uložit; teď vede do Dokončených a Zakázky staré `?status=uzavrene|done|paid`
+přesměrují samy. „Hotovo" bez zaplacení je v Dokončených, souhrn nahoře ukazuje „Nezaplaceno".
+
+### R-110 · Víc záloh na zakázku, ruční příjmy v Podnikání, kalendář na Dnes a v Hovorech (2026-11-15)
+**Rozhodnutí:** (1) Ve Finance › Podnikání jde zapsat **zálohu k zakázce** (libovolně mnoho na
+jednu zakázku) nebo **jednorázový příjem** bez zakázky. Záloha je řádek `finance_transactions`
+s `category = 'záloha'`, `source_project_id`, `deposit_transaction = true`, `area = 'byznys'`,
+`income_origin = 'manual'`; linie (přiznané/nepřiznané) se bere ze zakázky (`invoiced_on_ico`).
+Jednorázový příjem má `category = 'jednorázový příjem'` a linii z formuláře. (2) Zbývá doplatit
+= cena − vlastní záloha zakázky (je-li zaplacená) − ruční zálohy, **všude stejně**
+(`lib/admin/project-payments.ts`): doplatek při „Peníze dorazily", Nezaplacené zakázky
+v Podnikání, souhrn ve výpisu zakázek, částka nové faktury. Linie v Podnikání ukazuje „Z toho
+zálohy". (3) Na Dnes je pod úkoly týdenní kalendář, v Hovorech záložka `?pohled=kalendar`;
+je to tentýž `SmartCalendar` (prop `defaultView`). Rozhodl Kryštof 2026-11-15 (obě doporučené
+varianty).
+**Proč:** klient platí po částech a jediná záloha na zakázce to neuměla; příjem bez zakázky
+nešel v Podnikání zapsat vůbec.
+**Důsledek:** bez migrace — ruční záloha se pozná podle kategorie, ne podle `income_origin`
+(funguje i bez 109). Záloha vyšší než zbývá se neuloží (`INSERT … SELECT … WHERE`). Kontrola
+„má zakázka už vlastní zálohu" v `updateProject` ruční zálohy vynechává, jinak by vlastní zálohu
+zablokovaly. Ruční záloha je kandidát pro „Je tohle ta platba?" u faktury zakázky. Smazat jde
+jen ruční příjem, který si nepřevzala faktura. Nová cesta, která počítá doplatek, musí použít
+`remainingSql`/`remainingToPay`. Opakované příjmy z podnikání se nedělaly (`recurring_cash_flow`
+nemá linii přiznané/nepřiznané).
+
+### R-107 · Veškeré přihlašování přes Supabase, klienti e-mailem a heslem (2026-11-15)
+**Rozhodnutí:** z Clerku na Supabase Auth přechází **všechno** — po adminu (R-105) klientský
+prostor `/klient` (F1) a pak Workspace `/w` (F2), nakonec se Clerk z repa odstraní (F3).
+Kryštof 2026-11-15 vybral rozsah „i Workspace" a přihlášení klientů **e-mailem a heslem**.
+Všichni jsou v jednom projektu `zakaziq` (Free plán dovolí dva aktivní projekty a oba jsou
+obsazené); do adminu dál pustí jen `ADMIN_EMAIL` a TOTP. Účet vzniká **jen přes náš hook**
+„Before User Created" (HTTPS `/api/auth/supabase-hook`), který chce otisk platné pozvánky
+a shodný e-mail; pozvánka do `/klient` je proto **vždy vázaná na e-mail** a nesmí znít na
+`ADMIN_EMAIL`. Confirm email se vypíná — důkazem e-mailu je pozvánka. Data zůstávají v Neonu.
+**Proč:** zadání Kryštofa; `/klient` na produkci běžel na vývojové instanci Clerku (audit
+2026-11-15). HTTP hook nechává pravdu o pozvánkách v Neonu a nepotřebuje `service_role` klíč.
+**Důsledek:** mění R-073 (klientský prostor už není na Clerku) a R-105 v části „jen admin";
+R-106 v části hooku — Postgres hook `before_user_created_jen_admin` nahrazuje HTTPS hook
+a zapnutý smí být jen jeden. Migrace 113 (sloupec `portal.members.clerk_user_id` nese id ze
+Supabase, název zůstal kvůli opakovanému běhu migrace 095). Plán a kroky v dashboardu
+`docs/AUTH-SUPABASE-PLAN.md`, bezpečnost `.claude/security/DECISIONS.md` #031.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Supabase pro `/klient` — nasadit a nastavit (R-107, F1):** kód je na větvi
+  `auth/supabase-klient`, na produkci není. Pořadí: (1) migrace 113 na produkci,
+  (2) v Supabase hook Before User Created přepnout na **HTTPS**
+  `https://www.zakaziq.cz/api/auth/supabase-hook` (Postgres hook z R-106 vypnout),
+  (3) jeho tajemství do Vercelu jako `SUPABASE_AUTH_HOOK_SECRET`, (4) vypnout Confirm email,
+  (5) vlastní SMTP přes Resend (bez něj nedojde odkaz na nové heslo), (6) Redirect URL
+  `/klient/auth/potvrzeni` a `ADMIN_USER_ID` (id účtu adminu) do Vercelu, (7) deploy a průchod pozvánka → přístup → přehled → odhlášení →
+  přihlášení → zapomenuté heslo na 390 a 1280 px. Detail `docs/AUTH-SUPABASE-PLAN.md` → F1
+  · Kryštof · od 2026-11-15
+- [ ] **Workspace a úklid Clerku (R-107, F2 + F3):** nezačato. Před F2 rozhodnout, jestli
+  placený Workspace může běžet na Free projektu Supabase (uspání po týdnu bez provozu,
+  limity e-mailů, sdílený projekt s adminem) · `docs/AUTH-SUPABASE-PLAN.md` · od 2026-11-15
 - [ ] **Admin neposílá e-maily — Gmail SMTP vrací 535 BadCredentials (zjištěno 2026-11-14
   z runtime chyb Vercelu):** `[Email] Selhání odesílání: Invalid login: 535-5.7.8 Username and
   Password not accepted` (`code: 'EAUTH'`, `command: 'AUTH PLAIN'`). Routy
@@ -1028,10 +1099,6 @@ generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105
   funkce z AD09–AD17 (kontakty, fakturace, asistent, paměť, předání, AI leady). Chybí
   rozpad, která z nich kolik stojí, a strop v testu, aby se to nedělo potichu. Měření
   patří do „Hotovo, když" u každého dalšího sezení, které přidá klientskou komponentu
-  · od 2026-11-14
-- [ ] **Smazání události v kalendáři se pořád ptá nativním `confirm()`:** `AGENTS.md` chce
-  „akce hned + Zpět v toastu" a admin to tak dělá všude jinde (změna stavu zakázky, sloučení
-  kontaktů, platba faktury). Zůstalo to jediné místo · `components/SmartCalendar.tsx`
   · od 2026-11-14
 - [ ] **p75 z produkce nikdo neměřil:** admin je na produkci od 2026-11-13, takže to
   **poprvé jde** (Vercel runtime logy / Observability). Plán, sekce 11, má u p75 „Nic".
@@ -1273,6 +1340,79 @@ generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-16 (kalendář: úprava událostí)
+- **feat** **Vlastní události a blokace v kalendáři jdou upravit** (název, čas, poznámka,
+  kontakt) tlačítkem „Upravit" v detailu; změna se v téže transakci propíše do zrcadleného
+  kontaktu v Hovorech (R-010) a při posunu času se resetují připomínky. Druh (událost ×
+  blokace) se nemění. **Smazání už nepoužívá `confirm()`** — smaže se hned a toast nabídne
+  „Zpět" (obnoví událost i s poznámkami kontaktu); to zavírá otevřený problém z 2026-11-14.
+  Mazat/upravovat tudy jde jen `manual`/`block`; rezervace od klientů, hovory a deadliny mají
+  zdroj jinde (zakázka, Hovory) a detail na ně odkazuje. Soubory: `app/calendar-actions.ts`
+  (`updateCalendarEvent`, `restoreCalendarEvent`, `deleteCalendarEvent` vrací snímek),
+  `components/AdminEventModal.tsx`, `components/SmartCalendar.tsx`. Bez migrace.
+  Ověřeno: `tsc`, testy kalendáře a adminu, SQL v PGlite. **V prohlížeči neověřeno.**
+
+### 2026-11-15 (graf ETF pryč)
+- **chore** Z Finance › Osobní odebrán graf ETF (TradingView) i štítky VWCE/IWDA/EIMI/XDWD,
+  smazán `components/TradingViewChart.tsx`. CSP adminu přišla o `frame-src
+  https://www.tradingview-widget.com` (CSP-LOG v10, STATE). Ověřeno: `tsc`, testy CSP.
+  V prohlížeči neověřeno.
+
+### 2026-11-15 (zálohy, ruční příjmy a kalendář)
+- **feat** **Víc záloh na zakázku a ruční příjmy v Podnikání** (R-110): karta „Zapsat
+  příjem" ve Finance › Podnikání (záloha k zakázce / jednorázový příjem, seznam zapsaných
+  letos se smazáním a „Zpět"), linie ukazují „Z toho zálohy", doplatek a nezaplacené částky
+  odečítají ruční zálohy. Soubory: `lib/admin/project-payments.ts`,
+  `app/dashboard/finance/{business-income-actions.ts,BusinessIncomeForm.tsx,BusinessSection.tsx,finance-actions.ts,byznys-actions.ts,page.tsx}`,
+  `app/actions.ts`, `lib/admin/{invoice-issue,projects}.ts`, `components/SummaryBar.tsx`,
+  test `lib/__tests__/admin-zalohy.test.ts` (11 testů). Bez migrace.
+- **feat** **Kalendář na Dnes (týden) a záložka Kalendář v Hovorech** (R-110):
+  `components/SmartCalendar.tsx` (`defaultView`), `app/dashboard/page.tsx`,
+  `app/dashboard/calls/page.tsx`; `app/calendar-actions.ts` obnovuje i `/dashboard`.
+- **chore** Ověřeno: `tsc`, `npm test` (107 souborů / 1247 testů), `npm run build`.
+  **V prohlížeči neověřeno** — přihlášení je od R-105 přes Supabase a testovací Neon nemá 106.
+- **decision** **R-110**.
+
+### 2026-11-15 (Dokončené zakázky zvlášť)
+- **feat** **Dokončené jako vlastní položka menu** (R-109): Zakázky jen rozpracované,
+  hotové a zaplacené v `/dashboard/zakazky/dokoncene` s filtry Hotovo / Zaplaceno, druh
+  a zdroj, řazení podle uzavření. Společná obrazovka `components/admin/projects-list.tsx`,
+  výpis `lib/admin/projects.ts` (`ProjectScope`), ikona v menu, odkaz z Profilu,
+  přesměrování starých adres. Ověřeno: `tsc`, `npm test` (105 souborů / 1226 testů),
+  `npm run build`. **V prohlížeči neověřeno** — testovací Neon nemá migraci 106
+  (`closed_at`), takže výpis tam nejde otevřít.
+- **decision** **R-109**.
+
+### 2026-11-15 (klientský prostor přes Supabase, audit portálu)
+- **feat** **`/klient` se přihlašuje přes Supabase Auth** (R-107, F1): e-mail a heslo v server
+  actions (`app/klient/actions.ts`, `components/portal/auth-forms.tsx`), session v `proxy.ts`
+  (`checkUserSession`), identita `getClaims()` v `lib/portal/context.ts`. Přístup se zakládá
+  ze stránky pozvánky, obnova hesla přes `/klient/zapomenute-heslo` → `/klient/auth/potvrzeni`
+  → `/klient/nove-heslo`. `/klient/registrace` jen přesměruje. Clerk z `/klient` odešel
+  i z CSP (CSP-LOG v9).
+- **feat** **Hook registrace** `POST /api/auth/supabase-hook` (`lib/supabase/signup-hook.ts`):
+  podpis Standard Webhooks (`SUPABASE_AUTH_HOOK_SECRET`, nová env), fail-closed, pouští jen
+  účet s otiskem platné pozvánky a shodným e-mailem. Ověření podpisu vytažené do
+  `lib/security/webhook-signature.ts` (Resend ho re-exportuje).
+- **db** **Migrace 113** (aplikována: ne): `portal.members.clerk_user_id` nese id ze Supabase,
+  členové z Clerku vyřazení, pozvánka musí mít e-mail (`invites_email_required`), staré
+  nevázané zrušené, `redeem_invite` bez e-mailu nic nedá.
+- **fix** Z auditu portálu: **výměna odkazu `/p`** z detailu zakázky se „Zpět"
+  (`app/portal-link-actions.ts`, `components/admin/portal-link-rotate.tsx`); **rezervace z `/p`**
+  posílá potvrzení jen na `projects.client_email`, ne na adresu z formuláře, a termín nejvýš
+  183 dní dopředu (`app/portal-actions.ts`, texty v `components/BookingModal.tsx`); pozvánka
+  v adminu má povinný e-mail a nejde na `ADMIN_EMAIL`. Nová nepovinná env **`ADMIN_USER_ID`**
+  připne admina i na id účtu (`isAdminUser`), protože s vypnutým potvrzením e-mailu jde e-mail
+  účtu změnit bez potvrzení.
+- **chore** Ověřeno: `npx tsc --noEmit`, `npm run build`, testy (nový
+  `lib/__tests__/portal-supabase-auth.test.ts`, `portal-isolation` rozšířený o 113; plná sada
+  1234 prošlo, 1 padal jen na smazaném souboru evidovaném v gitu před commitem), lokální
+  `next start` (přesměrování, `next` na cizí doménu odmítnut, hook bez tajemství 403, CSP bez
+  Clerku, `/login` 200, `/dashboard` 307). **V prohlížeči a proti skutečnému Supabase
+  neověřeno** — hook ani registrace naživo neproběhly.
+- **docs** Plán `docs/AUTH-SUPABASE-PLAN.md` (F1–F3), DECISIONS #031, AUDIT-LOG, STATE,
+  reference, `.env.example`.
 
 ### 2026-11-15 (přihlášení do adminu přes Supabase Auth)
 - **fix** **Proč se nešlo přihlásit:** větev `admin/supabase-auth` nebyla pushnutá, takže

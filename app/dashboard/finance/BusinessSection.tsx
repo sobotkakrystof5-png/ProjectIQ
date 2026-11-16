@@ -8,6 +8,8 @@ import type { BusinessIncomeSummary, IncomeLine } from './finance-actions'
 import type { InvoiceArchiveData, InvoiceProjectOption } from './invoice-actions'
 import type { TaxNewsData } from './tax-news-actions'
 import { BASE_CURRENCY, formatMoney } from '@/lib/money-currency'
+import type { BusinessPaymentsPanel } from '@/lib/admin/project-payments'
+import { BusinessIncomeForm } from './BusinessIncomeForm'
 
 function formatAmount(amount: number) {
   return formatMoney(amount, BASE_CURRENCY)
@@ -67,6 +69,10 @@ function LineCard({
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
+          <span className="text-quiet">Z toho zálohy</span>
+          <span className="font-medium text-ink tabular-nums">{formatAmount(line.deposits)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
           <span className="text-quiet">Nezaplacené zakázky</span>
           <span
             className={`font-medium tabular-nums ${
@@ -94,7 +100,10 @@ export function BusinessSection({
   projectOptions,
   taxNews,
   todayIso,
+  payments,
 }: {
+  /** Ruční příjmy a zálohy (R-110). */
+  payments: BusinessPaymentsPanel
   summary: BusinessIncomeSummary
   invoices: InvoiceArchiveData
   projectOptions: InvoiceProjectOption[]
@@ -172,6 +181,9 @@ export function BusinessSection({
           </span>
         </div>
       )}
+
+      {/* Ruční zápis: zálohy k zakázce i jednorázové příjmy (R-110). */}
+      <BusinessIncomeForm panel={payments} todayIso={todayIso} />
 
       {/* Archiv faktur je podsekce přiznané linie — faktura je doklad k příjmu,
           který do téhle linie spadá. Samostatná stránka by ten vztah rozbila. */}

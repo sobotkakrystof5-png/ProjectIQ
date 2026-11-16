@@ -136,7 +136,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 
 | Skupina | Proměnné |
 |---------|----------|
-| DB + auth | `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` |
+| DB + auth | `DATABASE_URL`, `NEXTAUTH_URL` (už jen záložní adresa pro odkazy), `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_USER_ID` (nepovinné, připne admina na id účtu, R-107), `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_AUTH_HOOK_SECRET` (R-105, R-107) |
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
 | Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
 | Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení, hash klíčů rate limitu a (odvozeným klíčem) podpis odkazů v e-mailech. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) a e-maily s odkazy nevzniknou. Změna zneplatní klíče i odeslané odkazy |
@@ -148,7 +148,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | Crony | `CRON_SECRET` |
 | Hub | `LERNSAX_USER`, `LERNSAX_PASS`, `BESTESCHULE_USER`, `BESTESCHULE_PASS`, `BESTESCHULE_URL`, `CHROME_PATH` (dev), `ANTHROPIC_API_KEY` |
 | Požadavky klientů (portál `/p`) | `OPENAI_API_KEY` (přepis hlasu; bez něj je mikrofon skrytý), `OPENAI_TRANSCRIBE_MODEL` (volitelně, výchozí `gpt-4o-transcribe`), `CLIENT_REQUEST_AI_MODEL` (volitelně, výchozí `claude-sonnet-5-5`; používá `ANTHROPIC_API_KEY`) |
-| Klientský prostor a hlášení (KP03–KP07) | `DATABASE_URL_PORTAL` (role `portal_app`, `scripts/portal-create-role.js` po migracích 093–096), `PORTAL_INVITE_PEPPER` (hash pozvánek), `AGENT_KEY_PEPPER` (hash klíčů projektů pro hlášení z Claude Code); přepis hlasu a shrnutí jako u portálu `/p` |
+| Klientský prostor a hlášení (KP03–KP07) | `DATABASE_URL_PORTAL` (role `portal_app`, `scripts/portal-create-role.js` po migracích 093–096), `PORTAL_INVITE_PEPPER` (hash pozvánek i otisk pro hook registrace), `SUPABASE_AUTH_HOOK_SECRET` (podpis hooku Before User Created, R-107), `AGENT_KEY_PEPPER` (hash klíčů projektů pro hlášení z Claude Code); přepis hlasu a shrnutí jako u portálu `/p` |
 
 Nejdůležitější s popisem:
 
@@ -305,7 +305,7 @@ Plán a rozhodnutí: `docs/klientsky-prostor/PLAN.md` (R-070 a dál v `memory/me
 
 - **Aktivita zakázky** (migrace 093): `lib/project-activity.ts` (Zod, `redactSensitive`, `buildTimeline`), `app/project-activity-actions.ts` (koncept → schválit/zamítnout, souhrnný e-mail max. 1× za 24 h, selhání e-mailu publikaci nezruší), `components/ProjectActivityPanel.tsx`, portál `/p/[token]` ukazuje jen `published`.
 - **Hlášení z Claude Code** (094): `lib/agent-keys.ts`, `POST /api/agent/v1/projects/{id}/reports` (jen koncept), `app/project-agent-key-actions.ts`, `components/AgentKeyPanel.tsx`, skript `scripts/zakaziq-report.mjs`, skill `zakaziq-hlaseni`.
-- **Klientský prostor** (095, 096): `/klient` (Clerk bez organizací, `proxy.ts` má pro něj vlastní middleware), `lib/portal/{db,context,invite,projects,paths,admin-queries}.ts`, `app/klient/**`, `components/portal/`, správa z adminu `/dashboard/klientsky-prostor` (`app/portal-admin-actions.ts`). Klientovi se ukazuje jen schválené (triggery), zapisuje funkcemi `portal.submit_*`. Nová tabulka s daty klienta = `client_id`, RLS politika, složené cizí klíče a řádek v testu `lib/__tests__/portal-isolation.test.ts`.
+- **Klientský prostor** (095, 096, 113): `/klient` — od R-107 přihlášení **Supabase Auth** e-mailem a heslem (`app/klient/actions.ts`, formuláře `components/portal/auth-forms.tsx`, session v `proxy.ts` přes `checkUserSession`, identita `getPortalIdentity()` v `lib/portal/context.ts`). Účet vzniká jen z pozvánky: hook `POST /api/auth/supabase-hook` (`lib/supabase/signup-hook.ts`, `SUPABASE_AUTH_HOOK_SECRET`) pustí registraci s otiskem platné pozvánky v `user_metadata.zakaziq_invite` a shodným e-mailem. Pozvánka je vždy vázaná na e-mail, `portal.members.clerk_user_id` nese id ze Supabase (migrace 113). Obnova hesla `/klient/zapomenute-heslo` → `/klient/auth/potvrzeni` → `/klient/nove-heslo` (potřebuje vlastní SMTP v Supabase). Plán celého přechodu `docs/AUTH-SUPABASE-PLAN.md`. Dál `lib/portal/{db,invite,projects,paths,admin-queries}.ts`, `app/klient/**`, `components/portal/`, správa z adminu `/dashboard/klientsky-prostor` (`app/portal-admin-actions.ts`). Klientovi se ukazuje jen schválené (triggery), zapisuje funkcemi `portal.submit_*`. Nová tabulka s daty klienta = `client_id`, RLS politika, složené cizí klíče a řádek v testu `lib/__tests__/portal-isolation.test.ts`.
 - **Předání do Claude Code, úroveň 2** (KP09): `lib/claude-code-handoff.ts` (příkaz pro terminál s textem klienta v souboru přes heredoc, ne v `$(…)`), tlačítko na kartě požadavku.
 - **Kostra administrace** (KP01/KP02): viz `docs/admin/AGENTS-ADMIN.md` → Kostra administrace.
 

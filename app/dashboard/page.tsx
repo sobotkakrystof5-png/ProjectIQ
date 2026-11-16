@@ -1,6 +1,10 @@
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import Link from 'next/link'
-import { ArrowRight, CalendarClock, FileWarning, MessageSquarePlus, PauseCircle, ClipboardCheck, Wallet } from 'lucide-react'
+import { ArrowRight, CalendarClock, CalendarDays, FileWarning, MessageSquarePlus, PauseCircle, ClipboardCheck, Wallet } from 'lucide-react'
+import { SmartCalendar } from '@/components/SmartCalendar'
+import { loadCalendarWindow } from '@/lib/admin/calendar'
+import { windowFor } from '@/lib/admin/calendar-window'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { loadTodayScreen } from '@/lib/admin-today-queries'
 import { isTodayEmpty, pickFocus, daysBetween, type MonthMoney } from '@/lib/admin-today'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -104,8 +108,11 @@ function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
 }
 
 export default async function TodayPage() {
-  // Jedno kolo do databáze: věci k vyřízení i peníze jedou v jedné dávce.
-  const { data, money } = await loadTodayScreen()
+  // Věci k vyřízení i peníze jedou v jedné dávce; kalendář (R-110) má vlastní
+  // dotazy z `lib/admin/calendar.ts` a běží souběžně, ne po nich.
+  const today = getPragueTodayISO()
+  const calendarRange = windowFor(today)
+  const [{ data, money }, calendar] = await Promise.all([loadTodayScreen(), loadCalendarWindow(calendarRange)])
   const now = new Date()
   const focus = pickFocus(data, now)
   const empty = isTodayEmpty(data)
@@ -243,6 +250,26 @@ export default async function TodayPage() {
 
         <MonthMoneyPanel money={money} now={now} />
       </div>
+
+      {/* Kalendář na Dnes (R-110): stejný jako v sekci Kalendář, jen začíná týdnem. */}
+      <section aria-labelledby="dnes-kalendar" className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="dnes-kalendar" className={cn(SECTION_LABEL, 'flex items-center gap-2')}>
+            <span className="text-navy-500">
+              <CalendarDays size={16} strokeWidth={1.5} aria-hidden="true" />
+            </span>
+            Kalendář
+          </h2>
+          <Link
+            href="/dashboard/calendar"
+            className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-navy-700 hover:text-navy-900"
+          >
+            Otevřít celý kalendář
+            <ArrowRight size={15} strokeWidth={1.5} aria-hidden="true" />
+          </Link>
+        </div>
+        <SmartCalendar initial={calendar} initialRange={calendarRange} today={today} defaultView="week" />
+      </section>
     </PageShell>
   )
 }

@@ -17,6 +17,7 @@ import {
 import { parseInvoiceForm, insertInvoice, type InvoiceInput, type InvoicePdf } from '@/lib/invoices'
 import { adminDb } from '@/lib/admin/db'
 import { ledgerSql } from '@/lib/admin/ledger'
+import { EXTRA_DEPOSIT_CATEGORY, extraDepositsFor, remainingToPay } from '@/lib/admin/project-payments'
 import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
 
 /** Seznam zakázek — jedna sekce adminu po sloučení byznysů (AD02, R-088). */
@@ -354,9 +355,13 @@ export async function updateProject(
 
   // Záloha zaplacena → okamžitě zapsat do financí
   if (!wasDepositPaid && payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0) {
+    // Zálohy zapsané ručně z Podnikání (R-110) se nepočítají — jsou to jiné
+    // peníze než vlastní záloha zakázky.
     const existingDeposit = await sql`
       SELECT id FROM finance_transactions
-      WHERE source_project_id = ${id} AND deposit_transaction = true LIMIT 1
+      WHERE source_project_id = ${id} AND deposit_transaction = true
+        AND category IS DISTINCT FROM ${EXTRA_DEPOSIT_CATEGORY}
+      LIMIT 1
     `
     if ((existingDeposit as unknown[]).length === 0) {
       const note = payload.client_name + (payload.description ? ' — ' + payload.description : '') + ' (záloha)'
@@ -371,10 +376,16 @@ export async function updateProject(
     }
   }
 
-  // Přechod na zaplaceno → zapsat zbývající část (cena − záloha, nebo celá cena pokud záloha nebyla)
+  // Přechod na zaplaceno → zapsat zbývající část: cena − vlastní záloha −
+  // zálohy zapsané z Podnikání (R-110). Když je všechno zaplacené zálohami,
+  // doplatek nevznikne vůbec.
   if (!wasPaid && payload.paid && payload.price && payload.price > 0) {
-    const depositAlreadyPaid = payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0
-    const remaining = depositAlreadyPaid ? payload.price - (payload.deposit_amount ?? 0) : payload.price
+    const remaining = remainingToPay({
+      price: payload.price,
+      depositAmount: payload.deposit_amount,
+      depositPaid: payload.deposit_paid,
+      extraDeposits: await extraDepositsFor(id),
+    })
     if (remaining > 0) {
       const existingFinal = await sql`
         SELECT id FROM finance_transactions
