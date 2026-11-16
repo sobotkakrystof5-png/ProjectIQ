@@ -1048,9 +1048,16 @@ jen ruční příjem, který si nepřevzala faktura. Nová cesta, která počít
 `remainingSql`/`remainingToPay`. Opakované příjmy z podnikání se nedělaly (`recurring_cash_flow`
 nemá linii přiznané/nepřiznané).
 
+### R-111 · Asistent akce provádí sám, člověk je vrací (2026-11-16)
+**Rozhodnutí:** asistent v adminu přestává jen navrhovat a **provádí vratné akce sám** (kontakt, termín, poznámka, stav zakázky, zakázka, záloha a platba, náklad, „faktura zaplacena") s tlačítkem **Zpět** a historií. **Jedno klepnutí** zůstává u odeslání zprávy klientovi, vystavení faktury a mazání. Vystavenou fakturu nelze upravit (R-098), oprava je storno + nová. Je-li v kontextu text napsaný klientem, auto-provedení se vypne. Přibude hlas a plovoucí tlačítko. Plán `docs/admin/ASISTENT-PLAN.md`.
+**Proč:** Kryštof 2026-11-16: „aby to dělal všechno on za mě, jenom mu to řeknu textem". Třídy akcí jsou výchozí návrh k potvrzení.
+**Důsledek:** **mění R-084 a R-100** v části „asistent nekoná". Náklady odhadem 50–600 Kč měsíčně (ceník neověřený u přepisu hlasu). **Model nevrací strukturovaný výstup se schématem** — API ho odmítlo jako moc složité (ověřeno živě 2026-11-16); vrací JSON podle popisu v promptu a jedinou bránou je `lib/ai/plan-format.ts`. Pojistka proti cizímu textu platí pro každý kontext záznamu (na detailu zakázky/kontaktu nic samo). Bezpečnost DECISIONS #032, technika `docs/admin/AGENTS-ADMIN.md` → „AI asistent koná sám".
+
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Asistent (R-111) v prohlížeči neověřený a necommitnutý:** projít s přihlášením na databázi s migrací 110 (produkce ji má, testovací Neon ne) na 390 a 1280 px — diktování (povolení mikrofonu, Safari `audio/mp4`), věta se dvěma akcemi, toast „Zpět", „Vrátit" u kroku, faktura na klepnutí, věta na detailu zakázky (nesmí se provést sama). Pak commit a nasazení se souhlasem. Dotazy na data (A4) projít na produkčních datech — testovací Neon nemá tabulky adminu, takže živě běžely jen nad podstrčenými daty · `docs/admin/ASISTENT-PLAN.md` · od 2026-11-16
 
 - [ ] **Supabase pro `/klient` — nasadit a nastavit (R-107, F1):** kód je na větvi
   `auth/supabase-klient`, na produkci není. Pořadí: (1) migrace 113 na produkci,
@@ -1118,15 +1125,6 @@ nemá linii přiznané/nepřiznané).
   nemá (všechen kód GDPR exportu je ve Workspace, `lib/ws/gdpr.ts`). Výmaz pokrytý je — triggery
   `trg_projects_forget_memory` a `trg_contacts_forget_memory` plus denní úklid. Doplnit spolu
   s výmazem kontaktu na žádost (AD16/KP10) · DECISIONS #026 · od 2026-11-13
-- [ ] **AD14 v prohlížeči neověřený a živý dotaz na model neproběhl:** klíč se v sezení
-  nepoužil, takže **tvar strukturovaného výstupu se zanořeným sjednocením**
-  (`{ proposal: discriminatedUnion, … }`) ani čtení cachovaného prefixu
-  (`usage.cache_read_input_tokens` > 0) nikdo neviděl naživo. Projít na 390 / 768 / 1280 / 1440 px:
-  ⌘K s dotazem, který nic nenajde → „Zeptat se asistenta"; panel s větou „zavolat Nováka ve
-  čtvrtek ve dvě" → návrh `schedule_call` → Provést → termín v kalendáři; změna stavu zakázky
-  s toastem „Zpět"; `send_message` (musí být vidět řádek **Komu**); konzultanti u startupového
-  projektu (rozhovor s historií). Od 2026-11-14 to jde na produkci (110 je podle Kryštofa venku); na testovacím Neonu 110 chybí dál
-  · od 2026-11-13
 - [ ] **Doprovodné kroky po migracích nikdo neodškrtl (nasazení 2026-11-13):** (1) po 102
   kontrola `SELECT … WHERE lead_pending` z hlavičky migrace — stará nikdy nepotvrzená poptávka
   se má potvrdit nebo smazat, (2) u 109 `WARNING` o nevytvořeném indexu
@@ -1323,6 +1321,16 @@ nemá linii přiznané/nepřiznané).
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-16 (asistent koná sám — A0–A3)
+- **fix** **Asistent z AD14 naživo nefungoval:** strukturovaný výstup se schématem API odmítalo (`The compiled grammar is too large`, pak strop 16 polí s `null` a 24 nepovinných). Model teď vrací JSON podle popisu v promptu a přísnou kontrolu dělá `lib/ai/plan-format.ts`. Ověřeno živě: 6 vět ze 6 správně, haiku ~2,5–3 s, systémový prompt z cache.
+- **feat** **Asistent koná sám** (R-111): plán až s osmi akcemi a 13 druhy (kontakt, termín, přesun a zrušení termínu, zakázka, stav, poznámka, záloha a příjem, náklad, zaplacení, vystavení a storno faktury, zpráva), vratné hned se „Zpět", zbytek na klepnutí, „Vrátit" u každého kroku. Soubory: `lib/ai/{suggestion-schema,action-policy,action-lines,plan-format,propose,prompts}.ts`, `lib/admin/{suggestion-apply,suggestions,assistant-resolve}.ts`, `app/ai-actions.ts`, `components/admin/assistant-panel.tsx`; `createCalendarEvent` vrací `{ id }`. Bez migrace (stačí 110).
+- **feat** **Hlas a plovoucí tlačítko:** `POST /api/ai-assistant/prepis` (přihlášení, `Origin`, limity, nápověda jmen klientů pro přepis), `lib/transcribe.ts` umí `prompt`, `microphone=(self)` na `/dashboard/*` (`next.config.mjs`, DECISIONS #032, STATE).
+- **chore** Ověřeno: `tsc`, `npm test` (108 souborů / 1273 testů, nové `ai-plan-format.test.ts`, přepsané `ai-executory` a `ai-navrhy`), `npm run build:check`, živé volání modelu. **V prohlížeči neověřeno** (přihlášení přes Supabase, testovací Neon nemá 110). Nic necommitnuto.
+- **docs** Plán `docs/admin/ASISTENT-PLAN.md` (A0–A4, stav v oddílu 7), `docs/admin/AGENTS-ADMIN.md`.
+- **feat** **A4 — dotazy na data** („kolik mi dluží Novák", „kdy mám ve čtvrtek volno", „co mám tento týden"): model si řekne o jeden z pěti pevných dotazů jen pro čtení, server ho provede a model odpoví ve druhém kole. Plán nad daty se nespustí sám. Soubory `lib/admin/assistant-lookups.ts`, `lib/ai/plan-format.ts` (`lookupSchema`), `lib/ai/propose.ts`, značka `<data>` v `lib/ai/markers.ts`. Ověřeno živě s podstrčenými daty 4 ze 4. Test `lib/__tests__/ai-dotazy.test.ts`.
+- **fix** `ws-intake` a `ws-money` měly v `beforeAll` napevno 30 s místo globálních 60 s (AD09) a v plné sadě padaly na startu PGlite; sjednoceno. Plná sada 109 souborů / 1281 testů prošla.
+- **decision** **R-111**.
 
 ### 2026-11-16 (kalendář: úprava událostí)
 - **feat** **Vlastní události a blokace v kalendáři jdou upravit** (název, čas, poznámka,

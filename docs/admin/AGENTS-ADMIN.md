@@ -770,6 +770,34 @@ všem transakcím zakázky (potřebuje rozhodnutí, neměnit potichu) · `declar
 obousměrná automatika `costs` ↔ `finance_transactions` · dvě sady daňových sazeb ·
 `pdf_data bytea` v řádku faktury.
 
+### AI asistent koná sám, člověk vrací (R-111, plán `docs/admin/ASISTENT-PLAN.md`)
+
+**Od 2026-11-16 platí tohle; popis AD14 níž je historie a v detailech už neplatí.**
+
+- **Plán místo návrhu.** Věta (napsaná, nebo nadiktovaná přes `POST /api/ai-assistant/prepis`)
+  → `proposeSuggestion` → `lib/ai/propose.ts` vrátí plán až s osmi akcemi
+  (`lib/ai/suggestion-schema.ts`, 13 druhů). Model vrací **JSON podle popisu v promptu**
+  (`proposeCatalogue`), ne strukturovaný výstup: schéma API odmítlo jako moc složité (tři stropy
+  gramatiky, ověřeno živě). Jedinou bránou je `lib/ai/plan-format.ts` → `actionSchema`.
+- **Co běží samo:** `lib/ai/action-policy.ts`. Vratné akce hned, faktura/storno/zpráva/„Hotovo"
+  a „Zaplaceno" po klepnutí. Nic samo s kontextem záznamu (`untrustedContext`) ani při jistotě
+  pod 0,6.
+- **Provedení a „Zpět":** `lib/admin/suggestion-apply.ts` (`runAction`, `undoStep`) volá tytéž
+  server actions jako formuláře; výsledek a údaje pro vrácení jsou v `ai_suggestions.applied_ref`
+  (`{ steps: [...] }`, `lib/admin/suggestions.ts`). Zámek `applied_at` brání dvojímu provedení,
+  porovnání `applied_ref` dvojímu vrácení. `createCalendarEvent` kvůli tomu vrací `{ id }`.
+- **Dotazy na data (A4):** model může místo akcí vrátit `lookups` (kalendář, volný čas, zakázka,
+  kontakt, nezaplacené). `lib/admin/assistant-lookups.ts` je provede jen čtením a vrátí `<data>`;
+  `propose.ts` pak volá model podruhé. Plán nad daty má `untrustedContext` — nic samo. Nový dotaz =
+  varianta v `lookupSchema` (`lib/ai/plan-format.ts`), funkce v `assistant-lookups.ts`, řádek v katalogu.
+- **Hledání záznamu:** `lib/admin/assistant-resolve.ts` — přesně, pak kořen jména bez pádové
+  koncovky („Nováka" → „Novák"); dvě shody = otázka.
+- **Panel:** plovoucí tlačítko vpravo dole (nad spodní lištou telefonu), diktování, u každého
+  kroku „Provést" / „Vrátit" / „Otevřít".
+- **Bez migrace.** Provádění potřebuje 110 (`ai_suggestions`); bez ní asistent řekne, co by udělal,
+  a nic neprovede. Nová akce = varianta v `actionSchema`, řádek v `proposeCatalogue`, třída
+  v `action-policy.ts`, executor + `UndoToken` v `suggestion-apply.ts`, řádky v `action-lines.ts`.
+
 ### AI asistent: navrhne, člověk potvrdí (AD14, R-084, R-100)
 
 Asistent z jedné věty udělá **vyplněný návrh akce**. Nic neprovede sám — provede to server action

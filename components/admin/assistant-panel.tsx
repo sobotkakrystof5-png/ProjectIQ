@@ -1,82 +1,65 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Loader2, Sparkles } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, Check, Loader2, Mic, Sparkles, Square, Undo2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
-import { applySuggestion, proposeSuggestion, rejectSuggestion, undoProposedStatus } from '@/app/ai-actions'
+import {
+  applySuggestion,
+  proposeSuggestion,
+  rejectSuggestion,
+  undoSuggestion,
+  type PlanView,
+} from '@/app/ai-actions'
 import { contextRefFromPath, onAssistantOpen } from '@/lib/admin/assistant-open'
-import { CONFIDENCE_FLOOR, SUGGESTION_LABELS, type Suggestion } from '@/lib/ai/suggestion-schema'
 import { TEXT_MAX } from '@/lib/ai/assistant-limits'
-import type { ProjectStatus } from '@/lib/types'
+import type { StepView } from '@/lib/admin/suggestions'
 
 /**
- * Pravý panel asistenta (AD14).
+ * Asistent (AD14, od R-111 koná sám).
  *
- * Napíšete větu, asistent vrátí **vyplněný návrh** — a ten se provede až
- * po kliknutí. Nic se neuloží samo (R-084). Panel proto vždycky ukazuje,
- * co přesně se stane, co si asistent domyslel a co ve větě chybí.
+ * Řeknete nebo napíšete, co se má stát. Vratné věci (kontakt, termín,
+ * poznámka, platba, náklad…) se provedou hned a toast nabídne „Zpět";
+ * vystavení faktury, storno a zprávy klientovi čekají na klepnutí. Panel
+ * vždycky ukazuje, co přesně se stalo, a u každého kroku jde „Vrátit".
  *
- * Kontext si bere z adresy: na detailu zakázky „vidí" tu zakázku, na
- * startupovém projektu ten projekt. Jinde se ptá naslepo.
+ * Kontext si bere z adresy: na detailu zakázky „vidí" tu zakázku. Tam ale
+ * nic neprovede samo — kontext nese i text od klientů (R-069).
  */
 
-type Shown = { id: string | null; suggestion: Suggestion }
+type VoiceState = 'idle' | 'recording' | 'transcribing'
 
-/** Řádky návrhu k přečtení — ne JSON, ale to, co se opravdu stane. */
-function proposalLines(suggestion: Suggestion): { label: string; value: string }[] {
-  const p = suggestion.proposal
-  switch (p.kind) {
-    case 'create_lead':
-      return [
-        { label: 'Kontakt', value: p.companyName },
-        ...(p.contactName ? [{ label: 'Jméno', value: p.contactName }] : []),
-        ...(p.phone ? [{ label: 'Telefon', value: p.phone }] : []),
-        ...(p.email ? [{ label: 'E-mail', value: p.email }] : []),
-        ...(p.note ? [{ label: 'Poznámka', value: p.note }] : []),
-      ]
-    case 'schedule_call':
-      return [
-        { label: 'Termín', value: p.title },
-        { label: 'Kdy', value: [p.date, p.time].filter(Boolean).join(' ') || 'nedoplněno' },
-        { label: 'Délka', value: `${p.durationMinutes} min` },
-        ...(p.contactName ? [{ label: 'S kým', value: p.contactName }] : []),
-        ...(p.phone ? [{ label: 'Telefon', value: p.phone }] : []),
-      ]
-    case 'update_project_status':
-      return [
-        { label: 'Zakázka', value: p.project.hint ?? 'z otevřené obrazovky' },
-        { label: 'Nový stav', value: p.status },
-      ]
-    case 'create_invoice_draft':
-      return [
-        { label: 'Zakázka', value: p.project.hint ?? 'z otevřené obrazovky' },
-        ...(p.counterpartyName ? [{ label: 'Odběratel', value: p.counterpartyName }] : []),
-        ...(p.description ? [{ label: 'Za co', value: p.description }] : []),
-        ...(p.amount !== null ? [{ label: 'Částka', value: String(p.amount) }] : []),
-      ]
-    case 'add_note':
-      return [
-        { label: 'Kam', value: p.target === 'project' ? 'K zakázce' : 'Ke kontaktu' },
-        ...(p.ref.hint ? [{ label: 'Komu', value: p.ref.hint }] : []),
-        { label: 'Text', value: p.noteText },
-      ]
-    case 'send_message':
-      return [
-        { label: 'Čím', value: p.channel === 'email' ? 'E-mailem' : p.channel === 'sms' ? 'SMS' : 'WhatsAppem' },
-        // Komu to půjde, musí být vidět **vždycky**. V kontextu asistenta
-        // jsou i texty, které psal klient (poznámky, požadavky z portálu),
-        // a ten by mohl modelu podstrčit cizí adresu. Člověk, který potvrzuje,
-        // ji tedy musí mít před očima, ne schovanou v odkazu.
-        { label: 'Komu', value: (p.channel === 'email' ? p.email : p.phone) ?? 'nedoplněno' },
-        ...(p.subject ? [{ label: 'Předmět', value: p.subject }] : []),
-        { label: 'Text', value: p.body },
-      ]
-    case 'none':
-      return [{ label: 'Proč', value: p.reason }]
+const MAX_RECORDING_SECONDS = 90
+const PREFERRED_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
+
+function pickMimeType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined') return undefined
+  return PREFERRED_TYPES.find((type) => MediaRecorder.isTypeSupported(type))
+}
+
+function isExternal(href: string): boolean {
+  return href.startsWith('mailto:') || href.startsWith('sms:') || href.startsWith('http')
+}
+
+function StepLink({ href, label }: { href: string; label: string }) {
+  const cls = 'inline-flex min-h-11 items-center gap-1 text-sm text-ink underline-offset-4 hover:underline'
+  if (isExternal(href)) {
+    return (
+      <a href={href} className={cls} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">
+        {label}
+        <ArrowUpRight size={14} strokeWidth={1.5} aria-hidden="true" />
+      </a>
+    )
   }
+  return (
+    <Link href={href} className={cls}>
+      {label}
+      <ArrowUpRight size={14} strokeWidth={1.5} aria-hidden="true" />
+    </Link>
+  )
 }
 
 export function AssistantPanel() {
@@ -84,16 +67,25 @@ export function AssistantPanel() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
-  const [shown, setShown] = useState<Shown | null>(null)
+  const [plan, setPlan] = useState<PlanView | null>(null)
+  const [steps, setSteps] = useState<StepView[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const [applying, setApplying] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const [voice, setVoice] = useState<VoiceState>('idle')
+  const [seconds, setSeconds] = useState(0)
+  const [canRecord, setCanRecord] = useState(false)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(
     () =>
       onAssistantOpen(({ text: prefill }) => {
-        setShown(null)
+        setPlan(null)
+        setSteps([])
         setError(null)
         setText(prefill.slice(0, TEXT_MAX))
         setOpen(true)
@@ -101,192 +93,385 @@ export function AssistantPanel() {
     [],
   )
 
+  // Podporu mikrofonu jde zjistit až v prohlížeči.
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 80)
-  }, [open])
+    setCanRecord(typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia) && Boolean(pickMimeType()))
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      recorderRef.current?.stream.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
 
-  const ask = useCallback(() => {
-    const sentence = text.trim()
-    if (!sentence || pending) return
-    setError(null)
-    setShown(null)
-    startTransition(async () => {
-      const result = await proposeSuggestion({
-        text: sentence,
-        contextRef: contextRefFromPath(pathname),
-        source: 'panel',
+  useEffect(() => {
+    if (open && voice === 'idle') setTimeout(() => inputRef.current?.focus(), 80)
+  }, [open, voice])
+
+  const ask = useCallback(
+    (sentence: string, source: 'panel' | 'voice') => {
+      const trimmed = sentence.trim()
+      if (!trimmed || pending) return
+      setError(null)
+      setPlan(null)
+      setSteps([])
+      startTransition(async () => {
+        const result = await proposeSuggestion({ text: trimmed, contextRef: contextRefFromPath(pathname), source })
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
+        setPlan(result)
+        setSteps(result.steps)
+        const done = result.steps.filter((s) => s.ok)
+        if (done.length > 0) {
+          const id = result.id
+          toast.success(done.length === 1 ? done[0].message : `Hotovo: ${done.length} kroky`, {
+            description: done.length === 1 ? (done[0].description ?? undefined) : result.reply,
+            undo:
+              id && done.some((s) => s.canUndo)
+                ? () => {
+                    void undoSuggestion(id).then((r) => {
+                      if (r.ok) {
+                        setSteps(r.steps)
+                        toast.success('Vráceno')
+                      } else toast.error(r.error)
+                      router.refresh()
+                    })
+                  }
+                : undefined,
+          })
+          setText('')
+          router.refresh()
+        }
       })
-      if (!result.ok) setError(result.error)
-      else setShown({ id: result.id, suggestion: result.suggestion })
-    })
-  }, [text, pending, pathname])
+    },
+    [pending, pathname, router],
+  )
 
-  async function confirm() {
-    if (!shown?.id || applying) return
-    setApplying(true)
+  // ── Hlas ──────────────────────────────────────────────────────────────
+  function stopTimer() {
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = null
+  }
+
+  async function transcribe(audio: Blob) {
+    setVoice('transcribing')
     try {
-      const result = await applySuggestion(shown.id)
+      const form = new FormData()
+      form.append('audio', audio, 'nahravka')
+      const res = await fetch('/api/ai-assistant/prepis', { method: 'POST', body: form })
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; text?: string; error?: string } | null
+      if (res.ok && data?.ok && data.text) {
+        const heard = data.text.slice(0, TEXT_MAX)
+        setText(heard)
+        setVoice('idle')
+        // Diktování je celá věta — rovnou se zpracuje. Přepis je vidět
+        // v okénku, takže je jasné, z čeho asistent vycházel.
+        ask(heard, 'voice')
+        return
+      }
+      setError(data?.error ?? 'Nahrávku se nepodařilo přepsat. Napište to prosím.')
+    } catch {
+      setError('Nahrávku se nepodařilo odeslat. Zkontrolujte připojení, nebo to napište.')
+    }
+    setVoice('idle')
+  }
+
+  async function startRecording() {
+    setError(null)
+    const mimeType = pickMimeType()
+    if (!mimeType) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream, { mimeType })
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        stopTimer()
+        void transcribe(new Blob(chunksRef.current, { type: recorder.mimeType || mimeType }))
+      }
+      recorderRef.current = recorder
+      recorder.start()
+      setVoice('recording')
+      setSeconds(0)
+      timerRef.current = setInterval(() => {
+        setSeconds((s) => {
+          if (s + 1 >= MAX_RECORDING_SECONDS && recorder.state === 'recording') recorder.stop()
+          return s + 1
+        })
+      }, 1000)
+    } catch {
+      setError('Mikrofon se nepodařilo zapnout. Povolte ho v prohlížeči, nebo to napište.')
+      setVoice('idle')
+    }
+  }
+
+  function stopRecording() {
+    const recorder = recorderRef.current
+    if (recorder && recorder.state === 'recording') recorder.stop()
+  }
+
+  // ── Kroky ─────────────────────────────────────────────────────────────
+  async function runPending(index?: number) {
+    if (!plan?.id || busy) return
+    setBusy(index === undefined ? 'all' : `run-${index}`)
+    try {
+      const result = await applySuggestion(plan.id, index)
       if (!result.ok) {
         setError(result.error)
         return
       }
-
-      const suggestionId = shown.id
-      const previousStatus = result.previousStatus
-      toast.success(result.message, {
-        description: result.description,
-        undo: previousStatus
-          ? () => {
-              void undoProposedStatus(suggestionId, previousStatus as ProjectStatus).then(() => router.refresh())
-            }
-          : undefined,
-      })
-
-      setShown(null)
-      setText('')
-      setOpen(false)
-      // Odkaz na zprávu otevírá poštovního klienta, ne stránku adminu.
-      if (result.ref.href?.startsWith('mailto:') || result.ref.href?.startsWith('sms:')) {
-        window.location.href = result.ref.href
-      } else if (result.ref.href?.startsWith('http')) {
-        window.open(result.ref.href, '_blank', 'noopener,noreferrer')
-      } else if (result.ref.href) {
-        router.push(result.ref.href)
-      }
+      setError(null)
+      setSteps(result.steps)
+      const fresh = result.steps.filter((s) => index === undefined || s.index === index)
+      const failed = fresh.find((s) => !s.ok)
+      if (failed) toast.error(failed.error ?? 'Něco se nepovedlo.')
+      else toast.success(index === undefined ? 'Hotovo' : (fresh[0]?.message ?? 'Hotovo'))
+      // Připravená zpráva otevírá poštovního klienta nebo telefon.
+      const message = fresh.find((s) => s.ok && s.href?.startsWith('mailto:')) ?? fresh.find((s) => s.ok && s.href?.startsWith('sms:'))
+      if (message?.href) window.location.href = message.href
       router.refresh()
     } finally {
-      setApplying(false)
+      setBusy(null)
+    }
+  }
+
+  async function undo(index: number) {
+    if (!plan?.id || busy) return
+    setBusy(`undo-${index}`)
+    try {
+      const result = await undoSuggestion(plan.id, index)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      setSteps(result.steps)
+      toast.success('Vráceno')
+      router.refresh()
+    } finally {
+      setBusy(null)
     }
   }
 
   function dismiss() {
-    if (shown?.id) void rejectSuggestion(shown.id)
-    setShown(null)
+    if (plan?.id && steps.length === 0) void rejectSuggestion(plan.id)
+    setPlan(null)
+    setSteps([])
     setError(null)
     inputRef.current?.focus()
   }
 
-  const suggestion = shown?.suggestion
-  const kind = suggestion?.proposal.kind
-  const unsure = suggestion ? suggestion.confidence < CONFIDENCE_FLOOR : false
-  const canApply = Boolean(shown?.id) && kind !== undefined && kind !== 'none'
+  const stepFor = (index: number) => steps.find((s) => s.index === index)
+  const waiting = plan ? plan.actions.filter((a) => !stepFor(a.index)?.ok) : []
+  const canRun = Boolean(plan?.id) && !plan?.cannotRun
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent side="right" className="font-ws sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Sparkles size={18} strokeWidth={1.5} aria-hidden="true" />
-            Asistent
-          </SheetTitle>
-          <SheetDescription>
-            Napište jednou větou, co se má stát. Asistent připraví návrh — provede se až po vašem kliknutí.
-          </SheetDescription>
-        </SheetHeader>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Otevřít asistenta"
+        title="Asistent"
+        className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-navy-700 text-white shadow-lg transition-transform hover:bg-navy-800 active:scale-95 lg:bottom-6 lg:right-6"
+      >
+        <Sparkles size={22} strokeWidth={1.5} aria-hidden="true" />
+      </button>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-          <div>
-            <label htmlFor="asistent-veta" className="sr-only">Co se má stát</label>
-            <textarea
-              id="asistent-veta"
-              ref={inputRef}
-              value={text}
-              onChange={(e) => setText(e.target.value.slice(0, TEXT_MAX))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  ask()
-                }
-              }}
-              rows={3}
-              maxLength={TEXT_MAX}
-              placeholder="Například: zavolat Nováka ve čtvrtek ve dvě"
-              className="w-full rounded-chip border border-navy-100 bg-background px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-quiet focus:ring-2 focus:ring-ring"
-            />
-            <div className="mt-2 flex items-center gap-2">
-              <Button type="button" onClick={ask} disabled={pending || !text.trim()}>
-                {pending ? (
-                  <>
-                    <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
-                    Přemýšlím…
-                  </>
-                ) : (
-                  'Připravit návrh'
-                )}
-              </Button>
-              <span className="text-xs text-quiet">Enter odešle</span>
-            </div>
-          </div>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="right" className="font-ws sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles size={18} strokeWidth={1.5} aria-hidden="true" />
+              Asistent
+            </SheetTitle>
+            <SheetDescription>
+              Řekněte nebo napište, co se má stát. Zapíšu to hned a půjde to vrátit. Fakturu a zprávy klientům pošlu až
+              po vašem klepnutí.
+            </SheetDescription>
+          </SheetHeader>
 
-          {error && (
-            <p role="alert" className="rounded-chip bg-danger/10 px-3 py-2 text-sm text-ink">
-              {error}
-            </p>
-          )}
-
-          {suggestion && kind && (
-            <div className="rounded-panel border border-navy-100 bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-quiet">
-                {SUGGESTION_LABELS[kind]}
-              </p>
-
-              <dl className="mt-3 space-y-2">
-                {proposalLines(suggestion).map((line) => (
-                  <div key={line.label} className="flex gap-3 text-sm">
-                    <dt className="w-24 shrink-0 text-quiet">{line.label}</dt>
-                    <dd className="min-w-0 flex-1 whitespace-pre-wrap text-ink">{line.value}</dd>
-                  </div>
-                ))}
-              </dl>
-
-              {suggestion.assumptions.length > 0 && (
-                <div className="mt-4 border-t border-navy-100 pt-3">
-                  <p className="text-xs font-semibold text-quiet">Domyslel jsem si</p>
-                  <ul className="mt-1 space-y-1 text-sm text-ink">
-                    {suggestion.assumptions.map((item) => (
-                      <li key={item}>• {item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {suggestion.missing.length > 0 && (
-                <div className="mt-4 border-t border-navy-100 pt-3">
-                  <p className="text-xs font-semibold text-quiet">Chybí doplnit</p>
-                  <ul className="mt-1 space-y-1 text-sm text-ink">
-                    {suggestion.missing.map((item) => (
-                      <li key={item}>• {item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {unsure && kind !== 'none' && (
-                <p className="mt-4 rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
-                  Nejsem si jistý, jestli jsem to pochopil správně. Projděte si to, než to pustíte dál.
-                </p>
-              )}
-
-              {!shown?.id && kind !== 'none' && (
-                <p className="mt-4 rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
-                  Návrh se nepodařilo uložit, takže ho zatím nejde provést jedním klikem. Zapište to prosím ručně.
-                </p>
-              )}
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {canApply && (
-                  <Button type="button" onClick={confirm} disabled={applying}>
-                    {applying ? 'Provádím…' : 'Provést'}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <div>
+              <label htmlFor="asistent-veta" className="sr-only">
+                Co se má stát
+              </label>
+              <textarea
+                id="asistent-veta"
+                ref={inputRef}
+                value={text}
+                onChange={(e) => setText(e.target.value.slice(0, TEXT_MAX))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    ask(text, 'panel')
+                  }
+                }}
+                rows={3}
+                maxLength={TEXT_MAX}
+                disabled={voice !== 'idle'}
+                placeholder="Například: přidej Pavla Nováka, ve čtvrtek ve dvě s ním mám schůzku k webu"
+                className="w-full rounded-chip border border-navy-100 bg-background px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-quiet focus:ring-2 focus:ring-ring"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button type="button" onClick={() => ask(text, 'panel')} disabled={pending || voice !== 'idle' || !text.trim()}>
+                  {pending ? (
+                    <>
+                      <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
+                      Pracuju na tom…
+                    </>
+                  ) : (
+                    'Udělat'
+                  )}
+                </Button>
+                {canRecord && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={voice === 'recording' ? stopRecording : startRecording}
+                    disabled={pending || voice === 'transcribing'}
+                    aria-pressed={voice === 'recording'}
+                  >
+                    {voice === 'recording' ? (
+                      <>
+                        <Square size={14} strokeWidth={1.5} aria-hidden="true" />
+                        Hotovo ({seconds} s)
+                      </>
+                    ) : voice === 'transcribing' ? (
+                      <>
+                        <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
+                        Přepisuju…
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={14} strokeWidth={1.5} aria-hidden="true" />
+                        Nadiktovat
+                      </>
+                    )}
                   </Button>
                 )}
-                <Button type="button" variant="ghost" onClick={dismiss}>
-                  {canApply ? 'Zahodit' : 'Zavřít návrh'}
-                </Button>
+                <span className="text-xs text-quiet">Enter odešle</span>
               </div>
             </div>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
+
+            {error && (
+              <p role="alert" className="rounded-chip bg-danger/10 px-3 py-2 text-sm text-ink">
+                {error}
+              </p>
+            )}
+
+            {plan && (
+              <div className="space-y-3" aria-live="polite">
+                {plan.reply && <p className="text-sm text-ink">{plan.reply}</p>}
+
+                {plan.cannotRun && (
+                  <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
+                    Plán se nepodařilo uložit, takže ho nejde provést. Zapište to prosím ručně.
+                  </p>
+                )}
+                {plan.guarded && !plan.cannotRun && waiting.length > 0 && (
+                  <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
+                    Na téhle obrazovce můžou být texty od klientů, proto jsem nic neprovedl sám. Projděte si to a
+                    klepněte.
+                  </p>
+                )}
+                {plan.unsure && !plan.guarded && !plan.cannotRun && waiting.length > 0 && (
+                  <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
+                    Nejsem si jistý, jestli jsem to pochopil správně. Nic jsem neprovedl — projděte si to.
+                  </p>
+                )}
+
+                {plan.actions.map((action) => {
+                  const step = stepFor(action.index)
+                  const done = step?.ok === true
+                  return (
+                    <div key={action.index} className="rounded-panel border border-navy-100 bg-surface p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                          {done && !step?.undone && <Check size={16} strokeWidth={2} aria-hidden="true" />}
+                          {step && !step.ok && <AlertCircle size={16} strokeWidth={1.5} className="text-danger" aria-hidden="true" />}
+                          {done ? step.message : action.title}
+                          {step?.undone && <span className="font-normal text-quiet">(vráceno)</span>}
+                        </p>
+                        {!done && action.cls === 'confirm' && (
+                          <span className="shrink-0 rounded-chip bg-signal/15 px-2 py-0.5 text-xs text-ink">Čeká na vás</span>
+                        )}
+                      </div>
+
+                      {done && step.description ? (
+                        <p className="mt-1 text-sm text-ink">{step.description}</p>
+                      ) : (
+                        <dl className="mt-3 space-y-1.5">
+                          {action.lines.map((line) => (
+                            <div key={line.label} className="flex gap-3 text-sm">
+                              <dt className="w-24 shrink-0 text-quiet">{line.label}</dt>
+                              <dd className="min-w-0 flex-1 whitespace-pre-wrap text-ink">{line.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+
+                      {step?.error && <p className="mt-2 text-sm text-danger">{step.error}</p>}
+
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                        {!done && canRun && (
+                          <Button type="button" onClick={() => void runPending(action.index)} disabled={busy !== null}>
+                            {busy === `run-${action.index}` ? 'Provádím…' : step && !step.ok ? 'Zkusit znovu' : 'Provést'}
+                          </Button>
+                        )}
+                        {step?.href && <StepLink href={step.href} label={done ? 'Otevřít' : 'Doplnit ve formuláři'} />}
+                        {step?.canUndo && (
+                          <Button type="button" variant="ghost" onClick={() => void undo(action.index)} disabled={busy !== null}>
+                            <Undo2 size={14} strokeWidth={1.5} aria-hidden="true" />
+                            {busy === `undo-${action.index}` ? 'Vracím…' : 'Vrátit'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {(plan.assumptions.length > 0 || plan.missing.length > 0) && (
+                  <div className="space-y-2 text-sm">
+                    {plan.assumptions.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-quiet">Domyslel jsem si</p>
+                        <ul className="mt-1 space-y-1 text-ink">
+                          {plan.assumptions.map((item) => (
+                            <li key={item}>• {item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {plan.missing.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-quiet">Chybí doplnit</p>
+                        <ul className="mt-1 space-y-1 text-ink">
+                          {plan.missing.map((item) => (
+                            <li key={item}>• {item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {canRun && waiting.length > 1 && (
+                    <Button type="button" onClick={() => void runPending()} disabled={busy !== null}>
+                      {busy === 'all' ? 'Provádím…' : `Provést vše (${waiting.length})`}
+                    </Button>
+                  )}
+                  <Button type="button" variant="ghost" onClick={dismiss}>
+                    {steps.some((s) => s.ok) ? 'Nová věta' : 'Zahodit'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }

@@ -4,14 +4,14 @@ import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * Návrhy asistenta (AD14) proti skutečnému Postgresu (PGlite).
+ * Plány asistenta (AD14, R-111) proti skutečnému Postgresu (PGlite).
  *
- * Testuje se to, co drží pravidlo „navrhne, ty potvrdíš" (R-084):
- * - prohlížeč posílá jen `id`, obsah návrhu se bere z databáze,
- * - pozměněný řádek se neprovede,
- * - dvojklik neudělá akci dvakrát,
- * - nevyřízený návrh po sedmi dnech propadne,
- * - executor nic neposílá a na peníze nesahá.
+ * Testuje se to, co drží „asistent koná, člověk vrací":
+ * - vratné akce se provedou hned, faktura a zprávy čekají na klepnutí,
+ * - s cizím textem v kontextu nebo při nejistotě se nic neprovede samo,
+ * - prohlížeč posílá jen `id`, plán i údaje pro „Zpět" se berou z databáze,
+ * - pozměněný řádek se neprovede, dvojklik neudělá akci dvakrát,
+ * - „Zpět" vrátí každý krok jen jednou.
  */
 
 const ROOT = path.resolve(__dirname, '../..')
@@ -30,51 +30,74 @@ vi.mock('@/lib/api-rate-limit', () => ({
   recordApiRequest: async () => {},
 }))
 
-const applyProposalSpy = vi.fn()
+const runSpy = vi.fn()
+const undoSpy = vi.fn()
 vi.mock('@/lib/admin/suggestion-apply', () => ({
-  applyProposal: (proposal: unknown) => applyProposalSpy(proposal),
+  runAction: (action: unknown) => runSpy(action),
+  undoStep: (token: unknown) => undoSpy(token),
 }))
 
-import { setAdminDbForTests, adminDb } from '@/lib/admin/db'
-import { applySuggestion, rejectSuggestion } from '@/app/ai-actions'
+const proposeSpy = vi.fn()
+vi.mock('@/lib/ai/propose', () => ({
+  proposeAction: (input: unknown) => proposeSpy(input),
+}))
+
+import { setAdminDbForTests } from '@/lib/admin/db'
+import { applySuggestion, proposeSuggestion, rejectSuggestion, undoSuggestion } from '@/app/ai-actions'
 import {
   expireOldSuggestions,
   loadSuggestion,
   saveSuggestion,
   resetSuggestionsReadyForTests,
 } from '@/lib/admin/suggestions'
-import { suggestionSchema, type Suggestion } from '@/lib/ai/suggestion-schema'
+import { suggestionSchema, type Action, type Suggestion } from '@/lib/ai/suggestion-schema'
 import { pgliteAdminDriver } from './helpers/admin-pglite'
 
-const VALID: Suggestion = {
-  proposal: {
-    kind: 'schedule_call',
-    title: 'Hovor s Novákem',
-    date: '2026-11-19',
-    time: '14:00',
-    durationMinutes: 60,
-    contactName: 'Jan Novák',
-    phone: '+420777123456',
-    email: null,
-    note: null,
-  },
-  confidence: 0.9,
-  assumptions: ['„ve čtvrtek" = 19. 11. 2026'],
-  missing: [],
+const MEETING: Action = {
+  kind: 'schedule_event',
+  title: 'Schůzka s Novákem',
+  date: '2026-11-19',
+  time: '14:00',
+  durationMinutes: 60,
+  contactName: 'Jan Novák',
+  phone: '+420777123456',
+  email: null,
+  note: null,
+}
+const INVOICE: Action = {
+  kind: 'issue_invoice',
+  project: { id: null, hint: 'Novák' },
+  counterpartyName: null,
+  description: 'Web',
+  amount: 20000,
 }
 
-async function insert(suggestion: Suggestion = VALID): Promise<string> {
+const plan = (actions: Action[], confidence = 0.9): Suggestion => ({
+  actions,
+  reply: 'Zapíšu schůzku.',
+  confidence,
+  assumptions: ['„ve čtvrtek" = 19. 11. 2026'],
+  missing: [],
+})
+
+const EVENT_UNDO = { type: 'event_created', id: '22222222-2222-4222-8222-222222222222' }
+
+async function insert(suggestion: Suggestion = plan([MEETING])): Promise<string> {
   const id = await saveSuggestion({
     authorEmail: 'admin@example.cz',
     source: 'panel',
-    inputText: 'zavolat Nováka ve čtvrtek ve dvě',
+    inputText: 'schůzka s Novákem ve čtvrtek ve dvě',
     model: 'test-model',
     suggestion,
     tokensIn: 100,
     tokensOut: 50,
   })
-  if (!id) throw new Error('Návrh se neuložil')
+  if (!id) throw new Error('Plán se neuložil')
   return id
+}
+
+function proposed(suggestion: Suggestion, untrustedContext = false) {
+  proposeSpy.mockResolvedValue({ suggestion, model: 'test-model', tokensIn: 1, tokensOut: 1, untrustedContext })
 }
 
 beforeAll(async () => {
@@ -95,101 +118,165 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.exec('DELETE FROM ai_suggestions')
-  applyProposalSpy.mockReset()
-  applyProposalSpy.mockResolvedValue({
-    ok: true,
-    ref: { kind: 'calendar', id: null, href: '/dashboard/calendar' },
-    message: 'Termín je v kalendáři.',
+  runSpy.mockReset()
+  undoSpy.mockReset()
+  proposeSpy.mockReset()
+  runSpy.mockResolvedValue({ ok: true, message: 'Termín v kalendáři', href: '/dashboard/calendar', undo: EVENT_UNDO })
+  undoSpy.mockResolvedValue({ ok: true })
+})
+
+describe('věta → provedení', () => {
+  it('vratnou akci provede hned a uloží, jak ji vrátit', async () => {
+    proposed(plan([MEETING]))
+    const out = await proposeSuggestion({ text: 'schůzka s Novákem ve čtvrtek ve dvě' })
+
+    expect(out.ok).toBe(true)
+    if (!out.ok || !out.id) return
+    expect(runSpy).toHaveBeenCalledTimes(1)
+    expect(out.steps).toEqual([expect.objectContaining({ index: 0, ok: true, canUndo: true })])
+    // Údaj pro „Zpět" do prohlížeče nejde.
+    expect(JSON.stringify(out)).not.toContain(EVENT_UNDO.id)
+
+    const row = await loadSuggestion(out.id)
+    expect(row?.status).toBe('applied')
+    expect(row?.steps[0].undo).toEqual(EVENT_UNDO)
+  })
+
+  it('fakturu nechá čekat, i když vedle ní běží vratná akce', async () => {
+    proposed(plan([MEETING, INVOICE]))
+    const out = await proposeSuggestion({ text: 'schůzka a vystav fakturu' })
+
+    expect(out.ok).toBe(true)
+    if (!out.ok || !out.id) return
+    expect(runSpy).toHaveBeenCalledTimes(1)
+    expect(runSpy.mock.calls[0][0]).toEqual(MEETING)
+    expect((await loadSuggestion(out.id))?.status).toBe('pending')
+    expect(out.actions[1].cls).toBe('confirm')
+  })
+
+  it('s cizím textem v kontextu neprovede nic samo', async () => {
+    proposed(plan([MEETING]), true)
+    const out = await proposeSuggestion({ text: 'zapiš schůzku' })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.guarded).toBe(true)
+    expect(runSpy).not.toHaveBeenCalled()
+  })
+
+  it('při nejistotě neprovede nic samo', async () => {
+    proposed(plan([MEETING], 0.3))
+    const out = await proposeSuggestion({ text: 'něco s Novákem' })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.unsure).toBe(true)
+    expect(runSpy).not.toHaveBeenCalled()
   })
 })
 
-describe('potvrzení jedním klikem', () => {
+describe('klepnutí', () => {
   it('provede přesně to, co leží v databázi', async () => {
     const id = await insert()
     const result = await applySuggestion(id)
 
     expect(result.ok).toBe(true)
-    expect(applyProposalSpy).toHaveBeenCalledTimes(1)
-    expect(applyProposalSpy.mock.calls[0][0]).toEqual(VALID.proposal)
-
-    const row = await loadSuggestion(id)
-    expect(row?.status).toBe('applied')
-    expect(row?.appliedRef?.href).toBe('/dashboard/calendar')
+    expect(runSpy).toHaveBeenCalledTimes(1)
+    expect(runSpy.mock.calls[0][0]).toEqual(MEETING)
+    expect((await loadSuggestion(id))?.status).toBe('applied')
   })
 
-  it('pozměněný návrh v databázi se neprovede', async () => {
-    const id = await insert()
-    // Někdo (nebo něco) přepsal uložený návrh na tvar, kterému schéma
-    // nerozumí — třeba aby protlačil vlastní druh akce.
-    await db.query(
-      `UPDATE ai_suggestions SET proposal = $1::jsonb WHERE id = $2`,
-      [JSON.stringify({ proposal: { kind: 'drop_everything', sql: 'DELETE FROM projects' }, confidence: 1 }), id],
-    )
+  it('jen jednu akci, když se klepne u ní', async () => {
+    const id = await insert(plan([MEETING, INVOICE]))
+    const result = await applySuggestion(id, 1)
 
-    const result = await applySuggestion(id)
-
-    expect(result).toEqual({ ok: false, error: 'Návrh už neplatí. Zkuste to říct znovu.' })
-    expect(applyProposalSpy).not.toHaveBeenCalled()
+    expect(result).toEqual({ ok: true, steps: [expect.objectContaining({ index: 1 })], pending: [0] })
+    expect(runSpy.mock.calls[0][0]).toEqual(INVOICE)
+    expect((await loadSuggestion(id))?.status).toBe('pending')
   })
 
-  it('návrh s podstrčeným polem navíc neprojde', async () => {
+  it('pozměněný plán v databázi se neprovede', async () => {
     const id = await insert()
-    await db.query(
-      `UPDATE ai_suggestions SET proposal = $1::jsonb WHERE id = $2`,
-      [JSON.stringify({ ...VALID, proposal: { ...VALID.proposal, durationMinutes: 99999 } }), id],
-    )
+    await db.query(`UPDATE ai_suggestions SET proposal = $1::jsonb WHERE id = $2`, [
+      JSON.stringify({ actions: [{ kind: 'run_sql', sql: 'DELETE FROM projects' }], reply: '', confidence: 1, assumptions: [], missing: [] }),
+      id,
+    ])
+    expect(await applySuggestion(id)).toEqual({ ok: false, error: 'Plán už neplatí. Řekněte to prosím znovu.' })
+    expect(runSpy).not.toHaveBeenCalled()
+  })
 
-    const result = await applySuggestion(id)
-    expect(result.ok).toBe(false)
-    expect(applyProposalSpy).not.toHaveBeenCalled()
+  it('pole mimo meze neprojde', async () => {
+    const id = await insert()
+    await db.query(`UPDATE ai_suggestions SET proposal = $1::jsonb WHERE id = $2`, [
+      JSON.stringify(plan([{ ...MEETING, durationMinutes: 99999 } as Action])),
+      id,
+    ])
+    expect((await applySuggestion(id)).ok).toBe(false)
+    expect(runSpy).not.toHaveBeenCalled()
   })
 
   it('dvojklik neudělá akci dvakrát', async () => {
     const id = await insert()
-    const first = await applySuggestion(id)
-    const second = await applySuggestion(id)
-
-    expect(first.ok).toBe(true)
-    expect(second).toEqual({ ok: false, error: 'Tenhle návrh už je vyřízený.' })
-    expect(applyProposalSpy).toHaveBeenCalledTimes(1)
-  })
-
-  it('neexistující návrh nic neprovede', async () => {
-    const result = await applySuggestion('00000000-0000-0000-0000-000000000000')
-    expect(result.ok).toBe(false)
-    expect(applyProposalSpy).not.toHaveBeenCalled()
+    const [first, second] = await Promise.all([applySuggestion(id), applySuggestion(id)])
+    expect([first.ok, second.ok].filter(Boolean)).toHaveLength(1)
+    expect(runSpy).toHaveBeenCalledTimes(1)
   })
 
   it('identifikátor, který není UUID, skončí českou hláškou, ne pádem', async () => {
     for (const bogus of ['', 'abc', "1' OR '1'='1", '../../etc/passwd']) {
-      const result = await applySuggestion(bogus)
-      expect(result).toEqual({ ok: false, error: 'Návrh už neplatí. Zkuste to říct znovu.' })
+      expect(await applySuggestion(bogus)).toEqual({ ok: false, error: 'Plán už neplatí. Řekněte to prosím znovu.' })
     }
-    expect(await rejectSuggestion('nenu-uuid')).toEqual({ ok: false })
-    expect(applyProposalSpy).not.toHaveBeenCalled()
+    expect(await rejectSuggestion('neni-uuid')).toEqual({ ok: false })
+    expect(runSpy).not.toHaveBeenCalled()
   })
 
-  it('odmítnutý návrh už nejde potvrdit', async () => {
+  it('zahozený plán už nejde provést', async () => {
     const id = await insert()
     expect(await rejectSuggestion(id)).toEqual({ ok: true })
-
-    const result = await applySuggestion(id)
-    expect(result).toEqual({ ok: false, error: 'Tenhle návrh už je vyřízený.' })
-    expect(applyProposalSpy).not.toHaveBeenCalled()
+    expect(await applySuggestion(id)).toEqual({ ok: false, error: 'Tenhle plán už je vyřízený.' })
+    expect(runSpy).not.toHaveBeenCalled()
   })
 
-  it('když executor selže, návrh zůstane nevyřízený', async () => {
-    applyProposalSpy.mockResolvedValue({ ok: false, error: 'Chybí datum nebo čas.' })
+  it('když akce selže, plán zůstane otevřený a jde to zkusit znovu', async () => {
+    runSpy.mockResolvedValueOnce({ ok: false, error: 'Chybí den nebo čas termínu.' })
     const id = await insert()
 
-    const result = await applySuggestion(id)
-    expect(result).toEqual({ ok: false, error: 'Chybí datum nebo čas.' })
+    const first = await applySuggestion(id)
+    expect(first).toMatchObject({ ok: true, pending: [0] })
     expect((await loadSuggestion(id))?.status).toBe('pending')
+
+    const second = await applySuggestion(id)
+    expect(second).toMatchObject({ ok: true, pending: [] })
+    expect(runSpy).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('zpět', () => {
+  it('vrátí krok podle údajů z databáze a jen jednou', async () => {
+    proposed(plan([MEETING]))
+    const out = await proposeSuggestion({ text: 'schůzka' })
+    if (!out.ok || !out.id) throw new Error('plán se neprovedl')
+
+    const [first, second] = await Promise.all([undoSuggestion(out.id), undoSuggestion(out.id)])
+    expect([first.ok, second.ok].filter(Boolean)).toHaveLength(1)
+    expect(undoSpy).toHaveBeenCalledTimes(1)
+    expect(undoSpy).toHaveBeenCalledWith(EVENT_UNDO)
+    expect((await loadSuggestion(out.id))?.steps[0].undone).toBe(true)
+  })
+
+  it('když se vrátit nepovede, krok zůstane vratný a s hláškou', async () => {
+    proposed(plan([MEETING]))
+    const out = await proposeSuggestion({ text: 'schůzka' })
+    if (!out.ok || !out.id) throw new Error('plán se neprovedl')
+    undoSpy.mockResolvedValueOnce({ ok: false, error: 'Termín už v kalendáři není.' })
+
+    expect(await undoSuggestion(out.id)).toEqual({ ok: false, error: 'Termín už v kalendáři není.' })
+    const step = (await loadSuggestion(out.id))?.steps[0]
+    expect(step?.undone).toBe(false)
+    expect(step?.error).toBe('Termín už v kalendáři není.')
   })
 })
 
 describe('expirace', () => {
-  it('nevyřízený návrh po sedmi dnech propadne, čerstvý zůstane', async () => {
+  it('nevyřízený plán po sedmi dnech propadne, čerstvý zůstane', async () => {
     const old = await insert()
     const fresh = await insert()
     await db.query(`UPDATE ai_suggestions SET created_at = now() - interval '8 days' WHERE id = $1`, [old])
@@ -199,44 +286,49 @@ describe('expirace', () => {
     expect((await loadSuggestion(fresh))?.status).toBe('pending')
   })
 
-  it('propadlý návrh už nejde potvrdit', async () => {
+  it('propadlý plán už nejde provést', async () => {
     const id = await insert()
     await db.query(`UPDATE ai_suggestions SET created_at = now() - interval '30 days' WHERE id = $1`, [id])
     await expireOldSuggestions()
-
-    expect(await applySuggestion(id)).toEqual({ ok: false, error: 'Tenhle návrh už je vyřízený.' })
-    expect(applyProposalSpy).not.toHaveBeenCalled()
+    expect(await applySuggestion(id)).toEqual({ ok: false, error: 'Tenhle plán už je vyřízený.' })
   })
 })
 
-describe('schéma návrhu', () => {
-  it('přijme každý druh, který má executor', () => {
-    const kinds = [
-      VALID.proposal,
-      { kind: 'create_lead', companyName: 'Firma', contactName: null, phone: null, email: null, note: null },
-      { kind: 'update_project_status', project: { id: null, hint: 'Novák' }, status: 'done' },
-      { kind: 'create_invoice_draft', project: { id: null, hint: null }, counterpartyName: null, description: null, amount: null },
-      { kind: 'add_note', target: 'lead', ref: { id: null, hint: 'Novák' }, noteText: 'Volal.' },
-      { kind: 'send_message', channel: 'sms', ref: { id: null, hint: null }, phone: '+420777123456', email: null, subject: null, body: 'Dobrý den.' },
-      { kind: 'none', reason: 'Nerozumím.' },
+describe('schéma plánu', () => {
+  it('přijme každý druh akce', () => {
+    const ref = { id: null, hint: 'Novák' }
+    const actions = [
+      MEETING,
+      INVOICE,
+      { kind: 'create_contact', companyName: 'Firma', contactName: null, phone: null, email: null, note: null },
+      { kind: 'move_event', event: { ...ref, date: null }, date: '2026-11-20', time: null, durationMinutes: null },
+      { kind: 'cancel_event', event: { ...ref, date: '2026-11-19' } },
+      { kind: 'create_project', clientName: 'Novák', clientEmail: null, clientPhone: null, serviceType: 'web', description: null, price: 30000, deadline: null },
+      { kind: 'update_project_status', project: ref, status: 'done' },
+      { kind: 'add_note', target: 'lead', ref, noteText: 'Volal.' },
+      { kind: 'add_payment', paymentType: 'zaloha', project: ref, amount: 5000, date: null, note: null },
+      { kind: 'add_cost', name: 'Hosting', amount: 300, costType: 'fixed_monthly', category: 'hosting', project: null, note: null },
+      { kind: 'mark_invoice_paid', invoice: { id: null, hint: '2026014' }, paidOn: null },
+      { kind: 'cancel_invoice', invoice: { id: null, hint: '2026014' } },
+      { kind: 'send_message', channel: 'sms', ref, phone: '+420777123456', email: null, subject: null, body: 'Dobrý den.' },
     ]
-    for (const proposal of kinds) {
-      expect(suggestionSchema.safeParse({ proposal, confidence: 0.8, assumptions: [], missing: [] }).success).toBe(true)
+    // Po jedné — v jednom plánu jich smí být nejvýš osm.
+    for (const action of actions) {
+      expect(suggestionSchema.safeParse(plan([action as Action])).success, action.kind).toBe(true)
     }
+    expect(suggestionSchema.safeParse({ ...plan([]), reply: 'Na co se ptáte?' }).success).toBe(true)
   })
 
   it('neznámý druh akce odmítne', () => {
-    const parsed = suggestionSchema.safeParse({
-      proposal: { kind: 'run_sql', sql: 'DELETE FROM projects' },
-      confidence: 1,
-      assumptions: [],
-      missing: [],
-    })
-    expect(parsed.success).toBe(false)
+    const bad = { ...plan([]), actions: [{ kind: 'run_sql', sql: 'DELETE FROM projects' }] }
+    expect(suggestionSchema.safeParse(bad).success).toBe(false)
   })
 
   it('neplatné datum a čas odmítne', () => {
-    const bad = { ...VALID, proposal: { ...VALID.proposal, date: '19. 11. 2026', time: '14h' } }
-    expect(suggestionSchema.safeParse(bad).success).toBe(false)
+    expect(suggestionSchema.safeParse(plan([{ ...MEETING, date: '19. 11. 2026', time: '14h' } as Action])).success).toBe(false)
+  })
+
+  it('víc než osm akcí odmítne', () => {
+    expect(suggestionSchema.safeParse(plan(Array(9).fill(MEETING))).success).toBe(false)
   })
 })

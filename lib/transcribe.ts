@@ -48,9 +48,17 @@ function extensionFor(type: string): string {
 
 export type TranscribeResult = { text: string } | { error: string }
 
+/** Nejdelší nápověda k přepisu. Poskytovatel bere jen začátek, víc je zbytečný přenos. */
+export const PROMPT_MAX_CHARS = 800
+
 export async function transcribeAudio(
   audio: Blob,
   fetchImpl: typeof fetch = fetch,
+  /**
+   * Nápověda pro přepis — typicky jména klientů a firem, která by se jinak
+   * přepsala foneticky („Novák" → „no vák"). Volitelná; portál ji neposílá.
+   */
+  prompt?: string,
 ): Promise<TranscribeResult> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return { error: 'Přepis hlasu teď není dostupný. Napište prosím text.' }
@@ -60,6 +68,8 @@ export async function transcribeAudio(
   form.append('model', process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || DEFAULT_MODEL)
   form.append('language', 'cs')
   form.append('response_format', 'json')
+  const hint = prompt?.trim().slice(0, PROMPT_MAX_CHARS)
+  if (hint) form.append('prompt', hint)
 
   try {
     const res = await fetchImpl(ENDPOINT, {

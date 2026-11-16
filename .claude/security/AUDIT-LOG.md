@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-16 — review: asistent koná sám (R-111, A0–A4)
+Spouštěč: commit a deploy (větev `admin/asistent`)
+Rozsah: `app/ai-actions.ts` (server actions plánu, provedení, „Zpět"), `lib/admin/{suggestion-apply,suggestions,assistant-resolve,assistant-lookups}.ts`, `lib/ai/{suggestion-schema,action-policy,action-lines,plan-format,propose,prompts,markers}.ts`, nová routa `POST /api/ai-assistant/prepis`, `Permissions-Policy` na `/dashboard/*`, převzatá `app/portal-link-actions.ts` (výměna odkazu `/p`).
+Výsledek: 0 nálezů k opravě.
+Nálezy: žádné. Ověřeno: (1) tajemství — žádné nové `NEXT_PUBLIC_`, klíče jen na serveru, panel importuje ze `server-only` souboru jen typ; (2) validace — vstupy server actions přes Zod (`uuid`, pořadí kroku 0–20, text do 2000), plán z modelu přes `actionSchema` po každé akci, dotazy na data přes `lookupSchema`, routa přepisu: přihlášení, shodný `Origin`, 4 MB, povolené typy, 30 / 10 min a 200 / den; (3) HTML — odpověď modelu a řádky akcí jen jako text v Reactu, odkazy kroků skládá jen server (`mailtoHref`/`smsHref`/`whatsappHref` nebo interní cesta), `javascript:` nemá kudy; (4) SQL — jen parametrizované dotazy, LIKE přes `toLikePattern` s `ESCAPE`, `remainingSql` je konstanta z kódu; žádný volný SQL od modelu; (5) zneužití — denní strop 300 dotazů na model, dvojí provedení brání zámek `applied_at`, dvojí vrácení optimistický zámek nad `applied_ref`; s kontextem záznamu nebo daty z dotazů se nic neprovede samo (prompt injection z textů klientů). Výměna odkazu `/p`: `requireAuth`, Zod `uuid`, „Zpět" jen když token mezitím nikdo nezměnil.
+Přijatá rizika: DECISIONS #032 (model může větu pochopit špatně — vratné, viditelné; jména klientů k poskytovatelům AI).
+Opraveno: —
+
 ## 2026-11-14 — review: dokončení sjednocení a modály (AD18)
 Spouštěč: `web-security-review` před commitem AD18.
 Rozsah: 70 změněných souborů — třídy a barvy v osobní části adminu, na `/login`, `/p`, `/h`

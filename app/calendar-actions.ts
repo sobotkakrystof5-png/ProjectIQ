@@ -87,7 +87,7 @@ type LeadExtras = {
   next_action?: string | null
 }
 
-async function insertEvent(payload: CalendarEventPayload, extras: LeadExtras = {}) {
+async function insertEvent(payload: CalendarEventPayload, extras: LeadExtras = {}): Promise<string | null> {
   const title = payload.title.trim()
   const description = payload.description?.trim() || null
   const contactName = payload.contact_name?.trim() || null
@@ -99,6 +99,8 @@ async function insertEvent(payload: CalendarEventPayload, extras: LeadExtras = {
   // všechno ostatní, dřív jen VIZEON.
   const mirrorToLeads = payload.event_type !== 'block'
 
+  // Id nové události potřebuje asistent pro „Zpět" (R-111); formuláře ho zahodí.
+  let rows: Record<string, unknown>[]
   try {
     if (mirrorToLeads) {
       const { date, time } = isoToPragueDateAndTime(payload.starts_at)
@@ -115,7 +117,7 @@ async function insertEvent(payload: CalendarEventPayload, extras: LeadExtras = {
       // založení kalendářní události, zrcadlení do Hovorů a zpětné propojení
       // lead_id musí uspět (nebo selhat) společně, jinak by výpadek uprostřed
       // nechal osamocenou událost bez páru nebo naopak.
-      await sql`
+      rows = (await sql`
         WITH new_event AS (
           INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, lead_origin)
           VALUES (${title}, ${description}, ${payload.starts_at}, ${payload.ends_at}, ${payload.event_type}, ${DEFAULT_LEAD_ORIGIN})
@@ -136,12 +138,14 @@ async function insertEvent(payload: CalendarEventPayload, extras: LeadExtras = {
         UPDATE calendar_events SET lead_id = new_lead.id
         FROM new_lead
         WHERE calendar_events.id = new_lead.calendar_event_id
-      `
+        RETURNING calendar_events.id::text AS id
+      `) as Record<string, unknown>[]
     } else {
-      await sql`
+      rows = (await sql`
         INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, lead_origin)
         VALUES (${title}, ${description}, ${payload.starts_at}, ${payload.ends_at}, ${payload.event_type}, ${DEFAULT_LEAD_ORIGIN})
-      `
+        RETURNING id::text AS id
+      `) as Record<string, unknown>[]
     }
   } catch (err: unknown) {
     if ((err as { code?: string })?.code === '23P01') {
@@ -150,12 +154,13 @@ async function insertEvent(payload: CalendarEventPayload, extras: LeadExtras = {
     throw err
   }
   revalidateCalendar(mirrorToLeads)
+  return rows[0]?.id ? String(rows[0].id) : null
 }
 
-export async function createCalendarEvent(payload: CalendarEventPayload) {
+export async function createCalendarEvent(payload: CalendarEventPayload): Promise<{ id: string | null }> {
   await requireAuth()
   checkPayload(payload)
-  await insertEvent(payload)
+  return { id: await insertEvent(payload) }
 }
 
 /**

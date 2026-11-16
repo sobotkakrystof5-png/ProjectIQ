@@ -42,7 +42,7 @@ Realistický útočník: automatické skenery a boti na formuláře; u SaaS zvě
 | X-Content-Type-Options | ✅ nosniff | |
 | X-Frame-Options | ✅ DENY | mimo `/r/*`, `/embed/*`, `/api/public/v1/*`; PDF faktury `SAMEORIGIN` (DECISIONS #004) |
 | Referrer-Policy | ✅ strict-origin-when-cross-origin | |
-| Permissions-Policy | ✅ vše zakázané (kamera, mikrofon, poloha, platby, USB, Bluetooth, serial, HID, idle-detection, screen-wake-lock, local-fonts, browsing-topics…); výjimka `microphone=(self)` jen na `/p/*` a `/klient/*` | #018; `publickey-credentials-get` schválně **není** zakázané — zavřelo by WebAuthn pro budoucí 2FA adminu (audit 2026-11-14) |
+| Permissions-Policy | ✅ vše zakázané (kamera, mikrofon, poloha, platby, USB, Bluetooth, serial, HID, idle-detection, screen-wake-lock, local-fonts, browsing-topics…); výjimka `microphone=(self)` jen na `/p/*`, `/klient/*` a `/dashboard/*` (diktování asistentovi) | #018, #032; `publickey-credentials-get` schválně **není** zakázané — zavřelo by WebAuthn pro budoucí 2FA adminu (audit 2026-11-14) |
 | Cross-Origin-Opener-Policy | ✅ same-origin | Clerk popup OAuth by ho porušil — používat přesměrování (S07) |
 | Cross-Origin-Resource-Policy | ✅ same-origin | `cross-origin` pro `/embed/*`, `/api/public/v1/*` a obrázek novinky `/z/novinky/[id]/obrazek` (DECISIONS #013) |
 | X-XSS-Protection | ✅ 0 | |

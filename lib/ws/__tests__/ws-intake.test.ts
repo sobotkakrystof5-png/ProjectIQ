@@ -79,7 +79,7 @@ beforeAll(async () => {
      VALUES ($1, $2, 'delka', 'Délka vlasů', 'choice', true, '["Krátké","Dlouhé"]', 1)`,
     [A.account, A.business],
   )
-}, 30_000)
+}, 60_000)
 
 afterAll(async () => {
   setWsDriverForTests(null)

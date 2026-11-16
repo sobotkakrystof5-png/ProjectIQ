@@ -21,7 +21,7 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value:
       // Zakázané je všechno, co aplikace nepoužívá (web-security-setup → baseline).
-      // Výjimka `microphone=(self)` jen na /p a /klient, viz portalPermissionsPolicy.
+      // Výjimka `microphone=(self)` jen na /p, /klient a /dashboard, viz portalPermissionsPolicy.
       // `publickey-credentials-get` tu schválně NENÍ zakázané — blokovalo by WebAuthn,
       // kterým může jednou vzniknout dvoufázové ověření adminu (otevřená položka).
       'accelerometer=(), autoplay=(), bluetooth=(), browsing-topics=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), local-fonts=(), magnetometer=(), microphone=(), midi=(), payment=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()',
@@ -106,6 +106,12 @@ const nextConfig = {
       {
         // Klientský prostor (KP07): stejná výjimka pro mikrofon jako /p.
         source: '/klient/:path*',
+        headers: [{ key: 'Permissions-Policy', value: portalPermissionsPolicy }],
+      },
+      {
+        // Admin diktuje asistentovi (R-111): stejná výjimka pro mikrofon jako /p.
+        // `/:path*` pokryje i samotné `/dashboard`. DECISIONS.md #032.
+        source: '/dashboard/:path*',
         headers: [{ key: 'Permissions-Policy', value: portalPermissionsPolicy }],
       },
       { source: notIndexed, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
