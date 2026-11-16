@@ -64,7 +64,7 @@ describe('buildCsp', () => {
     expect(directive(csp, 'upgrade-insecure-requests')).toBeDefined()
   })
 
-  it('Google Fonts nepouští nikdo (AD04), TradingView jen admin', () => {
+  it('Google Fonts ani TradingView nepouští nikdo', () => {
     const ws = buildCsp({ nonce, pathname: '/w', profile: 'workspace', mode: 'enforce' })
     const admin = buildCsp({ nonce, pathname: '/dashboard/finance', profile: 'admin', mode: 'report-only' })
     const login = buildCsp({ nonce, pathname: '/login', profile: 'admin', mode: 'report-only' })
@@ -76,7 +76,8 @@ describe('buildCsp', () => {
       expect(csp).not.toContain('fonts.googleapis.com')
       expect(csp).not.toContain('fonts.gstatic.com')
     }
-    expect(directive(admin, 'frame-src')).toBe('frame-src https://www.tradingview-widget.com')
+    expect(admin).not.toContain('tradingview')
+    expect(directive(admin, 'frame-src')).toBe("frame-src 'none'")
   })
 
   it("object-src a frame-src 'self' jen u faktur", () => {
@@ -132,10 +133,10 @@ describe('Clerk', () => {
     expect(directive(w, 'script-src')).not.toContain(host)
     expect(w).not.toContain('*')
 
-    // Klientský prostor (KP05) má stejné Clerk zdroje jako /w a nic víc.
+    // Klientský prostor se od R-107 přihlašuje přes Supabase na serveru: žádný Clerk.
     const klient = buildCsp({ nonce, pathname: '/klient/prihlaseni', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    expect(directive(klient, 'connect-src')).toBe(`connect-src 'self' https://${host}`)
-    expect(directive(klient, 'script-src')).not.toContain(host)
+    expect(directive(klient, 'connect-src')).toBe(`connect-src 'self'`)
+    expect(klient).not.toContain('clerk')
     expect(klient).not.toContain('*')
 
     const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce', clerkHost: host })

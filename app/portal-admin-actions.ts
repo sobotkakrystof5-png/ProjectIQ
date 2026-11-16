@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { adminActorEmail, requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { generateInviteCode, inviteExpiry, InviteConfigError } from '@/lib/portal/invite'
+import { isAdminEmail } from '@/lib/supabase/config'
 
 // Správa klientských prostorů z adminu (KP05). Běží vlastníkem tabulek (lib/db),
 // ne rolí portal_app. Každá akce začíná requireAuth().
@@ -62,21 +63,24 @@ export async function unlinkProject(clientId: string, projectId: string): Promis
   return { success: true }
 }
 
-/** Vytvoří pozvánku. Odkaz s kódem se vrací jen tady, podruhé už ho nikdo nezjistí. */
+/**
+ * Vytvoří pozvánku. Odkaz s kódem se vrací jen tady, podruhé už ho nikdo nezjistí.
+ * Pozvánka je vždy vázaná na e-mail (R-107, migrace 113): s tímhle e-mailem se
+ * klient registruje a nikdo jiný ji neuplatní, ani když dostane odkaz přeposlaný.
+ */
 export async function createInvite(
   clientId: string,
-  email: string | null,
+  email: string,
   role: 'owner' | 'member',
 ): Promise<Result<{ url: string; expiresAt: string }>> {
   await requireAuth()
   const c = idSchema.safeParse(clientId)
   if (!c.success) return { success: false, error: 'Neplatný klient.' }
-  let boundEmail: string | null = null
-  if (email && email.trim()) {
-    const e = emailSchema.safeParse(email)
-    if (!e.success) return { success: false, error: e.error.issues[0].message }
-    boundEmail = e.data
-  }
+  const e = emailSchema.safeParse(email ?? '')
+  if (!e.success) return { success: false, error: 'Zadejte e-mail, na který pozvánka půjde.' }
+  // Klient nesmí dostat účet se stejným e-mailem jako admin (sdílený projekt Supabase).
+  if (isAdminEmail(e.data)) return { success: false, error: 'Tenhle e-mail patří administraci. Zadejte e-mail klienta.' }
+  const boundEmail = e.data
   if (role !== 'owner' && role !== 'member') return { success: false, error: 'Neplatná role.' }
 
   try {

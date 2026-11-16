@@ -40,6 +40,15 @@ Nálezy: žádné. Ověřeno: (1) tajemství — žádné nové `NEXT_PUBLIC_`, 
 Přijatá rizika: DECISIONS #032 (model může větu pochopit špatně — vratné, viditelné; jména klientů k poskytovatelům AI).
 Opraveno: —
 
+## 2026-11-15 — audit + review: klientský portál a přechod `/klient` na Supabase
+Spouštěč: dotaz Kryštofa „jak je na tom klientský portál, i z hlediska bezpečnosti"; pak `web-security-review` změny R-107.
+Rozsah: `/p/[token]` (`app/p`, `app/portal-actions.ts`, přepis hlasu), `/klient` (Clerk, `lib/portal/*`, migrace 092–096, role `portal_app`, pozvánky), živé hlavičky produkce; pak nové přihlášení přes Supabase, hook registrace, migrace 113, výměna odkazu `/p` a omezení rezervace.
+Výsledek: oddělení klientů v DB v pořádku (RLS, `portal_app` bez `public`, `submit_*` ověřují členství, pozvánky HMAC a jednorázové); testy 33/33. Nálezy níž, čtyři opravené v kódu.
+Nálezy: (1) `/klient` na produkci běžel na **vývojové instanci Clerku** (`ultimate-chimp-4657.clerk.accounts.dev` v CSP) → opraveno přechodem na Supabase (DECISIONS #031). (2) Odkaz `/p` platí navždy a nešel vyměnit → nové tlačítko „Vygenerovat nový odkaz" se „Zpět" (`app/portal-link-actions.ts`). (3) Rezervace z `/p` posílala potvrzení na **libovolný e-mail z formuláře** s textem odesílatele (3×/30 min na projekt) a termín neměl horní mez → potvrzení jen na `projects.client_email`, termín nejvýš 183 dní. (4) Pozvánka nemusela mít e-mail → povinný e-mail, staré nevázané zrušené (migrace 113). Neopraveno: `/p` ukazuje obsazené časy celého kalendáře (jen časy, rezervace to potřebuje); `frame-src` TradingView zbytečně i na `/p` (profil `admin`); RLS stojí na `app.client_id` nastaveném aplikací (proti zapomenutému filtru, ne proti kompromitovanému serveru).
+Opraveno: viz výš; ověřeno `npx tsc --noEmit`, `npm run build`, testy (nové `portal-supabase-auth.test.ts`, rozšířené `portal-isolation.test.ts` o migraci 113), lokální `next start`: `/klient` 307 na přihlášení s `next`, `next=https://zlo.cz` skončí na `/klient`, hook bez tajemství 403, CSP `/klient` bez Clerku, `/login` 200, `/dashboard` 307.
+Zbývá: migrace 113 a nastavení Supabase (hook HTTPS, tajemství, Confirm email, SMTP, Redirect URLs) — `docs/AUTH-SUPABASE-PLAN.md` → F1; průchod v prohlížeči.
+
+
 ## 2026-11-14 — review: dokončení sjednocení a modály (AD18)
 Spouštěč: `web-security-review` před commitem AD18.
 Rozsah: 70 změněných souborů — třídy a barvy v osobní části adminu, na `/login`, `/p`, `/h`

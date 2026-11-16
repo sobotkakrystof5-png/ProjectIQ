@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { SignOutButton } from '@clerk/nextjs'
 import { AuthShell } from '@/components/ws/auth/auth-shell'
+import { signOutClient } from '../actions'
 
 export const metadata: Metadata = { title: 'Bez přístupu' }
 
@@ -12,11 +12,11 @@ export default function BezPristupuPage() {
         <p className="mt-2 text-sm text-quiet">
           Do klientského prostoru se vstupuje přes pozvánku. Otevřete odkaz, který jste dostali, nebo nám napište a pošleme nový.
         </p>
-        <SignOutButton>
-          <button type="button" className="mt-4 inline-flex min-h-[44px] items-center rounded-chip border border-navy-100 px-4 text-sm font-medium text-ink hover:border-navy-300">
+        <form action={signOutClient}>
+          <button type="submit" className="mt-4 inline-flex min-h-[44px] items-center rounded-chip border border-navy-100 px-4 text-sm font-medium text-ink hover:border-navy-300">
             Odhlásit se
           </button>
-        </SignOutButton>
+        </form>
       </div>
     </AuthShell>
   )

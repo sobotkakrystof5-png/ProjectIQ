@@ -1028,6 +1028,23 @@ cookie; hlídá to test, ale jen na vymyšlených claims. Změna `ADMIN_EMAIL` z
 generátor znovu a SQL nahrát — hook si e-mail drží sám. Navazuje na R-105,
 `.claude/security/DECISIONS.md` #029 (doplnění).
 
+### R-107 · Veškeré přihlašování přes Supabase, klienti e-mailem a heslem (2026-11-15)
+**Rozhodnutí:** z Clerku na Supabase Auth přechází **všechno** — po adminu (R-105) klientský
+prostor `/klient` (F1) a pak Workspace `/w` (F2), nakonec se Clerk z repa odstraní (F3).
+Kryštof 2026-11-15 vybral rozsah „i Workspace" a přihlášení klientů **e-mailem a heslem**.
+Všichni jsou v jednom projektu `zakaziq` (Free plán dovolí dva aktivní projekty a oba jsou
+obsazené); do adminu dál pustí jen `ADMIN_EMAIL` a TOTP. Účet vzniká **jen přes náš hook**
+„Before User Created" (HTTPS `/api/auth/supabase-hook`), který chce otisk platné pozvánky
+a shodný e-mail; pozvánka do `/klient` je proto **vždy vázaná na e-mail** a nesmí znít na
+`ADMIN_EMAIL`. Confirm email se vypíná — důkazem e-mailu je pozvánka. Data zůstávají v Neonu.
+**Proč:** zadání Kryštofa; `/klient` na produkci běžel na vývojové instanci Clerku (audit
+2026-11-15). HTTP hook nechává pravdu o pozvánkách v Neonu a nepotřebuje `service_role` klíč.
+**Důsledek:** mění R-073 (klientský prostor už není na Clerku) a R-105 v části „jen admin";
+R-106 v části hooku — Postgres hook `before_user_created_jen_admin` nahrazuje HTTPS hook
+a zapnutý smí být jen jeden. Migrace 113 (sloupec `portal.members.clerk_user_id` nese id ze
+Supabase, název zůstal kvůli opakovanému běhu migrace 095). Plán a kroky v dashboardu
+`docs/AUTH-SUPABASE-PLAN.md`, bezpečnost `.claude/security/DECISIONS.md` #031.
+
 ### R-109 · Dokončené zakázky mají vlastní položku menu (2026-11-15)
 **Rozhodnutí:** Zakázky (`/dashboard/zakazky`) ukazují jen rozpracovanou práci (Nová,
 V řešení, Čeká na schválení). Hotové a zaplacené zakázky jsou v nové položce menu

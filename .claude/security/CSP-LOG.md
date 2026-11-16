@@ -82,9 +82,21 @@ Změna: **zúžení**. Z profilu `admin` odebrané `style-src https://fonts.goog
 Kvůli: AD04 (R-081) smazal `@import url(fonts.googleapis.com … Inter)` z `app/globals.css`. Celé repo je na Instrument Sans přes `next/font/google`, který písmo servíruje z vlastní domény (`/_next/static/media/*`), takže na Google Fonts už nic nesahá.
 Ověřeno: produkční build + `next start` lokálně 2026-11-11. Hlavičky `/login`, `/p/[token]`, 404: `style-src 'self' 'unsafe-inline'`, `font-src 'self' data:` — bez `fonts.*`. HTML `/login` ani žádný ze tří servírovaných CSS souborů `fonts.googleapis` neobsahuje (0 výskytů), `<html>` nese třídy písem a paleta je v CSS na `:root`. Testy `lib/security/__tests__/csp.test.ts` (profil `admin` i `/login` bez `fonts.*`) a `lib/__tests__/fonts-dilky.test.ts`. V prohlížeči s přihlášeným adminem neověřeno (agent nemá heslo); blokovat ale nemá co — zdroj, který výjimku potřeboval, v kódu není.
 
+## v9 — 2026-11-15
+Změna: z profilu `workspace` na `/klient/*` odebrány zdroje Clerku — `connect-src https://<frontend api Clerku>`, `img-src https://img.clerk.com`, `frame-src https://challenges.cloudflare.com`. `/w` je má dál.
+Kvůli: klientský prostor se od R-107 přihlašuje přes Supabase Auth **na serveru** (server actions), prohlížeč na Supabase ani na Clerk nesahá. Politika se zpřísnila, nic se nepřidalo.
+Ověřeno: produkční build + `next start` lokálně — hlavička `/klient/prihlaseni` bez slova `clerk`; testy `lib/security/__tests__/csp.test.ts` a `lib/__tests__/portal-supabase-auth.test.ts`. V prohlížeči neověřeno (stránky jsou serverové formuláře bez skriptů třetích stran).
+
+## v10 — 2026-11-15
+Změna: z profilu `admin` odebráno `frame-src https://www.tradingview-widget.com`. Admin má zase `frame-src 'none'`, jen `/dashboard/faktury/*` dál `'self'` (náhled PDF).
+Kvůli: graf ETF z Finance › Osobní zmizel na přání Kryštofa (`components/TradingViewChart.tsx` smazaný), skript ani iframe TradingView se už nenačítají. Politika se zpřísnila, nic se nepřidalo.
+Ověřeno: testy `lib/security/__tests__/csp.test.ts`. V prohlížeči neověřeno.
+
 ## Čeká (zapsat jako vN při přidání)
 - Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.
 
 ## Odebrané
+- `frame-src https://www.tradingview-widget.com` (profil `admin`) — odebráno 2026-11-15 ve v10, graf ETF z Financí zrušen.
+- Zdroje Clerku na `/klient/*` (`connect-src` Frontend API, `img-src img.clerk.com`, `frame-src challenges.cloudflare.com`) — odebráno 2026-11-15 ve v9, klientský prostor přešel na Supabase Auth (R-107, DECISIONS #031).
 - `style-src https://fonts.googleapis.com`, `font-src https://fonts.gstatic.com` (profil `admin`) — odebráno 2026-11-11 ve v8, protože Inter se přes `@import` už nenačítá (AD04, R-081).

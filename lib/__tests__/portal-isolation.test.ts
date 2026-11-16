@@ -47,10 +47,18 @@ beforeAll(async () => {
   await db.exec('CREATE TABLE client_feedback (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE, nps integer NOT NULL, content text, created_at timestamptz DEFAULT now())')
   await db.exec(read('migrations', '092_client_requests.sql'))
   await db.exec(read('migrations', '093_project_activity.sql'))
+  // Pozvánka bez e-mailu z doby před migrací 113 — ta ji má zrušit (R-107).
+  await db.exec(read('migrations', '095_portal_schema.sql'))
+  await db.query("INSERT INTO portal.clients (id, name) VALUES ('00000000-0000-4000-8000-0000000000c0', 'Starý klient')")
+  await db.query(
+    "INSERT INTO portal.invites (client_id, code_hash, email, expires_at) VALUES ('00000000-0000-4000-8000-0000000000c0', $1, NULL, '2099-01-01T00:00:00Z')",
+    ['c'.repeat(64)],
+  )
   for (let i = 0; i < 2; i++) {
-    // idempotence: obě migrace dvakrát po sobě
+    // idempotence: všechny migrace dvakrát po sobě
     await db.exec(read('migrations', '095_portal_schema.sql'))
     await db.exec(read('migrations', '096_portal_requests_messages.sql'))
+    await db.exec(read('migrations', '113_portal_supabase_auth.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')
@@ -182,7 +190,7 @@ describe('pozvánky a přihlášení', () => {
     db.query(
       `INSERT INTO portal.invites (client_id, code_hash, email, role, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
-      [A, hash, over.email ?? null, over.role ?? 'member', over.expires ?? '2099-01-01T00:00:00Z'],
+      [A, hash, over.email === undefined ? 'novy@example.cz' : over.email, over.role ?? 'member', over.expires ?? '2099-01-01T00:00:00Z'],
     )
   const redeem = async (hash: string, user: string, email = 'novy@example.cz') => {
     const res = await asClient<{ c: string | null }>(null, 'SELECT portal.redeem_invite($1, $2, $3, $4) AS c', [hash, user, email, 'Jana'])
@@ -215,6 +223,23 @@ describe('pozvánky a přihlášení', () => {
     await invite(h, { email: 'Jana@Example.cz' })
     expect(await redeem(h, 'user_4', 'jiny@example.cz')).toBeNull()
     expect(await redeem(h, 'user_4', 'jana@example.cz')).toBe(A)
+  })
+
+  it('pozvánka bez e-mailu nejde založit a stará nevázaná je zrušená (113)', async () => {
+    await expect(invite(hashOf('7'), { email: null })).rejects.toThrow()
+    expect(await redeem('c'.repeat(64), 'sb_7')).toBeNull()
+    const [old] = (await db.query<{ revoked: boolean }>(
+      "SELECT revoked_at IS NOT NULL AS revoked FROM portal.invites WHERE code_hash = $1",
+      ['c'.repeat(64)],
+    )).rows
+    expect(old.revoked).toBe(true)
+  })
+
+  it('bez e-mailu přihlášeného se pozvánka neuplatní', async () => {
+    const h = hashOf('8')
+    await invite(h)
+    expect(await redeem(h, 'sb_8', '')).toBeNull()
+    expect(await redeem(h, 'sb_8', 'NOVY@example.cz ')).toBe(A)
   })
 
   it('odebraný člen se nepřihlásí; archivovaný klient taky', async () => {

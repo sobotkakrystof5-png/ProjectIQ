@@ -1,5 +1,7 @@
 /**
- * Supabase je v ZakazIQ **jen poskytovatel přihlášení do admin konzole** (R-105).
+ * Supabase je v ZakazIQ **jen poskytovatel přihlášení** — admin konzole (R-105)
+ * a od R-107 klientský prostor `/klient`; Workspace přijde v F2
+ * (`docs/AUTH-SUPABASE-PLAN.md`).
  * Data zůstávají v Neonu (R-002): schéma `public` (admin), `ws` (Workspace)
  * i `portal` (klientský prostor). Do databáze Supabase se nic nepíše ani nečte.
  *
@@ -26,4 +28,18 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   const expected = adminEmail().trim().toLowerCase()
   if (!email || !expected) return false
   return email.trim().toLowerCase() === expected
+}
+
+/**
+ * Pojistka k `ADMIN_EMAIL` (R-107): v projektu jsou od teď i účty klientů, a když
+ * je vypnuté potvrzování e-mailu, Supabase provede i změnu e-mailu bez potvrzení.
+ * Kdyby účet adminu zmizel, mohl by si klient přepsat e-mail na `ADMIN_EMAIL`.
+ * S `ADMIN_USER_ID` (id účtu adminu v Supabase) to nestačí — musí sedět i id.
+ * Prázdná hodnota = kontrola jen podle e-mailu jako dosud.
+ */
+export function isAdminUser(email: string | null | undefined, userId: string | null | undefined): boolean {
+  if (!isAdminEmail(email)) return false
+  const pinned = (process.env.ADMIN_USER_ID ?? '').trim().toLowerCase()
+  if (!pinned) return true
+  return typeof userId === 'string' && userId.trim().toLowerCase() === pinned
 }

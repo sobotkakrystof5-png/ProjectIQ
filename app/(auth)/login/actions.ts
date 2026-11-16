@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 import { clientIp, recordAttempt } from '@/lib/auth'
-import { isAdminEmail, supabaseConfigured } from '@/lib/supabase/config'
+import { isAdminUser, supabaseConfigured } from '@/lib/supabase/config'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 /**
@@ -52,7 +52,7 @@ export async function signInAdmin(email: string, password: string): Promise<Sign
   }
 
   // Cizí účet (třeba klient) nesmí v adminu nechat session ani na chvíli.
-  if (!isAdminEmail(data.user.email)) {
+  if (!isAdminUser(data.user.email, data.user.id)) {
     await supabase.auth.signOut({ scope: 'local' })
     await recordAttempt(ip, false)
     return { ok: false, error: WRONG }

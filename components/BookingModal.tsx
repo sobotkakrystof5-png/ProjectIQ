@@ -236,8 +236,8 @@ function SuccessScreen({ onClose }: { onClose: () => void }) {
         transition={{ delay: 0.35 }}
         className="text-sm text-quiet leading-relaxed max-w-xs mb-8"
       >
-        Děkujeme za váš projevený zájem. Potvrzení obdržíte e-mailem
-        a na konzultaci se důkladně připravíme.
+        Děkujeme za váš zájem. Rezervaci máme a na konzultaci se důkladně
+        připravíme. Potvrzení pošleme na e-mail, který u projektu máme.
       </motion.p>
       <motion.button
         initial={{ opacity: 0 }}
@@ -407,7 +407,7 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
               {/* Client email */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-ink">
-                  Váš e-mail (pro potvrzení rezervace)
+                  Váš e-mail (ozveme se na něj, kdyby bylo potřeba)
                 </label>
                 <input
                   type="email"

@@ -128,6 +128,8 @@ function generateMeetingLink(channel: string, datetime: Date): string {
   }
 }
 
+const BOOKING_MAX_AHEAD_MS = 183 * 24 * 60 * 60 * 1000
+
 const CHANNEL_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
   teams: 'Microsoft Teams',
@@ -145,6 +147,10 @@ export async function submitConsultation(
 
   const scheduledDate = new Date(parsed.data.scheduledAt)
   if (scheduledDate <= new Date()) return { success: false, error: 'Nelze rezervovat termín v minulosti.' }
+  // Horní mez (audit 2026-11-15): rezervace na rok 3000 by jen zabírala kalendář.
+  if (scheduledDate.getTime() > Date.now() + BOOKING_MAX_AHEAD_MS) {
+    return { success: false, error: 'Termín jde vybrat nejvýš půl roku dopředu.' }
+  }
 
   const project = await getProjectByToken(token)
   if (!project) return { success: false, error: 'Projekt nenalezen.' }
@@ -218,14 +224,24 @@ export async function submitConsultation(
       subject: 'Nová rezervace konzultace – ZakazIQ',
       heading: 'Nová rezervace konzultace',
       intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji. Níže najdete vše potřebné.',
-      fields: [...fields, { label: 'Přání klienta', value: parsed.data.clientWish }],
+      fields: [
+        ...fields,
+        { label: 'E-mail z formuláře', value: parsed.data.clientEmail },
+        { label: 'Přání klienta', value: parsed.data.clientWish },
+      ],
       ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
     })
   }
 
-  if (parsed.data.clientEmail) {
+  // Potvrzení jde jen na e-mail klienta uložený u zakázky (audit 2026-11-15).
+  // Adresa z formuláře se uloží k rezervaci a dostane ji admin, ale server na ni
+  // nic neposílá — jinak by kdokoli s odkazem /p rozesílal z naší schránky
+  // e-maily s vlastním textem na libovolné adresy.
+  const ownerRows = await sql`SELECT client_email FROM projects WHERE id = ${projectId} LIMIT 1`
+  const clientEmail = (ownerRows[0] as { client_email: string | null } | undefined)?.client_email?.trim()
+  if (clientEmail) {
     await sendBrandedEmail({
-      to: parsed.data.clientEmail,
+      to: clientEmail,
       subject: 'Potvrzení rezervace konzultace – ZakazIQ',
       heading: 'Vaše konzultace byla potvrzena',
       intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji.',

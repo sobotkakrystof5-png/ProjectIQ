@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 /**
+ * **Nahrazeno 2026-11-15 (R-107):** hook Before User Created je teď HTTPS
+ * endpoint `/api/auth/supabase-hook`, který pouští klienty s pozvánkou. Tenhle
+ * Postgres hook pustí jen admina — zapnutý smí být jen jeden, takže ho po
+ * přepnutí v dashboardu nech vypnutý. Skript zůstává pro případ návratu.
+ *
  * Vypíše SQL pro Supabase Auth: hook „Before User Created", který pustí
  * jen e-mail admina (R-106). Nahrazuje placenou volbu „Allow new users to
  * sign up = off" — ta je v Supabase na Pro plánu, náš je Free.
