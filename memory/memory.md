@@ -1057,7 +1057,7 @@ nemá linii přiznané/nepřiznané).
 
 ## 3. Otevřené problémy
 
-- [ ] **Asistent (R-111) v prohlížeči neověřený a necommitnutý:** projít s přihlášením na databázi s migrací 110 (produkce ji má, testovací Neon ne) na 390 a 1280 px — diktování (povolení mikrofonu, Safari `audio/mp4`), věta se dvěma akcemi, toast „Zpět", „Vrátit" u kroku, faktura na klepnutí, věta na detailu zakázky (nesmí se provést sama). Pak commit a nasazení se souhlasem. Dotazy na data (A4) projít na produkčních datech — testovací Neon nemá tabulky adminu, takže živě běžely jen nad podstrčenými daty · `docs/admin/ASISTENT-PLAN.md` · od 2026-11-16
+- [ ] **Asistent (R-111) na produkci, ale v prohlížeči neověřený:** projít s přihlášením na produkci na 390 a 1280 px — diktování (povolení mikrofonu, Safari `audio/mp4`), věta se dvěma akcemi, toast „Zpět", „Vrátit" u kroku, faktura na klepnutí, věta na detailu zakázky (nesmí se provést sama). Dotazy na data (A4) projít na produkčních datech — testovací Neon nemá tabulky adminu, takže živě běžely jen nad podstrčenými daty · `docs/admin/ASISTENT-PLAN.md` · od 2026-11-16
 
 - [ ] **Supabase pro `/klient` — nasadit a nastavit (R-107, F1):** kód je na větvi
   `auth/supabase-klient`, na produkci není. Pořadí: (1) migrace 113 na produkci,
@@ -1321,6 +1321,9 @@ nemá linii přiznané/nepřiznané).
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-16 (asistent na produkci)
+- **chore** **Asistent (R-111) je na produkci** (`5f738bb`, fast-forward `7d63c55` → `5f738bb` z větve `admin/asistent`, se souhlasem Kryštofa). Spolu s ním šla úprava a mazání událostí v kalendáři se „Zpět" (`153b312`, převzato z `712cb66`) a výměna odkazu `/p` (`493c819`, převzato z `ba226aa` samostatně). **Přihlášení klientů přes Supabase (`ba226aa`, R-107) nasazené není** — čeká na migraci 113 a nastavení v Supabase, zůstává na větvi `auth/supabase-klient`. Ověřeno zvenku: `/` a `/login` 200, `/dashboard` 307, `POST /api/ai-assistant/prepis` 401, `microphone=(self)` jen na `/dashboard`. Klíče `ANTHROPIC_API_KEY` a `OPENAI_API_KEY` jsou ve Vercel Production. **Za přihlášením naživo nikdo nic nezkusil.**
 
 ### 2026-11-16 (asistent koná sám — A0–A3)
 - **fix** **Asistent z AD14 naživo nefungoval:** strukturovaný výstup se schématem API odmítalo (`The compiled grammar is too large`, pak strop 16 polí s `null` a 24 nepovinných). Model teď vrací JSON podle popisu v promptu a přísnou kontrolu dělá `lib/ai/plan-format.ts`. Ověřeno živě: 6 vět ze 6 správně, haiku ~2,5–3 s, systémový prompt z cache.
