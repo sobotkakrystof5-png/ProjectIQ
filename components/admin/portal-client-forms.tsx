@@ -110,7 +110,7 @@ export function InviteForm({ clientId }: { clientId: string }) {
     setError(null)
     setLink(null)
     start(async () => {
-      const res = await createInvite(clientId, email || null, role)
+      const res = await createInvite(clientId, email, role)
       if (!res.success) setError(res.error)
       else {
         setLink({ url: res.url, expiresAt: res.expiresAt })
@@ -134,8 +134,8 @@ export function InviteForm({ clientId }: { clientId: string }) {
     <div className="space-y-3">
       <form onSubmit={submit} className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
         <div>
-          <label className="mb-1 block text-xs font-medium text-quiet" htmlFor="invite-email">E-mail (nepovinné, pozvánka pak půjde použít jen s ním)</label>
-          <input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} placeholder="jana@firma.cz" />
+          <label className="mb-1 block text-xs font-medium text-quiet" htmlFor="invite-email">E-mail klienta (pozvánku půjde použít jen s ním)</label>
+          <input id="invite-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={field} placeholder="jana@firma.cz" />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-quiet" htmlFor="invite-role">Role</label>

@@ -1,5 +1,4 @@
 import 'server-only'
-import { createHmac, timingSafeEqual } from 'crypto'
 import { wsDb, wsSystem } from '../db'
 
 // Webhook Resendu (S15): nedoručené a odmítnuté e-maily. Podpis ve formátu
@@ -9,27 +8,9 @@ import { wsDb, wsSystem } from '../db'
 // v ws.webhook_events. Payload se neukládá.
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const TOLERANCE_S = 5 * 60
 
-/** Ověří podpis Svix. Bez tajemství nebo se starým časem = false. */
-export function verifySvix(body: string, headers: { id: string | null; timestamp: string | null; signature: string | null }, secret: string | undefined, nowS = Math.floor(Date.now() / 1000)): boolean {
-  if (!secret?.startsWith('whsec_') || !headers.id || !headers.timestamp || !headers.signature) return false
-  const ts = Number(headers.timestamp)
-  if (!Number.isInteger(ts) || Math.abs(nowS - ts) > TOLERANCE_S) return false
-  let key: Buffer
-  try {
-    key = Buffer.from(secret.slice('whsec_'.length), 'base64')
-  } catch {
-    return false
-  }
-  const expected = createHmac('sha256', key).update(`${headers.id}.${headers.timestamp}.${body}`).digest()
-  return headers.signature.split(' ').some((part) => {
-    const [version, sig] = part.split(',')
-    if (version !== 'v1' || !sig) return false
-    const given = Buffer.from(sig, 'base64')
-    return given.length === expected.length && timingSafeEqual(given, expected)
-  })
-}
+/** Ověření podpisu je společné s hookem Supabase Auth (`lib/security/webhook-signature.ts`). */
+export { verifySvix } from '@/lib/security/webhook-signature'
 
 type ResendEvent = {
   type?: string

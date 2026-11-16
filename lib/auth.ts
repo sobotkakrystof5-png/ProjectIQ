@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 
 import { sql } from './db'
 import { createSupabaseServerClient } from './supabase/server'
-import { isAdminEmail, supabaseConfigured } from './supabase/config'
+import { isAdminUser, supabaseConfigured } from './supabase/config'
 import { sessionTooOld } from './supabase/session-age'
 
 /**
@@ -55,7 +55,7 @@ export async function loadAdminSession(): Promise<AdminSession | null> {
 
   const claims = data.claims
   const email = typeof claims.email === 'string' ? claims.email : null
-  if (!email || !isAdminEmail(email)) return null
+  if (!email || !isAdminUser(email, typeof claims.sub === 'string' ? claims.sub : null)) return null
 
   // Dvanáct hodin od přihlášení a dost — „Time-box user sessions" je
   // v Supabase placená funkce, tak si strop držíme sami (R-106).

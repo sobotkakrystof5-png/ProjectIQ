@@ -89,7 +89,8 @@ export function clerkFrontendApiHost(publishableKey: string | undefined): string
 }
 
 /**
- * Clerk (S07) jen pod /w a /klient (KP05) — přihlášení, registrace, aplikace. Landing page Clerk
+ * Clerk (S07) jen pod /w — přihlášení, registrace, aplikace. `/klient` od R-107 Clerk nepoužívá
+ * (Supabase Auth běží na serveru, prohlížeč na nic cizího nesahá). Landing page Clerk
  * nenačítá. Skript clerk-js jde z Frontend API s naším nonce (ClerkProvider
  * `dynamic`), Turnstile ho načte sám (strict-dynamic). Telemetrie je vypnutá
  * v `app/w/layout.tsx`, host clerk-telemetry.com proto není potřeba.
@@ -109,17 +110,15 @@ function extras(profile: CspProfile, pathname: string, clerkHost: string | null)
     return {
       // fonts.googleapis.com / fonts.gstatic.com odebrané v AD04 (CSP-LOG v8): Inter
       // přes @import zmizel, Instrument Sans servíruje next/font z vlastní domény.
-      // TradingView graf v /dashboard/finance (components/TradingViewChart.tsx). Skript
-      // z s3.tradingview.com pouští strict-dynamic, iframe jde z tohohle hostu.
-      'frame-src': ['https://www.tradingview-widget.com'],
+      // TradingView (graf ETF) odebraný 2026-11-15 (CSP-LOG v10), frame-src je zase 'none'.
       // Náhled PDF faktury přes <object> (/dashboard/faktury/[id]) — Chrome ho
       // posuzuje jako rámec (frame-src), ostatní prohlížeče podle object-src.
       ...(hasPrefix(pathname, '/dashboard/faktury')
-        ? { 'object-src': ["'self'"], 'frame-src': ["'self'", 'https://www.tradingview-widget.com'] }
+        ? { 'object-src': ["'self'"], 'frame-src': ["'self'"] }
         : {}),
     }
   }
-  if (clerkHost && (hasPrefix(pathname, '/w') || hasPrefix(pathname, '/klient'))) return clerkSources(clerkHost)
+  if (clerkHost && hasPrefix(pathname, '/w')) return clerkSources(clerkHost)
   // S08: Stripe Checkout je přesměrování; pokud bude potřeba, `form-action https://checkout.stripe.com`.
   return {}
 }

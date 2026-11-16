@@ -1,12 +1,12 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
 import { clerkMiddleware } from '@clerk/nextjs/server'
-import { applyCookies, checkAdminSession } from '@/lib/supabase/proxy'
+import { applyCookies, checkAdminSession, checkUserSession } from '@/lib/supabase/proxy'
 import { clerkAuthorizedParties } from '@/lib/security/clerk'
 import { buildCsp, clerkFrontendApiHost, cspProfileFor, createNonce, hasPrefix } from '@/lib/security/csp'
 import { frameAncestorsFor } from '@/lib/security/embed'
 import { embedOriginsForSlug, orderSlugFromPath } from '@/lib/ws/intake/embed-origins'
 import { WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
-import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH, PORTAL_SIGN_UP_PATH } from '@/lib/portal/paths'
+import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH } from '@/lib/portal/paths'
 
 /**
  * Jediný proxy (dřív middleware) celého repa; od Next 16 běží na Node runtime. Pořadí:
@@ -16,9 +16,9 @@ import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH, PORTAL_SIGN_UP_PATH } from '@
  *   2. Workspace (`/w`, `/api/ws`) — Clerk. Běží jen tady, admin a landing page
  *      Clerk vůbec nespouští. Bez přihlášení → `/w/prihlaseni` (kromě
  *      přihlášení a registrace). Účet a organizaci hlídá `requireWorkspace()`.
- *      Klientský prostor (`/klient`, KP05) má vlastní Clerk middleware: veřejné jsou
- *      jen přihlášení, registrace a pozvánka, zbytek chce přihlášení. Členství
- *      firmy hlídá `requireClient()`.
+ *   2b. Klientský prostor (`/klient`, KP05) — od R-107 Supabase Auth jako admin:
+ *      session se tu obnovuje, veřejné jsou jen přihlášení, pozvánka a obnova
+ *      hesla, zbytek chce přihlášení. Členství firmy hlídá `requireClient()`.
  *   3. CSP s nonce pro každou stránku (`lib/security/csp.ts`). Clerk hlavičky
  *      požadavku s nonce zachová (přidává k nim své), ClerkProvider si nonce
  *      přečte z `x-nonce`.
@@ -52,21 +52,23 @@ const workspace = clerkMiddleware(
   { signInUrl: WS_SIGN_IN_PATH, signUpUrl: WS_SIGN_UP_PATH, authorizedParties: CLERK_AUTHORIZED_PARTIES },
 )
 
-const portal = clerkMiddleware(
-  async (auth, req) => {
-    const { pathname } = req.nextUrl
-    // API klientského prostoru si členství ověří samo (getPortalContext), CSP nepotřebuje.
-    if (hasPrefix(pathname, '/api/klient')) return NextResponse.next()
-    if (!PORTAL_PUBLIC_PATHS.some((p) => hasPrefix(pathname, p))) await auth.protect()
-    return withCsp(req)
-  },
-  { signInUrl: PORTAL_SIGN_IN_PATH, signUpUrl: PORTAL_SIGN_UP_PATH, authorizedParties: CLERK_AUTHORIZED_PARTIES },
-)
+/** Klientský prostor (R-107): Supabase session, bez Clerku. */
+async function portal(req: NextRequest): Promise<NextResponse> {
+  const { pathname, search } = req.nextUrl
+  const { userId, cookiesToSet } = await checkUserSession(req)
+  if (!userId && !PORTAL_PUBLIC_PATHS.some((p) => hasPrefix(pathname, p))) {
+    const url = req.nextUrl.clone()
+    url.pathname = PORTAL_SIGN_IN_PATH
+    url.search = `?next=${encodeURIComponent(`${pathname}${search}`)}`
+    return applyCookies(NextResponse.redirect(url), cookiesToSet)
+  }
+  return applyCookies(await withCsp(req), cookiesToSet)
+}
 
 export default async function proxy(req: NextRequest, event: NextFetchEvent) {
   const { pathname } = req.nextUrl
 
-  if (hasPrefix(pathname, '/klient') || hasPrefix(pathname, '/api/klient')) return portal(req, event)
+  if (hasPrefix(pathname, '/klient')) return portal(req)
 
   if (CLERK_PATHS.some((p) => hasPrefix(pathname, p))) return workspace(req, event)
 
@@ -129,7 +131,5 @@ export const config = {
     '/((?!api/|embed/|_next/static|_next/image|favicon.ico|\\.well-known/).*)',
     // API Workspace — jen kvůli Clerku (auth() v route handlerech)
     '/api/ws/:path*',
-    // API klientského prostoru — jen kvůli Clerku (auth() v route handlerech)
-    '/api/klient/:path*',
   ],
 }
