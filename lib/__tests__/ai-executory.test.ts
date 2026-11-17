@@ -37,6 +37,8 @@ const { calls, proxy } = vi.hoisted(() => {
   updateLead: vi.fn(),
   saveMemory: vi.fn(),
   discardMemory: vi.fn(),
+  createDraft: vi.fn(),
+  deleteAssistantDraft: vi.fn(),
   }
   const proxy =
     (name: keyof typeof calls) =>
@@ -88,6 +90,10 @@ vi.mock('@/app/dashboard/finance/invoice-actions', () => ({
 vi.mock('@/lib/admin/invoice-issue', () => ({
   loadIssueDraft: proxy('loadIssueDraft'),
   loadIssuerProfile: proxy('loadIssuerProfile'),
+}))
+vi.mock('@/lib/admin/invoice-drafts', () => ({
+  createDraft: proxy('createDraft'),
+  deleteAssistantDraft: proxy('deleteAssistantDraft'),
 }))
 
 import { setAdminDbForTests } from '@/lib/admin/db'
@@ -199,32 +205,14 @@ describe('co asistent nesmí', () => {
     expect(out).toEqual({ ok: false, error: 'Chybí e-mailová adresa.' })
   })
 
-  it('fakturu bez adresy odběratele nevystaví, pošle do formuláře', async () => {
+  it('fakturu nevystaví, připraví koncept — i když chybí adresa', async () => {
     calls.loadIssueDraft.mockResolvedValue({
       issuedOn: '2026-11-16', suppliedOn: '2026-11-16', dueOn: '2026-11-30',
       counterparty: { name: 'Kavárna Ukázková', address: '', ico: '', dic: '' },
-      amount: 25000, projectId, projectLabel: 'Kavárna', items: [],
+      email: '', amount: 25000, projectId, projectLabel: 'Kavárna', items: [],
     })
-    const out = await runAction({
-      kind: 'issue_invoice',
-      project: ref(null, projectId),
-      counterpartyName: null,
-      description: 'Web na míru',
-      amount: 25000,
-    })
-    expect(out.ok).toBe(false)
-    if (out.ok) return
-    expect(out.href).toBe(`/dashboard/faktury/nova?zakazka=${projectId}`)
-    expect(calls.issueNewInvoice).not.toHaveBeenCalled()
-  })
-
-  it('úplnou fakturu vystaví bez DPH a nenabídne „Zpět"', async () => {
-    calls.loadIssueDraft.mockResolvedValue({
-      issuedOn: '2026-11-16', suppliedOn: '2026-11-16', dueOn: '2026-11-30',
-      counterparty: { name: 'Kavárna Ukázková', address: 'Hlavní 1, Praha', ico: '', dic: '' },
-      amount: 25000, projectId, projectLabel: 'Kavárna', items: [],
-    })
-    calls.issueNewInvoice.mockResolvedValue({ id: invoiceId, number: '2026015' })
+    calls.loadIssuerProfile.mockResolvedValue({ profile: { vatPayer: false }, configured: true })
+    calls.createDraft.mockResolvedValue(invoiceId)
     const out = await runAction({
       kind: 'issue_invoice',
       project: ref(null, projectId),
@@ -234,9 +222,21 @@ describe('co asistent nesmí', () => {
     })
     expect(out.ok).toBe(true)
     if (!out.ok) return
-    expect(out.undo).toBeNull()
-    const input = calls.issueNewInvoice.mock.calls[0][0]
-    expect(input.items).toEqual([{ description: 'Web na míru', quantity: 1, unitPrice: 25000, vatRate: 0 }])
+    expect(calls.issueNewInvoice).not.toHaveBeenCalled()
+    expect(out.undo).toEqual({ type: 'invoice_draft', id: invoiceId })
+    expect(out.href).toBe('/dashboard/faktury')
+    expect(out.description).toContain('adresa odběratele')
+    const [source, fields] = calls.createDraft.mock.calls[0]
+    expect(source).toBe('assistant')
+    expect(fields.projectId).toBe(projectId)
+    expect(fields.items).toEqual([{ description: 'Web na míru', quantity: 1, unitPrice: 25000, vatRate: 0 }])
+  })
+
+  it('„Zpět" koncept od asistenta smaže', async () => {
+    calls.deleteAssistantDraft.mockResolvedValue(true)
+    expect(await undoStep({ type: 'invoice_draft', id: invoiceId })).toEqual({ ok: true })
+    calls.deleteAssistantDraft.mockResolvedValue(false)
+    expect((await undoStep({ type: 'invoice_draft', id: invoiceId })).ok).toBe(false)
   })
 
   it('zakázku, ke které už přišly peníze, „Zpět" nesmaže', async () => {
@@ -395,13 +395,13 @@ describe('co se provede samo (R-111)', () => {
   const invoice: Action = { kind: 'issue_invoice', project: null, counterpartyName: null, description: null, amount: null }
   const done: Action = { kind: 'update_project_status', project: { id: null, hint: 'X' }, status: 'done' }
 
-  it('vratné akce ano, faktura, storno, zpráva a „Hotovo" čekají', () => {
+  it('vratné akce ano (i koncept faktury), storno, zpráva a „Hotovo" čekají', () => {
     expect(actionClass(contact)).toBe('auto')
-    expect(actionClass(invoice)).toBe('confirm')
+    expect(actionClass(invoice)).toBe('auto')
     expect(actionClass({ kind: 'cancel_invoice', invoice: { id: null, hint: '1' } })).toBe('confirm')
     expect(actionClass(done)).toBe('confirm')
     expect(actionClass({ ...done, status: 'in_progress' } as Action)).toBe('auto')
-    expect(autoRunIndexes({ suggestion: plan([contact, invoice, contact]), untrustedContext: false })).toEqual([0, 2])
+    expect(autoRunIndexes({ suggestion: plan([contact, done, contact]), untrustedContext: false })).toEqual([0, 2])
   })
 
   it('s textem od klienta v kontextu se nic neprovede samo', () => {

@@ -21,6 +21,8 @@ export type NotificationType =
   | 'activity_draft'
   /** Firma od AI asistenta z Growth OS čeká na zavolání (R-112). */
   | 'outreach_lead'
+  /** Koncept faktury čeká na schválení (R-117). */
+  | 'invoice_draft'
 
 export async function createNotification(params: {
   type: NotificationType

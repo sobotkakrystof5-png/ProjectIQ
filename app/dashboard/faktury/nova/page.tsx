@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { IssueInvoiceForm } from '@/components/admin/invoices/issue-form'
 import { getInvoiceProjectOptions, getIssuerSettings } from '@/app/dashboard/finance/invoice-actions'
-import { loadIssueDraft } from '@/lib/admin/invoice-issue'
+import { loadIssueDraft, type IssueDraft } from '@/lib/admin/invoice-issue'
+import { getDraft, isDraftsReady } from '@/lib/admin/invoice-drafts'
+import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
 import { requireAuth } from '@/lib/auth'
 
 /**
@@ -12,22 +14,42 @@ import { requireAuth } from '@/lib/auth'
  *
  * `?zakazka=<id>` předvyplní odběratele a částku ze zakázky (cena mínus
  * zaplacená záloha), takže odkaz jde dát kamkoli k zakázce.
+ *
+ * `?koncept=<id>` otevře koncept faktury (R-117) k úpravě. Formulář ho pak
+ * jen ukládá; vystavuje se ve Fakturách › Ke schválení.
  */
 
 export const metadata = { title: 'Nová faktura' }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export default async function NewInvoicePage(props: { searchParams: Promise<{ zakazka?: string }> }) {
+export default async function NewInvoicePage(props: { searchParams: Promise<{ zakazka?: string; koncept?: string }> }) {
   await requireAuth()
   const searchParams = await props.searchParams
   const projectId = typeof searchParams.zakazka === 'string' && UUID.test(searchParams.zakazka) ? searchParams.zakazka : null
+  const conceptId = typeof searchParams.koncept === 'string' && UUID.test(searchParams.koncept) ? searchParams.koncept : null
 
-  const [{ profile, configured }, draft, projects] = await Promise.all([
+  const [{ profile, configured }, prefill, projects, draftsEnabled, concept] = await Promise.all([
     getIssuerSettings(),
     loadIssueDraft(projectId),
     getInvoiceProjectOptions(),
+    isDraftsReady(),
+    conceptId ? getDraft(conceptId) : Promise.resolve(null),
   ])
+  // Koncept, který mezitím někdo vystavil nebo zahodil, se už neupravuje.
+  const editable = concept && concept.status === 'draft' ? concept : null
+  if (conceptId && !editable) {
+    return (
+      <PageShell width="narrow">
+        <PageHeader title="Koncept faktury" subtitle="Tenhle koncept už je vystavený nebo zahozený." subtitleFont="sans" />
+        <Link href="/dashboard/faktury" className="text-sm font-medium text-navy-700 underline underline-offset-4">
+          Zpět na faktury
+        </Link>
+      </PageShell>
+    )
+  }
+
+  const draft: IssueDraft = editable ? fromConcept(editable) : prefill
 
   if (!configured) {
     return (
@@ -51,8 +73,14 @@ export default async function NewInvoicePage(props: { searchParams: Promise<{ za
   return (
     <PageShell width="default">
       <PageHeader
-        title="Nová faktura"
-        subtitle={draft.projectLabel ? `Za zakázku ${draft.projectLabel}` : 'Číslo přidělím při vystavení.'}
+        title={editable ? 'Koncept faktury' : 'Nová faktura'}
+        subtitle={
+          draft.projectLabel
+            ? `Za zakázku ${draft.projectLabel}`
+            : editable
+              ? 'Číslo dostane, až ji schválíte a pošlete.'
+              : 'Číslo přidělím při vystavení.'
+        }
         subtitleFont="sans"
         action={
           <Link href="/dashboard/faktury/dodavatel" className="text-sm text-quiet underline-offset-4 hover:text-ink hover:underline">
@@ -60,7 +88,30 @@ export default async function NewInvoicePage(props: { searchParams: Promise<{ za
           </Link>
         }
       />
-      <IssueInvoiceForm draft={draft} projects={projects} vatPayer={profile.vatPayer} />
+      <IssueInvoiceForm
+        draft={draft}
+        projects={projects}
+        vatPayer={profile.vatPayer}
+        draftId={editable?.id ?? null}
+        draftsEnabled={draftsEnabled}
+        initial={editable ? { currency: editable.currency, note: editable.note } : undefined}
+      />
     </PageShell>
   )
+}
+
+/** Koncept ve tvaru, kterým se plní formulář: dnešek, splatnost za N dní. */
+function fromConcept(concept: NonNullable<Awaited<ReturnType<typeof getDraft>>>): IssueDraft {
+  const today = getPragueTodayISO()
+  return {
+    issuedOn: today,
+    suppliedOn: concept.suppliedOn || today,
+    dueOn: addIsoDays(today, concept.dueDays),
+    counterparty: concept.counterparty,
+    email: concept.email,
+    amount: 0,
+    projectId: concept.projectId,
+    projectLabel: concept.projectLabel,
+    items: concept.items,
+  }
 }

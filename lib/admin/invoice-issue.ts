@@ -103,23 +103,7 @@ export type IssueResult = { id: string; number: string }
  * jako **snímek** — pozdější změna profilu starší faktury nepřepíše.
  */
 export async function issueInvoice(input: IssueInvoiceInput, issuer: IssuerProfile): Promise<IssueResult> {
-  const amount = invoiceTotal(input.items)
-
-  const payload = {
-    project_id: input.projectId,
-    client_name: input.counterparty.name,
-    client_ico: input.counterparty.ico,
-    client_dic: input.counterparty.dic,
-    client_address: input.counterparty.address,
-    issued_on: input.issuedOn,
-    supplied_on: input.suppliedOn,
-    due_on: input.dueOn,
-    currency: input.currency,
-    note: input.note,
-    amount,
-    items: input.items,
-    issuer,
-  }
+  const payload = issuePayload(input, issuer)
 
   // Dva příkazy schválně: řádek vložený funkcí ještě není vidět ve snímku
   // téhož dotazu, takže `JOIN invoices` by vrátil prázdno.
@@ -131,6 +115,29 @@ export async function issueInvoice(input: IssueInvoiceInput, issuer: IssuerProfi
   const number = (rows[0] as { invoice_number: string } | undefined)?.invoice_number
   if (!number) throw new Error('admin_invoice_missing')
   return { id, number }
+}
+
+/**
+ * Tvar, kterému rozumí `admin_invoice_issue` (migrace 107). Samostatně proto,
+ * že koncept faktury (R-117) vystavuje uvnitř jiného příkazu — koncept se
+ * označí jako vystavený **v téže transakci**, ve které doklad vznikne.
+ */
+export function issuePayload(input: IssueInvoiceInput, issuer: IssuerProfile): Record<string, unknown> {
+  return {
+    project_id: input.projectId,
+    client_name: input.counterparty.name,
+    client_ico: input.counterparty.ico,
+    client_dic: input.counterparty.dic,
+    client_address: input.counterparty.address,
+    issued_on: input.issuedOn,
+    supplied_on: input.suppliedOn,
+    due_on: input.dueOn,
+    currency: input.currency,
+    note: input.note,
+    amount: invoiceTotal(input.items),
+    items: input.items,
+    issuer,
+  }
 }
 
 /**
@@ -165,6 +172,8 @@ export type IssueDraft = {
   suppliedOn: string
   dueOn: string
   counterparty: { name: string; address: string; ico: string; dic: string }
+  /** Kam fakturu poslat: e-mail ze zakázky (R-117). Prázdné = zeptat se. */
+  email: string
   /** Cena ze zakázky mínus zaplacená záloha; 0 = nic k předvyplnění. */
   amount: number
   projectId: string | null
@@ -174,7 +183,7 @@ export type IssueDraft = {
    * vystavené faktury téhož kontaktu — spočítaný z historie, ne napsaný
    * modelem (R-085). Prázdné pole = fakturuje se mu poprvé.
    */
-  items: { description: string; quantity: number; unitPrice: number }[]
+  items: { description: string; quantity: number; unitPrice: number; vatRate?: 0 | 12 | 21 }[]
 }
 
 /**
@@ -203,6 +212,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     suppliedOn: today,
     dueOn: addIsoDays(today, DEFAULT_DUE_DAYS),
     counterparty: { name: '', address: '', ico: '', dic: '' },
+    email: '',
     amount: 0,
     projectId,
     projectLabel: null,
@@ -213,7 +223,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
   const [projectRows, invoiceRows] = await adminDb.batch([
     {
       text: `
-        SELECT p.client_name, p.description, p.price::float AS price,
+        SELECT p.client_name, p.client_email, p.description, p.price::float AS price,
                p.deposit_amount::float AS deposit_amount, p.deposit_paid,
                ${extraDepositsSql('p')}::float AS extra_deposits,
                c.ico AS contact_ico, c.dic AS contact_dic, c.company AS contact_company
@@ -244,6 +254,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
   const project = projectRows[0] as
     | {
         client_name: string
+        client_email: string | null
         description: string | null
         price: number | null
         deposit_amount: number | null
@@ -267,6 +278,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     depositPaid: project.deposit_paid,
     extraDeposits: Number(project.extra_deposits ?? 0),
   })
+  draft.email = project.client_email?.trim() ?? ''
   draft.projectLabel = project.description ? `${project.client_name} — ${project.description}` : project.client_name
   draft.counterparty = {
     name: last?.client_name ?? project.contact_company ?? project.client_name,

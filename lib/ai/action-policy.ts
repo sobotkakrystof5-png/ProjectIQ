@@ -6,9 +6,11 @@ import { CONFIDENCE_FLOOR, type Action, type Suggestion } from '@/lib/ai/suggest
  * Tři třídy:
  * - `auto`    — vratná akce, nic nikam neodchází. Provede se hned a toast
  *               nabídne „Zpět"; vrátit jde i později z panelu.
- * - `confirm` — výsledek nejde vzít zpět beze stopy: vystavená faktura dostane
- *               číslo, které se nerecykluje (R-098); storno je konečné; zpráva
+ * - `confirm` — výsledek nejde vzít zpět beze stopy: storno je konečné; zpráva
  *               a dotazník odejdou klientovi. Člověk jednou klepne.
+ *
+ * „Vyfakturuj…" je od R-117 `auto`: připraví jen koncept ve Fakturách › Ke
+ * schválení. Číslo z řady a odeslání přijdou až tam, kliknutím.
  *
  * Soubor je čistý (bez databáze), aby ho šlo testovat a aby z něj prohlížeč
  * uměl říct, co se stane.
@@ -18,7 +20,6 @@ export type ActionClass = 'auto' | 'confirm'
 
 export function actionClass(action: Action): ActionClass {
   switch (action.kind) {
-    case 'issue_invoice':
     case 'cancel_invoice':
     case 'send_message':
       return 'confirm'

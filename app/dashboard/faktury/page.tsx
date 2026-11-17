@@ -7,6 +7,8 @@ import { InvoiceDropZone, NewInvoiceButton } from '@/components/admin/invoices/i
 import { TableSearch } from '@/components/admin/table-search'
 import { Badge } from '@/components/ui/badge'
 import { PaidCell } from '@/components/admin/invoices/mark-paid'
+import { DraftsPanel } from '@/components/admin/invoices/drafts-panel'
+import { isDraftsReady, listOpenDrafts } from '@/lib/admin/invoice-drafts'
 import { invoiceTone, toneVariant } from '@/lib/admin-status'
 import {
   INVOICE_SORT,
@@ -156,7 +158,13 @@ export default async function FakturyPage(props: {
     pageSize: 50,
     tiebreak: 'i.created_at',
   })
-  const screen = await loadInvoiceRegistry(params, { year, status, query })
+  // Koncepty ke schválení (R-117) jdou souběžně s evidencí; bez migrace 117
+  // je seznam prázdný a panel se neukáže.
+  const [screen, draftsReady, drafts] = await Promise.all([
+    loadInvoiceRegistry(params, { year, status, query }),
+    isDraftsReady(),
+    listOpenDrafts(),
+  ])
   const links = tableLinks(PATH, searchParams)
   // Pražský den, ne UTC: `toISOString()` je mezi 23:00 a půlnocí o den vedle
   // a tohle datum se od AD08 zapisuje jako datum zaplacení faktury.
@@ -170,7 +178,7 @@ export default async function FakturyPage(props: {
     <PageShell width="wide">
       <PageHeader
         title="Faktury"
-        subtitle="Evidence všech faktur. Klikněte na fakturu pro údaje a PDF."
+        subtitle="Co čeká na schválení a evidence všech faktur."
         subtitleFont="sans"
         action={
           <>
@@ -189,6 +197,8 @@ export default async function FakturyPage(props: {
 
       <InvoiceDropZone projects={screen.projects}>
         <div className="flex flex-col gap-4">
+          {draftsReady && <DraftsPanel drafts={drafts} />}
+
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Tile
               label="Faktur"

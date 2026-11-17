@@ -54,6 +54,8 @@ export const undoTokenSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('lead_updated'), id: z.string().uuid(), before: z.record(z.string(), z.unknown()) }),
   z.object({ type: z.literal('project_updated'), id: z.string().uuid(), before: z.record(z.string(), z.unknown()) }),
   z.object({ type: z.literal('memory'), id: z.string().uuid() }),
+  // Koncept faktury od asistenta (R-117): „Zpět" ho smaže, dokud ho nikdo nevystavil.
+  z.object({ type: z.literal('invoice_draft'), id: z.string().uuid() }),
 ])
 
 export type UndoToken = z.infer<typeof undoTokenSchema>

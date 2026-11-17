@@ -67,6 +67,8 @@ const nextConfig = {
     // Odeslání faktury e-mailem vyrábí PDF taky — a od AD16 k němu umí přiložit
     // předávací dokument.
     '/api/invoices/*/email': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // „Schválit a poslat" u konceptu faktury vystaví a hned posílá PDF (R-117).
+    '/api/invoices/drafts/*/send': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     // Admin: předávací dokument „co bylo dodané“ (AD16).
     '/api/projects/*/predani': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/z/*/faktura/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],

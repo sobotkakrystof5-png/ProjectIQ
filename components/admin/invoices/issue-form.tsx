@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { itemTotals, invoiceTotal } from '@/lib/invoice-pdf/totals'
 import { issueNewInvoice, lookupCompany } from '@/app/dashboard/finance/invoice-actions'
+import { saveInvoiceDraft } from '@/app/dashboard/faktury/koncepty-actions'
 import type { InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 import type { IssueDraft } from '@/lib/admin/invoice-issue'
 import type { InvoiceIssueItem } from '@/lib/admin/invoice-issue-schema'
@@ -67,23 +68,42 @@ function toNumber(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+/** Počet dní mezi dvěma ISO daty (splatnost konceptu se ukládá jako „za kolik dní"). */
+function daysBetween(from: string, to: string): number {
+  const ms = Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)
+  return Number.isFinite(ms) ? Math.round(ms / 86_400_000) : 14
+}
+
 export function IssueInvoiceForm({
   draft,
   projects,
   vatPayer,
+  draftId = null,
+  draftsEnabled = false,
+  initial,
 }: {
   draft: IssueDraft
   projects: InvoiceProjectOption[]
   vatPayer: boolean
+  /**
+   * Úprava konceptu (R-117). Formulář pak koncept jen ukládá — vystavuje
+   * a posílá se ve Fakturách › Ke schválení jedním kliknutím.
+   */
+  draftId?: string | null
+  /** Je migrace 117 v databázi — jde ukládat koncepty? */
+  draftsEnabled?: boolean
+  initial?: { currency: string; note: string }
 }) {
   const router = useRouter()
+  const editingDraft = draftId !== null
   const [counterparty, setCounterparty] = useState<Party>(draft.counterparty)
+  const [email, setEmail] = useState(draft.email)
   const [projectId, setProjectId] = useState<string>(draft.projectId ?? '')
   const [issuedOn, setIssuedOn] = useState(draft.issuedOn)
   const [suppliedOn, setSuppliedOn] = useState(draft.suppliedOn)
   const [dueOn, setDueOn] = useState(draft.dueOn)
-  const [currency, setCurrency] = useState<string>('CZK')
-  const [note, setNote] = useState('')
+  const [currency, setCurrency] = useState<string>(initial?.currency ?? 'CZK')
+  const [note, setNote] = useState(initial?.note ?? '')
   // Popis i cena z historie klienta (AD15): co se mu fakturovalo naposledy.
   // Bez toho se u stálého klienta opisovalo totéž pokaždé znovu.
   const [items, setItems] = useState<ItemDraft[]>(() => {
@@ -93,7 +113,8 @@ export function IssueInvoiceForm({
         description: item.description,
         quantity: String(item.quantity),
         unitPrice: String(item.unitPrice),
-        vatRate,
+        // Koncept si sazbu pamatuje; předvyplnění z historie ji nenese.
+        vatRate: 'vatRate' in item && (item.vatRate === 0 || item.vatRate === 12 || item.vatRate === 21) ? item.vatRate : vatRate,
       }))
     }
     return [{ ...emptyItem(vatRate), unitPrice: draft.amount > 0 ? String(draft.amount) : '' }]
@@ -131,19 +152,49 @@ export function IssueInvoiceForm({
     })
   }
 
-  const submit = () => {
+  const saveDraft = () => {
     setError(null)
     start(async () => {
-      const result = await issueNewInvoice({
+      const result = await saveInvoiceDraft(draftId, {
         projectId: projectId === '' ? null : projectId,
         counterparty,
-        issuedOn,
-        suppliedOn,
-        dueOn,
-        currency,
+        email: email.trim(),
         items: items.map(toItem),
+        currency,
+        dueDays: Math.min(90, Math.max(0, daysBetween(issuedOn, dueOn))),
+        // Plnění v den vystavení se neukládá — u konceptu je to den schválení.
+        suppliedOn: suppliedOn === issuedOn ? '' : suppliedOn,
         note,
       })
+      if (result.error) {
+        setError(result.error)
+        return
+      }
+      toast.success(editingDraft ? 'Koncept uložený' : 'Koncept čeká ve Fakturách na schválení')
+      router.push('/dashboard/faktury#ke-schvaleni')
+    })
+  }
+
+  const submit = () => {
+    if (editingDraft) {
+      saveDraft()
+      return
+    }
+    setError(null)
+    start(async () => {
+      const result = await issueNewInvoice(
+        {
+          projectId: projectId === '' ? null : projectId,
+          counterparty,
+          issuedOn,
+          suppliedOn,
+          dueOn,
+          currency,
+          items: items.map(toItem),
+          note,
+        },
+        email.trim(),
+      )
       if (result.error || !result.id) {
         setError(result.error ?? 'Fakturu se nepodařilo vystavit.')
         return
@@ -180,7 +231,7 @@ export function IssueInvoiceForm({
           </div>
         </div>
         <Field label="Jméno nebo firma">
-          <Input value={counterparty.name} onChange={e => setCounterparty(p => ({ ...p, name: e.target.value }))} required />
+          <Input value={counterparty.name} onChange={e => setCounterparty(p => ({ ...p, name: e.target.value }))} required={!editingDraft} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Adresa">
@@ -190,6 +241,9 @@ export function IssueInvoiceForm({
             <Input value={counterparty.dic} onChange={e => setCounterparty(p => ({ ...p, dic: e.target.value }))} />
           </Field>
         </div>
+        <Field label="E-mail pro fakturu" hint="Sem fakturu pošlu. Na fakturu se netiskne.">
+          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="adresa@klient.cz" />
+        </Field>
       </section>
 
       <section className="flex flex-col gap-4 rounded-box border border-navy-100 bg-surface p-4 sm:p-5">
@@ -202,7 +256,7 @@ export function IssueInvoiceForm({
                   value={item.description}
                   placeholder="Web na míru, srpen"
                   onChange={e => setItem(index, { description: e.target.value })}
-                  required
+                  required={!editingDraft}
                 />
               </Field>
               <Field label={index === 0 ? 'Počet' : ''}>
@@ -302,12 +356,21 @@ export function IssueInvoiceForm({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Vystavuju…' : 'Vystavit fakturu'}
+          {editingDraft ? (pending ? 'Ukládám…' : 'Uložit koncept') : pending ? 'Vystavuju…' : 'Vystavit fakturu'}
         </Button>
+        {!editingDraft && draftsEnabled && (
+          <Button type="button" variant="outline" onClick={saveDraft} disabled={pending}>
+            Uložit jako koncept
+          </Button>
+        )}
         <Button type="button" variant="ghost" onClick={() => router.push('/dashboard/faktury')}>
           Zpět na faktury
         </Button>
-        <p className="text-xs text-quiet">Číslo přidělím při vystavení. Vystavenou fakturu už nejde měnit, jen stornovat.</p>
+        <p className="text-xs text-quiet">
+          {editingDraft
+            ? 'Vystavíte a pošlete ji jedním kliknutím ve Fakturách › Ke schválení.'
+            : 'Číslo přidělím při vystavení. Vystavenou fakturu už nejde měnit, jen stornovat.'}
+        </p>
       </div>
     </form>
   )

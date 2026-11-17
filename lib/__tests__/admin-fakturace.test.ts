@@ -87,6 +87,7 @@ beforeAll(async () => {
     CREATE TABLE projects (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       client_name text NOT NULL,
+      client_email text,
       description text,
       price numeric,
       deposit_amount numeric,

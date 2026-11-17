@@ -1120,10 +1120,16 @@ schůzky (R-114).
 **Důsledek:** **nahrazuje R-004** (Gmail SMTP). Nová cesta pro e-mail adminu jde přes `deliver()`
 v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
 
+### R-117 · Koncepty faktur ke schválení a „Schválit a poslat" jedním kliknutím (2026-11-17)
+**Rozhodnutí:** faktura se připraví sama jako **koncept** do Faktur › Ke schválení: (1) když zakázku přepnete na Hotovo nebo ji uzavřete (doplatek = cena − zálohy, e-mail ze zakázky; jen pro klienta, jen když k zakázce není platná faktura, jen jednou — ani zahozený se nevrátí), (2) tlačítkem „Uložit jako koncept" ve formuláři, (3) od asistenta („vyfakturuj…" je teď vratná akce `auto` se Zpět), (4) z **pravidelné faktury** jednou měsíčně (denní cron `send-reminders`, den 1–28). Koncept nemá číslo; „Schválit a poslat" ho po 10 s na „Zpět" vystaví (teprve teď číslo z řady) a pošle s PDF z krystof@vizeon.cz. Odběratel má na faktuře nově e-mail (`invoices.client_email`), formulář ho předvyplní ze zakázky.
+**Proč:** Kryštof 2026-11-17: „dashboard faktur, kam se mi exportne a po mém souhlasu se jedním klikem odešle klientovi", spouštěče vybral všechny čtyři, „Vystavit + poslat" jedním klikem. Číslo až při schválení, aby zahozený koncept nenechal v řadě díru (R-098).
+**Důsledek:** migrace 117 (`invoice_drafts`, `invoice_recurring`, `invoices.client_email`), `lib/admin/{invoice-drafts,invoice-draft-schema,invoice-send}.ts`, `app/api/invoices/drafts/[id]/send`, `app/dashboard/faktury/{koncepty-actions.ts,pravidelne/}`, `components/admin/invoices/{drafts-panel,recurring-manager}.tsx`. **Mění R-100/R-111** v části `issue_invoice`: asistent fakturu nevystavuje, připraví koncept. Nová cesta, která zakázku uzavře, má volat `prepareProjectDoneDraftLater`. Bez migrace 117 se Faktury chovají jako dřív (panel se neukáže). Bezpečnost DECISIONS #037.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Koncepty faktur (R-117) — nasadit a projít naživo:** kód na větvi `admin/faktury-koncepty` (worktree `../ZakazIQ-faktury`), na produkci není. Migrace 117 je podle Kryštofa na produkci, merge do `main` 2026-11-17. Zbývá průchod: zakázka → Hotovo → do 15 s koncept v Ke schválení → doplnit adresu → Schválit a poslat na vlastní e-mail → PDF v příloze, číslo v řadě; Zpět během 10 s nic nepošle; pravidelná faktura se dnem = dnešek se objeví až po běhu cronu. **Odeslání přes Resend s PDF nikdo nezkusil naživo** · od 2026-11-17
 - [ ] **Asistent jako chat (R-113) neověřený naživo ani v prohlížeči:** ověřeno testy, `tsc`, buildem a živě se Sonnetem nad smyšleným přehledem (4 ze 4), ale ne v prohlížeči nad skutečnými daty. Projít: věta bez času → otázka → odpověď „ve tři" → zapsáno jednou; „posuň to na čtvrtou" v témže chatu; „oprav Novákovi telefon"; „zapamatuj si…" a že se paměť objeví v dalším chatu; nový chat po „Nový chat". Hlídat, jestli se neptá zbytečně (otravné) a jestli Sonnet nestojí víc, než je odhad · od 2026-11-17
 - [ ] **Hovory od asistenta (R-112) — nasadit a projít:** (1) `GROWTH_OS_API_KEY` do Vercelu
   (Production) a do GitHub Secrets `vizeon-autopilot`, (2) migrace 114 na produkci,
@@ -1411,6 +1417,12 @@ v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-17 (koncepty faktur a odeslání jedním kliknutím — R-117)
+- **fix** Proč faktura „po vyplnění e-mailu" neodcházela: odeslání šlo přes Gmail SMTP, který odmítal heslo (535 v logu Vercelu, naposledy 21:19 UTC). Opravuje už R-116 (`2cf1447`, Resend), naživo zatím nevyzkoušeno. Odesílání faktury je teď sdílené (`lib/admin/invoice-send.ts`) pro starý i nový postup.
+- **feat** Faktury › **Ke schválení**: koncepty z hotové zakázky, ruční, od asistenta a z pravidelných faktur; „Schválit a poslat" (10 s Zpět, pak vystavit + PDF + e-mail), Upravit, Zahodit se Zpět. Nová stránka **Pravidelné faktury** (`/dashboard/faktury/pravidelne`). Formulář faktury má e-mail odběratele a „Uložit jako koncept". Zvonek hlásí nový koncept (`invoice_draft`).
+- **db** Migrace 117 `faktury_koncepty` (aplikována: produkce, podle Kryštofa 2026-11-17; agent ji neověřil). Číslo 116 drží neodevzdaná práce na hovorech v hlavní složce, takže `ws-schema` hlásí mezeru, dokud se větve nesloučí.
+- **chore** Ověřeno: `npx tsc --noEmit` čistý; nový `lib/__tests__/admin-faktury-koncepty.test.ts` (PGlite, 17 testů: jednou na zakázku, jednou za měsíc, dvojí kliknutí = jedna faktura, zaseknutý zámek) a upravené testy asistenta, fakturace a změny stavu prošly. Plná sada: selhávají jen dřívější známé (`ws-schema` mezera po 113, `ws-email` pevné datum, časové limity PGlite pod zátěží — samostatně procházejí). **V prohlížeči neověřeno.**
 
 ### 2026-11-17 (pošta adminu přes Resend — R-116)
 - **fix** E-maily z adminu (Hovory, faktury, připomínky, dotazník) šly přes Gmail SMTP, který

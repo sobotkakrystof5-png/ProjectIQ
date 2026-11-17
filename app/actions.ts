@@ -10,6 +10,7 @@ import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, STATUS_ORDER, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
 import { sendSurveyRequest } from '@/lib/admin/surveys'
+import { prepareProjectDoneDraftLater } from '@/lib/admin/invoice-drafts'
 import {
   LEAD_ORIGINS, LEADS_INBOX_PATH, DEFAULT_LEAD_ORIGIN, adminEmail, projectPath, toLeadOrigin,
   type LeadOrigin,
@@ -342,6 +343,10 @@ export async function updateProject(
     revalidatePath('/dashboard/finance')
   }
 
+  if (oldStatus && oldStatus !== payload.status && payload.status === 'done') {
+    after(() => prepareProjectDoneDraftLater(id, STAGE_EMAIL_DELAY_MS))
+  }
+
   if (oldStatus && oldStatus !== payload.status) {
     // `void` promise může skončit s odpovědí dřív, než se zápis dokončí —
     // `after()` ji dožene po odeslání odpovědi (AD08).
@@ -558,6 +563,10 @@ export async function setProjectStatus(
   if (p.status === status) return { previousStatus: p.status }
 
   await sql`UPDATE projects SET status = ${status}, updated_at = now() WHERE id = ${projectId}`
+
+  // Hotová zakázka → koncept faktury na doplatek ve Fakturách › Ke schválení
+  // (R-117). Až po odkladu, aby ho „Zpět" stihlo nezaložit; nic neodchází.
+  if (status === 'done') after(() => prepareProjectDoneDraftLater(projectId, STAGE_EMAIL_DELAY_MS))
 
   after(() => createNotification({
     type: 'project_status_changed',

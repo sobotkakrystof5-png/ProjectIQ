@@ -64,12 +64,11 @@ const MEETING: Action = {
   email: null,
   note: null,
 }
+// Akce, která čeká na klepnutí. „Vyfakturuj" od R-117 jen připraví koncept
+// a provede se sama, proto tu stojí storno.
 const INVOICE: Action = {
-  kind: 'issue_invoice',
-  project: { id: null, hint: 'Novák' },
-  counterpartyName: null,
-  description: 'Web',
-  amount: 20000,
+  kind: 'cancel_invoice',
+  invoice: { id: null, hint: '2026001' },
 }
 
 const plan = (actions: Action[], confidence = 0.9): Suggestion => ({
@@ -152,9 +151,9 @@ describe('věta → provedení', () => {
     expect(row?.steps[0].undo).toEqual(EVENT_UNDO)
   })
 
-  it('fakturu nechá čekat, i když vedle ní běží vratná akce', async () => {
+  it('storno faktury nechá čekat, i když vedle něj běží vratná akce', async () => {
     proposed(plan([MEETING, INVOICE]))
-    const out = await proposeSuggestion({ text: 'schůzka a vystav fakturu' })
+    const out = await proposeSuggestion({ text: 'schůzka a stornuj fakturu' })
 
     expect(out.ok).toBe(true)
     if (!out.ok || !out.id) return

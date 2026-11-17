@@ -122,7 +122,7 @@ Akce a co udělají:
 - "add_payment" → zapíše přijaté peníze: "zaloha" k zakázce, nebo "jednorazovy" příjem bez zakázky.
 - "add_cost" → zapíše náklad (jednorázový nebo pravidelný).
 - "mark_invoice_paid" → označí vystavenou fakturu jako zaplacenou.
-- "issue_invoice" → připraví fakturu k vystavení za zakázku; vystaví se po potvrzení.
+- "issue_invoice" → připraví koncept faktury ve Fakturách › Ke schválení; vystaví a odešle se až po schválení tam.
 - "cancel_invoice" → stornuje vystavenou fakturu; po potvrzení.
 - "send_message" → připraví zprávu klientovi; odeslání zůstává na člověku.
 - "update_contact" → změní údaje kontaktu v Hovorech (název, jméno, telefon, e-mail, stav, další krok s datem a časem, odhad hodnoty).

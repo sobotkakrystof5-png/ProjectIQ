@@ -29,6 +29,7 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   client_request_received: { icon: MessageSquarePlus, color: ICON, label: 'Požadavek klienta' },
   activity_draft:        { icon: ClipboardList,     color: ICON, label: 'Hlášení ke schválení' },
   outreach_lead:         { icon: PhoneCall,         color: ICON, label: 'Hovor od asistenta' },
+  invoice_draft:         { icon: FileText,          color: ICON, label: 'Faktura ke schválení' },
 }
 
 function timeAgo(iso: string): string {

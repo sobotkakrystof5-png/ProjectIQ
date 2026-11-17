@@ -704,6 +704,14 @@ Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a ad
 - Záloha vyšší než zbývá se neuloží (`INSERT … SELECT … WHERE`); smazat jde jen ruční příjem,
   který si nepřevzala faktura. Test `lib/__tests__/admin-zalohy.test.ts`.
 
+### Koncepty faktur a pravidelné faktury (R-117)
+
+- **Tabulky (migrace 117):** `invoice_drafts` (koncept: `source` `project_done`/`manual`/`assistant`/`recurring`, odběratel a položky v jsonb, `client_email`, `due_days`, `supplied_on` NULL = den schválení, `status` `draft` → `sending` → `issued` | `dismissed`, `invoice_id`), `invoice_recurring` (šablona, `day_of_month` 1–28, `active`) a sloupec `invoices.client_email` (kam faktura šla; trigger neměnnosti ho nehlídá). Unikátní indexy: jeden koncept `project_done` na zakázku (i zahozený), jeden koncept na šablonu a měsíc.
+- **Kód:** `lib/admin/invoice-drafts.ts` (čtení, zápis, `prepareProjectDoneDraft[Later]`, `prepareRecurringDrafts`, `issueDraft`), `lib/admin/invoice-draft-schema.ts` (Zod a `draftGaps` — čisté, čte i prohlížeč), `lib/admin/invoice-send.ts` (PDF + e-mail, sdílí ho i `/api/invoices/[id]/email`), akce `app/dashboard/faktury/koncepty-actions.ts`, UI `components/admin/invoices/{drafts-panel,recurring-manager}.tsx`, stránky `/dashboard/faktury` (panel Ke schválení nahoře), `/dashboard/faktury/nova?koncept=<id>` (úprava konceptu) a `/dashboard/faktury/pravidelne`.
+- **Spouštěče:** `setProjectStatus` a `updateProject` při přechodu na `done`, uzavření zakázky (`app/closed-actions.ts`) — všechny přes `after()` s odkladem 15 s, takže „Zpět" stihne zakázku vrátit; `send-reminders` (pravidelné); asistent `issue_invoice` (třída `auto`, undo `invoice_draft` koncept smaže).
+- **Vystavení:** `POST /api/invoices/drafts/[id]/send` (Chromium v `outputFileTracingIncludes`). `issueDraft` zamkne koncept (`sending`, zaseknutý se uvolní po 5 min), zkontroluje `draftGaps` a `issueInvoiceSchema` a vystaví **jedním příkazem** `UPDATE invoice_drafts SET invoice_id = admin_invoice_issue(…)`. Když selže e-mail, faktura už má číslo — odpověď 502 to řekne a vede na detail faktury („Poslat znovu").
+- **Bez migrace 117:** `isDraftsReady()` vrátí false, panel ani stránka pravidelných faktur se neukážou, spouštěče nic nedělají a detail faktury čte `client_email` přes `to_jsonb(i)`, takže nespadne.
+
 ### Náprava financí (AD13, R-099)
 
 Migrace **109** je jedna migrace o pěti věcech. `lib/admin/ledger.ts` zjistí stav **ze samotného

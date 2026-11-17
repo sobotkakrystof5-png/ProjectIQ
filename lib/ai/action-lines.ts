@@ -114,7 +114,7 @@ export function actionLines(action: Action): Line[] {
         ...opt('Odběratel', action.counterpartyName),
         ...opt('Za co', action.description),
         { label: 'Částka', value: action.amount !== null ? money(action.amount) : 'podle zakázky' },
-        { label: 'Pozor', value: 'Vystavená faktura dostane číslo a už nejde upravit, jen stornovat.' },
+        { label: 'Co se stane', value: 'Připraví koncept ve Fakturách › Ke schválení. Nic neodejde, dokud ho neschválíte.' },
       ]
     case 'cancel_invoice':
       return [

@@ -5,6 +5,7 @@ import { after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { SURVEY_SEND_DELAY_MS, sendSurveyRequest } from '@/lib/admin/surveys'
+import { prepareProjectDoneDraftLater } from '@/lib/admin/invoice-drafts'
 import { projectPath } from '@/lib/lead-origins'
 import { STATUS_ORDER, type ProjectStatus, type ProjectType } from '@/lib/types'
 
@@ -100,6 +101,13 @@ export async function closeProject(projectId: string, extra: CloseProjectExtra):
       // jediná cesta, která dotazník posílala i před AD16, takže posílá dál.
       await sendSurveyRequest(projectId, { fallbackWithoutColumn: true })
     })
+  }
+
+  // Uzavřená a nezaplacená zakázka → koncept faktury na doplatek (R-117).
+  // `prepareProjectDoneDraft` si stav přečte znovu, takže zaplacenou ani
+  // vlastní zakázku nefakturuje.
+  if (extra.project_type === 'client') {
+    after(() => prepareProjectDoneDraftLater(projectId, SURVEY_SEND_DELAY_MS))
   }
 
   let skippedCostsDueToExisting = false

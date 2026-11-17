@@ -10,6 +10,7 @@ import { expireOldSuggestions } from '@/lib/admin/suggestions'
 import { proposeMemoryDrafts } from '@/lib/admin/memory/drafts'
 import { remindPendingSurveys } from '@/lib/admin/surveys'
 import { sendOverdueInvites } from '@/lib/admin/meetings'
+import { prepareRecurringDrafts } from '@/lib/admin/invoice-drafts'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -217,6 +218,24 @@ export async function GET(req: NextRequest) {
       console.error('[cron] Pojistka e-mailů ke schůzkám selhala:', (err as Error).message)
       return 0
     }),
+    // Pravidelné faktury (R-117): jednou za měsíc koncept ke schválení.
+    // Nic neodchází — koncept čeká ve Fakturách, odesílá se až kliknutím.
+    prepareRecurringDrafts()
+      .then(async (created) => {
+        if (created > 0) {
+          await createNotification({
+            type: 'invoice_draft',
+            title: created === 1 ? 'Pravidelná faktura ke schválení' : `Pravidelné faktury ke schválení: ${created}`,
+            body: 'Koncept čeká ve Fakturách, odešle se až po vašem schválení.',
+            link: '/dashboard/faktury',
+          })
+        }
+        return created
+      })
+      .catch((err) => {
+        console.error('[cron] Pravidelné faktury selhaly:', (err as Error).message)
+        return 0
+      }),
   ])
 
   const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, surveys: surveys.sent, errors: surveys.failed }

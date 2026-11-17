@@ -13,8 +13,10 @@ import { setProjectStatus, undoProjectStatus } from '@/app/actions'
 import { addProjectNote, deleteProjectNote } from '@/app/project-notes-actions'
 import { addBusinessIncome, deleteBusinessIncome } from '@/app/dashboard/finance/business-income-actions'
 import { createCost, deleteCost } from '@/app/costs-actions'
-import { cancelIssuedInvoice, issueNewInvoice, setInvoicePaid } from '@/app/dashboard/finance/invoice-actions'
+import { cancelIssuedInvoice, setInvoicePaid } from '@/app/dashboard/finance/invoice-actions'
 import { loadIssueDraft, loadIssuerProfile } from '@/lib/admin/invoice-issue'
+import { createDraft, deleteAssistantDraft } from '@/lib/admin/invoice-drafts'
+import { draftGaps, gapsSentence } from '@/lib/admin/invoice-draft-schema'
 import { resolveEvent, resolveInvoice, resolveLead, resolveProject } from '@/lib/admin/assistant-resolve'
 import { getPragueTodayISO, isoToPragueDateAndTime, pragueDateTimeToISO } from '@/lib/prague-time'
 import { mailtoHref, smsHref, whatsappHref } from '@/lib/contacts/href'
@@ -358,10 +360,10 @@ async function runMarkInvoicePaid(a: Extract<Action, { kind: 'mark_invoice_paid'
 }
 
 /**
- * Vystavení faktury. Jen po klepnutí (`confirm`) a jen tehdy, když je doklad
- * úplný: odběratel **s adresou**, popis a částka. Bez adresy by vznikl
- * doklad bez povinného údaje — a vystavený doklad už nejde opravit (R-098).
- * Co chybí, se doplní v předvyplněném formuláři.
+ * „Vyfakturuj…" připraví **koncept** ve Fakturách › Ke schválení (R-117).
+ * Nic nevystaví ani neodešle: číslo z řady dostane faktura až tam, kliknutím
+ * „Schválit a poslat". Proto se to smí provést samo a „Zpět" koncept smaže.
+ * Co v konceptu chybí (adresa, e-mail…), ukáže dashboard.
  */
 async function runIssueInvoice(a: Extract<Action, { kind: 'issue_invoice' }>): Promise<RunOutcome> {
   let projectId: string | null = null
@@ -370,54 +372,51 @@ async function runIssueInvoice(a: Extract<Action, { kind: 'issue_invoice' }>): P
     if (!found.ok) return found
     projectId = found.id
   } else if (a.counterpartyName) {
-    // „Vystav fakturu Kavárně" — zakázka se pozná podle odběratele, když sedí
+    // „Vyfakturuj Kavárně" — zakázka se pozná podle odběratele, když sedí
     // právě na jednu. Jinak se fakturuje bez zakázky (a bez její částky).
     const found = await resolveProject({ id: null, hint: a.counterpartyName })
     if (found.ok) projectId = found.id
   }
-  const formHref = projectId ? `/dashboard/faktury/nova?zakazka=${projectId}` : '/dashboard/faktury/nova'
 
   const [draft, issuer] = await Promise.all([loadIssueDraft(projectId), loadIssuerProfile()])
-  if (!issuer.configured) {
-    return { ok: false, error: 'Nejdřív vyplňte údaje dodavatele.', href: '/dashboard/faktury/dodavatel' }
-  }
-  if (issuer.profile.vatPayer) {
-    return { ok: false, error: 'U plátce DPH je potřeba zvolit sazbu. Dokončete fakturu ve formuláři.', href: formHref }
-  }
-
   const counterparty = {
     ...draft.counterparty,
     name: draft.counterparty.name || a.counterpartyName?.trim() || '',
   }
-  const amount = a.amount ?? (draft.amount > 0 ? draft.amount : null)
+  const amount = a.amount ?? (draft.amount > 0 ? draft.amount : 0)
   const description = a.description?.trim() || draft.items[0]?.description || ''
 
-  if (!counterparty.name || !counterparty.address) {
-    return { ok: false, error: 'U odběratele chybí jméno nebo adresa. Doplňte je ve formuláři.', href: formHref }
+  let id: string
+  try {
+    id = await createDraft('assistant', {
+      projectId,
+      counterparty,
+      email: draft.email ?? '',
+      items: [{ description, quantity: 1, unitPrice: amount, vatRate: issuer.profile.vatPayer ? 21 : 0 }],
+      currency: 'CZK',
+      dueDays: 14,
+      suppliedOn: '',
+      note: '',
+    })
+  } catch (err) {
+    return { ok: false, error: draftErrorMessage(err) }
   }
-  if (!amount || amount <= 0 || !description) {
-    return { ok: false, error: 'Chybí popis nebo částka. Doplňte je ve formuláři.', href: formHref }
-  }
-
-  const result = await issueNewInvoice({
-    projectId,
-    counterparty,
-    issuedOn: draft.issuedOn,
-    suppliedOn: draft.suppliedOn,
-    dueOn: draft.dueOn,
-    currency: 'CZK',
-    items: [{ description, quantity: 1, unitPrice: amount, vatRate: 0 }],
-    note: '',
-  })
-  if (result.error || !result.id) return { ok: false, error: result.error ?? 'Fakturu se nepodařilo vystavit.', href: formHref }
+  const gaps = draftGaps({ counterparty, email: draft.email ?? '', items: [{ description, quantity: 1, unitPrice: amount, vatRate: 0 }] })
   return {
     ok: true,
-    message: `Faktura ${result.number ?? ''} vystavená`.replace(/\s+/g, ' '),
-    description: `${counterparty.name}, ${formatCzk(amount)}`,
-    href: `/dashboard/faktury/${result.id}`,
-    // Vystavený doklad se nevrací — opravuje se stornem (R-098).
-    undo: null,
+    message: 'Koncept faktury čeká na schválení',
+    description: [counterparty.name, amount > 0 ? formatCzk(amount) : null, gaps.length ? `chybí ${gapsSentence(gaps)}` : null]
+      .filter(Boolean)
+      .join(', '),
+    href: '/dashboard/faktury',
+    undo: { type: 'invoice_draft', id },
   }
+}
+
+function draftErrorMessage(err: unknown): string {
+  // `42P01` = migrace 117 ještě neběžela, tabulka konceptů neexistuje.
+  if ((err as { code?: string })?.code === '42P01') return 'Koncepty faktur ještě nejsou zapnuté. Vystavte fakturu ve formuláři.'
+  return 'Koncept faktury se nepodařilo uložit.'
 }
 
 async function runCancelInvoice(a: Extract<Action, { kind: 'cancel_invoice' }>): Promise<RunOutcome> {
@@ -796,6 +795,10 @@ export async function undoStep(token: UndoToken): Promise<UndoOutcome> {
         return { ok: true }
       case 'memory':
         return (await discardMemory(token.id)) ? { ok: true } : { ok: false, error: 'Tohle už v paměti není.' }
+      case 'invoice_draft':
+        return (await deleteAssistantDraft(token.id))
+          ? { ok: true }
+          : { ok: false, error: 'Koncept už je vystavený nebo upravený. Zahoďte ho ve Fakturách.' }
       default: {
         const never: never = token
         void never

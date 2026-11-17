@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { adminDb, type AdminQuery } from '@/lib/admin/db'
@@ -405,7 +406,9 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetail | null
           i.finance_transaction_id::text,
           p.description AS project_description,
           p.client_phone AS project_client_phone,
-          p.client_email AS project_client_email,
+          -- Adresa, kam faktura šla (migrace 117), jinak e-mail ze zakázky.
+          -- to_jsonb(i) proto, aby detail nespadl na databázi bez 117.
+          coalesce(nullif(to_jsonb(i) ->> 'client_email', ''), p.client_email) AS project_client_email,
           t.id::text AS ledger_id,
           t.amount::float AS ledger_amount,
           t.date::text AS ledger_date,
@@ -678,7 +681,11 @@ export async function saveIssuer(raw: unknown): Promise<{ error?: string }> {
   }
 }
 
-export async function issueNewInvoice(raw: unknown): Promise<{ error?: string; id?: string; number?: string }> {
+export async function issueNewInvoice(
+  raw: unknown,
+  /** Kam fakturu později poslat (R-117). Na doklad se netiskne, jen předvyplní odeslání. */
+  clientEmail?: string,
+): Promise<{ error?: string; id?: string; number?: string }> {
   await requireAuth()
 
   const parsed = issueInvoiceSchema.safeParse(raw)
@@ -692,10 +699,26 @@ export async function issueNewInvoice(raw: unknown): Promise<{ error?: string; i
 
   try {
     const { id, number } = await issueInvoice(parsed.data, profile)
+    const email = z.string().trim().max(254).email().safeParse(clientEmail ?? '')
+    if (email.success) await rememberClientEmail(id, email.data)
     revalidateInvoicePaths(parsed.data.projectId)
     return { id, number }
   } catch (err) {
     return { error: issueErrorMessage(err) }
+  }
+}
+
+/**
+ * E-mail odběratele na faktuře (migrace 117). Bez migrace se nezapíše nic —
+ * faktura je vystavená a adresa se při odeslání napíše ručně jako dřív.
+ */
+async function rememberClientEmail(id: string, email: string): Promise<void> {
+  try {
+    await sql`UPDATE invoices SET client_email = ${email} WHERE id = ${id}`
+  } catch (err) {
+    if ((err as { code?: string })?.code !== '42703') {
+      console.error('[Faktury] E-mail odběratele se nepodařilo uložit.', err instanceof Error ? err.message : String(err))
+    }
   }
 }
 

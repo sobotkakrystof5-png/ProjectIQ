@@ -73,7 +73,7 @@ export const SUGGESTION_LABELS: Record<SuggestionKind, string> = {
   add_payment: 'Zapsat platbu',
   add_cost: 'Zapsat náklad',
   mark_invoice_paid: 'Faktura zaplacena',
-  issue_invoice: 'Vystavit fakturu',
+  issue_invoice: 'Připravit fakturu',
   cancel_invoice: 'Stornovat fakturu',
   send_message: 'Připravit zprávu',
   update_contact: 'Upravit kontakt',

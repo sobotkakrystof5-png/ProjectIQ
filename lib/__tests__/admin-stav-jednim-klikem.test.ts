@@ -25,6 +25,10 @@ vi.mock('next/server', () => ({
 }))
 vi.mock('@/lib/email', () => ({ sendBrandedEmail: (...a: unknown[]) => sendBrandedMock(...a) }))
 vi.mock('@/lib/notifications', () => ({ createNotification: vi.fn() }))
+const prepareDraftMock = vi.fn(async () => {})
+vi.mock('@/lib/admin/invoice-drafts', () => ({
+  prepareProjectDoneDraftLater: (...a: unknown[]) => prepareDraftMock(...(a as [])),
+}))
 vi.mock('@/lib/invoices', () => ({ parseInvoiceForm: vi.fn(), insertInvoice: vi.fn() }))
 
 import { setProjectStatus, undoProjectStatus } from '@/app/actions'
@@ -135,9 +139,10 @@ describe('změna stavu jedním klikem', () => {
     queueSql([[{ ...zakazka, client_email: null }], []])
     await setProjectStatus(PROJECT_ID, 'done')
 
-    // Zbyde jen oznámení do zvonku.
-    expect(afterCallbacks).toHaveLength(1)
+    // Zbyde oznámení do zvonku a koncept faktury (R-117) — ten nic neposílá.
+    expect(afterCallbacks).toHaveLength(2)
     await runAfter()
     expect(sendBrandedMock).not.toHaveBeenCalled()
+    expect(prepareDraftMock).toHaveBeenCalledWith(PROJECT_ID, expect.any(Number))
   })
 })
