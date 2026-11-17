@@ -1,4 +1,5 @@
 import type { Transporter } from 'nodemailer'
+import { sendVizeonMail, vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
 
 // Jeden byznys = jedna odesílací schránka (AD02, R-088). Pošta jde z vlastní
 // schránky info@vizeon.cz (VIZEON_GMAIL_USER + VIZEON_GMAIL_APP_PASSWORD);
@@ -41,6 +42,52 @@ async function getTransporter(): Promise<{ transporter: Transporter; from: strin
     })
   }
   return { transporter: transporters[account]!, from: `ZakazIQ <${creds.user}>` }
+}
+
+// Odesílatel automatických upozornění (zvonek, připomínky) přes Resend.
+const NOTIFY_FROM = 'ZakazIQ <info@vizeon.cz>'
+
+/**
+ * Jediná cesta ven (R-116). Je-li nastavený `VIZEON_RESEND_API_KEY`, jde e-mail
+ * přes Resend z domény vizeon.cz; Gmail SMTP zůstal jen jako záloha, protože
+ * od 2026-08 odmítá heslo aplikace (535 BadCredentials) a nic neodcházelo.
+ */
+async function deliver(mail: {
+  to: string
+  subject: string
+  html: string
+  text?: string
+  from?: string
+  attachments?: { filename: string; content: Buffer; contentType?: string }[]
+}): Promise<boolean> {
+  if (vizeonMailConfigured()) {
+    const res = await sendVizeonMail({
+      to: mail.to,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text ?? '',
+      from: mail.from,
+      attachments: mail.attachments,
+    })
+    if (!res.ok) console.error('[Email] Selhání odesílání (Resend):', res.error)
+    return res.ok
+  }
+  const mailer = await getTransporter()
+  if (!mailer) return false
+  try {
+    await mailer.transporter.sendMail({
+      from: mailer.from,
+      to: mail.to,
+      subject: mail.subject,
+      ...(mail.text ? { text: mail.text } : {}),
+      html: mail.html,
+      ...(mail.attachments?.length ? { attachments: mail.attachments } : {}),
+    })
+    return true
+  } catch (err) {
+    console.error('[Email] Selhání odesílání:', err)
+    return false
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -109,20 +156,7 @@ export async function sendBrandedEmail(opts: {
   fields: EmailField[]
   ctas?: EmailCta[]
 }): Promise<boolean> {
-  const mailer = await getTransporter()
-  if (!mailer) return false
-  try {
-    await mailer.transporter.sendMail({
-      from: mailer.from,
-      to: opts.to,
-      subject: opts.subject,
-      html: buildLayout(opts),
-    })
-    return true
-  } catch (err) {
-    console.error('[Email] Selhání odesílání:', err)
-    return false
-  }
+  return deliver({ to: opts.to, subject: opts.subject, html: buildLayout(opts), from: NOTIFY_FROM })
 }
 
 function linkify(escaped: string): string {
@@ -153,21 +187,7 @@ function buildPlainLayout(text: string): string {
 // card) — used when the message should read as coming directly from the
 // admin rather than as an automated notification.
 export async function sendPlainEmail(opts: { to: string; subject: string; text: string }): Promise<boolean> {
-  const mailer = await getTransporter()
-  if (!mailer) return false
-  try {
-    await mailer.transporter.sendMail({
-      from: mailer.from,
-      to: opts.to,
-      subject: opts.subject,
-      text: opts.text,
-      html: buildPlainLayout(opts.text),
-    })
-    return true
-  } catch (err) {
-    console.error('[Email] Selhání odesílání:', err)
-    return false
-  }
+  return deliver({ to: opts.to, subject: opts.subject, text: opts.text, html: buildPlainLayout(opts.text) })
 }
 
 /**
@@ -184,22 +204,13 @@ export async function sendInvoiceEmail(opts: {
   /** Faktura, a od AD16 volitelně i předávací dokument. */
   pdfs: { filename: string; content: Buffer }[]
 }): Promise<boolean> {
-  const mailer = await getTransporter()
-  if (!mailer) return false
-  try {
-    await mailer.transporter.sendMail({
-      from: mailer.from,
-      to: opts.to,
-      subject: opts.subject,
-      text: opts.text,
-      html: buildPlainLayout(opts.text),
-      attachments: opts.pdfs.map(pdf => ({ filename: pdf.filename, content: pdf.content, contentType: 'application/pdf' })),
-    })
-    return true
-  } catch (err) {
-    console.error('[Email] Selhání odesílání faktury:', err)
-    return false
-  }
+  return deliver({
+    to: opts.to,
+    subject: opts.subject,
+    text: opts.text,
+    html: buildPlainLayout(opts.text),
+    attachments: opts.pdfs.map(pdf => ({ filename: pdf.filename, content: pdf.content, contentType: 'application/pdf' })),
+  })
 }
 
 /** Nejvíc položek v souhrnném e-mailu o aktivitě; zbytek je na portálu. */

@@ -8,7 +8,8 @@ import 'server-only'
  * doména zakaziq.cz) se schválně nepoužívá, ať e-mail nikdy neodejde z jiné
  * adresy, než Kryštof čeká. Odpovědi jdou na krystof@vizeon.cz.
  *
- * Gmail SMTP (`lib/email.ts`, R-004) tímhle zůstává jen pro staré cesty.
+ * Od 2026-11-17 přes tuhle funkci jde i všechna pošta z `lib/email.ts`
+ * (R-116); Gmail SMTP tam zůstal jen jako záloha bez klíče.
  */
 
 const RESEND_URL = 'https://api.resend.com/emails'
@@ -25,7 +26,10 @@ export type VizeonMail = {
   text: string
   html: string
   /** Stejný klíč = Resend e-mail podruhé neodešle (24 h). */
-  idempotencyKey: string
+  idempotencyKey?: string
+  /** Výchozí je krystof@vizeon.cz; jiná adresa musí být taky na vizeon.cz. */
+  from?: string
+  attachments?: { filename: string; content: Buffer; contentType?: string }[]
 }
 
 export type SendResult = { ok: true; id: string | null } | { ok: false; error: string }
@@ -43,15 +47,24 @@ export async function sendVizeonMail(mail: VizeonMail, fetchImpl: typeof fetch =
       headers: {
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
-        'Idempotency-Key': mail.idempotencyKey,
+        ...(mail.idempotencyKey ? { 'Idempotency-Key': mail.idempotencyKey } : {}),
       },
       body: JSON.stringify({
-        from: process.env.VIZEON_EMAIL_FROM || DEFAULT_FROM,
+        from: mail.from || process.env.VIZEON_EMAIL_FROM || DEFAULT_FROM,
         to: [mail.to],
         reply_to: DEFAULT_REPLY_TO,
         subject: mail.subject,
         text: mail.text,
         html: mail.html,
+        ...(mail.attachments?.length
+          ? {
+              attachments: mail.attachments.map(a => ({
+                filename: a.filename,
+                content: a.content.toString('base64'),
+                ...(a.contentType ? { content_type: a.contentType } : {}),
+              })),
+            }
+          : {}),
       }),
       signal: AbortSignal.timeout(10_000),
       cache: 'no-store',

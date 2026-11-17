@@ -147,7 +147,7 @@ describe('domluvit schůzku', () => {
     if (!result.ok) throw new Error(result.error)
     await db.query(`UPDATE calendar_events SET invite_send_after = now() - interval '1 second'`)
 
-    const send = vi.fn(async (_m: { to: string; text: string; idempotencyKey: string }) => ({ ok: true as const, id: 'email_1' }))
+    const send = vi.fn(async (_m: { to: string; text: string; idempotencyKey?: string }) => ({ ok: true as const, id: 'email_1' }))
     expect(await sendDueInvite(result.eventId, send)).toBe('sent')
     expect(await sendDueInvite(result.eventId, send)).toBe('skipped')
     expect(send).toHaveBeenCalledTimes(1)

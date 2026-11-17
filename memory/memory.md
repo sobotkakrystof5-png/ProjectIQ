@@ -1109,6 +1109,17 @@ testovací sady (`@playwright/test` a e2e testy v CI by byly nové rozhodnutí).
 balíčku se nedostane (devDependency, nikde se neimportuje). Upgrade jen vědomě, ne podle hlášky
 „Update available".
 
+### R-116 · Všechna pošta adminu přes Resend z vizeon.cz (2026-11-17)
+**Rozhodnutí:** `lib/email.ts` posílá přes `sendVizeonMail` (Resend, klíč
+`VIZEON_RESEND_API_KEY`, jen odesílání z vizeon.cz). Upozornění jdou od `ZakazIQ <info@vizeon.cz>`,
+osobní zprávy a faktury od `krystof@vizeon.cz`, odpovědi na krystof@vizeon.cz. Gmail SMTP zůstává
+jen jako záloha, když klíč chybí.
+**Proč:** Kryštof 2026-11-17 hlásil „Nepodařilo se odeslat email" v Hovorech; Gmail od 2026-08
+odmítal heslo aplikace (535) a z adminu neodcházelo nic. Resend s ověřenou vizeon.cz už běží pro
+schůzky (R-114).
+**Důsledek:** **nahrazuje R-004** (Gmail SMTP). Nová cesta pro e-mail adminu jde přes `deliver()`
+v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
+
 ---
 
 ## 3. Otevřené problémy
@@ -1156,17 +1167,11 @@ balíčku se nedostane (devDependency, nikde se neimportuje). Upgrade jen vědom
 - [ ] **Workspace a úklid Clerku (R-107, F2 + F3):** nezačato. Před F2 rozhodnout, jestli
   placený Workspace může běžet na Free projektu Supabase (uspání po týdnu bez provozu,
   limity e-mailů, sdílený projekt s adminem) · `docs/AUTH-SUPABASE-PLAN.md` · od 2026-11-15
-- [ ] **Admin neposílá e-maily — Gmail SMTP vrací 535 BadCredentials (zjištěno 2026-11-14
-  z runtime chyb Vercelu):** `[Email] Selhání odesílání: Invalid login: 535-5.7.8 Username and
-  Password not accepted` (`code: 'EAUTH'`, `command: 'AUTH PLAIN'`). Routy
-  `/api/cron/send-reminders` a `/dashboard/[id]`, poprvé **2026-08-18**, naposledy
-  **2026-11-14 08:00** — takže dnešní ranní cron e-mail neposlal. Dopadá na všechno, co admin
-  posílá přes `lib/email.ts` (R-004): připomínky konzultací, zprávy klientům a **automatický
-  dotazník z AD16** (R-102) — ten tedy neodejde, i kdyby migrace 112 na produkci byla.
-  Nejspíš platnost hesla aplikace Gmailu — `lib/email.ts` čte `VIZEON_GMAIL_USER`
-  + `VIZEON_GMAIL_APP_PASSWORD`, záložně `GMAIL_USER` + `GMAIL_APP_PASSWORD` (žádné
-  `EMAIL_PASSWORD` v repu není); vygenerovat nové a vyměnit ve
-  Vercelu. Chyba je zachycená, nic nepadá, jen se nic neodešle · Kryštof · od 2026-11-14
+- [ ] **Pošta adminu přes Resend (R-116) naživo neověřená:** Gmail SMTP odmítal heslo
+  (535 BadCredentials, od 2026-08-18 do 2026-11-17 neodešlo z adminu nic — připomínky, zprávy
+  klientům, faktury, dotazníky). Od R-116 jde všechno přes Resend z vizeon.cz. Ověřit první
+  skutečné odeslání z Hovorů a faktury s PDF; Gmail proměnné ve Vercelu můžou po ověření pryč
+  · od 2026-11-17
 - [ ] **Admin od AD08 přibral třetinu JavaScriptu a nikdo si toho nevšiml:** Hovory
   263,8 → 344,5 kB gzip (+31 %), Kalendář 260,6 → 339,4 (+30 %), Poptávky 250,6 → 331,0
   (+32 %), Dnes 245,7 → 297,5 (+21 %). Měřeno 2026-11-14 proti commitu `cabe01c`
@@ -1406,6 +1411,13 @@ balíčku se nedostane (devDependency, nikde se neimportuje). Upgrade jen vědom
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-17 (pošta adminu přes Resend — R-116)
+- **fix** E-maily z adminu (Hovory, faktury, připomínky, dotazník) šly přes Gmail SMTP, který
+  odmítal heslo (535). `lib/email.ts` je teď posílá přes Resend z vizeon.cz
+  (`lib/admin/vizeon-mail.ts` umí přílohy a odesílatele). Test `lib/__tests__/email-resend.test.ts`.
+- **chore** Nasazeno na produkci `9e2b2ca` (hovory od asistenta, schůzky s Meet, asistent jako
+  chat); build Ready, veřejné adresy odpovídají.
 
 ### 2026-11-17 (nastavení schůzek s Google Meet)
 - **chore** Google Cloud (krystof@vizeon.cz): projekt `zakaziq-admin`, Calendar API, souhlas
