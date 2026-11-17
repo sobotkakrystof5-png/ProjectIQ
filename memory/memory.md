@@ -1095,6 +1095,20 @@ SMTP (ten od 2026-08 stejně neposílá). Migrace 115 (`calendar_events.meet_url
 události v adminu („Připojit se"). Nová cesta, která zakládá schůzku s klientem, má jít přes
 `lib/admin/meetings.ts` (pořadí Google → admin → e-mail). Bezpečnost DECISIONS #035.
 
+### R-115 · Playwright CLI jako vývojová závislost (2026-11-17)
+**Rozhodnutí:** `@playwright/cli` **0.1.23** (Microsoft, `microsoft/playwright-cli`) je vývojová
+závislost s přesně připnutou verzí. Slouží agentům k ovládání prohlížeče z terminálu (`npx
+playwright-cli …`) — nastavení služeb v prohlížeči a kontrola obrazovek. Agent ho pouští mimo repo
+(scratchpad), ať se snímky stránek (`.playwright-cli/`) neukládají do gitu; `.gitignore` je pro
+jistotu má taky. Hesla, kódy a tajné klíče do stránek nezadává agent, ale Kryštof.
+**Proč:** Kryštof 2026-11-17: „dáme Playwright CLI, nainstaluj do projektu", když se rozšíření
+Claude pro Chrome nepřipojilo. Verze 0.1.24 vyšla před týdnem, proto o jednu starší (víc než
+dva týdny stará). `npm audit` nepřibyl žádný nález (11 vysokých je dál řetězec picomatch).
+**Důsledek:** upřesňuje R-080 — tohle **je** schválení Playwrightu, ale jen CLI pro agenty, ne
+testovací sady (`@playwright/test` a e2e testy v CI by byly nové rozhodnutí). Do produkčního
+balíčku se nedostane (devDependency, nikde se neimportuje). Upgrade jen vědomě, ne podle hlášky
+„Update available".
+
 ---
 
 ## 3. Otevřené problémy
@@ -1420,6 +1434,7 @@ události v adminu („Připojit se"). Nová cesta, která zakládá schůzku s 
 - **chore** Ve Vercelu (Production) vygenerované a uložené `GOOGLE_TOKEN_KEY` a `GROWTH_OS_API_KEY`,
   druhý se stejnou hodnotou i v GitHub Secrets `vizeon-autopilot`. Zbytek nastavení
   `docs/admin/GROWTH-OS-PLAN.md` oddíl 6.
+- **chore** Vývojová závislost `@playwright/cli` 0.1.23 (R-115), `.playwright-cli/` v `.gitignore`.
 - **decision** **R-114** (R-113 a DECISIONS #034 si souběžně vzalo sezení asistenta, proto #035).
 
 ### 2026-11-17 (hovory od asistenta z Growth OS — krok 1 a 2)

@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Měření velikosti balíčků (scripts/bundle-stats.mjs) — generované, nepatří do gitu
 route-bundle-stats.json
+
+# Snímky a logy Playwright CLI (R-115)
+.playwright-cli/
