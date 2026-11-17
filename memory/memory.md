@@ -1417,6 +1417,9 @@ události v adminu („Připojit se"). Nová cesta, která zakládá schůzku s 
   z migrace 051 a SQL migrací 114 + 115), `lib/__tests__/admin-schuzky-google.test.ts` (10:
   šablona e-mailu, šifrování, OAuth, Meet s podstrčeným Googlem, Resend). **Google ani Resend
   naživo nikdo nezkusil, v prohlížeči neověřeno.**
+- **chore** Ve Vercelu (Production) vygenerované a uložené `GOOGLE_TOKEN_KEY` a `GROWTH_OS_API_KEY`,
+  druhý se stejnou hodnotou i v GitHub Secrets `vizeon-autopilot`. Zbytek nastavení
+  `docs/admin/GROWTH-OS-PLAN.md` oddíl 6.
 - **decision** **R-114** (R-113 a DECISIONS #034 si souběžně vzalo sezení asistenta, proto #035).
 
 ### 2026-11-17 (hovory od asistenta z Growth OS — krok 1 a 2)
