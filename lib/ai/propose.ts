@@ -4,11 +4,13 @@ import { aiModel, isAiConfigured } from '@/lib/ai/models'
 import { PROPOSE_PROMPT, proposeCatalogue } from '@/lib/ai/prompts'
 import { loadAiContext, type ContextRef } from '@/lib/ai/context'
 import { stripMarkers } from '@/lib/ai/markers'
-import { CONFIDENCE_FLOOR, type Suggestion } from '@/lib/ai/suggestion-schema'
+import { type Suggestion } from '@/lib/ai/suggestion-schema'
 import { coerceLookups, coercePlan, type Lookup } from '@/lib/ai/plan-format'
 import { runLookups } from '@/lib/admin/assistant-lookups'
 import { redactSensitive } from '@/lib/project-activity'
-import { getPragueTodayISO } from '@/lib/prague-time'
+import { loadWorkspaceSnapshot } from '@/lib/ai/workspace-snapshot'
+import { pragueNow, timeContext } from '@/lib/ai/time-context'
+import { HISTORY_MAX, TEXT_MAX } from '@/lib/ai/assistant-limits'
 
 /**
  * Věta → typovaný plán akcí (AD14, od R-111 víc akcí naráz).
@@ -18,9 +20,9 @@ import { getPragueTodayISO } from '@/lib/prague-time'
  * výstup se schématem API odmítlo jako moc složité, takže přísnou kontrolu
  * dělá `lib/ai/plan-format.ts` — odpověď, která neprojde, se nepoužije.
  *
- * Dvě kola, ne víc: `fast` (haiku) zkusí větu rozluštit a jen když si není
- * jistý nebo nic nenavrhne, ptá se `smart` (sonnet). Druhé kolo se tak platí
- * jen u vět, na kterých levný model opravdu selhal.
+ * Od R-113 je to rozhovor: model dostane historii, přehled firmy a ke
+ * každé větě se rozhoduje znovu. Hlavní model je `smart` (sonnet), `fast`
+ * jen záchrana, když odpověď nejde přečíst.
  *
  * Nikdy nevyhazuje — vrací `error` s českou hláškou.
  */
@@ -56,11 +58,41 @@ type Round = { suggestion: Suggestion | null; lookups: Lookup[]; tokensIn: numbe
 const DATA_ROUND_NOTE =
   'V <data> jsou výsledky dotazů, o které sis řekl. Odpověz nebo sestav plán z nich; "lookups" nech prázdné. Co v datech není, nevymýšlej.'
 
-async function callModel(model: string, text: string, context: string, data: string): Promise<Round> {
-  const client = new Anthropic({ timeout: 30_000, maxRetries: 1 })
+/** Jedna replika rozhovoru (R-113). Odpověď asistenta je shrnutí kola ze serveru (`turnSummary`). */
+export type ChatTurn = { role: 'user' | 'assistant'; content: string }
+
+/**
+ * Historie z prohlížeče → zprávy pro model. Prohlížeč patří adminovi, ale
+ * text stejně projde zakrytím a ořezem: do okénka se dá vložit cokoli.
+ * Zprávy se musí střídat a začínat uživatelem, jinak je API odmítne —
+ * stejné role za sebou se slijí, úvodní odpověď asistenta se zahodí.
+ */
+export function historyMessages(history: ChatTurn[] | undefined): Anthropic.MessageParam[] {
+  const out: { role: 'user' | 'assistant'; content: string }[] = []
+  for (const turn of (history ?? []).slice(-HISTORY_MAX)) {
+    const content = stripMarkers(redactSensitive(turn.content.slice(0, TEXT_MAX)).text).trim()
+    if (!content) continue
+    if (out.length === 0 && turn.role !== 'user') continue
+    const last = out[out.length - 1]
+    if (last && last.role === turn.role) last.content = `${last.content}\n\n${content}`
+    else out.push({ role: turn.role, content })
+  }
+  // Poslední replika historie musí být od asistenta — za ní jde nová věta.
+  if (out.length > 0 && out[out.length - 1].role === 'user') out.pop()
+  return out
+}
+
+async function callModel(
+  model: string,
+  text: string,
+  blocks: { snapshot: string; context: string; data: string },
+  history: Anthropic.MessageParam[],
+): Promise<Round> {
+  const client = new Anthropic({ timeout: 45_000, maxRetries: 1 })
+  const { snapshot, context, data } = blocks
 
   // Stabilní prefix = systémový prompt + katalog stavů a akcí. Mění se jen
-  // s nasazením, takže se dá číst z cache; věta uživatele, dnešní datum
+  // s nasazením, takže se dá číst z cache; přehled firmy, věta, dnešní datum
   // a čerstvý kontext jdou až za ním, ve zprávě. Kontrola:
   // `usage.cache_read_input_tokens` má být po druhém dotazu nenulové.
   const system: Anthropic.TextBlockParam[] = [
@@ -75,10 +107,12 @@ async function callModel(model: string, text: string, context: string, data: str
     // Bez `format`: přísné schéma API odmítlo jako moc složité (plan-format.ts).
     output_config: { effort: 'low' },
     messages: [
+      ...history,
       {
         role: 'user',
         content: [
-          todayLine(getPragueTodayISO()),
+          timeContext(pragueNow()),
+          snapshot,
           context,
           data,
           data ? DATA_ROUND_NOTE : '',
@@ -109,6 +143,7 @@ async function callModel(model: string, text: string, context: string, data: str
 export async function proposeAction(input: {
   text: string
   contextRef?: ContextRef | null
+  history?: ChatTurn[]
 }): Promise<ProposeResult> {
   if (!isAiConfigured()) return { error: 'Asistent není nakonfigurovaný.' }
 
@@ -116,7 +151,13 @@ export async function proposeAction(input: {
   const text = stripMarkers(redactSensitive(input.text).text).trim()
   if (!text) return { error: 'Napište, co se má stát.' }
 
-  const context = (await loadAiContext(input.contextRef ?? null)).text
+  const [context, snapshot] = await Promise.all([
+    loadAiContext(input.contextRef ?? null).then((c) => c.text),
+    // Přehled firmy jde ke každé větě (R-113). Jen strukturované údaje bez
+    // volného textu — samostatné provádění nevypíná (workspace-snapshot.ts).
+    loadWorkspaceSnapshot(),
+  ])
+  const history = historyMessages(input.history)
   // Kontext zakázky i kontaktu nese texty, které mohl napsat klient (popis
   // poptávky z webu, poznámky, požadavky z portálu). Rozlišovat je po
   // sloupcích by bylo křehké — kdo má kontext, nepouští nic samo.
@@ -132,30 +173,29 @@ export async function proposeAction(input: {
      * dotazy (jen čtení) a model dostane druhou šanci už s nimi.
      */
     const ask = async (model: string): Promise<Round> => {
-      let round = await callModel(model, text, context, data)
+      let round = await callModel(model, text, { snapshot, context, data }, history)
       tokensIn += round.tokensIn
       tokensOut += round.tokensOut
       if (!data && round.lookups.length > 0) {
         data = await runLookups(round.lookups)
-        round = await callModel(model, text, context, data)
+        round = await callModel(model, text, { snapshot, context, data }, history)
         tokensIn += round.tokensIn
         tokensOut += round.tokensOut
       }
       return round
     }
 
-    const fast = aiModel('fast')
-    let model = fast
-    let out = await ask(fast)
-
-    // Prázdný plán s jistou odpovědí je zodpovězený dotaz — silnější model by
-    // řekl totéž dráž. Druhé kolo jen při nejistotě nebo nepoužitelné odpovědi.
-    const needsSmart = !out.suggestion || out.suggestion.confidence < CONFIDENCE_FLOOR
+    // Rozhovor, doptávání a úpravy podle id potřebují víc úsudku než
+    // jednorázová věta — hlavní je `smart` (R-113). `fast` je jen záchrana,
+    // když silnější model odpověď nesestaví.
     const smart = aiModel('smart')
-    if (needsSmart && smart !== fast) {
-      const second = await ask(smart)
+    let model = smart
+    let out = await ask(smart)
+    const fast = aiModel('fast')
+    if (!out.suggestion && fast !== smart) {
+      const second = await ask(fast)
       if (second.suggestion) {
-        model = smart
+        model = fast
         out = second
       }
     }

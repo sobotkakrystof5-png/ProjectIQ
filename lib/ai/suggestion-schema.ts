@@ -53,6 +53,10 @@ export const SUGGESTION_KINDS = [
   'issue_invoice',
   'cancel_invoice',
   'send_message',
+  'update_contact',
+  'update_project',
+  'update_event',
+  'remember',
 ] as const
 
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number]
@@ -72,6 +76,10 @@ export const SUGGESTION_LABELS: Record<SuggestionKind, string> = {
   issue_invoice: 'Vystavit fakturu',
   cancel_invoice: 'Stornovat fakturu',
   send_message: 'Připravit zprávu',
+  update_contact: 'Upravit kontakt',
+  update_project: 'Upravit zakázku',
+  update_event: 'Upravit termín',
+  remember: 'Zapamatovat si',
 }
 
 export const actionSchema = z.discriminatedUnion('kind', [
@@ -169,6 +177,49 @@ export const actionSchema = z.discriminatedUnion('kind', [
     email: optionalText(160),
     subject: optionalText(160).describe('Předmět; u SMS a WhatsAppu prázdný'),
     body: text(2000),
+  }),
+  // ── Úpravy existujících záznamů (R-113). `null` = beze změny; smazat
+  // hodnotu asistent neumí, to zůstává na formuláři.
+  z.object({
+    kind: z.literal('update_contact'),
+    ref: refSchema,
+    companyName: optionalText(160),
+    contactName: optionalText(120),
+    phone: optionalText(40),
+    email: optionalText(160),
+    leadStatus: z.enum(['cold', 'warm', 'hot', 'waiting', 'converted', 'lost']).nullable().default(null),
+    nextAction: optionalText(200),
+    nextActionDate: dateField,
+    nextActionTime: timeField,
+    nextActionType: z.enum(['call', 'meeting', 'email', 'whatsapp', 'online', 'other']).nullable().default(null),
+    estimatedValue: money,
+  }),
+  z.object({
+    kind: z.literal('update_project'),
+    project: refSchema,
+    clientName: optionalText(160),
+    clientEmail: optionalText(160),
+    clientPhone: optionalText(40),
+    serviceType: optionalText(120),
+    description: optionalText(600),
+    price: money,
+    deadline: dateField,
+  }),
+  z.object({
+    kind: z.literal('update_event'),
+    event: eventRefSchema,
+    title: optionalText(120),
+    note: optionalText(500),
+    contactName: optionalText(120),
+    phone: optionalText(40),
+    email: optionalText(160),
+  }),
+  z.object({
+    kind: z.literal('remember'),
+    scope: z.enum(['global', 'project']).describe('Obecně o firmě, nebo k jedné zakázce'),
+    project: refSchema.nullable().default(null),
+    memoryKind: z.enum(['summary', 'preference', 'risk', 'glossary']).default('summary'),
+    text: text(600),
   }),
 ])
 

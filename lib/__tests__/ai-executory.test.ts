@@ -34,6 +34,9 @@ const { calls, proxy } = vi.hoisted(() => {
   cancelIssuedInvoice: vi.fn(),
   loadIssueDraft: vi.fn(),
   loadIssuerProfile: vi.fn(),
+  updateLead: vi.fn(),
+  saveMemory: vi.fn(),
+  discardMemory: vi.fn(),
   }
   const proxy =
     (name: keyof typeof calls) =>
@@ -48,7 +51,13 @@ vi.mock('@/app/calls-actions', () => ({
   deleteLead: proxy('deleteLead'),
   addLeadNote: proxy('addLeadNote'),
   deleteLeadNote: proxy('deleteLeadNote'),
+  updateLead: proxy('updateLead'),
 }))
+vi.mock('@/lib/admin/memory/store', () => ({
+  saveMemory: proxy('saveMemory'),
+  discardMemory: proxy('discardMemory'),
+}))
+vi.mock('@/lib/auth', () => ({ adminActorEmail: async () => 'admin@example.cz' }))
 vi.mock('@/app/calendar-actions', () => ({
   createCalendarEvent: proxy('createCalendarEvent'),
   updateCalendarEvent: proxy('updateCalendarEvent'),
@@ -401,5 +410,89 @@ describe('co se provede samo (R-111)', () => {
 
   it('při nízké jistotě se nic neprovede samo', () => {
     expect(autoRunIndexes({ suggestion: plan([contact], 0.4), untrustedContext: false })).toEqual([])
+  })
+})
+
+describe('úpravy a paměť (R-113)', () => {
+  beforeAll(async () => {
+    await db.exec(`
+      ALTER TABLE client_leads
+        ADD COLUMN IF NOT EXISTS lead_status text DEFAULT 'warm',
+        ADD COLUMN IF NOT EXISTS next_action text,
+        ADD COLUMN IF NOT EXISTS next_action_date date,
+        ADD COLUMN IF NOT EXISTS next_action_time time,
+        ADD COLUMN IF NOT EXISTS next_action_type text,
+        ADD COLUMN IF NOT EXISTS notes text,
+        ADD COLUMN IF NOT EXISTS estimated_value numeric,
+        ADD COLUMN IF NOT EXISTS call_answered boolean;
+    `)
+  })
+
+  it('úprava zakázky změní jen řečené a „Zpět" vrátí původní', async () => {
+    await db.query(`UPDATE projects SET price = 20000, client_phone = '+420600000000' WHERE id = $1`, [projectId])
+    const out = await runAction({
+      kind: 'update_project',
+      project: ref(null, projectId),
+      clientName: null,
+      clientEmail: null,
+      clientPhone: null,
+      serviceType: null,
+      description: null,
+      price: 25000,
+      deadline: '2026-12-15',
+    })
+    expect(out.ok).toBe(true)
+    if (!out.ok || !out.undo) throw new Error('chybí Zpět')
+    let row = (await db.query<{ price: string; deadline: string; client_phone: string }>(
+      `SELECT price::text, deadline::text, client_phone FROM projects WHERE id = $1`,
+      [projectId],
+    )).rows[0]
+    expect(row).toEqual({ price: '25000', deadline: '2026-12-15', client_phone: '+420600000000' })
+
+    expect(await undoStep(out.undo)).toEqual({ ok: true })
+    row = (await db.query<{ price: string; deadline: string; client_phone: string }>(
+      `SELECT price::text, deadline::text, client_phone FROM projects WHERE id = $1`,
+      [projectId],
+    )).rows[0]
+    expect(row.price).toBe('20000')
+    expect(row.deadline).toBeNull()
+  })
+
+  it('úprava kontaktu jde přes updateLead se sloučenými údaji', async () => {
+    calls.updateLead.mockResolvedValue({})
+    const out = await runAction({
+      kind: 'update_contact',
+      ref: ref('Novák'),
+      companyName: null,
+      contactName: null,
+      phone: '+420777999888',
+      email: null,
+      leadStatus: 'hot',
+      nextAction: null,
+      nextActionDate: null,
+      nextActionTime: null,
+      nextActionType: null,
+      estimatedValue: null,
+    })
+    expect(out.ok).toBe(true)
+    const [, payload] = calls.updateLead.mock.calls[0] as [string, Record<string, unknown>]
+    expect(payload).toMatchObject({ company_name: 'Novák s.r.o.', contact_name: 'Jan Novák', phone: '+420777999888', lead_status: 'hot' })
+    if (!out.ok || !out.undo) throw new Error('chybí Zpět')
+    await undoStep(out.undo)
+    const [, before] = calls.updateLead.mock.calls[1] as [string, Record<string, unknown>]
+    expect(before).toMatchObject({ phone: '+420777123456', lead_status: 'warm' })
+  })
+
+  it('paměť uloží potvrzenou a „Zpět" ji zahodí', async () => {
+    calls.saveMemory.mockResolvedValue({ ok: true, id: '66666666-6666-4666-8666-666666666666' })
+    calls.discardMemory.mockResolvedValue(true)
+    const out = await runAction({ kind: 'remember', scope: 'global', project: null, memoryKind: 'preference', text: 'Schůzky jen odpoledne.' })
+    expect(out.ok).toBe(true)
+    expect(calls.saveMemory).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'global', refId: null, kind: 'preference', source: 'assistant', confirmedBy: 'admin@example.cz' }),
+    )
+    if (!out.ok || !out.undo) throw new Error('chybí Zpět')
+    expect(await undoStep(out.undo)).toEqual({ ok: true })
+    expect(calls.discardMemory).toHaveBeenCalledWith('66666666-6666-4666-8666-666666666666')
   })
 })

@@ -3,37 +3,46 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { AlertCircle, ArrowUpRight, Check, Loader2, Mic, Sparkles, Square, Undo2 } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, Check, Loader2, Mic, Plus, Sparkles, Square, Undo2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
-import {
-  applySuggestion,
-  proposeSuggestion,
-  rejectSuggestion,
-  undoSuggestion,
-  type PlanView,
-} from '@/app/ai-actions'
+import { applySuggestion, proposeSuggestion, undoSuggestion, type PlanView } from '@/app/ai-actions'
 import { contextRefFromPath, onAssistantOpen } from '@/lib/admin/assistant-open'
-import { TEXT_MAX } from '@/lib/ai/assistant-limits'
+import { HISTORY_MAX, TEXT_MAX } from '@/lib/ai/assistant-limits'
 import type { StepView } from '@/lib/admin/suggestions'
 
 /**
- * Asistent (AD14, od R-111 koná sám).
+ * Asistent jako chat (AD14 → R-111 koná sám → R-113 rozhovor).
  *
- * Řeknete nebo napíšete, co se má stát. Vratné věci (kontakt, termín,
- * poznámka, platba, náklad…) se provedou hned a toast nabídne „Zpět";
- * vystavení faktury, storno a zprávy klientovi čekají na klepnutí. Panel
- * vždycky ukazuje, co přesně se stalo, a u každého kroku jde „Vrátit".
+ * Každý chat je nová session: začne prázdný, ale server ke každé větě
+ * přidá přehled firmy (zakázky, kontakty, termíny, paměť), takže asistent
+ * ví, o čem se mluví. Uvnitř chatu si pamatuje předchozí repliky — když se
+ * zeptá na čas nebo telefon, stačí odpovědět „ve tři, 777 123 456".
+ * Nový chat začne tlačítkem, nebo sám po 15 minutách bez práce.
  *
- * Kontext si bere z adresy: na detailu zakázky „vidí" tu zakázku. Tam ale
- * nic neprovede samo — kontext nese i text od klientů (R-069).
+ * Vratné věci se provedou hned a toast nabídne „Zpět"; vystavení faktury,
+ * storno a zprávy klientovi čekají na klepnutí. Na detailu zakázky nic
+ * neprovede samo — kontext nese i text od klientů (R-069).
  */
 
 type VoiceState = 'idle' | 'recording' | 'transcribing'
 
+type ChatMessage =
+  | { key: string; role: 'user'; text: string }
+  | { key: string; role: 'assistant'; plan: PlanView; steps: StepView[]; turn: string }
+  | { key: string; role: 'error'; text: string }
+
+/** Po téhle pauze začne otevření panelu nový chat. */
+const SESSION_IDLE_MS = 15 * 60 * 1000
 const MAX_RECORDING_SECONDS = 90
 const PREFERRED_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
+
+const EXAMPLES = [
+  'Zapiš schůzku s Pavlem Novákem ve čtvrtek ve 14:00',
+  'Kolik mi kdo dluží?',
+  'Zapamatuj si, že web na míru stojí od 25 000 Kč',
+]
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined
@@ -43,6 +52,9 @@ function pickMimeType(): string | undefined {
 function isExternal(href: string): boolean {
   return href.startsWith('mailto:') || href.startsWith('sms:') || href.startsWith('http')
 }
+
+let keySeq = 0
+const nextKey = () => `m${Date.now()}-${keySeq++}`
 
 function StepLink({ href, label }: { href: string; label: string }) {
   const cls = 'inline-flex min-h-11 items-center gap-1 text-sm text-ink underline-offset-4 hover:underline'
@@ -62,17 +74,155 @@ function StepLink({ href, label }: { href: string; label: string }) {
   )
 }
 
+function PlanCard({
+  plan,
+  steps,
+  busy,
+  onRun,
+  onUndo,
+}: {
+  plan: PlanView
+  steps: StepView[]
+  busy: string | null
+  onRun: (index?: number) => void
+  onUndo: (index: number) => void
+}) {
+  const stepFor = (index: number) => steps.find((s) => s.index === index)
+  const waiting = plan.actions.filter((a) => !stepFor(a.index)?.ok)
+  const canRun = Boolean(plan.id) && !plan.cannotRun
+  const busyKey = (suffix: string) => `${plan.id}:${suffix}`
+
+  return (
+    <div className="space-y-3">
+      {plan.reply && <p className="whitespace-pre-wrap text-sm text-ink">{plan.reply}</p>}
+
+      {plan.cannotRun && (
+        <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
+          Plán se nepodařilo uložit, takže ho nejde provést. Zapište to prosím ručně.
+        </p>
+      )}
+      {plan.guarded && !plan.cannotRun && waiting.length > 0 && (
+        <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
+          V tomhle chatu jsou texty od klientů, proto jsem nic neprovedl sám. Projděte si to a klepněte.
+        </p>
+      )}
+      {plan.pastTime && !plan.cannotRun && waiting.length > 0 && (
+        <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
+          Ten čas už proběhl, proto jsem nic neprovedl sám. Jestli to chcete zapsat zpětně, klepněte. Jinak mi řekněte
+          správný čas.
+        </p>
+      )}
+      {plan.unsure && !plan.guarded && !plan.pastTime && !plan.cannotRun && waiting.length > 0 && (
+        <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
+          Nejsem si jistý, jestli jsem to pochopil správně. Nic jsem neprovedl — projděte si to.
+        </p>
+      )}
+
+      {plan.actions.map((action) => {
+        const step = stepFor(action.index)
+        const done = step?.ok === true
+        return (
+          <div
+            key={action.index}
+            className={`rounded-panel border border-navy-100 bg-surface p-4 ${plan.needsInfo ? 'opacity-70' : ''}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                {done && !step?.undone && <Check size={16} strokeWidth={2} aria-hidden="true" />}
+                {step && !step.ok && <AlertCircle size={16} strokeWidth={1.5} className="text-danger" aria-hidden="true" />}
+                {done ? step.message : action.title}
+                {step?.undone && <span className="font-normal text-quiet">(vráceno)</span>}
+              </p>
+              {plan.needsInfo ? (
+                <span className="shrink-0 rounded-chip bg-navy-50 px-2 py-0.5 text-xs text-ink">Po doplnění</span>
+              ) : (
+                !done &&
+                action.cls === 'confirm' && (
+                  <span className="shrink-0 rounded-chip bg-signal/15 px-2 py-0.5 text-xs text-ink">Čeká na vás</span>
+                )
+              )}
+            </div>
+
+            {done && step.description ? (
+              <p className="mt-1 text-sm text-ink">{step.description}</p>
+            ) : (
+              <dl className="mt-3 space-y-1.5">
+                {action.lines.map((line) => (
+                  <div key={line.label} className="flex gap-3 text-sm">
+                    <dt className="w-24 shrink-0 text-quiet">{line.label}</dt>
+                    <dd className="min-w-0 flex-1 whitespace-pre-wrap text-ink">{line.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {step?.error && <p className="mt-2 text-sm text-danger">{step.error}</p>}
+
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+              {!done && canRun && (
+                <Button type="button" onClick={() => onRun(action.index)} disabled={busy !== null}>
+                  {busy === busyKey(`run-${action.index}`) ? 'Provádím…' : step && !step.ok ? 'Zkusit znovu' : 'Provést'}
+                </Button>
+              )}
+              {step?.href && <StepLink href={step.href} label={done ? 'Otevřít' : 'Doplnit ve formuláři'} />}
+              {step?.canUndo && (
+                <Button type="button" variant="ghost" onClick={() => onUndo(action.index)} disabled={busy !== null}>
+                  <Undo2 size={14} strokeWidth={1.5} aria-hidden="true" />
+                  {busy === busyKey(`undo-${action.index}`) ? 'Vracím…' : 'Vrátit'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      {(plan.assumptions.length > 0 || plan.missing.length > 0) && (
+        <div className="space-y-2 text-sm">
+          {plan.missing.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-quiet">{plan.needsInfo ? 'Potřebuju od vás' : 'Chybí doplnit'}</p>
+              <ul className="mt-1 space-y-1 text-ink">
+                {plan.missing.map((item) => (
+                  <li key={item}>• {item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {plan.assumptions.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-quiet">Domyslel jsem si</p>
+              <ul className="mt-1 space-y-1 text-ink">
+                {plan.assumptions.map((item) => (
+                  <li key={item}>• {item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {canRun && waiting.length > 1 && (
+        <Button type="button" onClick={() => onRun()} disabled={busy !== null}>
+          {busy === busyKey('all') ? 'Provádím…' : `Provést vše (${waiting.length})`}
+        </Button>
+      )}
+    </div>
+  )
+}
+
 export function AssistantPanel() {
   const router = useRouter()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
-  const [plan, setPlan] = useState<PlanView | null>(null)
-  const [steps, setSteps] = useState<StepView[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [tainted, setTainted] = useState(false)
   const [pending, startTransition] = useTransition()
   const [busy, setBusy] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<ChatMessage[]>([])
+  const lastActivityRef = useRef(0)
 
   const [voice, setVoice] = useState<VoiceState>('idle')
   const [seconds, setSeconds] = useState(0)
@@ -81,16 +231,40 @@ export function AssistantPanel() {
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  const resetChat = useCallback(() => {
+    setMessages([])
+    messagesRef.current = []
+    setTainted(false)
+  }, [])
+
+  const newChat = useCallback(() => {
+    resetChat()
+    setText('')
+    lastActivityRef.current = Date.now()
+    setTimeout(() => inputRef.current?.focus(), 80)
+  }, [resetChat])
+
+  const openPanel = useCallback(() => {
+    // Každý chat je nová session; jen rozhovor z poslední čtvrthodiny
+    // pokračuje (asistent se třeba zrovna na něco ptal).
+    if (Date.now() - lastActivityRef.current > SESSION_IDLE_MS) resetChat()
+    setOpen(true)
+  }, [resetChat])
+
   useEffect(
     () =>
       onAssistantOpen(({ text: prefill }) => {
-        setPlan(null)
-        setSteps([])
-        setError(null)
+        // Z ⌘K přichází nová věta — začíná s ní nový chat.
+        resetChat()
         setText(prefill.slice(0, TEXT_MAX))
+        lastActivityRef.current = Date.now()
         setOpen(true)
       }),
-    [],
+    [resetChat],
   )
 
   // Podporu mikrofonu jde zjistit až v prohlížeči.
@@ -106,21 +280,55 @@ export function AssistantPanel() {
     if (open && voice === 'idle') setTimeout(() => inputRef.current?.focus(), 80)
   }, [open, voice])
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: 'end' })
+  }, [messages.length, pending])
+
+  const updatePlan = useCallback((planId: string, steps: StepView[], turn: string) => {
+    setMessages((list) =>
+      list.map((m) => (m.role === 'assistant' && m.plan.id === planId ? { ...m, steps, turn: turn || m.turn } : m)),
+    )
+  }, [])
+
   const ask = useCallback(
     (sentence: string, source: 'panel' | 'voice') => {
       const trimmed = sentence.trim()
       if (!trimmed || pending) return
-      setError(null)
-      setPlan(null)
-      setSteps([])
+      lastActivityRef.current = Date.now()
+
+      // Historie = předchozí repliky; asistentovu stranu tvoří shrnutí kola
+      // ze serveru (co se provedlo, s id záznamů), ne jen text odpovědi.
+      const history = messagesRef.current
+        .flatMap((m): { role: 'user' | 'assistant'; content: string }[] =>
+          m.role === 'user'
+            ? [{ role: 'user', content: m.text }]
+            : m.role === 'assistant'
+              ? [{ role: 'assistant', content: m.turn }]
+              : [],
+        )
+        .slice(-HISTORY_MAX)
+
+      setMessages((list) => [...list, { key: nextKey(), role: 'user', text: trimmed }])
+      setText('')
+
       startTransition(async () => {
-        const result = await proposeSuggestion({ text: trimmed, contextRef: contextRefFromPath(pathname), source })
+        const result = await proposeSuggestion({
+          text: trimmed,
+          contextRef: contextRefFromPath(pathname),
+          source,
+          history,
+          tainted,
+        })
+        lastActivityRef.current = Date.now()
         if (!result.ok) {
-          setError(result.error)
+          setMessages((list) => [...list, { key: nextKey(), role: 'error', text: result.error }])
           return
         }
-        setPlan(result)
-        setSteps(result.steps)
+        if (result.tainted) setTainted(true)
+        setMessages((list) => [
+          ...list,
+          { key: nextKey(), role: 'assistant', plan: result, steps: result.steps, turn: result.turn },
+        ])
         const done = result.steps.filter((s) => s.ok)
         if (done.length > 0) {
           const id = result.id
@@ -131,7 +339,7 @@ export function AssistantPanel() {
                 ? () => {
                     void undoSuggestion(id).then((r) => {
                       if (r.ok) {
-                        setSteps(r.steps)
+                        updatePlan(id, r.steps, r.turn)
                         toast.success('Vráceno')
                       } else toast.error(r.error)
                       router.refresh()
@@ -139,18 +347,21 @@ export function AssistantPanel() {
                   }
                 : undefined,
           })
-          setText('')
           router.refresh()
         }
       })
     },
-    [pending, pathname, router],
+    [pending, pathname, router, tainted, updatePlan],
   )
 
   // ── Hlas ──────────────────────────────────────────────────────────────
   function stopTimer() {
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = null
+  }
+
+  function pushError(message: string) {
+    setMessages((list) => [...list, { key: nextKey(), role: 'error', text: message }])
   }
 
   async function transcribe(audio: Blob) {
@@ -161,23 +372,20 @@ export function AssistantPanel() {
       const res = await fetch('/api/ai-assistant/prepis', { method: 'POST', body: form })
       const data = (await res.json().catch(() => null)) as { ok?: boolean; text?: string; error?: string } | null
       if (res.ok && data?.ok && data.text) {
-        const heard = data.text.slice(0, TEXT_MAX)
-        setText(heard)
         setVoice('idle')
         // Diktování je celá věta — rovnou se zpracuje. Přepis je vidět
-        // v okénku, takže je jasné, z čeho asistent vycházel.
-        ask(heard, 'voice')
+        // v chatu, takže je jasné, z čeho asistent vycházel.
+        ask(data.text.slice(0, TEXT_MAX), 'voice')
         return
       }
-      setError(data?.error ?? 'Nahrávku se nepodařilo přepsat. Napište to prosím.')
+      pushError(data?.error ?? 'Nahrávku se nepodařilo přepsat. Napište to prosím.')
     } catch {
-      setError('Nahrávku se nepodařilo odeslat. Zkontrolujte připojení, nebo to napište.')
+      pushError('Nahrávku se nepodařilo odeslat. Zkontrolujte připojení, nebo to napište.')
     }
     setVoice('idle')
   }
 
   async function startRecording() {
-    setError(null)
     const mimeType = pickMimeType()
     if (!mimeType) return
     try {
@@ -203,7 +411,7 @@ export function AssistantPanel() {
         })
       }, 1000)
     } catch {
-      setError('Mikrofon se nepodařilo zapnout. Povolte ho v prohlížeči, nebo to napište.')
+      pushError('Mikrofon se nepodařilo zapnout. Povolte ho v prohlížeči, nebo to napište.')
       setVoice('idle')
     }
   }
@@ -214,17 +422,17 @@ export function AssistantPanel() {
   }
 
   // ── Kroky ─────────────────────────────────────────────────────────────
-  async function runPending(index?: number) {
-    if (!plan?.id || busy) return
-    setBusy(index === undefined ? 'all' : `run-${index}`)
+  async function runPending(planId: string | null, index?: number) {
+    if (!planId || busy) return
+    lastActivityRef.current = Date.now()
+    setBusy(`${planId}:${index === undefined ? 'all' : `run-${index}`}`)
     try {
-      const result = await applySuggestion(plan.id, index)
+      const result = await applySuggestion(planId, index)
       if (!result.ok) {
-        setError(result.error)
+        toast.error(result.error)
         return
       }
-      setError(null)
-      setSteps(result.steps)
+      updatePlan(planId, result.steps, result.turn)
       const fresh = result.steps.filter((s) => index === undefined || s.index === index)
       const failed = fresh.find((s) => !s.ok)
       if (failed) toast.error(failed.error ?? 'Něco se nepovedlo.')
@@ -238,16 +446,17 @@ export function AssistantPanel() {
     }
   }
 
-  async function undo(index: number) {
-    if (!plan?.id || busy) return
-    setBusy(`undo-${index}`)
+  async function undo(planId: string | null, index: number) {
+    if (!planId || busy) return
+    lastActivityRef.current = Date.now()
+    setBusy(`${planId}:undo-${index}`)
     try {
-      const result = await undoSuggestion(plan.id, index)
+      const result = await undoSuggestion(planId, index)
       if (!result.ok) {
-        setError(result.error)
+        toast.error(result.error)
         return
       }
-      setSteps(result.steps)
+      updatePlan(planId, result.steps, result.turn)
       toast.success('Vráceno')
       router.refresh()
     } finally {
@@ -255,23 +464,11 @@ export function AssistantPanel() {
     }
   }
 
-  function dismiss() {
-    if (plan?.id && steps.length === 0) void rejectSuggestion(plan.id)
-    setPlan(null)
-    setSteps([])
-    setError(null)
-    inputRef.current?.focus()
-  }
-
-  const stepFor = (index: number) => steps.find((s) => s.index === index)
-  const waiting = plan ? plan.actions.filter((a) => !stepFor(a.index)?.ok) : []
-  const canRun = Boolean(plan?.id) && !plan?.cannotRun
-
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openPanel}
         aria-label="Otevřít asistenta"
         title="Asistent"
         className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-navy-700 text-white shadow-lg transition-transform hover:bg-navy-800 active:scale-95 lg:bottom-6 lg:right-6"
@@ -282,193 +479,140 @@ export function AssistantPanel() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="font-ws sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <Sparkles size={18} strokeWidth={1.5} aria-hidden="true" />
-              Asistent
-            </SheetTitle>
+            <div className="flex items-center justify-between gap-3 pr-8">
+              <SheetTitle className="flex items-center gap-2">
+                <Sparkles size={18} strokeWidth={1.5} aria-hidden="true" />
+                Asistent
+              </SheetTitle>
+              {messages.length > 0 && (
+                <Button type="button" variant="ghost" onClick={newChat} disabled={pending}>
+                  <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
+                  Nový chat
+                </Button>
+              )}
+            </div>
             <SheetDescription>
-              Řekněte nebo napište, co se má stát. Zapíšu to hned a půjde to vrátit. Fakturu a zprávy klientům pošlu až
-              po vašem klepnutí.
+              Zapíšu, upravím a zapamatuju si, co mi řeknete. Když mi něco chybí, zeptám se dřív, než to udělám.
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-            <div>
-              <label htmlFor="asistent-veta" className="sr-only">
-                Co se má stát
-              </label>
-              <textarea
-                id="asistent-veta"
-                ref={inputRef}
-                value={text}
-                onChange={(e) => setText(e.target.value.slice(0, TEXT_MAX))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    ask(text, 'panel')
-                  }
-                }}
-                rows={3}
-                maxLength={TEXT_MAX}
-                disabled={voice !== 'idle'}
-                placeholder="Například: přidej Pavla Nováka, ve čtvrtek ve dvě s ním mám schůzku k webu"
-                className="w-full rounded-chip border border-navy-100 bg-background px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-quiet focus:ring-2 focus:ring-ring"
-              />
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Button type="button" onClick={() => ask(text, 'panel')} disabled={pending || voice !== 'idle' || !text.trim()}>
-                  {pending ? (
-                    <>
-                      <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
-                      Pracuju na tom…
-                    </>
-                  ) : (
-                    'Udělat'
-                  )}
-                </Button>
-                {canRecord && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={voice === 'recording' ? stopRecording : startRecording}
-                    disabled={pending || voice === 'transcribing'}
-                    aria-pressed={voice === 'recording'}
-                  >
-                    {voice === 'recording' ? (
-                      <>
-                        <Square size={14} strokeWidth={1.5} aria-hidden="true" />
-                        Hotovo ({seconds} s)
-                      </>
-                    ) : voice === 'transcribing' ? (
-                      <>
-                        <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
-                        Přepisuju…
-                      </>
-                    ) : (
-                      <>
-                        <Mic size={14} strokeWidth={1.5} aria-hidden="true" />
-                        Nadiktovat
-                      </>
-                    )}
-                  </Button>
-                )}
-                <span className="text-xs text-quiet">Enter odešle</span>
-              </div>
-            </div>
-
-            {error && (
-              <p role="alert" className="rounded-chip bg-danger/10 px-3 py-2 text-sm text-ink">
-                {error}
-              </p>
-            )}
-
-            {plan && (
-              <div className="space-y-3" aria-live="polite">
-                {plan.reply && <p className="text-sm text-ink">{plan.reply}</p>}
-
-                {plan.cannotRun && (
-                  <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
-                    Plán se nepodařilo uložit, takže ho nejde provést. Zapište to prosím ručně.
-                  </p>
-                )}
-                {plan.guarded && !plan.cannotRun && waiting.length > 0 && (
-                  <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
-                    Na téhle obrazovce můžou být texty od klientů, proto jsem nic neprovedl sám. Projděte si to a
-                    klepněte.
-                  </p>
-                )}
-                {plan.unsure && !plan.guarded && !plan.cannotRun && waiting.length > 0 && (
-                  <p className="rounded-chip bg-signal/15 px-3 py-2 text-sm text-ink">
-                    Nejsem si jistý, jestli jsem to pochopil správně. Nic jsem neprovedl — projděte si to.
-                  </p>
-                )}
-
-                {plan.actions.map((action) => {
-                  const step = stepFor(action.index)
-                  const done = step?.ok === true
-                  return (
-                    <div key={action.index} className="rounded-panel border border-navy-100 bg-surface p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-                          {done && !step?.undone && <Check size={16} strokeWidth={2} aria-hidden="true" />}
-                          {step && !step.ok && <AlertCircle size={16} strokeWidth={1.5} className="text-danger" aria-hidden="true" />}
-                          {done ? step.message : action.title}
-                          {step?.undone && <span className="font-normal text-quiet">(vráceno)</span>}
-                        </p>
-                        {!done && action.cls === 'confirm' && (
-                          <span className="shrink-0 rounded-chip bg-signal/15 px-2 py-0.5 text-xs text-ink">Čeká na vás</span>
-                        )}
-                      </div>
-
-                      {done && step.description ? (
-                        <p className="mt-1 text-sm text-ink">{step.description}</p>
-                      ) : (
-                        <dl className="mt-3 space-y-1.5">
-                          {action.lines.map((line) => (
-                            <div key={line.label} className="flex gap-3 text-sm">
-                              <dt className="w-24 shrink-0 text-quiet">{line.label}</dt>
-                              <dd className="min-w-0 flex-1 whitespace-pre-wrap text-ink">{line.value}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      )}
-
-                      {step?.error && <p className="mt-2 text-sm text-danger">{step.error}</p>}
-
-                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                        {!done && canRun && (
-                          <Button type="button" onClick={() => void runPending(action.index)} disabled={busy !== null}>
-                            {busy === `run-${action.index}` ? 'Provádím…' : step && !step.ok ? 'Zkusit znovu' : 'Provést'}
-                          </Button>
-                        )}
-                        {step?.href && <StepLink href={step.href} label={done ? 'Otevřít' : 'Doplnit ve formuláři'} />}
-                        {step?.canUndo && (
-                          <Button type="button" variant="ghost" onClick={() => void undo(action.index)} disabled={busy !== null}>
-                            <Undo2 size={14} strokeWidth={1.5} aria-hidden="true" />
-                            {busy === `undo-${action.index}` ? 'Vracím…' : 'Vrátit'}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {(plan.assumptions.length > 0 || plan.missing.length > 0) && (
-                  <div className="space-y-2 text-sm">
-                    {plan.assumptions.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-quiet">Domyslel jsem si</p>
-                        <ul className="mt-1 space-y-1 text-ink">
-                          {plan.assumptions.map((item) => (
-                            <li key={item}>• {item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {plan.missing.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-quiet">Chybí doplnit</p>
-                        <ul className="mt-1 space-y-1 text-ink">
-                          {plan.missing.map((item) => (
-                            <li key={item}>• {item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {canRun && waiting.length > 1 && (
-                    <Button type="button" onClick={() => void runPending()} disabled={busy !== null}>
-                      {busy === 'all' ? 'Provádím…' : `Provést vše (${waiting.length})`}
-                    </Button>
-                  )}
-                  <Button type="button" variant="ghost" onClick={dismiss}>
-                    {steps.some((s) => s.ok) ? 'Nová věta' : 'Zahodit'}
-                  </Button>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" aria-live="polite">
+            {messages.length === 0 && !pending ? (
+              <div className="space-y-3 py-2">
+                <p className="text-sm text-quiet">
+                  Vidím rozpracované zakázky, kontakty a termíny na dva týdny dopředu. Zkuste třeba:
+                </p>
+                <div className="flex flex-col items-start gap-2">
+                  {EXAMPLES.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => {
+                        setText(example)
+                        inputRef.current?.focus()
+                      }}
+                      className="min-h-11 rounded-chip border border-navy-100 bg-surface px-3 py-2 text-left text-sm text-ink hover:bg-navy-50"
+                    >
+                      {example}
+                    </button>
+                  ))}
                 </div>
               </div>
+            ) : (
+              <div className="space-y-4 py-2">
+                {messages.map((m) =>
+                  m.role === 'user' ? (
+                    <div key={m.key} className="flex justify-end">
+                      <p className="max-w-[85%] whitespace-pre-wrap rounded-panel bg-navy-700 px-3.5 py-2.5 text-sm text-white">
+                        {m.text}
+                      </p>
+                    </div>
+                  ) : m.role === 'error' ? (
+                    <p key={m.key} role="alert" className="rounded-chip bg-danger/10 px-3 py-2 text-sm text-ink">
+                      {m.text}
+                    </p>
+                  ) : (
+                    <PlanCard
+                      key={m.key}
+                      plan={m.plan}
+                      steps={m.steps}
+                      busy={busy}
+                      onRun={(index) => void runPending(m.plan.id, index)}
+                      onUndo={(index) => void undo(m.plan.id, index)}
+                    />
+                  ),
+                )}
+                {pending && (
+                  <p className="flex items-center gap-2 text-sm text-quiet">
+                    <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
+                    Přemýšlím…
+                  </p>
+                )}
+              </div>
             )}
+            <div ref={bottomRef} />
+          </div>
+
+          <div className="border-t border-navy-100 pt-3">
+            <label htmlFor="asistent-veta" className="sr-only">
+              Zpráva pro asistenta
+            </label>
+            <textarea
+              id="asistent-veta"
+              ref={inputRef}
+              value={text}
+              onChange={(e) => setText(e.target.value.slice(0, TEXT_MAX))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  ask(text, 'panel')
+                }
+              }}
+              rows={2}
+              maxLength={TEXT_MAX}
+              disabled={voice !== 'idle'}
+              placeholder={messages.length > 0 ? 'Odpovězte nebo napište další věc…' : 'Co mám udělat?'}
+              className="w-full rounded-chip border border-navy-100 bg-background px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-quiet focus:ring-2 focus:ring-ring"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={() => ask(text, 'panel')} disabled={pending || voice !== 'idle' || !text.trim()}>
+                {pending ? (
+                  <>
+                    <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
+                    Pracuju na tom…
+                  </>
+                ) : (
+                  'Odeslat'
+                )}
+              </Button>
+              {canRecord && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={voice === 'recording' ? stopRecording : startRecording}
+                  disabled={pending || voice === 'transcribing'}
+                  aria-pressed={voice === 'recording'}
+                >
+                  {voice === 'recording' ? (
+                    <>
+                      <Square size={14} strokeWidth={1.5} aria-hidden="true" />
+                      Hotovo ({seconds} s)
+                    </>
+                  ) : voice === 'transcribing' ? (
+                    <>
+                      <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
+                      Přepisuju…
+                    </>
+                  ) : (
+                    <>
+                      <Mic size={14} strokeWidth={1.5} aria-hidden="true" />
+                      Nadiktovat
+                    </>
+                  )}
+                </Button>
+              )}
+              <span className="text-xs text-quiet">Enter odešle</span>
+            </div>
           </div>
         </SheetContent>
       </Sheet>

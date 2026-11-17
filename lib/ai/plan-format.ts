@@ -54,6 +54,18 @@ export function emptyToNull(value: unknown, key?: string): unknown {
   return out
 }
 
+/** Které pole s odkazem akce povinně má — i když ho model úplně vynechá. */
+const REQUIRED_REF: Record<string, 'ref' | 'event' | 'invoice'> = {
+  add_note: 'ref',
+  send_message: 'ref',
+  update_contact: 'ref',
+  move_event: 'event',
+  cancel_event: 'event',
+  update_event: 'event',
+  mark_invoice_paid: 'invoice',
+  cancel_invoice: 'invoice',
+}
+
 /** Drobnosti, které model píše jinak, než chceme, a jdou opravit bez hádání. */
 function normalizeAction(raw: unknown): unknown {
   const a = emptyToNull(raw)
@@ -68,12 +80,18 @@ function normalizeAction(raw: unknown): unknown {
   if (action.kind === 'schedule_event' && action.durationMinutes == null) action.durationMinutes = 60
   // Povinný odkaz (poznámka, termín, faktura, stav zakázky) nesmí zůstat `null` —
   // prázdný odkaz pak executor odmítne českou hláškou místo pádu schématu.
-  for (const key of ['ref', 'event', 'invoice'] as const) {
-    if (key in action && action[key] == null) {
-      action[key] = key === 'event' ? { id: null, hint: null, date: null } : { id: null, hint: null }
-    }
+  const requiredRef = REQUIRED_REF[String(action.kind)]
+  if (requiredRef && action[requiredRef] == null) {
+    action[requiredRef] = requiredRef === 'event' ? { id: null, hint: null, date: null } : { id: null, hint: null }
   }
-  if (action.kind === 'update_project_status' && action.project == null) action.project = { id: null, hint: null }
+  if ((action.kind === 'update_project_status' || action.kind === 'update_project') && action.project == null) {
+    action.project = { id: null, hint: null }
+  }
+  // Paměť bez rozsahu: se zakázkou patří k ní, jinak je obecná.
+  if (action.kind === 'remember') {
+    if (action.scope == null) action.scope = action.project ? 'project' : 'global'
+    if (action.memoryKind == null) action.memoryKind = 'summary'
+  }
   return action
 }
 

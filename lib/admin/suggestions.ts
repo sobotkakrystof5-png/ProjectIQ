@@ -50,6 +50,10 @@ export const undoTokenSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('income'), id: z.string().uuid() }),
   z.object({ type: z.literal('cost'), id: z.string().uuid(), projectId: z.string().uuid().nullable() }),
   z.object({ type: z.literal('invoice_paid'), id: z.string().uuid(), previousPaidOn: z.string().nullable() }),
+  // Úpravy (R-113): stav před změnou, „Zpět" ho zapíše zpátky.
+  z.object({ type: z.literal('lead_updated'), id: z.string().uuid(), before: z.record(z.string(), z.unknown()) }),
+  z.object({ type: z.literal('project_updated'), id: z.string().uuid(), before: z.record(z.string(), z.unknown()) }),
+  z.object({ type: z.literal('memory'), id: z.string().uuid() }),
 ])
 
 export type UndoToken = z.infer<typeof undoTokenSchema>

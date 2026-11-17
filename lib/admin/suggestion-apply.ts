@@ -1,7 +1,7 @@
 import 'server-only'
 import { revalidatePath } from 'next/cache'
 import { adminDb } from '@/lib/admin/db'
-import { addLeadNote, createLead, deleteLead, deleteLeadNote } from '@/app/calls-actions'
+import { addLeadNote, createLead, deleteLead, deleteLeadNote, updateLead, type LeadPayload } from '@/app/calls-actions'
 import {
   createCalendarEvent,
   deleteCalendarEvent,
@@ -22,6 +22,8 @@ import { DEFAULT_LEAD_ORIGIN } from '@/lib/lead-origins'
 import { STATUS_LABELS, STATUS_ORDER, type ProjectStatus } from '@/lib/types'
 import type { Action } from '@/lib/ai/suggestion-schema'
 import type { UndoToken } from '@/lib/admin/suggestions'
+import { discardMemory, saveMemory } from '@/lib/admin/memory/store'
+import { adminActorEmail } from '@/lib/auth'
 
 /**
  * Provedení akcí z plánu asistenta a jejich vrácení (AD14, od R-111 sám).
@@ -476,6 +478,204 @@ async function runSendMessage(a: Extract<Action, { kind: 'send_message' }>): Pro
   }
 }
 
+// ── Úpravy a paměť (R-113) ──────────────────────────────────────────────
+
+const LEAD_COLUMNS = [
+  'company_name',
+  'contact_name',
+  'phone',
+  'email',
+  'lead_status',
+  'next_action',
+  'next_action_date',
+  'next_action_time',
+  'next_action_type',
+  'notes',
+  'estimated_value',
+  'call_answered',
+] as const
+
+async function loadLeadPayload(id: string): Promise<LeadPayload | null> {
+  const rows = await adminDb`
+    SELECT company_name, contact_name, phone, email, lead_status, next_action,
+           next_action_date::text AS next_action_date,
+           substr(next_action_time::text, 1, 5) AS next_action_time,
+           next_action_type, notes, estimated_value::float AS estimated_value, call_answered
+    FROM client_leads WHERE id = ${id} LIMIT 1
+  `
+  const r = rows[0]
+  if (!r) return null
+  const out: Record<string, unknown> = {}
+  for (const key of LEAD_COLUMNS) out[key] = r[key] ?? null
+  return out as unknown as LeadPayload
+}
+
+/** Úprava kontaktu v Hovorech. Přes `updateLead`, takže se posune i termín v kalendáři (R-010). */
+async function runUpdateContact(a: Extract<Action, { kind: 'update_contact' }>): Promise<RunOutcome> {
+  const found = await resolveLead(a.ref)
+  if (!found.ok) return found
+  const before = await loadLeadPayload(found.id)
+  if (!before) return { ok: false, error: 'Kontakt už v Hovorech není.' }
+
+  const next: LeadPayload = {
+    ...before,
+    company_name: a.companyName ?? before.company_name,
+    contact_name: a.contactName ?? before.contact_name,
+    phone: a.phone ?? before.phone,
+    email: a.email ?? before.email,
+    lead_status: (a.leadStatus as LeadPayload['lead_status'] | null) ?? before.lead_status,
+    next_action: a.nextAction ?? before.next_action,
+    next_action_date: a.nextActionDate ?? before.next_action_date,
+    next_action_time: a.nextActionTime ?? before.next_action_time,
+    next_action_type: (a.nextActionType as LeadPayload['next_action_type']) ?? before.next_action_type,
+    estimated_value: a.estimatedValue ?? before.estimated_value,
+  }
+  try {
+    await updateLead(found.id, next)
+  } catch (err) {
+    return { ok: false, error: errorText(err, 'Kontakt se nepodařilo upravit.') }
+  }
+  const changed = LEAD_COLUMNS.filter((key) => next[key] !== before[key]).length
+  return {
+    ok: true,
+    message: 'Kontakt upravený',
+    description: `${next.company_name}${changed > 0 ? `, změn: ${changed}` : ''}`,
+    href: '/dashboard/calls',
+    undo: { type: 'lead_updated', id: found.id, before: before as unknown as Record<string, unknown> },
+  }
+}
+
+type ProjectFields = {
+  client_name: string
+  client_email: string | null
+  client_phone: string | null
+  service_type: string | null
+  description: string | null
+  price: number | null
+  deadline: string | null
+}
+
+async function loadProjectFields(id: string): Promise<ProjectFields | null> {
+  const rows = await adminDb`
+    SELECT client_name, client_email, client_phone, service_type, description,
+           price::float AS price, deadline::text AS deadline
+    FROM projects WHERE id = ${id} LIMIT 1
+  `
+  const r = rows[0]
+  if (!r) return null
+  return {
+    client_name: String(r.client_name ?? ''),
+    client_email: (r.client_email as string | null) ?? null,
+    client_phone: (r.client_phone as string | null) ?? null,
+    service_type: (r.service_type as string | null) ?? null,
+    description: (r.description as string | null) ?? null,
+    price: r.price === null || r.price === undefined ? null : Number(r.price),
+    deadline: (r.deadline as string | null) ?? null,
+  }
+}
+
+/**
+ * Zapíše údaje zakázky. Úzký UPDATE jako u založení: `updateProject` řeší
+ * formulář celý (stav, zálohu, e-maily klientovi) a asistent mění jen údaje.
+ */
+async function writeProjectFields(id: string, f: ProjectFields): Promise<void> {
+  await adminDb`
+    UPDATE projects SET
+      client_name = ${f.client_name},
+      client_email = ${f.client_email},
+      client_phone = ${f.client_phone},
+      service_type = ${f.service_type},
+      description = ${f.description},
+      price = ${f.price},
+      deadline = ${f.deadline}::date
+    WHERE id = ${id}
+  `
+  revalidatePath(`/dashboard/${id}`)
+  revalidatePath('/dashboard/zakazky')
+  revalidatePath('/dashboard')
+}
+
+async function runUpdateProject(a: Extract<Action, { kind: 'update_project' }>): Promise<RunOutcome> {
+  const found = await resolveProject(a.project)
+  if (!found.ok) return found
+  const before = await loadProjectFields(found.id)
+  if (!before) return { ok: false, error: 'Zakázka už neexistuje.' }
+  const next: ProjectFields = {
+    client_name: a.clientName?.trim() || before.client_name,
+    client_email: a.clientEmail ?? before.client_email,
+    client_phone: a.clientPhone ?? before.client_phone,
+    service_type: a.serviceType ?? before.service_type,
+    description: a.description ?? before.description,
+    price: a.price ?? before.price,
+    deadline: a.deadline ?? before.deadline,
+  }
+  await writeProjectFields(found.id, next)
+  return {
+    ok: true,
+    message: 'Zakázka upravená',
+    description: [next.client_name, a.price !== null ? formatCzk(a.price) : null, a.deadline ? `do ${a.deadline}` : null]
+      .filter(Boolean)
+      .join(', '),
+    href: `/dashboard/${found.id}`,
+    undo: { type: 'project_updated', id: found.id, before: before as unknown as Record<string, unknown> },
+  }
+}
+
+/** Název, poznámka a kontakt u termínu. Čas mění `move_event`. */
+async function runUpdateEvent(a: Extract<Action, { kind: 'update_event' }>): Promise<RunOutcome> {
+  const found = await resolveEvent(a.event)
+  if (!found.ok) return found
+  const before = await loadEvent(found.id)
+  if (!before) return { ok: false, error: 'Termín už v kalendáři není.' }
+  const next: EventRow = {
+    ...before,
+    title: a.title?.trim() || before.title,
+    description: a.note ?? before.description,
+    contact_name: a.contactName ?? before.contact_name,
+    phone: a.phone ?? before.phone,
+    email: a.email ?? before.email,
+  }
+  try {
+    await updateCalendarEvent(found.id, next)
+  } catch (err) {
+    return { ok: false, error: errorText(err, 'Termín se nepodařilo upravit.') }
+  }
+  return {
+    ok: true,
+    message: 'Termín upravený',
+    description: `${next.title}, ${formatWhen(next.starts_at)}`,
+    href: '/dashboard/calendar',
+    // Stejné „Zpět" jako u přesunu: zapíše se termín, jak byl.
+    undo: { type: 'event_moved', id: found.id, before },
+  }
+}
+
+/** „Zapamatuj si…" — řekl to člověk, takže je to rovnou potvrzené (R-085). */
+async function runRemember(a: Extract<Action, { kind: 'remember' }>): Promise<RunOutcome> {
+  let refId: string | null = null
+  if (a.scope === 'project') {
+    const found = await resolveProject(a.project)
+    if (!found.ok) return found
+    refId = found.id
+  }
+  const saved = await saveMemory({
+    scope: a.scope,
+    refId,
+    kind: a.memoryKind,
+    text: a.text,
+    source: 'assistant',
+    confirmedBy: await adminActorEmail(),
+  })
+  if (!saved.ok) return { ok: false, error: saved.error }
+  return {
+    ok: true,
+    message: 'Zapamatováno',
+    description: a.text.slice(0, 160),
+    href: refId ? `/dashboard/${refId}` : null,
+    undo: { type: 'memory', id: saved.id },
+  }
+}
+
 /** Whitelist executorů. Co tu není, se neprovede. */
 export async function runAction(action: Action): Promise<RunOutcome> {
   try {
@@ -506,6 +706,14 @@ export async function runAction(action: Action): Promise<RunOutcome> {
         return await runCancelInvoice(action)
       case 'send_message':
         return await runSendMessage(action)
+      case 'update_contact':
+        return await runUpdateContact(action)
+      case 'update_project':
+        return await runUpdateProject(action)
+      case 'update_event':
+        return await runUpdateEvent(action)
+      case 'remember':
+        return await runRemember(action)
       default: {
         const never: never = action
         void never
@@ -580,6 +788,14 @@ export async function undoStep(token: UndoToken): Promise<UndoOutcome> {
         const result = await setInvoicePaid(token.id, token.previousPaidOn)
         return result.error ? { ok: false, error: result.error } : { ok: true }
       }
+      case 'lead_updated':
+        await updateLead(token.id, token.before as unknown as LeadPayload)
+        return { ok: true }
+      case 'project_updated':
+        await writeProjectFields(token.id, token.before as unknown as ProjectFields)
+        return { ok: true }
+      case 'memory':
+        return (await discardMemory(token.id)) ? { ok: true } : { ok: false, error: 'Tohle už v paměti není.' }
       default: {
         const never: never = token
         void never

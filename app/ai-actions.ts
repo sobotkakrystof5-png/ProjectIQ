@@ -7,7 +7,9 @@ import { CONFIDENCE_FLOOR, suggestionSchema, type Suggestion } from '@/lib/ai/su
 import { actionClass, autoRunIndexes, type ActionClass } from '@/lib/ai/action-policy'
 import { actionLines, actionTitle, type Line } from '@/lib/ai/action-lines'
 import { CONTEXT_KINDS } from '@/lib/ai/context'
-import { TEXT_MAX } from '@/lib/ai/assistant-limits'
+import { HISTORY_MAX, TEXT_MAX } from '@/lib/ai/assistant-limits'
+import { gapsQuestion, planGaps } from '@/lib/ai/action-requirements'
+import { pastActions, pragueNow } from '@/lib/ai/time-context'
 import { runAction, undoStep } from '@/lib/admin/suggestion-apply'
 import {
   claimForApply,
@@ -41,6 +43,17 @@ const proposeInput = z.object({
   text: z.string().trim().min(1).max(TEXT_MAX),
   contextRef: z.object({ kind: z.enum(CONTEXT_KINDS), id: z.string().uuid() }).nullish(),
   source: z.enum(['command', 'panel', 'voice']).default('panel'),
+  /** Předchozí repliky téhož chatu (R-113). Každé otevření panelu po pauze začíná nový. */
+  history: z
+    .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(TEXT_MAX * 2) }))
+    .max(HISTORY_MAX)
+    .optional(),
+  /**
+   * Viděl už tenhle chat text, který mohl napsat někdo cizí (kontext záznamu,
+   * výsledky dotazů)? Pak se nic neprovede samo ani v dalších kolech —
+   * podstrčený pokyn by jinak mohl projít přes odpověď asistenta v historii.
+   */
+  tainted: z.boolean().optional(),
 })
 
 export type ActionView = {
@@ -63,6 +76,14 @@ export type PlanView = {
   guarded: boolean
   /** Plán nejde uložit (chybí migrace 110) — nic se neprovede vůbec. */
   cannotRun: boolean
+  /** Chybí povinný údaj — nic se neprovedlo, asistent se ptá (R-113). */
+  needsInfo: boolean
+  /** Termín nebo další krok míří do minulosti — nic se neprovedlo samo, čeká na klepnutí. */
+  pastTime: boolean
+  /** Shrnutí kola pro historii chatu: odpověď a co se s čím stalo, i s id záznamů. */
+  turn: string
+  /** Chat od teď nesmí nic provádět sám (viz `tainted` ve vstupu). */
+  tainted: boolean
 }
 
 export type ProposeOutcome = ({ ok: true } & PlanView) | { ok: false; error: string }
@@ -77,11 +98,63 @@ const DAY_WINDOW_MINUTES = 24 * 60
 const DAY_MAX_REQUESTS = 300
 const RATE_ACTOR = 'admin'
 
+/** Jaký záznam krok založil nebo změnil — model na něj v dalším kole odkáže přes id. */
+function stepRecord(step: StepState): string | null {
+  const undo = step.undo
+  if (!undo) return null
+  switch (undo.type) {
+    case 'lead':
+    case 'lead_updated':
+      return `kontakt ${undo.id}`
+    case 'event_created':
+    case 'event_moved':
+      return `termín ${undo.id}`
+    case 'project':
+    case 'project_updated':
+      return `zakázka ${undo.id}`
+    case 'status':
+      return `zakázka ${undo.projectId}`
+    case 'income':
+      return `příjem ${undo.id}`
+    case 'cost':
+      return `náklad ${undo.id}`
+    case 'invoice_paid':
+      return `faktura ${undo.id}`
+    default:
+      return null
+  }
+}
+
+/**
+ * Co se v kole stalo, jako text pro historii chatu. Model z toho v dalším
+ * kole pozná, co je hotové, co čeká a na co se ptal — a má id záznamů,
+ * aby „posuň to na čtvrtou" sáhlo na správný termín.
+ */
+function turnSummaryFor(suggestion: Suggestion, steps: StepState[], needsInfo: boolean): string {
+  const lines: string[] = []
+  if (suggestion.reply) lines.push(suggestion.reply)
+  for (const [index, action] of suggestion.actions.entries()) {
+    const step = steps.find((s) => s.index === index)
+    const detail = actionLines(action)
+      .map((l) => `${l.label}: ${l.value}`)
+      .join('; ')
+    if (step?.ok && step.undone) lines.push(`[Vráceno] ${step.message} (${detail})`)
+    else if (step?.ok) {
+      const record = stepRecord(step)
+      lines.push(`[Provedeno] ${step.message}${step.description ? ` — ${step.description}` : ''}${record ? ` (${record})` : ''}`)
+    } else if (step && !step.ok) lines.push(`[Nepovedlo se] ${actionTitle(action)}: ${step.error ?? ''} (${detail})`)
+    else if (needsInfo) lines.push(`[Neprovedeno, čeká na doplnění] ${actionTitle(action)} (${detail})`)
+    else lines.push(`[Čeká na klepnutí] ${actionTitle(action)} (${detail})`)
+  }
+  return lines.join('\n').slice(0, TEXT_MAX * 2)
+}
+
 function view(
   id: string | null,
   suggestion: Suggestion,
   steps: StepState[],
-  flags: { unsure: boolean; guarded: boolean; cannotRun: boolean },
+  flags: { unsure: boolean; guarded: boolean; cannotRun: boolean; needsInfo: boolean; pastTime: boolean; tainted: boolean },
+  turn: string,
 ): PlanView {
   return {
     id,
@@ -96,6 +169,7 @@ function view(
     assumptions: suggestion.assumptions,
     missing: suggestion.missing,
     ...flags,
+    turn,
   }
 }
 
@@ -150,9 +224,38 @@ export async function proposeSuggestion(raw: unknown): Promise<ProposeOutcome> {
   }
   await Promise.all([recordApiRequest(RATE_KEY, RATE_ACTOR), recordApiRequest(DAY_KEY, RATE_ACTOR)])
 
-  const result = await proposeAction({ text: parsed.data.text, contextRef: parsed.data.contextRef })
+  const result = await proposeAction({
+    text: parsed.data.text,
+    contextRef: parsed.data.contextRef,
+    history: parsed.data.history,
+  })
   if ('error' in result) return { ok: false, error: result.error }
-  const suggestion = result.suggestion
+  let suggestion = result.suggestion
+  const tainted = result.untrustedContext || parsed.data.tainted === true
+
+  // Pojistka „nejdřív se zeptej" (R-113): s chybějícím povinným údajem se
+  // nic neprovede a plán se ani neuloží — zeptá se a další kolo ho sestaví
+  // znovu, celý. Když model otázku sám nepoložil, doplní ji server.
+  const gaps = planGaps(suggestion.actions)
+  const needsInfo = gaps.length > 0
+  if (needsInfo) {
+    const question = gapsQuestion(gaps)
+    const asked = suggestion.reply.includes('?')
+    suggestion = {
+      ...suggestion,
+      reply: asked ? suggestion.reply : [suggestion.reply, question].filter(Boolean).join(' ').slice(0, 500),
+      missing: [...new Set([...suggestion.missing, ...gaps])].slice(0, 8),
+    }
+    const flags = { unsure: false, guarded: false, cannotRun: false, needsInfo: true, pastTime: false, tainted }
+    return { ok: true, ...view(null, suggestion, [], flags, turnSummaryFor(suggestion, [], true)) }
+  }
+
+  // Termín v minulosti je buď omyl („ve tři" řečené v pět), nebo zpětný
+  // zápis. Ani jedno nesmí proběhnout samo — čeká na klepnutí.
+  const past = pastActions(suggestion.actions, pragueNow())
+  if (past.length > 0) {
+    suggestion = { ...suggestion, missing: [...new Set([...past, ...suggestion.missing])].slice(0, 8) }
+  }
 
   // Bez migrace 110 se plán neuloží (`id` je null) — asistent pak řekne, co
   // by udělal, ale nic neprovede: bez uloženého plánu by nešlo „Zpět".
@@ -168,21 +271,23 @@ export async function proposeSuggestion(raw: unknown): Promise<ProposeOutcome> {
 
   const flags = {
     unsure: suggestion.actions.length > 0 && suggestion.confidence < CONFIDENCE_FLOOR,
-    guarded: suggestion.actions.length > 0 && result.untrustedContext,
+    guarded: suggestion.actions.length > 0 && tainted,
     cannotRun: id === null && suggestion.actions.length > 0,
+    needsInfo: false,
+    pastTime: past.length > 0,
+    tainted,
   }
-  if (!id) return { ok: true, ...view(null, suggestion, [], flags) }
+  if (!id) return { ok: true, ...view(null, suggestion, [], flags, turnSummaryFor(suggestion, [], false)) }
 
-  const steps = await runIndexes(
-    suggestion,
-    autoRunIndexes({ suggestion, untrustedContext: result.untrustedContext }),
-  )
+  const steps = past.length > 0 ? [] : await runIndexes(suggestion, autoRunIndexes({ suggestion, untrustedContext: tainted }))
   await saveSteps(id, steps, pendingIndexes(suggestion, steps).length === 0)
 
-  return { ok: true, ...view(id, suggestion, steps, flags) }
+  return { ok: true, ...view(id, suggestion, steps, flags, turnSummaryFor(suggestion, steps, false)) }
 }
 
-export type StepsOutcome = { ok: true; steps: StepView[]; pending: number[] } | { ok: false; error: string }
+export type StepsOutcome =
+  | { ok: true; steps: StepView[]; pending: number[]; turn: string }
+  | { ok: false; error: string }
 
 /**
  * Provede, co v plánu čeká: všechno, nebo jen akci s pořadím `index`.
@@ -215,7 +320,7 @@ export async function applySuggestion(id: string, index?: number): Promise<Steps
   const steps = mergeSteps(row.steps, fresh)
   const left = pendingIndexes(suggestion, steps)
   await saveSteps(id, steps, left.length === 0)
-  return { ok: true, steps: steps.map(toStepView), pending: left }
+  return { ok: true, steps: steps.map(toStepView), pending: left, turn: turnSummaryFor(suggestion, steps, false) }
 }
 
 /**
@@ -259,7 +364,12 @@ export async function undoSuggestion(id: string, index?: number): Promise<StepsO
   const views = finalSteps.map(toStepView)
   if (failed.size > 0) return { ok: false, error: [...failed.values()][0] }
   const row2 = suggestionSchema.safeParse(row.suggestion)
-  return { ok: true, steps: views, pending: row2.success ? pendingIndexes(row2.data, finalSteps) : [] }
+  return {
+    ok: true,
+    steps: views,
+    pending: row2.success ? pendingIndexes(row2.data, finalSteps) : [],
+    turn: row2.success ? turnSummaryFor(row2.data, finalSteps, false) : '',
+  }
 }
 
 export async function rejectSuggestion(id: string): Promise<{ ok: boolean }> {

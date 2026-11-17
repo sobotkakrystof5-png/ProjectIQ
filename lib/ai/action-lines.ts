@@ -1,4 +1,4 @@
-import { STATUS_LABELS, type ProjectStatus } from '@/lib/types'
+import { LEAD_STATUS_LABELS, STATUS_LABELS, type LeadStatus, type ProjectStatus } from '@/lib/types'
 import { SUGGESTION_LABELS, type Action } from '@/lib/ai/suggestion-schema'
 
 /**
@@ -129,6 +129,43 @@ export function actionLines(action: Action): Line[] {
         { label: 'Komu', value: (action.channel === 'email' ? action.email : action.phone) ?? refText(action.ref, 'podle kontaktu') },
         ...opt('Předmět', action.subject),
         { label: 'Text', value: action.body },
+      ]
+    case 'update_contact':
+      return [
+        { label: 'Kontakt', value: refText(action.ref, 'otevřený kontakt') },
+        ...opt('Nový název', action.companyName),
+        ...opt('Jméno', action.contactName),
+        ...opt('Telefon', action.phone),
+        ...opt('E-mail', action.email),
+        ...opt('Stav', action.leadStatus ? (LEAD_STATUS_LABELS[action.leadStatus as LeadStatus] ?? action.leadStatus) : null),
+        ...opt('Další krok', action.nextAction),
+        ...opt('Kdy', action.nextActionDate || action.nextActionTime ? when(action.nextActionDate, action.nextActionTime) : null),
+        ...opt('Odhad hodnoty', action.estimatedValue !== null ? money(action.estimatedValue) : null),
+      ]
+    case 'update_project':
+      return [
+        { label: 'Zakázka', value: refText(action.project, 'otevřená zakázka') },
+        ...opt('Klient', action.clientName),
+        ...opt('Druh práce', action.serviceType),
+        ...opt('Cena', action.price !== null ? money(action.price) : null),
+        ...opt('Termín', czDate(action.deadline)),
+        ...opt('Telefon', action.clientPhone),
+        ...opt('E-mail', action.clientEmail),
+        ...opt('Popis', action.description),
+      ]
+    case 'update_event':
+      return [
+        { label: 'Termín', value: [refText(action.event, 'z otevřené obrazovky'), czDate(action.event.date)].filter(Boolean).join(', ') },
+        ...opt('Nový název', action.title),
+        ...opt('S kým', action.contactName),
+        ...opt('Telefon', action.phone),
+        ...opt('E-mail', action.email),
+        ...opt('Poznámka', action.note),
+      ]
+    case 'remember':
+      return [
+        { label: 'Kam', value: action.scope === 'global' ? 'Obecně o firmě' : `Zakázka: ${refText(action.project, 'otevřená zakázka')}` },
+        { label: 'Co', value: action.text },
       ]
   }
 }

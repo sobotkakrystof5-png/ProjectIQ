@@ -108,9 +108,15 @@ beforeAll(async () => {
   await db.exec(migration)
   setAdminDbForTests(pgliteAdminDriver(db))
   resetSuggestionsReadyForTests()
+  // Asistent hlídá termíny v minulosti (R-113). Pevné „teď" před termíny
+  // z testu, ať test nezačne padat, až 19. 11. 2026 projde. Jen `Date` —
+  // časovače PGlite běží dál.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-17T09:00:00Z'))
 })
 
 afterAll(async () => {
+  vi.useRealTimers()
   setAdminDbForTests(null)
   resetSuggestionsReadyForTests()
   await db.close()
@@ -134,8 +140,12 @@ describe('věta → provedení', () => {
     if (!out.ok || !out.id) return
     expect(runSpy).toHaveBeenCalledTimes(1)
     expect(out.steps).toEqual([expect.objectContaining({ index: 0, ok: true, canUndo: true })])
-    // Údaj pro „Zpět" do prohlížeče nejde.
-    expect(JSON.stringify(out)).not.toContain(EVENT_UNDO.id)
+    // Údaj pro „Zpět" do prohlížeče nejde. Id záznamu ve shrnutí kola být
+    // smí (R-113): model ho v dalším kole potřebuje, aby „posuň to" sáhlo
+    // na správný termín — jak krok vrátit, ale leží jen v databázi.
+    expect(JSON.stringify(out.steps)).not.toContain(EVENT_UNDO.id)
+    expect(JSON.stringify(out)).not.toContain('"undo"')
+    expect(out.turn).toContain(`termín ${EVENT_UNDO.id}`)
 
     const row = await loadSuggestion(out.id)
     expect(row?.status).toBe('applied')
@@ -173,6 +183,69 @@ describe('věta → provedení', () => {
   })
 })
 
+describe('nejdřív se zeptat (R-113)', () => {
+  it('termín bez času nic neprovede, neuloží a zeptá se', async () => {
+    proposed(plan([{ ...MEETING, time: null }]))
+    const out = await proposeSuggestion({ text: 'schůzka s Novákem ve čtvrtek' })
+
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(runSpy).not.toHaveBeenCalled()
+    expect(out.needsInfo).toBe(true)
+    expect(out.id).toBeNull()
+    expect(out.missing).toContain('čas termínu')
+    expect(out.reply).toContain('čas termínu')
+    expect(out.turn).toContain('čeká na doplnění')
+    const rows = await db.query('SELECT count(*)::int AS n FROM ai_suggestions')
+    expect((rows.rows[0] as { n: number }).n).toBe(0)
+  })
+
+  it('zadrží celý plán, i když je v něm i úplná akce', async () => {
+    proposed(plan([{ kind: 'create_contact', companyName: 'Novák', contactName: null, phone: '777123456', email: null, note: null }, { ...MEETING, date: null }]))
+    const out = await proposeSuggestion({ text: 'přidej Nováka a zapiš ho na schůzku' })
+    expect(out.ok && out.needsInfo).toBe(true)
+    expect(runSpy).not.toHaveBeenCalled()
+  })
+
+  it('historii a příznak cizího textu přijme a cizí text vypne samostatné provádění', async () => {
+    proposed(plan([MEETING]))
+    const out = await proposeSuggestion({
+      text: 've dvě, telefon 777 123 456',
+      history: [
+        { role: 'user', content: 'schůzka s Novákem ve čtvrtek' },
+        { role: 'assistant', content: 'V kolik hodin?' },
+      ],
+      tainted: true,
+    })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(proposeSpy.mock.calls[0][0]).toMatchObject({ history: [{ role: 'user' }, { role: 'assistant' }] })
+    expect(runSpy).not.toHaveBeenCalled()
+    expect(out.guarded).toBe(true)
+    expect(out.tainted).toBe(true)
+  })
+})
+
+describe('čas (R-113)', () => {
+  it('termín, který už proběhl, se neprovede sám, ale jde zapsat klepnutím', async () => {
+    proposed(plan([{ ...MEETING, date: '2026-11-17', time: '08:00' }]))
+    const out = await proposeSuggestion({ text: 'zapiš schůzku s Novákem dnes v osm' })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(runSpy).not.toHaveBeenCalled()
+    expect(out.pastTime).toBe(true)
+    expect(out.id).not.toBeNull()
+    expect(out.missing[0]).toContain('už proběhl')
+  })
+
+  it('dnešní termín, který teprve bude, proběhne sám', async () => {
+    proposed(plan([{ ...MEETING, date: '2026-11-17', time: '16:00' }]))
+    const out = await proposeSuggestion({ text: 'zapiš schůzku s Novákem dnes ve čtyři' })
+    expect(out.ok && out.pastTime).toBe(false)
+    expect(runSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('klepnutí', () => {
   it('provede přesně to, co leží v databázi', async () => {
     const id = await insert()
@@ -188,7 +261,12 @@ describe('klepnutí', () => {
     const id = await insert(plan([MEETING, INVOICE]))
     const result = await applySuggestion(id, 1)
 
-    expect(result).toEqual({ ok: true, steps: [expect.objectContaining({ index: 1 })], pending: [0] })
+    expect(result).toEqual({
+      ok: true,
+      steps: [expect.objectContaining({ index: 1 })],
+      pending: [0],
+      turn: expect.any(String),
+    })
     expect(runSpy.mock.calls[0][0]).toEqual(INVOICE)
     expect((await loadSuggestion(id))?.status).toBe('pending')
   })

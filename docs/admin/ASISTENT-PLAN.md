@@ -69,3 +69,18 @@ Odchylky od oddílu 2: pojistka proti cizímu textu se uplatní u **každého** 
 - **A4** — dotazy na data, jen čtení, pět pevných tvarů (`lib/admin/assistant-lookups.ts`): kalendář za období (tytéž zdroje jako obrazovka Kalendář), volný čas v den (pracovní doba 8–18, admin žádnou nastavenou nemá), zakázka s doplatkem (`remainingSql`, i ruční zálohy), kontakt, nezaplacené faktury a nedoplacené zakázky. Model si o data řekne (`lookups`), server je provede a model odpoví ve druhém kole. Bez poznámek a popisů (píší je klienti); plán sestavený nad daty se **neprovede sám**. Ověřeno živě s podstrčenými daty: dluh, volno, týden v kalendáři a „zapiš na první volné místo" — 4 ze 4, 3–5 s.
 
 Zbývá: průchod v prohlížeči na 390 / 1280 px s přihlášením a databází s migrací 110 (testovací Neon ji nemá), commit a nasazení se souhlasem.
+
+## 8. Chat, kontext a doptávání (R-113, 2026-11-17)
+
+Kryštof chtěl, aby asistent měl paměť a souvislosti o firmě, aby každý chat byl nová session s kontextem, aby mohl upravovat všechno a aby se na čas, telefon a další potřebné údaje zeptal dřív, než něco udělá.
+
+- **Chat:** panel drží repliky jednoho chatu a posílá je s každou větou (`history`, nejvýš 20). Asistentovu stranu tvoří shrnutí kola ze serveru (`turnSummaryFor` v `app/ai-actions.ts`) — odpověď a stav každé akce s id záznamu, takže „posuň to na čtvrtou" trefí správný termín. Nový chat: tlačítko, ⌘K, nebo otevření po 15 minutách bez práce.
+- **Přehled firmy** (`lib/ai/workspace-snapshot.ts`) ke každé větě: popis firmy a adminu, rozpracované zakázky (20), kontakty v Hovorech (20), termíny na 14 dní (25), obecná paměť. Jen strukturované údaje, telefon a e-mail jen jako „máme / nemáme".
+- **Úpravy:** `update_contact` (přes `updateLead`), `update_project` (úzký UPDATE), `update_event` (název, poznámka, kontakt; čas dál `move_event`). Prázdné pole = beze změny; mazat hodnoty asistent neumí.
+- **Paměť:** `remember` uloží potvrzenou větu do `project_memory` (obecně, nebo k zakázce). Obecná paměť se objeví v přehledu každého dalšího chatu.
+- **Nejdřív se zeptat:** prompt vyjmenuje, co se v které tabulce vede a na co se ptát; `lib/ai/action-requirements.ts` je tvrdá pojistka — chybí-li povinný údaj, nic se neprovede ani neuloží a odpověď je otázka. Povinné: termín = den + čas; kontakt = telefon nebo e-mail; zakázka = druh práce, cena, telefon nebo e-mail; platba = částka (+ zakázka u zálohy); náklad = název + částka; úpravy = záznam + aspoň jedna změna. Telefon u termínu s novým člověkem a jméno kontaktní osoby jsou „zeptej se jednou" jen v promptu.
+- **Cizí text:** kontext záznamu nebo dotazy na data označí celý chat (`tainted`) — dál se nic neprovede samo. Přehled firmy chat neoznačí (DECISIONS #034).
+- **Čas** (`lib/ai/time-context.ts`): ke každé větě blok `<cas>` — teď v pražském čase s částí dne, tabulka dnů na 14 dní (den v týdnu → datum), začátek příštího týdne a předpočítané „za 15 minut … za tři hodiny“ (zaokrouhleno nahoru na 5 minut; model to sám počítal špatně). Prompt: datum ke dni bere z tabulky, „ráno/odpoledne/večer“ není čas, dnešní čas, který proběhl → otázka (zítra, nebo zpětně), kolize s termínem v přehledu → otázka s nabídkou volna, mimo 8–18 a o víkendu jen upozornění, „do konce měsíce“ = poslední den. Pojistka `pastActions`: termín nebo další krok v minulosti se nikdy neprovede sám, jen klepnutím (zpětný zápis).
+- **Model:** hlavní `smart` (Sonnet 5.5), `fast` jen když odpověď nejde přečíst.
+
+Zbývá: živá zkouška s modelem a průchod v prohlížeči (otevřený problém v memory.md).

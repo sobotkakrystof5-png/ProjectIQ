@@ -1076,6 +1076,11 @@ opakované poslání nic nezdvojí a dorazí i změny, které hovor nespouští.
 z Growth OS se nepíše — firma se převezme do Hovorů a dál jede stávající `convertLeadToProject`.
 Rezervace termínů přes Workspace API (D-055 v Growth OS) se nemění. Bezpečnost DECISIONS #033.
 
+### R-113 · Asistent je chat s přehledem firmy, umí upravovat a ptá se dřív, než něco udělá (2026-11-17)
+**Rozhodnutí:** (1) Asistent v adminu vede **rozhovor**: každé otevření panelu po 15 minutách bez práce (nebo „Nový chat") je nová session, uvnitř si pamatuje předchozí repliky. (2) Ke každé větě dostane **přehled firmy** — rozpracované zakázky, kontakty, termíny na 14 dní a obecnou paměť (`lib/ai/workspace-snapshot.ts`). (3) Umí **upravit** kontakt, zakázku a termín a **zapamatovat si** větu do `project_memory` (vše se „Zpět"). (4) **Než cokoli udělá, má mít všechno potřebné** — u termínu den a přesný čas, u kontaktu telefon nebo e-mail, u zakázky druh práce, cenu a kontakt, u platby částku; jinak se zeptá a nic neprovede (`lib/ai/action-requirements.ts` zadrží celý plán). (5) Hlavní model je `smart` (Sonnet), `fast` je jen záchrana. (6) **Čas:** ke každé větě blok `<cas>` (`lib/ai/time-context.ts`) — kolik je teď v Praze, část dne, tabulka dnů na 14 dní, začátek příštího týdne a předpočítané „za hodinu“ (model to sám počítal špatně). Prompt: „ráno/odpoledne“ není čas, dnešní čas, který proběhl → otázka, kolize s termínem v přehledu → otázka s nabídkou volna, mimo 8–18 jen upozornění. Termín nebo další krok v minulosti se nikdy neprovede sám (`pastActions`), jen klepnutím.
+**Proč:** Kryštof 2026-11-17: „dodej mu paměť a souvislosti o projektu, každý chat jako nová session s kontextem, ať může vše upravovat, rozumněji, na čas a číslo se vždy zeptej dřív, než něco uděláš".
+**Důsledek:** rozšiřuje R-111. Shrnutí kola (co se provedlo, s id záznamů) jde do prohlížeče a zpět jako historie; údaje pro „Zpět" zůstávají v DB. Přehled nese jen strukturované údaje, takže samostatné provádění nevypíná; kontext záznamu a dotazy na data ho vypínají pro celý chat (`tainted`). Nový druh akce = schéma, `actionGaps`, řádky, executor a undo token. Cena ~0,3–0,5 Kč za větu místo ~0,07. Bezpečnost `.claude/security/DECISIONS.md` #034, plán `docs/admin/ASISTENT-PLAN.md` oddíl 8.
+
 ### R-114 · Schůzka s Google Meet a e-mail klientovi z vizeon.cz přes Resend (2026-11-17)
 **Rozhodnutí:** „Domluvit schůzku" u firmy od AI asistenta založí událost s Google Meet v Google
 Kalendáři Kryštofa (Workspace vizeon.cz, OAuth „Internal", scope jen `calendar.events`),
@@ -1094,6 +1099,7 @@ události v adminu („Připojit se"). Nová cesta, která zakládá schůzku s 
 
 ## 3. Otevřené problémy
 
+- [ ] **Asistent jako chat (R-113) neověřený naživo ani v prohlížeči:** ověřeno testy, `tsc`, buildem a živě se Sonnetem nad smyšleným přehledem (4 ze 4), ale ne v prohlížeči nad skutečnými daty. Projít: věta bez času → otázka → odpověď „ve tři" → zapsáno jednou; „posuň to na čtvrtou" v témže chatu; „oprav Novákovi telefon"; „zapamatuj si…" a že se paměť objeví v dalším chatu; nový chat po „Nový chat". Hlídat, jestli se neptá zbytečně (otravné) a jestli Sonnet nestojí víc, než je odhad · od 2026-11-17
 - [ ] **Hovory od asistenta (R-112) — nasadit a projít:** (1) `GROWTH_OS_API_KEY` do Vercelu
   (Production) a do GitHub Secrets `vizeon-autopilot`, (2) migrace 114 na produkci,
   (3) merge a deploy ZakazIQ, (4) push `claude/zakaziq-admin-sync` v autopilotu, (5) jednou
@@ -1385,6 +1391,10 @@ události v adminu („Připojit se"). Nová cesta, která zakládá schůzku s 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-17 (asistent jako chat — R-113)
+- **feat** **Asistent je chat s pamětí a přehledem firmy:** historie replik v rámci chatu, nový chat po 15 min nebo tlačítkem, ke každé větě blok `<prehled>` (zakázky, kontakty, termíny na 14 dní, obecná paměť). Nové akce `update_contact`, `update_project`, `update_event`, `remember` se „Zpět". Pojistka „nejdřív se zeptej" zadrží plán s chybějícím povinným údajem. Hlavní model Sonnet. **Pojem o čase:** blok `<cas>` s hodinou, tabulkou dnů a předpočítaným „za hodinu“, pravidla pro relativní časy, kolize a minulost; termín v minulosti jen klepnutím. Soubory: `lib/ai/{action-requirements,workspace-snapshot,time-context,prompts,propose,plan-format,action-lines,suggestion-schema}.ts`, `lib/admin/{suggestion-apply,suggestions}.ts`, `app/ai-actions.ts`, `components/admin/assistant-panel.tsx`, testy `lib/__tests__/ai-chat.test.ts`, `ai-navrhy`, `ai-executory`. Bez migrace (stačí 110 a 111).
+- **chore** Ověřeno: `tsc`, testy asistenta 115/115, `npm test` (5 selhání mimo asistenta — `ws-schema` mezera po 113, `ws-email` pevné datum, tři časové limity v plné sadě, samostatně procházejí), `npm run build:check`. **Živě se Sonnetem nad smyšleným přehledem 4 ze 4:** věta bez času → otázka na čas i telefon; odpověď „ve tři, číslo…“ v témže chatu → úplný termín; „zvedni cenu a zapamatuj si…“ → úprava zakázky + paměť k ní s id z přehledu; „posuň to na čtvrtou“ → přesun termínu podle id z minulého kola. Čas živě v 19:50: „dnes ve dvě“ → „už proběhlo, myslíte zítra?“; „ve čtvrtek v deset“ s obsazeným termínem → nabídne 11:00; „za hodinu“ → 20:55; „zítra odpoledne“ → zeptá se na přesný čas. **Prohlížeč neověřený.** Necommitnuto.
 
 ### 2026-11-17 (schůzka s Google Meet a e-mail z vizeon.cz — krok 3 a 4)
 - **feat** **Domluvit schůzku** u firmy v Hovorech › Od asistenta (R-114): den, čas, délka, e-mail
