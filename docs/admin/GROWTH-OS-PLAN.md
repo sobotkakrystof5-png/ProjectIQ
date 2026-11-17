@@ -83,21 +83,26 @@ doplnit mazání i v Googlu.
 
 ## 6. Co nasadit
 
-1. Vygenerovat klíč (`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`), dát ho do
-   Vercelu ZakazIQ jako `GROWTH_OS_API_KEY` (Production) a do GitHub Secrets `vizeon-autopilot`
-   pod stejným názvem.
-2. Migrace 114 na produkční Neon (aditivní, smí jít před nasazením).
-3. Nasadit ZakazIQ (merge `admin/growth-hovory` → `main`, push jen se souhlasem).
-4. Pushnout `claude/zakaziq-admin-sync` v autopilotu do `main` (= nasazení, jen na pokyn Kryštofa).
-5. Jednou spustit workflow „Synchronizace do ZakazIQ" s volbou „všechny" (dotažení historie).
-6. **Google Cloud** (účet Workspace vizeon.cz, console.cloud.google.com): nový projekt → zapnout
-   **Google Calendar API** → OAuth consent screen, typ **Internal** → Credentials → OAuth client
-   ID, typ **Web application**, Authorized redirect URIs
+**Hotovo 2026-11-17 (agent):** `GOOGLE_TOKEN_KEY` a `GROWTH_OS_API_KEY` vygenerované a uložené ve
+Vercelu (Production); `GROWTH_OS_API_KEY` se stejnou hodnotou v GitHub Secrets `vizeon-autopilot`.
+Hodnoty nikde nezapsané.
+
+**Zbývá (Kryštof), v tomhle pořadí:**
+
+1. **Migrace 114 a 115 na produkci.** `DATABASE_URL` je ve Vercelu citlivá, `vercel env pull` ji
+   stáhne prázdnou. Buď Neon → SQL Editor → vložit obsah `migrations/114_hovory_od_asistenta.sql`,
+   spustit, pak totéž s `115_schuzky_google_meet.sql` (obě jsou idempotentní), nebo produkční
+   connection string do `.env.production.local` a
+   `node scripts/apply-migration.js 114_hovory_od_asistenta.sql 115_schuzky_google_meet.sql --env .env.production.local`.
+2. **Google Cloud** (účet krystof@vizeon.cz): `gcloud auth login` (pak umí agent založit projekt
+   a zapnout Calendar API), nebo ručně v console.cloud.google.com: nový projekt → APIs & Services →
+   Library → **Google Calendar API** → Enable → Google Auth Platform / OAuth consent screen, typ
+   **Internal** → Clients → Create client, typ **Web application**, Authorized redirect URIs
    `https://www.zakaziq.cz/api/google/callback` a `http://localhost:3000/api/google/callback`.
-7. **Vercel** (Production): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`
-   (`openssl rand -base64 32`), `VIZEON_RESEND_API_KEY` (Resend → API Keys, Sending access, jen
-   doména vizeon.cz).
-8. Migrace 115 na produkci (aditivní).
-9. Profil → **Propojit Google účet**.
-10. Projít Hovory › Od asistenta na telefonu a na počítači: Domluvit schůzku na sebe (vlastní
-    e-mail jako klient) → odkaz v e-mailu, v Google Kalendáři a v kalendáři adminu, „Zpět" do 15 s.
+   Client ID a Client secret do Vercelu (Production) jako `GOOGLE_CLIENT_ID` a `GOOGLE_CLIENT_SECRET`.
+3. **Resend** (účet s doménou vizeon.cz): API Keys → Create → Sending access, doména vizeon.cz →
+   do Vercelu (Production) jako `VIZEON_RESEND_API_KEY`.
+4. Dát vědět agentovi: merge `admin/growth-hovory` → `main` a push (produkční deploy), push
+   `claude/zakaziq-admin-sync` v autopilotu, workflow „Synchronizace do ZakazIQ" s volbou
+   „všechny".
+5. Profil → **Propojit Google účet**, pak zkušební schůzka na vlastní e-mail z Hovory › Od asistenta.
