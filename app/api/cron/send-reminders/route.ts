@@ -9,6 +9,7 @@ import {
 import { expireOldSuggestions } from '@/lib/admin/suggestions'
 import { proposeMemoryDrafts } from '@/lib/admin/memory/drafts'
 import { remindPendingSurveys } from '@/lib/admin/surveys'
+import { sendOverdueInvites } from '@/lib/admin/meetings'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -210,6 +211,12 @@ export async function GET(req: NextRequest) {
     // za běh; bez klíče k modelu nebo bez migrace 111 se neudělá nic.
     proposeMemoryDrafts().catch(() => ({ checked: 0, created: 0 })),
     remindPendingSurveys().catch(() => ({ sent: 0, failed: 0 })),
+    // E-maily ke schůzkám (R-112), které po 15 s odkladu neodešly, protože
+    // funkce spadla. Jen pojistka — běžně odcházejí hned přes `after()`.
+    sendOverdueInvites().catch((err) => {
+      console.error('[cron] Pojistka e-mailů ke schůzkám selhala:', (err as Error).message)
+      return 0
+    }),
   ])
 
   const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, surveys: surveys.sent, errors: surveys.failed }

@@ -15,6 +15,8 @@ import { HodnoceniDashboard } from '@/components/HodnoceniDashboard'
 import { loadPerformanceScreen } from '@/lib/admin/closed'
 import { TotpCard } from '@/components/admin/totp-card'
 import { totpState } from '@/app/totp-actions'
+import { GoogleCard } from '@/components/admin/google-card'
+import { googleStatus } from '@/lib/admin/google/oauth'
 
 async function loadStats() {
   const [
@@ -158,11 +160,15 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
   )
 }
 
-export default async function ProfilPage() {
+export default async function ProfilPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const session = await getAdminSession()
   if (!session) redirect('/login')
 
-  const totp = await totpState()
+  const searchParams = await props.searchParams
+  const googleResult = typeof searchParams.google === 'string' ? searchParams.google : null
+  const [totp, google] = await Promise.all([totpState(), googleStatus()])
 
   // Dvě nezávislá čtení — souhrn profilu a podklady pro přehled výkonnosti.
   const [stats, performance] = await Promise.all([loadStats(), loadPerformanceScreen()])
@@ -454,6 +460,9 @@ export default async function ProfilPage() {
 
       {/* Přihlášení a druhý faktor (R-105) */}
       <TotpCard enabled={totp.enabled} />
+
+      {/* Google Kalendář a Meet pro schůzky (R-112) */}
+      <GoogleCard status={google} result={googleResult} />
 
       {/* Rychlé odkazy */}
       <div className="bg-surface border border-navy-100 rounded-chip p-5 shadow-sm">

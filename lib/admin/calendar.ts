@@ -48,6 +48,10 @@ export type RawCalendarEvent = {
   contact_name: string | null
   contact_phone: string | null
   contact_email: string | null
+  /** Schůzka s Google Meet (R-112, migrace 115). Bez migrace null. */
+  meet_url?: string | null
+  invite_status?: string | null
+  invite_sent_at?: string | null
 }
 
 export type RawLead = {
@@ -120,7 +124,10 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
         e.id, e.title, e.description, e.starts_at, e.ends_at, e.event_type, e.project_id,
         COALESCE(NULLIF(l.contact_name, ''), NULLIF(l.company_name, '')) AS contact_name,
         l.phone AS contact_phone,
-        l.email AS contact_email
+        l.email AS contact_email,
+        to_jsonb(e) ->> 'meet_url' AS meet_url,
+        to_jsonb(e) ->> 'invite_status' AS invite_status,
+        to_jsonb(e) ->> 'invite_sent_at' AS invite_sent_at
       FROM calendar_events e
       LEFT JOIN client_leads l ON l.id = e.lead_id
       WHERE e.starts_at >= ${fromInstant} AND e.starts_at < ${toInstant}

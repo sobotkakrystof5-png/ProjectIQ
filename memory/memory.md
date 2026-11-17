@@ -7,7 +7,8 @@
 > „Od asistenta" (komu zavolat a proč, převzetí do Hovorů s plánovaným hovorem). Krok 1 a 2
 > z `docs/admin/GROWTH-OS-PLAN.md` jsou v kódu na větvi `admin/growth-hovory`, strana Growth OS
 > na větvi autopilota `claude/zakaziq-admin-sync`. **Nenasazeno, v prohlížeči neověřeno;**
-> Google Meet a e-mail jedním klikem čekají na Kryštofovy odpovědi.
+> Večer přibyla **schůzka s Google Meet a e-mail klientovi z krystof@vizeon.cz** (R-114,
+> krok 3 a 4, migrace 115). Čeká na nastavení Google Cloudu a klíčů ve Vercelu.
 >
 > Předchozí: 2026-11-15 · **Veškeré přihlašování přechází na Supabase** (R-107).
 > Fáze F1 je v kódu na větvi `auth/supabase-klient`: klientský prostor `/klient` už nejede
@@ -1075,6 +1076,20 @@ opakované poslání nic nezdvojí a dorazí i změny, které hovor nespouští.
 z Growth OS se nepíše — firma se převezme do Hovorů a dál jede stávající `convertLeadToProject`.
 Rezervace termínů přes Workspace API (D-055 v Growth OS) se nemění. Bezpečnost DECISIONS #033.
 
+### R-114 · Schůzka s Google Meet a e-mail klientovi z vizeon.cz přes Resend (2026-11-17)
+**Rozhodnutí:** „Domluvit schůzku" u firmy od AI asistenta založí událost s Google Meet v Google
+Kalendáři Kryštofa (Workspace vizeon.cz, OAuth „Internal", scope jen `calendar.events`),
+událost v kalendáři adminu s odkazem a pošle klientovi e-mail **z krystof@vizeon.cz přes Resend**
+(vlastní klíč `VIZEON_RESEND_API_KEY`). **Pozvánku od Googlu klient nedostává** — událost
+v Googlu nemá hosty; klient se připojí rovnou z našeho e-mailu. E-mail čeká 15 s na „Zpět".
+**Proč:** Kryštof 2026-11-17: „poslat z krystof@vizeon.cz, resend z vizeon.cz", „je to
+workspace", „můj e-mail s odkazem na Meet … klient se rovnou připojí z e-mailu".
+**Důsledek:** **mění R-004** pro e-maily klientům VIZEONu ze schůzek — jdou přes Resend, ne Gmail
+SMTP (ten od 2026-08 stejně neposílá). Migrace 115 (`calendar_events.meet_url`, `invite_*`,
+`admin_settings.google_oauth`). Odkaz na Meet je v e-mailu, v Google Kalendáři a v detailu
+události v adminu („Připojit se"). Nová cesta, která zakládá schůzku s klientem, má jít přes
+`lib/admin/meetings.ts` (pořadí Google → admin → e-mail). Bezpečnost DECISIONS #035.
+
 ---
 
 ## 3. Otevřené problémy
@@ -1085,9 +1100,16 @@ Rezervace termínů přes Workspace API (D-055 v Growth OS) se nemění. Bezpeč
   workflow „Synchronizace do ZakazIQ" s volbou „všechny", (6) projít Hovory › Od asistenta
   na 390 a 1280 px, převzetí do Hovorů (hovor v kalendáři ve správný čas) a „Nemá zájem" se Zpět
   · `docs/admin/GROWTH-OS-PLAN.md` oddíl 6 · Kryštof · od 2026-11-17
-- [ ] **Hovory od asistenta — kroky 3 a 4 čekají na rozhodnutí:** odkud posílat e-mail klientovi
-  (Resend z vizeon.cz × Gmail), typ Google účtu (Gmail × Workspace) a zda posílat i pozvánku
-  od Googlu · `docs/admin/GROWTH-OS-PLAN.md` oddíl 5 · od 2026-11-17
+- [ ] **Schůzky s Google Meet (R-114) — nastavit a projít:** Google Cloud projekt ve Workspace
+  vizeon.cz (Calendar API, souhlas „Internal", OAuth klient s redirectem
+  `https://www.zakaziq.cz/api/google/callback`), do Vercelu `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`, `VIZEON_RESEND_API_KEY`, migrace 115, Profil →
+  Propojit Google účet; pak zkušební schůzka na vlastní e-mail. **Naživo nic nezkoušeno** —
+  Google ani Resend jen s podstrčenými odpověďmi v testech · `docs/admin/GROWTH-OS-PLAN.md`
+  oddíl 6 · Kryštof · od 2026-11-17
+- [ ] **Schůzka smazaná v kalendáři adminu zůstane v Google Kalendáři:** běžné mazání
+  (`deleteCalendarEvent`) Google nezná; ruší ji jen „Zpět" do odeslání e-mailu. Doplnit mazání
+  v Googlu, nebo mazat ručně · `app/calendar-actions.ts` · od 2026-11-17
 - [ ] **Next 16.4.2 má nové zranitelnosti (zjištěno 2026-11-17):** `next build` se při prvním
   běhu zastaví hláškou `SecurityFatalError` (opakovaný běh projde). `npm audit`: Next 16.2.0–16.4.4
   moderate (GHSA-mfr8-8qww-v76h, GHSA-vc7v-qv4w-wrv8 — únik přes `'use cache'`/`unstable_cache`;
@@ -1363,6 +1385,29 @@ Rezervace termínů přes Workspace API (D-055 v Growth OS) se nemění. Bezpeč
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-17 (schůzka s Google Meet a e-mail z vizeon.cz — krok 3 a 4)
+- **feat** **Domluvit schůzku** u firmy v Hovorech › Od asistenta (R-114): den, čas, délka, e-mail
+  klientovi s předvyplněným textem → událost s Google Meet v Google Kalendáři (bez hostů, Google
+  nic neposílá), událost v kalendáři adminu s odkazem a kontakt v Hovorech (stávající, nebo nový),
+  firma převzatá. E-mail z krystof@vizeon.cz přes Resend odchází po 15 s; „Zpět" ho zastaví a smaže
+  událost v adminu i v Googlu. Soubory: `lib/admin/meetings.ts`, `lib/admin/meeting-email.ts`,
+  `lib/admin/vizeon-mail.ts`, `app/meeting-actions.ts`, `components/admin/schedule-meeting-dialog.tsx`,
+  `components/admin/outreach-queue.tsx`, `app/dashboard/calls/page.tsx`.
+- **feat** **Propojení Google Kalendáře** v Profilu: `GET /api/google/connect` a `/api/google/callback`
+  (OAuth s PKCE, `state` v HttpOnly cookie), obnovovací token šifrovaný AES-256-GCM
+  (`GOOGLE_TOKEN_KEY`), odpojení s odvoláním tokenu. Soubory: `lib/admin/google/{oauth,crypto,calendar}.ts`,
+  `app/api/google/`, `components/admin/google-card.tsx`, `app/dashboard/profil/page.tsx`.
+- **feat** V detailu události kalendáře tlačítko **Připojit se** (Meet), stav e-mailu klientovi
+  a **Poslat e-mail znovu**, když neodešel. Denní cron `send-reminders` dožene e-maily, které po
+  odkladu zůstaly viset. Soubory: `lib/admin/calendar.ts`, `components/SmartCalendar.tsx`,
+  `app/api/cron/send-reminders/route.ts`.
+- **db** Migrace 115 `schuzky_google_meet` (aplikována: ne, nikde).
+- **chore** Ověřeno: `lib/__tests__/admin-schuzky.test.ts` (8 testů nad PGlite s vazbami
+  z migrace 051 a SQL migrací 114 + 115), `lib/__tests__/admin-schuzky-google.test.ts` (10:
+  šablona e-mailu, šifrování, OAuth, Meet s podstrčeným Googlem, Resend). **Google ani Resend
+  naživo nikdo nezkusil, v prohlížeči neověřeno.**
+- **decision** **R-114** (R-113 a DECISIONS #034 si souběžně vzalo sezení asistenta, proto #035).
 
 ### 2026-11-17 (hovory od asistenta z Growth OS — krok 1 a 2)
 - **feat** **Příjem hovorů z Growth OS** (R-112, DECISIONS #033): `POST /api/public/outreach`

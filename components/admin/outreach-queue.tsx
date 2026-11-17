@@ -9,6 +9,7 @@ import { SECTION_LABEL } from '@/components/admin/card'
 import { toast } from '@/components/ui/toast'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { dismissOutreachLead, takeOverOutreachLead, undoDismissOutreachLead } from '@/app/outreach-actions'
+import { ScheduleMeetingDialog, type MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
 import { formatWhen, queueReason, type OutreachQueueRow } from '@/lib/admin/outreach-view'
 import { cn } from '@/lib/utils'
 
@@ -20,7 +21,16 @@ import { cn } from '@/lib/utils'
  * `Shrnutí hovoru` je text od modelu o skutečném člověku: vykresluje se jako
  * text (React escapuje sám) a klientovi se neposílá.
  */
-export function OutreachQueue({ rows, nowIso }: { rows: OutreachQueueRow[]; nowIso: string }) {
+export function OutreachQueue({
+  rows,
+  nowIso,
+  meeting,
+}: {
+  rows: OutreachQueueRow[]
+  nowIso: string
+  /** Je propojený Google a nastavené odesílání z vizeon.cz? (R-112) */
+  meeting: MeetingReadiness
+}) {
   const [openId, setOpenId] = useState<string | null>(rows[0]?.id ?? null)
   // „Teď" přichází ze serveru, ať server a prohlížeč vykreslí stejné popisky
   // („dnes 14:30", „Chtěl zavolat") a řazení sedí s tím, co spočítal server.
@@ -44,6 +54,8 @@ export function OutreachQueue({ rows, nowIso }: { rows: OutreachQueueRow[]; nowI
           key={row.id}
           row={row}
           now={now}
+          nowIso={nowIso}
+          meeting={meeting}
           open={openId === row.id}
           onToggle={() => setOpenId(openId === row.id ? null : row.id)}
         />
@@ -55,16 +67,21 @@ export function OutreachQueue({ rows, nowIso }: { rows: OutreachQueueRow[]; nowI
 function OutreachItem({
   row,
   now,
+  nowIso,
+  meeting,
   open,
   onToggle,
 }: {
   row: OutreachQueueRow
   now: Date
+  nowIso: string
+  meeting: MeetingReadiness
   open: boolean
   onToggle: () => void
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const [meetingOpen, setMeetingOpen] = useState(false)
   const reason = queueReason(row, now)
   const detailId = `outreach-${row.id}`
 
@@ -178,7 +195,10 @@ function OutreachItem({
           </dl>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-navy-100 pt-3">
-            <Button type="button" onClick={prevzit} disabled={pending}>
+            <Button type="button" onClick={() => setMeetingOpen(true)} disabled={pending}>
+              Domluvit schůzku
+            </Button>
+            <Button type="button" variant="outline" onClick={prevzit} disabled={pending}>
               Převzít do Hovorů
             </Button>
             <Button type="button" variant="ghost" onClick={nezajem} disabled={pending}>
@@ -186,6 +206,16 @@ function OutreachItem({
             </Button>
           </div>
         </div>
+      )}
+
+      {meetingOpen && (
+        <ScheduleMeetingDialog
+          row={row}
+          nowIso={nowIso}
+          readiness={meeting}
+          open={meetingOpen}
+          onOpenChange={setMeetingOpen}
+        />
       )}
     </li>
   )

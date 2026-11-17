@@ -9,6 +9,8 @@ import { SmartCalendar } from '@/components/SmartCalendar'
 import { LEAD_SORT, loadCallsScreen } from '@/lib/admin/leads'
 import { loadAgentLeads } from '@/lib/admin/agent-leads'
 import { countOutreachQueue, loadOutreachQueue } from '@/lib/admin/outreach'
+import { googleStatus } from '@/lib/admin/google/oauth'
+import { vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
 import { loadCalendarWindow } from '@/lib/admin/calendar'
 import { windowFor } from '@/lib/admin/calendar-window'
 import { getPragueTodayISO } from '@/lib/prague-time'
@@ -46,13 +48,14 @@ export default async function CallsPage(props: {
   // jen ukládaly a nikdo je neviděl. Počty v záložkách potřebuje i pohled
   // kalendáře, proto se výpis čte vždy; kalendář jen na své záložce.
   const now = new Date()
-  const [screen, agentLeads, calendar, outreach, outreachCount] = await Promise.all([
+  const [screen, agentLeads, calendar, outreach, outreachCount, google] = await Promise.all([
     loadCallsScreen(params, waiting),
     calendarView || assistantView ? null : loadAgentLeads(),
     calendarView ? loadCalendarWindow(calendarRange) : null,
     assistantView ? loadOutreachQueue(now) : null,
     // null = migrace 114 ještě neběžela, záložka se neukáže.
     countOutreachQueue(),
+    assistantView ? googleStatus() : null,
   ])
   const links = tableLinks(PATH, searchParams)
 
@@ -121,7 +124,14 @@ export default async function CallsPage(props: {
           <SmartCalendar initial={calendar} initialRange={calendarRange} today={today} defaultView="week" />
         ) : assistantView ? (
           outreach?.available ? (
-            <OutreachQueue rows={outreach.rows} nowIso={now.toISOString()} />
+            <OutreachQueue
+              rows={outreach.rows}
+              nowIso={now.toISOString()}
+              meeting={{
+                google: google?.configured === true && google.connected,
+                mail: vizeonMailConfigured(),
+              }}
+            />
           ) : (
             <p className="text-sm text-quiet">Hovory od asistenta se ukážou, až databáze dostane migraci 114.</p>
           )

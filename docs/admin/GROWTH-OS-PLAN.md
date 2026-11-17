@@ -59,26 +59,29 @@ sledovací odkaz (`links`, plán Voice Outreach) nebo čtení stavu z Resendu.
 |---|---|---|
 | 1 | Příjem z Growth OS: migrace 114, `POST /api/public/outreach`, oznámení do zvonku; v autopilotu synchronizace z D1 | **v kódu 2026-11-17** (ZakazIQ větev `admin/growth-hovory`, autopilot větev `claude/zakaziq-admin-sync`), nenasazeno |
 | 2 | Fronta „Komu zavolat" v Hovorech: řazení podle naléhavosti, shrnutí, ukázka, „Zavolat", „Převzít do Hovorů" (plánovaný hovor v kalendáři), „Nemá zájem" se Zpět | **v kódu 2026-11-17**, v prohlížeči neověřeno |
-| 3 | Google Kalendář + Meet: propojení Google účtu v Profilu (OAuth, scope `calendar.events`, refresh token šifrovaně v DB), „Schůzka domluvena" → událost s `conferenceData` (Meet) + `calendar_events` | čeká na odpovědi v oddílu 5 |
-| 4 | E-mail jedním klikem: šablona (ukázka, vizeon.cz, termín, Meet), náhled, odeslání se Zpět 60 s, záznam ke kontaktu | čeká na odpovědi v oddílu 5 |
+| 3 | Google Kalendář + Meet: propojení Google účtu v Profilu (OAuth s PKCE, scope `calendar.events`, obnovovací token šifrovaně v DB), „Domluvit schůzku" → událost s Meetem v Google Kalendáři (bez hostů) + `calendar_events` s `meet_url` + kontakt v Hovorech | **v kódu 2026-11-17**, migrace 115, nenasazeno |
+| 4 | E-mail jedním klikem z krystof@vizeon.cz (Resend): úvod od Kryštofa + termín, tlačítko Připojit se ke schůzce, ukázka, vizeon.cz, podpis; odchází po 15 s se Zpět; stav a „Poslat e-mail znovu" v detailu události | **v kódu 2026-11-17**, nenasazeno |
 | 5 | Asistent (R-111): „domluv Novákovi schůzku ve čtvrtek ve 3 a pošli pozvánku" — schůzka sama, e-mail na klepnutí | po krocích 3 a 4 |
 | 6 | Zpětný kanál do Growth OS: „nevolat" a „zakázka" z adminu do D1, ať robot nevolá | po kroku 2 v provozu |
 | 7 | Sledování otevření ukázky a e-mailu v Growth OS (sledovací odkaz / Resend), ať fronta ví „otevřel ukázku" | práce v autopilotu |
 
-## 5. Otevřené otázky (rozhoduje Kryštof)
+## 5. Rozhodnuto 2026-11-17
 
-1. **Odkud posílat e-mail klientovi (krok 4)?** Resend z vizeon.cz (sledování otevření, opraví i
-   nefunkční Gmail v adminu — Otevřené problémy, 535 od 2026-08-18) × Gmail (zpráva v Odeslaných,
-   nové heslo aplikace). Doporučení: Resend s odpovědí na Kryštofův e-mail. Mění R-004.
-2. **Google účet (krok 3):** obyčejný Gmail, nebo Google Workspace na vizeon.cz? Mění nastavení
-   přihlášení. Pozor: aplikace v Google Cloud v režimu „Testing" vydává přístup jen na 7 dní —
-   musí být „In production" (pro vlastní účet bez ověřování Googlem).
-3. **Pozvánka od Googlu:** má klientovi přijít i pozvánka z Google Kalendáře (`sendUpdates=all`),
-   nebo jen náš e-mail s Meet odkazem?
-4. **Retence `outreach_leads`:** jak dlouho držet firmy, které nemají zájem nebo se nikdy
-   neozvaly. Návrh: 12 měsíců od posledního snímku, převzaté do Hovorů se řídí retencí Hovorů.
+1. **E-mail klientovi** jde z `krystof@vizeon.cz` přes **Resend** (doména vizeon.cz, stejný účet
+   Resendu jako Growth OS), vlastním klíčem `VIZEON_RESEND_API_KEY`. Odpovědi na krystof@vizeon.cz.
+2. **Google účet je Workspace** — OAuth klient typu „Internal", obnovovací token nevyprší.
+3. **Pozvánka od Googlu se klientovi neposílá.** Událost v Google Kalendáři nemá hosty; klient
+   dostane jen náš e-mail s odkazem na Meet a připojí se rovnou z něj.
 
-## 6. Co nasadit (krok 1 a 2)
+**Kde je odkaz na Meet:** v e-mailu klientovi (tlačítko „Připojit se ke schůzce"), v Google
+Kalendáři Kryštofa (telefon, počítač, upozornění od Googlu) a v kalendáři adminu — Kalendář, Dnes
+i Hovory › Kalendář — v detailu události tlačítko „Připojit se". Oba se připojí stejným odkazem.
+
+**Otevřené:** retence `outreach_leads` (návrh 12 měsíců od posledního snímku); schůzka smazaná
+v kalendáři adminu běžnou cestou (ne „Zpět") zůstane v Google Kalendáři — smazat ručně, nebo
+doplnit mazání i v Googlu.
+
+## 6. Co nasadit
 
 1. Vygenerovat klíč (`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`), dát ho do
    Vercelu ZakazIQ jako `GROWTH_OS_API_KEY` (Production) a do GitHub Secrets `vizeon-autopilot`
@@ -87,4 +90,14 @@ sledovací odkaz (`links`, plán Voice Outreach) nebo čtení stavu z Resendu.
 3. Nasadit ZakazIQ (merge `admin/growth-hovory` → `main`, push jen se souhlasem).
 4. Pushnout `claude/zakaziq-admin-sync` v autopilotu do `main` (= nasazení, jen na pokyn Kryštofa).
 5. Jednou spustit workflow „Synchronizace do ZakazIQ" s volbou „všechny" (dotažení historie).
-6. Projít Hovory › Od asistenta na telefonu a na počítači.
+6. **Google Cloud** (účet Workspace vizeon.cz, console.cloud.google.com): nový projekt → zapnout
+   **Google Calendar API** → OAuth consent screen, typ **Internal** → Credentials → OAuth client
+   ID, typ **Web application**, Authorized redirect URIs
+   `https://www.zakaziq.cz/api/google/callback` a `http://localhost:3000/api/google/callback`.
+7. **Vercel** (Production): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`
+   (`openssl rand -base64 32`), `VIZEON_RESEND_API_KEY` (Resend → API Keys, Sending access, jen
+   doména vizeon.cz).
+8. Migrace 115 na produkci (aditivní).
+9. Profil → **Propojit Google účet**.
+10. Projít Hovory › Od asistenta na telefonu a na počítači: Domluvit schůzku na sebe (vlastní
+    e-mail jako klient) → odkaz v e-mailu, v Google Kalendáři a v kalendáři adminu, „Zpět" do 15 s.

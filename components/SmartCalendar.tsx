@@ -10,6 +10,7 @@ import {
   Building2, User, Mail, MessageCircle, Coins,
 } from 'lucide-react'
 import { deleteCalendarEvent, restoreCalendarEvent } from '@/app/calendar-actions'
+import { resendMeetingInvite } from '@/app/meeting-actions'
 import { toast } from '@/components/ui/toast'
 import {
   CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS,
@@ -71,6 +72,9 @@ interface UnifiedEvent {
   meta: {
     projectId?: string
     meetingLink?: string | null
+    /** Stav e-mailu s odkazem na schůzku (R-112). */
+    inviteNote?: string | null
+    inviteFailed?: boolean
     clientWish?: string
     clientEmail?: string | null
     description?: string | null
@@ -246,6 +250,10 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
             ? { name: e.contact_name, phone: e.contact_phone, email: e.contact_email }
             : undefined,
         contactDraft: { name: e.contact_name, phone: e.contact_phone, email: e.contact_email },
+        // Schůzka s Google Meet (R-112): tlačítko „Připojit se" a stav e-mailu klientovi.
+        meetingLink: e.meet_url ?? null,
+        inviteNote: inviteNote(e.invite_status ?? null),
+        inviteFailed: e.invite_status === 'failed',
       },
     })
   }
@@ -308,6 +316,42 @@ function eventsForDay(events: UnifiedEvent[], iso: string): UnifiedEvent[] {
 }
 
 // ─── Event detail modal ───────────────────────────────────────────────────────
+
+function ResendInviteButton({ eventId }: { eventId: string }) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const res = await resendMeetingInvite(eventId)
+          if (res.ok) toast.success('E-mail klientovi odešel.')
+          else toast.error(res.error ?? 'E-mail se nepodařilo odeslat.')
+          router.refresh()
+        })
+      }
+      className="min-h-11 text-xs font-semibold text-navy-700 underline-offset-4 hover:underline disabled:opacity-60"
+    >
+      {pending ? 'Odesílám…' : 'Poslat e-mail znovu'}
+    </button>
+  )
+}
+
+function inviteNote(status: string | null): string | null {
+  switch (status) {
+    case 'sent':
+      return 'Klient dostal e-mail s odkazem na schůzku.'
+    case 'pending':
+    case 'sending':
+      return 'E-mail s odkazem na schůzku se odesílá.'
+    case 'failed':
+      return 'E-mail s odkazem klientovi neodešel.'
+    default:
+      return null
+  }
+}
 
 function EventDetailModal({
   event,
@@ -472,6 +516,13 @@ function EventDetailModal({
                 >
                   {event.meta.clientEmail}
                 </a>
+              </div>
+            )}
+
+            {event.meta.inviteNote && (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-xs text-quiet">{event.meta.inviteNote}</p>
+                {event.meta.inviteFailed && <ResendInviteButton eventId={event.id} />}
               </div>
             )}
 
