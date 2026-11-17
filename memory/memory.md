@@ -1120,11 +1120,12 @@ balíčku se nedostane (devDependency, nikde se neimportuje). Upgrade jen vědom
   workflow „Synchronizace do ZakazIQ" s volbou „všechny", (6) projít Hovory › Od asistenta
   na 390 a 1280 px, převzetí do Hovorů (hovor v kalendáři ve správný čas) a „Nemá zájem" se Zpět
   · `docs/admin/GROWTH-OS-PLAN.md` oddíl 6 · Kryštof · od 2026-11-17
-- [ ] **Schůzky s Google Meet (R-114) — nastavit a projít:** Google Cloud projekt ve Workspace
-  vizeon.cz (Calendar API, souhlas „Internal", OAuth klient s redirectem
-  `https://www.zakaziq.cz/api/google/callback`), do Vercelu `GOOGLE_CLIENT_ID`,
-  `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`, `VIZEON_RESEND_API_KEY`, migrace 115, Profil →
-  Propojit Google účet; pak zkušební schůzka na vlastní e-mail. **Naživo nic nezkoušeno** —
+- [ ] **Schůzky s Google Meet (R-114) — nasadit a projít:** nastavení je hotové 2026-11-17
+  (Google Cloud projekt `zakaziq-admin` pod organizací vizeon.cz, Calendar API, souhlas
+  Internal se scope `calendar.events`, klient „ZakazIQ admin web"; ve Vercelu Production
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`, `VIZEON_RESEND_API_KEY` —
+  klíč Resendu jen pro odesílání z vizeon.cz; migrace 114 a 115 podle Kryštofa na produkci).
+  Zbývá nasazení, Profil → Propojit Google účet a zkušební schůzka na vlastní e-mail. **Naživo nic nezkoušeno** —
   Google ani Resend jen s podstrčenými odpověďmi v testech · `docs/admin/GROWTH-OS-PLAN.md`
   oddíl 6 · Kryštof · od 2026-11-17
 - [ ] **Schůzka smazaná v kalendáři adminu zůstane v Google Kalendáři:** běžné mazání
@@ -1405,6 +1406,13 @@ balíčku se nedostane (devDependency, nikde se neimportuje). Upgrade jen vědom
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-17 (nastavení schůzek s Google Meet)
+- **chore** Google Cloud (krystof@vizeon.cz): projekt `zakaziq-admin`, Calendar API, souhlas
+  Internal se scope `calendar.events`, OAuth klient s redirectem
+  `https://www.zakaziq.cz/api/google/callback`. Ve Vercelu Production `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET` a `VIZEON_RESEND_API_KEY` (nový klíč Resendu jen `sending_access`
+  pro doménu vizeon.cz, ne plný klíč). Migrace 114 a 115 pustil Kryštof. Nenasazeno.
 
 ### 2026-11-17 (asistent jako chat — R-113)
 - **feat** **Asistent je chat s pamětí a přehledem firmy:** historie replik v rámci chatu, nový chat po 15 min nebo tlačítkem, ke každé větě blok `<prehled>` (zakázky, kontakty, termíny na 14 dní, obecná paměť). Nové akce `update_contact`, `update_project`, `update_event`, `remember` se „Zpět". Pojistka „nejdřív se zeptej" zadrží plán s chybějícím povinným údajem. Hlavní model Sonnet. **Pojem o čase:** blok `<cas>` s hodinou, tabulkou dnů a předpočítaným „za hodinu“, pravidla pro relativní časy, kolize a minulost; termín v minulosti jen klepnutím. Soubory: `lib/ai/{action-requirements,workspace-snapshot,time-context,prompts,propose,plan-format,action-lines,suggestion-schema}.ts`, `lib/admin/{suggestion-apply,suggestions}.ts`, `app/ai-actions.ts`, `components/admin/assistant-panel.tsx`, testy `lib/__tests__/ai-chat.test.ts`, `ai-navrhy`, `ai-executory`. Bez migrace (stačí 110 a 111).
