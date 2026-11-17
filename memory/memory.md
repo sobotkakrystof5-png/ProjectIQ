@@ -1131,18 +1131,19 @@ v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
 
 - [ ] **Koncepty faktur (R-117) — nasadit a projít naživo:** kód na větvi `admin/faktury-koncepty` (worktree `../ZakazIQ-faktury`), na produkci není. Migrace 117 je podle Kryštofa na produkci, merge do `main` 2026-11-17. Zbývá průchod: zakázka → Hotovo → do 15 s koncept v Ke schválení → doplnit adresu → Schválit a poslat na vlastní e-mail → PDF v příloze, číslo v řadě; Zpět během 10 s nic nepošle; pravidelná faktura se dnem = dnešek se objeví až po běhu cronu. **Odeslání přes Resend s PDF nikdo nezkusil naživo** · od 2026-11-17
 - [ ] **Asistent jako chat (R-113) neověřený naživo ani v prohlížeči:** ověřeno testy, `tsc`, buildem a živě se Sonnetem nad smyšleným přehledem (4 ze 4), ale ne v prohlížeči nad skutečnými daty. Projít: věta bez času → otázka → odpověď „ve tři" → zapsáno jednou; „posuň to na čtvrtou" v témže chatu; „oprav Novákovi telefon"; „zapamatuj si…" a že se paměť objeví v dalším chatu; nový chat po „Nový chat". Hlídat, jestli se neptá zbytečně (otravné) a jestli Sonnet nestojí víc, než je odhad · od 2026-11-17
-- [ ] **Hovory od asistenta (R-112) — nasadit a projít:** (1) `GROWTH_OS_API_KEY` do Vercelu
-  (Production) a do GitHub Secrets `vizeon-autopilot`, (2) migrace 114 na produkci,
-  (3) merge a deploy ZakazIQ, (4) push `claude/zakaziq-admin-sync` v autopilotu, (5) jednou
-  workflow „Synchronizace do ZakazIQ" s volbou „všechny", (6) projít Hovory › Od asistenta
-  na 390 a 1280 px, převzetí do Hovorů (hovor v kalendáři ve správný čas) a „Nemá zájem" se Zpět
+- [ ] **Hovory od asistenta (R-112) — spustit a projít:** ZakazIQ strana je na produkci
+  (`2cf1447`, `POST /api/public/outreach` bez klíče vrací 401), klíč ve Vercelu i v GitHub
+  Secrets, migrace 114 podle Kryštofa venku. Zbývá: (1) push `claude/zakaziq-admin-sync`
+  v autopilotu (commit `91c286d`), (2) jednou workflow „Synchronizace do ZakazIQ" s volbou
+  „všechny", (3) projít Hovory › Od asistenta na 390 a 1280 px, převzetí do Hovorů (hovor
+  v kalendáři ve správný čas) a „Nemá zájem" se Zpět
   · `docs/admin/GROWTH-OS-PLAN.md` oddíl 6 · Kryštof · od 2026-11-17
-- [ ] **Schůzky s Google Meet (R-114) — nasadit a projít:** nastavení je hotové 2026-11-17
+- [ ] **Schůzky s Google Meet (R-114) — projít naživo:** kód na produkci od `2cf1447`; nastavení je hotové 2026-11-17
   (Google Cloud projekt `zakaziq-admin` pod organizací vizeon.cz, Calendar API, souhlas
   Internal se scope `calendar.events`, klient „ZakazIQ admin web"; ve Vercelu Production
   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`, `VIZEON_RESEND_API_KEY` —
   klíč Resendu jen pro odesílání z vizeon.cz; migrace 114 a 115 podle Kryštofa na produkci).
-  Zbývá nasazení, Profil → Propojit Google účet a zkušební schůzka na vlastní e-mail. **Naživo nic nezkoušeno** —
+  Zbývá Profil → Propojit Google účet a zkušební schůzka na vlastní e-mail. **Naživo nic nezkoušeno** —
   Google ani Resend jen s podstrčenými odpověďmi v testech · `docs/admin/GROWTH-OS-PLAN.md`
   oddíl 6 · Kryštof · od 2026-11-17
 - [ ] **Schůzka smazaná v kalendáři adminu zůstane v Google Kalendáři:** běžné mazání
@@ -1430,6 +1431,8 @@ v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
   (`lib/admin/vizeon-mail.ts` umí přílohy a odesílatele). Test `lib/__tests__/email-resend.test.ts`.
 - **chore** Nasazeno na produkci `9e2b2ca` (hovory od asistenta, schůzky s Meet, asistent jako
   chat); build Ready, veřejné adresy odpovídají.
+- **chore** Na produkci i `2cf1447` (R-116): `origin/main` = `2cf1447`, produkční build Ready
+  (22:18), `/api/public/outreach` 401 bez klíče, `/api/google/connect` 307 na `/login`.
 
 ### 2026-11-17 (nastavení schůzek s Google Meet)
 - **chore** Google Cloud (krystof@vizeon.cz): projekt `zakaziq-admin`, Calendar API, souhlas
