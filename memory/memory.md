@@ -1088,6 +1088,11 @@ Rezervace termínů přes Workspace API (D-055 v Growth OS) se nemění. Bezpeč
 - [ ] **Hovory od asistenta — kroky 3 a 4 čekají na rozhodnutí:** odkud posílat e-mail klientovi
   (Resend z vizeon.cz × Gmail), typ Google účtu (Gmail × Workspace) a zda posílat i pozvánku
   od Googlu · `docs/admin/GROWTH-OS-PLAN.md` oddíl 5 · od 2026-11-17
+- [ ] **Next 16.4.2 má nové zranitelnosti (zjištěno 2026-11-17):** `next build` se při prvním
+  běhu zastaví hláškou `SecurityFatalError` (opakovaný běh projde). `npm audit`: Next 16.2.0–16.4.4
+  moderate (GHSA-mfr8-8qww-v76h, GHSA-vc7v-qv4w-wrv8 — únik přes `'use cache'`/`unstable_cache`;
+  repo ani jedno nepoužívá) a picomatch high (ReDoS, oprava jen přes Tailwind 4). Upgrade Next je
+  podle R-053 samostatný krok s ověřením celého repa · od 2026-11-17
 - [ ] **`outreach_leads` bez retence:** drží jména a telefony lidí, kterým se volalo nevyžádaně,
   i když zájem nemají. Návrh 12 měsíců od posledního snímku · DECISIONS #033 · od 2026-11-17
 - [ ] **Growth OS neeviduje otevření ukázky ani e-mailu:** `demos.views` a `emails.opened_at`
