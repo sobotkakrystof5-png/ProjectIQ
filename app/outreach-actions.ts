@@ -77,6 +77,7 @@ export async function takeOverOutreachLead(id: string): Promise<OutreachResult> 
 
   await markOutreachHandled(id, 'prevzato', leadId)
   revalidatePath('/dashboard/calls')
+  revalidatePath('/dashboard/ai-asistent')
   revalidatePath('/dashboard/kontakty')
   revalidatePath('/dashboard/calendar')
   return { ok: true, leadId }
@@ -88,6 +89,7 @@ export async function dismissOutreachLead(id: string): Promise<void> {
   if (!UUID.test(id)) throw new Error('Firma nenalezena.')
   await markOutreachHandled(id, 'nezajem', null)
   revalidatePath('/dashboard/calls')
+  revalidatePath('/dashboard/ai-asistent')
 }
 
 /** „Zpět" — firma se do fronty vrátí. */
@@ -96,4 +98,5 @@ export async function undoDismissOutreachLead(id: string): Promise<void> {
   if (!UUID.test(id)) throw new Error('Firma nenalezena.')
   await restoreOutreachLead(id)
   revalidatePath('/dashboard/calls')
+  revalidatePath('/dashboard/ai-asistent')
 }

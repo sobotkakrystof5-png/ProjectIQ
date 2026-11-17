@@ -70,6 +70,7 @@
 | Klientský portál | `app/p/[token]/page.tsx`, `app/portal-actions.ts`, `components/Feedback*`, `Booking*` |
 | Rezervace / kalendář / sloty | `lib/prague-time.ts`, `components/SmartCalendar.tsx`, `BookingModal.tsx`, `app/calendar-actions.ts` |
 | Poptávky z webů (vizeon.cz, alteno.cz, prvotka.cz) | `lib/lead-origins.ts`, `lib/web-leads.ts`, `app/api/public/booking/**`, `app/api/public/{alteno,prvotka}-leads`, `app/dashboard/poptavky/`, `components/LeadCard.tsx`, migrace 102, R-088 |
+| AI asistent: kontakty od robota, denní reporty, analýza a prompt pro Claude Code | `app/dashboard/ai-asistent/`, `components/admin/ai-asistent/`, `lib/admin/{outreach-reports,outreach-analysis}.ts`, `types/outreach-report.ts`, `app/api/public/outreach/reports/`, migrace 116, R-118 |
 | Hovory od AI asistenta z Growth OS | `docs/admin/GROWTH-OS-PLAN.md`, `app/api/public/outreach/`, `types/outreach.ts`, `lib/admin/{outreach,outreach-view}.ts`, `app/outreach-actions.ts`, `components/admin/outreach-queue.tsx`, migrace 114, R-112 |
 | Hovory / leady | `app/calls-actions.ts`, `components/LeadsTable.tsx`, `lib/portfolio-email.ts`, `app/api/public/{leads,agent-leads}` |
 | Dokončené, dotazník, hodnocení | `app/completed-actions.ts`, `app/h/[token]`, `components/SurveyForm.tsx`, `HodnoceniDashboard.tsx` |

@@ -196,7 +196,10 @@ function OutreachItem({
 
           <div className="flex flex-wrap items-center gap-2 border-t border-navy-100 pt-3">
             <Button type="button" onClick={() => setMeetingOpen(true)} disabled={pending}>
-              Domluvit schůzku
+              {/* Termín, který si klient s robotem domluvil, je v okně předvyplněný — stačí potvrdit. */}
+              {row.callbackAt && Date.parse(row.callbackAt) > now.getTime()
+                ? `Poslat pozvánku na ${formatWhen(row.callbackAt, now)}`
+                : 'Domluvit schůzku'}
             </Button>
             <Button type="button" variant="outline" onClick={prevzit} disabled={pending}>
               Převzít do Hovorů

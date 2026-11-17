@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { purgeClientRetention } from '@/lib/client-retention'
 import { purgeMemoryRetention } from '@/lib/admin/memory/store'
+import { purgeOutreachRetention } from '@/lib/admin/outreach-reports'
 
 // Denní úklid dat klientů po dokončených zakázkách (D-K10, R-076, vercel.json).
 //
@@ -19,7 +20,9 @@ export async function GET(req: NextRequest) {
     const result = await purgeClientRetention()
     // Chybějící migrace 111 vrátí null; úklid klientských dat tím netrpí.
     const memory = await purgeMemoryRetention().catch(() => null)
-    return NextResponse.json({ success: true, ...result, memory })
+    // Přepisy hovorů AI asistenta po 90 dnech, hovory po roce (R-118, migrace 116).
+    const outreach = await purgeOutreachRetention().catch(() => null)
+    return NextResponse.json({ success: true, ...result, memory, outreach })
   } catch (e) {
     console.error('cron.client-retention: úklid selhal', { error: e instanceof Error ? e.message : 'unknown' })
     return NextResponse.json({ success: false, error: 'Retention failed' }, { status: 500 })

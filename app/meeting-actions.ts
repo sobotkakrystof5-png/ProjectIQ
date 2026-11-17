@@ -42,6 +42,7 @@ const scheduleSchema = z.object({
 
 function revalidate() {
   revalidatePath('/dashboard/calls')
+  revalidatePath('/dashboard/ai-asistent')
   revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard')
 }

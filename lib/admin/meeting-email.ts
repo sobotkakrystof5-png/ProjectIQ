@@ -30,16 +30,27 @@ export function defaultSubject(startsAt: string): string {
   return `Naše schůzka ${meetingWhen(startsAt)}`
 }
 
-export function defaultIntro(hasDemo: boolean): string {
-  return [
-    'Dobrý den,',
-    '',
-    hasDemo
-      ? 'děkuji za domluvu. Posílám odkaz na naši schůzku a ještě jednou ukázku webu, kterou jsme pro vás připravili.'
-      : 'děkuji za domluvu. Posílám odkaz na naši schůzku.',
-    '',
-    'Těším se na vás.',
-  ].join('\n')
+/** „pondělí 17. listopadu" — den hovoru s robotem, pražský čas. */
+export function callDay(at: string): string {
+  return new Intl.DateTimeFormat('cs-CZ', { timeZone: PRAGUE, weekday: 'long', day: 'numeric', month: 'long' }).format(
+    new Date(at),
+  )
+}
+
+/**
+ * Úvod e-mailu. Kryštof ho může přepsat; den hovoru (R-118) je v něm, ať
+ * klient hned ví, na co navazujeme.
+ */
+export function defaultIntro(hasDemo: boolean, lastCallAt: string | null = null): string {
+  // Po „Dobrý den," pokračuje věta malým písmenem.
+  const opening =
+    lastCallAt && !Number.isNaN(Date.parse(lastCallAt))
+      ? `navazuji na náš telefonát z ${callDay(lastCallAt)}.`
+      : 'děkuji za domluvu.'
+  const body = hasDemo
+    ? 'Jak jsme se domluvili, posílám ukázku webu, kterou jsme pro vás připravili, a odkaz na naši konzultaci.'
+    : 'Posílám odkaz na naši konzultaci.'
+  return ['Dobrý den,', '', `${opening} ${body}`, '', 'Těším se na vás.'].join('\n')
 }
 
 export type MeetingEmailInput = {

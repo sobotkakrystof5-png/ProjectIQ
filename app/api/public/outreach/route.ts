@@ -76,13 +76,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const events = result.events
   for (const event of events.slice(0, MAX_NOTIFICATIONS)) {
     const { title, body } = notificationFor(event)
-    await createNotification({ type: 'outreach_lead', title, body, link: '/dashboard/calls?pohled=asistent' })
+    await createNotification({ type: 'outreach_lead', title, body, link: '/dashboard/ai-asistent' })
   }
   if (events.length > MAX_NOTIFICATIONS) {
     await createNotification({
       type: 'outreach_lead',
       title: `Dalších ${events.length - MAX_NOTIFICATIONS} firem od asistenta čeká na vás`,
-      link: '/dashboard/calls?pohled=asistent',
+      link: '/dashboard/ai-asistent',
     })
   }
 

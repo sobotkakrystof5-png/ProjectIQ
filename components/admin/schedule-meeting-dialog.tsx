@@ -75,7 +75,7 @@ export function ScheduleMeetingDialog({
   const [sendInvite, setSendInvite] = useState(Boolean(row.email) && readiness.mail)
   const [inviteTo, setInviteTo] = useState(row.email ?? '')
   const [subjectEdited, setSubjectEdited] = useState<string | null>(null)
-  const [intro, setIntro] = useState(defaultIntro(Boolean(row.demoUrl)))
+  const [intro, setIntro] = useState(defaultIntro(Boolean(row.demoUrl), row.lastCallAt))
 
   const iso = approxIso(date, time)
   const autoSubject = useMemo(() => (iso ? defaultSubject(iso) : 'Naše schůzka'), [iso])

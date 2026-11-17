@@ -1,5 +1,5 @@
 import {
-  Bell, Building2, CalendarDays, CircleCheck, FileText, Inbox, Layers, Megaphone,
+  Bell, Bot, Building2, CalendarDays, CircleCheck, FileText, Inbox, Layers, Megaphone,
   MessageSquarePlus, PhoneCall, Receipt, Rocket, Sun, UserCircle, Users, Wallet, FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
@@ -23,6 +23,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   startup: Rocket,
   bell: Bell,
   profile: UserCircle,
+  assistant: Bot,
 }
 
 export function NavGlyph({ name, size = 18 }: { name: NavIcon; size?: number }) {

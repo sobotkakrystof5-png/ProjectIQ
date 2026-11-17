@@ -64,6 +64,7 @@ sledovací odkaz (`links`, plán Voice Outreach) nebo čtení stavu z Resendu.
 | 5 | Asistent (R-111): „domluv Novákovi schůzku ve čtvrtek ve 3 a pošli pozvánku" — schůzka sama, e-mail na klepnutí | po krocích 3 a 4 |
 | 6 | Zpětný kanál do Growth OS: „nevolat" a „zakázka" z adminu do D1, ať robot nevolá | po kroku 2 v provozu |
 | 7 | Sledování otevření ukázky a e-mailu v Growth OS (sledovací odkaz / Resend), ať fronta ví „otevřel ukázku" | práce v autopilotu |
+| 8 | **Sekce AI asistent** (R-118): Kontakty, Reporty den po dni, Analýza (kde hovory váznou) a prompt pro Claude Code; `POST /api/public/outreach/reports`, migrace 116; v autopilotu report po každém kole, `zakaziq:report` pro historii a okamžitá synchronizace po souhlasu (D-105, commit `842dcca`) | **v kódu 2026-11-17**, nenasazeno |
 
 ## 5. Rozhodnuto 2026-11-17
 

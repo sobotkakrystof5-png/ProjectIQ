@@ -452,6 +452,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
 | `GET /api/google/connect`, `GET /api/google/callback` | session (kontrola v route) + `state` a PKCE v HttpOnly cookie | Propojení Google Kalendáře pro schůzky s Meet (R-114, DECISIONS #035). Obnovovací token zašifrovaný `GOOGLE_TOKEN_KEY` v `admin_settings.google_oauth` |
 | `POST /api/public/outreach` | Bearer `GROWTH_OS_API_KEY` | Snímky obvolaných firem z Growth OS (vizeon-autopilot) → `outreach_leads`, fronta Hovory › Od asistenta (R-112). Dávka nejvýš 100 firem, tělo 256 kB, 60 požadavků/min, starší snímek novější nepřepíše, bez migrace 114 vrací 503 |
+| `POST /api/public/outreach/reports` | Bearer `GROWTH_OS_API_KEY` | Denní reporty hovorů z Growth OS (R-118): čísla dne + řádek za hovor, přepis jen u spojených → `outreach_reports`, `outreach_calls` (migrace 116). Tělo 2 MB, 30 požadavků/min, upsert podle dne a kola / `external_id`, starší report novější nepřepíše, bez migrace 116 vrací 503. Kontrakt `types/outreach-report.ts` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
@@ -1200,3 +1201,26 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - Daně a odvody počítej **jen** přes `lib/tax.ts` + `lib/tax-constants.ts`; daňové termíny jsou pevný kalendář v `lib/tax-deadlines.ts`
 - AI přepis faktury **nikdy neblokuje** ruční uložení — bez `ANTHROPIC_API_KEY` musí appka fungovat dál
 - Částky v různých měnách (CZK/EUR) se **nikdy** nesčítají do jednoho čísla
+
+## AI asistent: kontakty, reporty a analýza z Growth OS (R-118)
+
+`/dashboard/ai-asistent` (menu Práce, ikona `Bot`) spojuje všechno z Growth OS. Pohled je v adrese:
+
+- **Kontakty** (výchozí) — tatáž fronta jako Hovory › Od asistenta (`OutreachQueue`, `outreach_leads`).
+  Firma, která robotovi odsouhlasí ukázku, přijde hned (autopilot pouští synchronizaci v `post-call.yml`,
+  D-105). Tlačítko „Poslat pozvánku na …" otevře `ScheduleMeetingDialog` s termínem od robota;
+  úvod e-mailu navazuje na den hovoru (`defaultIntro(hasDemo, lastCallAt)`). Odeslání = Meet,
+  událost v kalendáři, kontakt v Hovorech, e-mail za 15 s (R-114).
+- **Reporty** (`?pohled=reporty`, detail `&den=RRRR-MM-DD`) — za den souhrn dne, jinak poslední report po
+  kole; hovory s rozbalitelným přepisem (`<details>`, jen text).
+- **Analýza** (`?pohled=analyza&obdobi=7|30|90`) — `lib/admin/outreach-analysis.ts` (čisté funkce):
+  trychtýř vytočeno → zvedl → odpověděl na úvod → slyšel nabídku → nepoložil → souhlas, „kde hovory
+  váznou" (hlavní problém = největší ztráta, kterou ovlivní agent; „nezvedli" je dosah), kdy lidé
+  pokládají, kritéria hodnocení, námitky, obory, test úvodu, den po dni. **Prompt pro Claude Code**
+  skládá `buildImprovementPrompt` šablonou: bez jmen firem, přepisy ve značce `<prepis>` bez `<>`
+  (DECISIONS #036).
+
+Data: `lib/admin/outreach-reports.ts` (ingest, čtení, `purgeOutreachRetention` z cronu
+`client-retention`: přepisy 90 dní, hovory 12 měsíců). Historii dotáhne v autopilotu
+`npm run zakaziq:report -- --od RRRR-MM-DD`.
+

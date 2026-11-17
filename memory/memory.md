@@ -1125,6 +1125,23 @@ v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
 **Proč:** Kryštof 2026-11-17: „dashboard faktur, kam se mi exportne a po mém souhlasu se jedním klikem odešle klientovi", spouštěče vybral všechny čtyři, „Vystavit + poslat" jedním klikem. Číslo až při schválení, aby zahozený koncept nenechal v řadě díru (R-098).
 **Důsledek:** migrace 117 (`invoice_drafts`, `invoice_recurring`, `invoices.client_email`), `lib/admin/{invoice-drafts,invoice-draft-schema,invoice-send}.ts`, `app/api/invoices/drafts/[id]/send`, `app/dashboard/faktury/{koncepty-actions.ts,pravidelne/}`, `components/admin/invoices/{drafts-panel,recurring-manager}.tsx`. **Mění R-100/R-111** v části `issue_invoice`: asistent fakturu nevystavuje, připraví koncept. Nová cesta, která zakázku uzavře, má volat `prepareProjectDoneDraftLater`. Bez migrace 117 se Faktury chovají jako dřív (panel se neukáže). Bezpečnost DECISIONS #037.
 
+### R-118 · Sekce AI asistent: kontakty od robota, denní reporty a analýza (2026-11-17)
+**Rozhodnutí:** v adminu je nová sekce **AI asistent** (`/dashboard/ai-asistent`) se záložkami Kontakty,
+Reporty a Analýza. (1) Firma, která robotovi odsouhlasí ukázku, je v ZakazIQ **hned** (autopilot
+pouští synchronizaci po souhlasu, D-105) s předvyplněným e-mailem: ukázka, den hovoru, vizeon.cz,
+termín a Meet; jedním klikem odejde a zapíše se do kalendáře a Hovorů (R-114). Do kalendáře se
+termín **nezapisuje sám** — až odesláním. (2) Growth OS posílá report po každém kole a souhrn dne
+na `POST /api/public/outreach/reports` (migrace 116), historii dotáhne `zakaziq:report`.
+(3) **Přepisy** spojených hovorů se ukládají na **90 dní**, hovory 12 měsíců, telefony a e-maily
+v kontraktu nejsou. (4) **Prompt pro Claude Code** skládá šablona z čísel a přepisů — žádný model
+v adminu; rozbor a návrh oprav dělá Claude Code v repu autopilota a implementuje až po souhlasu.
+**Proč:** Kryštof 2026-11-17: „chci novou sekci… ať se to hned migruje do ZakazIQ a vznikne
+automaticky šablona", „reporty z konkrétních dní, úspěšnost a analýza, kde hovory váznou,
+automaticky připravíš prompt pro Claude Code". Volby (šablona, přepisy 90 dní) vybral sám.
+**Důsledek:** Hovory › Od asistenta zůstává (tatáž fronta). „Kde hovory váznou" ukazuje jako
+hlavní problém jen krok, který ovlivní agent (úvod, slyšitelnost, nabídka, námitky); „nezvedli"
+je dosah. Bezpečnost DECISIONS #036, technika `docs/admin/AGENTS-ADMIN.md` → „AI asistent".
+
 ---
 
 ## 3. Otevřené problémy
@@ -1146,6 +1163,12 @@ v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
   Zbývá Profil → Propojit Google účet a zkušební schůzka na vlastní e-mail. **Naživo nic nezkoušeno** —
   Google ani Resend jen s podstrčenými odpověďmi v testech · `docs/admin/GROWTH-OS-PLAN.md`
   oddíl 6 · Kryštof · od 2026-11-17
+- [ ] **AI asistent (R-118) — nasadit a projít:** (1) migrace 116 na produkci, (2) deploy ZakazIQ,
+  (3) push `claude/zakaziq-admin-sync` v autopilotu, (4) jednou `npm run zakaziq:report -- --od 2026-11-10`
+  a workflow „Synchronizace do ZakazIQ" s „všechny", (5) projít `/dashboard/ai-asistent` na 390
+  a 1280 px: Kontakty → Poslat pozvánku (termín a úvod s dnem hovoru), Reporty a detail dne,
+  Analýza a zkopírování promptu. Bez migrace 116 endpoint vrací 503 a autopilot po každém reportu
+  pošle notifikaci · Kryštof · od 2026-11-17
 - [ ] **Schůzka smazaná v kalendáři adminu zůstane v Google Kalendáři:** běžné mazání
   (`deleteCalendarEvent`) Google nezná; ruší ji jen „Zpět" do odeslání e-mailu. Doplnit mazání
   v Googlu, nebo mazat ručně · `app/calendar-actions.ts` · od 2026-11-17
@@ -1418,6 +1441,24 @@ v `lib/email.ts`; test `lib/__tests__/email-resend.test.ts`.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-17 (sekce AI asistent — R-118)
+- **feat** Sekce **AI asistent** v menu Práce: Kontakty (fronta od robota, tlačítko „Poslat
+  pozvánku na …" s termínem od robota), Reporty den po dni s hovory a přepisy, Analýza
+  (trychtýř, kde hovory váznou, kdy lidé pokládají, kritéria, námitky, obory, test úvodu, den po
+  dni) a prompt pro Claude Code ke zkopírování. Úvod e-mailu navazuje na den hovoru. Soubory:
+  `app/dashboard/ai-asistent/`, `components/admin/ai-asistent/`, `lib/admin/{outreach-reports,outreach-analysis}.ts`,
+  `types/outreach-report.ts`, `app/api/public/outreach/reports/route.ts`, `lib/admin/meeting-email.ts`,
+  `components/admin/{outreach-queue,schedule-meeting-dialog}.tsx`, `lib/admin-nav.ts`,
+  cron `client-retention` (úklid přepisů). Migrace 116 (aplikována: produkce, podle Kryštofa 2026-11-17; agent ji neověřil).
+- **feat** Autopilot (větev `claude/zakaziq-admin-sync`, commit `842dcca`, nepushnuto, D-105):
+  report po každém kole a souhrn dne do ZakazIQ, `npm run zakaziq:report -- --od …` pro historii,
+  synchronizace hned po souhlasu (krok 4 v `post-call.yml`), zakrývání kontaktů ve volném textu.
+- **chore** Ověřeno: nové testy `lib/__tests__/admin-ai-asistent.test.ts` a
+  `app/api/public/outreach/reports/__tests__/route.test.ts` + dosavadní testy hovorů a schůzek
+  (46/46), `tsc`; v autopilotu 161/161 a payloady z produkční D1 (10.–18. 11., čteno jen ke čtení)
+  prošly Zod schématem ZakazIQ. **V prohlížeči neověřeno.**
+- **decision** **R-118**, DECISIONS #036.
 
 ### 2026-11-17 (koncepty faktur a odeslání jedním kliknutím — R-117)
 - **fix** Proč faktura „po vyplnění e-mailu" neodcházela: odeslání šlo přes Gmail SMTP, který odmítal heslo (535 v logu Vercelu, naposledy 21:19 UTC). Opravuje už R-116 (`2cf1447`, Resend), naživo zatím nevyzkoušeno. Odesílání faktury je teď sdílené (`lib/admin/invoice-send.ts`) pro starý i nový postup.
