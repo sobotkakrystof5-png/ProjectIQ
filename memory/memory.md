@@ -2,7 +2,14 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-15 · **Veškeré přihlašování přechází na Supabase** (R-107).
+> **Poslední aktualizace:** 2026-11-17 · **Hovory od AI asistenta z Growth OS jdou do adminu** (R-112).
+> Growth OS posílá stav obvolaných firem na `/api/public/outreach`, v Hovorech přibyla záložka
+> „Od asistenta" (komu zavolat a proč, převzetí do Hovorů s plánovaným hovorem). Krok 1 a 2
+> z `docs/admin/GROWTH-OS-PLAN.md` jsou v kódu na větvi `admin/growth-hovory`, strana Growth OS
+> na větvi autopilota `claude/zakaziq-admin-sync`. **Nenasazeno, v prohlížeči neověřeno;**
+> Google Meet a e-mail jedním klikem čekají na Kryštofovy odpovědi.
+>
+> Předchozí: 2026-11-15 · **Veškeré přihlašování přechází na Supabase** (R-107).
 > Fáze F1 je v kódu na větvi `auth/supabase-klient`: klientský prostor `/klient` už nejede
 > na vývojové instanci Clerku, ale na Supabase (e-mail a heslo, účet jen z pozvánky vázané
 > na e-mail, hook registrace u nás). Workspace `/w` (F2) a úklid Clerku (F3) čekají — plán
@@ -1053,9 +1060,39 @@ nemá linii přiznané/nepřiznané).
 **Proč:** Kryštof 2026-11-16: „aby to dělal všechno on za mě, jenom mu to řeknu textem". Třídy akcí jsou výchozí návrh k potvrzení.
 **Důsledek:** **mění R-084 a R-100** v části „asistent nekoná". Náklady odhadem 50–600 Kč měsíčně (ceník neověřený u přepisu hlasu). **Model nevrací strukturovaný výstup se schématem** — API ho odmítlo jako moc složité (ověřeno živě 2026-11-16); vrací JSON podle popisu v promptu a jedinou bránou je `lib/ai/plan-format.ts`. Pojistka proti cizímu textu platí pro každý kontext záznamu (na detailu zakázky/kontaktu nic samo). Bezpečnost DECISIONS #032, technika `docs/admin/AGENTS-ADMIN.md` → „AI asistent koná sám".
 
+### R-112 · Hovory od AI asistenta z Growth OS patří do adminu (2026-11-17)
+**Rozhodnutí:** výsledky hovorů z Growth OS (`vizeon-autopilot`: ElevenLabs, ukázkové weby,
+Resend) se vyřizují v **adminu**, ne ve Workspace. Growth OS posílá snímky stavu firem na
+`POST /api/public/outreach`, admin z nich staví frontu Hovory › Od asistenta. **D1 v Growth OS
+zůstává pravdou o tom, komu volá robot**; admin drží kopii a to, co s firmou udělal Kryštof.
+Další kroky (Google Meet, e-mail jedním klikem, asistent, zpětný kanál) podle
+`docs/admin/GROWTH-OS-PLAN.md`.
+**Proč:** Kryštof 2026-11-17: „vše chci propojit a postavit v admin" — admin je jeho CRM
+s Hovory, kalendářem a kontakty; Workspace je produkt pro klienty. Snímek místo událostí:
+opakované poslání nic nezdvojí a dorazí i změny, které hovor nespouští.
+**Důsledek:** migrace 114 (`outreach_leads`); 113 drží větev `auth/supabase-klient`, takže test
+číslování `ws-schema` je na téhle větvi červený, dokud se obě nesloučí. Nová cesta k zakázce
+z Growth OS se nepíše — firma se převezme do Hovorů a dál jede stávající `convertLeadToProject`.
+Rezervace termínů přes Workspace API (D-055 v Growth OS) se nemění. Bezpečnost DECISIONS #033.
+
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Hovory od asistenta (R-112) — nasadit a projít:** (1) `GROWTH_OS_API_KEY` do Vercelu
+  (Production) a do GitHub Secrets `vizeon-autopilot`, (2) migrace 114 na produkci,
+  (3) merge a deploy ZakazIQ, (4) push `claude/zakaziq-admin-sync` v autopilotu, (5) jednou
+  workflow „Synchronizace do ZakazIQ" s volbou „všechny", (6) projít Hovory › Od asistenta
+  na 390 a 1280 px, převzetí do Hovorů (hovor v kalendáři ve správný čas) a „Nemá zájem" se Zpět
+  · `docs/admin/GROWTH-OS-PLAN.md` oddíl 6 · Kryštof · od 2026-11-17
+- [ ] **Hovory od asistenta — kroky 3 a 4 čekají na rozhodnutí:** odkud posílat e-mail klientovi
+  (Resend z vizeon.cz × Gmail), typ Google účtu (Gmail × Workspace) a zda posílat i pozvánku
+  od Googlu · `docs/admin/GROWTH-OS-PLAN.md` oddíl 5 · od 2026-11-17
+- [ ] **`outreach_leads` bez retence:** drží jména a telefony lidí, kterým se volalo nevyžádaně,
+  i když zájem nemají. Návrh 12 měsíců od posledního snímku · DECISIONS #033 · od 2026-11-17
+- [ ] **Growth OS neeviduje otevření ukázky ani e-mailu:** `demos.views` a `emails.opened_at`
+  v D1 nikdo neplní, takže fronta „otevřel ukázku" zatím nenastane · práce v autopilotu
+  (plán krok 7) · od 2026-11-17
 
 - [ ] **Asistent (R-111) na produkci, ale v prohlížeči neověřený:** projít s přihlášením na produkci na 390 a 1280 px — diktování (povolení mikrofonu, Safari `audio/mp4`), věta se dvěma akcemi, toast „Zpět", „Vrátit" u kroku, faktura na klepnutí, věta na detailu zakázky (nesmí se provést sama). Dotazy na data (A4) projít na produkčních datech — testovací Neon nemá tabulky adminu, takže živě běžely jen nad podstrčenými daty · `docs/admin/ASISTENT-PLAN.md` · od 2026-11-16
 
@@ -1322,233 +1359,29 @@ nemá linii přiznané/nepřiznané).
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
-### 2026-11-16 (asistent na produkci)
-- **chore** **Asistent (R-111) je na produkci** (`5f738bb`, fast-forward `7d63c55` → `5f738bb` z větve `admin/asistent`, se souhlasem Kryštofa). Spolu s ním šla úprava a mazání událostí v kalendáři se „Zpět" (`153b312`, převzato z `712cb66`) a výměna odkazu `/p` (`493c819`, převzato z `ba226aa` samostatně). **Přihlášení klientů přes Supabase (`ba226aa`, R-107) nasazené není** — čeká na migraci 113 a nastavení v Supabase, zůstává na větvi `auth/supabase-klient`. Ověřeno zvenku: `/` a `/login` 200, `/dashboard` 307, `POST /api/ai-assistant/prepis` 401, `microphone=(self)` jen na `/dashboard`. Klíče `ANTHROPIC_API_KEY` a `OPENAI_API_KEY` jsou ve Vercel Production. **Za přihlášením naživo nikdo nic nezkusil.**
-
-### 2026-11-16 (asistent koná sám — A0–A3)
-- **fix** **Asistent z AD14 naživo nefungoval:** strukturovaný výstup se schématem API odmítalo (`The compiled grammar is too large`, pak strop 16 polí s `null` a 24 nepovinných). Model teď vrací JSON podle popisu v promptu a přísnou kontrolu dělá `lib/ai/plan-format.ts`. Ověřeno živě: 6 vět ze 6 správně, haiku ~2,5–3 s, systémový prompt z cache.
-- **feat** **Asistent koná sám** (R-111): plán až s osmi akcemi a 13 druhy (kontakt, termín, přesun a zrušení termínu, zakázka, stav, poznámka, záloha a příjem, náklad, zaplacení, vystavení a storno faktury, zpráva), vratné hned se „Zpět", zbytek na klepnutí, „Vrátit" u každého kroku. Soubory: `lib/ai/{suggestion-schema,action-policy,action-lines,plan-format,propose,prompts}.ts`, `lib/admin/{suggestion-apply,suggestions,assistant-resolve}.ts`, `app/ai-actions.ts`, `components/admin/assistant-panel.tsx`; `createCalendarEvent` vrací `{ id }`. Bez migrace (stačí 110).
-- **feat** **Hlas a plovoucí tlačítko:** `POST /api/ai-assistant/prepis` (přihlášení, `Origin`, limity, nápověda jmen klientů pro přepis), `lib/transcribe.ts` umí `prompt`, `microphone=(self)` na `/dashboard/*` (`next.config.mjs`, DECISIONS #032, STATE).
-- **chore** Ověřeno: `tsc`, `npm test` (108 souborů / 1273 testů, nové `ai-plan-format.test.ts`, přepsané `ai-executory` a `ai-navrhy`), `npm run build:check`, živé volání modelu. **V prohlížeči neověřeno** (přihlášení přes Supabase, testovací Neon nemá 110). Nic necommitnuto.
-- **docs** Plán `docs/admin/ASISTENT-PLAN.md` (A0–A4, stav v oddílu 7), `docs/admin/AGENTS-ADMIN.md`.
-- **feat** **A4 — dotazy na data** („kolik mi dluží Novák", „kdy mám ve čtvrtek volno", „co mám tento týden"): model si řekne o jeden z pěti pevných dotazů jen pro čtení, server ho provede a model odpoví ve druhém kole. Plán nad daty se nespustí sám. Soubory `lib/admin/assistant-lookups.ts`, `lib/ai/plan-format.ts` (`lookupSchema`), `lib/ai/propose.ts`, značka `<data>` v `lib/ai/markers.ts`. Ověřeno živě s podstrčenými daty 4 ze 4. Test `lib/__tests__/ai-dotazy.test.ts`.
-- **fix** `ws-intake` a `ws-money` měly v `beforeAll` napevno 30 s místo globálních 60 s (AD09) a v plné sadě padaly na startu PGlite; sjednoceno. Plná sada 109 souborů / 1281 testů prošla.
-- **decision** **R-111**.
-
-### 2026-11-16 (kalendář: úprava událostí)
-- **feat** **Vlastní události a blokace v kalendáři jdou upravit** (název, čas, poznámka,
-  kontakt) tlačítkem „Upravit" v detailu; změna se v téže transakci propíše do zrcadleného
-  kontaktu v Hovorech (R-010) a při posunu času se resetují připomínky. Druh (událost ×
-  blokace) se nemění. **Smazání už nepoužívá `confirm()`** — smaže se hned a toast nabídne
-  „Zpět" (obnoví událost i s poznámkami kontaktu); to zavírá otevřený problém z 2026-11-14.
-  Mazat/upravovat tudy jde jen `manual`/`block`; rezervace od klientů, hovory a deadliny mají
-  zdroj jinde (zakázka, Hovory) a detail na ně odkazuje. Soubory: `app/calendar-actions.ts`
-  (`updateCalendarEvent`, `restoreCalendarEvent`, `deleteCalendarEvent` vrací snímek),
-  `components/AdminEventModal.tsx`, `components/SmartCalendar.tsx`. Bez migrace.
-  Ověřeno: `tsc`, testy kalendáře a adminu, SQL v PGlite. **V prohlížeči neověřeno.**
-
-### 2026-11-15 (zálohy, ruční příjmy a kalendář)
-- **feat** **Víc záloh na zakázku a ruční příjmy v Podnikání** (R-110): karta „Zapsat
-  příjem" ve Finance › Podnikání (záloha k zakázce / jednorázový příjem, seznam zapsaných
-  letos se smazáním a „Zpět"), linie ukazují „Z toho zálohy", doplatek a nezaplacené částky
-  odečítají ruční zálohy. Soubory: `lib/admin/project-payments.ts`,
-  `app/dashboard/finance/{business-income-actions.ts,BusinessIncomeForm.tsx,BusinessSection.tsx,finance-actions.ts,byznys-actions.ts,page.tsx}`,
-  `app/actions.ts`, `lib/admin/{invoice-issue,projects}.ts`, `components/SummaryBar.tsx`,
-  test `lib/__tests__/admin-zalohy.test.ts` (11 testů). Bez migrace.
-- **feat** **Kalendář na Dnes (týden) a záložka Kalendář v Hovorech** (R-110):
-  `components/SmartCalendar.tsx` (`defaultView`), `app/dashboard/page.tsx`,
-  `app/dashboard/calls/page.tsx`; `app/calendar-actions.ts` obnovuje i `/dashboard`.
-- **chore** Ověřeno: `tsc`, `npm test` (107 souborů / 1247 testů), `npm run build`.
-  **V prohlížeči neověřeno** — přihlášení je od R-105 přes Supabase a testovací Neon nemá 106.
-- **decision** **R-110**.
-
-### 2026-11-15 (Dokončené zakázky zvlášť)
-- **feat** **Dokončené jako vlastní položka menu** (R-109): Zakázky jen rozpracované,
-  hotové a zaplacené v `/dashboard/zakazky/dokoncene` s filtry Hotovo / Zaplaceno, druh
-  a zdroj, řazení podle uzavření. Společná obrazovka `components/admin/projects-list.tsx`,
-  výpis `lib/admin/projects.ts` (`ProjectScope`), ikona v menu, odkaz z Profilu,
-  přesměrování starých adres. Ověřeno: `tsc`, `npm test` (105 souborů / 1226 testů),
-  `npm run build`. **V prohlížeči neověřeno** — testovací Neon nemá migraci 106
-  (`closed_at`), takže výpis tam nejde otevřít.
-- **decision** **R-109**.
-
-### 2026-11-15 (přihlášení do adminu přes Supabase Auth)
-- **fix** **Proč se nešlo přihlásit:** větev `admin/supabase-auth` nebyla pushnutá, takže
-  www.zakaziq.cz běžela pořád na NextAuthu (`46259df`) a heslo ze Supabase tam neplatilo; na
-  Supabase za celou dobu nepřišel jediný pokus (`/token`). Účet v Supabase byl v pořádku.
-- **chore** **Zámek po pěti pokusech zrušen** na přání Kryštofa (DECISIONS #030): zkoušet jde
-  dokola, pokusy se jen zapisují, při limitu Supabase (429) je vlastní hláška. `ADMIN_EMAIL`
-  nastaven na e-mail účtu v Supabase v Preview i Production.
-- **chore** **Supabase Auth je na produkci** (2026-11-15, `307ef15`, fast-forward `46259df` →
-  `307ef15`, se souhlasem Kryštofa). Ověřeno zvenku: `/login` 200 s novým formulářem,
-  `/api/auth/providers` 404 (NextAuth pryč), `/dashboard` 307, `/` 200. **Přihlášení samo
-  naživo ověřené není** — heslo zná jen Kryštof.
-- **feat** **Admin se přihlašuje přes Supabase Auth** (R-105, DECISIONS #029): e-mail, heslo
-  a dvoufázové ověření ověřovací aplikací. Rozsah je **jen admin** — Workspace a klientský
-  prostor zůstávají na Clerku a **data zůstávají v Neonu**. Nové `lib/supabase/*`, přepsané
-  `lib/auth.ts`, dvoukrokové `/login`, zapnutí TOTP v Profilu, admin část `proxy.ts`.
-  Do adminu projde jen session s e-mailem `ADMIN_EMAIL` (R-001) a zapsaný faktor **nelze
-  přeskočit**. Zámek na IP zůstal.
-- **fix** **Cookie se session je zpevněná proti výchozímu stavu `@supabase/ssr`**, který dává
-  `httpOnly: false` (token by přečetl JavaScript, tedy i XSS) a platnost **400 dní**. Admin má
-  `httpOnly: true`, `secure` mimo vývoj, `sameSite: 'lax'` a nejvýš 12 h jako dřív NextAuth.
-- **chore** **CSP se nemění.** Přihlášení i nastavení TOTP běží jen v server actions, takže
-  prohlížeč na Supabase nesahá; QR kreslí balíček `qrcode`, který v repu už byl (R-064), a jde
-  do stránky jako `data:` URL, což `img-src` povoluje. Do `CSP-LOG.md` tedy nic.
-- **refactor** `next-auth`, `bcryptjs` a `@types/bcryptjs` odinstalované, `app/api/auth/[...nextauth]`
-  smazané, 30 call sites převedených na `getAdminSession()` / `adminActorEmail()`, mocky ve
-  20 testech přepsané z `next-auth` na `@/lib/auth`.
-- **fix** Env Supabase se čte **ve funkci, ne do konstanty při načtení modulu** — na Vercelu by
-  to prošlo, ale záleželo by na tom, kdy se modul poprvé naimportoval. Odhalil to nový test.
-- **chore** Ověření: `npx tsc --noEmit` čistý, `npm run build` prošel (bez varování), nový test
-  `lib/__tests__/admin-supabase-auth.test.ts` (10 testů: cizí účet neprojde, faktor se nedá
-  přeskočit, cookie je zpevněná, `next-auth` v repu nezůstal). **Naživo neověřeno** — projekt
-  má nula uživatelů, takže skutečné přihlášení ani druhý faktor nikdo nezkusil (otevřený problém).
-- **chore** Build poprvé spadl na `next/font/google` a prošel až po smazání `.next` — tedy
-  **potvrzení otevřeného problému** o poškozené build cache z 2026-11-13, ne vada téhle změny.
-- **decision** **R-105** — Supabase jen jako poskytovatel identity pro admin; Neon zůstává.
-- **fix** **Dvě věci z R-105 šly jen za Pro, tak se řeší jinak** (R-106, DECISIONS #029
-  doplnění): veřejnou registraci zavírá **hook `before_user_created_jen_admin`** (Postgres
-  funkce, cizí účet vůbec nevznikne → `403`; generátor SQL `scripts/supabase-auth-sql.mjs`,
-  aby e-mail nebyl natvrdo v gitu) a délku session drží **kód** — strop 12 h od přihlášení
-  z `amr` v podepsaných claims (`lib/supabase/session-age.ts`), který se při obnovení tokenu
-  nemění, takže je to pevný strop, ne klouzavé okno jako cookie. Ověřeno proti živé databázi:
-  cizí e-mail odmítnut, `ADMIN_EMAIL` i velkými písmeny povolen, `security definer` vypnuté,
-  spouštět smí jen `supabase_auth_admin`. **Hook se ještě musí zapnout v dashboardu.**
-- **chore** Zjištěno, že **Supabase env ve Vercelu už existuje** (integrace, jen Production) —
-  včetně `SUPABASE_SERVICE_ROLE_KEY`, který kód nepoužívá. Ověřit cílový projekt a klíč odebrat.
-- **decision** **R-106** — co je v Supabase placené, řeší kód a hook.
-- **chore** **Vercel nastavený** (2026-11-15): `SUPABASE_URL` a `SUPABASE_PUBLISHABLE_KEY`
-  doplněné pro **Preview**; Production je má z integrace Supabase a je ověřené, že míří na
-  projekt `awcgvgkeuwgspybwvvpn` a klíč je týž publishable jako lokálně. Hook
-  `before_user_created_jen_admin` je nově **i ve schématu `extensions`**, protože dialog
-  v dashboardu předvyplňuje právě to schéma; obě kopie ověřené proti živé DB.
-
-### 2026-11-14 (ověření produkce z runtime chyb Vercelu)
-- **chore** **Tři migrace jsou prokázané, ne jen slíbené.** Dotaz na runtime chyby produkce
-  (Vercel MCP, 7 dní) ukázal, co tam nechal starý kód před nasazením větve: `weight_logs`
-  a `nutrition_logs` neexistují (**migrace 100**, `DROP TABLE` je nevratně hotový), `business`
-  neexistuje (**102**) a 430× `completed_projects` neexistuje na veřejném `/h/[token]`
-  (**106**; ten dotazník kvůli tomu 23 hodin vracel 500). Od 13. 11. 19:15 **žádná chyba
-  schématu** — nový kód a databáze si nikde neodporují.
-- **docs** **110–112 tím prokázané nejsou** a čistý log cronu je neprokáže: `expireOldSuggestions`,
-  `proposeMemoryDrafts` i `remindPendingSurveys` jsou volané s `.catch(…)`, takže chybějící
-  tabulku spolknou. Zapsáno do otevřených problémů místo dřívější domněnky.
-- **chore** Kryštof na dotaz potvrdil, že **všechny migrace jsou nasazené** — 110–112, 101
-  i 097–099 z Workspace. Měřením zvenku prokázané zůstávají 100, 102 a 106; zbytek je jeho slovo.
-  Doprovodné kroky po migracích (backfill kontaktů, `lead_pending`, duplicitní příjmy u 109)
-  jsou samostatná věc a odškrtnuté nejsou.
-- **fix** **Nalezen tichý výpadek e-mailů:** Gmail SMTP odmítá přihlášení (535 BadCredentials)
-  od 2026-08-18, naposledy dnes v 8:00 z denního cronu. Admin tedy neposílá připomínky, zprávy
-  klientům ani automatický dotazník z AD16. Nový otevřený problém.
-
-### 2026-11-14 (nasazení AD14–AD18 na produkci)
-- **chore** **Produkce běží na `8210f04` — celá modernizace adminu je venku.** Kryštof pustil
-  migrace **110, 111 a 112** (všechny aditivní), merge `admin/modernizace` → `main` byl
-  fast-forward (`d58e561` → `8210f04`) a **build prošel na první pokus** (135 s, `fra1`);
-  potíž s obnovenou cache z 13. 11. se neopakovala. Na produkci je tím poprvé AI asistent,
-  paměť projektu, automatický dotazník, předávací dokument, AI leady i celý nový vzhled.
-- **chore** Ověřeno zvenku bez přihlášení: 17 adres vrací, co má (`/` 200, `/h` a `/p` 404,
-  `/dashboard` 307, cron 401, veřejná API 405 na GET, `/ikony/ikona.svg` 200). **Že 110–112
-  opravdu běžely, zvenku prokázat nejde** — žádná veřejná routa je nečte; stojí to na
-  Kryštofově slovu, první skutečná zkouška je denní cron nebo otevření adminu.
-- **chore** **Za přihlášením okem nikdo nic neviděl** a doprovodné kroky po migracích
-  (backfill kontaktů, `lead_pending`, duplicitní příjmy) zůstávají neodškrtnuté.
-
-### 2026-11-14 (bezpečnostní audit od A do Z)
-- **fix** **Auditní skript hlásil DNS fail-open.** `dig +short` píše chyby resolveru na
-  stdout, takže `[[ -n "$(dig +short CAA …)" ]]` čtelo `;; connection timed out` jako
-  „záznam existuje" — kontrola při každé poruše DNS tvrdila OK. Druhá vada: CAA, DNSSEC,
-  SPF a DMARC se čtou pro **apex**, ne pro host, na který se audit pustí (`www` je CNAME na
-  Vercel, dotaz na CAA alias následuje). Dohromady dva falešně pozitivní a dva falešně
-  negativní řádky — a `STATE.md` podle nich nesl špatný stav DNS. Soubory:
-  `.claude/security/security-check.sh`, DECISIONS #028.
-- **fix** **Čtyři veřejné odkazy adminu vracely 500 místo 404.** `projects.public_token`
-  i `survey_token` jsou `uuid`, ale token z adresy šel do dotazu neověřený → Postgres
-  `22P02` → nezachycená chyba, kterou umí vyvolat kdokoli bez přihlášení. Nový
-  `publicToken()` + test. Soubory: `lib/public-token.ts`, `app/p/[token]/page.tsx`,
-  `app/h/[token]/page.tsx`, `app/portal-actions.ts`. Ověřeno na dev serveru.
-- **fix** **Pět veřejných JSON routů adminu čtlo tělo bez stropu.** Workspace má na totéž
-  64 kB (`lib/ws/intake/http.ts`), admin ochranu neměl. Nový `readJsonLimited()` nad už
-  existujícím `readBodyLimited` (zvládá i `chunked` bez `content-length`); ověření klíče
-  zůstává **před** čtením těla. Soubory: `lib/security/request-body.ts`,
-  `app/api/public/{agent-leads,invoices,leads}/route.ts`, `lib/web-leads.ts` + testy.
-- **fix** **`redactSensitive()` pouštěl pět tvarů tajemství** — `whsec_` (podpisy
-  Stripe/Svix/Resend), `re_` (Resend), `AIza` (Google), `npg_` (heslo role na Neonu)
-  a blok `-----BEGIN … PRIVATE KEY-----`. Filtrem jde kontext AI asistenta, paměť projektu,
-  hlášení z Claude Code i předávací dokument. Soubory: `lib/project-activity.ts` + testy.
-- **fix** Drobnosti: `lib/web-leads.ts` neposílal `Vary: Origin` a povoloval
-  `http://localhost:3000` i v produkci; cookie motivu se zapisovala bez `Secure`
-  (`lib/ws/theme.ts`); název nahraného PDF v adminu šel do `Content-Disposition`
-  a do přílohy e-mailu bez očištění a délky (`lib/invoices.ts`, Workspace to dělá);
-  `Permissions-Policy` doplněna o `bluetooth`, `browsing-topics`, `hid`,
-  `idle-detection`, `local-fonts`, `screen-wake-lock`, `serial`
-  (`publickey-credentials-get` schválně ne — zavřelo by WebAuthn pro budoucí 2FA).
-- **docs** Zjištěný stav mimo kód (vlastník Kryštof, v `STATE.md` → Otevřené položky):
-  apex **bez SPF** a DMARC `p=none` **bez `rua=`**, přitom doména odesílá z apexu i přijímá
-  (MX Resendu) → podvrhnout e-mail jménem `@zakaziq.cz` jde a nikdo se o tom nedozví;
-  **CAA a DNSSEC chybí**; **HSTS `preload`** je v hlavičce, ale doména na seznamu není
-  (uzavírá otevřenou otázku u DECISIONS #005); `/w/registrace` je veřejně dosažitelná
-  na **dev** instanci Clerku (potvrzeno zvenku).
-- **chore** Ověření: `npm test` 103 souborů / **1205 testů** (+4 nové, 3 přeskočené),
-  `npx tsc --noEmit`, `npm run build` bez chyb a varování, `node scripts/sync-agent-context.mjs --check`.
-  Zápisy: `.claude/security/{AUDIT-LOG,STATE,DECISIONS}.md` (CSP se nemění, do CSP-LOG nic).
-
-### 2026-11-14 (AD18 — dokončení sjednocení a ověření)
-- **feat** **AD18 hotové, modernizace adminu tím končí.** Pět commitů, **bez migrace**.
-  Technický popis: `docs/admin/AGENTS-ADMIN.md` → „Dokončení sjednocení: modály
-  a přístupnost (AD18)", odchylky v R-104, měření v plánu, sekce 11.
-- **feat** **Stará vizuální vrstva nezbyla.** Strop zakázaných tříd je **nula** u všech
-  skupin (`muted-foreground` 283 → 0, `rounded-lg|xl|2xl` 197 → 0, duhové barvy 269 → 0,
-  `bg-white` 96 → 0, šedé škály 41 → 0, `brand-*` 0); jediný zbytek je `@apply border-border`
-  v základní vrstvě. Zmizely i `.brand-gradient` (44×), literální paleta `brand`
-  z `tailwind.config.ts`, gradienty `from-violet-*` a **emoji v rozhraní** — ikony
-  konzultantů a popisky v kalkulačce startupu jsou Lucide (`components/ConsultantIcon.tsx`).
-  Gradient zůstal jedinému, komu podle Dílků patří: **logu**.
-- **feat** **Zelená je pryč i z osobní části.** Projekty, startup, Profil, přehled
-  výkonnosti, hodnocení, oznámení, daně, novinky, klienti, portál `/p`, dotazník `/h`
-  a přihlášení. Škály (NPS 1–10, náročnost zakázky, trychtýř zakázek, hvězdičky) rostou
-  **tmavostí** navy, ne odstínem; potvrzení „Děkujeme" je navy se zatržítkem; druh oznámení
-  ve zvonku přestal být barva, protože je to kategorie (R-091). Amber zůstalo jen tam, kde
-  něco **čeká na vás**: blížící se limit obratu, termín daně, nepotvrzená novinka, tajný
-  klíč webu a „Čeká na platbu".
-- **feat** **Modální okno se nekreslí ručně.** Sedm vlastních vrstev `fixed inset-0`
-  (rezervace z portálu, přidání i detail události v kalendáři, detail konzultace, faktura
-  v archivu, zpráva kontaktu, asistent) plus spodní nabídka na telefonu a ⌘K jede přes
-  `components/ui/{dialog,sheet}.tsx`. Focus zůstává uvnitř a vrátí se tam, odkud okno
-  vzniklo, `Escape` zavírá a okolí dostane `aria-hidden` — **dosud se z otevřeného okna
-  dalo tabulátorem vyjet na stránku pod ním** a `Escape` fungoval jen někde.
-- **fix** **Viditelný focus a vypnutý pohyb platí pro celé repo.** `:focus-visible`
-  s obrysem 2 px `navy-700` v `app/globals.css` (ruční `<button>` a `<a>` se dosud
-  spoléhaly na výchozí obrys prohlížeče) a `prefers-reduced-motion`, které platilo jen
-  uvnitř `data-app="ws"` — admin přitom animuje přes Framer Motion, Radix i pulz kostlivců.
-- **fix** **Konzole je poprvé úplně čistá.** Kořenový layout dostal ikonu
-  (`/ikony/ikona.svg`), takže `/favicon.ico` 404 na každé stránce adminu, `/login`, `/p`
-  i `/h` zmizelo — otevřený problém od AD12.
-- **fix** Drobné popisky a prázdné hodnoty měly `text-quiet` se sníženou průhledností
-  (~3,3:1), teď mají plných 6,6:1. Plochy akcí 44 px dorovnané u odhlášení (16 px), odkazu
-  na logo (32 px), štítků a tlačítek v editoru novinek (20–36 px), „Pozvat klienta" (36 px)
-  a polí i tlačítka na `/login` (40–42 px); popisky polí jsou věta, ne mono verzálky.
-- **chore** **Ověřeno v prohlížeči** (headless Chrome s podepsanou session,
-  390 / 768 / 1280 / 1440 px): Profil, Projekty, Startup, Oznámení, Kontakty, Novinky,
-  Klienti, `/login` — nikde vodorovné přetečení, nikde plocha pod 44 px, konzole bez chyby.
-  Průchod klávesnicí: první zastávka „Přeskočit na obsah", žádný z dvaceti kroků bez
-  viditelného prstence. Tři modály i spodní nabídka na 390 px: focus trap drží, `Escape`
-  zavírá, `aria-hidden` sedí. S `prefers-reduced-motion: reduce` neběží jediná animace.
-  **`/dashboard/profil` ověřený není** — testovací Neon nemá migraci 106.
-- **chore** **Měření** (plán, sekce 11): kvůli chybějícímu měření mezi AD08 a AD17 se
-  samostatně přeložil a změřil i commit `cabe01c`. **AD18 je na JavaScriptu nula**
-  (−0,2 až +0,3 kB; landing −3,1 kB přesypáním chunků), takže převod modálů na Radix nic
-  nepřidal — `@radix-ui/react-dialog` v adminu už byl a čtyři komponenty naopak přestaly
-  importovat `AnimatePresence`. Těch 50–80 kB navíc proti AD08 přinesla sezení AD09–AD17
-  (otevřený problém).
-- **chore** Ověření: `npm test` **102 souborů / 1201 testů** (3 přeskočené),
-  `npx tsc --noEmit`, `npm run build:check` a `node scripts/sync-agent-context.mjs --check`
-  bez varování. Bezpečnostní review **bez nálezu** (AUDIT-LOG 2026-11-14).
-- **chore** **Úklid paměti podle pravidel §4:** changelog 2026-11-13 (AD12–AD17) šel do
-  `archiv/2026-11.md`, hlavička a snímek stavu se přepsaly na AD18 — `memory.md` spadl
-  z 1546 na ~1100 řádků. Pořád je nad doporučenými ~400; co zbývá, jsou **Rozhodnutí**
-  (R-001–R-104, nearchivují se) a otevřené problémy.
-- **decision** **R-104** — sedm vědomých odchylek od zadání AD18.
+### 2026-11-17 (hovory od asistenta z Growth OS — krok 1 a 2)
+- **feat** **Příjem hovorů z Growth OS** (R-112, DECISIONS #033): `POST /api/public/outreach`
+  (Bearer `GROWTH_OS_API_KEY`, 256 kB, 60/min, Zod) ukládá snímky obvolaných firem do nové
+  tabulky `outreach_leads`, jeden parametrizovaný upsert z JSON, starší snímek novější nepřepíše
+  a snímek nesahá na to, co s firmou udělal admin. Do zvonku jde firma nově ve frontě, první
+  otevření ukázky a odpověď na e-mail (nový typ oznámení `outreach_lead`). Migrace 114
+  (aplikována: ne, nikde). Soubory: `types/outreach.ts`, `lib/admin/outreach.ts`,
+  `app/api/public/outreach/route.ts`, `lib/notifications.ts`, `components/NotificationList.tsx`.
+- **feat** **Hovory › Od asistenta** — fronta „Komu zavolat" seřazená podle naléhavosti
+  (odpověděl na e-mail → chce zavolat dnes → otevřel ukázku → …), tlačítko Zavolat, odkaz na
+  ukázku a web firmy, shrnutí hovoru označené jako odhad, **Převzít do Hovorů** (kontakt
+  + plánovaný hovor v pražském čase, ukáže se v kalendáři) a **Nemá zájem** se Zpět; firma se
+  vrátí sama, když odpoví na e-mail. Bez migrace 114 se záložka neukáže. Soubory:
+  `components/admin/outreach-queue.tsx`, `lib/admin/outreach-view.ts`, `app/outreach-actions.ts`,
+  `app/dashboard/calls/page.tsx`.
+- **feat** **Strana Growth OS** (repozitář `vizeon-autopilot`, větev `claude/zakaziq-admin-sync`,
+  commit `91c286d`, nepushnuto): `src/zakaziq-admin.mjs`, `scripts/zakaziq-sync.mjs`, workflow
+  `zakaziq-sync.yml` (po–pá hodinově 8–19) a krok 8 stavby ukázky. Na straně Growth OS D-103.
+- **chore** Ověřeno: `lib/__tests__/admin-hovory-asistent.test.ts` (9 testů nad PGlite se SQL
+  migrace 114, včetně dvojího běhu migrace), `app/api/public/outreach/__tests__/route.test.ts`
+  (5), v autopilotu `tests/zakaziq-admin.test.mjs` (4, celá sada 143 prošla) a snímky
+  vyrobené autopilotem z testovací D1 prošly kontraktem ZakazIQ. **V prohlížeči neověřeno.**
+- **docs** Plán `docs/admin/GROWTH-OS-PLAN.md` (kroky 1–7, otevřené otázky ke krokům 3 a 4).
+- **decision** **R-112**.
 
 *Starší dny (AD12–AD17 z 2026-11-13 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*

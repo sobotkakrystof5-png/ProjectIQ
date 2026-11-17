@@ -19,6 +19,8 @@ export type NotificationType =
   | 'invoice_received'
   | 'client_request_received'
   | 'activity_draft'
+  /** Firma od AI asistenta z Growth OS čeká na zavolání (R-112). */
+  | 'outreach_lead'
 
 export async function createNotification(params: {
   type: NotificationType

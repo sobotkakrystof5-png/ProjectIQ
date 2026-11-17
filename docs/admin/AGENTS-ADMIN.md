@@ -450,6 +450,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/prvotka-leads` | `x-prvotka-lead-signature` = `PRVOTKA_LEAD_WEBHOOK_SECRET` | Kontaktní formulář prvotka.cz → nepotvrzená poptávka (AD02; web ještě napojený není) |
 | `POST /api/public/leads` | `N8N_API_KEY` | Leady z n8n chatbota → Hovory |
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
+| `POST /api/public/outreach` | Bearer `GROWTH_OS_API_KEY` | Snímky obvolaných firem z Growth OS (vizeon-autopilot) → `outreach_leads`, fronta Hovory › Od asistenta (R-112). Dávka nejvýš 100 firem, tělo 256 kB, 60 požadavků/min, starší snímek novější nepřepíše, bez migrace 114 vrací 503 |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |

@@ -3,10 +3,12 @@ import { PillNav } from '@/components/ws/app/toolbar'
 import { Pagination } from '@/components/admin/pagination'
 import LeadsTable from '@/components/LeadsTable'
 import { AgentLeadsStrip } from '@/components/admin/agent-leads-strip'
+import { OutreachQueue } from '@/components/admin/outreach-queue'
 import ProjectCalculator from '@/components/ProjectCalculator'
 import { SmartCalendar } from '@/components/SmartCalendar'
 import { LEAD_SORT, loadCallsScreen } from '@/lib/admin/leads'
 import { loadAgentLeads } from '@/lib/admin/agent-leads'
+import { countOutreachQueue, loadOutreachQueue } from '@/lib/admin/outreach'
 import { loadCalendarWindow } from '@/lib/admin/calendar'
 import { windowFor } from '@/lib/admin/calendar-window'
 import { getPragueTodayISO } from '@/lib/prague-time'
@@ -29,6 +31,8 @@ export default async function CallsPage(props: {
   const focusLead = Array.isArray(searchParams.lead) ? searchParams.lead[0] : searchParams.lead
   const waiting = searchParams.pohled === 'cekani'
   const calendarView = searchParams.pohled === 'kalendar'
+  // Firmy od AI asistenta z Growth OS (R-112): komu zavolat a proč.
+  const assistantView = searchParams.pohled === 'asistent'
 
   const params = parseTableParams(searchParams, {
     allowed: LEAD_SORT,
@@ -41,10 +45,14 @@ export default async function CallsPage(props: {
   // AI leady z vizeon-lead-agent visí v pruhu nad výpisem (AD16) — dosud se
   // jen ukládaly a nikdo je neviděl. Počty v záložkách potřebuje i pohled
   // kalendáře, proto se výpis čte vždy; kalendář jen na své záložce.
-  const [screen, agentLeads, calendar] = await Promise.all([
+  const now = new Date()
+  const [screen, agentLeads, calendar, outreach, outreachCount] = await Promise.all([
     loadCallsScreen(params, waiting),
-    calendarView ? null : loadAgentLeads(),
+    calendarView || assistantView ? null : loadAgentLeads(),
     calendarView ? loadCalendarWindow(calendarRange) : null,
+    assistantView ? loadOutreachQueue(now) : null,
+    // null = migrace 114 ještě neběžela, záložka se neukáže.
+    countOutreachQueue(),
   ])
   const links = tableLinks(PATH, searchParams)
 
@@ -79,7 +87,7 @@ export default async function CallsPage(props: {
               key: 'hovory',
               label: 'Hovory',
               href: tableHref(PATH, searchParams, { pohled: null, page: null }),
-              active: !waiting && !calendarView,
+              active: !waiting && !calendarView && !assistantView,
               count: screen.active,
             },
             {
@@ -89,6 +97,17 @@ export default async function CallsPage(props: {
               active: waiting,
               count: screen.waiting,
             },
+            ...(outreachCount !== null
+              ? [
+                  {
+                    key: 'asistent',
+                    label: 'Od asistenta',
+                    href: tableHref(PATH, searchParams, { pohled: 'asistent', page: null }),
+                    active: assistantView,
+                    count: outreachCount,
+                  },
+                ]
+              : []),
             {
               key: 'kalendar',
               label: 'Kalendář',
@@ -100,6 +119,12 @@ export default async function CallsPage(props: {
 
         {calendar ? (
           <SmartCalendar initial={calendar} initialRange={calendarRange} today={today} defaultView="week" />
+        ) : assistantView ? (
+          outreach?.available ? (
+            <OutreachQueue rows={outreach.rows} nowIso={now.toISOString()} />
+          ) : (
+            <p className="text-sm text-quiet">Hovory od asistenta se ukážou, až databáze dostane migraci 114.</p>
+          )
         ) : (
           <>
             {agentLeads && <AgentLeadsStrip rows={agentLeads.rows} total={agentLeads.total} />}
@@ -121,7 +146,7 @@ export default async function CallsPage(props: {
         )}
       </div>
 
-      {!calendarView && (
+      {!calendarView && !assistantView && (
         <div className="border-t border-navy-100 pt-10">
           <ProjectCalculator />
         </div>
