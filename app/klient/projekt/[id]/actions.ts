@@ -181,3 +181,47 @@ export async function sendFeedback(projectId: string, raw: { nps: number; conten
   revalidatePath(`/klient/projekt/${id.data}`)
   return { success: true }
 }
+
+const taskStateSchema = z.object({ taskId: z.string().uuid(), done: z.boolean() })
+
+/**
+ * „Mám hotovo" u úkolu etapy (KP12). Úkol, zakázku i členství ověřuje
+ * `portal.submit_task_state`; Kryštofovi přijde zvonek, jen když se úkol
+ * opravdu označil (ne při vrácení ani při druhém kliknutí).
+ */
+export async function setTaskDone(projectId: string, raw: { taskId: string; done: boolean }): Promise<ActionResult> {
+  const ctx = await getPortalContext()
+  if (!ctx) return { success: false, error: 'Přihlaste se prosím znovu.' }
+  const id = projectIdSchema.safeParse(projectId)
+  const parsed = taskStateSchema.safeParse(raw)
+  if (!id.success || !parsed.success) return { success: false, error: 'Tenhle úkol nebyl nalezen.' }
+
+  let changed = false
+  let taskProject: string | null = null
+  try {
+    const rows = await portalDb({ clientId: ctx.clientId })<{ task_project: string; changed: boolean }>`
+      SELECT * FROM portal.submit_task_state(${parsed.data.taskId}, ${ctx.memberId}, ${parsed.data.done})
+    `
+    changed = Boolean(rows[0]?.changed)
+    taskProject = rows[0]?.task_project ? String(rows[0].task_project) : null
+  } catch (err) {
+    return { success: false, error: explain(err, 'Úkoly jste měnili hodně často. Zkuste to prosím za chvíli.') }
+  }
+  // Úkol z jiné zakázky téhož klienta: funkce ho pustí (patří klientovi),
+  // ale odkaz a obnovení stránky musí sedět na skutečnou zakázku.
+  const project = taskProject ?? id.data
+
+  if (changed && parsed.data.done) {
+    const info = await adminProjectInfo(project)
+    if (info) {
+      await createNotification({
+        type: 'client_task_done',
+        title: `Klient splnil úkol — ${info.client_name}`,
+        body: 'Úkol z etapy je v klientském prostoru označený jako hotový.',
+        link: `${projectPath(project)}#etapy`,
+      })
+    }
+  }
+  revalidatePath(`/klient/projekt/${project}`)
+  return { success: true }
+}

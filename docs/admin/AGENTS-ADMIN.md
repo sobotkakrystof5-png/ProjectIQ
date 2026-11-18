@@ -1138,6 +1138,39 @@ Všechno, co se u zdroje liší, je v `lib/lead-origins.ts`. **Přidání dalš�
 
 ---
 
+## Služby a etapy zakázky (KP12, R-121, R-124)
+
+Migrace 121. Admin:
+
+- **Nastavení › Služby a etapy** `/dashboard/sluzby` (menu Klienti): `components/admin/phases/services-settings.tsx`.
+  Služba (`service_templates`) = název, pořadí, `active` („Nabízet u nové zakázky"). Etapy šablony
+  (`service_phase_templates`): název, `client_description`, `typical_days`, `client_tasks text[]`.
+  Uložení nahradí etapy šablony celé v jedné transakci (`saveService`); smazání služby jde vrátit
+  (`deleteService` vrací snímek, `restoreService` ho vloží se stejným id). Prázdný stav nabídne
+  prázdné služby Web, E-shop, Design, Automatizace (`createSuggestedServices`). Obsah píše Kryštof.
+- **Nová zakázka** (`ProjectForm` s `services`): výběr služby nastaví `service_type` na název služby
+  a do formuláře zkopíruje etapy (`components/admin/phases/phase-draft-editor.tsx`). Termín etapy
+  = začátek + součet `typical_days` (`draftsFromTemplate`, `withDueDates`); ručně změněný termín se
+  při posunu začátku nepřepočítá. `createProject` etapy ověří Zodem (`phaseDraftsSchema`) a po
+  vložení zakázky zapíše `initProjectPhases` (jeden příkaz, jen když zakázka etapy nemá). Selhání
+  zakázku nezruší, etapy jdou přidat v detailu.
+- **Detail zakázky** › Přehled › karta Etapy (`project-phases-card.tsx`): stav Čeká / Běží / Hotovo
+  jedním klikem se „Zpět", termín v řádku se „Zpět", úkoly klienta s datem označení. Zakázka bez
+  etap nabídne výběr služby a „Uložit etapy" (`addProjectPhasesAction`).
+- **Postup v %** (D-K14): trigger `trg_project_phases_progress` přepíše `projects.progress`
+  = zaokrouhlené hotové / všechny, jakmile má zakázka etapu. `updateProject` u zakázky s etapami
+  `progress` nepřepisuje (`projectHasPhases`, `coalesce`) a formulář místo posuvníku ukáže
+  „Počítá se z hotových etap". Zakázka bez etap má ruční % jako dřív.
+- **Etapy zakázky** (`project_phases`, `project_phase_tasks`) jsou **kopie** šablony, žádný odkaz
+  na ni; úprava šablony běžící zakázky nemění. Úkol má složený klíč `(project_id, phase_id)`.
+- Klient označí úkol v `/klient/projekt/[id]` → `portal.submit_task_state` zapíše
+  `client_done_at` + `client_done_by` (id člena) → zvonek `client_task_done` s odkazem na `#etapy`.
+- Do `portal` (DECISIONS #041) jdou triggerem jen etapy propojené zakázky, bez schvalování.
+  `portal.link_project` z 095 je přepsaná: kopíruje i etapy a úkoly. Po migraci pustit
+  `node scripts/portal-create-role.js` (granty).
+- Bez migrace 121 vrací `loadServices`/`loadProjectPhases` `null`: karta i výběr služby se
+  schovají, `/dashboard/sluzby` řekne, že to ještě není zapnuté. Testy `lib/__tests__/kp12-sluzby-etapy.test.ts`.
+
 ## Stavy zakázky — tóny
 
 Od AD05 nese barva **naléhavost, ne druh** (R-091). Odstíny se nikde nepíšou ručně: tón je

@@ -59,6 +59,7 @@ beforeAll(async () => {
     await db.exec(read('migrations', '095_portal_schema.sql'))
     await db.exec(read('migrations', '096_portal_requests_messages.sql'))
     await db.exec(read('migrations', '113_portal_supabase_auth.sql'))
+    await db.exec(read('migrations', '121_sluzby_a_etapy.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')

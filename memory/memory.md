@@ -113,7 +113,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy, KP13 peníze a faktury, KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). Nic z toho není v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury, KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). KP13–KP17 nejsou v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1259,6 +1259,17 @@ i nepřečtené zprávy jako na WhatsApp a Messenger… v podobném stylu, ale j
 a Konzultace. Ze Slacku záměrně ne: vlákna v odpovědích, reakce, vlastní kanály, přímé zprávy mezi
 členy klienta, „píše…", hovory, stavy. Krok „doručeno" není. Náčrt v `docs/klientsky-prostor/PLAN.md` 4.7.
 Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
+
+### R-124 · Postup zakázky v % z hotových etap; čtyři prázdné služby (2026-11-18)
+**Rozhodnutí:** (1) Zakázka s etapami má postup v % = hotové etapy / všechny etapy, počítá ho
+databáze (trigger nad `project_phases`) a ruční posuvník u ní zmizí. Zakázka bez etap si nechá
+ruční % jako dřív (D-K14). (2) Prázdný stav Nastavení › Služby nabídne jedním kliknutím prázdné
+služby Web, E-shop, Design a Automatizace; etapy do nich píše Kryštof. (3) Etapy jdou do
+klientského prostoru hned, bez schvalování (DECISIONS #041).
+**Proč:** Kryštof 2026-11-18 vybral obě doporučené varianty. Ruční % vedle etap by si odporovalo.
+**Důsledek:** `updateProject` u zakázky s etapami `progress` nepřepisuje; nová cesta, která mění
+stav etapy, nemusí počítat % sama. Migrace 121, `docs/admin/AGENTS-ADMIN.md` → „Služby a etapy
+zakázky (KP12)". Upřesňuje R-121 a uzavírá D-K14.
 ---
 
 ## 3. Otevřené problémy
@@ -1336,6 +1347,15 @@ Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
   `klient/kp11-prihlaseni` a push (Kryštof schválil 2026-11-18), (6) průchod pozvánka → přístup →
   přehled → odhlášení → přihlášení → zapomenuté heslo na 390 a 1280 px. Tajné hodnoty agent
   nevkládá (R-115). Detail `docs/AUTH-SUPABASE-PLAN.md` → F1 · od 2026-11-15
+- [ ] **KP12 nasadit a projít naživo:** kód na větvi `klient/kp12-etapy` (nad `klient/kp11-prihlaseni`),
+  commitnutý 2026-11-18, nepushnutý. Před nasazením: migrace 121 na produkci (aditivní, starý build ji přežije), pak
+  `node scripts/portal-create-role.js` (granty pro `portal_app`). Projít: Nastavení › Služby (založit
+  čtyři služby, napsat etapy Webu, přetáhnout pořadí, smazat a Zpět), nová zakázka se službou Web
+  (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
+  i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
+  s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **`ws-schema` test je na větvích `klient/*` červený:** číslo 120 drží necommitnutá oprava
+  kalendáře v hlavním stromu, KP12 proto vzala 121. Zmizí, až bude 120 v historii · od 2026-11-18
 - [ ] **Admin v Supabase nemá druhý faktor:** účet adminu má 0 ověřených TOTP faktorů (zjištěno
   2026-11-18), přihlášení do adminu tedy stojí jen na hesle. Zapnout v `/dashboard/profil` →
   Přihlášení · Kryštof · od 2026-11-18
@@ -1593,6 +1613,26 @@ Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-18 (KP12 — služby a etapy zakázky)
+- **feat** Nastavení › Služby a etapy (`/dashboard/sluzby`): služby s etapami, typickou délkou, popisem
+  a úkoly pro klienta, řazení přetažením, smazání se Zpět, čtyři prázdné služby jedním kliknutím.
+  Soubory: `app/dashboard/sluzby/`, `components/admin/phases/services-settings.tsx`, `lib/admin-nav.ts`.
+- **feat** Nová zakázka: výběr služby předvyplní etapy s termíny od začátku práce, jdou upravit, smazat
+  a přidat; etapy jsou kopie šablony. Detail zakázky: karta Etapy (stav jedním klikem se Zpět, termín,
+  úkoly klienta), u zakázky bez etap „Uložit etapy" ze služby. Soubory: `components/ProjectForm.tsx`,
+  `components/admin/phases/`, `components/admin/project-detail-view.tsx`, `app/actions.ts`,
+  `app/phases-actions.ts`, `lib/admin/{phase-model,phases}.ts`.
+- **feat** Klientský prostor: osa etap s aktuální etapou a termíny, úkoly s „Mám hotovo" a Vrátit,
+  zvonek `client_task_done` Kryštofovi. Soubory: `lib/portal/phases.ts`, `components/portal/`,
+  `app/klient/projekt/[id]/`.
+- **db** Migrace 121 `sluzby_a_etapy` (aplikována: ne, nikde). Granty v `scripts/portal-grants.sql`.
+- **decision** R-124 (postup v % z etap, D-K14), DECISIONS #041, AUDIT-LOG 2026-11-18.
+- **chore** Ověřeno: `npx tsc --noEmit`; nový `lib/__tests__/kp12-sluzby-etapy.test.ts` (18 testů nad
+  PGlite, migrace dvakrát po sobě); celá sada 1435/1444 před opravou mocku v `admin-after-emails`
+  (teď 6/6), zbylá selhání známá (`ws-email` pevná data, `ws-schema` mezera po 120, dva testy
+  asistenta na časový limit pod zátěží). Vzhled na dočasné stránce s vymyšlenými daty (Playwright,
+  390 a 1280 px): bez vodorovného posouvání, konzole bez chyb; stránka smazaná. Naživo neověřeno.
 
 ### 2026-11-18 (KP11 — nastavení Supabase a Vercelu, rozpracované)
 - **chore** Migrace 113 na produkčním Neonu (pustil Kryštof v SQL editoru, agent neověřil).

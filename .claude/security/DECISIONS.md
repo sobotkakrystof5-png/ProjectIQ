@@ -341,3 +341,11 @@ Důvod: D-K12 a R-121 (heslo zná jen klient, pozvání jedním klikem). Tiché 
 Zvažované alternativy: jen zkopírovat odkaz a poslat ho ručně (zůstává jako záloha „Zkopírovat odkaz"); pozvánka e-mailem ze Supabase (`inviteUserByEmail` chce klíč `service_role` a druhou šablonu mimo naši kontrolu).
 Přijaté riziko: kód leží v systémech Resendu a ve schránce klienta. Kdo odkaz má, založí účet na adresu z pozvánky (Confirm email je vypnutý, R-107), proto je odkaz jednorázový, platí 14 dní, jde zrušit a e-mail prosí o nepřeposílání.
 Revize: 2027-02-18, nebo při změně poskytovatele e-mailů či zapnutí Confirm email.
+
+## 041 — Etapy zakázky v klientském prostoru bez schvalování a „Mám hotovo" funkcí
+Datum: 2026-11-18
+Rozhodnutí: etapy a úkoly zakázky (migrace 121, KP12, R-124) jdou do `portal.phases` a `portal.phase_tasks` triggerem hned po zápisu v adminu, jen u zakázky propojené s klientem (`portal.projects`), bez kroku „schválit" jako u aktivity (R-072). Do projekce jde jen název, popis pro klienta, termín, stav a text úkolu; kdo úkol označil (`client_done_by`) a záznam o označení (`portal.task_marks`) zůstávají klientovi skryté. Klient smí jediné: označit nebo vrátit svůj úkol funkcí `portal.submit_task_state` (SECURITY DEFINER, pevný `search_path`, kontrola `app.client_id`, úkolu i člena přes `assert_member_project`, limit 60 změn za hodinu na člena). `portal_app` na nové tabulky jen čte, `task_marks` nevidí.
+Důvod: etapy jsou plán pro klienta, ne zpráva o práci — schvalovat každou změnu termínu by Kryštofa zdržovalo a plán by v prostoru zaostával. Pole jsou v adminu výslovně popsaná „uvidí klient".
+Zvažované alternativy: schvalování etap jako u aktivity (zbytečný krok navíc); přímý UPDATE `portal.phase_tasks` pro `portal_app` (klient by mohl měnit i text úkolu a cizí úkoly hlídala jen RLS).
+Přijaté riziko: co Kryštof napíše do názvu nebo popisu etapy, klient uvidí hned. `portal.task_marks` nemá vlastní retenci (jen id a časy, maže se s členem); doplnit spolu s retencí klientského prostoru (KP10).
+Revize: 2027-02-18, nebo při zavedení schvalování obsahu pro klienta.

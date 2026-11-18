@@ -21,3 +21,9 @@ GRANT SELECT ON portal.requests, portal.messages, portal.feedback TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.submit_request(uuid, uuid, text, text) TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.submit_message(uuid, uuid, text) TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.submit_feedback(uuid, uuid, integer, text) TO portal_app;
+
+-- Etapy a úkoly zakázky (migrace 121, KP12). Klient je jen čte a úkol označí
+-- funkcí submit_task_state; záznam o označení (task_marks) nevidí.
+GRANT SELECT ON portal.phases, portal.phase_tasks TO portal_app;
+REVOKE ALL ON portal.task_marks FROM portal_app;
+GRANT EXECUTE ON FUNCTION portal.submit_task_state(uuid, uuid, boolean) TO portal_app;

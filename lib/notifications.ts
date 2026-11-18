@@ -27,6 +27,8 @@ export type NotificationType =
   | 'portal_invite_failed'
   /** Klient dal v dotazníku 0–6 — ozvat se mu, dokud se dá něco zachránit (R-119). */
   | 'survey_detractor'
+  /** Klient v prostoru označil úkol etapy jako hotový (KP12, R-121). */
+  | 'client_task_done'
 
 export async function createNotification(params: {
   type: NotificationType

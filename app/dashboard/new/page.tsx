@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { ProjectForm } from '@/components/ProjectForm'
 import { loadProjectPrefill } from '@/lib/admin/memory/prefill'
 import { requireAuth } from '@/lib/auth'
+import { loadServices } from '@/lib/admin/phases'
 
 /**
  * Nová zakázka. S `?kontakt=<id>` se formulář předvyplní z historie klienta
@@ -21,7 +22,11 @@ export default async function NewProjectPage(props: { searchParams: Promise<{ ko
   const contactId = typeof searchParams.kontakt === 'string' && UUID.test(searchParams.kontakt)
     ? searchParams.kontakt
     : null
-  const prefill = contactId === null ? null : await loadProjectPrefill(contactId)
+  const [prefill, services] = await Promise.all([
+    contactId === null ? null : loadProjectPrefill(contactId),
+    // Služby s etapami (KP12); bez migrace 121 `null` a formulář je jako dřív.
+    loadServices({ activeOnly: true }),
+  ])
 
   return (
     <PageShell width="narrow">
@@ -54,7 +59,7 @@ export default async function NewProjectPage(props: { searchParams: Promise<{ ko
         </div>
       )}
       <div className="rounded-panel border border-navy-100 bg-surface p-6">
-        <ProjectForm prefill={prefill ?? undefined} />
+        <ProjectForm prefill={prefill ?? undefined} services={services} />
       </div>
     </PageShell>
   )

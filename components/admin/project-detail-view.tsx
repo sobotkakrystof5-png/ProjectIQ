@@ -28,6 +28,8 @@ import { AgentKeyPanel } from '@/components/AgentKeyPanel'
 import { PortalReplyPanel, type PortalThreadMessage } from '@/components/admin/portal-reply-panel'
 import { PortalAccessCard } from '@/components/admin/portal-access-card'
 import { loadProjectPortalAccess } from '@/lib/portal/project-access'
+import { ProjectPhasesCard } from '@/components/admin/phases/project-phases-card'
+import { loadProjectPhases, loadServices } from '@/lib/admin/phases'
 import { getProjectInvoices } from '@/app/dashboard/finance/invoice-actions'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { getProjectCosts } from '@/app/costs-actions'
@@ -261,13 +263,29 @@ function surveyState(project: Project): string {
 async function OverviewTab({ project }: { project: Project }) {
   const publicUrl = getPublicUrl(project.public_token)
   // Klientský prostor (KP11): kdo v něm je a kdo čeká na pozvánku. Vlastní projekt nemá koho zvát.
-  const portalAccess = project.project_type === 'personal' ? null : await loadProjectPortalAccess(project.id)
+  const [portalAccess, phases, services] = await Promise.all([
+    project.project_type === 'personal' ? null : loadProjectPortalAccess(project.id),
+    // Etapy (KP12). `null` = migrace 121 ještě neběžela — karta se neukáže.
+    loadProjectPhases(project.id),
+    loadServices(),
+  ])
 
   return (
     <>
+      {phases && services && (
+        <Card id="etapy">
+          <ProjectPhasesCard
+            projectId={project.id}
+            phases={phases}
+            services={services}
+            inPortal={Boolean(portalAccess?.client)}
+          />
+        </Card>
+      )}
+
       <Card id="editace-zakazky">
         <CardHead title="Editace zakázky" />
-        <ProjectForm project={project} />
+        <ProjectForm project={project} hasPhases={Boolean(phases && phases.length > 0)} />
       </Card>
 
       {/* Paměť zakázky (AD15): čísla z historie klienta a věty, které si k ní někdo zapsal. */}

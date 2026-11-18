@@ -14,6 +14,10 @@ import {
   type InvoiceFormState,
 } from '@/components/InvoiceFields'
 import type { ProjectPrefill } from '@/lib/admin/memory/types'
+import type { ServiceTemplate } from '@/lib/admin/phase-model'
+import {
+  PhaseDraftEditor, draftsProblem, rowsFromService, rowsToDrafts, type PhaseDraftState,
+} from '@/components/admin/phases/phase-draft-editor'
 
 type FormData = {
   client_name: string
@@ -51,7 +55,17 @@ interface ProjectFormProps {
    * věta od modelu se do formuláře nikdy nedostane (R-085).
    */
   prefill?: ProjectPrefill
+  /**
+   * Služby z Nastavení › Služby (KP12) — jen u nové zakázky. Výběr služby
+   * předvyplní etapy s termíny. `null`/prázdné = jen volný text jako dřív.
+   */
+  services?: ServiceTemplate[] | null
+  /** Upravovaná zakázka má etapy — postup v % pak počítají ony (D-K14). */
+  hasPhases?: boolean
 }
+
+/** Volba „jiná služba" bez šablony v seznamu služeb. */
+const OTHER_SERVICE = '__jina'
 
 const defaultData: FormData = {
   client_name: '',
@@ -123,10 +137,19 @@ function prefillToForm(prefill: ProjectPrefill): FormData {
   }
 }
 
-export function ProjectForm({ project, prefill }: ProjectFormProps) {
+export function ProjectForm({ project, prefill, services, hasPhases = false }: ProjectFormProps) {
   const [form, setForm] = useState<FormData>(
     project ? projectToForm(project) : prefill ? prefillToForm(prefill) : defaultData,
   )
+  // Služba a etapy nové zakázky (KP12). U úpravy se etapy mění v detailu.
+  const serviceOptions = !project && services && services.length > 0 ? services : null
+  const [phaseState, setPhaseState] = useState<PhaseDraftState>(() => ({
+    serviceId: '',
+    startDay: getPragueTodayISO(),
+    rows: [],
+  }))
+  const pickedService = serviceOptions?.find((s) => s.id === phaseState.serviceId)
+  const usesPhases = project ? hasPhases : phaseState.rows.length > 0
   const [depositManuallySet, setDepositManuallySet] = useState(
     project ? project.deposit_amount !== null : false
   )
@@ -172,8 +195,14 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
       return
     }
 
-    if (progressChanged && !form.progressNote.trim()) {
+    if (!usesPhases && progressChanged && !form.progressNote.trim()) {
       setError('Posunutí postupu vyžaduje popis — co jsi udělal?')
+      return
+    }
+
+    const phasesError = !project && phaseState.rows.length > 0 ? draftsProblem(phaseState.rows) : null
+    if (phasesError) {
+      setError(phasesError)
       return
     }
 
@@ -197,6 +226,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
       invoiced_on_ico: form.invoiced_on_ico,
       deadline: form.deadline || null,
       notes: form.notes.trim() || null,
+      phases: !project && phaseState.rows.length > 0 ? rowsToDrafts(phaseState.rows) : undefined,
     }
 
     const wantsInvoice = !project && attachInvoice
@@ -222,7 +252,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
           await updateProject(
             project.id,
             payload,
-            progressChanged
+            !usesPhases && progressChanged
               ? { from: originalProgress, description: form.progressNote.trim() }
               : undefined
           )
@@ -292,15 +322,57 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
           />
         </Field>
 
-        <Field label="Typ služby">
-          <input
-            type="text"
-            value={form.service_type}
-            onChange={e => set('service_type', e.target.value)}
-            placeholder="např. Web na míru, E-shop, Logo…"
-            className={inputCls}
-          />
-        </Field>
+        {serviceOptions ? (
+          <Field label="Služba">
+            <select
+              value={phaseState.serviceId}
+              onChange={e => {
+                const id = e.target.value
+                const service = serviceOptions.find(s => s.id === id)
+                setPhaseState(prev => ({ ...prev, serviceId: id, rows: rowsFromService(service, prev.startDay) }))
+                if (service) set('service_type', service.name)
+                else if (id === '') set('service_type', '')
+              }}
+              className={inputCls}
+            >
+              <option value="">Vyberte službu</option>
+              {serviceOptions.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+              <option value={OTHER_SERVICE}>Jiná služba (bez etap)</option>
+            </select>
+            {phaseState.serviceId === OTHER_SERVICE && (
+              <input
+                type="text"
+                value={form.service_type}
+                onChange={e => set('service_type', e.target.value)}
+                placeholder="Jaká služba to je"
+                aria-label="Název jiné služby"
+                className={cn(inputCls, 'mt-2')}
+              />
+            )}
+          </Field>
+        ) : (
+          <Field label="Typ služby">
+            <input
+              type="text"
+              value={form.service_type}
+              onChange={e => set('service_type', e.target.value)}
+              placeholder="např. Web na míru, E-shop, Logo…"
+              className={inputCls}
+            />
+          </Field>
+        )}
+
+        {pickedService && (
+          <div className="sm:col-span-2 rounded-chip border border-navy-100 bg-navy-50/60 p-4">
+            <h3 className={SECTION_LABEL}>Etapy zakázky · {pickedService.name}</h3>
+            <p className="mb-4 mt-2 text-sm text-quiet">
+              Zkopírované ze služby. Úpravy tady šablonu nemění a klient etapy uvidí v klientském prostoru.
+            </p>
+            <PhaseDraftEditor value={phaseState} onChange={setPhaseState} disabled={isPending} />
+          </div>
+        )}
 
         <Field label="Popis zakázky" className="sm:col-span-2">
           <input
@@ -344,6 +416,11 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
           </select>
         </Field>
 
+        {usesPhases ? (
+          <Field label={project ? `Postup — ${project.progress}%` : 'Postup'}>
+            <p className="py-2.5 text-sm text-quiet">Počítá se z hotových etap.</p>
+          </Field>
+        ) : (
         <Field label={`Postup — ${form.progress}%`} className={progressChanged ? 'sm:col-span-2' : undefined}>
           <div className="flex items-center gap-3">
             <input
@@ -374,6 +451,7 @@ export function ProjectForm({ project, prefill }: ProjectFormProps) {
             </div>
           )}
         </Field>
+        )}
 
         <Field label="Cena (Kč)">
           <input

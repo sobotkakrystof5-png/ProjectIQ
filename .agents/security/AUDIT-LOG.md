@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-18 — review: služby a etapy zakázky (KP12, R-124)
+Spouštěč: před commitem (skill `web-security-review`)
+Rozsah: migrace 121 (tabulky, triggery `portal.sync_phase*`, `portal.link_project`, `portal.submit_task_state`), `scripts/portal-grants.sql`, `app/phases-actions.ts`, `lib/admin/{phases,phase-model}.ts`, `createProject`/`updateProject` v `app/actions.ts`, `setTaskDone` v `app/klient/projekt/[id]/actions.ts`, `lib/portal/phases.ts`, komponenty v `components/admin/phases/` a `components/portal/`.
+Výsledek: 0 zneužitelných nálezů, 1 drobnost opravená.
+Nálezy: (1) chybějící práva `portal_app` (granty po migraci nepuštěné) by klientskou osu etap potichu schovala.
+Opraveno: `lib/portal/phases.ts` při `42501` zapíše do logu, co pustit. Dál ověřeno: všechny akce adminu začínají `requireAuth`, vstupy přes Zod s délkami (etapy, úkoly, služby, data), SQL jen parametricky (JSON jako parametr), texty klienta i adminu se vykreslují jako text; `portal_app` na nové tabulky jen SELECT, do `task_marks` ani `public` nic (testy v `kp12-sluzby-etapy.test.ts`: cizí úkol, cizí člen, bez kontextu, zápis do projekcí); zvonek Kryštofovi nenese text od klienta; žádná nová env ani změna CSP.
+Zůstává: etapy jdou klientovi bez schvalování, `task_marks` bez retence — DECISIONS #041.
+
 ## 2026-11-18 — review: pozvání do klientského prostoru z detailu zakázky (KP11, R-121)
 Spouštěč: před commitem (skill `web-security-review`)
 Rozsah: `inviteToClientSpace` a `undoClientSpaceInvite` (`app/portal-admin-actions.ts`), `lib/portal/{project-access,invite-email}.ts`, `components/admin/portal-access-card.tsx`. Převzatá F1 (`ba226aa`, přihlášení `/klient` přes Supabase) prošla vlastní kontrolou 2026-11-15.

@@ -29,8 +29,9 @@ vi.mock('@/lib/notifications', () => ({ createNotification: (...a: unknown[]) =>
 vi.mock('@/lib/invoices', () => ({ parseInvoiceForm: vi.fn(), insertInvoice: vi.fn() }))
 // Od AD13 ukládá zakázka i datum platby přes dávkovaný `lib/admin/db.ts`.
 // Bez migrace 109 se jen zjistí, že sloupce nejsou, a nic se nezapisuje.
+// Od KP12 se `updateProject` ptá, jestli má zakázka etapy (prázdno = nemá).
 vi.mock('@/lib/admin/db', () => ({
-  adminDb: Object.assign(vi.fn(), { batch: async () => [[]] }),
+  adminDb: Object.assign(vi.fn(async () => []), { batch: async () => [[]] }),
 }))
 // Dotazník má od AD16 vlastní modul a odklad 15 s — test čeká na rozhodnutí,
 // ne na časovač. Co posílá a komu, hlídá `admin-hodnoceni.test.ts`.

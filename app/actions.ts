@@ -20,6 +20,8 @@ import { adminDb } from '@/lib/admin/db'
 import { ledgerSql } from '@/lib/admin/ledger'
 import { EXTRA_DEPOSIT_CATEGORY, extraDepositsFor, remainingToPay } from '@/lib/admin/project-payments'
 import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
+import { phaseDraftsSchema, type PhaseDraft } from '@/lib/admin/phase-model'
+import { initProjectPhases, projectHasPhases } from '@/lib/admin/phases'
 
 /** Seznam zakázek — jedna sekce adminu po sloučení byznysů (AD02, R-088). */
 const PROJECTS_PATH = '/dashboard/zakazky'
@@ -57,6 +59,11 @@ type ProjectPayload = {
   deposit_paid_on?: string | null
   /** Fakturováno na IČO — příjmy z této zakázky patří do přiznané linie */
   invoiced_on_ico: boolean
+  /**
+   * Etapy nové zakázky ze služby (KP12). Kopie šablony upravená ve formuláři;
+   * ověřuje se tady, ne v prohlížeči. Úprava zakázky je ignoruje.
+   */
+  phases?: PhaseDraft[]
 }
 
 /**
@@ -199,6 +206,13 @@ export async function createProject(
     invoice = { data: parsed.data, pdf: parsed.pdf }
   }
 
+  let phases: PhaseDraft[] = []
+  if (payload.phases && payload.phases.length > 0) {
+    const parsed = phaseDraftsSchema.safeParse(payload.phases)
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Zkontrolujte etapy.' }
+    phases = parsed.data
+  }
+
   const progress = clampProgress(payload.progress)
   const rows = await sql`
     INSERT INTO projects (client_name, client_email, client_phone, service_type, description, focus, project_url, status, progress, price, paid, deadline, notes, estimated_costs, deposit_amount, deposit_paid, lead_origin, invoiced_on_ico)
@@ -228,6 +242,16 @@ export async function createProject(
   const publicToken = (rows[0] as { id: string; public_token: string }).public_token
 
   await saveProjectPaymentDates(newProjectId, payload.paid_on, payload.deposit_paid_on)
+
+  // Etapy ze služby (KP12). Postup v % od teď počítá databáze z hotových etap.
+  // Selhání nesmí shodit založenou zakázku — etapy jdou přidat v detailu.
+  if (phases.length > 0) {
+    try {
+      await initProjectPhases(newProjectId, phases)
+    } catch (err) {
+      console.error('[zakázka] etapy se nepodařilo uložit:', err instanceof Error ? err.name : 'unknown')
+    }
+  }
 
   // Záloha zaplacena při vytvoření → okamžitě zapsat do financí
   if (payload.deposit_paid && payload.deposit_amount && payload.deposit_amount > 0) {
@@ -293,7 +317,9 @@ export async function updateProject(
   progressUpdate?: { from: number; description: string }
 ) {
   await requireAuth()
-  const progress = clampProgress(payload.progress)
+  // Zakázka s etapami má postup z etap (D-K14) — formulář ho nesmí přepsat
+  // starou hodnotou, kterou si držel od načtení stránky.
+  const progress = (await projectHasPhases(id)) ? null : clampProgress(payload.progress)
 
   const oldRows = await sql`SELECT status, paid, deposit_paid, invoiced_on_ico FROM projects WHERE id = ${id} LIMIT 1`
   type OldProject = { status: string; paid: boolean; deposit_paid: boolean; invoiced_on_ico: boolean }
@@ -313,7 +339,7 @@ export async function updateProject(
       focus = ${payload.focus},
       project_url = ${payload.project_url},
       status = ${payload.status},
-      progress = ${progress},
+      progress = coalesce(${progress}::int, progress),
       price = ${payload.price},
       paid = ${payload.paid},
       deadline = ${payload.deadline},
@@ -324,18 +350,19 @@ export async function updateProject(
       invoiced_on_ico = ${payload.invoiced_on_ico},
       updated_at = now()
     WHERE id = ${id}
-    RETURNING public_token
+    RETURNING public_token, progress
   `
-  if (progressUpdate && progressUpdate.from !== progress) {
+  if (progressUpdate && progress !== null && progressUpdate.from !== progress) {
     await sql`
       INSERT INTO progress_updates (project_id, progress_from, progress_to, description)
       VALUES (${id}, ${progressUpdate.from}, ${progress}, ${progressUpdate.description})
     `
   }
-  const publicToken = (rows[0] as { public_token: string }).public_token
+  const saved = rows[0] as { public_token: string; progress: number }
+  const publicToken = saved.public_token
   const changeMail: ProjectChangeMail = {
     client_name: payload.client_name, client_email: payload.client_email, status: payload.status,
-    progress, project_url: payload.project_url, public_token: publicToken,
+    progress: Number(saved.progress), project_url: payload.project_url, public_token: publicToken,
   }
   // Dokončení přes formulář posílá dotazník stejně jako rychlá změna stavu
   // a uzavření (R-119) — dřív odešla jen zpráva „projekt byl aktualizován".

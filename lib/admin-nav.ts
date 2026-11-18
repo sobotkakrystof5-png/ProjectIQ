@@ -9,7 +9,7 @@
 export type NavIcon =
   | 'today' | 'projects' | 'done' | 'requests' | 'inbox'
   | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
-  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant'
+  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services'
 
 export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts'
 
@@ -67,6 +67,8 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Klienti',
     items: [
       { href: '/dashboard/klientsky-prostor', label: 'Klientský prostor', icon: 'clients' },
+      // Šablony etap podle druhu práce (KP12, R-121) — u nové zakázky se předvyplní.
+      { href: '/dashboard/sluzby', label: 'Služby a etapy', icon: 'services' },
       { href: '/dashboard/klienti', label: 'Klienti Workspace', icon: 'clients' },
       { href: '/dashboard/novinky', label: 'Novinky', icon: 'news' },
     ],
