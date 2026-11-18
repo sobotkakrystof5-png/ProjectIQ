@@ -4,8 +4,9 @@
 >
 > **Poslední aktualizace:** 2026-11-18 · **AI asistent jako CRM** (R-120): Přehled, Kontakty
 > s filtry a detail klienta (ukázka, všechny hovory s přepisem, e-maily, časová osa),
-> kontrakt v2 s Growth OS a zpětný kanál, migrace 119. Necommitnuto, nenasazeno; Growth OS má
-> zadání v `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`.
+> kontrakt v2 s Growth OS a zpětný kanál, migrace 119. **Na produkci od 2026-11-18 (`4408221`);**
+> Growth OS zatím posílá v1, takže detail ukáže jen poslední hovor, dokud se nesplní zadání
+> `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`. Za přihlášením nikdo nic neviděl.
 >
 > Předchozí: 2026-11-17 · **Hovory od AI asistenta z Growth OS jdou do adminu** (R-112).
 > Growth OS posílá stav obvolaných firem na `/api/public/outreach`, v Hovorech přibyla záložka
@@ -1202,7 +1203,7 @@ tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozši�
 ## 3. Otevřené problémy
 
 - [ ] **AI asistent jako CRM (R-120) — propojit s Growth OS:** ~~migrace 119~~ na produkci
-  (Kryštof 2026-11-18), ~~merge a deploy~~ (větev `admin/ai-asistent-crm` → `main`). Zbývá:
+  (Kryštof 2026-11-18), ~~merge a deploy~~ (`4408221`, 2026-11-18). Zbývá:
   (3) zadání
   `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md` v Claude Code v repu autopilota
   (kontrakt v2, odeslání hned po hovoru, Resend webhook, měření ukázky, náhled, Odorik, zpětný kanál),
@@ -1512,6 +1513,11 @@ tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozši�
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-18 (AI asistent jako CRM — R-120)
+- **chore** **Na produkci** (2026-11-18): migraci 119 pustil Kryštof, větev `admin/ai-asistent-crm`
+  → `main` fast-forward (`32e27a9` → `4408221`), build Ready asi za 4 min. Ověřeno veřejně: `/`
+  a `/login` 200, `/dashboard/ai-asistent` i detail 307, `/api/public/outreach/handled` 401 bez klíče,
+  `POST /api/public/outreach` 401, náhled ukázky 401 bez přihlášení, smazaná cesta nahrávek 404,
+  15 min po nasazení žádná běhová chyba. **Za přihlášením okem nikdo nic neviděl.**
 - **feat** Sekce AI asistent: nový **Přehled** (dnešek a 7 dní, „Na tahu jste vy", cesta k zakázce za
   30 dní, poslední hovory, provoz — čerstvost dat z Growth OS, kredit Odoriku a ElevenLabs), **Kontakty**
   s filtry (Na tahu, Ukázka odeslaná, Otevřeli, Odpověď a schůzka, Vyřízené, Všichni) a hledáním
