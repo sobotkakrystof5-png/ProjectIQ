@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-18 — review: dotazník spokojenosti na jednu minutu (R-119)
+Spouštěč: `web-security-review` před nasazením větve `admin/dotaznik` na produkci.
+Rozsah: veřejné server actions `saveSurveyScore`, `submitSurvey`, `recordGoogleReviewClick` (`app/portal-actions.ts`), stránka `/h/[token]`, `lib/admin/{survey-model,survey-answers,survey-email,survey-notify,surveys,reference,closed}.ts`, admin akce `setSurveyFollowUp` a `saveGoogleReviewSetting` (`app/closed-actions.ts`), `components/{SurveyForm,HodnoceniDashboard}.tsx`, `components/admin/google-review-card.tsx`, migrace 118.
+Výsledek: 0 nálezů k opravě.
+Nálezy: žádné. Ověřeno: (1) tajemství — žádné nové `NEXT_PUBLIC_` ani `process.env` mimo testy, klientské komponenty importují jen čisté moduly bez `server-only` a env; (2) validace — token přes `publicToken()` před dotazem, Zod se stropy délek i rozsahů, CHECK v migraci 118, server sám zahodí referenci a souhlas u známky pod 9; (3) HTML — žádný `dangerouslySetInnerHTML`, e-mail escapuje název zakázky i odkazy, text klienta jde v React jako text; (4) databáze — všechny dotazy parametrizované, do textu SQL jdou jen konstanty modulu; (5) vstup, do kterého jde bušit — jedna odpověď na zakázku (unikátní index), po odeslání uzavřená, upozornění i e-mail Kryštofovi jednou; admin akce za `requireAuth()` a s kontrolou UUID; odkaz na Google jen `https://`.
+Přijatá rizika: DECISIONS #038 (bez časového limitu pokusů u veřejných akcí, známku z odkazu do odeslání formuláře může přepsat, kdo zná odkaz).
+Opraveno: —
+
 ## 2026-11-16 — review: asistent koná sám (R-111, A0–A4)
 Spouštěč: commit a deploy (větev `admin/asistent`)
 Rozsah: `app/ai-actions.ts` (server actions plánu, provedení, „Zpět"), `lib/admin/{suggestion-apply,suggestions,assistant-resolve,assistant-lookups}.ts`, `lib/ai/{suggestion-schema,action-policy,action-lines,plan-format,propose,prompts,markers}.ts`, nová routa `POST /api/ai-assistant/prepis`, `Permissions-Policy` na `/dashboard/*`, převzatá `app/portal-link-actions.ts` (výměna odkazu `/p`).

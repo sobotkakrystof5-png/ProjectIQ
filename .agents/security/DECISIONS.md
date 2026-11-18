@@ -315,4 +315,4 @@ Rozhodnutí: dotazník `/h/<token>` (R-119) má tři veřejné server actions: `
 Důvod: zadání Kryštofa 2026-11-17 — kratší dotazník, známka jedním kliknutím z e-mailu, upozornění na nespokojené.
 Zvažované alternativy: uložit známku už při otevření odkazu (jednodušší, ale roboty by vyráběly známky a falešná upozornění); počítání pokusů v čase jako u ostatních akcí portálu (počítá řádky, a ten je tu na zakázku jen jeden).
 Přijaté riziko: kdo zná odkaz z e-mailu klienta, může do odeslání formuláře přepisovat jeho známku a spustit jedno upozornění. Filtr pošty, který stránku i vykreslí se skriptem, by známku uložit mohl — projevilo by se to známkou bez textu, kterou klient pak sám přepíše.
-Revize: po prvních deseti odpovědích, nebo kdyby se v Hodnocení objevily známky, které klient nedal.
+Revize: 2027-02-18, dřív po prvních deseti odpovědích, nebo kdyby se v Hodnocení objevily známky, které klient nedal.
