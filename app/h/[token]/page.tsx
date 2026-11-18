@@ -33,11 +33,10 @@ export default async function SurveyPage(props: PageProps) {
   const state = await loadSurveyPage(token)
   if (!state) notFound()
 
-  const { project, answer, googleReviewUrl } = state
+  const { project, answer } = state
   const completed = answer?.completed_at != null
   const fromUrl = scoreFromUrl(searchParams.znamka)
   const initialScore = fromUrl ?? answer?.nps ?? null
-  const promoter = answer?.nps != null && answer.nps >= 9
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -62,23 +61,12 @@ export default async function SurveyPage(props: PageProps) {
                   </div>
                   <p className="font-semibold text-ink">Dotazník už je odeslaný</p>
                   <p className="max-w-sm text-sm text-quiet">Děkuji za vaše odpovědi i za spolupráci.</p>
-                  {googleReviewUrl && promoter && !answer?.google_review_clicked_at && (
-                    <a
-                      href={googleReviewUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex min-h-11 items-center rounded-full bg-navy-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
-                    >
-                      Napsat recenzi na Googlu
-                    </a>
-                  )}
                 </div>
               ) : (
                 <SurveyForm
                   token={token}
                   initialScore={initialScore}
                   saveInitialScore={fromUrl !== null && fromUrl !== answer?.nps}
-                  googleReviewUrl={googleReviewUrl}
                 />
               )}
             </div>

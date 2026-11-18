@@ -8,7 +8,6 @@ import { feedbackSchema, bookingSchema, surveySchema, surveyScoreSchema } from '
 import { sendBrandedEmail } from '@/lib/email'
 import {
   claimDetractorAlert,
-  markGoogleReviewClick,
   saveSurveyScore as saveSurveyScoreInDb,
   submitSurveyAnswers,
 } from '@/lib/admin/survey-answers'
@@ -313,15 +312,6 @@ export async function submitSurvey(token: string, rawData: unknown): Promise<Sur
     else await notifySurveySubmitted(answer, project)
   })
   return { success: true }
-}
-
-/** Spokojený klient klikl na „Napsat recenzi na Googlu". Jen pro přehled. */
-export async function recordGoogleReviewClick(token: string): Promise<void> {
-  const surveyToken = publicToken(token)
-  if (!surveyToken) return
-  await markGoogleReviewClick(surveyToken).catch((err) => {
-    console.error('[Dotazník] Kliknutí na recenzi se nepodařilo zapsat.', err instanceof Error ? err.message : err)
-  })
 }
 
 // ─── Požadavek klienta (text nebo přepis hlasu) ─────────────────────────────────

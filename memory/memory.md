@@ -1173,6 +1173,10 @@ zápisy `lib/admin/survey-answers.ts`, e-mail `lib/admin/survey-email.ts`. Serve
 reference a souhlas jen u 9–10. Druhý dotaz po 2–3 měsících („přinesl web poptávky?") se nestavěl.
 Zakázka zapsaná rovnou jako hotová (`createProject`) dotazník neposílá, často jde o starou práci.
 Upravuje R-102 bod 3 (souhlas má tři úrovně). Bezpečnost `.claude/security/DECISIONS.md` #038.
+**Upraveno 2026-11-18:** recenze na Googlu z bodu 3 a 6 odešla — tlačítko po odeslání dotazníku,
+karta v Profilu i řádek v Hodnocení. Kryštof: „stačí reference, kterou mi klient napíše sám."
+Sloupce `admin_settings.google_review_url` a `project_surveys.google_review_clicked_at` z migrace
+118 v databázi zůstaly nevyužité; staré migrace se neupravují a mazat je není potřeba.
 
 
 ### R-120 · AI asistent jako CRM: detail klienta a kontrakt v2 s Growth OS (2026-11-18)
@@ -1212,11 +1216,10 @@ tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozši�
 
 - [ ] **Koncepty faktur (R-117) — nasadit a projít naživo:** kód na větvi `admin/faktury-koncepty` (worktree `../ZakazIQ-faktury`), na produkci není. Migrace 117 je podle Kryštofa na produkci, merge do `main` 2026-11-17. Zbývá průchod: zakázka → Hotovo → do 15 s koncept v Ke schválení → doplnit adresu → Schválit a poslat na vlastní e-mail → PDF v příloze, číslo v řadě; Zpět během 10 s nic nepošle; pravidelná faktura se dnem = dnešek se objeví až po běhu cronu. **Odeslání přes Resend s PDF nikdo nezkusil naživo** · od 2026-11-17
 - [ ] **Dotazník R-119 — projít naživo:** migrace 118 je na produkci (pustil Kryštof 2026-11-18)
-  a kód taky (`70abbed`). Zbývá: (1) vložit odkaz na recenzi z Google profilu firmy do Profilu
-  → Recenze na Googlu, (2) zkušební zakázka s vlastním e-mailem → Hotovo → po 15 s e-mail
+  a kód taky (`70abbed`). Zbývá: (1) zkušební zakázka s vlastním e-mailem → Hotovo → po 15 s e-mail
   z krystof@vizeon.cz, klik na číslo → známka uložená, dokončit formulář pro 10, 7 a 3
-  (u 3 upozornění do zvonku i e-mailem), (3) e-mail v Gmailu, Seznamu a Apple Mailu na
-  telefonu. **Doručení ani formulář nad skutečnou databází nikdo nezkusil** · Kryštof · od 2026-11-17
+  (u 10 reference v Hodnocení, u 3 upozornění do zvonku i e-mailem), (2) e-mail v Gmailu,
+  Seznamu a Apple Mailu na telefonu. **Doručení ani formulář nad skutečnou databází nikdo nezkusil** · Kryštof · od 2026-11-17
 - [ ] **Asistent jako chat (R-113) neověřený naživo ani v prohlížeči:** ověřeno testy, `tsc`, buildem a živě se Sonnetem nad smyšleným přehledem (4 ze 4), ale ne v prohlížeči nad skutečnými daty. Projít: věta bez času → otázka → odpověď „ve tři" → zapsáno jednou; „posuň to na čtvrtou" v témže chatu; „oprav Novákovi telefon"; „zapamatuj si…" a že se paměť objeví v dalším chatu; nový chat po „Nový chat". Hlídat, jestli se neptá zbytečně (otravné) a jestli Sonnet nestojí víc, než je odhad · od 2026-11-17
 - [ ] **Hovory od asistenta (R-112) — spustit a projít:** ZakazIQ strana je na produkci
   (`2cf1447`, `POST /api/public/outreach` bez klíče vrací 401), klíč ve Vercelu i v GitHub
@@ -1511,6 +1514,15 @@ tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozši�
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-18 (dotazník bez recenze na Googlu — R-119)
+- **refactor** Z dotazníku odešla recenze na Googlu: tlačítko po odeslání, karta Recenze na Googlu
+  v Profilu, akce `recordGoogleReviewClick` a `saveGoogleReviewSetting` a řádek „Klikl na recenzi"
+  v Hodnocení. Spokojenému klientovi zůstává reference se souhlasem přímo ve formuláři. Bez migrace,
+  sloupce z 118 zůstaly nevyužité. Soubory: `components/SurveyForm.tsx`, `app/h/[token]/page.tsx`,
+  `app/{portal,closed}-actions.ts`, `app/dashboard/profil/page.tsx`, `lib/admin/{survey-answers,survey-model}.ts`,
+  `components/HodnoceniDashboard.tsx`, smazané `components/admin/google-review-card.tsx`.
+- **chore** Ověřeno: `npx tsc --noEmit`, testy dotazníku, hodnocení a tříd adminu (59/59).
 
 ### 2026-11-18 (AI asistent jako CRM — R-120)
 - **chore** **Na produkci** (2026-11-18): migraci 119 pustil Kryštof, větev `admin/ai-asistent-crm`

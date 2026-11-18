@@ -47,25 +47,14 @@ function asAnswer(row: AdminRow | undefined): SurveyAnswer | null {
   return data && typeof data === 'object' ? normalizeSurvey(data as Record<string, unknown>) : null
 }
 
-function httpsUrl(value: unknown): string | null {
-  if (typeof value !== 'string' || value.trim() === '') return null
-  try {
-    const url = new URL(value.trim())
-    return url.protocol === 'https:' ? url.toString() : null
-  } catch {
-    return null
-  }
-}
-
 export type SurveyPageState = {
   project: SurveyProject
   answer: SurveyAnswer | null
-  googleReviewUrl: string | null
 }
 
 /** Všechno, co potřebuje stránka `/h/<token>`, jedním požadavkem. */
 export async function loadSurveyPage(token: string): Promise<SurveyPageState | null> {
-  const [projectRows, answerRows, settingsRows] = await batchTolerant([
+  const [projectRows, answerRows] = await batchTolerant([
     { text: PROJECT_BY_TOKEN, params: [token] },
     {
       text: `SELECT to_jsonb(s) AS row FROM project_surveys s
@@ -73,18 +62,10 @@ export async function loadSurveyPage(token: string): Promise<SurveyPageState | n
              WHERE p.survey_token = $1::uuid LIMIT 1`,
       params: [token],
     },
-    {
-      text: `SELECT to_jsonb(a) ->> 'google_review_url' AS url FROM admin_settings a WHERE a.id = true LIMIT 1`,
-      params: [],
-    },
   ])
   const project = asProject(projectRows[0])
   if (!project) return null
-  return {
-    project,
-    answer: asAnswer(answerRows[0]),
-    googleReviewUrl: httpsUrl(settingsRows[0]?.url),
-  }
+  return { project, answer: asAnswer(answerRows[0]) }
 }
 
 export type SaveScoreResult =
@@ -209,21 +190,6 @@ export async function claimDetractorAlert(
   return { answer, project: asProject(row)! }
 }
 
-/** Klient spokojený (9–10) klikl na recenzi na Googlu. Jen první kliknutí. */
-export async function markGoogleReviewClick(token: string): Promise<boolean> {
-  const [rows] = await adminDb.batch([
-    {
-      text: `UPDATE project_surveys s
-             SET google_review_clicked_at = coalesce(s.google_review_clicked_at, now())
-             FROM projects p
-             WHERE p.id = s.project_id AND p.survey_token = $1::uuid AND s.nps >= 9
-             RETURNING s.id::text AS id`,
-      params: [token],
-    },
-  ])
-  return rows.length > 0
-}
-
 /** „Ozval jsem se" u nespokojeného klienta — a zpět. */
 export async function setSurveyFollowedUp(surveyId: string, done: boolean): Promise<string | null> {
   const [rows] = await adminDb.batch([
@@ -237,32 +203,4 @@ export async function setSurveyFollowedUp(surveyId: string, done: boolean): Prom
   ])
   const projectId = rows[0]?.project_id
   return typeof projectId === 'string' ? projectId : null
-}
-
-export async function getGoogleReviewUrl(): Promise<string | null> {
-  const [rows] = await batchTolerant([
-    {
-      text: `SELECT to_jsonb(a) ->> 'google_review_url' AS url FROM admin_settings a WHERE a.id = true LIMIT 1`,
-      params: [],
-    },
-  ])
-  return httpsUrl(rows[0]?.url)
-}
-
-/** Prázdná hodnota odkaz smaže. Jinak jen https — jde na veřejnou stránku. */
-export async function saveGoogleReviewUrl(raw: string): Promise<{ ok: true; url: string | null } | { ok: false; error: string }> {
-  const trimmed = raw.trim()
-  if (trimmed.length > 500) return { ok: false, error: 'Odkaz je moc dlouhý.' }
-  const url = trimmed === '' ? null : httpsUrl(trimmed)
-  if (trimmed !== '' && !url) {
-    return { ok: false, error: 'Odkaz musí začínat https://. Zkopírujte ho prosím z Googlu celý.' }
-  }
-  await adminDb.batch([
-    {
-      text: `INSERT INTO admin_settings (id, google_review_url, updated_at) VALUES (true, $1, now())
-             ON CONFLICT (id) DO UPDATE SET google_review_url = EXCLUDED.google_review_url, updated_at = now()`,
-      params: [url],
-    },
-  ])
-  return { ok: true, url }
 }

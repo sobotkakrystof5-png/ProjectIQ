@@ -20,10 +20,7 @@ const ROOT = path.resolve(__dirname, '../..')
 import { setAdminDbForTests } from '@/lib/admin/db'
 import {
   claimDetractorAlert,
-  getGoogleReviewUrl,
   loadSurveyPage,
-  markGoogleReviewClick,
-  saveGoogleReviewUrl,
   saveSurveyScore,
   setSurveyFollowedUp,
   submitSurveyAnswers,
@@ -129,7 +126,6 @@ beforeEach(async () => {
   await db.exec(`
     DELETE FROM project_surveys WHERE project_id <> '00000000-0000-4000-8000-000000000001';
     DELETE FROM projects WHERE id <> '00000000-0000-4000-8000-000000000001';
-    UPDATE admin_settings SET google_review_url = NULL;
   `)
 })
 
@@ -277,29 +273,6 @@ describe('upozornění na nespokojeného klienta', () => {
     expect(unhandledDetractors(await read())).toHaveLength(0)
     await setSurveyFollowedUp(saved.surveyId, false)
     expect(unhandledDetractors(await read())).toHaveLength(1)
-  })
-})
-
-describe('recenze na Googlu', () => {
-  it('uloží jen https a prázdnou hodnotou se smaže', async () => {
-    expect((await saveGoogleReviewUrl('javascript:alert(1)')).ok).toBe(false)
-    expect((await saveGoogleReviewUrl('http://g.page/r/abc/review')).ok).toBe(false)
-    expect(await saveGoogleReviewUrl(' https://g.page/r/abc/review ')).toEqual({
-      ok: true,
-      url: 'https://g.page/r/abc/review',
-    })
-    expect(await getGoogleReviewUrl()).toBe('https://g.page/r/abc/review')
-    expect(await saveGoogleReviewUrl('')).toEqual({ ok: true, url: null })
-    expect(await getGoogleReviewUrl()).toBeNull()
-  })
-
-  it('kliknutí se zapíše jen u spokojeného klienta', async () => {
-    const happy = await newProject('Spokojený')
-    const sad = await newProject('Nespokojený')
-    await saveSurveyScore(happy.token, 9)
-    await saveSurveyScore(sad.token, 6)
-    expect(await markGoogleReviewClick(happy.token)).toBe(true)
-    expect(await markGoogleReviewClick(sad.token)).toBe(false)
   })
 })
 

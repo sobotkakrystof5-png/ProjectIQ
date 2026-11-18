@@ -317,7 +317,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `agent_leads` | 052, **112** | AI-scorované leady z externího `vizeon-lead-agent`. Od AD16 visí v pruhu nad Hovory; `handled_at`, `client_lead_id` a `project_id` říkají, co už někdo vyřídil |
 | `completed_projects_archiv` | 011, 029, 047, 057, **106** | Původní **Dokončené** — kopie zakázky s vlastní cenou. Od AD11 se z ní nečte ani nepíše; drží se jen jako doklad, dokud daňové součty sedí. `migrated_project_id` říká, která zakázka z řádku vznikla. |
 | `costs` | 011, 012, 013, 060 | Náklady — firemní (`/dashboard/naklady`) i osobní fixní (`/dashboard/finance`), volitelná vazba na projekt |
-| `project_surveys` | 016, 046, **106**, **118** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. Je to **odpověď** klienta, proto razítka odeslání nesou `projects.survey_*` (AD16). Od 118 (R-119): `nps` 0–10, `rating_result/communication/schedule/value` 1–5, `improve_text`, `publish_mode` (`named`/`anonymous`/`private`, drží `consent`), `reviewer_role`, `completed_at` (řádek vzniká už známkou), `detractor_alerted_at`, `followed_up_at`, `google_review_clicked_at`; staré `rating_*` nejsou povinné. `admin_settings.google_review_url`. |
+| `project_surveys` | 016, 046, **106**, **118** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. Je to **odpověď** klienta, proto razítka odeslání nesou `projects.survey_*` (AD16). Od 118 (R-119): `nps` 0–10, `rating_result/communication/schedule/value` 1–5, `improve_text`, `publish_mode` (`named`/`anonymous`/`private`, drží `consent`), `reviewer_role`, `completed_at` (řádek vzniká už známkou), `detractor_alerted_at`, `followed_up_at`; staré `rating_*` nejsou povinné. `google_review_clicked_at` a `admin_settings.google_review_url` jsou od 2026-11-18 nevyužité (recenze na Googlu odešla). |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
 | `invoices` | 053, 056, **107**, **108** | Faktury. Archiv cizích PDF (AI přepis, vazba na transakci) **i doklady vystavené tady** (AD12): `direction` (`issued`/`received`), `pdf_generated`, `items`, `issuer` (snímek dodavatele), `client_address`, `supplied_on`, `vat_total`, `number_seq`, `cancelled_at`, `sent_at`. Vystavená tady = `number_seq IS NOT NULL`. Unikátnost čísla je částečná (`WHERE direction='issued'`), aby přijatá faktura mohla nést číslo dodavatele |
@@ -977,7 +977,9 @@ Dvě věci, které u něj platí tvrdě:
   `updateProject` (formulář) při přechodu do `done`/`paid`, vždy po 15 s a místo obvyklé zprávy.
 - **Hodnocení** (`components/HodnoceniDashboard.tsx`): NPS za období, průměr oblastí a nejslabší
   oblast, nespokojení bez „Ozval jsem se" (`setSurveyFollowUp`, Zpět v toastu), odpovědi po
-  zakázkách. Karta **Recenze na Googlu** v Profilu ukládá `admin_settings.google_review_url` (jen https).
+  zakázkách.
+- **Recenze na Googlu se nenabízí** (od 2026-11-18): spokojenému klientovi stačí reference se
+  souhlasem ve formuláři. Sloupce z migrace 118, které ji nesly, zůstaly v databázi nevyužité.
 
 **AI leady konečně vidět.** `agent_leads` se od migrace 052 plnily z vizeon-lead-agent a v celém
 repu k nim vedl jediný řádek — INSERT v route handleru. Teď visí nad Hovory jako pruh

@@ -16,8 +16,6 @@ import { loadPerformanceScreen } from '@/lib/admin/closed'
 import { TotpCard } from '@/components/admin/totp-card'
 import { totpState } from '@/app/totp-actions'
 import { GoogleCard } from '@/components/admin/google-card'
-import { GoogleReviewCard } from '@/components/admin/google-review-card'
-import { getGoogleReviewUrl } from '@/lib/admin/survey-answers'
 import { googleStatus } from '@/lib/admin/google/oauth'
 
 async function loadStats() {
@@ -178,7 +176,7 @@ export default async function ProfilPage(props: {
 
   const searchParams = await props.searchParams
   const googleResult = typeof searchParams.google === 'string' ? searchParams.google : null
-  const [totp, google, googleReviewUrl] = await Promise.all([totpState(), googleStatus(), getGoogleReviewUrl()])
+  const [totp, google] = await Promise.all([totpState(), googleStatus()])
 
   // Dvě nezávislá čtení — souhrn profilu a podklady pro přehled výkonnosti.
   const [stats, performance] = await Promise.all([loadStats(), loadPerformanceScreen()])
@@ -467,9 +465,6 @@ export default async function ProfilPage(props: {
           <HodnoceniDashboard projects={performance.projects} surveys={performance.surveys} />
         </div>
       )}
-
-      {/* Odkaz na recenzi na Googlu pro spokojené klienty (R-119) */}
-      <GoogleReviewCard url={googleReviewUrl} />
 
       {/* Přihlášení a druhý faktor (R-105) */}
       <TotpCard enabled={totp.enabled} />

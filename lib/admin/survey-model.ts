@@ -61,7 +61,6 @@ export type SurveyAnswer = {
   completed_at: string | null
   detractor_alerted_at: string | null
   followed_up_at: string | null
-  google_review_clicked_at: string | null
 }
 
 /** Odpověď i s tím, ke které zakázce patří — pro přehled v Hodnocení. */
@@ -202,7 +201,6 @@ export function normalizeSurvey(row: Record<string, unknown>): SurveyAnswer {
     completed_at: iso(row.completed_at) ?? (nps === null ? iso(row.created_at) : null),
     detractor_alerted_at: iso(row.detractor_alerted_at),
     followed_up_at: iso(row.followed_up_at),
-    google_review_clicked_at: iso(row.google_review_clicked_at),
   }
 }
 

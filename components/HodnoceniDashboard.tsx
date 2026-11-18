@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Star, ChevronDown, ChevronRight, Clock, Copy, Check, Trash2,
-  Link2, Quote, ShieldCheck, Loader2, Inbox, ExternalLink,
+  Link2, Quote, ShieldCheck, Loader2, Inbox,
 } from 'lucide-react'
 import { deleteProjectSurvey, setSurveyFollowUp } from '@/app/closed-actions'
 import { getSurveyUrl, cn } from '@/lib/utils'
@@ -365,12 +365,6 @@ function SurveyResult({
           <span className="flex items-center gap-1.5 text-ink">
             <ShieldCheck size={12} strokeWidth={1.5} />
             {PUBLISH_LABEL[survey.publish_mode]}
-          </span>
-        )}
-        {survey.google_review_clicked_at && (
-          <span className="flex items-center gap-1.5">
-            <ExternalLink size={12} strokeWidth={1.5} />
-            Klikl na recenzi na Googlu
           </span>
         )}
         {survey.followed_up_at && (

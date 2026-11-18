@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Check, CheckCircle2, ExternalLink, Loader2, Star } from 'lucide-react'
-import { recordGoogleReviewClick, saveSurveyScore, submitSurvey } from '@/app/portal-actions'
+import { Check, CheckCircle2, Loader2, Star } from 'lucide-react'
+import { saveSurveyScore, submitSurvey } from '@/app/portal-actions'
 import { npsGroup, SURVEY_AREAS, type PublishMode, type SurveyAreaKey } from '@/lib/admin/survey-model'
 import { SURVEY_QUESTION } from '@/lib/admin/survey-email'
 import { cn } from '@/lib/utils'
@@ -26,7 +26,6 @@ type Props = {
   initialScore: number | null
   /** Klient přišel kliknutím na číslo v e-mailu — známku hned uložit. */
   saveInitialScore: boolean
-  googleReviewUrl: string | null
 }
 
 type Ratings = Partial<Record<SurveyAreaKey, number>>
@@ -94,24 +93,9 @@ function StarRow({
   )
 }
 
-function ThankYou({
-  done,
-  googleReviewUrl,
-  onGoogleReview,
-  copied,
-}: {
-  done: Done
-  googleReviewUrl: string | null
-  onGoogleReview: () => void
-  copied: boolean
-}) {
+function ThankYou({ done }: { done: Done }) {
   const content = {
-    promoter: {
-      title: 'Moc vám děkuji!',
-      text: googleReviewUrl
-        ? 'Pomohla by mi i krátká recenze na Googlu. Lidé, kteří mě ještě neznají, se podle ní rozhodují.'
-        : 'Vážím si toho, že jste si na to našli chvilku.',
-    },
+    promoter: { title: 'Moc vám děkuji!', text: 'Vážím si toho, že jste si na to našli chvilku.' },
     passive: { title: 'Děkuji za odpověď', text: 'S vašimi poznámkami budu pracovat.' },
     detractor: { title: 'Děkuji za upřímnost', text: 'Ozvu se vám, ať to můžeme spolu probrat.' },
     already: { title: 'Dotazník už je odeslaný', text: 'Děkuji za vaše odpovědi i za spolupráci.' },
@@ -124,24 +108,11 @@ function ThankYou({
       </div>
       <p className="font-semibold text-ink">{content.title}</p>
       <p className="max-w-sm text-sm text-quiet">{content.text}</p>
-      {done === 'promoter' && googleReviewUrl && (
-        <div className="mt-2 flex flex-col items-center gap-2">
-          <button
-            type="button"
-            onClick={onGoogleReview}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-navy-700 px-5 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
-          >
-            Napsat recenzi na Googlu
-            <ExternalLink size={15} strokeWidth={1.5} />
-          </button>
-          {copied && <p className="text-xs text-quiet">Váš text jsem zkopíroval, na Googlu ho stačí vložit.</p>}
-        </div>
-      )}
     </div>
   )
 }
 
-export function SurveyForm({ token, initialScore, saveInitialScore, googleReviewUrl }: Props) {
+export function SurveyForm({ token, initialScore, saveInitialScore }: Props) {
   const [score, setScore] = useState<number | null>(initialScore)
   const [saveState, setSaveState] = useState<SaveState>(
     initialScore !== null && !saveInitialScore ? 'saved' : 'idle',
@@ -153,7 +124,6 @@ export function SurveyForm({ token, initialScore, saveInitialScore, googleReview
   const [role, setRole] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<Done | null>(null)
-  const [copied, setCopied] = useState(false)
   const [isPending, startTransition] = useTransition()
   const lastSaved = useRef<number | null>(null)
   const autoSaved = useRef(false)
@@ -216,21 +186,8 @@ export function SurveyForm({ token, initialScore, saveInitialScore, googleReview
     })
   }
 
-  function openGoogleReview() {
-    if (!googleReviewUrl) return
-    // Text reference se zkopíruje, ať ho klient na Googlu jen vloží.
-    if (reference.trim() && navigator.clipboard) {
-      navigator.clipboard.writeText(reference.trim()).then(
-        () => setCopied(true),
-        () => setCopied(false),
-      )
-    }
-    void recordGoogleReviewClick(token)
-    window.open(googleReviewUrl, '_blank', 'noopener,noreferrer')
-  }
-
   if (done) {
-    return <ThankYou done={done} googleReviewUrl={googleReviewUrl} onGoogleReview={openGoogleReview} copied={copied} />
+    return <ThankYou done={done} />
   }
 
   return (
