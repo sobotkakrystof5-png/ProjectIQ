@@ -1173,13 +1173,12 @@ Upravuje R-102 bod 3 (souhlas má tři úrovně). Bezpečnost `.claude/security/
 ## 3. Otevřené problémy
 
 - [ ] **Koncepty faktur (R-117) — nasadit a projít naživo:** kód na větvi `admin/faktury-koncepty` (worktree `../ZakazIQ-faktury`), na produkci není. Migrace 117 je podle Kryštofa na produkci, merge do `main` 2026-11-17. Zbývá průchod: zakázka → Hotovo → do 15 s koncept v Ke schválení → doplnit adresu → Schválit a poslat na vlastní e-mail → PDF v příloze, číslo v řadě; Zpět během 10 s nic nepošle; pravidelná faktura se dnem = dnešek se objeví až po běhu cronu. **Odeslání přes Resend s PDF nikdo nezkusil naživo** · od 2026-11-17
-- [ ] **Dotazník R-119 — nasadit a projít:** (1) migrace 118 na produkci **před** nasazením,
-  (2) odkaz na Google recenzi do Profilu, (3) zkušební zakázka s vlastním e-mailem → Hotovo →
-  po 15 s e-mail z krystof@vizeon.cz, klik na číslo → známka uložená, dokončit formulář pro
-  10, 7 a 3 (upozornění na nespokojeného do zvonku i e-mailem), (4) e-mail v Gmailu, Seznamu
-  a Apple Mailu na telefonu (řada 0–10 na úzkém displeji), formulář na 390 a 1280 px. **Naživo
-  ani v prohlížeči nic neověřeno**, jen testy nad PGlite · Kryštof · od 2026-11-17
-
+- [ ] **Dotazník R-119 — projít naživo:** migrace 118 je na produkci (pustil Kryštof 2026-11-18)
+  a kód taky (`70abbed`). Zbývá: (1) vložit odkaz na recenzi z Google profilu firmy do Profilu
+  → Recenze na Googlu, (2) zkušební zakázka s vlastním e-mailem → Hotovo → po 15 s e-mail
+  z krystof@vizeon.cz, klik na číslo → známka uložená, dokončit formulář pro 10, 7 a 3
+  (u 3 upozornění do zvonku i e-mailem), (3) e-mail v Gmailu, Seznamu a Apple Mailu na
+  telefonu. **Doručení ani formulář nad skutečnou databází nikdo nezkusil** · Kryštof · od 2026-11-17
 - [ ] **Asistent jako chat (R-113) neověřený naživo ani v prohlížeči:** ověřeno testy, `tsc`, buildem a živě se Sonnetem nad smyšleným přehledem (4 ze 4), ale ne v prohlížeči nad skutečnými daty. Projít: věta bez času → otázka → odpověď „ve tři" → zapsáno jednou; „posuň to na čtvrtou" v témže chatu; „oprav Novákovi telefon"; „zapamatuj si…" a že se paměť objeví v dalším chatu; nový chat po „Nový chat". Hlídat, jestli se neptá zbytečně (otravné) a jestli Sonnet nestojí víc, než je odhad · od 2026-11-17
 - [ ] **Hovory od asistenta (R-112) — spustit a projít:** ZakazIQ strana je na produkci
   (`2cf1447`, `POST /api/public/outreach` bez klíče vrací 401), klíč ve Vercelu i v GitHub
@@ -1476,6 +1475,12 @@ Upravuje R-102 bod 3 (souhlas má tři úrovně). Bezpečnost `.claude/security/
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-18 (dotazník spokojenosti na jednu minutu — R-119)
+- **chore** **Na produkci** (2026-11-18): migraci 118 pustil Kryštof, merge `admin/dotaznik` → `main`
+  fast-forward (`ae2cdb5` → `70abbed`, s ním i sekce AI asistent R-118), build `dpl_7vS8Z…` Ready
+  za 103 s v `fra1`. Ověřeno veřejně: `/` a `/login` 200, `/h/<neznámý token>` i s `?znamka=9`
+  404, `/dashboard/profil` a `/dashboard/ai-asistent` 307, `POST /api/public/outreach/reports`
+  bez klíče 401, za hodinu po nasazení žádná běhová chyba. Bezpečnostní kontrola
+  `web-security-review` bez nálezu (AUDIT-LOG 2026-11-18). **Za přihlášením okem nikdo nic neviděl.**
 - **feat** Nový dotazník: známka 0–10 jako jediná povinná otázka (uloží se hned po výběru),
   čtyři nepovinné oblasti (Výsledek, Komunikace, Termín, Cena), text podle známky, souhlas ve
   třech úrovních a recenze na Googlu se zkopírovaným textem. Stránka `/h` nese Kryštofa
