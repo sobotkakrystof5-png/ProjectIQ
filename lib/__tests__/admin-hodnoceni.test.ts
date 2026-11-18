@@ -20,15 +20,19 @@ const ROOT = path.resolve(__dirname, '../..')
 let db: PGlite
 const sent: { to: string; subject: string; heading: string }[] = []
 
-vi.mock('@/lib/email', () => ({
-  sendBrandedEmail: async (opts: { to: string; subject: string; heading: string }) => {
-    sent.push({ to: opts.to, subject: opts.subject, heading: opts.heading })
+// Dotazník odchází z krystof@vizeon.cz přes Resend (R-119), ne přes `lib/email`.
+vi.mock('@/lib/admin/vizeon-mail', () => ({
+  sendVizeonMail: async (mail: { to: string; subject: string; html: string }) => {
+    sent.push({ to: mail.to, subject: mail.subject, heading: mail.html })
+    return { ok: true, id: 'test' }
   },
 }))
+process.env.NEXT_PUBLIC_APP_URL = 'https://www.zakaziq.cz'
 
 import { setAdminDbForTests } from '@/lib/admin/db'
 import { remindPendingSurveys, sendSurveyRequest, SURVEY_REMINDER_DAYS } from '@/lib/admin/surveys'
 import { buildReference, canUseAsReference, referenceAsJson, referenceAsText } from '@/lib/admin/reference'
+import { normalizeSurvey } from '@/lib/admin/survey-model'
 import { loadHandover, loadHandoverForPdf, resetHandoverReadyForTests, saveHandover } from '@/lib/admin/handover'
 import { handoverHtml } from '@/lib/invoice-pdf/handover'
 import { buildJourney } from '@/lib/admin/journey'
@@ -161,7 +165,7 @@ describe('jedna připomínka po sedmi dnech', () => {
 
     expect(await remindPendingSurveys()).toEqual({ sent: 1, failed: 0 })
     expect(sent).toHaveLength(1)
-    expect(sent[0].heading).toBe('Našli byste pár minut?')
+    expect(sent[0].subject).toBe('Ještě ta jedna otázka k zakázce')
 
     // Druhý den cron běží znovu — připomínka je už odeslaná.
     expect(await remindPendingSurveys()).toEqual({ sent: 0, failed: 0 })
@@ -246,14 +250,14 @@ describe('bez migrace 112', () => {
 })
 
 describe('reference pro web', () => {
-  const survey = {
+  const survey = normalizeSurvey({
     id: 'a', project_id: 'b', completed_project_id: null,
     rating_cooperation: 5, rating_speed: 5, rating_design: 4,
     rating_functionality: 5, rating_reliability: 5, rating_flexibility: 4,
     reference_text: '  Web byl hotov\u00fd d\u0159\u00edv, ne\u017e jsme \u010dekali.  ',
     consent: true,
     created_at: '2026-11-13T08:30:00.000Z',
-  }
+  })
   const project = { client_name: 'Jan Nov\u00e1k', company: 'Kav\u00e1rna U lipy' }
 
   it('bez souhlasu se nenab\u00eddne', () => {

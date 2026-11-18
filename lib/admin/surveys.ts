@@ -1,6 +1,7 @@
 import 'server-only'
 import { adminDb, type AdminRow } from '@/lib/admin/db'
-import { sendBrandedEmail } from '@/lib/email'
+import { sendVizeonMail } from '@/lib/admin/vizeon-mail'
+import { renderSurveyEmail } from '@/lib/admin/survey-email'
 import { getSurveyUrl } from '@/lib/utils'
 
 /**
@@ -13,6 +14,12 @@ import { getSurveyUrl } from '@/lib/utils'
  * Od AD16 se dotazník zařadí k odeslání sám, jakmile zakázka skončí
  * (uzavření nebo stav „Hotovo"/„Zaplaceno"), a po sedmi dnech odejde **jedna**
  * připomínka. Pak už nic.
+ *
+ * Od R-119 odchází **z krystof@vizeon.cz přes Resend** jako osobní e-mail
+ * s první otázkou (0–10) přímo v textu (`lib/admin/survey-email.ts`).
+ * Bez `VIZEON_RESEND_API_KEY` neodejde nic — záložní Gmail by poslal
+ * z jiné adresy, a to Kryštof nechce. Zámek se pak vrátí a dotazník zkusí
+ * odeslat další akce.
  *
  * Dvě pojistky:
  *  - **„Zpět" ho zruší.** Mezi akcí a odesláním je odklad; po něm se stav
@@ -63,22 +70,22 @@ async function one<T extends AdminRow>(text: string, params: unknown[]): Promise
   return rows[0] as T | undefined
 }
 
+// Dvojímu odeslání brání zámek v databázi (`survey_requested_at`,
+// `survey_reminded_at`), ne klíč u Resendu — ten by po přechodné chybě
+// mohl zablokovat i oprávněný druhý pokus.
 async function sendRequestEmail(target: SurveyTarget, reminder: boolean): Promise<void> {
-  await sendBrandedEmail({
-    to: target.client_email,
-    subject: reminder ? 'Ještě dotazník k zakázce – ZakazIQ' : 'Děkuji za spolupráci – ZakazIQ',
-    heading: reminder ? 'Našli byste pár minut?' : 'Děkuji za spolupráci!',
-    intro: reminder
-      ? `Dobrý den, ${target.client_name}, před týdnem jsem vám poslal krátký dotazník k zakázce. Kdybyste na něj našel chvilku, moc mi to pomůže — zabere pár minut. Pokud ho vyplňovat nechcete, nic se neděje, víc už vám s ním psát nebudu.`
-      : `Dobrý den, ${target.client_name}, zakázka je hotová a moc vám děkuji za spolupráci — byla mi potěšením. Budu rád, když si najdete chvilku a vyplníte krátký dotazník spokojenosti. Pomůže mi to zlepšovat mé služby a zabere jen pár minut. Na konci můžete napsat i referenci, kterou se mnou chcete sdílet.`,
-    fields: [{ label: 'Zakázka', value: target.title }],
-    ctas: [
-      {
-        label: reminder ? 'Vyplnit dotazník' : 'Vyplnit dotazník spokojenosti',
-        href: getSurveyUrl(target.survey_token),
-      },
-    ],
+  const mail = renderSurveyEmail({
+    title: target.title,
+    surveyUrl: getSurveyUrl(target.survey_token),
+    reminder,
   })
+  const res = await sendVizeonMail({
+    to: target.client_email.trim(),
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+  })
+  if (!res.ok) throw new Error(res.error)
 }
 
 /**

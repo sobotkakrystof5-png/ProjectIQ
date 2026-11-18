@@ -23,6 +23,8 @@ export type NotificationType =
   | 'outreach_lead'
   /** Koncept faktury čeká na schválení (R-117). */
   | 'invoice_draft'
+  /** Klient dal v dotazníku 0–6 — ozvat se mu, dokud se dá něco zachránit (R-119). */
+  | 'survey_detractor'
 
 export async function createNotification(params: {
   type: NotificationType

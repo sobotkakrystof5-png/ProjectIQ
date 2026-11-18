@@ -9,7 +9,7 @@ import { getPublicUrl } from '@/lib/utils'
 import { sendBrandedEmail, type EmailCta } from '@/lib/email'
 import { STATUS_LABELS, STATUS_ORDER, type ProjectStatus, type ProjectType } from '@/lib/types'
 import { createNotification } from '@/lib/notifications'
-import { sendSurveyRequest } from '@/lib/admin/surveys'
+import { SURVEY_SEND_DELAY_MS, sendSurveyRequest } from '@/lib/admin/surveys'
 import { prepareProjectDoneDraftLater } from '@/lib/admin/invoice-drafts'
 import {
   LEAD_ORIGINS, LEADS_INBOX_PATH, DEFAULT_LEAD_ORIGIN, adminEmail, projectPath, toLeadOrigin,
@@ -129,27 +129,38 @@ export async function notifyClientOfProjectChange(
   // zneužít jako neautentizovaný email-relay.
   await requireAuth()
   if (!project.client_email) return
-  const ctas: EmailCta[] = []
-  if (project.project_url) ctas.push({ label: 'Zobrazit živou verzi', href: project.project_url })
-  ctas.push({ label: 'Otevřít přehled projektu', href: getPublicUrl(project.public_token), primary: false })
-
   // Klient dostane e-mail, až když je uložení odpovězené (AD08). Gmail SMTP
   // trvá stovky milisekund až sekundy a uložení zakázky na něj čekalo —
   // `after()` ho pustí po odeslání odpovědi. `sendBrandedEmail` nikdy
   // nevyhodí výjimku (vrací false a loguje), takže se nemá co ztratit.
-  const email = project.client_email
-  after(async () => {
-    await sendBrandedEmail({
-      to: email,
-      subject: changeType === 'created' ? 'Váš projekt byl založen – ZakazIQ' : 'Aktualizace vašeho projektu – ZakazIQ',
-      heading: changeType === 'created' ? 'Váš projekt byl založen' : 'Váš projekt byl aktualizován',
-      intro: `Dobrý den, ${project.client_name}, právě jsme aktualizovali stav vašeho projektu.`,
-      fields: [
-        { label: 'Stav', value: STATUS_LABELS[project.status] },
-        { label: 'Postup', value: `${project.progress}%` },
-      ],
-      ctas,
-    })
+  after(() => sendProjectChangeEmail(project, changeType))
+}
+
+type ProjectChangeMail = {
+  client_name: string
+  client_email: string | null
+  status: ProjectStatus
+  progress: number
+  project_url: string | null
+  public_token: string
+}
+
+/** Samotné odeslání zprávy o změně — bez kontroly přihlášení, volá se z `after()`. */
+async function sendProjectChangeEmail(project: ProjectChangeMail, changeType: 'created' | 'updated'): Promise<void> {
+  if (!project.client_email) return
+  const ctas: EmailCta[] = []
+  if (project.project_url) ctas.push({ label: 'Zobrazit živou verzi', href: project.project_url })
+  ctas.push({ label: 'Otevřít přehled projektu', href: getPublicUrl(project.public_token), primary: false })
+  await sendBrandedEmail({
+    to: project.client_email,
+    subject: changeType === 'created' ? 'Váš projekt byl založen – ZakazIQ' : 'Aktualizace vašeho projektu – ZakazIQ',
+    heading: changeType === 'created' ? 'Váš projekt byl založen' : 'Váš projekt byl aktualizován',
+    intro: `Dobrý den, ${project.client_name}, právě jsme aktualizovali stav vašeho projektu.`,
+    fields: [
+      { label: 'Stav', value: STATUS_LABELS[project.status] },
+      { label: 'Postup', value: `${project.progress}%` },
+    ],
+    ctas,
   })
 }
 
@@ -322,10 +333,28 @@ export async function updateProject(
     `
   }
   const publicToken = (rows[0] as { public_token: string }).public_token
-  await notifyClientOfProjectChange(
-    { client_name: payload.client_name, client_email: payload.client_email, status: payload.status, progress, project_url: payload.project_url, public_token: publicToken },
-    'updated'
-  )
+  const changeMail: ProjectChangeMail = {
+    client_name: payload.client_name, client_email: payload.client_email, status: payload.status,
+    progress, project_url: payload.project_url, public_token: publicToken,
+  }
+  // Dokončení přes formulář posílá dotazník stejně jako rychlá změna stavu
+  // a uzavření (R-119) — dřív odešla jen zpráva „projekt byl aktualizován".
+  // Po odkladu na „Zpět" se stav čte znovu; když dotazník neodejde (už
+  // odešel, vlastní projekt, bez e-mailu), pošle se obvyklá zpráva.
+  const finishing =
+    (payload.status === 'done' || payload.status === 'paid') && oldStatus !== 'done' && oldStatus !== 'paid'
+  if (finishing) {
+    after(async () => {
+      await new Promise((resolve) => setTimeout(resolve, SURVEY_SEND_DELAY_MS))
+      const current = await sql`SELECT status FROM projects WHERE id = ${id} LIMIT 1`
+      const now = current[0] as { status: ProjectStatus } | undefined
+      if (!now) return
+      if ((now.status === 'done' || now.status === 'paid') && (await sendSurveyRequest(id))) return
+      await sendProjectChangeEmail({ ...changeMail, status: now.status }, 'updated')
+    })
+  } else {
+    await notifyClientOfProjectChange(changeMail, 'updated')
+  }
 
   // Přepnutí „fakturováno na IČO" musí přerovnat i příjmy, které ze zakázky
   // už vznikly — jinak by zakázka byla v jedné linii a její peníze v druhé

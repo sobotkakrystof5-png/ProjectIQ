@@ -1142,11 +1142,44 @@ automaticky připravíš prompt pro Claude Code". Volby (šablona, přepisy 90 d
 hlavní problém jen krok, který ovlivní agent (úvod, slyšitelnost, nabídka, námitky); „nezvedli"
 je dosah. Bezpečnost DECISIONS #036, technika `docs/admin/AGENTS-ADMIN.md` → „AI asistent".
 
+### R-119 · Dotazník spokojenosti na jednu minutu, z krystof@vizeon.cz (2026-11-17)
+**Rozhodnutí:** (1) Dotazník má jednu povinnou otázku „Doporučili byste mě známému?" (0–10, NPS)
+a čtyři nepovinné oblasti hvězdičkami: **Výsledek, Komunikace, Termín, Cena**. Šest starých
+povinných hvězdiček zůstává jen v historii. (2) **První otázka je přímo v e-mailu**: řada 0–10,
+každé číslo otevře formulář s vybranou známkou. Známka se uloží hned, i když klient zbytek
+nevyplní, ale **ukládá ji až prohlížeč, ne otevření odkazu**. (3) Další otázka podle známky:
+9–10 reference s návodnými otázkami, souhlas ve třech úrovních (se jménem a firmou / bez jména /
+nezveřejňovat) a po odeslání „Napsat recenzi na Googlu" (text se zkopíruje); 7–8 „Co by z toho
+udělalo desítku?"; 0–6 „Co jsem měl udělat jinak?" a Kryštofovi přijde upozornění do zvonku
+i e-mailem, **jednou**. (4) E-mail klientovi jde **z krystof@vizeon.cz přes Resend** (`sendVizeonMail`),
+bez záložního Gmailu. (5) Dotazník odchází sám po dokončení zakázky všemi cestami: uzavření,
+rychlá změna stavu i **úprava zakázky formulářem** (ta dosud posílala jen „projekt byl aktualizován").
+(6) V Hodnocení je NPS za období (Letos / 12 měsíců / Vše), průměr čtyř oblastí s nejslabší
+oblastí a seznam nespokojených s „Ozval jsem se" (se Zpět). Odkaz na Google recenzi je pole v Profilu.
+**Proč:** Kryštof 2026-11-17 schválil návrh „takto to přesně udělej", s automatickým odesláním po
+dokončení zakázky z krystof@vizeon.cz. Šest otázek se překrývalo a nesedělo na e-shop ani
+automatizaci; bez NPS nešlo poznat spokojené od nespokojených a nic se podle toho nedělo.
+Ukládání při otevření odkazu by známky vyráběly roboty, které odkazy v e-mailech procházejí
+(firemní filtry pošty), a falešná upozornění na nespokojené klienty.
+**Důsledek:** migrace 118 (aditivní, **před** nasazením — bez ní nový dotazník odpověď neuloží).
+Model a výpočty `lib/admin/survey-model.ts` (čte se přes `to_jsonb`, admin tedy běží i bez 118),
+zápisy `lib/admin/survey-answers.ts`, e-mail `lib/admin/survey-email.ts`. Server sám drží větvení:
+reference a souhlas jen u 9–10. Druhý dotaz po 2–3 měsících („přinesl web poptávky?") se nestavěl.
+Zakázka zapsaná rovnou jako hotová (`createProject`) dotazník neposílá, často jde o starou práci.
+Upravuje R-102 bod 3 (souhlas má tři úrovně). Bezpečnost `.claude/security/DECISIONS.md` #038.
+
 ---
 
 ## 3. Otevřené problémy
 
 - [ ] **Koncepty faktur (R-117) — nasadit a projít naživo:** kód na větvi `admin/faktury-koncepty` (worktree `../ZakazIQ-faktury`), na produkci není. Migrace 117 je podle Kryštofa na produkci, merge do `main` 2026-11-17. Zbývá průchod: zakázka → Hotovo → do 15 s koncept v Ke schválení → doplnit adresu → Schválit a poslat na vlastní e-mail → PDF v příloze, číslo v řadě; Zpět během 10 s nic nepošle; pravidelná faktura se dnem = dnešek se objeví až po běhu cronu. **Odeslání přes Resend s PDF nikdo nezkusil naživo** · od 2026-11-17
+- [ ] **Dotazník R-119 — nasadit a projít:** (1) migrace 118 na produkci **před** nasazením,
+  (2) odkaz na Google recenzi do Profilu, (3) zkušební zakázka s vlastním e-mailem → Hotovo →
+  po 15 s e-mail z krystof@vizeon.cz, klik na číslo → známka uložená, dokončit formulář pro
+  10, 7 a 3 (upozornění na nespokojeného do zvonku i e-mailem), (4) e-mail v Gmailu, Seznamu
+  a Apple Mailu na telefonu (řada 0–10 na úzkém displeji), formulář na 390 a 1280 px. **Naživo
+  ani v prohlížeči nic neověřeno**, jen testy nad PGlite · Kryštof · od 2026-11-17
+
 - [ ] **Asistent jako chat (R-113) neověřený naživo ani v prohlížeči:** ověřeno testy, `tsc`, buildem a živě se Sonnetem nad smyšleným přehledem (4 ze 4), ale ne v prohlížeči nad skutečnými daty. Projít: věta bez času → otázka → odpověď „ve tři" → zapsáno jednou; „posuň to na čtvrtou" v témže chatu; „oprav Novákovi telefon"; „zapamatuj si…" a že se paměť objeví v dalším chatu; nový chat po „Nový chat". Hlídat, jestli se neptá zbytečně (otravné) a jestli Sonnet nestojí víc, než je odhad · od 2026-11-17
 - [ ] **Hovory od asistenta (R-112) — spustit a projít:** ZakazIQ strana je na produkci
   (`2cf1447`, `POST /api/public/outreach` bez klíče vrací 401), klíč ve Vercelu i v GitHub
@@ -1441,6 +1474,33 @@ je dosah. Bezpečnost DECISIONS #036, technika `docs/admin/AGENTS-ADMIN.md` → 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-18 (dotazník spokojenosti na jednu minutu — R-119)
+- **feat** Nový dotazník: známka 0–10 jako jediná povinná otázka (uloží se hned po výběru),
+  čtyři nepovinné oblasti (Výsledek, Komunikace, Termín, Cena), text podle známky, souhlas ve
+  třech úrovních a recenze na Googlu se zkopírovaným textem. Stránka `/h` nese Kryštofa
+  a VIZEON místo „Powered by ZakazIQ". Soubory: `components/SurveyForm.tsx`, `app/h/[token]/page.tsx`,
+  `app/portal-actions.ts` (`saveSurveyScore`, `submitSurvey`, `recordGoogleReviewClick`),
+  `lib/admin/{survey-model,survey-answers,survey-notify}.ts`, `lib/feedback-schema.ts`.
+- **feat** E-mail s dotazníkem z krystof@vizeon.cz přes Resend, řada 0–10 přímo v e-mailu;
+  připomínka po 7 dnech stejně. Soubory: `lib/admin/survey-email.ts`, `lib/admin/surveys.ts`.
+- **fix** Dokončení zakázky **formulářem** (stav Hotovo/Zaplaceno) dotazník neposílalo, jen zprávu
+  „projekt byl aktualizován". Teď stejně jako rychlá změna stavu: po 15 s dotazník, jinak obvyklá
+  zpráva. Soubor: `app/actions.ts`.
+- **feat** Hodnocení v Profilu: NPS za období, průměr oblastí s nejslabší oblastí, nespokojení
+  s „Ozval jsem se" a Zpět, nový typ oznámení „Nespokojený klient", karta Recenze na Googlu.
+  Soubory: `components/HodnoceniDashboard.tsx`, `components/PerformanceOverview.tsx`,
+  `components/admin/google-review-card.tsx`, `app/closed-actions.ts`, `app/dashboard/profil/page.tsx`,
+  `lib/admin/{closed,reference}.ts`, `lib/notifications.ts`, `components/NotificationList.tsx`.
+- **db** Migrace 118 `dotaznik_nps` (aplikována: ne, nikde).
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-dotaznik.test.ts` (24 testů nad
+  PGlite včetně dvojího běhu migrace), plná sada 1385/1387 (selhávají jen známé `ws-schema`
+  mezera po 113 a `ws-email` pevné datum) a `next build`. Vzhled na dočasné stránce
+  s vymyšlenými daty (Playwright, 390 a 1280 px): formulář prázdný, 9 a 3, e-mail, Hodnocení;
+  bez vodorovného posouvání, plochy 44 px, konzole bez chyb. **Naživo se skutečnou databází
+  a doručením e-mailu neověřeno.** Větev `admin/dotaznik` nad `admin/growth-hovory`, migrace
+  118 a R-119 (117 a R-117/118 obsadila souběžná sezení).
+- **decision** **R-119**.
 
 ### 2026-11-17 (sekce AI asistent — R-118)
 - **feat** Sekce **AI asistent** v menu Práce: Kontakty (fronta od robota, tlačítko „Poslat

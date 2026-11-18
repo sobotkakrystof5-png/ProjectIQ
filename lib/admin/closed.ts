@@ -1,6 +1,7 @@
 import 'server-only'
-import { adminDb } from './db'
-import type { ClosedProject, ProjectSurvey } from '@/lib/types'
+import { adminDb, type AdminRow } from './db'
+import { normalizeSurvey, type SurveyWithProject } from '@/lib/admin/survey-model'
+import type { ClosedProject } from '@/lib/types'
 
 /**
  * Uzavřené zakázky a hodnocení pro přehled na `/dashboard/profil` (AD11).
@@ -32,13 +33,29 @@ export const CLOSED_COLUMNS = `id::text,
   to_jsonb(projects) ->> 'survey_requested_at' AS survey_requested_at,
   to_jsonb(projects) ->> 'survey_reminded_at'  AS survey_reminded_at`
 
-const SURVEY_COLUMNS = `id::text, project_id::text, completed_project_id::text,
-  rating_cooperation, rating_speed, rating_design, rating_functionality,
-  rating_reliability, rating_flexibility, reference_text, consent, created_at`
+/**
+ * Odpověď na dotazník i se zakázkou, ke které patří (R-119). Celý řádek přes
+ * `to_jsonb`, ať přehled funguje i bez migrace 118 — chybějící sloupec je
+ * v `normalizeSurvey` prostě `null`. Zakázka nemusí být uzavřená: dotazník
+ * odchází i při stavu Hotovo nebo Zaplaceno.
+ */
+const SURVEY_COLUMNS = `to_jsonb(s) AS row,
+  coalesce(nullif(btrim(coalesce(p.description, '')), ''), p.client_name) AS project_title,
+  p.client_name, p.client_email, to_jsonb(p) ->> 'client_phone' AS client_phone`
+
+function toSurvey(row: AdminRow): SurveyWithProject {
+  return {
+    ...normalizeSurvey(row.row as Record<string, unknown>),
+    project_title: String(row.project_title ?? ''),
+    client_name: (row.client_name as string | null) ?? null,
+    client_email: (row.client_email as string | null) ?? null,
+    client_phone: (row.client_phone as string | null) ?? null,
+  }
+}
 
 export type PerformanceScreen = {
   projects: ClosedProject[]
-  surveys: ProjectSurvey[]
+  surveys: SurveyWithProject[]
 }
 
 /** Podklady pro „Jak se mi daří" a souhrn hodnocení — jedno kolo do databáze. */
@@ -53,15 +70,15 @@ export async function loadPerformanceScreen(): Promise<PerformanceScreen> {
     {
       // Hodnocení bez zakázky (archivní řádek, ke kterému se zakázka nedohledala)
       // v přehledu nedává smysl — nejde u něj říct, čeho se týká.
-      text: `SELECT ${SURVEY_COLUMNS} FROM project_surveys
-             WHERE project_id IS NOT NULL
-             ORDER BY created_at DESC LIMIT $1`,
+      text: `SELECT ${SURVEY_COLUMNS} FROM project_surveys s
+             JOIN projects p ON p.id = s.project_id
+             ORDER BY s.created_at DESC LIMIT $1`,
       params: [STATS_LIMIT],
     },
   ])
 
   return {
     projects: projectRows as unknown as ClosedProject[],
-    surveys: surveyRows as unknown as ProjectSurvey[],
+    surveys: surveyRows.map(toSurvey),
   }
 }

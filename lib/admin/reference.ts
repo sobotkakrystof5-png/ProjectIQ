@@ -1,4 +1,5 @@
-import { SURVEY_CATEGORIES, type ClosedProject, type ProjectSurvey } from '@/lib/types'
+import { ratingAverage, type SurveyAnswer } from '@/lib/admin/survey-model'
+import type { ClosedProject } from '@/lib/types'
 
 /**
  * Reference pro web z vyplněného dotazníku (AD16).
@@ -6,7 +7,8 @@ import { SURVEY_CATEGORIES, type ClosedProject, type ProjectSurvey } from '@/lib
  * Tři pravidla, a všechna jsou tvrdá:
  *  1. **Bez souhlasu se reference vůbec nenabídne.** Souhlas je na dotazníku
  *     (`project_surveys.consent`) a od AD16 je dobrovolný — klient smí
- *     ohodnotit spolupráci a zveřejnění odmítnout.
+ *     ohodnotit spolupráci a zveřejnění odmítnout. Od R-119 má tři úrovně:
+ *     „bez jména" znamená, že jméno ani firma do reference nejdou.
  *  2. **Text se nikdy nepřepisuje.** Do reference jde doslova to, co klient
  *     napsal; nic se nedoplňuje, nekrátí ani „neučesává" (B10).
  *  3. **Nic se nepublikuje samo.** Výstup je text ke zkopírování, na web ho
@@ -21,23 +23,23 @@ export type ReferenceSnippet = {
   name: string
   /** Firma, pokud ji zakázka zná. */
   company: string | null
-  /** Průměr hvězdiček zaokrouhlený na jedno desetinné místo. */
-  rating: number
-  /** Celé hvězdičky pro web (1–5). */
-  stars: number
+  /** Průměr hvězdiček na jedno desetinné místo; `null`, když klient dal jen známku 0–10. */
+  rating: number | null
+  /** Celé hvězdičky pro web (1–5), nebo `null`. */
+  stars: number | null
   /** Co klient napsal. Prázdné = reference bez textu, jen hvězdičky. */
   text: string | null
   /** Datum vyplnění ve tvaru `YYYY-MM-DD`. */
   date: string
 }
 
-export function surveyAverage(survey: ProjectSurvey): number {
-  const sum = SURVEY_CATEGORIES.reduce((acc, c) => acc + Number(survey[c.key] ?? 0), 0)
-  return sum / SURVEY_CATEGORIES.length
+/** Průměr vyplněných hvězdiček (nové oblasti, u staré odpovědi staré). */
+export function surveyAverage(survey: SurveyAnswer): number | null {
+  return ratingAverage(survey)
 }
 
 /** Souhlas je jediná podmínka. Bez něj se tlačítko ani neukáže. */
-export function canUseAsReference(survey: Pick<ProjectSurvey, 'consent'>): boolean {
+export function canUseAsReference(survey: Pick<SurveyAnswer, 'consent'>): boolean {
   return survey.consent === true
 }
 
@@ -47,17 +49,19 @@ function isoDay(value: string | Date): string {
 }
 
 export function buildReference(
-  survey: ProjectSurvey,
+  survey: SurveyAnswer,
   project: Pick<ClosedProject, 'client_name' | 'company'>,
 ): ReferenceSnippet | null {
   if (!canUseAsReference(survey)) return null
   const average = surveyAverage(survey)
   const text = survey.reference_text?.trim()
+  const anonymous = survey.publish_mode === 'anonymous'
   return {
-    name: project.client_name?.trim() || 'Klient',
-    company: project.company?.trim() || null,
-    rating: Math.round(average * 10) / 10,
-    stars: Math.round(average),
+    name: anonymous ? 'Klient' : project.client_name?.trim() || 'Klient',
+    // Firmu nebo pozici napsal klient sám; jinak firma ze zakázky.
+    company: anonymous ? null : survey.reviewer_role?.trim() || project.company?.trim() || null,
+    rating: average === null ? null : Math.round(average * 10) / 10,
+    stars: average === null ? null : Math.round(average),
     text: text ? text : null,
     date: isoDay(survey.created_at),
   }
@@ -66,8 +70,11 @@ export function buildReference(
 /** Podoba ke zkopírování do textu — co se dá rovnou vložit na stránku. */
 export function referenceAsText(snippet: ReferenceSnippet): string {
   const kdo = snippet.company ? `${snippet.name}, ${snippet.company}` : snippet.name
-  const hvezdy = '★'.repeat(snippet.stars) + '☆'.repeat(5 - snippet.stars)
-  const lines = [snippet.text ? `„${snippet.text}"` : null, `— ${kdo}`, `${hvezdy} ${snippet.rating} / 5`]
+  const hvezdy =
+    snippet.stars === null || snippet.rating === null
+      ? null
+      : `${'★'.repeat(snippet.stars)}${'☆'.repeat(5 - snippet.stars)} ${snippet.rating} / 5`
+  const lines = [snippet.text ? `„${snippet.text}"` : null, `— ${kdo}`, hvezdy]
   return lines.filter((line): line is string => line !== null).join('\n')
 }
 

@@ -1,3 +1,5 @@
+import type { SurveyAnswer } from '@/lib/admin/survey-model'
+
 export type ProjectStatus = 'new' | 'in_progress' | 'review' | 'done' | 'paid'
 
 export interface Project {
@@ -236,39 +238,12 @@ export interface ClosedProject {
   survey_reminded_at?: string | null
 }
 
-export interface ProjectSurvey {
-  id: string
-  /** Zakázka, ke které hodnocení patří (migrace 106). */
-  project_id: string | null
-  /** Odkaz do `completed_projects_archiv`; u nových dotazníků NULL. */
-  completed_project_id: string | null
-  rating_cooperation: number
-  rating_speed: number
-  rating_design: number
-  rating_functionality: number
-  rating_reliability: number
-  rating_flexibility: number
-  reference_text: string | null
-  consent: boolean
-  created_at: string | Date
-}
-
-export type SurveyRatingKey =
-  | 'rating_cooperation'
-  | 'rating_speed'
-  | 'rating_design'
-  | 'rating_functionality'
-  | 'rating_reliability'
-  | 'rating_flexibility'
-
-export const SURVEY_CATEGORIES: { key: SurveyRatingKey; label: string }[] = [
-  { key: 'rating_cooperation', label: 'Spolupráce' },
-  { key: 'rating_speed', label: 'Rychlost' },
-  { key: 'rating_design', label: 'Design' },
-  { key: 'rating_functionality', label: 'Funkčnost stránky' },
-  { key: 'rating_reliability', label: 'Spolehlivost' },
-  { key: 'rating_flexibility', label: 'Flexibilita' },
-]
+/**
+ * Vyplněný dotazník spokojenosti. Od migrace 118 je jádrem známka 0–10
+ * a staré šestice hvězdiček zůstává jen v historii — model, výpočty
+ * a převod řádku z databáze jsou v `lib/admin/survey-model.ts` (R-119).
+ */
+export type ProjectSurvey = SurveyAnswer
 
 export interface Cost {
   id: string

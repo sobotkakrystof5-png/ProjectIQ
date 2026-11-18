@@ -16,22 +16,32 @@ export const bookingSchema = z.object({
   path: ['channelOtherText'],
 })
 
-const rating = z.number().int().min(1).max(5)
+/**
+ * Dotazník spokojenosti (R-119). Povinná je jen známka 0–10; čtyři oblasti
+ * a texty jsou nepovinné. Délky hlídá server, ne jen formulář.
+ */
+const npsScore = z
+  .number({ message: 'Vyberte prosím číslo od 0 do 10.' })
+  .int({ message: 'Vyberte prosím číslo od 0 do 10.' })
+  .min(0, { message: 'Vyberte prosím číslo od 0 do 10.' })
+  .max(10, { message: 'Vyberte prosím číslo od 0 do 10.' })
+const area = z.number().int().min(1).max(5).nullable().optional()
+const optionalText = (max: number, message: string) =>
+  z.string().trim().max(max, { message }).optional()
+
+export const surveyScoreSchema = z.object({ nps: npsScore })
 
 export const surveySchema = z.object({
-  rating_cooperation: rating,
-  rating_speed: rating,
-  rating_design: rating,
-  rating_functionality: rating,
-  rating_reliability: rating,
-  rating_flexibility: rating,
-  reference_text: z.string().max(3000).optional(),
-  // Souhlas se zveřejněním je od AD16 **dobrovolný**: klient smí spolupráci
-  // ohodnotit a zveřejnění odmítnout. Jinak by „se souhlasem“ nic neznamenalo —
-  // podmínkou odeslání by si ho vynutil formulář u každého.
-  consent: z.boolean().default(false),
+  nps: npsScore,
+  rating_result: area,
+  rating_communication: area,
+  rating_schedule: area,
+  rating_value: area,
+  improve_text: optionalText(2000, 'Text je moc dlouhý, zkraťte ho prosím pod 2 000 znaků.'),
+  reference_text: optionalText(3000, 'Reference je moc dlouhá, zkraťte ji prosím pod 3 000 znaků.'),
+  // Souhlas se zveřejněním je dobrovolný (AD16) a od R-119 má tři úrovně.
+  publish_mode: z.enum(['named', 'anonymous', 'private']).default('private'),
+  reviewer_role: optionalText(120, 'Firma nebo pozice může mít nejvýš 120 znaků.'),
 })
 
-export type FeedbackInput = z.infer<typeof feedbackSchema>
-export type BookingInput = z.infer<typeof bookingSchema>
 export type SurveyInput = z.infer<typeof surveySchema>

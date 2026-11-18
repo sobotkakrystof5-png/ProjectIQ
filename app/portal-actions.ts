@@ -4,9 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { sql } from '@/lib/db'
 import { adminDb, q } from '@/lib/admin/db'
-import { feedbackSchema, bookingSchema, surveySchema, type SurveyInput } from '@/lib/feedback-schema'
+import { feedbackSchema, bookingSchema, surveySchema, surveyScoreSchema } from '@/lib/feedback-schema'
 import { sendBrandedEmail } from '@/lib/email'
-import { SURVEY_CATEGORIES } from '@/lib/types'
+import {
+  claimDetractorAlert,
+  markGoogleReviewClick,
+  saveSurveyScore as saveSurveyScoreInDb,
+  submitSurveyAnswers,
+} from '@/lib/admin/survey-answers'
+import { alertDetractor, notifySurveySubmitted } from '@/lib/admin/survey-notify'
 import { createNotification } from '@/lib/notifications'
 import { projectPath, adminEmail } from '@/lib/lead-origins'
 import { clientRequestSchema, REQUEST_KIND_LABELS } from '@/lib/client-requests'
@@ -29,7 +35,7 @@ async function getProjectByToken(token: string): Promise<{ id: string } | null> 
 // add a line here for any new public-action table instead of hardcoding a
 // two-way ternary.
 const RATE_LIMIT_QUERIES: Record<
-  'client_feedback' | 'consultation_slots' | 'project_surveys' | 'client_requests',
+  'client_feedback' | 'consultation_slots' | 'client_requests',
   (id: string, windowMinutes: number) => Promise<{ count: string }[]>
 > = {
   client_feedback: (id, windowMinutes) =>
@@ -38,8 +44,6 @@ const RATE_LIMIT_QUERIES: Record<
     sql`SELECT count(*) FROM consultation_slots WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
   client_requests: (id, windowMinutes) =>
     sql`SELECT count(*) FROM client_requests WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
-  project_surveys: (id, windowMinutes) =>
-    sql`SELECT count(*) FROM project_surveys WHERE project_id = ${id} AND created_at > now() - interval '1 minute' * ${windowMinutes}` as unknown as Promise<{ count: string }[]>,
 }
 
 async function isRateLimited(
@@ -244,76 +248,80 @@ export async function submitConsultation(
   return { success: true }
 }
 
-// ─── Satisfaction survey (Hodnocení) ────────────────────────────────────────────
+// ─── Dotazník spokojenosti (R-119) ──────────────────────────────────────────────
+//
+// Zakázku najde tajný `survey_token` z odkazu v e-mailu; nic jiného se
+// z prohlížeče nebere. Limit pokusů tu nahrazuje jediná odpověď na zakázku
+// (unikátní index z migrace 106): opakované odeslání jen přepisuje tentýž
+// řádek, dokud není formulář odeslaný, a upozornění odchází jednou.
 
-export async function submitSurvey(
-  token: string,
-  rawData: Partial<SurveyInput>,
-): Promise<ActionResult> {
-  const parsed = surveySchema.safeParse(rawData)
-  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Neplatná data.' }
+/** Kolik se čeká, než po samotné známce 0–6 odejde upozornění. */
+const DETRACTOR_ALERT_DELAY_MS = 20_000
 
-  // Dotazník visí od migrace 106 na zakázce, ne na kopii v Dokončených (AD11).
-  // Token si zakázka přebrala z archivu, takže dřív odeslané odkazy platí dál.
+export type SurveyScoreResult = { success: true } | { success: false; error: string; completed?: boolean }
+
+export async function saveSurveyScore(token: string, nps: number): Promise<SurveyScoreResult> {
   const surveyToken = publicToken(token)
-  if (!surveyToken) return { success: false, error: 'Dotazník nenalezen.' }
-  const projectRows = await sql`
-    SELECT id, coalesce(nullif(btrim(coalesce(description, '')), ''), client_name) AS title, client_name
-    FROM projects WHERE survey_token = ${surveyToken} AND NOT lead_pending LIMIT 1
-  `
-  const cp = projectRows[0] as { id: string; title: string; client_name: string | null } | undefined
-  if (!cp) return { success: false, error: 'Dotazník nenalezen.' }
+  if (!surveyToken) return { success: false, error: 'Dotazník jsme nenašli. Zkontrolujte prosím odkaz z e-mailu.' }
+  const parsed = surveyScoreSchema.safeParse({ nps })
+  if (!parsed.success) return { success: false, error: 'Vyberte prosím číslo od 0 do 10.' }
 
-  if (await isRateLimited('project_surveys', cp.id, 10, 3)) {
-    return { success: false, error: 'Příliš mnoho pokusů v krátkém čase. Zkuste to prosím později.' }
+  const res = await saveSurveyScoreInDb(surveyToken, parsed.data.nps)
+  if (res.status === 'not_found') {
+    return { success: false, error: 'Dotazník jsme nenašli. Zkontrolujte prosím odkaz z e-mailu.' }
+  }
+  if (res.status === 'completed') {
+    return { success: false, completed: true, error: 'Dotazník už je odeslaný. Děkuji!' }
   }
 
-  const d = parsed.data
-  try {
-    await sql`
-      INSERT INTO project_surveys (
-        project_id, rating_cooperation, rating_speed, rating_design,
-        rating_functionality, rating_reliability, rating_flexibility, reference_text, consent
-      )
-      VALUES (
-        ${cp.id}, ${d.rating_cooperation}, ${d.rating_speed}, ${d.rating_design},
-        ${d.rating_functionality}, ${d.rating_reliability}, ${d.rating_flexibility},
-        ${d.reference_text?.trim() || null}, ${d.consent}
-      )
-    `
-  } catch (err: unknown) {
-    if ((err as { code?: string })?.code === '23505') {
-      return { success: false, error: 'Tento dotazník již byl vyplněn. Děkujeme!' }
-    }
-    console.error('[Survey] DB chyba při INSERT:', err)
-    return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
-  }
-
-  revalidatePath(`/dashboard/${cp.id}`)
-  revalidatePath('/dashboard/profil')
-
-  void createNotification({
-    type: 'survey_submitted',
-    title: `Nový dotazník spokojenosti`,
-    body: `${cp.client_name ?? cp.title}`,
-    link: `/dashboard/${cp.id}`,
-  })
-
-  const to = adminEmail()
-  if (to) {
-    await sendBrandedEmail({
-      to,
-      subject: `Nový vyplněný dotazník – ${cp.client_name ?? cp.title}`,
-      heading: 'Nový vyplněný dotazník spokojenosti',
-      intro: `Klient ${cp.client_name ?? cp.title} právě vyplnil dotazník spokojenosti k projektu „${cp.title}".`,
-      fields: [
-        ...SURVEY_CATEGORIES.map(c => ({ label: c.label, value: `${d[c.key]} / 5` })),
-        ...(d.reference_text?.trim() ? [{ label: 'Reference', value: d.reference_text.trim() }] : []),
-      ],
+  revalidatePath(projectPath(res.project.id))
+  // Nízká známka: když klient formulář nedokončí, Kryštof se to dozví i tak.
+  // Po odkladu se znovu ověří, že známka pořád platí a formulář neodešel
+  // (to pak upozorní odeslání, i s textem klienta).
+  if (parsed.data.nps <= 6) {
+    const surveyId = res.surveyId
+    after(async () => {
+      await new Promise((resolve) => setTimeout(resolve, DETRACTOR_ALERT_DELAY_MS))
+      const alert = await claimDetractorAlert(surveyId, { onlyUnfinished: true })
+      if (alert) await alertDetractor(alert.answer, alert.project)
     })
   }
-
   return { success: true }
+}
+
+export async function submitSurvey(token: string, rawData: unknown): Promise<SurveyScoreResult> {
+  const surveyToken = publicToken(token)
+  if (!surveyToken) return { success: false, error: 'Dotazník jsme nenašli. Zkontrolujte prosím odkaz z e-mailu.' }
+  const parsed = surveySchema.safeParse(rawData)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Zkontrolujte prosím odpovědi.' }
+
+  const res = await submitSurveyAnswers(surveyToken, parsed.data)
+  if (res.status === 'not_found') {
+    return { success: false, error: 'Dotazník jsme nenašli. Zkontrolujte prosím odkaz z e-mailu.' }
+  }
+  if (res.status === 'completed') {
+    return { success: false, completed: true, error: 'Dotazník už je odeslaný. Děkuji!' }
+  }
+
+  revalidatePath(projectPath(res.project.id))
+  revalidatePath('/dashboard/profil')
+
+  const { answer, project } = res
+  after(async () => {
+    const alert = answer.nps !== null && answer.nps <= 6 ? await claimDetractorAlert(answer.id) : null
+    if (alert) await alertDetractor(alert.answer, alert.project)
+    else await notifySurveySubmitted(answer, project)
+  })
+  return { success: true }
+}
+
+/** Spokojený klient klikl na „Napsat recenzi na Googlu". Jen pro přehled. */
+export async function recordGoogleReviewClick(token: string): Promise<void> {
+  const surveyToken = publicToken(token)
+  if (!surveyToken) return
+  await markGoogleReviewClick(surveyToken).catch((err) => {
+    console.error('[Dotazník] Kliknutí na recenzi se nepodařilo zapsat.', err instanceof Error ? err.message : err)
+  })
 }
 
 // ─── Požadavek klienta (text nebo přepis hlasu) ─────────────────────────────────

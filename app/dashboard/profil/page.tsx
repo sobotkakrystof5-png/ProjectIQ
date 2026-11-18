@@ -16,6 +16,8 @@ import { loadPerformanceScreen } from '@/lib/admin/closed'
 import { TotpCard } from '@/components/admin/totp-card'
 import { totpState } from '@/app/totp-actions'
 import { GoogleCard } from '@/components/admin/google-card'
+import { GoogleReviewCard } from '@/components/admin/google-review-card'
+import { getGoogleReviewUrl } from '@/lib/admin/survey-answers'
 import { googleStatus } from '@/lib/admin/google/oauth'
 
 async function loadStats() {
@@ -89,13 +91,21 @@ async function loadStats() {
       SELECT created_at FROM projects ORDER BY created_at ASC LIMIT 1
     `,
     sql`
+      -- Průměr vyplněných hvězdiček na odpověď (R-119): nový dotazník má čtyři
+      -- nepovinné oblasti, starý šest povinných. Přes to_jsonb, ať to funguje
+      -- i bez migrace 118. Odpovědi jen se známkou 0–10 se nepočítají.
       SELECT
-        COUNT(*)::int AS total,
-        ROUND(AVG(
-          (rating_cooperation + rating_speed + rating_design +
-           rating_functionality + rating_reliability + rating_flexibility) / 6.0
-        ), 2)::numeric AS avg_overall
-      FROM project_surveys
+        COUNT(r.avg_row)::int AS total,
+        ROUND(AVG(r.avg_row), 2)::numeric AS avg_overall
+      FROM project_surveys s
+      CROSS JOIN LATERAL (
+        SELECT avg(e.value::numeric) AS avg_row
+        FROM jsonb_each_text(to_jsonb(s)) AS e(key, value)
+        WHERE e.value IS NOT NULL AND e.key IN (
+          'rating_result', 'rating_communication', 'rating_schedule', 'rating_value',
+          'rating_cooperation', 'rating_speed', 'rating_design',
+          'rating_functionality', 'rating_reliability', 'rating_flexibility')
+      ) r
     `,
   ])
 
@@ -168,7 +178,7 @@ export default async function ProfilPage(props: {
 
   const searchParams = await props.searchParams
   const googleResult = typeof searchParams.google === 'string' ? searchParams.google : null
-  const [totp, google] = await Promise.all([totpState(), googleStatus()])
+  const [totp, google, googleReviewUrl] = await Promise.all([totpState(), googleStatus(), getGoogleReviewUrl()])
 
   // Dvě nezávislá čtení — souhrn profilu a podklady pro přehled výkonnosti.
   const [stats, performance] = await Promise.all([loadStats(), loadPerformanceScreen()])
@@ -451,12 +461,15 @@ export default async function ProfilPage(props: {
         </div>
       )}
 
-      {performance.surveys.length > 0 && (
+      {(performance.surveys.length > 0 || performance.projects.length > 0) && (
         <div className="border-t border-navy-100 pt-8">
           <SectionHeader icon={<Star size={14} strokeWidth={1.5} />} title="Hodnocení od klientů" />
           <HodnoceniDashboard projects={performance.projects} surveys={performance.surveys} />
         </div>
       )}
+
+      {/* Odkaz na recenzi na Googlu pro spokojené klienty (R-119) */}
+      <GoogleReviewCard url={googleReviewUrl} />
 
       {/* Přihlášení a druhý faktor (R-105) */}
       <TotpCard enabled={totp.enabled} />

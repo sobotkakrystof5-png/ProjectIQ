@@ -6,17 +6,14 @@ import {
   TrendingUp, Clock, Target, Star, Gauge, ArrowUpRight,
   ArrowDownRight, ChevronDown, ChevronRight, Sparkles,
 } from 'lucide-react'
-import { SURVEY_CATEGORIES, type ClosedProject, type ProjectSurvey } from '@/lib/types'
+import type { ClosedProject, ProjectSurvey } from '@/lib/types'
+import { areaAverages, npsScore } from '@/lib/admin/survey-model'
 import { cn } from '@/lib/utils'
 
 function fmt(n: number) {
   return n.toLocaleString('cs-CZ', { maximumFractionDigits: 0 })
 }
 
-function surveyAverage(s: ProjectSurvey): number {
-  const sum = SURVEY_CATEGORIES.reduce((acc, c) => acc + (s[c.key] as number), 0)
-  return sum / SURVEY_CATEGORIES.length
-}
 
 function StatCard({
   label,
@@ -309,11 +306,10 @@ function ClientSatisfaction({ projects, surveys }: { projects: ClosedProject[]; 
     )
   }
 
-  const overallAvg = answered.reduce((s, r) => s + surveyAverage(r), 0) / answered.length
-  const perCategory = SURVEY_CATEGORIES.map(c => ({
-    label: c.label,
-    avg: answered.reduce((s, r) => s + (r[c.key] as number), 0) / answered.length,
-  }))
+  // Souhrn podle nového dotazníku (R-119); podrobnosti jsou v Hodnocení níž.
+  const scores = answered.map(r => r.nps).filter((n): n is number => n !== null)
+  const nps = npsScore(scores)
+  const areas = areaAverages(answered).filter(a => a.avg !== null)
 
   return (
     <div>
@@ -323,19 +319,27 @@ function ClientSatisfaction({ projects, surveys }: { projects: ClosedProject[]; 
         sub={`${answered.length} z ${projects.length} ${projects.length === 1 ? 'zakázky' : 'zakázek'} ohodnoceno`}
       />
 
-      <div className="flex items-center gap-2 mb-3">
-        <span className="font-num text-2xl font-bold text-ink">{overallAvg.toFixed(1)}</span>
-        <span className="text-sm text-quiet">/ 5 průměr napříč kategoriemi</span>
-      </div>
+      {nps !== null && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-num text-2xl font-bold text-ink">{nps > 0 ? `+${nps}` : nps}</span>
+          <span className="text-sm text-quiet">NPS z {scores.length} {scores.length === 1 ? 'odpovědi' : 'odpovědí'}</span>
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mb-3">
-        {perCategory.map(c => (
-          <div key={c.label} className="flex items-center justify-between gap-2 text-xs">
-            <span className="text-quiet">{c.label}</span>
-            <span className="font-medium text-ink">{c.avg.toFixed(1)}/5</span>
-          </div>
-        ))}
-      </div>
+      {areas.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mb-3">
+          {areas.map(c => (
+            <div key={c.key} className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-quiet">{c.label}</span>
+              <span className="font-medium text-ink">{c.avg!.toFixed(1)}/5</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {nps === null && areas.length === 0 && (
+        <p className="text-sm text-quiet">Odpovědi jsou zatím jen ze starého dotazníku. Najdete je v Hodnocení níž.</p>
+      )}
     </div>
   )
 }

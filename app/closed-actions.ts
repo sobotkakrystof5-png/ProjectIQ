@@ -6,6 +6,7 @@ import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { SURVEY_SEND_DELAY_MS, sendSurveyRequest } from '@/lib/admin/surveys'
 import { prepareProjectDoneDraftLater } from '@/lib/admin/invoice-drafts'
+import { saveGoogleReviewUrl, setSurveyFollowedUp } from '@/lib/admin/survey-answers'
 import { projectPath } from '@/lib/lead-origins'
 import { STATUS_ORDER, type ProjectStatus, type ProjectType } from '@/lib/types'
 
@@ -176,4 +177,25 @@ export async function deleteProjectSurvey(id: string) {
   const projectId = (rows[0] as { project_id: string | null } | undefined)?.project_id
   if (projectId) revalidatePath(projectPath(projectId))
   revalidatePath('/dashboard/profil')
+}
+
+/** „Ozval jsem se" u nespokojeného klienta (R-119) — a zpět. */
+export async function setSurveyFollowUp(id: string, done: boolean): Promise<void> {
+  await requireAuth()
+  if (!UUID.test(id)) throw new Error('Hodnocení nenalezeno')
+  const projectId = await setSurveyFollowedUp(id, done === true)
+  if (projectId) revalidatePath(projectPath(projectId))
+  revalidatePath('/dashboard/profil')
+}
+
+/** Odkaz na recenzi na Googlu, který dotazník ukáže spokojeným klientům (R-119). */
+export async function saveGoogleReviewSetting(
+  url: string,
+): Promise<{ success: true; url: string | null } | { success: false; error: string }> {
+  await requireAuth()
+  if (typeof url !== 'string') return { success: false, error: 'Vložte prosím odkaz.' }
+  const res = await saveGoogleReviewUrl(url)
+  if (!res.ok) return { success: false, error: res.error }
+  revalidatePath('/dashboard/profil')
+  return { success: true, url: res.url }
 }
