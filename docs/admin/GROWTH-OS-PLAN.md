@@ -1,7 +1,8 @@
 # Growth OS → admin ZakazIQ: hovory od asistenta, schůzky a e-mail jedním klikem
 
-> Plán propojení Kryštofova systému Growth OS (repozitář `vizeon-autopilot`, AI hovory přes ElevenLabs,
-> ukázkové weby, e-maily přes Resend) s adminem ZakazIQ. Rozhodnutí **R-112** v `memory/memory.md`,
+> Plán propojení Kryštofova systému Growth OS (repozitář `vizeon-autopilot`, AI hovory přes ElevenLabs
+> a SIP trunk Odoriku, ukázkové weby, e-maily přes Resend) s adminem ZakazIQ. Rozhodnutí **R-112**
+> a **R-120** v `memory/memory.md`,
 > na straně Growth OS **D-103** v `growth-os/docs/06-rozhodnuti-a-otevrene.md`. Stav kroků v oddílu 4.
 
 ## 1. Cíl
@@ -53,6 +54,37 @@ Zdroj pravdy je `types/outreach.ts` (ZakazIQ) a `src/zakaziq-admin.mjs` (autopil
 neplní). Pole v kontraktu jsou připravená; ZakazIQ je začne ukazovat, jakmile Growth OS přidá
 sledovací odkaz (`links`, plán Voice Outreach) nebo čtení stavu z Resendu.
 
+### Kontrakt v2 (R-120, 2026-11-18)
+
+Všechno volitelné, snímek v1 projde beze změny. `version: 2`. Chybějící hodnota v ZakazIQ nic
+nepřepíše (přepis hovoru, cena…), takže hodinová synchronizace smí posílat hovory **bez přepisu**.
+Tělo nejvýš **1 MB** — Growth OS dělí dávky podle velikosti (pod 900 kB).
+
+| Pole firmy | Význam |
+|---|---|
+| `segment`, `source_batch` | skupina a seznam, ze kterého firma přišla |
+| `next_call_after` | kdy robot zavolá znovu (null = už ne) |
+| `meeting_at` | schůzka domluvená přímo s robotem (`meetings.starts_at`) |
+| `demo.slug`, `demo.preview_url` | slug ukázky a obrázek náhledu (jen `https://navrhy.vizeon.cz/…`) |
+| `demo.last_viewed_at`, `demo.max_view_s` | čtení ukázky (až Growth OS začne měřit) |
+| `calls[]` | **všechny hovory** firmy (nejvýš 30), tvar jako hovor v reportu bez `company`/`lead_external_id`, navíc `conversation_id` (ElevenLabs), `cost_czk` + `cost_source` (`odorik`/`odhad`), `telephony_status`, `collected` (data collection), `criteria` (všechna hodnoticí kritéria) |
+| `email_log[]` | každý e-mail (nejvýš 30): `external_id` `vizeon-email:<id>`, `kind`, `status`, `subject`, `text`, `scheduled_for`, `sent_at`, `delivered_at`, `opened_at`, `clicked_at`, `replied_at`, `bounced_at`, `opens`, `clicks` |
+| `status_history[]` | `{at, status}` z `events` (lead.status), nejvýš 60 |
+| `research` | `{angle, hook, findings[]}` z rešerše před studeným e-mailem |
+
+Report (`/api/public/outreach/reports`) smí v `calls[]` nést tatáž pole v2 a ve `stats` navíc
+`costCzk` a `account` (`odorik_balance_czk`, `elevenlabs_credits_left`, `elevenlabs_credits_limit`,
+`checked_at`) — Přehled z nich ukazuje kredity.
+
+**Zpětný kanál:** `GET /api/public/outreach/handled?since=<ISO>` (týž Bearer klíč) vrátí
+`{ now, has_more, leads: [{ external_id, handled: 'prevzato'|'nezajem'|null, handled_at, changed_at, meeting_at }] }`
+vzestupně podle `changed_at`, nejvýš 500. Growth OS si pamatuje poslední `changed_at`.
+
+**Odorik a ElevenLabs.** Volá agent ElevenLabs „Vizeon hovory" přes SIP trunk Odoriku
+(`sip2.odorik.cz`). Growth OS dnes cenu jen odhaduje z délky; skutečnou cenu a stav linky má výpis
+hovorů z API Odoriku. **Nahrávky admin nepotřebuje, stačí přepis** (Kryštof 2026-11-18) —
+ZakazIQ do ElevenLabs nesahá; `conversation_id` slouží jen k dohledání hovoru v ElevenLabs.
+
 ## 4. Kroky a stav
 
 | # | Co | Stav |
@@ -62,8 +94,9 @@ sledovací odkaz (`links`, plán Voice Outreach) nebo čtení stavu z Resendu.
 | 3 | Google Kalendář + Meet: propojení Google účtu v Profilu (OAuth s PKCE, scope `calendar.events`, obnovovací token šifrovaně v DB), „Domluvit schůzku" → událost s Meetem v Google Kalendáři (bez hostů) + `calendar_events` s `meet_url` + kontakt v Hovorech | **v kódu 2026-11-17**, migrace 115, nenasazeno |
 | 4 | E-mail jedním klikem z krystof@vizeon.cz (Resend): úvod od Kryštofa + termín, tlačítko Připojit se ke schůzce, ukázka, vizeon.cz, podpis; odchází po 15 s se Zpět; stav a „Poslat e-mail znovu" v detailu události | **v kódu 2026-11-17**, nenasazeno |
 | 5 | Asistent (R-111): „domluv Novákovi schůzku ve čtvrtek ve 3 a pošli pozvánku" — schůzka sama, e-mail na klepnutí | po krocích 3 a 4 |
-| 6 | Zpětný kanál do Growth OS: „nevolat" a „zakázka" z adminu do D1, ať robot nevolá | po kroku 2 v provozu |
-| 7 | Sledování otevření ukázky a e-mailu v Growth OS (sledovací odkaz / Resend), ať fronta ví „otevřel ukázku" | práce v autopilotu |
+| 6 | Zpětný kanál do Growth OS: koho Kryštof převzal nebo odložil, ať robot nevolá | **ZakazIQ strana v kódu 2026-11-18** (`GET /api/public/outreach/handled`, migrace 119); Growth OS čtení — zadání v kroku 9 |
+| 7 | Sledování otevření ukázky a e-mailu v Growth OS (sledovací odkaz / Resend), ať fronta ví „otevřel ukázku" | práce v autopilotu, zadání v kroku 9 |
+| 9 | **AI asistent jako CRM** (R-120): Přehled, Kontakty s filtry, detail klienta (ukázka, všechny hovory s přepisem, e-maily, časová osa), kontrakt v2, zpětný kanál; migrace 119. Zadání pro Growth OS: `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md` | **ZakazIQ v kódu 2026-11-18**, nenasazeno; Growth OS nezačato |
 | 8 | **Sekce AI asistent** (R-118): Kontakty, Reporty den po dni, Analýza (kde hovory váznou) a prompt pro Claude Code; `POST /api/public/outreach/reports`, migrace 116; v autopilotu report po každém kole, `zakaziq:report` pro historii a okamžitá synchronizace po souhlasu (D-105, commit `842dcca`) | **v kódu 2026-11-17**, nenasazeno |
 
 ## 5. Rozhodnuto 2026-11-17

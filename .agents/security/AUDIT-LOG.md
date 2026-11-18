@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-18 — review: AI asistent jako CRM (R-120)
+Spouštěč: `web-security-review` před commitem a nasazením na produkci (větev `admin/ai-asistent-crm`).
+Rozsah: nové `GET /api/public/outreach/handled` a `GET /api/outreach/leads/[id]/nahled`, upravené `POST /api/public/outreach` (kontrakt v2, tělo 1 MB), `lib/admin/{outreach,outreach-calls,outreach-crm,outreach-crm-view,outreach-reports,outreach-demo}.ts`, `types/outreach{,-report}.ts`, komponenty `components/admin/ai-asistent/*`, `components/admin/outreach-lead-actions.tsx`, stránka `/dashboard/ai-asistent/kontakt/[id]`, migrace 119, cron `client-retention`.
+Výsledek: 1 nález, opraven.
+Nálezy: (1) náhled ukázky četl celou odpověď do paměti (`arrayBuffer()`) a velikost kontroloval až potom — odpověď bez `content-length` mohla zabrat libovolně paměti funkce. Zdroj je jen `navrhy.vizeon.cz` (vlastní hosting), takže riziko nízké. Ověřeno bez nálezu: (a) tajemství — žádné nové `NEXT_PUBLIC_` ani env (přehrávání nahrávek s klíčem ElevenLabs bylo vypuštěno), klientské komponenty importují jen čisté moduly; (b) validace — Zod se stropy u kontraktu v2 (30 hovorů, 30 e-mailů, texty, `conversation_id` regexem) a CHECK v migraci, `since` délka a datum, `id` jako UUID před dotazem; (c) HTML — žádný `dangerouslySetInnerHTML`, shrnutí, přepis, data z hovoru i text e-mailu jen jako text; odkazy jen z https/http sloupců hlídaných CHECKem (ukázka jen https, Meet jen meet.google.com); (d) SQL — hodnoty jen parametry, do textu dotazu jdou jen konstanty modulu a filtr z allowlistu, hledání escapuje `\ % _`; (e) zneužití — oba veřejné endpointy za Bearer klíčem v konstantním čase a s limitem, náhled za přihlášením s allowlistem hostitele (https, bez portu a přihlašovacích údajů, bez přesměrování, jen PNG/JPEG/WebP, `nosniff`, `sandbox`), zpětný kanál bez jmen a kontaktů.
+Přijatá rizika: DECISIONS #039.
+Opraveno: (1) čtení se stropem 2 MB (`readCapped`), test na odpověď bez `content-length`.
+
 ## 2026-11-18 — review: dotazník spokojenosti na jednu minutu (R-119)
 Spouštěč: `web-security-review` před nasazením větve `admin/dotaznik` na produkci.
 Rozsah: veřejné server actions `saveSurveyScore`, `submitSurvey`, `recordGoogleReviewClick` (`app/portal-actions.ts`), stránka `/h/[token]`, `lib/admin/{survey-model,survey-answers,survey-email,survey-notify,surveys,reference,closed}.ts`, admin akce `setSurveyFollowUp` a `saveGoogleReviewSetting` (`app/closed-actions.ts`), `components/{SurveyForm,HodnoceniDashboard}.tsx`, `components/admin/google-review-card.tsx`, migrace 118.

@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardHead, SECTION_LABEL } from '@/components/admin/card'
-import { pct, resultBadge, transcriptText, type AnalysisCall, type DayReport } from '@/lib/admin/outreach-analysis'
+import { CallCard } from '@/components/admin/ai-asistent/call-card'
+import { pct, type DayReport } from '@/lib/admin/outreach-analysis'
 import type { ReportListItem } from '@/lib/admin/outreach-reports'
 
 /**
@@ -19,13 +19,6 @@ export function dayLabel(date: string): string {
     day: 'numeric',
     month: 'numeric',
   }).format(new Date(`${date}T12:00:00Z`))
-}
-
-function timeLabel(iso: string | null): string {
-  if (!iso) return ''
-  return new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: 'numeric', minute: '2-digit' }).format(
-    new Date(iso),
-  )
 }
 
 export function ReportDaysList({ days, hrefFor }: { days: ReportListItem[]; hrefFor: (date: string) => string }) {
@@ -85,7 +78,14 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
   )
 }
 
-export function ReportDayDetail({ report }: { report: DayReport }) {
+export function ReportDayDetail({
+  report,
+  leadHrefs,
+}: {
+  report: DayReport
+  /** Klíč firmy z Growth OS → odkaz na detail klienta. */
+  leadHrefs?: Map<string, string>
+}) {
   const s = report.stats
   return (
     <div className="flex flex-col gap-6">
@@ -156,96 +156,11 @@ export function ReportDayDetail({ report }: { report: DayReport }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {report.calls.map((c) => (
-              <CallRow key={c.id} call={c} />
+              <CallCard key={c.id} call={c} companyHref={leadHrefs?.get(c.leadId) ?? null} />
             ))}
           </ul>
         )}
       </section>
     </div>
-  )
-}
-
-function CallRow({ call }: { call: AnalysisCall }) {
-  const badge = resultBadge(call.result)
-  const hasDetail = Boolean(
-    call.summary || call.transcript?.length || call.failedCriteria.length || call.objections.length || call.chanceWhy.length,
-  )
-  const head = (
-    <span className="flex min-h-11 items-center gap-3 px-4 py-2.5">
-      <span className="w-12 shrink-0 font-num text-xs text-quiet">{timeLabel(call.calledAt)}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-ink">{call.company}</span>
-        <span className="block truncate text-xs text-quiet">
-          {[
-            call.industry,
-            call.round ? `${call.round}. kolo` : null,
-            call.durationS ? `${Math.round(call.durationS)} s` : null,
-            call.chanceLevel && call.chanceLevel !== 'zatím nevíme' && call.chanceLevel !== 'žádná'
-              ? `šance ${call.chanceLevel}`
-              : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-      </span>
-      <Badge variant={badge.tone} className="shrink-0">
-        {badge.label}
-      </Badge>
-    </span>
-  )
-
-  if (!hasDetail) return <li className="rounded-box border border-navy-100 bg-surface">{head}</li>
-
-  return (
-    <li className="rounded-box border border-navy-100 bg-surface">
-      <details className="group">
-        <summary className="cursor-pointer list-none rounded-box transition-colors hover:bg-navy-50 [&::-webkit-details-marker]:hidden">
-          {head}
-        </summary>
-        <div className="flex flex-col gap-4 border-t border-navy-100 px-4 py-4">
-          {call.chanceWhy.length > 0 && (
-            <div>
-              <h3 className={SECTION_LABEL}>Proč tahle šance</h3>
-              <p className="mt-1 text-sm text-ink">{call.chanceWhy.join('; ')}</p>
-              {call.chanceAction && <p className="mt-1 text-sm text-quiet">Co dál: {call.chanceAction}</p>}
-            </div>
-          )}
-          {call.summary && (
-            <div>
-              <h3 className={SECTION_LABEL}>Shrnutí</h3>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{call.summary}</p>
-              <p className="mt-1 text-xs text-quiet">Shrnul to AI asistent, nemusí být přesné.</p>
-            </div>
-          )}
-          {call.objections.length > 0 && (
-            <div>
-              <h3 className={SECTION_LABEL}>Námitky a otázky</h3>
-              <p className="mt-1 text-sm text-ink">{call.objections.join('; ')}</p>
-            </div>
-          )}
-          {call.failedCriteria.length > 0 && (
-            <div>
-              <h3 className={SECTION_LABEL}>Kde agent chyboval</h3>
-              <ul className="mt-1 flex flex-col gap-1 text-sm text-ink">
-                {call.failedCriteria.map((f) => (
-                  <li key={f.id}>
-                    <span className="font-medium">{f.name}</span>
-                    {f.rationale ? <span className="text-quiet"> — {f.rationale}</span> : null}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {call.transcript && call.transcript.length > 0 && (
-            <div>
-              <h3 className={SECTION_LABEL}>Přepis</h3>
-              <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-chip bg-navy-50 p-3 font-num text-xs leading-relaxed text-ink">
-                {transcriptText(call.transcript, 20_000)}
-              </pre>
-            </div>
-          )}
-        </div>
-      </details>
-    </li>
   )
 }

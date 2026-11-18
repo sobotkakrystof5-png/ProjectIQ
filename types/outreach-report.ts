@@ -67,6 +67,20 @@ export const reportStatsSchema = z.object({
   demos: count,
   /** Cena hovorů dne, text z autopilota („0,84 €"). */
   costEur: optText(40),
+  /** Cena hovorů dne v Kč (v2): z výpisu Odoriku, jinak odhad z délky. */
+  costCzk: z.number().min(0).max(1_000_000).nullish(),
+  /**
+   * Stav účtů u dodavatelů (v2), ať admin včas vidí, že dochází kredit.
+   * Odorik = předplacený kredit SIP linky, ElevenLabs = kredity za minuty agenta.
+   */
+  account: z
+    .object({
+      odorik_balance_czk: z.number().min(-100_000).max(1_000_000).nullish(),
+      elevenlabs_credits_left: z.number().int().min(0).max(1_000_000_000).nullish(),
+      elevenlabs_credits_limit: z.number().int().min(0).max(1_000_000_000).nullish(),
+      checked_at: isoDate.nullish(),
+    })
+    .nullish(),
   contacts: z
     .object({ total: count, reached: count, neverReached: count })
     .nullish(),
@@ -105,6 +119,41 @@ export const transcriptTurnSchema = z.object({
   text: z.string().max(1000),
 })
 
+/**
+ * Co k hovoru přibylo ve v2 (snímek firmy i report). Všechno volitelné:
+ * chybějící hodnota v ZakazIQ nic nepřepíše.
+ */
+export const callExtrasSchema = z.object({
+  /** Id hovoru v ElevenLabs — jen pro dohledání hovoru tam; nahrávky admin nepřehrává. */
+  conversation_id: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{1,100}$/, 'neplatné id hovoru')
+    .nullish(),
+  /** Cena hovoru v Kč. `odorik` = z výpisu operátora, `odhad` = z délky a ceníku. */
+  cost_czk: z.number().min(0).max(10_000).nullish(),
+  cost_source: z.enum(['odhad', 'odorik']).nullish(),
+  /** Stav od operátora (Odorik): answered, busy, no_answer, failed… */
+  telephony_status: optText(40),
+  /** Data collection z ElevenLabs (chce_ukazku, termin_text…), jen krátké texty. */
+  collected: z
+    .record(z.string().trim().max(60), z.string().trim().max(300))
+    .refine((r) => Object.keys(r).length <= 20, { message: 'nejvýš 20 polí' })
+    .nullish(),
+  /** Všechna hodnoticí kritéria, ne jen nesplněná. */
+  criteria: z
+    .array(
+      z.object({
+        id: z.string().trim().max(80),
+        name: z.string().trim().max(200),
+        result: z.string().trim().max(20),
+        rationale: optText(600),
+      }),
+    )
+    .max(30)
+    .default([]),
+})
+
 export const reportCallSchema = z.object({
   /** `vizeon-call:<id hovoru v D1>`, nikdy se nemění. */
   external_id: z.string().trim().min(1).max(100),
@@ -140,7 +189,7 @@ export const reportCallSchema = z.object({
   opening_variant: optText(10),
   /** Jen u hovorů, kde někdo zvedl. */
   transcript: z.array(transcriptTurnSchema).max(150).nullish(),
-})
+}).merge(callExtrasSchema)
 
 export const reportPayloadSchema = z.object({
   version: z.number().int().min(1),
@@ -166,3 +215,4 @@ export type ReportStats = z.infer<typeof reportStatsSchema>
 export type ReportRound = z.infer<typeof reportRoundSchema>
 export type ReportCriterion = z.infer<typeof reportCriterionSchema>
 export type TranscriptTurn = z.infer<typeof transcriptTurnSchema>
+export type CallExtras = z.infer<typeof callExtrasSchema>

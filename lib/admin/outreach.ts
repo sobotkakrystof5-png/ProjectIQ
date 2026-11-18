@@ -2,6 +2,13 @@ import 'server-only'
 import { adminDb, batchTolerant } from '@/lib/admin/db'
 import type { OutreachLeadPayload } from '@/types/outreach'
 import {
+  callRecord,
+  emailRecord,
+  pragueDate,
+  upsertOutreachCalls,
+  upsertOutreachEmails,
+} from '@/lib/admin/outreach-calls'
+import {
   CLOSED_STATUSES,
   QUEUE_STATUSES,
   queueReason,
@@ -30,7 +37,7 @@ export type { OutreachQueueRow, QueueReason } from '@/lib/admin/outreach-view'
 
 // ─── Fronta ──────────────────────────────────────────────────────────────────
 
-const QUEUE_WHERE = `
+export const QUEUE_WHERE = `
   handled_at IS NULL
   AND do_not_call = false
   AND status <> ALL ('{${CLOSED_STATUSES.join(',')}}'::text[])
@@ -130,12 +137,16 @@ type Prev = {
   handled_at: unknown
 }
 
-export type OutreachEvent =
+export type OutreachEvent = (
   | { kind: 'do-fronty'; company: string; reason: string }
   | { kind: 'otevrel-ukazku'; company: string }
   | { kind: 'odpovedel'; company: string }
+) & {
+  /** uuid řádku — odkaz z oznámení vede rovnou na detail klienta (R-120). */
+  leadId?: string
+}
 
-export type IngestResult = { received: number; saved: number; events: OutreachEvent[] }
+export type IngestResult = { received: number; saved: number; calls: number; emails: number; events: OutreachEvent[] }
 
 function inQueue(p: { status: string; do_not_call: boolean; demo_views: number; replied: boolean; handled: boolean }): boolean {
   if (p.handled || p.do_not_call) return false
@@ -153,7 +164,7 @@ export function latestPerLead(leads: OutreachLeadPayload[]): OutreachLeadPayload
   return [...byId.values()]
 }
 
-function toRecord(lead: OutreachLeadPayload) {
+function toRecord(lead: OutreachLeadPayload, version = 1) {
   return {
     external_id: lead.external_id,
     source_updated_at: lead.updated_at,
@@ -182,6 +193,19 @@ function toRecord(lead: OutreachLeadPayload) {
     email_opened_at: lead.emails?.opened_at ?? null,
     email_clicked_at: lead.emails?.clicked_at ?? null,
     email_replied_at: lead.emails?.replied_at ?? null,
+    // v2 (migrace 119)
+    segment: lead.segment ?? null,
+    source_batch: lead.source_batch ?? null,
+    next_call_after: lead.next_call_after ?? null,
+    meeting_at: lead.meeting_at ?? null,
+    demo_slug: lead.demo?.slug ?? null,
+    demo_preview_url: lead.demo?.preview_url ?? null,
+    demo_last_viewed_at: lead.demo?.last_viewed_at ?? null,
+    demo_max_view_s: lead.demo?.max_view_s ?? null,
+    // Sloupec je NOT NULL; prázdné pole v UPDATE nic nepřepíše.
+    status_history: lead.status_history ?? [],
+    research: lead.research ?? null,
+    snapshot_version: version,
   }
 }
 
@@ -192,6 +216,29 @@ const RECORD_COLUMNS = `
   demo_url text, demo_status text, demo_built_at timestamptz, demo_views integer,
   demo_first_viewed_at timestamptz, cold_email_sent_at timestamptz, demo_email_sent_at timestamptz,
   email_opened_at timestamptz, email_clicked_at timestamptz, email_replied_at timestamptz`
+
+const RECORD_COLUMNS_V2 = `${RECORD_COLUMNS},
+  segment text, source_batch text, next_call_after timestamptz, meeting_at timestamptz, demo_slug text,
+  demo_preview_url text, demo_last_viewed_at timestamptz, demo_max_view_s integer, status_history jsonb,
+  research jsonb, snapshot_version integer`
+
+/**
+ * Sloupce v2. Snímek v1 (starší Growth OS) je nepřepíše; v2 je přepíše vždy,
+ * kromě historie stavů a rešerše, které chybějící hodnota nesmaže.
+ */
+const DATA_COLUMNS_V2 = [
+  'segment', 'source_batch', 'next_call_after', 'meeting_at', 'demo_slug', 'demo_preview_url',
+  'demo_last_viewed_at', 'demo_max_view_s', 'status_history', 'research', 'snapshot_version',
+] as const
+
+function v2UpdateExpr(c: (typeof DATA_COLUMNS_V2)[number]): string {
+  if (c === 'snapshot_version') return `${c} = EXCLUDED.${c}`
+  if (c === 'status_history') {
+    return `${c} = CASE WHEN EXCLUDED.${c} IS NOT NULL AND jsonb_array_length(EXCLUDED.${c}) > 0 THEN EXCLUDED.${c} ELSE outreach_leads.${c} END`
+  }
+  if (c === 'research') return `${c} = coalesce(EXCLUDED.${c}, outreach_leads.${c})`
+  return `${c} = CASE WHEN EXCLUDED.snapshot_version >= 2 THEN EXCLUDED.${c} ELSE outreach_leads.${c} END`
+}
 
 const DATA_COLUMNS = [
   'source_updated_at', 'company_name', 'contact_name', 'phone', 'email', 'website', 'industry', 'city', 'status',
@@ -205,7 +252,7 @@ const DATA_COLUMNS = [
  * do databáze), starší snímek novější nepřepíše. Vrací události pro oznámení:
  * firma nově ve frontě, poprvé otevřená ukázka, nová odpověď na e-mail.
  */
-export async function ingestOutreachLeads(input: OutreachLeadPayload[]): Promise<IngestResult> {
+export async function ingestOutreachLeads(input: OutreachLeadPayload[], version = 1): Promise<IngestResult> {
   const leads = latestPerLead(input)
   const ids = leads.map((l) => l.external_id)
 
@@ -215,15 +262,69 @@ export async function ingestOutreachLeads(input: OutreachLeadPayload[]): Promise
   `
   const prev = new Map(prevRows.map((r) => [r.external_id, r]))
 
-  const allColumns = ['external_id', ...DATA_COLUMNS]
+  const records = leads.map((l) => toRecord(l, version))
+  let saved: { external_id: string; id: string }[]
+  let v2 = true
+  try {
+    saved = await upsertLeads(records, true)
+  } catch (err) {
+    // Bez migrace 119 se snímek uloží jako v1 (bez hovorů a e-mailů).
+    if ((err as { code?: string })?.code !== '42703') throw err
+    v2 = false
+    saved = await upsertLeads(records, false)
+  }
+  const savedIds = new Set(saved.map((r) => r.external_id))
+
+  // Hovory a e-maily jen u firem, jejichž snímek se opravdu uložil: starší
+  // snímek by jinak vrátil „čeká" přes skutečný výsledek hovoru.
+  let calls = 0
+  let emails = 0
+  const fresh = leads.filter((l) => savedIds.has(l.external_id))
+  const callRecords = fresh.flatMap((l) =>
+    (l.calls ?? []).map((c) =>
+      callRecord(c, {
+        leadExternalId: l.external_id,
+        company: l.company,
+        date: pragueDate(c.at ?? l.updated_at),
+      }),
+    ),
+  )
+  if (callRecords.length) {
+    try {
+      calls = await upsertOutreachCalls(callRecords)
+    } catch (err) {
+      // Bez migrace 116 (tabulka hovorů) snímek firmy stejně platí.
+      if ((err as { code?: string })?.code !== '42P01') throw err
+    }
+  }
+  if (v2) {
+    const emailRecords = fresh.flatMap((l) => (l.email_log ?? []).map((e) => emailRecord(e, l.external_id)))
+    emails = await upsertOutreachEmails(emailRecords)
+  }
+
+  const idByExternal = new Map(saved.map((r) => [r.external_id, r.id]))
+  const events: OutreachEvent[] = collectEvents(leads, savedIds, prev).map(({ externalId, ...e }) => ({
+    ...e,
+    leadId: idByExternal.get(externalId),
+  }))
+  return { received: input.length, saved: savedIds.size, calls, emails, events }
+}
+
+async function upsertLeads(records: ReturnType<typeof toRecord>[], v2: boolean): Promise<{ external_id: string; id: string }[]> {
+  const dataColumns: string[] = [...DATA_COLUMNS, ...(v2 ? DATA_COLUMNS_V2 : [])]
+  const allColumns = ['external_id', ...dataColumns]
+  const rows = v2
+    ? records
+    : records.map((r) => Object.fromEntries(allColumns.map((c) => [c, (r as Record<string, unknown>)[c]])))
   const [saved] = await adminDb.batch([
     {
       text: `
         INSERT INTO outreach_leads (${allColumns.join(', ')})
         SELECT ${allColumns.join(', ')}
-          FROM jsonb_to_recordset($1::jsonb) AS x(${RECORD_COLUMNS})
+          FROM jsonb_to_recordset($1::jsonb) AS x(${v2 ? RECORD_COLUMNS_V2 : RECORD_COLUMNS})
         ON CONFLICT (external_id) DO UPDATE SET
           ${DATA_COLUMNS.map((c) => `${c} = EXCLUDED.${c}`).join(',\n          ')},
+          ${v2 ? `${DATA_COLUMNS_V2.map(v2UpdateExpr).join(',\n          ')},` : ''}
           -- „Nemá zájem" se vrací do fronty, když firma nově odpoví na e-mail.
           handled_at = CASE
             WHEN outreach_leads.handled_reason = 'nezajem'
@@ -238,13 +339,19 @@ export async function ingestOutreachLeads(input: OutreachLeadPayload[]): Promise
           received_at = now(),
           updated_at = now()
         WHERE outreach_leads.source_updated_at <= EXCLUDED.source_updated_at
-        RETURNING external_id`,
-      params: [JSON.stringify(leads.map(toRecord))],
+        RETURNING external_id, id::text AS id`,
+      params: [JSON.stringify(rows)],
     },
   ])
-  const savedIds = new Set((saved as { external_id: string }[]).map((r) => r.external_id))
+  return saved as { external_id: string; id: string }[]
+}
 
-  const events: OutreachEvent[] = []
+function collectEvents(
+  leads: OutreachLeadPayload[],
+  savedIds: Set<string>,
+  prev: Map<string, Prev>,
+): (OutreachEvent & { externalId: string })[] {
+  const events: (OutreachEvent & { externalId: string })[] = []
   for (const lead of leads) {
     if (!savedIds.has(lead.external_id)) continue
     const before = prev.get(lead.external_id)
@@ -261,11 +368,11 @@ export async function ingestOutreachLeads(input: OutreachLeadPayload[]): Promise
     if (!nowIn) continue
 
     if (replied && (!before || before.email_replied_at === null)) {
-      events.push({ kind: 'odpovedel', company: rec.company_name })
+      events.push({ kind: 'odpovedel', company: rec.company_name, externalId: rec.external_id })
       continue
     }
     if (rec.demo_views > 0 && (!before || Number(before.demo_views) === 0)) {
-      events.push({ kind: 'otevrel-ukazku', company: rec.company_name })
+      events.push({ kind: 'otevrel-ukazku', company: rec.company_name, externalId: rec.external_id })
       continue
     }
     const wasIn =
@@ -303,11 +410,10 @@ export async function ingestOutreachLeads(input: OutreachLeadPayload[]): Promise
         emailRepliedAt: rec.email_replied_at,
         receivedAt: new Date().toISOString(),
       })
-      events.push({ kind: 'do-fronty', company: rec.company_name, reason: reason.label })
+      events.push({ kind: 'do-fronty', company: rec.company_name, reason: reason.label, externalId: rec.external_id })
     }
   }
-
-  return { received: input.length, saved: savedIds.size, events }
+  return events
 }
 
 // ─── Akce Kryštofa ───────────────────────────────────────────────────────────
@@ -365,4 +471,66 @@ export async function restoreOutreachLead(id: string): Promise<void> {
     UPDATE outreach_leads SET handled_at = NULL, handled_reason = NULL, updated_at = now()
      WHERE id = ${id} AND handled_reason = 'nezajem'
   `
+}
+
+// ─── Zpětný kanál pro Growth OS (R-120) ──────────────────────────────────────
+
+export type HandledChange = {
+  external_id: string
+  /** prevzato = vede ho Kryštof, nezajem = odložil; null = vrátil se do fronty. */
+  handled: 'prevzato' | 'nezajem' | null
+  handled_at: string | null
+  changed_at: string
+  /** Schůzka, kterou Kryštof domluvil v adminu (nejbližší budoucí, jinak poslední). */
+  meeting_at: string | null
+}
+
+/** Strop jedné odpovědi; Growth OS si další dotáhne s `since` = poslední `changed_at`. */
+export const HANDLED_PAGE = 500
+
+/**
+ * Co Kryštof v adminu s firmami udělal od `since` — ať robot nevolá tomu,
+ * koho převzal nebo odložil. Čte jen `admin_changed_at` (trigger z migrace 119),
+ * seřazeno vzestupně, aby šlo stránkovat. Bez migrace 119 `null`.
+ */
+export async function loadHandledChanges(since: Date): Promise<HandledChange[] | null> {
+  const query = (withMeeting: boolean) => ({
+    text: `
+      SELECT l.external_id, l.handled_reason, l.handled_at, l.admin_changed_at,
+             ${
+               withMeeting
+                 ? `(SELECT e.starts_at FROM calendar_events e
+                      WHERE e.outreach_lead_id = l.id
+                      ORDER BY (e.starts_at >= now()) DESC, abs(extract(epoch FROM e.starts_at - now()))
+                      LIMIT 1)`
+                 : 'NULL::timestamptz'
+             } AS meeting_at
+        FROM outreach_leads l
+       WHERE l.admin_changed_at > $1::timestamptz
+       ORDER BY l.admin_changed_at ASC
+       LIMIT ${HANDLED_PAGE}`,
+    params: [since.toISOString()],
+  })
+  const missing = (err: unknown) => ['42703', '42P01'].includes((err as { code?: string })?.code ?? '')
+  try {
+    let rows: Record<string, unknown>[]
+    try {
+      ;[rows] = await adminDb.batch([query(true)])
+    } catch (err) {
+      // Bez migrace 115 (schůzky s Meet) zpětný kanál funguje dál, jen bez termínu.
+      if (!missing(err)) throw err
+      ;[rows] = await adminDb.batch([query(false)])
+    }
+    return rows.map((r) => ({
+      external_id: String(r.external_id),
+      handled: r.handled_reason === 'prevzato' || r.handled_reason === 'nezajem' ? r.handled_reason : null,
+      handled_at: iso(r.handled_at),
+      changed_at: iso(r.admin_changed_at) ?? new Date(0).toISOString(),
+      meeting_at: iso(r.meeting_at),
+    }))
+  } catch (err) {
+    // 42703: chybí admin_changed_at (migrace 119); 42P01: chybí tabulka (114).
+    if (missing(err)) return null
+    throw err
+  }
 }

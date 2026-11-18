@@ -3,6 +3,7 @@ import { verifyCronSecret } from '@/lib/api-auth'
 import { purgeClientRetention } from '@/lib/client-retention'
 import { purgeMemoryRetention } from '@/lib/admin/memory/store'
 import { purgeOutreachRetention } from '@/lib/admin/outreach-reports'
+import { purgeOutreachEmails } from '@/lib/admin/outreach-calls'
 
 // Denní úklid dat klientů po dokončených zakázkách (D-K10, R-076, vercel.json).
 //
@@ -22,7 +23,9 @@ export async function GET(req: NextRequest) {
     const memory = await purgeMemoryRetention().catch(() => null)
     // Přepisy hovorů AI asistenta po 90 dnech, hovory po roce (R-118, migrace 116).
     const outreach = await purgeOutreachRetention().catch(() => null)
-    return NextResponse.json({ success: true, ...result, memory, outreach })
+    // E-maily od robota po 12 měsících (R-120, migrace 119).
+    const outreachEmails = await purgeOutreachEmails().catch(() => null)
+    return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails })
   } catch (e) {
     console.error('cron.client-retention: úklid selhal', { error: e instanceof Error ? e.message : 'unknown' })
     return NextResponse.json({ success: false, error: 'Retention failed' }, { status: 500 })

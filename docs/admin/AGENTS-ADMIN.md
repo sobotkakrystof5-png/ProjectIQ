@@ -451,7 +451,9 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/leads` | `N8N_API_KEY` | Leady z n8n chatbota → Hovory |
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
 | `GET /api/google/connect`, `GET /api/google/callback` | session (kontrola v route) + `state` a PKCE v HttpOnly cookie | Propojení Google Kalendáře pro schůzky s Meet (R-114, DECISIONS #035). Obnovovací token zašifrovaný `GOOGLE_TOKEN_KEY` v `admin_settings.google_oauth` |
-| `POST /api/public/outreach` | Bearer `GROWTH_OS_API_KEY` | Snímky obvolaných firem z Growth OS (vizeon-autopilot) → `outreach_leads`, fronta Hovory › Od asistenta (R-112). Dávka nejvýš 100 firem, tělo 256 kB, 60 požadavků/min, starší snímek novější nepřepíše, bez migrace 114 vrací 503 |
+| `POST /api/public/outreach` | Bearer `GROWTH_OS_API_KEY` | Snímky obvolaných firem z Growth OS (vizeon-autopilot) → `outreach_leads`, fronta Hovory › Od asistenta (R-112). Kontrakt v2 (R-120) navíc všechny hovory → `outreach_calls`, e-maily → `outreach_emails`, historii stavů a rešerši. Dávka nejvýš 100 firem, tělo 1 MB, 60 požadavků/min, starší snímek novější nepřepíše (ani jeho hovory), bez migrace 114 vrací 503, bez 119 uloží jako v1 |
+| `GET /api/public/outreach/handled` | Bearer `GROWTH_OS_API_KEY` | Zpětný kanál pro Growth OS (R-120): koho Kryštof převzal nebo odložil od `?since=` (podle `outreach_leads.admin_changed_at`, trigger z 119), nejvýš 500 vzestupně, bez jmen a kontaktů. 30/min, bez migrace 119 vrací 503 |
+| `GET /api/outreach/leads/[id]/nahled` | session | Náhled ukázky přes náš server: jen https z `navrhy.vizeon.cz` (`lib/admin/outreach-demo.ts`), bez přesměrování, jen PNG/JPEG/WebP do 2 MB |
 | `POST /api/public/outreach/reports` | Bearer `GROWTH_OS_API_KEY` | Denní reporty hovorů z Growth OS (R-118): čísla dne + řádek za hovor, přepis jen u spojených → `outreach_reports`, `outreach_calls` (migrace 116). Tělo 2 MB, 30 požadavků/min, upsert podle dne a kola / `external_id`, starší report novější nepřepíše, bez migrace 116 vrací 503. Kontrakt `types/outreach-report.ts` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
@@ -1223,11 +1225,17 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - AI přepis faktury **nikdy neblokuje** ruční uložení — bez `ANTHROPIC_API_KEY` musí appka fungovat dál
 - Částky v různých měnách (CZK/EUR) se **nikdy** nesčítají do jednoho čísla
 
-## AI asistent: kontakty, reporty a analýza z Growth OS (R-118)
+## AI asistent: kontakty, reporty a analýza z Growth OS (R-118, R-120)
 
 `/dashboard/ai-asistent` (menu Práce, ikona `Bot`) spojuje všechno z Growth OS. Pohled je v adrese:
 
-- **Kontakty** (výchozí) — tatáž fronta jako Hovory › Od asistenta (`OutreachQueue`, `outreach_leads`).
+- **Přehled** (výchozí, R-120) — dnešek a 7 dní z `outreach_calls` (vytočeno, zvedlo, souhlas, cena),
+  „Na tahu jste vy" (prvních 5 z fronty), cesta k zakázce za 30 dní z `outreach_leads`, poslední
+  hovory s odkazem na detail a Provoz (čerstvost dat z Growth OS, kredit Odoriku a ElevenLabs
+  z `stats.account` posledního reportu). Obnovuje se každých 30 s (`AutoRefresh`, jen viditelná karta).
+- **Kontakty** (`?pohled=kontakty&filtr=…&q=…`) — filtr „Na tahu" je fronta s akcemi (`OutreachQueue`),
+  ostatní (Ukázka odeslaná, Otevřeli, Odpověď a schůzka, Vyřízené, Všichni) seznam s odkazem na detail.
+  Hledá ve firmě, jménu, e-mailu, městě a v číslicích telefonu. Dál platí:
   Firma, která robotovi odsouhlasí ukázku, přijde hned (autopilot pouští synchronizaci v `post-call.yml`,
   D-105). Tlačítko „Poslat pozvánku na …" otevře `ScheduleMeetingDialog` s termínem od robota;
   úvod e-mailu navazuje na den hovoru (`defaultIntro(hasDemo, lastCallAt)`). Odeslání = Meet,
@@ -1244,4 +1252,28 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 Data: `lib/admin/outreach-reports.ts` (ingest, čtení, `purgeOutreachRetention` z cronu
 `client-retention`: přepisy 90 dní, hovory 12 měsíců). Historii dotáhne v autopilotu
 `npm run zakaziq:report -- --od RRRR-MM-DD`.
+
+### Detail klienta a kontrakt v2 (R-120)
+
+`/dashboard/ai-asistent/kontakt/[id]` (uuid z `outreach_leads`): Co dál (důvod ve frontě, termín jeho
+slovy, schůzka s „Připojit se", tlačítka `OutreachLeadActions` — stejná jako ve frontě), Kontakt,
+Ukázka (náhled přes `/api/outreach/leads/[id]/nahled`, kolikrát otevřel), Hovory (`CallCard`:
+shrnutí, co asistent zjistil, kritéria, přepis; **nahrávky ne**, stačí přepis),
+E-maily od asistenta (předmět, text, doručení/otevření/klik/odpověď), Časová osa
+(`buildTimeline`, čistá funkce), Proč jsme ho oslovili (rešerše) a Asistent (pokusy, cena, další
+hovor). Telefon: kontakt a ukázka, pak hovory, doplňky nakonec. Obnovuje se každých 30 s.
+
+**Ukládání:** snímek i report jdou přes `lib/admin/outreach-calls.ts` (`callsUpsertQuery`):
+chybějící hodnota nic nepřepíše (přepis, cena, shrnutí; prázdné pole jsonb taky ne), `result`
+vždy ten poslední. Hovory a e-maily ze snímku se uloží **jen když se uložil snímek** — starší
+snímek nevrátí „čeká" přes skutečný výsledek. Údaje v2 u firmy přepíše jen snímek v2.
+**Čtení** jde přes `to_jsonb(řádek)` (`lib/admin/outreach-crm.ts`), takže admin běží i bez migrace
+119. Zápis bez 119 spadne na `42703` a zopakuje se jako v1.
+
+**Zpětný kanál:** trigger `trg_outreach_leads_admin_changed` nastaví `admin_changed_at` při každé
+změně `handled_at`/`handled_reason` — z fronty, ze schůzky (`lib/admin/meetings.ts`) i z ručního SQL.
+Growth OS si to čte `GET /api/public/outreach/handled?since=`.
+
+**Úklid:** `purge_outreach_emails()` (e-maily po 12 měsících) volá cron `client-retention` vedle
+`purge_outreach_retention()`. Nahrávky ZakazIQ nečte ani neukládá.
 

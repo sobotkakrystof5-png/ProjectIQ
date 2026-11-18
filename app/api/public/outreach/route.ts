@@ -11,9 +11,12 @@ import { outreachPayloadSchema } from '@/types/outreach'
  * (GitHub Actions / Cloudflare) s klíčem `GROWTH_OS_API_KEY`; prohlížeč sem
  * nechodí, takže žádné CORS.
  *
- * 100 firem na dávku má i se shrnutím hovoru pod 256 kB.
+ * v1: 100 firem na dávku má i se shrnutím hovoru pod 256 kB.
+ * v2 (R-120): ke snímku jdou všechny hovory i s přepisem a e-maily s textem.
+ * Growth OS proto dělí dávky podle velikosti (pod 900 kB); hodinová
+ * synchronizace posílá hovory bez přepisu, přepis jde hned po hovoru.
  */
-const MAX_BODY_BYTES = 256 * 1024
+const MAX_BODY_BYTES = 1024 * 1024
 const ENDPOINT = 'growth_os_outreach'
 const RATE_LIMIT_WINDOW_MINUTES = 1
 // Jednorázové dotažení historie posílá desítky dávek za sebou.
@@ -64,7 +67,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let result
   try {
-    result = await ingestOutreachLeads(parsed.data.leads)
+    result = await ingestOutreachLeads(parsed.data.leads, parsed.data.version)
   } catch (err) {
     if ((err as { code?: string })?.code === '42P01') {
       return errorResponse(503, 'Databáze ještě nemá tabulku pro hovory od asistenta (migrace 114).')
@@ -76,15 +79,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const events = result.events
   for (const event of events.slice(0, MAX_NOTIFICATIONS)) {
     const { title, body } = notificationFor(event)
-    await createNotification({ type: 'outreach_lead', title, body, link: '/dashboard/ai-asistent' })
+    const link = event.leadId ? `/dashboard/ai-asistent/kontakt/${event.leadId}` : '/dashboard/ai-asistent?pohled=kontakty'
+    await createNotification({ type: 'outreach_lead', title, body, link })
   }
   if (events.length > MAX_NOTIFICATIONS) {
     await createNotification({
       type: 'outreach_lead',
       title: `Dalších ${events.length - MAX_NOTIFICATIONS} firem od asistenta čeká na vás`,
-      link: '/dashboard/ai-asistent',
+      link: '/dashboard/ai-asistent?pohled=kontakty',
     })
   }
 
-  return NextResponse.json({ success: true, received: result.received, saved: result.saved }, { status: 200 })
+  return NextResponse.json(
+    { success: true, received: result.received, saved: result.saved, calls: result.calls, emails: result.emails },
+    { status: 200 },
+  )
 }

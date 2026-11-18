@@ -1,16 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import Link from 'next/link'
 import { ChevronDown, ChevronRight, ExternalLink, Phone } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { SECTION_LABEL } from '@/components/admin/card'
-import { toast } from '@/components/ui/toast'
 import { ContactActions } from '@/components/admin/contact-actions'
-import { dismissOutreachLead, takeOverOutreachLead, undoDismissOutreachLead } from '@/app/outreach-actions'
-import { ScheduleMeetingDialog, type MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
+import { OutreachLeadActions } from '@/components/admin/outreach-lead-actions'
+import type { MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
 import { formatWhen, queueReason, type OutreachQueueRow } from '@/lib/admin/outreach-view'
+import { adminDemoHref } from '@/lib/admin/outreach-demo'
 import { cn } from '@/lib/utils'
 
 /**
@@ -79,36 +78,8 @@ function OutreachItem({
   open: boolean
   onToggle: () => void
 }) {
-  const router = useRouter()
-  const [pending, start] = useTransition()
-  const [meetingOpen, setMeetingOpen] = useState(false)
   const reason = queueReason(row, now)
   const detailId = `outreach-${row.id}`
-
-  const prevzit = () =>
-    start(async () => {
-      const result = await takeOverOutreachLead(row.id)
-      if (!result.ok) {
-        toast.error(result.error)
-        return
-      }
-      toast.success(row.callbackAt ? 'Převzato. Hovor je v kalendáři.' : 'Převzato do Hovorů.')
-      router.push(`/dashboard/calls?lead=${result.leadId}`)
-    })
-
-  const nezajem = () =>
-    start(async () => {
-      await dismissOutreachLead(row.id)
-      toast.success(`${row.company} je mimo frontu.`, {
-        description: 'Kdyby odpověděl na e-mail, vrátí se sám.',
-        undo: () =>
-          start(async () => {
-            await undoDismissOutreachLead(row.id)
-            router.refresh()
-          }),
-      })
-      router.refresh()
-    })
 
   return (
     <li className="overflow-hidden rounded-box border border-navy-100 bg-surface">
@@ -159,7 +130,7 @@ function OutreachItem({
           {(row.demoUrl || row.website) && (
             <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
               {row.demoUrl && (
-                <ExternalA href={row.demoUrl}>
+                <ExternalA href={adminDemoHref(row.demoUrl)}>
                   Ukázka
                   {row.demoViews > 0 ? ` · otevřel ${row.demoViews}×` : ' · zatím neotevřel'}
                 </ExternalA>
@@ -194,31 +165,20 @@ function OutreachItem({
             {row.emailRepliedAt && <Line label="Odpověděl" value={formatWhen(row.emailRepliedAt, now)} />}
           </dl>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-navy-100 pt-3">
-            <Button type="button" onClick={() => setMeetingOpen(true)} disabled={pending}>
-              {/* Termín, který si klient s robotem domluvil, je v okně předvyplněný — stačí potvrdit. */}
-              {row.callbackAt && Date.parse(row.callbackAt) > now.getTime()
-                ? `Poslat pozvánku na ${formatWhen(row.callbackAt, now)}`
-                : 'Domluvit schůzku'}
-            </Button>
-            <Button type="button" variant="outline" onClick={prevzit} disabled={pending}>
-              Převzít do Hovorů
-            </Button>
-            <Button type="button" variant="ghost" onClick={nezajem} disabled={pending}>
-              Nemá zájem
-            </Button>
-          </div>
+          <OutreachLeadActions
+            row={row}
+            nowIso={nowIso}
+            meeting={meeting}
+            className="flex flex-wrap items-center gap-2 border-t border-navy-100 pt-3"
+          />
+          <Link
+            href={`/dashboard/ai-asistent/kontakt/${row.id}`}
+            className="inline-flex min-h-11 items-center gap-1 self-start text-sm font-medium text-navy-700 underline-offset-4 hover:underline"
+          >
+            Celý detail: hovory, ukázka, e-maily
+            <ChevronRight size={16} strokeWidth={1.5} aria-hidden="true" />
+          </Link>
         </div>
-      )}
-
-      {meetingOpen && (
-        <ScheduleMeetingDialog
-          row={row}
-          nowIso={nowIso}
-          readiness={meeting}
-          open={meetingOpen}
-          onOpenChange={setMeetingOpen}
-        />
       )}
     </li>
   )

@@ -3,22 +3,29 @@ import { ChevronLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
-import { OutreachQueue } from '@/components/admin/outreach-queue'
 import { ReportDayDetail, ReportDaysList, dayLabel } from '@/components/admin/ai-asistent/reports-view'
 import { AnalysisView } from '@/components/admin/ai-asistent/analysis-view'
-import { countOutreachQueue, loadOutreachQueue } from '@/lib/admin/outreach'
+import { OverviewView } from '@/components/admin/ai-asistent/overview-view'
+import { ContactsView } from '@/components/admin/ai-asistent/contacts-view'
+import { AutoRefresh } from '@/components/admin/ai-asistent/auto-refresh'
+import { countOutreachQueue } from '@/lib/admin/outreach'
+import { OVERVIEW_FUNNEL_DAYS, leadIdsByExternal, loadContacts, loadOverview } from '@/lib/admin/outreach-crm'
+import { parseContactFilter } from '@/lib/admin/outreach-crm-view'
 import { loadAnalysisInput, loadReportDay, loadReportDays } from '@/lib/admin/outreach-reports'
 import { analyze, buildImprovementPrompt } from '@/lib/admin/outreach-analysis'
 import { googleStatus } from '@/lib/admin/google/oauth'
 import { vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
 import { getPragueTodayISO } from '@/lib/prague-time'
 
-// AI asistent (R-118): všechno z Growth OS na jednom místě.
-//  - Kontakty: komu je na tahu Kryštof (souhlas s ukázkou, zavolat jindy…),
-//    e-mail s ukázkou, termínem a Meetem jedním klikem (R-114).
+// AI asistent (R-118, R-120): všechno z Growth OS na jednom místě.
+//  - Přehled: dnešek a týden, kdo je na tahu, cesta k zakázce, poslední
+//    hovory a provoz (čerstvost dat, kredity Odoriku a ElevenLabs).
+//  - Kontakty: fronta „Na tahu" s akcemi (R-112, R-114) a všechny firmy
+//    s filtry a hledáním; klik vede na detail klienta.
 //  - Reporty: den po dni, co robot nahovořil.
 //  - Analýza: úspěšnost, kde hovory váznou a prompt pro Claude Code.
-// Pohled, den i období jsou v adrese, takže přežijí reload i Zpět.
+// Pohled, filtr, den i období jsou v adrese, takže přežijí reload i Zpět.
+// Přehled a Kontakty se obnovují každých 30 s, dokud je karta vidět.
 
 const PATH = '/dashboard/ai-asistent'
 const PERIODS = [7, 30, 90] as const
@@ -35,8 +42,10 @@ function href(params: Record<string, string | null>): string {
 
 export default async function AiAssistantPage(props: { searchParams: Promise<Search> }) {
   const searchParams = await props.searchParams
-  const view = one(searchParams.pohled) ?? 'kontakty'
-  if (!['kontakty', 'reporty', 'analyza'].includes(view)) notFound()
+  const view = one(searchParams.pohled) ?? 'prehled'
+  if (!['prehled', 'kontakty', 'reporty', 'analyza'].includes(view)) notFound()
+  const filter = parseContactFilter(one(searchParams.filtr))
+  const q = (one(searchParams.q) ?? '').trim().slice(0, 80)
 
   const den = one(searchParams.den)
   // Tvar i skutečné datum: „2026-13-45" by tvarem prošlo a Intl by na něm spadl.
@@ -51,17 +60,33 @@ export default async function AiAssistantPage(props: { searchParams: Promise<Sea
   const period = (PERIODS as readonly number[]).includes(periodRaw) ? periodRaw : 30
 
   const now = new Date()
-  const [queueCount, queue, google, days, day, analysisInput] = await Promise.all([
+  const [queueCount, overview, contacts, google, days, day, analysisInput] = await Promise.all([
     countOutreachQueue(),
-    view === 'kontakty' ? loadOutreachQueue(now) : null,
+    view === 'prehled' ? loadOverview(now) : null,
+    view === 'kontakty' ? loadContacts(filter, q, now) : null,
     view === 'kontakty' ? googleStatus() : null,
     view === 'reporty' && !reportDate ? loadReportDays() : null,
     view === 'reporty' && reportDate ? loadReportDay(reportDate).catch(() => null) : null,
     view === 'analyza' ? loadAnalysisInput(period) : null,
   ])
+  const leadHrefs = day
+    ? new Map(
+        [...(await leadIdsByExternal(day.calls.map((c) => c.leadId)))].map(([ext, id]) => [
+          ext,
+          `${PATH}/kontakt/${id}`,
+        ]),
+      )
+    : undefined
 
   const tabs = [
-    { key: 'kontakty', label: 'Kontakty', href: href({}), active: view === 'kontakty', count: queueCount ?? undefined },
+    { key: 'prehled', label: 'Přehled', href: href({}), active: view === 'prehled' },
+    {
+      key: 'kontakty',
+      label: 'Kontakty',
+      href: href({ pohled: 'kontakty' }),
+      active: view === 'kontakty',
+      count: queueCount ?? undefined,
+    },
     { key: 'reporty', label: 'Reporty', href: href({ pohled: 'reporty' }), active: view === 'reporty' },
     { key: 'analyza', label: 'Analýza', href: href({ pohled: 'analyza' }), active: view === 'analyza' },
   ]
@@ -70,15 +95,28 @@ export default async function AiAssistantPage(props: { searchParams: Promise<Sea
     <PageShell width="default" className="gap-6">
       <PageHeader
         title="AI asistent"
-        subtitle="Koho robot obvolal, kdo chce ukázku nebo hovor a jak se robotovi daří."
+        subtitle="Koho asistent obvolal, kdo chce ukázku nebo hovor a jak se mu daří."
         subtitleFont="sans"
       />
       <PillNav label="Pohled" variant="segmented" items={tabs} />
 
+      {(view === 'prehled' || view === 'kontakty') && <AutoRefresh seconds={30} />}
+
+      {view === 'prehled' &&
+        overview &&
+        (overview.available ? (
+          <OverviewView data={overview} nowIso={now.toISOString()} funnelDays={OVERVIEW_FUNNEL_DAYS} />
+        ) : (
+          <p className="text-sm text-quiet">Přehled se ukáže, až databáze dostane migraci 114.</p>
+        ))}
+
       {view === 'kontakty' &&
-        (queue?.available ? (
-          <OutreachQueue
-            rows={queue.rows}
+        contacts &&
+        (contacts.available ? (
+          <ContactsView
+            data={contacts}
+            filter={filter}
+            q={q}
             nowIso={now.toISOString()}
             meeting={{
               google: google?.configured === true && google.connected,
@@ -108,7 +146,7 @@ export default async function AiAssistantPage(props: { searchParams: Promise<Sea
           </Link>
           <h2 className="text-xl font-semibold capitalize text-ink">{dayLabel(reportDate)}</h2>
           {day ? (
-            <ReportDayDetail report={day} />
+            <ReportDayDetail report={day} leadHrefs={leadHrefs} />
           ) : (
             <p className="text-sm text-quiet">Za tenhle den report není.</p>
           )}

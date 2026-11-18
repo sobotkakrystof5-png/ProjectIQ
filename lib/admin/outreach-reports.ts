@@ -1,6 +1,7 @@
 import 'server-only'
 import { adminDb } from '@/lib/admin/db'
-import type { ReportCallPayload, ReportPayload } from '@/types/outreach-report'
+import type { ReportPayload } from '@/types/outreach-report'
+import { callRecord, callsUpsertQuery } from '@/lib/admin/outreach-calls'
 import type { AnalysisCall, DayReport, DayTrend } from '@/lib/admin/outreach-analysis'
 
 /**
@@ -42,94 +43,46 @@ function json<T>(v: unknown, fallback: T): T {
   return v as T
 }
 
-const CALL_COLUMNS = [
-  'external_id', 'lead_external_id', 'company_name', 'report_date', 'round', 'called_at', 'result',
-  'duration_s', 'who_hung_up', 'hangup_at_s', 'intro_s', 'termination_reason', 'chance_level',
-  'chance_why', 'chance_action', 'summary', 'objections', 'failed_criteria', 'segment', 'industry',
-  'opening_variant', 'transcript',
-] as const
-
-const CALL_RECORD = `
-  external_id text, lead_external_id text, company_name text, report_date date, round integer,
-  called_at timestamptz, result text, duration_s numeric, who_hung_up text, hangup_at_s numeric,
-  intro_s numeric, termination_reason text, chance_level text, chance_why jsonb, chance_action text,
-  summary text, objections jsonb, failed_criteria jsonb, segment text, industry text,
-  opening_variant text, transcript jsonb`
-
-function callRecord(date: string, c: ReportCallPayload): Record<(typeof CALL_COLUMNS)[number], unknown> {
-  return {
-    external_id: c.external_id,
-    lead_external_id: c.lead_external_id,
-    company_name: c.company,
-    report_date: date,
-    round: c.round ?? null,
-    called_at: c.at ? new Date(c.at).toISOString() : null,
-    result: c.result,
-    duration_s: c.duration_s ?? null,
-    who_hung_up: c.who_hung_up ?? null,
-    hangup_at_s: c.hangup_at_s ?? null,
-    intro_s: c.intro_s ?? null,
-    termination_reason: c.termination_reason ?? null,
-    chance_level: c.chance?.level ?? null,
-    chance_why: c.chance?.why ?? [],
-    chance_action: c.chance?.action ?? null,
-    summary: c.summary ?? null,
-    objections: c.objections,
-    failed_criteria: c.failed_criteria,
-    segment: c.segment ?? null,
-    industry: c.industry ?? null,
-    opening_variant: c.opening_variant ?? null,
-    transcript: c.transcript && c.transcript.length ? c.transcript : null,
-  }
-}
-
-// Přepis staršího než 90 dní (úklid ho už smazal, nebo by ho smazal) se
-// pozdním reportem ani dotažením historie neuloží.
-const TRANSCRIPT_IN_RETENTION = `CASE WHEN report_date < (now() AT TIME ZONE 'Europe/Prague')::date - 90
-  THEN NULL ELSE transcript END`
-
-/** Uloží report a jeho hovory jedním požadavkem (transakce). Vrací počet uložených hovorů. */
+/**
+ * Uloží report a jeho hovory jedním požadavkem (transakce). Vrací počet
+ * uložených hovorů. Bez migrace 119 se hovory uloží bez údajů v2.
+ */
 export async function ingestOutreachReport(payload: ReportPayload): Promise<{ calls: number }> {
   const r = payload.report
-  // Stejný hovor dvakrát v jedné dávce by ON CONFLICT odmítl — vyhrává poslední.
-  const byId = new Map(payload.calls.map((c) => [c.external_id, c]))
-  const calls = [...byId.values()].map((c) => callRecord(r.date, c))
+  const calls = payload.calls.map((c) =>
+    callRecord(c, { leadExternalId: c.lead_external_id, company: c.company, date: r.date }),
+  )
+  const reportQuery = {
+    text: `
+      INSERT INTO outreach_reports (report_date, round, subject, stats, rounds, segments, criteria, generated_at)
+      VALUES ($1::date, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::timestamptz)
+      ON CONFLICT (report_date, round) DO UPDATE SET
+        subject = EXCLUDED.subject, stats = EXCLUDED.stats, rounds = EXCLUDED.rounds,
+        segments = EXCLUDED.segments, criteria = EXCLUDED.criteria,
+        generated_at = EXCLUDED.generated_at, received_at = now()
+      WHERE outreach_reports.generated_at <= EXCLUDED.generated_at`,
+    params: [
+      r.date,
+      r.round ?? 0,
+      r.subject,
+      JSON.stringify(r.stats),
+      JSON.stringify(r.rounds),
+      JSON.stringify(r.segments),
+      JSON.stringify(r.criteria),
+      new Date(r.generated_at).toISOString(),
+    ],
+  }
 
-  const [, saved] = await adminDb.batch([
-    {
-      text: `
-        INSERT INTO outreach_reports (report_date, round, subject, stats, rounds, segments, criteria, generated_at)
-        VALUES ($1::date, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::timestamptz)
-        ON CONFLICT (report_date, round) DO UPDATE SET
-          subject = EXCLUDED.subject, stats = EXCLUDED.stats, rounds = EXCLUDED.rounds,
-          segments = EXCLUDED.segments, criteria = EXCLUDED.criteria,
-          generated_at = EXCLUDED.generated_at, received_at = now()
-        WHERE outreach_reports.generated_at <= EXCLUDED.generated_at`,
-      params: [
-        r.date,
-        r.round ?? 0,
-        r.subject,
-        JSON.stringify(r.stats),
-        JSON.stringify(r.rounds),
-        JSON.stringify(r.segments),
-        JSON.stringify(r.criteria),
-        new Date(r.generated_at).toISOString(),
-      ],
-    },
-    {
-      text: `
-        INSERT INTO outreach_calls (${CALL_COLUMNS.join(', ')})
-        SELECT ${CALL_COLUMNS.map((c) => (c === 'transcript' ? TRANSCRIPT_IN_RETENTION : c)).join(', ')}
-          FROM jsonb_to_recordset($1::jsonb) AS x(${CALL_RECORD})
-        ON CONFLICT (external_id) DO UPDATE SET
-          ${CALL_COLUMNS.filter((c) => c !== 'external_id' && c !== 'transcript').map((c) => `${c} = EXCLUDED.${c}`).join(',\n          ')},
-          transcript = EXCLUDED.transcript,
-          received_at = now()
-        RETURNING external_id`,
-      params: [JSON.stringify(calls)],
-    },
-  ])
-  return { calls: (saved as unknown[]).length }
+  const run = async (extras: boolean) => {
+    const [, saved] = await adminDb.batch([reportQuery, callsUpsertQuery(calls, { extras })])
+    return { calls: (saved as unknown[]).length }
+  }
+  try {
+    return await run(true)
+  } catch (err) {
+    if ((err as { code?: string })?.code !== '42703') throw err
+    return run(false)
+  }
 }
 
 // ─── Čtení ───────────────────────────────────────────────────────────────────

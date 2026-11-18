@@ -1,7 +1,8 @@
 import { z } from 'zod'
+import { reportCallSchema } from '@/types/outreach-report'
 
 /**
- * Kontrakt s Growth OS (repozitář vizeon-autopilot), R-112.
+ * Kontrakt s Growth OS (repozitář vizeon-autopilot), R-112, v2 R-120.
  *
  * Growth OS posílá **snímky stavu** firem, které obvolává: jeden prvek
  * `leads[]` = jedna firma z jeho databáze D1 se vším, co o ní teď ví.
@@ -10,6 +11,11 @@ import { z } from 'zod'
  *
  * Bez `.strict()`: když Growth OS přidá pole (vyšší `version`), starší
  * ZakazIQ ho tiše zahodí a funguje dál.
+ *
+ * **v2** (R-120) přidává k firmě všechny hovory (`calls[]`), e-maily
+ * (`email_log[]`), historii stavů, rešerši a víc o ukázce. Všechno je
+ * volitelné: snímek v1 projde beze změny. Pole, které ve snímku chybí,
+ * v ZakazIQ nic nepřepíše (přepis hovoru se drží, dokud nepřijde nový).
  */
 
 const isoDate = z
@@ -55,6 +61,33 @@ export const OUTREACH_STATUSES = [
 
 export type OutreachStatus = (typeof OUTREACH_STATUSES)[number]
 
+/** Hovor ve snímku firmy: jako v reportu, jen bez firmy (ta je nad ním). */
+export const snapshotCallSchema = reportCallSchema.omit({ lead_external_id: true, company: true })
+
+/** Jeden e-mail, který robot firmě poslal (v2). */
+export const snapshotEmailSchema = z.object({
+  /** `vizeon-email:<id v D1>`, nikdy se nemění. */
+  external_id: z.string().trim().min(1).max(100),
+  /** cold, demo, reminder, followup — neznámý druh se uloží, jak přišel. */
+  kind: z.string().trim().min(1).max(20),
+  status: optText(20),
+  subject: optText(300),
+  /** Náš text e-mailu (jen text, žádné HTML). */
+  text: optText(8000),
+  scheduled_for: optDate,
+  sent_at: optDate,
+  delivered_at: optDate,
+  opened_at: optDate,
+  clicked_at: optDate,
+  replied_at: optDate,
+  bounced_at: optDate,
+  opens: z.number().int().min(0).max(10_000).default(0),
+  clicks: z.number().int().min(0).max(10_000).default(0),
+})
+
+export type SnapshotCall = z.infer<typeof snapshotCallSchema>
+export type SnapshotEmail = z.infer<typeof snapshotEmailSchema>
+
 export const outreachLeadSchema = z.object({
   external_id: z.string().trim().min(1).max(100),
   updated_at: isoDate,
@@ -69,6 +102,13 @@ export const outreachLeadSchema = z.object({
   website: webUrl(false).nullish(),
   industry: optText(120),
   city: optText(120),
+  /** v2: segment importu (remeslnik, maser…) a dávka, ze které firma přišla. */
+  segment: optText(40),
+  source_batch: optText(120),
+  /** v2: kdy robot zavolá znovu (null = už ne). */
+  next_call_after: optDate,
+  /** v2: schůzka, kterou si klient domluvil přímo s robotem. */
+  meeting_at: optDate,
   // Neznámý stav nesmí shodit celý snímek — nová verze Growth OS může přidat stav.
   status: z.string().trim().min(1).max(40),
   do_not_call: z.boolean().default(false),
@@ -89,6 +129,13 @@ export const outreachLeadSchema = z.object({
       built_at: optDate,
       views: z.number().int().min(0).max(100_000).default(0),
       first_viewed_at: optDate,
+      /** v2 */
+      slug: z.string().trim().regex(/^[a-z0-9][a-z0-9-]{0,99}$/, 'neplatný slug').nullish(),
+      /** v2: obrázek náhledu (https, admin ho stáhne přes svůj server). */
+      preview_url: webUrl(true).nullish(),
+      last_viewed_at: optDate,
+      /** v2: nejdelší prohlížení v sekundách. */
+      max_view_s: z.number().int().min(0).max(86_400).nullish(),
     })
     .nullish(),
   emails: z
@@ -100,10 +147,30 @@ export const outreachLeadSchema = z.object({
       replied_at: optDate,
     })
     .nullish(),
+  /** v2: všechny hovory firmy, nejnovější nahoře nebo dole, na pořadí nezáleží. */
+  calls: z.array(snapshotCallSchema).max(30).nullish(),
+  /** v2: všechny e-maily, které robot firmě poslal. */
+  email_log: z.array(snapshotEmailSchema).max(30).nullish(),
+  /** v2: historie stavů z D1 (`events` typu lead.status). */
+  status_history: z
+    .array(z.object({ at: isoDate, status: z.string().trim().min(1).max(40) }))
+    .max(60)
+    .nullish(),
+  /** v2: proč jsme firmu oslovili (rešerše webu před studeným e-mailem). */
+  research: z
+    .object({
+      angle: optText(40),
+      hook: optText(500),
+      findings: z.array(z.string().trim().max(300)).max(10).default([]),
+    })
+    .nullish(),
 })
 
 /** Strop jedné dávky. Growth OS posílá po kouscích, ať je tělo malé. */
 export const OUTREACH_MAX_BATCH = 100
+
+/** Nejvyšší verze kontraktu, které tenhle ZakazIQ rozumí. Vyšší projde, nová pole zahodí. */
+export const OUTREACH_CONTRACT_VERSION = 2
 
 export const outreachPayloadSchema = z.object({
   version: z.number().int().min(1),

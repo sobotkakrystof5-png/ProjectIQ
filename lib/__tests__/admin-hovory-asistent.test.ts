@@ -109,7 +109,7 @@ describe('příjem snímků z Growth OS', () => {
   it('uloží firmu, podruhé nic nezdvojí a ohlásí ji jen jednou', async () => {
     const first = await ingestOutreachLeads([lead()])
     expect(first.saved).toBe(1)
-    expect(first.events).toEqual([{ kind: 'do-fronty', company: 'Topenářství Testové', reason: expect.any(String) }])
+    expect(first.events).toMatchObject([{ kind: 'do-fronty', company: 'Topenářství Testové', reason: expect.any(String), leadId: expect.any(String) }])
 
     const again = await ingestOutreachLeads([lead({ updated_at: '2026-11-17T08:05:00Z' })])
     expect(again.saved).toBe(1)
@@ -143,7 +143,7 @@ describe('příjem snímků z Growth OS', () => {
     const viewed = await ingestOutreachLeads([
       lead({ updated_at: '2026-11-17T09:00:00Z', status: 'demo_viewed', last_call: null, demo: { ...demo, views: 2 } }),
     ])
-    expect(viewed.events).toEqual([{ kind: 'otevrel-ukazku', company: 'Topenářství Testové' }])
+    expect(viewed.events).toMatchObject([{ kind: 'otevrel-ukazku', company: 'Topenářství Testové' }])
   })
 
   it('kontrakt odmítne odkaz na ukázku bez https a telefon v jiném tvaru', () => {
@@ -245,7 +245,7 @@ describe('akce Kryštofa', () => {
     const reply = await ingestOutreachLeads([
       lead({ updated_at: '2026-11-17T10:00:00Z', status: 'replied', emails: { replied_at: '2026-11-17T09:55:00Z' } }),
     ])
-    expect(reply.events).toEqual([{ kind: 'odpovedel', company: 'Topenářství Testové' }])
+    expect(reply.events).toMatchObject([{ kind: 'odpovedel', company: 'Topenářství Testové' }])
     expect((await loadOutreachQueue(NOW)).rows.map((r) => r.company)).toEqual(['Topenářství Testové'])
   })
 })

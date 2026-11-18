@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-17 · **Hovory od AI asistenta z Growth OS jdou do adminu** (R-112).
+> **Poslední aktualizace:** 2026-11-18 · **AI asistent jako CRM** (R-120): Přehled, Kontakty
+> s filtry a detail klienta (ukázka, všechny hovory s přepisem, e-maily, časová osa),
+> kontrakt v2 s Growth OS a zpětný kanál, migrace 119. Necommitnuto, nenasazeno; Growth OS má
+> zadání v `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`.
+>
+> Předchozí: 2026-11-17 · **Hovory od AI asistenta z Growth OS jdou do adminu** (R-112).
 > Growth OS posílá stav obvolaných firem na `/api/public/outreach`, v Hovorech přibyla záložka
 > „Od asistenta" (komu zavolat a proč, převzetí do Hovorů s plánovaným hovorem). Krok 1 a 2
 > z `docs/admin/GROWTH-OS-PLAN.md` jsou v kódu na větvi `admin/growth-hovory`, strana Growth OS
@@ -1168,9 +1173,41 @@ reference a souhlas jen u 9–10. Druhý dotaz po 2–3 měsících („přinesl
 Zakázka zapsaná rovnou jako hotová (`createProject`) dotazník neposílá, často jde o starou práci.
 Upravuje R-102 bod 3 (souhlas má tři úrovně). Bezpečnost `.claude/security/DECISIONS.md` #038.
 
+
+### R-120 · AI asistent jako CRM: detail klienta a kontrakt v2 s Growth OS (2026-11-18)
+**Rozhodnutí:** (1) Sekce AI asistent má čtyři pohledy: **Přehled** (výchozí), Kontakty, Reporty,
+Analýza, a **detail klienta** `/dashboard/ai-asistent/kontakt/[id]` se vším z Growth OS. (2) Growth OS
+posílá **kontrakt v2**: ke snímku firmy všechny hovory (s `conversation_id`, cenou, daty z hovoru
+a kritérii), e-maily s textem, historii stavů a rešerši; **hned po každém hovoru** jednu firmu
+s přepisem, hodinově bez přepisu. Chybějící hodnota v ZakazIQ nic nepřepíše. (3) **Nahrávky ne,
+stačí přepis** (Kryštof 2026-11-18: „nepotřebuji nahrávky, stačí mi přepis hovoru") — ZakazIQ do
+ElevenLabs nesahá, `conversation_id` je jen pro dohledání. (4) **Náhled ukázky** jen z `navrhy.vizeon.cz`, přes náš server.
+(5) **Zpětný kanál je pull:** Growth OS se ptá `GET /api/public/outreach/handled`, koho Kryštof
+převzal nebo odložil; ZakazIQ nikam nevolá. Odložení „nemá zájem" robot bere **vratně**, ne jako
+nevratné „nevolat". (6) Odorik je jen SIP linka; skutečnou cenu a kredit má dodat Growth OS z API
+Odoriku, ZakazIQ jen ukazuje (`cost_source` odorik/odhad).
+**Proč:** Kryštof 2026-11-18: „kontakty, kam jsem poslal ukázku, se okamžitě propíšou do admina;
+když kliknu na klienta, uvidím ukázku, všechny údaje a detail hovoru… kompletní dashboard". Snímek
+v1 nesl jen poslední hovor a hovory chodily až po kole, takže detail nešel složit. Náhled ukázky
+přes proxy drží CSP beze změny. Přehrávání nahrávek bylo připravené, ale vypuštěné — bez potřeby by
+přineslo další tajemství a další přístup k hlasu lidí, kterým se volalo nevyžádaně. Pull je jednodušší než push: ZakazIQ nemusí
+držet adresu a klíč autopilota a výpadek se dožene sám.
+**Důsledek:** migrace 119 (aditivní; bez ní v2 uloží jako v1). Hovory se ukládají jedinou cestou
+`lib/admin/outreach-calls.ts` pro snímek i report. Nové čtení dat z Growth OS přes `to_jsonb(řádek)`,
+ať admin běží i bez nových sloupců. Odkaz na ukázku z adminu nese `?od=admin` (Growth OS ho nemá
+počítat). Strana Growth OS je zadání `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`,
+tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozšiřuje R-112 a R-118.
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **AI asistent jako CRM (R-120) — propojit s Growth OS:** ~~migrace 119~~ na produkci
+  (Kryštof 2026-11-18), ~~merge a deploy~~ (větev `admin/ai-asistent-crm` → `main`). Zbývá:
+  (3) zadání
+  `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md` v Claude Code v repu autopilota
+  (kontrakt v2, odeslání hned po hovoru, Resend webhook, měření ukázky, náhled, Odorik, zpětný kanál),
+  (4) projít na produkci Přehled, Kontakty a detail na 390 a 1280 px. **Nic z toho nikdo neviděl
+  na skutečných datech** · od 2026-11-18
 
 - [ ] **Koncepty faktur (R-117) — nasadit a projít naživo:** kód na větvi `admin/faktury-koncepty` (worktree `../ZakazIQ-faktury`), na produkci není. Migrace 117 je podle Kryštofa na produkci, merge do `main` 2026-11-17. Zbývá průchod: zakázka → Hotovo → do 15 s koncept v Ke schválení → doplnit adresu → Schválit a poslat na vlastní e-mail → PDF v příloze, číslo v řadě; Zpět během 10 s nic nepošle; pravidelná faktura se dnem = dnešek se objeví až po běhu cronu. **Odeslání přes Resend s PDF nikdo nezkusil naživo** · od 2026-11-17
 - [ ] **Dotazník R-119 — projít naživo:** migrace 118 je na produkci (pustil Kryštof 2026-11-18)
@@ -1474,6 +1511,40 @@ Upravuje R-102 bod 3 (souhlas má tři úrovně). Bezpečnost `.claude/security/
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
+### 2026-11-18 (AI asistent jako CRM — R-120)
+- **feat** Sekce AI asistent: nový **Přehled** (dnešek a 7 dní, „Na tahu jste vy", cesta k zakázce za
+  30 dní, poslední hovory, provoz — čerstvost dat z Growth OS, kredit Odoriku a ElevenLabs), **Kontakty**
+  s filtry (Na tahu, Ukázka odeslaná, Otevřeli, Odpověď a schůzka, Vyřízené, Všichni) a hledáním
+  i podle číslic telefonu, **detail klienta** `/dashboard/ai-asistent/kontakt/[id]` (co dál, kontakt,
+  ukázka s náhledem, všechny hovory s přepisem, sesbíranými daty a kritérii, e-maily od
+  asistenta, časová osa, rešerše). Přehled, Kontakty a detail se obnovují každých 30 s. Oznámení ve
+  zvonku vedou na detail. Odkazy na ukázku z adminu nesou `?od=admin`. Soubory:
+  `app/dashboard/ai-asistent/{page.tsx,kontakt/[id]/}`, `components/admin/ai-asistent/{overview-view,contacts-view,contact-detail,call-card,auto-refresh}.tsx`,
+  `components/admin/outreach-lead-actions.tsx`, `lib/admin/{outreach-crm,outreach-crm-view,outreach-calls,outreach-demo}.ts`.
+- **feat** Kontrakt v2 s Growth OS (zpětně kompatibilní): ke snímku firmy všechny hovory, e-maily,
+  historie stavů, rešerše a víc o ukázce; tělo 1 MB. Chybějící hodnota nic nepřepíše, starší snímek
+  nevrátí hovoru starý výsledek. Report smí nést tatáž pole a `stats.account` / `costCzk`. Zpětný
+  kanál `GET /api/public/outreach/handled`, náhled `/api/outreach/leads/[id]/nahled` (jen
+  navrhy.vizeon.cz). Přehrávání nahrávek bylo hotové, ale na přání Kryštofa vypuštěné — stačí přepis. Soubory:
+  `types/outreach{,-report}.ts`, `lib/admin/outreach{,-reports}.ts`, `app/api/public/outreach/{route.ts,handled/}`,
+  `app/api/outreach/`, cron `client-retention` (`purge_outreach_emails`).
+- **db** Migrace 119 `ai_asistent_crm` (aplikována: produkce, podle Kryštofa 2026-11-18; agent neověřil).
+- **fix** Bezpečnostní kontrola před nasazením (`web-security-review`): náhled ukázky četl celou
+  odpověď do paměti před kontrolou velikosti — teď čte se stropem 2 MB. `.claude/security/AUDIT-LOG.md`.
+- **docs** Zadání pro Claude Code v Growth OS: `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`
+  (kontrakt v2, okamžité odeslání po hovoru, Resend webhook, měření ukázky, náhled, ceny z Odoriku,
+  zpětný kanál). `docs/admin/GROWTH-OS-PLAN.md` (kontrakt v2, kroky 6 a 9), `docs/admin/AGENTS-ADMIN.md`,
+  `.claude/security/DECISIONS.md` #039, `STATE.md`.
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-ai-asistent-crm.test.ts` (16 testů nad
+  PGlite se SQL 114, 116 a 119 včetně dvojího běhu 119 a databáze bez 119), plná sada 1401/1403
+  (selhávají jen známé `ws-schema` mezera po 113 a `ws-email` pevné datum), `npm run build`
+  (napoprvé ho zastavila známá hláška Next o zranitelnosti, podruhé prošel). Vzhled na dočasné stránce
+  s vymyšlenými daty (Playwright, 390 a 1280 px): bez vodorovného posouvání, stránka smazaná. Agent
+  ElevenLabs „Vizeon hovory" přečtený přes MCP (jen nastavení): post-call webhook bez audia, agent se
+  hned představí jako AI. **Naživo s produkční databází, ElevenLabs
+  a Growth OS neověřeno.**
+- **decision** **R-120**, DECISIONS #039. Archiv: dny 2026-11-17 přesunuté do `archiv/2026-11.md`.
+
 ### 2026-11-18 (dotazník spokojenosti na jednu minutu — R-119)
 - **chore** **Na produkci** (2026-11-18): migraci 118 pustil Kryštof, merge `admin/dotaznik` → `main`
   fast-forward (`ae2cdb5` → `70abbed`, s ním i sekce AI asistent R-118), build `dpl_7vS8Z…` Ready
@@ -1507,100 +1578,4 @@ Upravuje R-102 bod 3 (souhlas má tři úrovně). Bezpečnost `.claude/security/
   118 a R-119 (117 a R-117/118 obsadila souběžná sezení).
 - **decision** **R-119**.
 
-### 2026-11-17 (sekce AI asistent — R-118)
-- **feat** Sekce **AI asistent** v menu Práce: Kontakty (fronta od robota, tlačítko „Poslat
-  pozvánku na …" s termínem od robota), Reporty den po dni s hovory a přepisy, Analýza
-  (trychtýř, kde hovory váznou, kdy lidé pokládají, kritéria, námitky, obory, test úvodu, den po
-  dni) a prompt pro Claude Code ke zkopírování. Úvod e-mailu navazuje na den hovoru. Soubory:
-  `app/dashboard/ai-asistent/`, `components/admin/ai-asistent/`, `lib/admin/{outreach-reports,outreach-analysis}.ts`,
-  `types/outreach-report.ts`, `app/api/public/outreach/reports/route.ts`, `lib/admin/meeting-email.ts`,
-  `components/admin/{outreach-queue,schedule-meeting-dialog}.tsx`, `lib/admin-nav.ts`,
-  cron `client-retention` (úklid přepisů). Migrace 116 (aplikována: produkce, podle Kryštofa 2026-11-17; agent ji neověřil).
-- **feat** Autopilot (větev `claude/zakaziq-admin-sync`, commit `842dcca`, nepushnuto, D-105):
-  report po každém kole a souhrn dne do ZakazIQ, `npm run zakaziq:report -- --od …` pro historii,
-  synchronizace hned po souhlasu (krok 4 v `post-call.yml`), zakrývání kontaktů ve volném textu.
-- **chore** Ověřeno: nové testy `lib/__tests__/admin-ai-asistent.test.ts` a
-  `app/api/public/outreach/reports/__tests__/route.test.ts` + dosavadní testy hovorů a schůzek
-  (46/46), `tsc`; v autopilotu 161/161 a payloady z produkční D1 (10.–18. 11., čteno jen ke čtení)
-  prošly Zod schématem ZakazIQ. **V prohlížeči neověřeno.**
-- **decision** **R-118**, DECISIONS #036.
-
-### 2026-11-17 (koncepty faktur a odeslání jedním kliknutím — R-117)
-- **fix** Proč faktura „po vyplnění e-mailu" neodcházela: odeslání šlo přes Gmail SMTP, který odmítal heslo (535 v logu Vercelu, naposledy 21:19 UTC). Opravuje už R-116 (`2cf1447`, Resend), naživo zatím nevyzkoušeno. Odesílání faktury je teď sdílené (`lib/admin/invoice-send.ts`) pro starý i nový postup.
-- **feat** Faktury › **Ke schválení**: koncepty z hotové zakázky, ruční, od asistenta a z pravidelných faktur; „Schválit a poslat" (10 s Zpět, pak vystavit + PDF + e-mail), Upravit, Zahodit se Zpět. Nová stránka **Pravidelné faktury** (`/dashboard/faktury/pravidelne`). Formulář faktury má e-mail odběratele a „Uložit jako koncept". Zvonek hlásí nový koncept (`invoice_draft`).
-- **db** Migrace 117 `faktury_koncepty` (aplikována: produkce, podle Kryštofa 2026-11-17; agent ji neověřil). Číslo 116 drží neodevzdaná práce na hovorech v hlavní složce, takže `ws-schema` hlásí mezeru, dokud se větve nesloučí.
-- **chore** Ověřeno: `npx tsc --noEmit` čistý; nový `lib/__tests__/admin-faktury-koncepty.test.ts` (PGlite, 17 testů: jednou na zakázku, jednou za měsíc, dvojí kliknutí = jedna faktura, zaseknutý zámek) a upravené testy asistenta, fakturace a změny stavu prošly. Plná sada: selhávají jen dřívější známé (`ws-schema` mezera po 113, `ws-email` pevné datum, časové limity PGlite pod zátěží — samostatně procházejí). **V prohlížeči neověřeno.**
-
-### 2026-11-17 (pošta adminu přes Resend — R-116)
-- **fix** E-maily z adminu (Hovory, faktury, připomínky, dotazník) šly přes Gmail SMTP, který
-  odmítal heslo (535). `lib/email.ts` je teď posílá přes Resend z vizeon.cz
-  (`lib/admin/vizeon-mail.ts` umí přílohy a odesílatele). Test `lib/__tests__/email-resend.test.ts`.
-- **chore** Nasazeno na produkci `9e2b2ca` (hovory od asistenta, schůzky s Meet, asistent jako
-  chat); build Ready, veřejné adresy odpovídají.
-- **chore** Na produkci i `2cf1447` (R-116): `origin/main` = `2cf1447`, produkční build Ready
-  (22:18), `/api/public/outreach` 401 bez klíče, `/api/google/connect` 307 na `/login`.
-
-### 2026-11-17 (nastavení schůzek s Google Meet)
-- **chore** Google Cloud (krystof@vizeon.cz): projekt `zakaziq-admin`, Calendar API, souhlas
-  Internal se scope `calendar.events`, OAuth klient s redirectem
-  `https://www.zakaziq.cz/api/google/callback`. Ve Vercelu Production `GOOGLE_CLIENT_ID`,
-  `GOOGLE_CLIENT_SECRET` a `VIZEON_RESEND_API_KEY` (nový klíč Resendu jen `sending_access`
-  pro doménu vizeon.cz, ne plný klíč). Migrace 114 a 115 pustil Kryštof. Nenasazeno.
-
-### 2026-11-17 (asistent jako chat — R-113)
-- **feat** **Asistent je chat s pamětí a přehledem firmy:** historie replik v rámci chatu, nový chat po 15 min nebo tlačítkem, ke každé větě blok `<prehled>` (zakázky, kontakty, termíny na 14 dní, obecná paměť). Nové akce `update_contact`, `update_project`, `update_event`, `remember` se „Zpět". Pojistka „nejdřív se zeptej" zadrží plán s chybějícím povinným údajem. Hlavní model Sonnet. **Pojem o čase:** blok `<cas>` s hodinou, tabulkou dnů a předpočítaným „za hodinu“, pravidla pro relativní časy, kolize a minulost; termín v minulosti jen klepnutím. Soubory: `lib/ai/{action-requirements,workspace-snapshot,time-context,prompts,propose,plan-format,action-lines,suggestion-schema}.ts`, `lib/admin/{suggestion-apply,suggestions}.ts`, `app/ai-actions.ts`, `components/admin/assistant-panel.tsx`, testy `lib/__tests__/ai-chat.test.ts`, `ai-navrhy`, `ai-executory`. Bez migrace (stačí 110 a 111).
-- **chore** Ověřeno: `tsc`, testy asistenta 115/115, `npm test` (5 selhání mimo asistenta — `ws-schema` mezera po 113, `ws-email` pevné datum, tři časové limity v plné sadě, samostatně procházejí), `npm run build:check`. **Živě se Sonnetem nad smyšleným přehledem 4 ze 4:** věta bez času → otázka na čas i telefon; odpověď „ve tři, číslo…“ v témže chatu → úplný termín; „zvedni cenu a zapamatuj si…“ → úprava zakázky + paměť k ní s id z přehledu; „posuň to na čtvrtou“ → přesun termínu podle id z minulého kola. Čas živě v 19:50: „dnes ve dvě“ → „už proběhlo, myslíte zítra?“; „ve čtvrtek v deset“ s obsazeným termínem → nabídne 11:00; „za hodinu“ → 20:55; „zítra odpoledne“ → zeptá se na přesný čas. **Prohlížeč neověřený.** Necommitnuto.
-
-### 2026-11-17 (schůzka s Google Meet a e-mail z vizeon.cz — krok 3 a 4)
-- **feat** **Domluvit schůzku** u firmy v Hovorech › Od asistenta (R-114): den, čas, délka, e-mail
-  klientovi s předvyplněným textem → událost s Google Meet v Google Kalendáři (bez hostů, Google
-  nic neposílá), událost v kalendáři adminu s odkazem a kontakt v Hovorech (stávající, nebo nový),
-  firma převzatá. E-mail z krystof@vizeon.cz přes Resend odchází po 15 s; „Zpět" ho zastaví a smaže
-  událost v adminu i v Googlu. Soubory: `lib/admin/meetings.ts`, `lib/admin/meeting-email.ts`,
-  `lib/admin/vizeon-mail.ts`, `app/meeting-actions.ts`, `components/admin/schedule-meeting-dialog.tsx`,
-  `components/admin/outreach-queue.tsx`, `app/dashboard/calls/page.tsx`.
-- **feat** **Propojení Google Kalendáře** v Profilu: `GET /api/google/connect` a `/api/google/callback`
-  (OAuth s PKCE, `state` v HttpOnly cookie), obnovovací token šifrovaný AES-256-GCM
-  (`GOOGLE_TOKEN_KEY`), odpojení s odvoláním tokenu. Soubory: `lib/admin/google/{oauth,crypto,calendar}.ts`,
-  `app/api/google/`, `components/admin/google-card.tsx`, `app/dashboard/profil/page.tsx`.
-- **feat** V detailu události kalendáře tlačítko **Připojit se** (Meet), stav e-mailu klientovi
-  a **Poslat e-mail znovu**, když neodešel. Denní cron `send-reminders` dožene e-maily, které po
-  odkladu zůstaly viset. Soubory: `lib/admin/calendar.ts`, `components/SmartCalendar.tsx`,
-  `app/api/cron/send-reminders/route.ts`.
-- **db** Migrace 115 `schuzky_google_meet` (aplikována: ne, nikde).
-- **chore** Ověřeno: `lib/__tests__/admin-schuzky.test.ts` (8 testů nad PGlite s vazbami
-  z migrace 051 a SQL migrací 114 + 115), `lib/__tests__/admin-schuzky-google.test.ts` (10:
-  šablona e-mailu, šifrování, OAuth, Meet s podstrčeným Googlem, Resend). **Google ani Resend
-  naživo nikdo nezkusil, v prohlížeči neověřeno.**
-- **chore** Ve Vercelu (Production) vygenerované a uložené `GOOGLE_TOKEN_KEY` a `GROWTH_OS_API_KEY`,
-  druhý se stejnou hodnotou i v GitHub Secrets `vizeon-autopilot`. Zbytek nastavení
-  `docs/admin/GROWTH-OS-PLAN.md` oddíl 6.
-- **chore** Vývojová závislost `@playwright/cli` 0.1.23 (R-115), `.playwright-cli/` v `.gitignore`.
-- **decision** **R-114** (R-113 a DECISIONS #034 si souběžně vzalo sezení asistenta, proto #035).
-
-### 2026-11-17 (hovory od asistenta z Growth OS — krok 1 a 2)
-- **feat** **Příjem hovorů z Growth OS** (R-112, DECISIONS #033): `POST /api/public/outreach`
-  (Bearer `GROWTH_OS_API_KEY`, 256 kB, 60/min, Zod) ukládá snímky obvolaných firem do nové
-  tabulky `outreach_leads`, jeden parametrizovaný upsert z JSON, starší snímek novější nepřepíše
-  a snímek nesahá na to, co s firmou udělal admin. Do zvonku jde firma nově ve frontě, první
-  otevření ukázky a odpověď na e-mail (nový typ oznámení `outreach_lead`). Migrace 114
-  (aplikována: ne, nikde). Soubory: `types/outreach.ts`, `lib/admin/outreach.ts`,
-  `app/api/public/outreach/route.ts`, `lib/notifications.ts`, `components/NotificationList.tsx`.
-- **feat** **Hovory › Od asistenta** — fronta „Komu zavolat" seřazená podle naléhavosti
-  (odpověděl na e-mail → chce zavolat dnes → otevřel ukázku → …), tlačítko Zavolat, odkaz na
-  ukázku a web firmy, shrnutí hovoru označené jako odhad, **Převzít do Hovorů** (kontakt
-  + plánovaný hovor v pražském čase, ukáže se v kalendáři) a **Nemá zájem** se Zpět; firma se
-  vrátí sama, když odpoví na e-mail. Bez migrace 114 se záložka neukáže. Soubory:
-  `components/admin/outreach-queue.tsx`, `lib/admin/outreach-view.ts`, `app/outreach-actions.ts`,
-  `app/dashboard/calls/page.tsx`.
-- **feat** **Strana Growth OS** (repozitář `vizeon-autopilot`, větev `claude/zakaziq-admin-sync`,
-  commit `91c286d`, nepushnuto): `src/zakaziq-admin.mjs`, `scripts/zakaziq-sync.mjs`, workflow
-  `zakaziq-sync.yml` (po–pá hodinově 8–19) a krok 8 stavby ukázky. Na straně Growth OS D-103.
-- **chore** Ověřeno: `lib/__tests__/admin-hovory-asistent.test.ts` (9 testů nad PGlite se SQL
-  migrace 114, včetně dvojího běhu migrace), `app/api/public/outreach/__tests__/route.test.ts`
-  (5), v autopilotu `tests/zakaziq-admin.test.mjs` (4, celá sada 143 prošla) a snímky
-  vyrobené autopilotem z testovací D1 prošly kontraktem ZakazIQ. **V prohlížeči neověřeno.**
-- **docs** Plán `docs/admin/GROWTH-OS-PLAN.md` (kroky 1–7, otevřené otázky ke krokům 3 a 4).
-- **decision** **R-112**.
-
-*Starší dny (AD12–AD17 z 2026-11-13 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*
+*Starší dny (2026-11-17 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*
