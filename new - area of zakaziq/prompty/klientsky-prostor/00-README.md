@@ -1,6 +1,6 @@
 # Prompty pro Claude Code — klientský prostor, hlášení práce a nový admin
 
-Jedenáct sezení (KP00–KP10). **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa `ZakazIQ`.
+Sezení KP00–KP16 (KP17 analýza čeká na rozhodnutí D-K16 a prompt nemá). Druhá vlna KP11–KP16 (R-121, R-122) je popsaná níž v oddílu „Druhá vlna". **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa `ZakazIQ`.
 Každé sezení začíná přečtením paměti a končí jejím zápisem, takže na sebe navazují i bez kontextu z minula.
 Zdroj pravdy je plán `docs/klientsky-prostor/PLAN.md` (architektura, bezpečnostní model, rozhodnutí D-K1–D-K11, tabulka sezení).
 
@@ -31,6 +31,19 @@ Kdyby sezení nestihlo vše: napiš „ukonči sezení podle zakaziq-memory“ a
 | KP10 | Audit, GDPR, pilot, spuštění | web-security-audit, humanize-text-cs | vše | ano |
 
 KP00–KP04 nepotřebují přihlášení klientů a dávají užitek hned. KP05–KP07 jdou po sobě. KP08 a KP09 jdou prohodit nebo vynechat.
+
+### Druhá vlna (R-121, R-122, 2026-11-18)
+
+| # | Sezení | Hlavní skilly | Potřebuje | Admin |
+|---|---|---|---|---|
+| KP11 | Přihlášení naostro a pozvání jedním klikem | workspace-backend, web-security-* | F1 na větvi `auth/supabase-klient` | částečně |
+| KP12 | Služby a etapy | workspace-backend, design-dilky, impeccable | KP11, D-K14 | ano |
+| KP13 | Peníze a faktury v prostoru | workspace-backend, web-security-* | KP11 | částečně |
+| KP14 | Konzultace z volna v kalendáři | workspace-backend, web-security-*, design-dilky | KP11, D-K13 | ano |
+| KP15 | Chat a rozvržení jako Slack, přečteno jako WhatsApp, schránka zpráv v adminu | workspace-backend, web-security-*, design-dilky, mobile-native | KP11, D-K17, D-K18 | ano |
+| KP16 | Přehled klienta | design-dilky, impeccable, break-ui | KP12–KP15 | částečně |
+
+KP11 první, KP12–KP15 v libovolném pořadí, KP16 po nich, pak KP10. Pro druhou vlnu platí místo zastaralých bodů níž: práce na nové větvi z aktuálního `main` (admin i prostor jsou na produkci z `main`), regrese `/login`, `/dashboard`, `/dashboard/finance`, `/p/[token]` (`/alteno` a `/hub` už jen přesměrovávají), merge do `main` a push jen se souhlasem.
 
 ## Společná pravidla (platí v každém sezení)
 

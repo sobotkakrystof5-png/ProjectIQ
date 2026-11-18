@@ -113,7 +113,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a pushnutý na `origin/ws/redesign-app`, na produkci (`main`) nasazený není. Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. Plán: `docs/klientsky-prostor/PLAN.md` sekce 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (převzít F1 z `auth/supabase-klient`), KP12 služby a etapy, KP13 peníze a faktury, KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). Nic z toho není v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1198,6 +1198,50 @@ držet adresu a klíč autopilota a výpadek se dožene sám.
 ať admin běží i bez nových sloupců. Odkaz na ukázku z adminu nese `?od=admin` (Growth OS ho nemá
 počítat). Strana Growth OS je zadání `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`,
 tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozšiřuje R-112 a R-118.
+
+### R-121 · Klientský prostor 2: heslo z pozvánky, etapy ze šablon, konzultace z volna, peníze (2026-11-18)
+**Rozhodnutí:** (1) Klient si heslo nastaví sám z pozvánky vázané na jeho e-mail (F1, R-107).
+Hesla nevymýšlí Kryštof ani agent; pozvání je jedno tlačítko u zakázky. (2) Etapy zakázky vycházejí
+ze šablony podle druhu služby. Obsah šablon píše Kryštof, u nové zakázky se předvyplní a jdou upravit.
+(3) Konzultaci si klient rezervuje **jen v časech, které Kryštof v kalendáři ZakazIQ označí jako volno
+pro klienty**; pevné hodiny `getHourSlots` končí. (4) Každý klient ve svém prostoru vidí u svých zakázek
+cenu, co zaplatil, co zbývá, faktury a co bylo uděláno, bez přepínače u zakázky. Online platba se nedělá.
+**Proč:** Kryštof 2026-11-18 („vlastní e-mail a heslo… přehled faktur, co bylo zaplacené… rozfázované,
+deadline… kdykoli si se mnou rezervovat konzultaci" a odpovědi na doplňující otázky). Heslo, které zná
+ještě někdo jiný a přišlo e-mailem, není klientovo. Volno místo pevných hodin drží kalendář v Kryštofových rukou.
+**Důsledek:** **mění R-070 a plán** v tom, že klient vidí cenu a faktury (KP06 „žádná cena", plán
+sekce 10). Sezení KP11–KP17 a D-K12–D-K18 v `docs/klientsky-prostor/PLAN.md` (4.7, 6, 7), prompty
+KP11–KP16. Volno pro klienty je vlastní tabulka, ne `calendar_events` — guard z 008/044 bere každou
+událost jako obsazený čas. Interní údaje (poznámky, `invoiced_on_ico`, koncepty faktur) do `portal`
+nikdy. Otevřené: délka a lhůty konzultace (D-K13, KP14), postup v % z etap (D-K14, KP12), co je
+„analýza" (D-K16).
+
+### R-122 · Chat s klientem jako přes WhatsApp pro veškerou zpětnou vazbu (2026-11-18)
+**Rozhodnutí:** v klientském prostoru je u každé zakázky chat mezi Kryštofem a klientem, kde se
+probírá web a návrh a klient tam dává veškerou zpětnou vazbu (co upravit a co ne). Kryštof má
+v adminu jednu schránku přes všechny klienty. Chat má živé obnovení, přečteno, e-mailová upozornění
+na nepřečtené, hlasové zprávy, obrázky a PDF, odpověď na zprávu, „Ke schválení" a v adminu „Udělat
+z toho zadání" (AI shrnutí a prompt pro Claude Code, R-069).
+**Proč:** Kryštof 2026-11-18: „chatový prostor mezi mnou a klientem, kde probíráme věci jako přes
+WhatsApp… klient mi zde bude dávat veškerou zpětnou vazbu k projektu". Dnešní „Zprávy" (`portal.messages`,
+migrace 096) jsou jen formulář bez upozornění klientovi, bez obnovení a bez příloh.
+**Důsledek:** sezení KP15, přehled klienta se posouvá na KP16, analýza na KP17. Zadání z chatu se nikdy
+nespustí samo, Kryštof ho zkontroluje a vloží (R-069, R-070). Obnovení dotazováním, ne WebSocket (R-044).
+Otevřené: sloučit sekci Požadavky do chatu (D-K17, doporučeno) a úložiště příloh (D-K18, nová závislost
+a CSP jen se souhlasem; nahrazuje D-K8 pro přílohy v chatu).
+
+### R-123 · Klientský prostor rozvržený jako Slack, přečteno jako WhatsApp (2026-11-18)
+**Rozhodnutí:** celý klientský prostor je jedna aplikace ve stylu Slacku, jen jednodušší: vlevo firma,
+Přehled, zakázky jako kanály s nepřečtenými, Faktury a Konzultace; uprostřed chat zakázky; vpravo panel
+O zakázce. Na telefonu se chová jako WhatsApp (seznam → chat → detail). U zpráv je odesláno a přečteno
+jako ve WhatsAppu a Messengeru (jedna a dvě fajfky, „Přečteno 14:32 · jméno", čára „Nové zprávy").
+Schránka Zprávy v adminu má stejné rozvržení. Vzhled podle Dílků, ne podle Slacku.
+**Proč:** Kryštof 2026-11-18: „v podobném stylu jako Slack, kompletní klientský dashboard… přečtené
+i nepřečtené zprávy jako na WhatsApp a Messenger… v podobném stylu, ale jednodušší v rámci mého systému".
+**Důsledek:** KP15 staví kostru prostoru i chat, KP16 do ní doplní Přehled, panel O zakázce, Faktury
+a Konzultace. Ze Slacku záměrně ne: vlákna v odpovědích, reakce, vlastní kanály, přímé zprávy mezi
+členy klienta, „píše…", hovory, stavy. Krok „doručeno" není. Náčrt v `docs/klientsky-prostor/PLAN.md` 4.7.
+Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
 ---
 
 ## 3. Otevřené problémy
@@ -1511,6 +1555,16 @@ tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozši�
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-18 (klientský prostor 2 — plán)
+- **decision** **R-121**: heslo si klient nastaví sám z pozvánky, etapy ze šablony podle druhu služby,
+  konzultace jen ve volnu označeném v kalendáři, každý klient vidí své peníze a faktury.
+- **decision** **R-122**: chat s klientem jako přes WhatsApp pro veškerou zpětnou vazbu (KP15).
+- **decision** **R-123**: klientský prostor i schránka Zprávy v adminu rozvržené jako Slack, jen jednodušší;
+  odesláno a přečteno jako ve WhatsAppu.
+- **docs** `docs/klientsky-prostor/PLAN.md`: architektura 4.7 s náčrtem, sezení KP11–KP17, rozhodnutí D-K12–D-K19,
+  sekce 10 (online platby mimo rozsah, faktury v rozsahu). Prompty KP11–KP16 a rozcestník
+  v `new - area of zakaziq/prompty/klientsky-prostor/`. Kód beze změny.
 
 ### 2026-11-18 (AI asistent jako CRM — R-120)
 - **chore** **Na produkci** (2026-11-18): migraci 119 pustil Kryštof, větev `admin/ai-asistent-crm`

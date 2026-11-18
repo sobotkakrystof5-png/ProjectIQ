@@ -1,6 +1,8 @@
 # Klientský prostor, hlášení práce a nový admin — plán
 
 > Stav: **rozpracováno** (2026-11-01). Kryštof zadal implementaci všech kroků, tím jsem přijal doporučení u D-K1–D-K11 (zapsáno jako R-070, `memory/memory.md`). Implementováno KP00 (zápis rozhodnutí), KP01–KP07 a KP09 úroveň 2 v kódu na větvi `ws/redesign-app`; migrace 092–096 aplikované na produkci (2026-11-01), **nic neověřeno v prohlížeči**, KP08 odloženo, KP10 rozpracováno (DPA a rezidence AI zpracovatelů ověřeny, sekce 8.1). Prompty sezení jsou v `new - area of zakaziq/prompty/klientsky-prostor/` (rozcestník `00-README.md`).
+>
+> **Druhá vlna (2026-11-18, R-121):** pozvání jedním klikem s heslem, které si klient nastaví sám, etapy ze šablony podle druhu služby, peníze a faktury v prostoru, konzultace jen ve volnu, které Kryštof označí v kalendáři, a chat s klientem jako přes WhatsApp pro veškerou zpětnou vazbu (R-122). Celý prostor je rozvržený jako Slack, jen jednodušší, s přečtenými a nepřečtenými zprávami jako ve WhatsAppu (R-123). Architektura v 4.7, sezení KP11–KP17 v 6, rozhodnutí D-K12–D-K19 v 7. Přihlášení e-mailem a heslem (Supabase, R-107 F1) je hotové v kódu na větvi `auth/supabase-klient`, nesloučené.
 
 ## 1. Co chceme
 
@@ -114,6 +116,46 @@ Dnes: 13 odkazů v jedné liště, tři vzhledy (VIZEON modrá, ALTENO oranžov�
 
 Technicky: nový společný layout na Dílky (boční menu na počítači, spodní lišta a šuplík na telefonu, hledání ⌘K, pravý panel pro detail) postavený na `components/ui` a sdílených primitivech `components/ws/app`. Staré stránky zůstávají funkční a přebírají vzhled jedna po druhé (strangler), staré adresy se nemění. **Tohle mění R-027 (admin si nechává svůj vzhled)** a potřebuje nové rozhodnutí; zadání Kryštofa „zlepšit i admina“ platí jako výslovné povolení sahat na admin v sezeních KP01–KP04, KP06, KP10.
 
+### 4.7 Druhá vlna (R-121): pozvání, etapy, peníze, konzultace
+
+Zásada z 4.1 platí dál: `portal_app` nemá práva do `public`, do `portal` se dostává jen to, co má klient vidět, a to přes triggery nebo úzké `SECURITY DEFINER` funkce. Interní údaje (poznámky, linie přiznané/nepřiznané `invoiced_on_ico`, `finance_transactions`, koncepty faktur, AI přepisy) do `portal` nikdy.
+
+**Pozvání jedním klikem (KP11).** V detailu zakázky tlačítko „Pozvat klienta do prostoru": najde existujícího klienta podle e-mailu člena, jinak založí `portal.clients`, propojí zakázku (`portal.link_project`), vytvoří pozvánku vázanou na e-mail (F1, migrace 113) a pošle ji z krystof@vizeon.cz přes Resend (`sendVizeonMail`, R-116). Heslo si klient nastaví sám a nikdo jiný ho nezná. Pozvánku nejde poslat na `ADMIN_EMAIL`. Kdo už v prostoru je, dostane jen e-mail o nové zakázce. Asistent smí pozvání připravit, odeslání je „jedno klepnutí" (R-111).
+
+**Služby a etapy (KP12).** `projects.service_type` je dnes volný text. Nově číselník služeb a ke každé šablona etap: název, popis pro klienta, typická délka ve dnech, úkoly pro klienta (dodat texty, fotky, přístupy, schválit návrh). **Obsah šablon píše Kryštof** v Nastavení, agent nic nevymýšlí; prázdné šablony Web, E-shop, Design, Automatizace jsou jen návrh k potvrzení. Při založení zakázky se etapy **zkopírují** do zakázky (kopie, ne odkaz, aby úprava šablony nepřepsala běžící zakázky) a termíny se předvyplní od data zahájení; Kryštof je upraví. Do `portal` jde projekce triggerem (název, popis, termín, stav, úkoly). Klient smí jen označit svůj úkol „Mám hotovo" funkcí `portal.submit_*` (členství, limit), Kryštofovi přijde zvonek. Hesla a přístupy se tudy neposílají, říká to text u úkolu.
+
+**Peníze (KP13).** Klient vidí u svých zakázek cenu, zaplaceno (záloha, ruční zálohy, platby faktur), zbývá doplatit a faktury. Výpočet je tentýž jako v adminu (`lib/admin/project-payments.ts`, R-110), měny se nesčítají. Faktury: vystavené (`number_seq IS NOT NULL`) a archivní navázané na zakázku, stav zaplaceno / čeká / po splatnosti / stornováno; koncepty (R-117) nikdy. Projekce do `portal` triggerem se snímkem položek, dodavatele, odběratele a splatnosti. PDF pro klienta se vyrábí z projekce stejným `lib/invoice-pdf/render.ts`, takže kód `/klient` nepotřebuje spojení vlastníka; archivní PDF (`pdf_data`) rozhodne KP13 s `web-security-review`. QR platba jen u nezaplacené faktury v CZK s IBANem. Online platba se nedělá.
+
+**Konzultace z volna (KP14).** Kryštof v kalendáři adminu označí **Volno pro klienty**. Je to **vlastní tabulka, ne `calendar_events`**: překryvový guard z migrací 008 a 044 bere každou událost jako obsazený čas, takže by volno kolidovalo s rezervací uvnitř sebe. Klient vidí sloty = volno − události kalendáře − konzultace − plánované hovory, po délce konzultace (D-K13). Rezervace jde úzkou funkcí (členství, limit, kolize atomicky v DB, R-005), založí `consultation_slots`, kalendářní událost a zrcadlo v Hovorech (R-096); pak Google Meet a e-maily přes `lib/admin/meetings.ts` (R-114). Jak to spustit bez spojení vlastníka v kódu `/klient`, rozhodne KP14 s `web-security-review`; selhání Meetu nesmí rezervaci zrušit. Pevné hodiny `getHourSlots` (všední dny 14–20, víkend 8–22) na `/p` nahradí stejné volno.
+
+**Chat s klientem (KP15, R-122).** Jedno vlákno na zakázku, kde klient dává veškerou zpětnou vazbu (web, návrh, co upravit a co ne) a Kryštof odpovídá, jako přes WhatsApp. Staví na `portal.messages` z migrace 096 (klient i admin, limit 20 zpráv za hodinu) a `replyToClient` v `app/portal-admin-actions.ts`. Dnes chybí: (a) **schránka v adminu** přes všechny klienty s nepřečtenými, s odpovědí i z telefonu (dnes jen panel v detailu zakázky); (b) **živé obnovení** dotazováním po 10 s s ETagem jako ve Workspace (R-044), žádný WebSocket; (c) **přečteno** u obou stran; (d) **upozornění**: když druhá strana nemá chat právě otevřený (poslední obnovení starší než minuta), odejde jí e-mail hned, nejvýš jednou za hodinu na vlákno; klientovi z krystof@vizeon.cz s odkazem rovnou do chatu, Kryštofovi navíc zvonek (už je). Čekat „15 minut, jestli si to přečte" Vercel Hobby neumí (cron 1× denně, R-006); (e) **hlasová zpráva** stejnou cestou jako požadavek (přepis, audio se neukládá, R-069); (f) **obrázky a PDF** (screenshoty návrhu), viz D-K18; (g) **odpověď na konkrétní zprávu** a odkaz na etapu, ke které se zpětná vazba vztahuje; (h) **„Ke schválení"**: Kryštof pošle návrh nebo odkaz a klient klikne „Schvaluji" nebo „Chci změny", schválení splní úkol etapy z KP12; (i) **„Udělat z toho zadání"** u jedné nebo víc zpráv v adminu: stávající AI shrnutí a prompt pro Claude Code (R-069), Kryštof ho zkontroluje a vloží sám, nic se nespustí samo. Text klienta se nikdy nevykresluje jako HTML, odkazy jen jako text nebo s `rel="noopener noreferrer nofollow"`. Retence podle R-076 (zprávy už v ní jsou), přílohy musí přibýt.
+
+**Rozvržení jako Slack, jen jednodušší (R-123).** Celý klientský prostor je jedna aplikace se třemi sloupci; vzhled podle Dílků, ne podle Slacku. Vlevo firma klienta, Přehled, **zakázky jako kanály** (řazené podle poslední zprávy, nepřečtené tučně s počtem v tónu `signal`), Faktury a Konzultace. Uprostřed chat zakázky, nahoře její název a etapa. Vpravo panel **O zakázce**: etapa a termín, co čeká na klienta, zaplaceno a zbývá, nejbližší konzultace a „Domluvit konzultaci"; pod 1280 px se otevírá tlačítkem. Na telefonu jako WhatsApp: seznam zakázek s poslední zprávou, časem a počtem nepřečtených → chat přes celou obrazovku → detail ze záhlaví; dole lišta Zprávy, Přehled, Faktury, Konzultace. Schránka **Zprávy v adminu** má stejné rozvržení: vlevo konverzace všech klientů, uprostřed chat, vpravo klient a zakázka s akcemi („Udělat z toho zadání", „Ke schválení", „Otevřít zakázku").
+
+```
+┌────────────────┬────────────────────────────────┬──────────────────────┐
+│ Kavárna Novák  │ Web pro kavárnu     Vývoj 2/4  │ O zakázce            │
+│                │────────────────────────────────│ Vývoj · do 12. 12.   │
+│ Přehled        │ ─────── Nové zprávy ───────    │ Na tahu jste vy:     │
+│                │ Kryštof: Posílám návrh menu    │   dodat fotky        │
+│ ZAKÁZKY        │   [Ke schválení]               │ Zaplaceno 12 000 Kč  │
+│ ▪ Web       3  │   Schvaluji | Chci změny       │ Zbývá 8 000 Kč       │
+│   E-shop       │          Vy: Logo menší  ✓✓    │ Konzultace čt 14:00  │
+│                │                                │ [Domluvit konzultaci]│
+│ Faktury        │ ┌────────────────────────────┐ │                      │
+│ Konzultace     │ │ Napište zprávu…  mic  +  > │ │                      │
+│ Jan Novák      │ └────────────────────────────┘ │                      │
+└────────────────┴────────────────────────────────┴──────────────────────┘
+```
+
+**Přečtené a nepřečtené jako ve WhatsAppu a Messengeru.** U vlastní zprávy jedna fajfka = odesláno, dvě plné = přečteno; po klepnutí „Přečteno 14:32 · Jan Novák". Krok „doručeno" není, protože web nemá zařízení, kam by se doručovalo. Nepřečtené: tučná zakázka s počtem v levém sloupci, čára „Nové zprávy" ve vlákně, počet v titulku karty. Pamatuje se poslední přečtení každé strany ve vlákně; u klienta s více členy stačí, když si zprávu přečte kterýkoli z nich, a Kryštof vidí kdo. Kdo co vidí o aktivitě druhé strany, řeší D-K19.
+
+**Co ze Slacku záměrně není:** vlákna v odpovědích (stačí citace zprávy), reakce, vlastní kanály, přímé zprávy mezi členy klienta, „píše…", hovory, stavy a sdílení obrazovky. Jeden kanál = jedna zakázka = klient a Kryštof.
+
+**Přehled klienta (KP16).** Položka Přehled v levém sloupci a obsah pravého panelu. Začíná tím, co čeká na klienta (úkol z etapy, schválení návrhu, faktura po splatnosti, hodnocení) a nepřečtenými zprávami, pak aktuální etapa s termínem, nejbližší konzultace, peníze a poslední aktivita. Faktury a Konzultace v levém sloupci jsou souhrn přes všechny zakázky klienta. Hodnocení přejde na dotazník R-119 (dnes `/klient` nabízí starou `FeedbackCard`). Při přechodu etapy souhrnný e-mail nejvýš 1× za 24 h jako u aktivity (R-072).
+
+**Analýza (KP17).** Co klient uvidí, není rozhodnuté (D-K16).
+
 ## 5. Bezpečnostní model
 
 | Hrozba | Opatření | Kde |
@@ -148,8 +190,17 @@ Jedno sezení = jedna nová konverzace v Claude Code. Velikost: S ≈ půl dne, 
 | **KP08** | Soubory a přílohy (volitelné) | M | 09x | D-K8, KP07 | ne | nezačato (odloženo, D-K8) |
 | **KP09** | Předání do Claude Code: úroveň 2, experiment s úrovní 3 | M | — | D-K7, KP07 | ne | úroveň 2 hotova; úroveň 3 se nedělá bez experimentu a rozhodnutí |
 | **KP10** | Audit, GDPR, právní texty, pilot s jedním klientem, spuštění | M | — | vše | ano | nezačato (audit, GDPR, pilot) |
+| **KP11** | Přihlášení naostro a pozvání jedním klikem: převzít F1 z `auth/supabase-klient`, seznam nastavení Supabase pro Kryštofa, tlačítko „Pozvat klienta do prostoru", průchod v prohlížeči | M | — (113 z F1) | R-107 F1, D-K12 | částečně | nezačato |
+| **KP12** | Služby a etapy: číselník služeb, šablony etap v Nastavení, předvyplnění u nové zakázky, etapy v detailu zakázky, úkoly pro klienta, projekce do `portal` | L | ano | KP11, D-K14 | **ano** | nezačato |
+| **KP13** | Peníze v prostoru: zaplaceno, zbývá, faktury s PDF a QR, projekce do `portal` | M | ano | KP11, D-K15 | částečně | nezačato |
+| **KP14** | Konzultace z volna: Volno pro klienty v kalendáři adminu, rezervace v prostoru, Google Meet a e-maily, `/p` na stejný zdroj | L | ano | KP11, D-K13 | **ano** | nezačato |
+| **KP15** | Chat a rozvržení jako Slack: tři sloupce se zakázkami jako kanály, telefon jako WhatsApp, odesláno a přečteno, schránka Zprávy v adminu ve stejném rozvržení, živé obnovení, e-mailová upozornění, hlasové zprávy, obrázky a PDF, „Ke schválení", „Udělat z toho zadání" | L | ano | KP11, D-K17, D-K18, D-K19 | **ano** | nezačato |
+| **KP16** | Přehled klienta do rozvržení z KP15: Přehled, panel O zakázce, Faktury a Konzultace v levém sloupci; hodnocení přes dotazník R-119; e-mail při změně etapy | M | — | KP12–KP15 | částečně | nezačato |
+| **KP17** | Analýza pro klienta | ? | ? | D-K16 | ? | čeká na rozhodnutí, bez promptu |
 
 Pořadí: KP00 → KP01 → KP02 → KP03 → KP04 jde čistě na adminu a nepotřebuje přihlášení klientů, takže dává užitek hned (Kryštof má hlášení a nový admin, klient je vidí přes stávající `/p`). Teprve KP05 přidá přihlášení. KP08 a KP09 jsou volitelné a jdou prohodit.
+
+Druhá vlna: **KP11 první** (bez přihlášení nemá zbytek smysl), pak KP12, KP13, KP14 a KP15 v libovolném pořadí (sahají na různé části; „Ke schválení" v chatu umí splnit úkol etapy až po KP12, do té doby jen zaznamená odpověď), KP16 až po nich, protože skládá jejich výsledky. KP10 (audit, pilot) až za KP16.
 
 Čísla migrací jsou orientační; sezení vždy vezme **první volné číslo po poslední migraci**.
 
@@ -168,6 +219,14 @@ Pořadí: KP00 → KP01 → KP02 → KP03 → KP04 jde čistě na adminu a nepot
 | D-K9 | Větev: admin patří na `main`, ale kód je na `ws/redesign-app` (Next 16, `main` je starší) | pracovat na větvi nad `ws/redesign-app` a sloučit s ní | přijato doporučení (R-070) |
 | D-K10 | Jak dlouho držet data klientů po skončení zakázky (aktivita, zprávy, požadavky) | 3 roky, pak anonymizace nebo výmaz; GDPR žádost okamžitě | přijato doporučení (R-070); implementováno migrací 098 a cronem `client-retention` (R-076) |
 | D-K11 | Zavést firmu klienta jako samostatný záznam (víc projektů pod jednou firmou) | ano, `portal.clients`; propojení se zakázkou při pozvání | přijato doporučení (R-070) |
+| D-K12 | Kdo nastaví klientovi heslo | klient sám z pozvánky vázané na jeho e-mail; nikdo jiný heslo nezná | **rozhodl Kryštof 2026-11-18 (R-121)** |
+| D-K13 | Konzultace: kdy a jak | **jen v časech, které Kryštof v kalendáři označí jako volno pro klienty** (rozhodl Kryštof 2026-11-18). Zbývá potvrdit v KP14: délka (doporučení 30 min, u volna jde změnit), nejdřív 12 h předem, přesun a zrušení do 24 h předem (jako R-051), nejvýš dvě budoucí rezervace na klienta | časy rozhodnuté, parametry potvrdí KP14 |
+| D-K14 | Etapy | šablona podle druhu služby, obsah píše Kryštof, u nové zakázky se předvyplní a jdou upravit (rozhodl Kryštof 2026-11-18). Zbývá v KP12: počítat postup v % z hotových etap? Doporučení ano, ruční % zmizí | šablony rozhodnuté, % potvrdí KP12 |
+| D-K15 | Kdo vidí peníze | každý klient u svých zakázek vidí cenu, zaplaceno, zbývá a faktury, bez přepínače; online platba ne | **rozhodl Kryštof 2026-11-18 (R-121)** |
+| D-K16 | Co je „analýza" pro klienta: návštěvnost jeho webu, poptávky z jeho webu, nebo kolik práce a peněz projekt stál | — | **nerozhodnuto** |
+| D-K17 | Chat a dnešní „Požadavky": dvě místa, nebo jedno | jedno: požadavek je zpráva v chatu (i hlasová) a Kryštof z ní v adminu udělá zadání pro Claude Code; samostatná sekce Požadavky v prostoru zmizí, historie zůstane v chatu | chat **rozhodl Kryštof 2026-11-18 (R-122)**, sloučení potvrdí KP15 |
+| D-K18 | Obrázky a PDF v chatu: kam je ukládat | soukromé úložiště, soubor jen přes náš server s kontrolou členství, typ podle obsahu (ne přípony), limit velikosti, retence se zakázkou. Kandidáti: Vercel Blob, nebo Supabase Storage (projekt `zakaziq` už existuje). Nová závislost a CSP jen se souhlasem. Nahrazuje D-K8 pro přílohy v chatu | potvrdí KP15 |
+| D-K19 | Kdo vidí aktivitu druhé strany | přečteno (dvě fajfky) vidí obě strany jako ve WhatsAppu; Kryštof navíc vidí, kdy byl klient naposledy aktivní; **klient Kryštofovu aktivitu nevidí**, aby nečekal okamžitou odpověď jen proto, že je Kryštof zrovna v adminu | přečteno rozhodl Kryštof 2026-11-18 (R-123), aktivitu potvrdí KP15 |
 
 ## 8. Rizika
 
@@ -203,7 +262,7 @@ Orientační, ceníky ověřit při nasazení:
 
 ## 10. Mimo rozsah
 
-Fakturace přes klientský prostor (platby klientů), vícejazyčnost, SMS a WhatsApp, mobilní aplikace, plně automatické spouštění agenta z textu klienta, změna Workspace pro firmy (SaaS) a Hub (osobní moduly).
+Online platby klientů (klient od R-121 vidí faktury a platí převodem nebo QR kódem), vícejazyčnost, SMS a WhatsApp, mobilní aplikace, plně automatické spouštění agenta z textu klienta, změna Workspace pro firmy (SaaS) a Hub (osobní moduly).
 
 ## 11. Kritéria úspěchu
 
