@@ -52,6 +52,11 @@
 
 ### Nastavení, které musí udělat Kryštof (pořadí)
 
+> **Stav 2026-11-18:** hotové 1, 4, 6, 6b, navíc Site URL na `https://www.zakaziq.cz`, druhá
+> Redirect URL `…/klient/auth/potvrzeni?**` (odkaz nese `?next=`) a `NEXT_PUBLIC_APP_URL` v Production
+> na www. Zbývá 5 (heslo SMTP), 2 a 3 (tajemství hooku), česká šablona a 7. Podrobně
+> `memory/memory.md` → Otevřené problémy.
+
 1. **Migrace 113** na produkční Neon (`node scripts/apply-migration.js
    migrations/113_portal_supabase_auth.sql --env .env.production.local`). Je
    kompatibilní se starým buildem: ten jen přestane nacházet členy z Clerku, a ti

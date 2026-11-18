@@ -1316,15 +1316,29 @@ Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
 
 - [ ] **Asistent (R-111) na produkci, ale v prohlížeči neověřený:** projít s přihlášením na produkci na 390 a 1280 px — diktování (povolení mikrofonu, Safari `audio/mp4`), věta se dvěma akcemi, toast „Zpět", „Vrátit" u kroku, faktura na klepnutí, věta na detailu zakázky (nesmí se provést sama). Dotazy na data (A4) projít na produkčních datech — testovací Neon nemá tabulky adminu, takže živě běžely jen nad podstrčenými daty · `docs/admin/ASISTENT-PLAN.md` · od 2026-11-16
 
-- [ ] **Supabase pro `/klient` — nasadit a nastavit (R-107, F1):** kód je na větvi
-  `klient/kp11-prihlaseni` (KP11 ho převzala z `auth/supabase-klient`), na produkci není. Pořadí: (1) migrace 113 na produkci,
-  (2) v Supabase hook Before User Created přepnout na **HTTPS**
-  `https://www.zakaziq.cz/api/auth/supabase-hook` (Postgres hook z R-106 vypnout),
-  (3) jeho tajemství do Vercelu jako `SUPABASE_AUTH_HOOK_SECRET`, (4) vypnout Confirm email,
-  (5) vlastní SMTP přes Resend (bez něj nedojde odkaz na nové heslo), (6) Redirect URL
-  `/klient/auth/potvrzeni` a `ADMIN_USER_ID` (id účtu adminu) do Vercelu, (7) deploy a průchod pozvánka → přístup → přehled → odhlášení →
-  přihlášení → zapomenuté heslo na 390 a 1280 px. Detail `docs/AUTH-SUPABASE-PLAN.md` → F1
-  · Kryštof · od 2026-11-15
+- [ ] **Supabase pro `/klient` — dokončit nastavení a nasadit (R-107, F1):** kód je na větvi
+  `klient/kp11-prihlaseni` (KP11 ho převzala z `auth/supabase-klient`), na produkci není.
+  **Hotovo 2026-11-18:** migrace 113 na produkci (podle Kryštofa, agent neověřil); v Supabase
+  Confirm email vypnuté, Site URL `https://www.zakaziq.cz` (dřív adresa `vercel.app`), Redirect URLs
+  `https://www.zakaziq.cz/klient/auth/potvrzeni` a `…/potvrzeni?**` (kvůli `?next=`); ve Vercelu
+  Production `ADMIN_USER_ID` (jediný účet v Supabase, admin) a `NEXT_PUBLIC_APP_URL` přepnuté
+  z `https://zakaziq.cz` na `https://www.zakaziq.cz` (R-075; proměnná platí pro Production i Preview,
+  projeví se až dalším deployem — canonical, sitemapa a odkazy v e-mailech přejdou na www).
+  **Zbývá, v tomhle pořadí:** (1) Kryštof: SMTP v Supabase (Emails › SMTP Settings — vyplněno
+  `prihlaseni@zakaziq.cz`, jméno ZakazIQ, `smtp.resend.com`, 465, uživatel `resend`; chybí heslo =
+  klíč Resendu jen pro odesílání z zakaziq.cz, pak Save), (2) Kryštof: hook Before User Created
+  přepnout na HTTPS `https://www.zakaziq.cz/api/auth/supabase-hook` → Generate secret → Update hook
+  (do té doby běží Postgres hook z R-106 a pouští jen e-mail adminu, takže vypnuté potvrzení e-mailu
+  nic neotevřelo), (3) Kryštof: `vercel env add SUPABASE_AUTH_HOOK_SECRET production` (Sensitive) —
+  **před** deployem, jinak endpoint odmítne každou registraci, (4) agent: česká šablona „Reset
+  Password" s odkazem `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery` (funguje i na
+  jiném zařízení; šablony jdou upravit až po uložení SMTP), (5) agent: fast-forward main →
+  `klient/kp11-prihlaseni` a push (Kryštof schválil 2026-11-18), (6) průchod pozvánka → přístup →
+  přehled → odhlášení → přihlášení → zapomenuté heslo na 390 a 1280 px. Tajné hodnoty agent
+  nevkládá (R-115). Detail `docs/AUTH-SUPABASE-PLAN.md` → F1 · od 2026-11-15
+- [ ] **Admin v Supabase nemá druhý faktor:** účet adminu má 0 ověřených TOTP faktorů (zjištěno
+  2026-11-18), přihlášení do adminu tedy stojí jen na hesle. Zapnout v `/dashboard/profil` →
+  Přihlášení · Kryštof · od 2026-11-18
 - [ ] **KP11 naživo neověřené:** pozvání z detailu zakázky běží jen v testech a na dočasné stránce.
   Po nastavení Supabase (předchozí bod) projít: zakázka → Pozvat do prostoru → e-mail z krystof@vizeon.cz
   → nastavit heslo → klient vidí zakázku; „Zpět" do 10 s nic nepošle; druhá zakázka stejného klienta se
@@ -1579,6 +1593,14 @@ Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-18 (KP11 — nastavení Supabase a Vercelu, rozpracované)
+- **chore** Migrace 113 na produkčním Neonu (pustil Kryštof v SQL editoru, agent neověřil).
+- **chore** Supabase (projekt `zakaziq`, přes Chrome): Confirm email vypnuté, Site URL
+  `https://www.zakaziq.cz`, Redirect URLs `…/klient/auth/potvrzeni` a `…/potvrzeni?**`. Vercel
+  Production: `ADMIN_USER_ID` nově, `NEXT_PUBLIC_APP_URL` → `https://www.zakaziq.cz` (R-075; dosud
+  apex). SMTP, HTTPS hook a `SUPABASE_AUTH_HOOK_SECRET` čekají na Kryštofa (tajné hodnoty), větev
+  se nesloučila. Zbytek v Otevřených problémech.
 
 ### 2026-11-18 (KP11 — přihlášení a pozvání do klientského prostoru)
 - **chore** Worktree `../ZakazIQ-klient`, větev `klient/kp11-prihlaseni` z `main` (`5c9ccec`): v hlavním
