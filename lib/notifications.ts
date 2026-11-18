@@ -23,6 +23,8 @@ export type NotificationType =
   | 'outreach_lead'
   /** Koncept faktury čeká na schválení (R-117). */
   | 'invoice_draft'
+  /** Pozvánka do klientského prostoru neodešla e-mailem (KP11, R-121). */
+  | 'portal_invite_failed'
   /** Klient dal v dotazníku 0–6 — ozvat se mu, dokud se dá něco zachránit (R-119). */
   | 'survey_detractor'
 

@@ -113,7 +113,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (převzít F1 z `auth/supabase-klient`), KP12 služby a etapy, KP13 peníze a faktury, KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). Nic z toho není v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy, KP13 peníze a faktury, KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). Nic z toho není v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1317,7 +1317,7 @@ Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
 - [ ] **Asistent (R-111) na produkci, ale v prohlížeči neověřený:** projít s přihlášením na produkci na 390 a 1280 px — diktování (povolení mikrofonu, Safari `audio/mp4`), věta se dvěma akcemi, toast „Zpět", „Vrátit" u kroku, faktura na klepnutí, věta na detailu zakázky (nesmí se provést sama). Dotazy na data (A4) projít na produkčních datech — testovací Neon nemá tabulky adminu, takže živě běžely jen nad podstrčenými daty · `docs/admin/ASISTENT-PLAN.md` · od 2026-11-16
 
 - [ ] **Supabase pro `/klient` — nasadit a nastavit (R-107, F1):** kód je na větvi
-  `auth/supabase-klient`, na produkci není. Pořadí: (1) migrace 113 na produkci,
+  `klient/kp11-prihlaseni` (KP11 ho převzala z `auth/supabase-klient`), na produkci není. Pořadí: (1) migrace 113 na produkci,
   (2) v Supabase hook Before User Created přepnout na **HTTPS**
   `https://www.zakaziq.cz/api/auth/supabase-hook` (Postgres hook z R-106 vypnout),
   (3) jeho tajemství do Vercelu jako `SUPABASE_AUTH_HOOK_SECRET`, (4) vypnout Confirm email,
@@ -1325,6 +1325,13 @@ Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
   `/klient/auth/potvrzeni` a `ADMIN_USER_ID` (id účtu adminu) do Vercelu, (7) deploy a průchod pozvánka → přístup → přehled → odhlášení →
   přihlášení → zapomenuté heslo na 390 a 1280 px. Detail `docs/AUTH-SUPABASE-PLAN.md` → F1
   · Kryštof · od 2026-11-15
+- [ ] **KP11 naživo neověřené:** pozvání z detailu zakázky běží jen v testech a na dočasné stránce.
+  Po nastavení Supabase (předchozí bod) projít: zakázka → Pozvat do prostoru → e-mail z krystof@vizeon.cz
+  → nastavit heslo → klient vidí zakázku; „Zpět" do 10 s nic nepošle; druhá zakázka stejného klienta se
+  zeptá na prostor; „Zkopírovat odkaz" · větev `klient/kp11-prihlaseni` · od 2026-11-18
+- [ ] **Člověk ve dvou prostorech vidí jen ten první:** `portal.member_lookup` vrací členství podle data
+  vzniku a `/klient` bere první. Pozvání proto stejný e-mail drží v jednom prostoru (s potvrzením); kdyby
+  měl někdo pracovat pro dvě firmy, chce to výběr prostoru v `/klient` · `lib/portal/context.ts` · od 2026-11-18
 - [ ] **Workspace a úklid Clerku (R-107, F2 + F3):** nezačato. Před F2 rozhodnout, jestli
   placený Workspace může běžet na Free projektu Supabase (uspání po týdnu bez provozu,
   limity e-mailů, sdílený projekt s adminem) · `docs/AUTH-SUPABASE-PLAN.md` · od 2026-11-15
@@ -1572,6 +1579,29 @@ Otevřené: zda klient vidí Kryštofovu aktivitu (D-K19, doporučeno ne).
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-18 (KP11 — přihlášení a pozvání do klientského prostoru)
+- **chore** Worktree `../ZakazIQ-klient`, větev `klient/kp11-prihlaseni` z `main` (`5c9ccec`): v hlavním
+  stromu leží necommitnuté změny kalendáře z jiného sezení, ty zůstaly netknuté. Plán druhé vlny
+  commitnutý zvlášť (`7717d91`).
+- **feat** Převzata F1 (R-107) z `auth/supabase-klient` (`ba226aa` → `3d913cb`): `/klient` přes
+  Supabase e-mailem a heslem, hook registrace, migrace 113 (aplikována: ne). Konflikty jen v AUDIT-LOG
+  a DECISIONS (#031 nechal `main` volné). Druhý commit větve (`712cb66`) se nepřenášel, na `main` je
+  jako `153b312`. Do paměti doplněno chybějící R-107. `ws-schema` je tím zelený (mezera po 113 zmizela).
+- **feat** „Pozvat do prostoru" v přehledu zakázky (R-121, D-K12): `inviteToClientSpace` najde nebo
+  založí klienta, propojí zakázku, vytvoří pozvánku vázanou na e-mail a po 13 s ji pošle z
+  krystof@vizeon.cz; „Zpět" vše vrátí. Kdo už v prostoru je, dostane jen zprávu o nové zakázce. Do
+  prostoru, kam e-mail už patří, jen s potvrzením (nález vlastní kontroly, DECISIONS #040). Karta
+  ukazuje členy, čekající pozvánky („Poslat znovu", „Zrušit") a jednorázově „Zkopírovat odkaz".
+  Neodeslaný e-mail = oznámení `portal_invite_failed`. Soubory: `app/portal-admin-actions.ts`,
+  `lib/portal/{project-access,invite-email,invite-delay}.ts`, `components/admin/portal-access-card.tsx`,
+  `components/admin/project-detail-view.tsx`, `lib/notifications.ts`, `components/NotificationList.tsx`.
+- **chore** Ověřeno: `npx tsc --noEmit`; nový `lib/__tests__/portal-pozvani-zakazka.test.ts` (13 testů nad
+  PGlite); plná sada 1420/1426, padají `ws-email` (známé pevné datum) a pod zátěží `admin-ai-asistent-crm`
+  a `admin-hovory-asistent` (samostatně procházejí); `npm run build` napodruhé (napoprvé známý
+  `SecurityFatalError`). Karta na dočasné stránce s vymyšlenými daty (Playwright, 390 a 1280 px): bez
+  přetečení, plochy ≥ 44 px, akce bez přihlášení odmítnuta. **Pozvánku naživo nikdo neposlal**, čeká se
+  na nastavení Supabase a migraci 113. Bezpečnost: AUDIT-LOG 2026-11-18, DECISIONS #040.
 
 ### 2026-11-18 (klientský prostor 2 — plán)
 - **decision** **R-121**: heslo si klient nastaví sám z pozvánky, etapy ze šablony podle druhu služby,

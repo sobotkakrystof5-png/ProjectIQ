@@ -334,3 +334,10 @@ Zvažované alternativy: přehrávání nahrávek přes náš server s omezeným
 Přijaté riziko: v databázi adminu jsou nově texty e-mailů se jménem oslovené osoby (12 měsíců, `purge_outreach_emails`) a data z hovoru (`collected`, s řádkem hovoru 12 měsíců). Uniklý `GROWTH_OS_API_KEY` teď navíc prozradí, koho Kryštof převzal (bez jmen). Nevyžádané hovory jsou riziko na straně Growth OS (§ 96 ZEK, GDPR — DOPLNIT v jeho rozhodnutích); agent se hned představí jako AI.
 Revize: 2027-02-18, nebo dřív, kdyby se nahrávky přece jen měly přehrávat nebo se rozšiřoval allowlist náhledů.
 
+## 040 — Pozvánka do klientského prostoru e-mailem přes Resend; cizí prostor jen s potvrzením
+Datum: 2026-11-18
+Rozhodnutí: pozvánku do `/klient` (kód z `lib/portal/invite.ts`: vázaný na e-mail, jednorázový, 14 dní) pošle admin jedním tlačítkem u zakázky e-mailem z krystof@vizeon.cz přes Resend (`VIZEON_RESEND_API_KEY`, R-116). Odkaz s kódem je jen v těle e-mailu; do naší databáze (tam HMAC), logů ani oznámení se nedostane. E-mail odchází po 13 s a těsně před odesláním se stav čte znovu, takže „Zpět" ho zastaví. Připojit zakázku do prostoru, kam e-mail už patří, smí akce jen s výslovným potvrzením správce (`confirmClientId`).
+Důvod: D-K12 a R-121 (heslo zná jen klient, pozvání jedním klikem). Tiché připojení podle e-mailu by mohlo zakázku jedné firmy ukázat lidem z jiné.
+Zvažované alternativy: jen zkopírovat odkaz a poslat ho ručně (zůstává jako záloha „Zkopírovat odkaz"); pozvánka e-mailem ze Supabase (`inviteUserByEmail` chce klíč `service_role` a druhou šablonu mimo naši kontrolu).
+Přijaté riziko: kód leží v systémech Resendu a ve schránce klienta. Kdo odkaz má, založí účet na adresu z pozvánky (Confirm email je vypnutý, R-107), proto je odkaz jednorázový, platí 14 dní, jde zrušit a e-mail prosí o nepřeposílání.
+Revize: 2027-02-18, nebo při změně poskytovatele e-mailů či zapnutí Confirm email.

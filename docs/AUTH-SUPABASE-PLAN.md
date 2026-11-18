@@ -9,7 +9,7 @@
 | Fáze | Co | Stav |
 |---|---|---|
 | F0 | Admin `/dashboard` (R-105, R-106) | na produkci od 2026-11-15 |
-| **F1** | Klientský prostor `/klient` | **v kódu** na větvi `auth/supabase-klient`, migrace 113 připravená, neaplikovaná |
+| **F1** | Klientský prostor `/klient` | **v kódu** na větvi `klient/kp11-prihlaseni` (převzato z `auth/supabase-klient` v KP11, 2026-11-18), migrace 113 připravená, neaplikovaná |
 | F2 | Workspace `/w`, `/api/ws`, pozvání klientů z adminu (S17) | nezačato |
 | F3 | Odstranění Clerku z repa (`@clerk/*`, webhook, CSP, env) | nezačato, až po F2 |
 

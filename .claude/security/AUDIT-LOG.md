@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-18 — review: pozvání do klientského prostoru z detailu zakázky (KP11, R-121)
+Spouštěč: před commitem (skill `web-security-review`)
+Rozsah: `inviteToClientSpace` a `undoClientSpaceInvite` (`app/portal-admin-actions.ts`), `lib/portal/{project-access,invite-email}.ts`, `components/admin/portal-access-card.tsx`. Převzatá F1 (`ba226aa`, přihlášení `/klient` přes Supabase) prošla vlastní kontrolou 2026-11-15.
+Výsledek: 1 nález, opravený; 0 otevřených.
+Nálezy: (1) pozvání podle e-mailu potichu připojilo zakázku do prostoru, kam už e-mail patřil. U člověka z jiné firmy by zakázku uviděli lidé z cizího prostoru.
+Opraveno: do existujícího prostoru jen s výslovným potvrzením správce (`confirmClientId`, test i s podvrženým id). Dál ověřeno: obě akce začínají `requireAuth` (bez přihlášení vyzkoušeno, končí „Neautorizovaný přístup"); vstupy přes Zod s délkami; SQL jen parametricky; e-mail administrace odmítnut; v HTML e-mailu escapovaný text a odkaz jen `https`; kód pozvánky jen v e-mailu, ne v DB (HMAC), logu ani oznámení (test); v kartě žádné `dangerouslySetInnerHTML`; žádná nová env ani změna CSP.
+Zůstává: kód pozvánky prochází Resendem, DECISIONS #040.
+
 ## 2026-11-18 — review: AI asistent jako CRM (R-120)
 Spouštěč: `web-security-review` před commitem a nasazením na produkci (větev `admin/ai-asistent-crm`).
 Rozsah: nové `GET /api/public/outreach/handled` a `GET /api/outreach/leads/[id]/nahled`, upravené `POST /api/public/outreach` (kontrakt v2, tělo 1 MB), `lib/admin/{outreach,outreach-calls,outreach-crm,outreach-crm-view,outreach-reports,outreach-demo}.ts`, `types/outreach{,-report}.ts`, komponenty `components/admin/ai-asistent/*`, `components/admin/outreach-lead-actions.tsx`, stránka `/dashboard/ai-asistent/kontakt/[id]`, migrace 119, cron `client-retention`.

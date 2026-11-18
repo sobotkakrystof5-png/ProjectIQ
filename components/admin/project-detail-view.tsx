@@ -26,6 +26,8 @@ import { ContactActions } from '@/components/admin/contact-actions'
 import { ProjectActivityPanel } from '@/components/ProjectActivityPanel'
 import { AgentKeyPanel } from '@/components/AgentKeyPanel'
 import { PortalReplyPanel, type PortalThreadMessage } from '@/components/admin/portal-reply-panel'
+import { PortalAccessCard } from '@/components/admin/portal-access-card'
+import { loadProjectPortalAccess } from '@/lib/portal/project-access'
 import { getProjectInvoices } from '@/app/dashboard/finance/invoice-actions'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { getProjectCosts } from '@/app/costs-actions'
@@ -258,6 +260,8 @@ function surveyState(project: Project): string {
 
 async function OverviewTab({ project }: { project: Project }) {
   const publicUrl = getPublicUrl(project.public_token)
+  // Klientský prostor (KP11): kdo v něm je a kdo čeká na pozvánku. Vlastní projekt nemá koho zvát.
+  const portalAccess = project.project_type === 'personal' ? null : await loadProjectPortalAccess(project.id)
 
   return (
     <>
@@ -298,6 +302,14 @@ async function OverviewTab({ project }: { project: Project }) {
           </div>
         </div>
       </Card>
+
+      {portalAccess && (
+        <PortalAccessCard
+          projectId={project.id}
+          access={portalAccess}
+          defaults={{ company: project.company?.trim() || project.client_name, email: project.client_email ?? '' }}
+        />
+      )}
 
       <Card>
         <CardHead title={project.closed_at ? 'Uzavřená zakázka' : 'Uzavřít zakázku'} />

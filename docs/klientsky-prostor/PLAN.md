@@ -190,7 +190,7 @@ Jedno sezení = jedna nová konverzace v Claude Code. Velikost: S ≈ půl dne, 
 | **KP08** | Soubory a přílohy (volitelné) | M | 09x | D-K8, KP07 | ne | nezačato (odloženo, D-K8) |
 | **KP09** | Předání do Claude Code: úroveň 2, experiment s úrovní 3 | M | — | D-K7, KP07 | ne | úroveň 2 hotova; úroveň 3 se nedělá bez experimentu a rozhodnutí |
 | **KP10** | Audit, GDPR, právní texty, pilot s jedním klientem, spuštění | M | — | vše | ano | nezačato (audit, GDPR, pilot) |
-| **KP11** | Přihlášení naostro a pozvání jedním klikem: převzít F1 z `auth/supabase-klient`, seznam nastavení Supabase pro Kryštofa, tlačítko „Pozvat klienta do prostoru", průchod v prohlížeči | M | — (113 z F1) | R-107 F1, D-K12 | částečně | nezačato |
+| **KP11** | Přihlášení naostro a pozvání jedním klikem: převzít F1 z `auth/supabase-klient`, seznam nastavení Supabase pro Kryštofa, tlačítko „Pozvat klienta do prostoru", průchod v prohlížeči | M | — (113 z F1) | R-107 F1, D-K12 | částečně | kód hotov na větvi `klient/kp11-prihlaseni` (2026-11-18): F1 převzatá, pozvání jedním klikem s potvrzením cizího prostoru; čeká na nastavení Supabase a migraci 113, v prohlížeči jen karta s vymyšlenými daty |
 | **KP12** | Služby a etapy: číselník služeb, šablony etap v Nastavení, předvyplnění u nové zakázky, etapy v detailu zakázky, úkoly pro klienta, projekce do `portal` | L | ano | KP11, D-K14 | **ano** | nezačato |
 | **KP13** | Peníze v prostoru: zaplaceno, zbývá, faktury s PDF a QR, projekce do `portal` | M | ano | KP11, D-K15 | částečně | nezačato |
 | **KP14** | Konzultace z volna: Volno pro klienty v kalendáři adminu, rezervace v prostoru, Google Meet a e-maily, `/p` na stejný zdroj | L | ano | KP11, D-K13 | **ano** | nezačato |
