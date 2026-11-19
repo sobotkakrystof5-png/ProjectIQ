@@ -465,6 +465,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `/api/cron/*` | Bearer `CRON_SECRET` (`verifyCronSecret`) | Viz crony níže |
 | `POST /api/agent/v1/projects/{id}/reports` | `Authorization: Bearer zk_agent_…` | Hlášení z Claude Code jako koncept (KP04). Klíč umí jen zápis konceptu do svého projektu; limity 20/hod na klíč, 60/hod na IP; `AGENT_KEY_PEPPER` |
 | `POST /api/klient/transcribe` | přihlášený člen klientského prostoru (Clerk) | Přepis hlasu pro požadavek klienta; limit po IP a členovi |
+| `GET /api/klient/faktury/{id}/pdf` | přihlášený člen klientského prostoru (Supabase) | PDF faktury vlastní zakázky (KP13): vystavená z projekce `portal.invoices`, archivní přes `portal.invoice_pdf`; cizí = 404, ETag, limit 20 za 10 min na člena |
 
 Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-closed) + `lib/api-rate-limit.ts` + Zod validace. Klíč se nikdy neloguje.
 
@@ -703,8 +704,12 @@ Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a ad
   `source_project_id`, `deposit_transaction`, linie ze zakázky; jednorázový příjem
   `category = 'jednorázový příjem'`, linie z formuláře. Obojí `area = 'byznys'`.
 - **Doplatek se počítá jedním vzorcem** (`lib/admin/project-payments.ts` → `remainingSql`,
-  `remainingToPay`): cena − vlastní záloha zakázky − ruční zálohy. Používá ho `updateProject`
-  („Peníze dorazily"), Nezaplacené zakázky v Podnikání, souhrn výpisu zakázek a návrh faktury.
+  `remainingToPay`): cena − vlastní záloha zakázky − ruční zálohy − **zaplacené korunové faktury**
+  (od R-125: jen příjem, který faktura v ledgeru sama založila, `invoicePaymentsSql`). Používá ho
+  `updateProject` („Peníze dorazily"), Nezaplacené zakázky v Podnikání, souhrn výpisu zakázek,
+  návrh faktury a asistent. Tentýž výpočet běží v databázi pro klientský prostor
+  (`portal.refresh_project_money`, migrace 122) — změna jednoho = změna druhého, porovnává je
+  `lib/__tests__/kp13-penize-faktury.test.ts`.
 - Záloha vyšší než zbývá se neuloží (`INSERT … SELECT … WHERE`); smazat jde jen ruční příjem,
   který si nepřevzala faktura. Test `lib/__tests__/admin-zalohy.test.ts`.
 
@@ -1170,6 +1175,26 @@ Migrace 121. Admin:
   `node scripts/portal-create-role.js` (granty).
 - Bez migrace 121 vrací `loadServices`/`loadProjectPhases` `null`: karta i výběr služby se
   schovají, `/dashboard/sluzby` řekne, že to ještě není zapnuté. Testy `lib/__tests__/kp12-sluzby-etapy.test.ts`.
+
+## Peníze a faktury v klientském prostoru (KP13, R-125)
+
+- Admin se kvůli tomu nemění v obrazovkách, jen ve výpočtu doplatku (R-125, viz „Zálohy a ruční
+  příjmy v Podnikání"). Všechno ostatní dělají triggery z migrace 122.
+- **Projekce:** `portal.project_money` (cena, zaplaceno = cena − zbývá, zbývá; jen Kč) a
+  `portal.invoices` (faktury `direction = 'issued'` propojené zakázky; u vystavených v adminu snímek
+  položek, dodavatele bez e-mailu, odběratele a poznámky *na faktuře*; u archivních jen hlavička,
+  `has_pdf` a `md5` nahraného PDF). Triggery: `portal_sync_invoice` (invoices), `portal_sync_money_ledger`
+  (finance_transactions — ruční zálohy a příjmy z faktur), `portal_sync_project_money` (projects —
+  cena, zálohy, zaplaceno). `portal.link_project` je znovu přepsaná: kopíruje i faktury a peníze;
+  migrace na konci doplní projekci už propojeným zakázkám.
+- **Nikdy do portal:** koncepty (`invoice_drafts`), přijaté faktury, `notes`, poznámka archivu,
+  `ai_extracted`, `client_email`, linie a řádky ledgeru (DECISIONS #042).
+- **Klient:** `lib/portal/money.ts` (čtení přes `portal_app`, stav faktury `invoiceState` s pražským
+  dneškem, QR `spaydPaymentString`), `components/portal/project-money.tsx`, PDF
+  `GET /api/klient/faktury/[id]/pdf` (vystavená z projekce `renderInvoicePdf`, archivní
+  `portal.invoice_pdf`). Po migraci pustit `node scripts/portal-create-role.js`.
+- Bez migrace 122 nebo bez grantů vrací `loadClientMoney` prázdno a sekce Peníze se neukáže.
+  Testy `lib/__tests__/kp13-penize-faktury.test.ts`, `app/api/klient/faktury/[id]/pdf/__tests__/route.test.ts`.
 
 ## Stavy zakázky — tóny
 

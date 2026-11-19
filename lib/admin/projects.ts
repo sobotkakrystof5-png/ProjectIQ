@@ -1,6 +1,6 @@
 import 'server-only'
 import { adminDb, batchTolerant, type AdminQuery } from './db'
-import { extraDepositsSql } from './project-payments'
+import { extraDepositsSql, invoicePaymentsSql } from './project-payments'
 import type { TableParams } from '@/lib/admin-table'
 import type { Project, ProjectStatus } from '@/lib/types'
 import type { SummaryProject } from '@/components/SummaryBar'
@@ -123,7 +123,8 @@ export async function loadProjectsScreen(
   }
   const summary: AdminQuery = {
     text: `SELECT status, price, paid, deposit_amount, deposit_paid,
-                  ${extraDepositsSql('projects')}::float AS extra_deposits
+                  ${extraDepositsSql('projects')}::float AS extra_deposits,
+                  ${invoicePaymentsSql('projects')}::float AS invoice_payments
            FROM projects ${originOnly.sql} ORDER BY created_at DESC LIMIT $${originOnly.params.length + 1}`,
     params: [...originOnly.params, SUMMARY_LIMIT],
   }

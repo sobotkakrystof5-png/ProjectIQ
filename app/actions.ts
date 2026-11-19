@@ -18,7 +18,7 @@ import {
 import { parseInvoiceForm, insertInvoice, type InvoiceInput, type InvoicePdf } from '@/lib/invoices'
 import { adminDb } from '@/lib/admin/db'
 import { ledgerSql } from '@/lib/admin/ledger'
-import { EXTRA_DEPOSIT_CATEGORY, extraDepositsFor, remainingToPay } from '@/lib/admin/project-payments'
+import { EXTRA_DEPOSIT_CATEGORY, projectPaymentsFor, remainingToPay } from '@/lib/admin/project-payments'
 import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
 import { phaseDraftsSchema, type PhaseDraft } from '@/lib/admin/phase-model'
 import { initProjectPhases, projectHasPhases } from '@/lib/admin/phases'
@@ -438,14 +438,14 @@ export async function updateProject(
   }
 
   // Přechod na zaplaceno → zapsat zbývající část: cena − vlastní záloha −
-  // zálohy zapsané z Podnikání (R-110). Když je všechno zaplacené zálohami,
-  // doplatek nevznikne vůbec.
+  // zálohy zapsané z Podnikání (R-110) − zaplacené faktury (R-125). Když je
+  // všechno zaplacené zálohami nebo fakturami, doplatek nevznikne vůbec.
   if (!wasPaid && payload.paid && payload.price && payload.price > 0) {
     const remaining = remainingToPay({
       price: payload.price,
       depositAmount: payload.deposit_amount,
       depositPaid: payload.deposit_paid,
-      extraDeposits: await extraDepositsFor(id),
+      ...(await projectPaymentsFor(id)),
     })
     if (remaining > 0) {
       const existingFinal = await sql`

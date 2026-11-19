@@ -30,10 +30,10 @@ beforeAll(async () => {
     );
     CREATE TABLE finance_transactions (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      source_project_id uuid, type text, user_id uuid, category text, amount numeric
+      source_project_id uuid, source_invoice_id uuid, type text, user_id uuid, category text, amount numeric
     );
     CREATE TABLE invoices (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid,
       invoice_number text, client_name text, amount numeric, currency text DEFAULT 'CZK',
       due_on date, paid_on date, cancelled_at timestamptz
     );

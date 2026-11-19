@@ -70,7 +70,7 @@ beforeAll(async () => {
       category text, created_at timestamptz DEFAULT now()
     );
     CREATE TABLE invoices (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), invoice_number text,
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), invoice_number text, project_id uuid,
       currency text NOT NULL DEFAULT 'CZK', amount numeric, paid_on date,
       finance_transaction_id uuid, cancelled_at timestamptz
     );

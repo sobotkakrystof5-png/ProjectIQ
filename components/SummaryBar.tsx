@@ -5,6 +5,8 @@ import type { Project } from '@/lib/types'
 export type SummaryProject = Pick<Project, 'status' | 'price' | 'paid' | 'deposit_amount' | 'deposit_paid'> & {
   /** Zálohy zapsané z Finance › Podnikání (R-110). */
   extra_deposits?: number | null
+  /** Zaplacené korunové faktury zakázky (R-125). */
+  invoice_payments?: number | null
 }
 
 interface SummaryBarProps {
@@ -22,9 +24,10 @@ export function SummaryBar({ projects, mode = 'active' }: SummaryBarProps) {
     .filter(p => !p.paid && p.price)
     .reduce((sum, p) => {
       // Stejně jako `remainingToPay` (lib/admin/project-payments.ts): vlastní
-      // záloha i zálohy z Podnikání, nikdy pod nulu.
+      // záloha, zálohy z Podnikání a zaplacené faktury, nikdy pod nulu.
       const alreadyPaid = (p.deposit_paid && p.deposit_amount ? Number(p.deposit_amount) : 0)
         + Number(p.extra_deposits ?? 0)
+        + Number(p.invoice_payments ?? 0)
       return sum + Math.max(0, Number(p.price ?? 0) - alreadyPaid)
     }, 0)
 

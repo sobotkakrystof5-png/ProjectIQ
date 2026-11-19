@@ -113,7 +113,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury, KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). KP13–KP17 nejsou v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). KP14–KP17 nejsou v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1270,6 +1270,21 @@ klientského prostoru hned, bez schvalování (DECISIONS #041).
 **Důsledek:** `updateProject` u zakázky s etapami `progress` nepřepisuje; nová cesta, která mění
 stav etapy, nemusí počítat % sama. Migrace 121, `docs/admin/AGENTS-ADMIN.md` → „Služby a etapy
 zakázky (KP12)". Upřesňuje R-121 a uzavírá D-K14.
+
+### R-125 · Zaplacená faktura snižuje „zbývá doplatit"; klient vidí tatáž čísla (2026-11-18)
+**Rozhodnutí:** (1) Společný výpočet doplatku (`lib/admin/project-payments.ts`) odečítá kromě vlastní
+zálohy a ručních záloh i **zaplacené korunové faktury zakázky** — jen příjem, který faktura v ledgeru
+sama založila (`source_invoice_id`); faktura, která převzala už zapsanou zálohu, se nepočítá dvakrát.
+Zaplacená zakázka („Peníze dorazily") nezbývá nic. (2) Klient v prostoru vidí u svých zakázek cenu,
+zaplaceno (= cena − zbývá) a zbývá v Kč, tímtéž výpočtem v databázi (`portal.refresh_project_money`,
+migrace 122), a seznam faktur s PDF a QR platbou. Eurové faktury jsou v seznamu, do součtu ne.
+**Proč:** Kryštof 2026-11-18 vybral „započítat faktury". Dřív zaplacená faktura „zbývá" nesnížila
+(nulovalo ho jen „Peníze dorazily"), zatímco průvodka ji už brala jako zaplacenou — klient by po
+zaplacení faktury dál viděl dluh.
+**Důsledek:** **mění chování adminu** (upřesňuje R-110): nižší „Nezaplaceno" ve výpisu zakázek
+a v Podnikání, předvyplněná částka druhé faktury, horní mez ruční zálohy a odpovědi asistenta.
+Výpočet je ve dvou kopiích (TypeScript `remainingSql` a SQL v migraci 122) — změna jedné = změna
+druhé, porovnává je `lib/__tests__/kp13-penize-faktury.test.ts`. Bezpečnost DECISIONS #042.
 ---
 
 ## 3. Otevřené problémy
@@ -1348,12 +1363,22 @@ zakázky (KP12)". Upřesňuje R-121 a uzavírá D-K14.
   přehled → odhlášení → přihlášení → zapomenuté heslo na 390 a 1280 px. Tajné hodnoty agent
   nevkládá (R-115). Detail `docs/AUTH-SUPABASE-PLAN.md` → F1 · od 2026-11-15
 - [ ] **KP12 nasadit a projít naživo:** kód na větvi `klient/kp12-etapy` (nad `klient/kp11-prihlaseni`),
-  commitnutý 2026-11-18, nepushnutý. Před nasazením: migrace 121 na produkci (aditivní, starý build ji přežije), pak
+  commitnutý 2026-11-18; na GitHubu je uvnitř větve `klient/kp13-penize` (sama větev pushnutá není). Před nasazením: migrace 121 na produkci (aditivní, starý build ji přežije), pak
   `node scripts/portal-create-role.js` (granty pro `portal_app`). Projít: Nastavení › Služby (založit
   čtyři služby, napsat etapy Webu, přetáhnout pořadí, smazat a Zpět), nová zakázka se službou Web
   (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
   i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
   s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **KP13 nasadit a projít naživo:** kód na větvi `klient/kp13-penize` (nad `klient/kp12-etapy`),
+  commitnutý a pushnutý na GitHub 2026-11-19 (jen tahle větev, `main` beze změny). Před nasazením: migrace 121 **a** 122 na produkci (obě aditivní; 122 vyžaduje 107
+  a 121), teprve pak `node scripts/portal-create-role.js` — `portal-grants.sql` z téhle větve odkazuje
+  na tabulky ze 122 a bez ní skončí chybou. Projít: zakázka propojená s klientem → `/klient` › projekt
+  ukáže Cenu, Zaplaceno, Zbývá; vystavit fakturu → objeví se „Čeká na zaplacení", Stáhnout PDF (shodné
+  s PDF v adminu), Zaplatit QR kódem v bance (jen s IBANem v profilu dodavatele); označit zaplaceno →
+  Zbývá klesne v adminu i u klienta; storno; archivní faktura s nahraným PDF. **Změna adminu (R-125):**
+  po nasazení zkontrolovat „Nezaplaceno" ve výpisu zakázek a v Podnikání — u zakázek se zaplacenou
+  fakturou bez „Peníze dorazily" teď klesne. Ověřeno jen PGlite a dočasnou stránkou na 390 a 1280 px
+  · od 2026-11-18
 - [ ] **`ws-schema` test je na větvích `klient/*` červený:** číslo 120 drží necommitnutá oprava
   kalendáře v hlavním stromu, KP12 proto vzala 121. Zmizí, až bude 120 v historii · od 2026-11-18
 - [ ] **Admin v Supabase nemá druhý faktor:** účet adminu má 0 ověřených TOTP faktorů (zjištěno
@@ -1613,6 +1638,33 @@ zakázky (KP12)". Upřesňuje R-121 a uzavírá D-K14.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-18 (KP13 — peníze a faktury v klientském prostoru)
+- **feat** Klientský prostor › detail projektu: sekce Peníze s cenou, zaplaceno a zbývá doplatit, seznam
+  faktur se stavem (zaplaceno, čeká, po splatnosti klidně, stornováno), Stáhnout PDF a Zaplatit QR
+  kódem (jen nezaplacená v Kč s IBANem). Soubory: `components/portal/project-money.tsx`,
+  `lib/portal/money.ts`, `app/klient/projekt/[id]/page.tsx`.
+- **feat** `GET /api/klient/faktury/[id]/pdf`: vystavená faktura se vyrobí z projekce stejným
+  rendererem jako v adminu, archivní PDF přes `portal.invoice_pdf`; ETag, limit 20 za 10 min na člena.
+  Chromium pro trasu v `outputFileTracingIncludes` (`next.config.mjs`), jinak by na Vercelu vracela 503.
+- **fix** Admin: zaplacená faktura zakázky teď snižuje „zbývá doplatit" (R-125) — `remainingSql`,
+  souhrn výpisu zakázek (`SummaryBar`), předvyplněná částka faktury, doplatek u „Peníze dorazily".
+  Soubory: `lib/admin/{project-payments,projects,invoice-issue}.ts`, `components/SummaryBar.tsx`,
+  `app/actions.ts`.
+- **db** Migrace 122 `portal_penize_faktury` (aplikována: ne, nikde). Granty v `scripts/portal-grants.sql`.
+- **decision** R-125, DECISIONS #042, AUDIT-LOG 2026-11-18 (1 nález opravený).
+- **chore** Ověřeno: `npx tsc --noEmit`; nové testy `lib/__tests__/kp13-penize-faktury.test.ts` (19 nad
+  PGlite: migrace dvakrát, čísla klienta = admin, EUR zvlášť, storno, koncept a přijatá faktura nikdy,
+  klient B nic, `portal_app` bez `public`) a `app/api/klient/faktury/[id]/pdf/__tests__/route.test.ts`
+  (6); testy KP12 a oddělení klientů pouští i 122 (`lib/__tests__/helpers/portal-money-tables.ts`),
+  zjednodušené tabulky v `admin-zalohy`, `admin-prijem-datum` a `ai-dotazy` dostaly `invoices.project_id`
+  / `source_invoice_id` jako v produkci. Celá sada 1464/1469 (2 selhání známá: `ws-email` pevná data,
+  `ws-schema` mezera po 120; 3 přeskočené). `npm run build` prošel napodruhé (první běh zastavila známá
+  hláška Next o upgradu). Regrese na vývojovém serveru: `/`, `/login`, `/klient/prihlaseni` 200,
+  `/dashboard` a `/dashboard/finance` 307, cizí `/p` 404, PDF trasa bez přihlášení 401 (`next start`
+  v prostředí agenta spojení resetoval, proto dev). Vzhled na dočasné stránce s vymyšlenými daty
+  (Playwright, 390 a 1280 px): bez vodorovného posouvání, plochy ≥ 44 px, konzole bez chyb; stránka
+  smazaná. Naživo neověřeno.
 
 ### 2026-11-18 (KP12 — služby a etapy zakázky)
 - **feat** Nastavení › Služby a etapy (`/dashboard/sluzby`): služby s etapami, typickou délkou, popisem

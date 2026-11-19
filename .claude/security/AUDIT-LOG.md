@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-18 — review: peníze a faktury v klientském prostoru (KP13, R-125)
+Spouštěč: před commitem (skill `web-security-review`)
+Rozsah: migrace 122 (tabulky `portal.project_money`, `portal.invoices`, funkce `refresh_project_money`, `put_invoice`, `invoice_pdf`, triggery na `projects`, `invoices`, `finance_transactions`, přepsané `link_project`), `scripts/portal-grants.sql`, `lib/portal/money.ts`, `GET /api/klient/faktury/[id]/pdf`, `components/portal/project-money.tsx`, sdílený výpočet `lib/admin/project-payments.ts` a jeho volající (`app/actions.ts`, `lib/admin/{projects,invoice-issue}.ts`, `components/SummaryBar.tsx`).
+Výsledek: 1 nález, opravený; 0 otevřených.
+Nálezy: (1) limit stažení PDF platil jen pro vyráběné PDF — archivní PDF (až 5 MB z databáze) šlo jedním členem stahovat bez omezení.
+Opraveno: limit 20 za 10 minut na člena pro obě cesty, až za 304 (test trasy). Dál ověřeno: trasa bez přihlášení 401 a do DB nejde, nesmyslné i cizí id 404, `clientId` a `memberId` jen z přihlášení; SQL jen parametricky, do textu jde jen konstanta sloupců a alias zakázky; definer funkce s pevným `search_path`, `REVOKE ALL FROM PUBLIC`, `portal_app` dostal jen SELECT na dvě projekce a EXECUTE na `invoice_pdf` (test: SELECT na `public.invoices` i `finance_transactions` „permission denied", UPDATE projekce odmítnut, klient B nevidí nic z A, bez kontextu nic); do `portal` se nedostane interní poznámka, AI přepis, e-mail dodavatele ani odběratele, nahraný název souboru, linie ani řádky ledgeru (test prohledá celý obsah projekcí); koncept, přijatá faktura a faktura nepropojené zakázky v projekci nejsou; v komponentě žádné `dangerouslySetInnerHTML`, QR je SVG cesta z Reactu; žádná nová env ani změna CSP.
+Zůstává: PDF archivní faktury z `public` úzkou funkcí, IBAN a odběratel v `portal`, projekce bez vlastní retence — DECISIONS #042.
+
 ## 2026-11-18 — review: služby a etapy zakázky (KP12, R-124)
 Spouštěč: před commitem (skill `web-security-review`)
 Rozsah: migrace 121 (tabulky, triggery `portal.sync_phase*`, `portal.link_project`, `portal.submit_task_state`), `scripts/portal-grants.sql`, `app/phases-actions.ts`, `lib/admin/{phases,phase-model}.ts`, `createProject`/`updateProject` v `app/actions.ts`, `setTaskDone` v `app/klient/projekt/[id]/actions.ts`, `lib/portal/phases.ts`, komponenty v `components/admin/phases/` a `components/portal/`.

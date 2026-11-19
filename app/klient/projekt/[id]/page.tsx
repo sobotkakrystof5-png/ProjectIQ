@@ -10,6 +10,8 @@ import { FeedbackCard } from '@/components/portal/feedback-card'
 import { MessageThread } from '@/components/portal/message-thread'
 import { PhaseTimeline } from '@/components/portal/phase-timeline'
 import { loadClientPhases } from '@/lib/portal/phases'
+import { ProjectMoney } from '@/components/portal/project-money'
+import { loadClientMoney } from '@/lib/portal/money'
 import { isTranscriptionConfigured } from '@/lib/transcribe'
 import { sendRequest } from './actions'
 import { PortalFrame } from '@/components/portal/portal-frame'
@@ -25,9 +27,10 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
   const data = await loadClientProject(ctx.clientId, id)
   if (!data) notFound()
   const { project, activity } = data
-  const [{ requests, messages, rated }, phases] = await Promise.all([
+  const [{ requests, messages, rated }, phases, { money, invoices }] = await Promise.all([
     loadProjectExtras(ctx.clientId, id, ctx.memberId),
     loadClientPhases(ctx.clientId, id),
+    loadClientMoney(ctx.clientId, id),
   ])
   const isDone = project.status === 'done' || project.status === 'paid'
 
@@ -65,6 +68,8 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
       </section>
 
       {phases.length > 0 && <PhaseTimeline projectId={project.id} phases={phases} />}
+
+      <ProjectMoney money={money} invoices={invoices} />
 
       {isDone && !rated && (
         <div className="mt-5">

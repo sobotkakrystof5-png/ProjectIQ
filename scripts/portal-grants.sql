@@ -27,3 +27,8 @@ GRANT EXECUTE ON FUNCTION portal.submit_feedback(uuid, uuid, integer, text) TO p
 GRANT SELECT ON portal.phases, portal.phase_tasks TO portal_app;
 REVOKE ALL ON portal.task_marks FROM portal_app;
 GRANT EXECUTE ON FUNCTION portal.submit_task_state(uuid, uuid, boolean) TO portal_app;
+
+-- Peníze a faktury zakázky (migrace 122, KP13). Klient je jen čte; nahrané PDF
+-- archivní faktury vydá jen funkce invoice_pdf (členství, jedna faktura).
+GRANT SELECT ON portal.project_money, portal.invoices TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.invoice_pdf(uuid, uuid) TO portal_app;

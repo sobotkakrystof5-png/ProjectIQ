@@ -2,7 +2,7 @@ import 'server-only'
 import { sql } from '@/lib/db'
 import { contactOfProject, loadFacts, type AdminFacts } from '@/lib/admin/memory/facts'
 import { adminDb, type AdminQuery } from './db'
-import { extraDepositsSql, remainingToPay } from './project-payments'
+import { extraDepositsSql, invoicePaymentsSql, remainingToPay } from './project-payments'
 import { invoiceTotal } from '@/lib/invoice-pdf/totals'
 import type { PdfInvoice } from '@/lib/invoice-pdf/render'
 import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
@@ -226,6 +226,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
         SELECT p.client_name, p.client_email, p.description, p.price::float AS price,
                p.deposit_amount::float AS deposit_amount, p.deposit_paid,
                ${extraDepositsSql('p')}::float AS extra_deposits,
+               ${invoicePaymentsSql('p')}::float AS invoice_payments,
                c.ico AS contact_ico, c.dic AS contact_dic, c.company AS contact_company
         FROM projects p
         LEFT JOIN contacts c ON c.id = ${CONTACT_ROOT}
@@ -260,6 +261,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
         deposit_amount: number | null
         deposit_paid: boolean
         extra_deposits: number | null
+        invoice_payments: number | null
         contact_ico: string | null
         contact_dic: string | null
         contact_company: string | null
@@ -271,12 +273,14 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     | { client_name: string | null; client_ico: string | null; client_dic: string | null; client_address: string | null }
     | undefined
 
-  // Doplatek: cena − vlastní záloha − zálohy zapsané z Podnikání (R-110).
+  // Doplatek: cena − vlastní záloha − zálohy zapsané z Podnikání (R-110)
+  // − už zaplacené faktury (R-125), ať druhá faktura nenabízí celou cenu znovu.
   draft.amount = remainingToPay({
     price: project.price,
     depositAmount: project.deposit_amount,
     depositPaid: project.deposit_paid,
     extraDeposits: Number(project.extra_deposits ?? 0),
+    invoicePayments: Number(project.invoice_payments ?? 0),
   })
   draft.email = project.client_email?.trim() ?? ''
   draft.projectLabel = project.description ? `${project.client_name} — ${project.description}` : project.client_name

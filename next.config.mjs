@@ -71,6 +71,8 @@ const nextConfig = {
     '/api/invoices/drafts/*/send': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     // Admin: předávací dokument „co bylo dodané“ (AD16).
     '/api/projects/*/predani': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    // Klientský prostor: PDF vystavené faktury se vyrábí z projekce při stažení (KP13).
+    '/api/klient/faktury/*/pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/z/*/faktura/*': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/ucet/export': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     '/w/*/faktury': ['./node_modules/@sparticuz/chromium/bin/**/*'],
