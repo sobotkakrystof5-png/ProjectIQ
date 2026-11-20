@@ -527,6 +527,22 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
   (`/dashboard/calls?pohled=kalendar`); obě místa začínají týdnem (`defaultView="week"`)
   a čtou stejné okno `windowFor(today)` přes `loadCalendarWindow`.
 - Ruční událost nebo blokaci zakládá `AdminEventModal`.
+- **Volno pro klienty (KP14, migrace 123, R-126).** Třetí volba v `AdminEventModal` — den,
+  od–do, délka konzultace (15–120 min, výchozí 30), týdenní opakování do data. Není to událost:
+  tabulka `client_availability` v pražském nástěnném čase, výskyty vrací
+  `client_availability_occurrences(from, to)` (čte je `loadCalendarWindow` dávkou `batchTolerant`,
+  bez migrace 123 prázdné pole). `SmartCalendar` kreslí výskyt jako plochu pod událostmi
+  (`AvailabilityBands`, kliky na mřížku propouští, detail otevře ikona vpravo nahoře nad událostmi),
+  v Měsíci jako řádek „Volno 14:00–17:00". Detail (`AvailabilityDetailModal`) maže jen den
+  (`skip_days`) nebo celou řadu, „Zpět" vrátí snímek (`deleteClientAvailability`,
+  `restoreClientAvailability`). Smazání volna rezervace neruší.
+- **Konzultace z volna.** Klient (`/klient` i `/p`) rezervuje přes `consultation_book` (migrace 123):
+  pod zámkem ověří čas ve volnu (`consultation_free_slots` = volno − události − konzultace −
+  plánované hovory po 30 min, předstih 2 h), založí rezervaci, událost s její délkou
+  (`duration_minutes`) a kontakt v Hovorech. Meet, potvrzení a zvonek dokončí
+  `lib/admin/consultations.ts` (`finishConsultationBooking`, `…Move`, `…Cancel`), pojistka v cronu
+  `send-reminders` (`finishUnfinishedConsultations`). Konzultace v kalendáři nese `booked_via`
+  a `meet_status` (detail ukáže, když se Meet nevytvořil).
 - **Čte jen okno, ne historii (AD08).** Stránka pošle měsíc kotvy ± 7 dní
   (`windowFor` v `lib/admin/calendar-window.ts`), dotazy jsou v `lib/admin/calendar.ts`
   jednou dávkou. Proklik mimo načtené okno dotáhne server action `loadCalendarMonth`

@@ -10,6 +10,7 @@ import { expireOldSuggestions } from '@/lib/admin/suggestions'
 import { proposeMemoryDrafts } from '@/lib/admin/memory/drafts'
 import { remindPendingSurveys } from '@/lib/admin/surveys'
 import { sendOverdueInvites } from '@/lib/admin/meetings'
+import { finishUnfinishedConsultations } from '@/lib/admin/consultations'
 import { prepareRecurringDrafts } from '@/lib/admin/invoice-drafts'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
@@ -216,6 +217,12 @@ export async function GET(req: NextRequest) {
     // funkce spadla. Jen pojistka — běžně odcházejí hned přes `after()`.
     sendOverdueInvites().catch((err) => {
       console.error('[cron] Pojistka e-mailů ke schůzkám selhala:', (err as Error).message)
+      return 0
+    }),
+    // Konzultace z volna (KP14), kterým po rezervaci nedoběhl Meet nebo
+    // potvrzení klientovi. Jen pojistka — běžně doběhnou hned přes `after()`.
+    finishUnfinishedConsultations().catch((err) => {
+      console.error('[cron] Pojistka konzultací selhala:', (err as Error).message)
       return 0
     }),
     // Pravidelné faktury (R-117): jednou za měsíc koncept ke schválení.

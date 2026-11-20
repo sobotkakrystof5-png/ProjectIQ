@@ -1285,6 +1285,24 @@ zaplacení faktury dál viděl dluh.
 a v Podnikání, předvyplněná částka druhé faktury, horní mez ruční zálohy a odpovědi asistenta.
 Výpočet je ve dvou kopiích (TypeScript `remainingSql` a SQL v migraci 122) — změna jedné = změna
 druhé, porovnává je `lib/__tests__/kp13-penize-faktury.test.ts`. Bezpečnost DECISIONS #042.
+
+### R-126 · Konzultace jen ve volnu: 30 minut, předstih 2 h, změna do 24 h, bez limitu počtu (2026-11-20)
+**Rozhodnutí:** (1) Volno pro klienty je **vlastní tabulka** `client_availability` v pražském nástěnném
+čase (den, od–do, délka konzultace, týdenní opakování do data, vynechané dny), ne událost v kalendáři.
+(2) Výchozí konzultace **30 minut** (u volna jde změnit 15–120), nejdřív **2 hodiny** předem, klient ji
+sám přesune nebo zruší do **24 hodin** před začátkem, **počet budoucích konzultací se neomezuje**
+(technicky jen 10 rezervací za hodinu na člena a 5 přesunů jedné konzultace proti zneužití).
+(3) Volné časy = volno − události − konzultace − plánované hovory (30 min), po délce konzultace —
+jediná funkce `consultation_free_slots`, ze které čte `/klient` i `/p`; pevné hodiny `getHourSlots`
+na `/p` skončily. (4) Rezervace z prostoru je vždy Google Meet; potvrzení jde z krystof@vizeon.cz
+na e-mail člena, u `/p` dál jen na e-mail ze zakázky. Meet ani pošta rezervaci neruší.
+**Proč:** Kryštof 2026-11-20 zvolil 30 minut, předstih 2 h, změnu do 24 h a „kolik bude klient chtít
+konzultací". Vlastní tabulka proto, že překryvový guard (008/044/105) by rezervaci ve volnu bral jako
+kolizi s volnem samotným; nástěnný čas proto, aby opakování drželo „čtvrtek 14:00" přes změnu času.
+**Důsledek:** migrace 123 (aplikována: ne), `lib/admin/{availability,consultations,consultation-email}.ts`,
+`lib/portal/consultations.ts`, `lib/consultations/rules.ts` (čísla jsou i v migraci — změna jedné =
+změna druhé). Nová cesta k rezervaci jde přes `consultation_book`, ne přímým INSERT. Smazání volna
+existující rezervace neruší. Bezpečnost DECISIONS #043.
 ---
 
 ## 3. Otevřené problémy
@@ -1369,6 +1387,15 @@ druhé, porovnává je `lib/__tests__/kp13-penize-faktury.test.ts`. Bezpečnost 
   (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
   i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
   s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **KP14 nasadit a projít naživo:** kód na větvi `klient/kp14-konzultace` (nad `klient/kp13-penize`),
+  nic nenasazené. Před nasazením: migrace 121, 122 **a** 123 na produkci (všechny aditivní; 123 potřebuje
+  095, 096, 105 a 115), teprve pak `node scripts/portal-create-role.js` (granty pro `portal_app`) — bez
+  123 skončí granty chybou. Projít: Kalendář › Přidat › Volno pro klienty (jednou i každý týden),
+  plocha v Týdnu a Dni, detail volna a smazání jen dne i celé řady se Zpět; `/klient` › projekt ›
+  Domluvit konzultaci (den, čas, popis) → do minuty odkaz na Meet v e-mailu z krystof@vizeon.cz,
+  v kalendáři adminu i v Hovorech; Přesunout a Zrušit (+ Vrátit); `/p` rezervace jen ve volnu, bez volna
+  věta „Volný termín teď nemám". **Google Meet ani Resend nikdo nezkusil naživo** (jen testy
+  s podstrčenými odpověďmi); vzhled ověřen na dočasné stránce s vymyšlenými daty na 375 a 1280 px · od 2026-11-20
 - [ ] **KP13 nasadit a projít naživo:** kód na větvi `klient/kp13-penize` (nad `klient/kp12-etapy`),
   commitnutý a pushnutý na GitHub 2026-11-19 (jen tahle větev, `main` beze změny). Před nasazením: migrace 121 **a** 122 na produkci (obě aditivní; 122 vyžaduje 107
   a 121), teprve pak `node scripts/portal-create-role.js` — `portal-grants.sql` z téhle větve odkazuje
@@ -1638,6 +1665,33 @@ druhé, porovnává je `lib/__tests__/kp13-penize-faktury.test.ts`. Bezpečnost 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-20 (KP14 — konzultace z volna)
+- **feat** Kalendář adminu: **Volno pro klienty** v okně Přidat (den, od–do, délka konzultace, týdenní
+  opakování do data), plocha pod událostmi v Týdnu a Dni, řádek v Měsíci, detail se smazáním jen dne
+  nebo celé řady a Zpět. Konzultace mají v kalendáři skutečnou délku a stav Meetu. Soubory:
+  `components/{SmartCalendar,AdminEventModal}.tsx`, `app/calendar-actions.ts`, `lib/admin/{availability,calendar}.ts`.
+- **feat** Klientský prostor › projekt: sekce **Konzultace** — Domluvit konzultaci (den, čas z volna, o čem),
+  přehled domluvených s Připojit se (Google Meet), Přesunout a Zrušit do 24 h předem, zrušení jde
+  Vrátit. Soubory: `components/portal/consultations.tsx`, `components/consultations/slot-picker.tsx`,
+  `app/klient/projekt/[id]/{actions.ts,page.tsx}`, `lib/portal/consultations.ts`, `lib/consultations/rules.ts`.
+- **feat** Po rezervaci (prostor i `/p`): Google Meet v kalendáři Kryštofa, potvrzení klientovi
+  z krystof@vizeon.cz, zvonek; přesun posune událost v Googlu, zrušení ji smaže; denní pojistka v cronu
+  `send-reminders`. Nové typy oznámení `consultation_changed`, `consultation_meet_failed`. Soubory:
+  `lib/admin/{consultations,consultation-email}.ts`, `moveGoogleEvent` v `lib/admin/google/calendar.ts`.
+- **refactor** Odkaz `/p`: rezervace jen ve volnu přes `consultation_book` (pevné hodiny `getHourSlots`
+  už nevolá nic), výběr dne a času jako v prostoru. Soubory: `components/{BookingModal,BookingCTA}.tsx`,
+  `app/portal-actions.ts`, `app/p/[token]/page.tsx`.
+- **db** Migrace 123 `konzultace_z_volna` (aplikována: ne, nikde).
+- **fix** Bezpečnostní kontrola (`web-security-review`): limit i na neúspěšné pokusy o rezervaci
+  (30/10 min na člena, 15/10 min na zakázku u `/p`). `.claude/security/{AUDIT-LOG,DECISIONS,STATE}.md`, #043.
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/kp14-konzultace.test.ts` (23 testů nad PGlite,
+  migrace dvakrát po sobě, rezervace jako `portal_app`), testy KP11–KP13 s migrací 123 a `npm run build`.
+  Plná sada: 3 chyby — známé `ws-schema` (mezera po 120) a `ws-email` (pevné datum) a časový limit 5 s
+  v testu, který zakládá novou PGlite (`admin-ai-asistent-crm` „bez migrace 119"); samostatně prochází.
+  Vzhled na dočasné stránce s vymyšlenými daty (375 a 1280 px, bez vodorovného posouvání, plochy ≥ 44 px,
+  konzole čistá), stránka smazaná. **Naživo s databází, Googlem a Resendem neověřeno.**
+- **decision** **R-126**, DECISIONS #043.
 
 ### 2026-11-18 (KP13 — peníze a faktury v klientském prostoru)
 - **feat** Klientský prostor › detail projektu: sekce Peníze s cenou, zaplaceno a zbývá doplatit, seznam

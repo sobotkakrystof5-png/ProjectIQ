@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
-  ChevronLeft, ChevronRight, Phone, Monitor, Video,
+  Phone, Monitor, Video,
   MessageSquare, Loader2, CheckCircle2, CalendarDays, HelpCircle,
 } from 'lucide-react'
 import {
@@ -17,21 +17,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { submitConsultation } from '@/app/portal-actions'
-import {
-  getPragueNow, getHourSlots, pragueSlotToISO, isSlotPast, isDayPast,
-  isSlotBooked, getDaysInMonth, getMonthStartOffset, toMondayFirst,
-} from '@/lib/prague-time'
+import { SlotPicker } from '@/components/consultations/slot-picker'
+import type { FreeSlot } from '@/lib/consultations/rules'
 import { cn } from '@/lib/utils'
 
 // ─── Types & constants ────────────────────────────────────────────────────────
-
-const WEEKDAYS_CZ = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
-const MONTHS_CZ = [
-  'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
-  'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec',
-]
-
-interface SelectedDate { year: number; month: number; day: number }
 
 const CHANNELS = [
   { id: 'whatsapp' as const, label: 'WhatsApp',        icon: MessageSquare },
@@ -54,155 +44,12 @@ type FormValues = z.infer<typeof formSchema>
 
 interface BookingModalProps {
   token: string
-  bookedSlots: string[]   // UTC ISO strings
+  /** Volné časy z volna pro klienty (KP14, migrace 123). */
+  freeSlots: FreeSlot[]
+  /** Dnešní pražský den 'YYYY-MM-DD'. */
+  today: string
   isOpen: boolean
   onClose: () => void
-}
-
-// ─── Mini calendar ────────────────────────────────────────────────────────────
-
-function MonthCalendar({
-  viewYear, viewMonth, selectedDate, bookedSlots, onSelectDate, onPrevMonth, onNextMonth,
-}: {
-  viewYear: number
-  viewMonth: number
-  selectedDate: SelectedDate | null
-  bookedSlots: string[]
-  onSelectDate: (d: SelectedDate) => void
-  onPrevMonth: () => void
-  onNextMonth: () => void
-}) {
-  const now = getPragueNow()
-  const daysInMonth = getDaysInMonth(viewYear, viewMonth)
-  const startOffset = getMonthStartOffset(viewYear, viewMonth)
-  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7
-
-  const canPrev =
-    viewYear > now.year || (viewYear === now.year && viewMonth > now.month)
-
-  return (
-    <div>
-      {/* Month header */}
-      <div className="flex items-center justify-between mb-3">
-        <button
-          type="button"
-          onClick={onPrevMonth}
-          disabled={!canPrev}
-          className="p-1.5 rounded-chip text-quiet hover:bg-navy-50 hover:text-navy-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          aria-label="Předchozí měsíc"
-        >
-          <ChevronLeft size={16} strokeWidth={1.5} />
-        </button>
-        <span className="text-sm font-semibold text-ink">
-          {MONTHS_CZ[viewMonth - 1]} {viewYear}
-        </span>
-        <button
-          type="button"
-          onClick={onNextMonth}
-          className="p-1.5 rounded-chip text-quiet hover:bg-navy-50 hover:text-navy-800 transition-colors"
-          aria-label="Následující měsíc"
-        >
-          <ChevronRight size={16} strokeWidth={1.5} />
-        </button>
-      </div>
-
-      {/* Weekday labels */}
-      <div className="grid grid-cols-7 mb-1">
-        {WEEKDAYS_CZ.map(d => (
-          <div key={d} className="text-center text-[10px] font-semibold text-quiet uppercase py-1">
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Day grid */}
-      <div className="grid grid-cols-7 gap-0.5">
-        {Array.from({ length: totalCells }, (_, i) => {
-          const dayNum = i - startOffset + 1
-          if (dayNum < 1 || dayNum > daysInMonth) return <div key={i} />
-
-          const dow = new Date(viewYear, viewMonth - 1, dayNum).getDay()
-          const isPast = isDayPast(viewYear, viewMonth, dayNum, now)
-          const isSelected =
-            selectedDate?.year === viewYear &&
-            selectedDate?.month === viewMonth &&
-            selectedDate?.day === dayNum
-          const isToday =
-            now.year === viewYear && now.month === viewMonth && now.day === dayNum
-          const isWeekend = dow === 0 || dow === 6
-
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={isPast}
-              onClick={() => onSelectDate({ year: viewYear, month: viewMonth, day: dayNum })}
-              className={cn(
-                'aspect-square flex items-center justify-center text-sm rounded-chip transition-all duration-150 font-medium',
-                isPast && 'cursor-not-allowed text-navy-200',
-                !isPast && isWeekend && !isSelected && 'text-navy-600 hover:bg-navy-50',
-                !isPast && !isWeekend && !isSelected && 'text-ink hover:bg-navy-50 hover:text-navy-800',
-                isToday && !isSelected && 'ring-1 ring-navy-300',
-                isSelected && 'bg-navy-700 text-white shadow-sm scale-110',
-              )}
-              aria-label={`${dayNum}. ${viewMonth}. ${viewYear}`}
-            >
-              {dayNum}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─── Time slot picker ─────────────────────────────────────────────────────────
-
-function TimeSlotPicker({
-  date, bookedSlots, selectedHour, onSelectHour,
-}: {
-  date: SelectedDate
-  bookedSlots: string[]
-  selectedHour: number | null
-  onSelectHour: (h: number) => void
-}) {
-  const now = getPragueNow()
-  const dow = new Date(date.year, date.month - 1, date.day).getDay()
-  const slots = getHourSlots(dow)
-
-  return (
-    <div>
-      <p className="mb-2.5 text-sm font-medium text-ink">
-        Dostupné časy
-      </p>
-      <div className="grid grid-cols-4 gap-1.5">
-        {slots.map(h => {
-          const past = isSlotPast(date.year, date.month, date.day, h, now)
-          const booked = isSlotBooked(bookedSlots, date.year, date.month, date.day, h)
-          const isSelected = selectedHour === h
-          const disabled = past || booked
-
-          return (
-            <button
-              key={h}
-              type="button"
-              disabled={disabled}
-              onClick={() => !disabled && onSelectHour(h)}
-              className={cn(
-                'py-2 text-xs font-semibold rounded-chip border transition-all duration-150',
-                disabled && 'cursor-not-allowed border-navy-100 bg-navy-50 text-navy-200 line-through',
-                !disabled && !isSelected && 'border-navy-100 bg-navy-50 text-navy-700 hover:border-navy-400 hover:bg-navy-100',
-                isSelected && 'bg-navy-700 text-white border-transparent shadow-sm',
-              )}
-              title={booked ? 'Obsazeno' : past ? 'Uplynulý čas' : `${h}:00`}
-            >
-              {h}:00
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
 }
 
 // ─── Success screen ───────────────────────────────────────────────────────────
@@ -255,13 +102,9 @@ function SuccessScreen({ onClose }: { onClose: () => void }) {
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
 
-export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingModalProps) {
-  const now = getPragueNow()
-
-  const [viewYear, setViewYear] = useState(now.year)
-  const [viewMonth, setViewMonth] = useState(now.month)
-  const [selectedDate, setSelectedDate] = useState<SelectedDate | null>(null)
-  const [selectedHour, setSelectedHour] = useState<number | null>(null)
+export function BookingModal({ token, freeSlots, today, isOpen, onClose }: BookingModalProps) {
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [selectedStart, setSelectedStart] = useState<string | null>(null)
   const [slotError, setSlotError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -274,15 +117,12 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
   const selectedChannel = watch('channel')
 
   const resetModal = useCallback(() => {
-    setSelectedDate(null)
-    setSelectedHour(null)
+    setSelectedDay(null)
+    setSelectedStart(null)
     setSlotError(null)
     setServerError(null)
     setSuccess(false)
     reset()
-    const n = getPragueNow()
-    setViewYear(n.year)
-    setViewMonth(n.month)
   }, [reset])
 
   function handleClose() {
@@ -290,32 +130,19 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
     setTimeout(resetModal, 350) // after exit animation
   }
 
-  function prevMonth() {
-    if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12) }
-    else setViewMonth(m => m - 1)
-    setSelectedDate(null); setSelectedHour(null)
-  }
-
-  function nextMonth() {
-    if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1) }
-    else setViewMonth(m => m + 1)
-    setSelectedDate(null); setSelectedHour(null)
-  }
-
   const onSubmit = handleSubmit(async (data) => {
-    if (!selectedDate || selectedHour === null) {
-      setSlotError('Vyberte prosím datum a čas konzultace.')
+    if (!selectedStart) {
+      setSlotError('Vyberte prosím den a čas konzultace.')
       return
     }
     setSlotError(null)
     setServerError(null)
-    const iso = pragueSlotToISO(selectedDate.year, selectedDate.month, selectedDate.day, selectedHour)
     try {
-      const res = await submitConsultation(token, { ...data, scheduledAt: iso })
+      const res = await submitConsultation(token, { ...data, scheduledAt: selectedStart })
       if (res.success) setSuccess(true)
-      else setServerError(res.error ?? 'Chyba serveru. Zkuste to prosím znovu.')
+      else setServerError(res.error ?? 'Rezervace se nepovedla. Zkuste to prosím znovu.')
     } catch {
-      setServerError('Chyba serveru. Zkuste to prosím znovu.')
+      setServerError('Rezervace se nepovedla. Zkuste to prosím znovu.')
     }
   })
 
@@ -344,39 +171,17 @@ export function BookingModal({ token, bookedSlots, isOpen, onClose }: BookingMod
               onSubmit={onSubmit}
               className="p-5 space-y-5"
             >
-              {/* Calendar */}
-              <div className="bg-navy-50 border border-navy-100 rounded-chip p-4">
-                <MonthCalendar
-                  viewYear={viewYear}
-                  viewMonth={viewMonth}
-                  selectedDate={selectedDate}
-                  bookedSlots={bookedSlots}
-                  onSelectDate={d => { setSelectedDate(d); setSelectedHour(null); setSlotError(null) }}
-                  onPrevMonth={prevMonth}
-                  onNextMonth={nextMonth}
+              {/* Den a čas z volna pro klienty (KP14) */}
+              <div className="rounded-chip border border-navy-100 bg-navy-50 p-4">
+                <SlotPicker
+                  slots={freeSlots}
+                  today={today}
+                  day={selectedDay}
+                  value={selectedStart}
+                  onDayChange={(d) => { setSelectedDay(d); setSelectedStart(null); setSlotError(null) }}
+                  onChange={(start) => { setSelectedStart(start); setSlotError(null) }}
                 />
               </div>
-
-              {/* Time slots */}
-              <AnimatePresence>
-                {selectedDate && (
-                  <motion.div
-                    key="timeslots"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <TimeSlotPicker
-                      date={selectedDate}
-                      bookedSlots={bookedSlots}
-                      selectedHour={selectedHour}
-                      onSelectHour={h => { setSelectedHour(h); setSlotError(null) }}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {slotError && (
                 <p className="text-xs text-danger font-medium">{slotError}</p>

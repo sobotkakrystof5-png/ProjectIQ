@@ -7,9 +7,11 @@ import {
   ChevronLeft, ChevronRight, Plus, ExternalLink,
   CalendarDays, Phone, Monitor, Video, MessageSquare,
   CalendarPlus, Lock, Trash2, Clock, Flag, Pencil,
-  Building2, User, Mail, MessageCircle, Coins,
+  Building2, User, Mail, MessageCircle, Coins, CalendarClock, Repeat,
 } from 'lucide-react'
-import { deleteCalendarEvent, restoreCalendarEvent } from '@/app/calendar-actions'
+import {
+  deleteCalendarEvent, restoreCalendarEvent, deleteClientAvailability, restoreClientAvailability,
+} from '@/app/calendar-actions'
 import { resendMeetingInvite } from '@/app/meeting-actions'
 import { toast } from '@/components/ui/toast'
 import {
@@ -38,7 +40,7 @@ import {
 } from '@/lib/prague-time'
 import { loadCalendarMonth } from '@/app/calendar-actions'
 import type {
-  CalendarData, RawCalendarEvent, RawConsultation, RawDeadline, RawLead,
+  CalendarData, RawAvailability, RawCalendarEvent, RawConsultation, RawDeadline, RawLead,
 } from '@/lib/admin/calendar'
 import {
   covers, mergeRanges, neighbourAnchor, startOfMonthIso, startOfWeekIso, viewRange,
@@ -188,7 +190,7 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
 
   for (const c of consultations) {
     const start = new Date(c.scheduled_at)
-    const end = new Date(start.getTime() + 60 * 60 * 1000)
+    const end = new Date(start.getTime() + (c.duration_minutes ?? 60) * 60 * 1000)
     result.push({
       id: c.id,
       kind: 'consultation',
@@ -197,7 +199,8 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
       ...moment(start, end),
       allDay: false,
       label: c.client_name,
-      sublabel: CHANNEL_LABELS[c.channel],
+      // Z klientského prostoru i z odkazu /p jde rezervace z volna (KP14).
+      sublabel: c.booked_via === 'prostor' ? `${CHANNEL_LABELS[c.channel]} · z prostoru` : CHANNEL_LABELS[c.channel],
       channel: c.channel,
       meta: {
         projectId: c.project_id,
@@ -205,6 +208,10 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
         clientWish: c.client_wish,
         clientEmail: c.client_email,
         clientName: c.client_name,
+        inviteNote:
+          c.meet_status === 'failed' ? 'Odkaz na Meet se nevytvořil. Pošlete klientovi odkaz sami.'
+          : c.meet_status === 'pending' || c.meet_status === 'creating' ? 'Odkaz na Meet se právě vytváří.'
+          : null,
       },
     })
   }
@@ -313,6 +320,116 @@ function formatShortDate(date: Date): string {
 
 function eventsForDay(events: UnifiedEvent[], iso: string): UnifiedEvent[] {
   return events.filter(ev => ev.day === iso)
+}
+
+// ─── Volno pro klienty (KP14) ─────────────────────────────────────────────────
+
+function availabilityForDay(availability: RawAvailability[], iso: string): RawAvailability[] {
+  return availability.filter(a => a.day === iso)
+}
+
+/** „14:00–17:00" v pražském čase. */
+function availabilityRange(a: RawAvailability): string {
+  return `${formatTime(new Date(a.starts_at))}–${formatTime(new Date(a.ends_at))}`
+}
+
+function repeatLabel(a: RawAvailability): string {
+  if (!a.repeat_weekly) return 'Jen tento den'
+  const weekday = WEEKDAYS_LONG_CZ[toMondayFirst(isoWeekday(a.day))].toLowerCase()
+  if (!a.repeat_until) return `Každý týden (${weekday})`
+  const [y, m, d] = a.repeat_until.split('-').map(Number)
+  return `Každý týden (${weekday}) do ${d}. ${m}. ${y}`
+}
+
+function AvailabilityDetailModal({
+  availability,
+  onClose,
+  onChanged,
+}: {
+  availability: RawAvailability
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  async function remove(scope: 'series' | 'day') {
+    setBusy(true)
+    try {
+      const snapshot = await deleteClientAvailability(availability.id, scope, availability.day)
+      onChanged()
+      onClose()
+      if (snapshot === null) {
+        toast.error('Volno už neexistuje.')
+        return
+      }
+      toast.success(scope === 'day' ? 'Volno v tento den je smazané.' : 'Volno je smazané.', {
+        undo: async () => {
+          try {
+            await restoreClientAvailability(snapshot)
+            onChanged()
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Smazání se nepodařilo vrátit.')
+          }
+        },
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Volno se nepodařilo smazat.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <div className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full border border-navy-200 bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
+            <CalendarClock size={12} strokeWidth={1.5} aria-hidden="true" />
+            Volno pro klienty
+          </div>
+          <DialogTitle className="text-base leading-tight">
+            {formatShortDate(new Date(availability.starts_at))}, {availabilityRange(availability)}
+          </DialogTitle>
+          <DialogDescription>
+            Klienti si tu můžou zarezervovat konzultaci. Kdo už rezervaci má, o ni smazáním volna nepřijde.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2.5 text-sm">
+          <div className="flex items-center gap-2.5">
+            <Clock size={14} strokeWidth={1.5} className="shrink-0 text-quiet" aria-hidden="true" />
+            <span className="text-ink">Konzultace po {availability.slot_minutes} minutách</span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <Repeat size={14} strokeWidth={1.5} className="shrink-0 text-quiet" aria-hidden="true" />
+            <span className="text-ink">{repeatLabel(availability)}</span>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2">
+          {availability.repeat_weekly && (
+            <button
+              type="button"
+              onClick={() => remove('day')}
+              disabled={busy}
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50 disabled:opacity-50"
+            >
+              Smazat jen tento den
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => remove('series')}
+            disabled={busy}
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-danger/30 px-4 text-sm font-semibold text-danger transition-colors hover:bg-danger/5 disabled:opacity-50"
+          >
+            <Trash2 size={14} strokeWidth={1.5} aria-hidden="true" />
+            {availability.repeat_weekly ? 'Smazat celé opakování' : 'Smazat volno'}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 // ─── Event detail modal ───────────────────────────────────────────────────────
@@ -605,6 +722,7 @@ const MAX_PILLS_PER_DAY = 3
 
 function MonthView({
   events,
+  availability,
   year,
   month,
   todayIso,
@@ -612,6 +730,7 @@ function MonthView({
   onSelectDay,
 }: {
   events: UnifiedEvent[]
+  availability: RawAvailability[]
   year: number
   month: number
   todayIso: string
@@ -695,6 +814,13 @@ function MonthView({
                 {overflow > 0 && (
                   <span className="px-1 text-[10px] font-medium text-quiet">+{overflow} dalších</span>
                 )}
+                {/* Volno pro klienty jen jako řádek — detail je v Týdnu a Dni (KP14). */}
+                {availabilityForDay(availability, iso).map(a => (
+                  <span key={`${a.id}-${a.day}`} className="mt-auto flex items-center gap-1 truncate px-1 text-[10px] font-medium text-navy-700">
+                    <CalendarClock size={10} strokeWidth={1.5} aria-hidden="true" />
+                    <span className="truncate">Volno {availabilityRange(a)}</span>
+                  </span>
+                ))}
               </div>
             </div>
           )
@@ -734,17 +860,74 @@ function isInGrid(ev: UnifiedEvent): boolean {
   return !ev.allDay && ev.endMin > DAY_START * 60 && ev.startMin < (DAY_END + 1) * 60
 }
 
+/** Plocha volna pro klienty v mřížce dne; mimo zobrazené hodiny nic. */
+function bandGeometry(a: RawAvailability): { topPx: number; heightPx: number } | null {
+  const startMin = pragueMinutesOf(a.starts_at)
+  const endMin = pragueDayOf(a.ends_at) === a.day ? pragueMinutesOf(a.ends_at) : 24 * 60
+  const gridStart = DAY_START * 60
+  const from = Math.max(startMin, gridStart)
+  const to = Math.min(endMin, (DAY_END + 1) * 60)
+  if (to <= from) return null
+  return { topPx: ((from - gridStart) / 60) * HOUR_PX, heightPx: ((to - from) / 60) * HOUR_PX }
+}
+
+/**
+ * Volno se kreslí **pod** událostmi a kliky na mřížku propouští (přidat
+ * událost jde i do volna). Klikat jde jen na štítek, který otevře detail.
+ */
+function AvailabilityBands({
+  items,
+  className,
+  onSelect,
+}: {
+  items: RawAvailability[]
+  className?: string
+  onSelect: (a: RawAvailability) => void
+}) {
+  return (
+    <>
+      {items.map(a => {
+        const g = bandGeometry(a)
+        if (!g) return null
+        return (
+          <div
+            key={`${a.id}-${a.day}`}
+            className={cn('pointer-events-none absolute border-l-2 border-navy-400 bg-navy-50/80', className)}
+            style={{ top: `${g.topPx}px`, height: `${g.heightPx}px` }}
+          >
+            <span className="m-0.5 block truncate px-1 py-0.5 text-[10px] font-semibold text-navy-700">Volno</span>
+            {/* Nad událostmi, aby šel detail otevřít, i když je první čas volna zarezervovaný. */}
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onSelect(a) }}
+              className="pointer-events-auto absolute right-0.5 top-0.5 z-20 inline-flex h-5 w-5 items-center justify-center rounded-tiny border border-navy-200 bg-surface text-navy-700 hover:bg-navy-100"
+              aria-label={`Volno pro klienty ${availabilityRange(a)}`}
+              title={`Volno pro klienty ${availabilityRange(a)}`}
+            >
+              <CalendarClock size={11} strokeWidth={1.5} aria-hidden="true" />
+            </button>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 function WeekView({
   events,
+  availability,
   weekStart,
   todayIso,
   onSelectEvent,
+  onSelectAvailability,
   onClickSlot,
 }: {
   events: UnifiedEvent[]
+  availability: RawAvailability[]
   weekStart: string
   todayIso: string
   onSelectEvent: (ev: UnifiedEvent) => void
+  onSelectAvailability: (a: RawAvailability) => void
   onClickSlot: (date: string, hour: number) => void
 }) {
   const days = Array.from({ length: 7 }, (_, i) => addIsoDays(weekStart, i))
@@ -846,6 +1029,12 @@ function WeekView({
                     />
                   ))}
 
+                  <AvailabilityBands
+                    items={availabilityForDay(availability, d)}
+                    className="inset-x-0"
+                    onSelect={onSelectAvailability}
+                  />
+
                   {/* Events */}
                   {timedEvents.map(ev => {
                     const style = getEventStyle(ev)
@@ -889,14 +1078,18 @@ function WeekView({
 
 function DayView({
   events,
+  availability,
   date,
   onSelectEvent,
+  onSelectAvailability,
   onClickSlot,
 }: {
   events: UnifiedEvent[]
+  availability: RawAvailability[]
   /** 'YYYY-MM-DD' pražského dne */
   date: string
   onSelectEvent: (ev: UnifiedEvent) => void
+  onSelectAvailability: (a: RawAvailability) => void
   onClickSlot: (dateStr: string, hour: number) => void
 }) {
   const hours = Array.from({ length: DAY_END - DAY_START + 1 }, (_, i) => i + DAY_START)
@@ -949,6 +1142,12 @@ function DayView({
                 </span>
               </div>
             ))}
+
+            <AvailabilityBands
+              items={availabilityForDay(availability, date)}
+              className="left-14 right-2"
+              onSelect={onSelectAvailability}
+            />
 
             {/* Events */}
             {timedEvents.map(ev => {
@@ -1037,6 +1236,10 @@ function Legend() {
         <span>Blokovaný čas</span>
       </div>
       <div className="flex items-center gap-1.5">
+        <span className="h-2.5 w-2.5 border-l-2 border-navy-400 bg-navy-50" />
+        <span>Volno pro klienty</span>
+      </div>
+      <div className="flex items-center gap-1.5">
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, KIND_TONE.call ?? 0) }} />
         <span>Plánovaná akce (Hovory)</span>
       </div>
@@ -1073,6 +1276,7 @@ export function SmartCalendar({
   const [view, setView] = useState<ViewMode>(defaultView)
   const [anchor, setAnchor] = useState(() => (defaultView === 'month' ? startOfMonthIso(today) : today))
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null)
+  const [selectedAvailability, setSelectedAvailability] = useState<RawAvailability | null>(null)
   const [createModal, setCreateModal] = useState<{ open: boolean; date?: string; hour?: number; editing?: EditableEvent }>({ open: false })
 
   // Data kalendáře žijí tady, ne v propech: do prohlížeče přijde jen okno
@@ -1095,6 +1299,7 @@ export function SmartCalendar({
       deadlines: [...prev.deadlines.filter((d) => outside(d.deadline)), ...incoming.deadlines],
       events: [...prev.events.filter((e) => outside(pragueDayOf(e.starts_at))), ...incoming.events],
       leads: [...prev.leads.filter((l) => outside(pragueDayOf(l.action_at))), ...incoming.leads],
+      availability: [...prev.availability.filter((a) => outside(a.day)), ...incoming.availability],
     }))
     setLoaded((prev) => mergeRanges([...prev, range]))
   }, [])
@@ -1258,6 +1463,7 @@ export function SmartCalendar({
               {view === 'month' && (
                 <MonthView
                   events={unified}
+                  availability={data.availability}
                   year={Number(anchor.slice(0, 4))}
                   month={Number(anchor.slice(5, 7))}
                   todayIso={today}
@@ -1268,17 +1474,21 @@ export function SmartCalendar({
               {view === 'week' && (
                 <WeekView
                   events={unified}
+                  availability={data.availability}
                   weekStart={startOfWeekIso(anchor)}
                   todayIso={today}
                   onSelectEvent={setSelectedEvent}
+                  onSelectAvailability={setSelectedAvailability}
                   onClickSlot={handleClickSlot}
                 />
               )}
               {view === 'day' && (
                 <DayView
                   events={unified}
+                  availability={data.availability}
                   date={anchor}
                   onSelectEvent={setSelectedEvent}
+                  onSelectAvailability={setSelectedAvailability}
                   onClickSlot={handleClickSlot}
                 />
               )}
@@ -1315,6 +1525,14 @@ export function SmartCalendar({
               },
             })
           }}
+        />
+      )}
+
+      {selectedAvailability && (
+        <AvailabilityDetailModal
+          availability={selectedAvailability}
+          onClose={() => setSelectedAvailability(null)}
+          onChanged={reloadCurrent}
         />
       )}
 

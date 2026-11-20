@@ -29,6 +29,10 @@ export type NotificationType =
   | 'survey_detractor'
   /** Klient v prostoru označil úkol etapy jako hotový (KP12, R-121). */
   | 'client_task_done'
+  /** Klient přesunul nebo zrušil konzultaci (KP14, R-126). */
+  | 'consultation_changed'
+  /** Ke konzultaci se nevytvořil odkaz na Google Meet (KP14, R-126). */
+  | 'consultation_meet_failed'
 
 export async function createNotification(params: {
   type: NotificationType

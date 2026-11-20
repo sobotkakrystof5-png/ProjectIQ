@@ -3,6 +3,7 @@ import path from 'path'
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { preparePortalMoneyTables } from '@/lib/__tests__/helpers/portal-money-tables'
+import { prepareConsultationTables } from '@/lib/__tests__/helpers/consultation-tables'
 
 // Oddělení klientů v schématu portal (KP05, migrace 095) proti PGlite:
 // migrace dvakrát po sobě, práva a RLS jako role portal_app, triggery.
@@ -56,6 +57,7 @@ beforeAll(async () => {
     ['c'.repeat(64)],
   )
   await preparePortalMoneyTables(db)
+  await prepareConsultationTables(db)
   for (let i = 0; i < 2; i++) {
     // idempotence: všechny migrace dvakrát po sobě
     await db.exec(read('migrations', '095_portal_schema.sql'))
@@ -63,6 +65,7 @@ beforeAll(async () => {
     await db.exec(read('migrations', '113_portal_supabase_auth.sql'))
     await db.exec(read('migrations', '121_sluzby_a_etapy.sql'))
     await db.exec(read('migrations', '122_portal_penize_faktury.sql'))
+    await db.exec(read('migrations', '123_konzultace_z_volna.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')

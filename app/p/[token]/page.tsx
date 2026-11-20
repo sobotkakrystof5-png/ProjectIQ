@@ -8,7 +8,6 @@ import { publicToken } from '@/lib/public-token'
 import { isTranscriptionConfigured } from '@/lib/transcribe'
 import { formatDate } from '@/lib/utils'
 import { ACTIVITY_KIND_LABELS, buildTimeline, type TimelineActivity } from '@/lib/project-activity'
-import { expandRangeToHourlySlots } from '@/lib/prague-time'
 import { Calendar, RefreshCw, MessageSquare, TrendingUp, Star, ExternalLink } from 'lucide-react'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/lib/types'
 
@@ -34,7 +33,7 @@ export default async function ClientPortalPage(props: PageProps) {
 
   const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at' | 'project_url'>
 
-  const [msgRows, progressRows, bookedRows, eventRows, activityRows] = await Promise.all([
+  const [msgRows, progressRows, freeRows, activityRows] = await Promise.all([
     sql`
       SELECT id, content, created_at
       FROM client_messages
@@ -47,18 +46,12 @@ export default async function ClientPortalPage(props: PageProps) {
       WHERE project_id = ${project.id}
       ORDER BY created_at DESC
     `,
-    sql`
-      SELECT scheduled_at
-      FROM consultation_slots
-      WHERE scheduled_at > now()
-      ORDER BY scheduled_at
-    `,
+    // Volné časy z volna pro klienty (KP14, migrace 123) — stejná funkce jako
+    // v klientském prostoru. Bez migrace se rezervace nenabídne.
     sql`
       SELECT starts_at, ends_at
-      FROM calendar_events
-      WHERE ends_at > now()
-      ORDER BY starts_at
-    `,
+      FROM consultation_free_slots(now(), now() + interval '60 days')
+    `.catch(() => []),
     // Jen schválené zprávy (KP03). Koncepty, zdroj ani příznak citlivosti klient
     // nikdy nevidí. Tabulka vzniká migrací 093; do jejího nasazení portál nesmí spadnout.
     sql`
@@ -73,11 +66,10 @@ export default async function ClientPortalPage(props: PageProps) {
   const messages = msgRows as Pick<ClientMessage, 'id' | 'content' | 'created_at'>[]
   const progressUpdates = progressRows as Pick<ProgressUpdate, 'id' | 'progress_from' | 'progress_to' | 'description' | 'created_at'>[]
   const timeline = buildTimeline(progressUpdates, activityRows as TimelineActivity[])
-  const consultationSlots = (bookedRows as { scheduled_at: Date | string }[]).map(r => new Date(r.scheduled_at).toISOString())
-  const blockedRangeSlots = (eventRows as { starts_at: Date | string; ends_at: Date | string }[]).flatMap(r =>
-    expandRangeToHourlySlots(new Date(r.starts_at).toISOString(), new Date(r.ends_at).toISOString()),
-  )
-  const bookedSlots = [...consultationSlots, ...blockedRangeSlots]
+  const freeSlots = (freeRows as { starts_at: Date | string; ends_at: Date | string }[]).map(r => ({
+    startsAt: new Date(r.starts_at).toISOString(),
+    endsAt: new Date(r.ends_at).toISOString(),
+  }))
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -238,7 +230,7 @@ export default async function ClientPortalPage(props: PageProps) {
                 </div>
 
                 {/* Booking CTA */}
-                <BookingCTA token={params.token} bookedSlots={bookedSlots} />
+                <BookingCTA token={params.token} freeSlots={freeSlots} />
               </div>
             </div>
           </div>

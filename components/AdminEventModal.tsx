@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Loader2, CalendarPlus, Lock } from 'lucide-react'
+import { Loader2, CalendarPlus, Lock, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,7 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { createCalendarEvent, updateCalendarEvent } from '@/app/calendar-actions'
+import { createCalendarEvent, createClientAvailability, updateCalendarEvent } from '@/app/calendar-actions'
+import { CONSULTATION_DEFAULT_MINUTES, CONSULTATION_SLOT_MINUTES } from '@/lib/consultations/rules'
 import { cn } from '@/lib/utils'
 import { getPragueTodayISO, isoToPragueDateAndTime, parsePragueDatetimeLocalToISO } from '@/lib/prague-time'
 import type { CalendarEventType } from '@/lib/types'
@@ -63,7 +64,12 @@ function localDatetimeToISO(localDt: string): string {
   return parsePragueDatetimeLocalToISO(localDt)
 }
 
-const EVENT_TYPES: { id: CalendarEventType; label: string; description: string; icon: typeof Lock }[] = [
+/** Volno pro klienty není událost (vlastní tabulka, KP14) — jen třetí volba formuláře. */
+type FormType = CalendarEventType | 'availability'
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+const EVENT_TYPES: { id: FormType; label: string; description: string; icon: typeof Lock }[] = [
   {
     id: 'manual',
     label: 'Událost / schůzka',
@@ -76,6 +82,12 @@ const EVENT_TYPES: { id: CalendarEventType; label: string; description: string; 
     description: 'Blokuj termín — klienti neuvidí volný slot',
     icon: Lock,
   },
+  {
+    id: 'availability',
+    label: 'Volno pro klienty',
+    description: 'Čas, kdy si klienti můžou zarezervovat konzultaci',
+    icon: CalendarClock,
+  },
 ]
 
 export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: AdminEventModalProps) {
@@ -85,7 +97,14 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
 
   const [title, setTitle] = useState(editing?.title ?? '')
   const [description, setDescription] = useState(editing?.description ?? '')
-  const [eventType, setEventType] = useState<CalendarEventType>(editing?.type ?? 'manual')
+  const [eventType, setEventType] = useState<FormType>(editing?.type ?? 'manual')
+  // Volno pro klienty (KP14): den, od–do, délka konzultace, opakování.
+  const [avDay, setAvDay] = useState(initDate)
+  const [avStart, setAvStart] = useState(`${pad2(Math.min(initHour, 22))}:00`)
+  const [avEnd, setAvEnd] = useState(`${pad2(Math.min(initHour + 2, 23))}:00`)
+  const [avSlot, setAvSlot] = useState<number>(CONSULTATION_DEFAULT_MINUTES)
+  const [avRepeat, setAvRepeat] = useState(false)
+  const [avUntil, setAvUntil] = useState('')
   const [contactName, setContactName] = useState(editing?.contactName ?? '')
   const [phone, setPhone] = useState(editing?.phone ?? '')
   const [email, setEmail] = useState(editing?.email ?? '')
@@ -118,6 +137,26 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (eventType === 'availability') {
+      if (avEnd <= avStart) { setError('Konec musí být po začátku.'); return }
+      setError(null)
+      startTransition(async () => {
+        try {
+          await createClientAvailability({
+            day: avDay,
+            start: avStart,
+            end: avEnd,
+            slotMinutes: avSlot,
+            repeatWeekly: avRepeat,
+            repeatUntil: avRepeat && avUntil ? avUntil : null,
+          })
+          close(true)
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Volno se nepodařilo uložit.')
+        }
+      })
+      return
+    }
     if (!title.trim()) { setError('Název je povinný.'); return }
     if (new Date(endsAt) <= new Date(startsAt)) {
       setError('Čas konce musí být po čase začátku.')
@@ -131,7 +170,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
           description: description.trim() || null,
           starts_at: localDatetimeToISO(startsAt),
           ends_at: localDatetimeToISO(endsAt),
-          event_type: eventType,
+          event_type: eventType as CalendarEventType,
           // Blokace je soukromá — do Hovorů se nezrcadlí, takže ani kontakt
           // nemá komu patřit.
           contact_name: eventType === 'manual' ? contactName.trim() || null : null,
@@ -159,12 +198,12 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
             <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-600" aria-hidden="true" />
             {editing ? 'Upravit v kalendáři' : 'Přidat do kalendáře'}
           </DialogTitle>
-          <DialogDescription>{editing ? 'Změňte, co potřebujete, a uložte. Termín se hlídá proti kolizi.' : 'Událost nebo blokace v diáři. Termín se hlídá proti kolizi.'}</DialogDescription>
+          <DialogDescription>{editing ? 'Změňte, co potřebujete, a uložte. Termín se hlídá proti kolizi.' : eventType === 'availability' ? 'Klienti si v tomhle čase zarezervují konzultaci. Co už máte v kalendáři, zůstane obsazené.' : 'Událost nebo blokace v diáři. Termín se hlídá proti kolizi.'}</DialogDescription>
         </DialogHeader>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Event type selector */}
-        {!editing && <div className="grid grid-cols-2 gap-2">
+        {!editing && <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {EVENT_TYPES.map(({ id, label, description: desc, icon: Icon }) => (
             <button
               key={id}
@@ -195,6 +234,43 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
           ))}
         </div>}
 
+        {eventType === 'availability' && (
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="av-day" className="text-sm font-medium text-ink">Den *</label>
+              <input id="av-day" type="date" value={avDay} min={today} onChange={e => setAvDay(e.target.value)} className={inputCls} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="av-start" className="text-sm font-medium text-ink">Od *</label>
+                <input id="av-start" type="time" step={900} value={avStart} onChange={e => setAvStart(e.target.value)} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="av-end" className="text-sm font-medium text-ink">Do *</label>
+                <input id="av-end" type="time" step={900} value={avEnd} onChange={e => setAvEnd(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="av-slot" className="text-sm font-medium text-ink">Délka jedné konzultace</label>
+              <select id="av-slot" value={avSlot} onChange={e => setAvSlot(Number(e.target.value))} className={cn(inputCls, 'min-h-11')}>
+                {CONSULTATION_SLOT_MINUTES.map(m => <option key={m} value={m}>{m} minut</option>)}
+              </select>
+            </div>
+            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink">
+              <input type="checkbox" checked={avRepeat} onChange={e => setAvRepeat(e.target.checked)} className="h-4 w-4 accent-navy-700" />
+              Opakovat každý týden
+            </label>
+            {avRepeat && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="av-until" className="text-sm font-medium text-ink">Opakovat do (nepovinné)</label>
+                <input id="av-until" type="date" value={avUntil} min={avDay} onChange={e => setAvUntil(e.target.value)} className={inputCls} />
+                <p className="text-[11px] leading-snug text-quiet">Bez data se volno opakuje, dokud ho nesmažete.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {eventType !== 'availability' && <>
         {/* Title */}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-ink">
@@ -293,6 +369,8 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
           </div>
         )}
 
+        </>}
+
         {error && (
           <p className="rounded-chip border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-medium text-danger">
             {error}
@@ -307,7 +385,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
           >
             {isPending
               ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
-              : editing ? 'Uložit změny' : 'Uložit událost'
+              : editing ? 'Uložit změny' : eventType === 'availability' ? 'Uložit volno' : 'Uložit událost'
             }
           </button>
           <button

@@ -32,7 +32,7 @@ function meetLink(event: GoogleEvent): string | null {
 }
 
 async function call(
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   url: string,
   body: unknown,
   fetchImpl: Fetch,
@@ -104,4 +104,21 @@ export async function createMeetEvent(
 /** Smaže událost v Googlu. Už smazaná (404/410) je v pořádku. */
 export async function deleteGoogleEvent(googleEventId: string, options: { fetchImpl?: Fetch } = {}): Promise<void> {
   await call('DELETE', `${EVENTS_URL}/${encodeURIComponent(googleEventId)}?sendUpdates=none`, null, options.fetchImpl ?? fetch)
+}
+
+/** Posune událost v Googlu na nový čas (přesun konzultace klientem, KP14). Odkaz na Meet zůstává. */
+export async function moveGoogleEvent(
+  googleEventId: string,
+  input: { startsAt: string; endsAt: string },
+  options: { fetchImpl?: Fetch } = {},
+): Promise<void> {
+  await call(
+    'PATCH',
+    `${EVENTS_URL}/${encodeURIComponent(googleEventId)}?sendUpdates=none`,
+    {
+      start: { dateTime: input.startsAt, timeZone: 'Europe/Prague' },
+      end: { dateTime: input.endsAt, timeZone: 'Europe/Prague' },
+    },
+    options.fetchImpl ?? fetch,
+  )
 }

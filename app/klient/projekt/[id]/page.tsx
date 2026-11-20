@@ -12,6 +12,9 @@ import { PhaseTimeline } from '@/components/portal/phase-timeline'
 import { loadClientPhases } from '@/lib/portal/phases'
 import { ProjectMoney } from '@/components/portal/project-money'
 import { loadClientMoney } from '@/lib/portal/money'
+import { ProjectConsultations } from '@/components/portal/consultations'
+import { loadClientConsultations } from '@/lib/portal/consultations'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { isTranscriptionConfigured } from '@/lib/transcribe'
 import { sendRequest } from './actions'
 import { PortalFrame } from '@/components/portal/portal-frame'
@@ -27,10 +30,11 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
   const data = await loadClientProject(ctx.clientId, id)
   if (!data) notFound()
   const { project, activity } = data
-  const [{ requests, messages, rated }, phases, { money, invoices }] = await Promise.all([
+  const [{ requests, messages, rated }, phases, { money, invoices }, consultations] = await Promise.all([
     loadProjectExtras(ctx.clientId, id, ctx.memberId),
     loadClientPhases(ctx.clientId, id),
     loadClientMoney(ctx.clientId, id),
+    loadClientConsultations(ctx.clientId, id),
   ])
   const isDone = project.status === 'done' || project.status === 'paid'
 
@@ -70,6 +74,15 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
       {phases.length > 0 && <PhaseTimeline projectId={project.id} phases={phases} />}
 
       <ProjectMoney money={money} invoices={invoices} />
+
+      {consultations.enabled && (
+        <ProjectConsultations
+          projectId={project.id}
+          today={getPragueTodayISO()}
+          upcoming={consultations.upcoming}
+          freeSlots={consultations.freeSlots}
+        />
+      )}
 
       {isDone && !rated && (
         <div className="mt-5">

@@ -6,6 +6,14 @@ import { requireAuth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { ensureContact } from '@/lib/admin/contacts'
 import { loadCalendarWindow, type CalendarData } from '@/lib/admin/calendar'
+import {
+  availabilitySchema,
+  insertAvailability,
+  removeAvailability,
+  restoreAvailability,
+  type AvailabilityInput,
+  type AvailabilitySnapshot,
+} from '@/lib/admin/availability'
 import { isCalendarDay, windowFor, type DayRange } from '@/lib/admin/calendar-window'
 import { isoToPragueDateAndTime } from '@/lib/prague-time'
 import { DEFAULT_LEAD_ORIGIN } from '@/lib/lead-origins'
@@ -306,4 +314,60 @@ export async function restoreCalendarEvent(snapshot: CalendarEventSnapshot) {
       next_action: s.lead?.next_action ?? null,
     },
   )
+}
+
+
+// ─── Volno pro klienty (KP14, migrace 123) ────────────────────────────────────
+//
+// Volno není událost a do Hovorů se nezrcadlí. Klienti si v něm rezervují
+// konzultace; smazáním volna se existující rezervace neruší.
+
+function availabilityError(err: unknown): never {
+  const code = (err as { code?: string })?.code
+  if (code === '42P01' || code === '42883') {
+    throw new Error('Volno pro klienty ještě není v databázi (migrace 123).')
+  }
+  throw err
+}
+
+export async function createClientAvailability(payload: AvailabilityInput): Promise<{ id: string }> {
+  await requireAuth()
+  const parsed = availabilitySchema.safeParse(payload)
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Zkontrolujte prosím volno.')
+  try {
+    const id = await insertAvailability(parsed.data)
+    revalidateCalendar(false)
+    return { id }
+  } catch (err) {
+    return availabilityError(err)
+  }
+}
+
+const removeSchema = z.object({
+  id: z.string().uuid(),
+  scope: z.enum(['series', 'day']),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+})
+
+/** Smaže volno (celé, nebo jen jeden den opakování) a vrátí snímek pro „Zpět". */
+export async function deleteClientAvailability(
+  id: string,
+  scope: 'series' | 'day',
+  day: string,
+): Promise<AvailabilitySnapshot | null> {
+  await requireAuth()
+  const parsed = removeSchema.parse({ id, scope, day })
+  try {
+    const snapshot = await removeAvailability(parsed.id, parsed.scope, parsed.day)
+    revalidateCalendar(false)
+    return snapshot
+  } catch (err) {
+    return availabilityError(err)
+  }
+}
+
+export async function restoreClientAvailability(snapshot: AvailabilitySnapshot): Promise<void> {
+  await requireAuth()
+  await restoreAvailability(snapshot)
+  revalidateCalendar(false)
 }

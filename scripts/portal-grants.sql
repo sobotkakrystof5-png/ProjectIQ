@@ -32,3 +32,12 @@ GRANT EXECUTE ON FUNCTION portal.submit_task_state(uuid, uuid, boolean) TO porta
 -- archivní faktury vydá jen funkce invoice_pdf (členství, jedna faktura).
 GRANT SELECT ON portal.project_money, portal.invoices TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.invoice_pdf(uuid, uuid) TO portal_app;
+
+-- Konzultace z volna (migrace 123, KP14). Klient čte jen své konzultace
+-- a volné časy (bez toho, čím je zbytek obsazený); rezervuje, přesouvá
+-- a ruší jen funkcemi (členství, lhůta 24 h, limity).
+GRANT SELECT ON portal.consultations TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.free_consultation_slots(timestamptz, timestamptz) TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.book_consultation(uuid, uuid, timestamptz, text) TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.move_consultation(uuid, uuid, timestamptz) TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.cancel_consultation(uuid, uuid) TO portal_app;

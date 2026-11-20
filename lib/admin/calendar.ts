@@ -1,5 +1,6 @@
 import 'server-only'
-import { adminDb, q } from '@/lib/admin/db'
+import { batchTolerant, q } from '@/lib/admin/db'
+import { availabilityQuery, mapAvailability, type RawAvailability } from '@/lib/admin/availability'
 import { addIsoDays, pragueWallClockToISO } from '@/lib/prague-time'
 import type { DayRange } from '@/lib/admin/calendar-window'
 import type { LeadStatus, ConsultationChannel, CalendarEventType } from '@/lib/types'
@@ -22,6 +23,12 @@ export type RawConsultation = {
   client_email: string | null
   client_name: string
   project_id: string
+  /** Délka v minutách (KP14, migrace 123). Starší rezervace hodina. */
+  duration_minutes?: number | null
+  /** Odkud rezervace přišla: 'odkaz' (/p), 'prostor' (/klient). */
+  booked_via?: string | null
+  /** Stav Google Meetu u rezervace z volna. */
+  meet_status?: string | null
 }
 
 export type RawDeadline = {
@@ -74,6 +81,16 @@ export type CalendarData = {
   deadlines: RawDeadline[]
   events: RawCalendarEvent[]
   leads: RawLead[]
+  /** Volno pro klienty (KP14). Bez migrace 123 prázdné. */
+  availability: RawAvailability[]
+}
+
+export type { RawAvailability }
+
+/** Chybějící tabulka nebo funkce (migrace ještě neproběhla) se snese, jiná chyba ne. */
+const notMissingSchema = (err: unknown) => {
+  const code = (err as { code?: string })?.code
+  return code !== '42P01' && code !== '42883'
 }
 
 const iso = (instant: Date | string): string =>
@@ -97,7 +114,7 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
   const fromInstant = pragueWallClockToISO(...dayParts(from), 0, 0)
   const toInstant = pragueWallClockToISO(...dayParts(toExclusive), 0, 0)
 
-  const [consultationRows, deadlineRows, eventRows, leadRows] = await adminDb.batch([
+  const [consultationRows, deadlineRows, eventRows, leadRows, availabilityRows] = await batchTolerant([
     q`
       SELECT
         cs.id,
@@ -107,7 +124,10 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
         cs.meeting_link,
         cs.client_email,
         p.client_name,
-        p.id AS project_id
+        p.id AS project_id,
+        (to_jsonb(cs) ->> 'duration_minutes')::int AS duration_minutes,
+        to_jsonb(cs) ->> 'booked_via' AS booked_via,
+        to_jsonb(cs) ->> 'meet_status' AS meet_status
       FROM consultation_slots cs
       JOIN projects p ON cs.project_id = p.id
       WHERE cs.scheduled_at >= ${fromInstant} AND cs.scheduled_at < ${toInstant}
@@ -147,7 +167,8 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
         AND calendar_event_id IS NULL
       ORDER BY next_action_date, next_action_time
     `,
-  ])
+    availabilityQuery(from, range.to),
+  ], notMissingSchema)
 
   const consultations = (consultationRows as unknown as RawConsultation[]).map((r) => ({
     ...r,
@@ -183,5 +204,6 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
       estimated_value: r.estimated_value == null ? null : Number(r.estimated_value),
       action_at: iso(r.action_at),
     })),
+    availability: mapAvailability(availabilityRows),
   }
 }

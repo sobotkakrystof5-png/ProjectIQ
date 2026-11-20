@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { prepareConsultationTables } from '@/lib/__tests__/helpers/consultation-tables'
 
 let db: PGlite
 
@@ -152,12 +153,14 @@ beforeAll(async () => {
   await db.exec(read('migrations', '093_project_activity.sql'))
   await db.exec(read('migrations', '107_fakturace_vystavovani.sql'))
   await db.exec(read('migrations', '117_faktury_koncepty.sql'))
+  await prepareConsultationTables(db)
   for (let i = 0; i < 2; i++) {
     await db.exec(read('migrations', '095_portal_schema.sql'))
     await db.exec(read('migrations', '096_portal_requests_messages.sql'))
     await db.exec(read('migrations', '113_portal_supabase_auth.sql'))
     await db.exec(read('migrations', '121_sluzby_a_etapy.sql'))
     await db.exec(read('migrations', '122_portal_penize_faktury.sql'))
+    await db.exec(read('migrations', '123_konzultace_z_volna.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')

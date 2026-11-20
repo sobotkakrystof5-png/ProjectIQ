@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { setAdminDbForTests } from '@/lib/admin/db'
 import { pgliteAdminDriver } from '@/lib/__tests__/helpers/admin-pglite'
 import { preparePortalMoneyTables } from '@/lib/__tests__/helpers/portal-money-tables'
+import { prepareConsultationTables } from '@/lib/__tests__/helpers/consultation-tables'
 import {
   addDays,
   currentPhaseIndex,
@@ -77,12 +78,14 @@ beforeAll(async () => {
   await db.exec(read('migrations', '092_client_requests.sql'))
   await db.exec(read('migrations', '093_project_activity.sql'))
   await preparePortalMoneyTables(db)
+  await prepareConsultationTables(db)
   for (let i = 0; i < 2; i++) {
     await db.exec(read('migrations', '095_portal_schema.sql'))
     await db.exec(read('migrations', '096_portal_requests_messages.sql'))
     await db.exec(read('migrations', '113_portal_supabase_auth.sql'))
     await db.exec(read('migrations', '121_sluzby_a_etapy.sql'))
     await db.exec(read('migrations', '122_portal_penize_faktury.sql'))
+    await db.exec(read('migrations', '123_konzultace_z_volna.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')

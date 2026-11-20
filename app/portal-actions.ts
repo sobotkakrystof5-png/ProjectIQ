@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { sql } from '@/lib/db'
-import { adminDb, q } from '@/lib/admin/db'
+import { adminDb } from '@/lib/admin/db'
 import { feedbackSchema, bookingSchema, surveySchema, surveyScoreSchema } from '@/lib/feedback-schema'
 import { sendBrandedEmail } from '@/lib/email'
 import {
@@ -18,6 +18,8 @@ import { projectPath, adminEmail } from '@/lib/lead-origins'
 import { clientRequestSchema, REQUEST_KIND_LABELS } from '@/lib/client-requests'
 import { publicToken } from '@/lib/public-token'
 import { summarizeClientRequest } from '@/lib/client-request-ai'
+import { finishConsultationBooking } from '@/lib/admin/consultations'
+import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 
 type ActionResult = { success: boolean; error?: string }
 
@@ -159,49 +161,37 @@ export async function submitConsultation(
   if (await isRateLimited('consultation_slots', projectId, 30, 3)) {
     return { success: false, error: 'Příliš mnoho rezervací v krátkém čase. Zkuste to prosím později.' }
   }
+  // Pokusy včetně neúspěšných (obsazený čas, mimo volno): každý bere zámek
+  // rezervací, takže se odkaz /p nesmí dát použít k jejich zdržování (KP14).
+  const attemptKey = `p-konzultace:${projectId}`
+  if (await isApiRateLimited(attemptKey, 'token', 10, 15)) {
+    return { success: false, error: 'Zkoušíte to hodně často. Počkejte prosím pár minut.' }
+  }
+  await recordApiRequest(attemptKey, 'token')
 
-  const effectiveChannel = parsed.data.channel
+  // Google Meet zakládá dokončení rezervace (Google účet Kryštofa, R-114);
+  // ostatní kanály mají odkaz hned.
+  const meetingLink = parsed.data.channel === 'meet' ? null : generateMeetingLink(parsed.data.channel, scheduledDate)
 
-  const meetingLink = generateMeetingLink(parsed.data.channel, scheduledDate)
-
+  // Rezervace jde jedinou cestou s klientským prostorem (KP14, migrace 123):
+  // databáze ověří, že čas leží ve volnu pro klienty a nic ho nezabírá, pod
+  // zámkem založí rezervaci, kalendářní událost i kontakt v Hovorech.
+  let slotId: string
   try {
-    // Rezervace, kalendářní událost a zrcadlený kontakt v Hovorech vznikají
-    // v **jedné transakci** (AD10, migrace 105) — jinak by domluvená
-    // konzultace žila jen ve `consultation_slots`, kde ji Hovory nevidí.
-    //
-    // Pořadí je dané křížovým guardem (044): rezervace první (její trigger
-    // kontroluje cizí události), událost až po ní s odkazem na rezervaci,
-    // takže guard dvojici pozná a nehlásí překryv sám se sebou. Dvě
-    // samostatné příkazy proto, že funkce `admin_slot_ensure_event` by řádek
-    // vložený v CTE téhož příkazu neviděla.
-    const insertSlot = q`
-      INSERT INTO consultation_slots (project_id, scheduled_at, channel, channel_other_text, client_wish, meeting_link, client_email)
-      VALUES (${projectId}, ${scheduledDate.toISOString()}, ${effectiveChannel}, ${parsed.data.channelOtherText ?? null}, ${parsed.data.clientWish}, ${meetingLink}, ${parsed.data.clientEmail})
+    const rows = await adminDb<{ id: string }>`
+      SELECT consultation_book(
+        ${projectId}, ${scheduledDate.toISOString()}, ${parsed.data.channel}, ${parsed.data.channelOtherText ?? null},
+        ${parsed.data.clientWish}, ${parsed.data.clientEmail}, ${meetingLink}, 'odkaz', NULL
+      )::text AS id
     `
-    try {
-      await adminDb.batch([
-        insertSlot,
-        q`
-          SELECT admin_slot_ensure_event(id) AS event_id
-          FROM consultation_slots
-          WHERE project_id = ${projectId} AND scheduled_at = ${scheduledDate.toISOString()}
-        `,
-      ])
-    } catch (pairErr: unknown) {
-      // Databáze bez migrace 105 (`42883` = funkce neexistuje) nesmí stát
-      // klienta rezervaci — ta se uloží i sama, jen se nezrcadlí do kalendáře
-      // a Hovorů. Stejná úvaha jako `batchTolerant` v `lib/admin/db.ts`.
-      if ((pairErr as { code?: string })?.code !== '42883') throw pairErr
-      console.error('[Booking] migrace 105 chybí, rezervace se nezrcadlí do kalendáře')
-      await adminDb.batch([insertSlot])
-    }
+    slotId = String(rows[0].id)
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code
     if (code === '23505' || code === '23P01') {
-      return { success: false, error: 'Tento termín je již obsazen. Vyberte prosím jiný.' }
+      return { success: false, error: 'Tenhle čas už není volný. Vyberte prosím jiný.' }
     }
-    console.error('[Booking] DB chyba při INSERT:', err)
-    return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
+    console.error('[Booking] Rezervace se neuložila:', (err as { code?: string })?.code ?? 'unknown')
+    return { success: false, error: 'Rezervace se nepovedla. Zkuste to prosím znovu.' }
   }
 
   const to = adminEmail()
@@ -213,53 +203,36 @@ export async function submitConsultation(
   const channelName = parsed.data.channel === 'other'
     ? (parsed.data.channelOtherText ?? 'Jiné')
     : (CHANNEL_LABEL[parsed.data.channel] ?? parsed.data.channel)
-  const fields = [
-    { label: 'Datum a čas', value: formattedTime },
-    { label: 'Komunikační kanál', value: channelName },
-  ]
 
   if (to) {
     await sendBrandedEmail({
       to,
       subject: 'Nová rezervace konzultace – ZakazIQ',
       heading: 'Nová rezervace konzultace',
-      intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji. Níže najdete vše potřebné.',
+      intro: 'Klient si přes odkaz na projekt zarezervoval konzultaci ve vašem volnu.',
       fields: [
-        ...fields,
+        { label: 'Datum a čas', value: formattedTime },
+        { label: 'Komunikační kanál', value: channelName },
         { label: 'E-mail z formuláře', value: parsed.data.clientEmail },
         { label: 'Přání klienta', value: parsed.data.clientWish },
       ],
-      ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
+      ...(meetingLink ? { ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }] } : {}),
     })
   }
 
-  // Potvrzení jde jen na e-mail klienta uložený u zakázky (audit 2026-11-15).
-  // Adresa z formuláře se uloží k rezervaci a dostane ji admin, ale server na ni
-  // nic neposílá — jinak by kdokoli s odkazem /p rozesílal z naší schránky
-  // e-maily s vlastním textem na libovolné adresy.
-  const ownerRows = await sql`SELECT client_email FROM projects WHERE id = ${projectId} LIMIT 1`
-  const clientEmail = (ownerRows[0] as { client_email: string | null } | undefined)?.client_email?.trim()
-  if (clientEmail) {
-    await sendBrandedEmail({
-      to: clientEmail,
-      subject: 'Potvrzení rezervace konzultace – ZakazIQ',
-      heading: 'Vaše konzultace byla potvrzena',
-      intro: 'S vaší rezervací počítám a na konzultaci se důkladně připravuji.',
-      fields: [...fields, { label: 'Vaše přání', value: parsed.data.clientWish }],
-      ctas: [{ label: 'Připojit se ke konzultaci', href: meetingLink }],
-    })
-  }
-
-  void createNotification({
-    type: 'consultation_booked',
-    title: 'Nová rezervace konzultace',
-    body: `${formattedTime} · ${channelName} — ${parsed.data.clientWish}`,
-    link: projectPath(projectId),
-  })
+  // Meet, potvrzení klientovi a zvonek doběhnou po odpovědi (KP14). Potvrzení
+  // jde jen na e-mail klienta uložený u zakázky (audit 2026-11-15): adresa
+  // z formuláře se uloží k rezervaci a dostane ji admin, ale server na ni nic
+  // neposílá — jinak by kdokoli s odkazem /p rozesílal z naší schránky e-maily
+  // s vlastním textem na libovolné adresy.
+  after(() => finishConsultationBooking(slotId).catch((err) =>
+    console.error('[Booking] Dokončení rezervace selhalo:', err instanceof Error ? err.name : 'unknown'),
+  ))
 
   // Rezervace je od AD10 vidět v kalendáři i v Hovorech.
   revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard/calls')
+  revalidatePath(`/p/${token}`)
 
   return { success: true }
 }
