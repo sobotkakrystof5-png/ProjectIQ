@@ -2,16 +2,16 @@
 
 import { Fragment, useEffect, useOptimistic, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { Badge, badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ws/brand'
 import { toast } from '@/components/ui/toast'
 import { LEAD_ACTION_TONE, LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
-import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote, getLeadNotes } from '@/app/calls-actions'
+import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, addLeadNote, deleteLeadNote, getLeadNotes } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import type { SortDir } from '@/lib/admin-table'
-import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
+import { LeadEmailDialog, type LeadEmailReadiness } from '@/components/LeadEmailDialog'
 import { cn, formatDate } from '@/lib/utils'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { formatPhone, mailtoHref, telHref } from '@/lib/contacts/href'
@@ -411,8 +411,7 @@ function LeadRow({
   onConvert,
   onMoveToWaiting,
   onToggleAnswered,
-  onSendPortfolio,
-  onOpenCustomMessage,
+  onOpenEmail,
   onAddNote,
   onDeleteNote,
   isPending,
@@ -427,8 +426,7 @@ function LeadRow({
   onConvert: () => void
   onMoveToWaiting: () => void
   onToggleAnswered: (val: boolean | null) => void
-  onSendPortfolio: () => void
-  onOpenCustomMessage: () => void
+  onOpenEmail: () => void
   onAddNote: (content: string) => void
   onDeleteNote: (id: string) => void
   isPending: boolean
@@ -494,24 +492,15 @@ function LeadRow({
       <ValueCell lead={lead} />
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1">
-          {lead.email && lead.next_action_date && (
-            <button
-              onClick={onSendPortfolio}
-              disabled={isPending}
-              title="Poslat portfolio (odešle ihned)"
-              className={iconActionPrimary}
-            >
-              <Send size={13} strokeWidth={1.5} />
-            </button>
-          )}
           {lead.email && (
             <button
-              onClick={onOpenCustomMessage}
+              onClick={onOpenEmail}
               disabled={isPending}
-              title="Napsat jinou zprávu"
-              className={iconAction}
+              title="Poslat e-mail (portfolio, nabídka, schůzka)"
+              aria-label="Poslat e-mail"
+              className={iconActionPrimary}
             >
-              <MessageSquareText size={13} strokeWidth={1.5} />
+              <Send size={15} strokeWidth={1.5} aria-hidden="true" />
             </button>
           )}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -903,6 +892,7 @@ export default function LeadsTable({
   dir,
   sortLinks,
   focusLeadId,
+  meeting,
 }: {
   initialLeads: LeadWithNotes[]
   /** `true` = pohled „Čekání na odpověď". */
@@ -912,6 +902,8 @@ export default function LeadsTable({
   /** Odkaz na řazení pro každý sloupec, spočítaný na serveru. */
   sortLinks: Record<string, string>
   focusLeadId?: string
+  /** Je propojený Google a nastavené odesílání z vizeon.cz? Bez toho nejde poslat schůzku. */
+  meeting: LeadEmailReadiness
 }) {
   /**
    * Řádky se vykreslují **z propů** (AD17). Dřív si je komponenta kopírovala
@@ -931,7 +923,7 @@ export default function LeadsTable({
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
-  const [portfolioModalLead, setPortfolioModalLead] = useState<ClientLead | null>(null)
+  const [emailLead, setEmailLead] = useState<ClientLead | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -1019,17 +1011,6 @@ export default function LeadsTable({
 
   const handleToggleAnswered = (id: string, val: boolean | null) =>
     optimisticky({ type: 'answered', id, value: val }, () => setCallAnswered(id, val))
-
-  const handleSendPortfolio = (id: string) => {
-    startTransition(async () => {
-      const result = await sendPortfolioEmail(id)
-      if ('error' in result) {
-        toast.error(result.error)
-        return
-      }
-      toast.success('Portfolio odesláno')
-    })
-  }
 
   const handleAddNote = (leadId: string, content: string) => {
     startTransition(async () => {
@@ -1217,8 +1198,7 @@ export default function LeadsTable({
                     onConvert={() => handleConvert(lead.id)}
                     onMoveToWaiting={() => handleMoveToWaiting(lead.id)}
                     onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
-                    onSendPortfolio={() => handleSendPortfolio(lead.id)}
-                    onOpenCustomMessage={() => setPortfolioModalLead(lead)}
+                    onOpenEmail={() => setEmailLead(lead)}
                     onAddNote={(content) => handleAddNote(lead.id, content)}
                     onDeleteNote={handleDeleteNote}
                     isPending={isPending}
@@ -1233,13 +1213,10 @@ export default function LeadsTable({
         </div>
       </div>
 
-      <PortfolioEmailModal
-        isOpen={!!portfolioModalLead}
-        lead={portfolioModalLead}
-        onClose={() => setPortfolioModalLead(null)}
-        // Odeslání zapisuje `portfolio_sent_at` a revaliduje, nový řádek přijde ze serveru.
-        onSent={() => {}}
-      />
+      {emailLead && (
+        // `key` ať si každý kontakt začne s čistým výběrem šablony a textu.
+        <LeadEmailDialog key={emailLead.id} lead={emailLead} readiness={meeting} onClose={() => setEmailLead(null)} />
+      )}
     </div>
   )
 }

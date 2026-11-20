@@ -55,7 +55,8 @@ export default async function CallsPage(props: {
     assistantView ? loadOutreachQueue(now) : null,
     // null = migrace 114 ještě neběžela, záložka se neukáže.
     countOutreachQueue(),
-    assistantView ? googleStatus() : null,
+    // Schůzku s Google Meet jde poslat z tabulky Hovorů i z fronty od asistenta.
+    calendarView ? null : googleStatus(),
   ])
   const links = tableLinks(PATH, searchParams)
 
@@ -149,6 +150,10 @@ export default async function CallsPage(props: {
               dir={params.dir}
               sortLinks={sortLinks}
               focusLeadId={focusLead}
+              meeting={{
+                google: google?.configured === true && google.connected,
+                mail: vizeonMailConfigured(),
+              }}
             />
 
             <Pagination params={params} total={screen.total} links={links} />

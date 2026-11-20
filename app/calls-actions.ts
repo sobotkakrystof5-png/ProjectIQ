@@ -8,10 +8,8 @@ import { sql } from '@/lib/db'
 import { adminDb, q, type AdminRow } from '@/lib/admin/db'
 import { loadLeadNotes } from '@/lib/admin/leads'
 import { ensureContact } from '@/lib/admin/contacts'
-import { sendPlainEmail } from '@/lib/email'
 import { notifyClientOfProjectChange } from '@/app/actions'
-import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
-import { getPragueTodayISO, pragueDateTimeToISO } from '@/lib/prague-time'
+import { pragueDateTimeToISO } from '@/lib/prague-time'
 import type { ClientLead, LeadNote, LeadStatus, LeadActionType } from '@/lib/types'
 
 export type LeadPayload = {
@@ -262,46 +260,4 @@ export async function convertLeadToProject(leadId: string) {
   revalidatePath('/dashboard/kontakty')
   // Dřív to vyhodilo na Dnes, takže se nová zakázka musela hledat.
   redirect(`/dashboard/${created.id}`)
-}
-
-async function markPortfolioSent(leadId: string) {
-  await sql`UPDATE client_leads SET portfolio_sent_at = now() WHERE id = ${leadId}`
-  revalidatePath('/dashboard/calls')
-}
-
-export async function sendPortfolioEmail(leadId: string): Promise<{ success: true } | { error: string }> {
-  await requireAuth()
-  const rows = await sql`SELECT *, next_action_date::text AS next_action_date FROM client_leads WHERE id = ${leadId}`
-  const lead = rows[0] as unknown as ClientLead
-  if (!lead) return { error: 'Kontakt nenalezen.' }
-  if (!lead.email) return { error: 'Kontakt nemá vyplněný email.' }
-  if (!lead.next_action_date) return { error: 'Kontakt nemá vyplněné datum příštího hovoru.' }
-
-  const body = buildPortfolioEmailBody({
-    todayISO: getPragueTodayISO(),
-    nextCallDateISO: lead.next_action_date,
-  })
-  const ok = await sendPlainEmail({ to: lead.email, subject: PORTFOLIO_EMAIL_SUBJECT, text: body })
-  if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
-
-  await markPortfolioSent(leadId)
-  return { success: true }
-}
-
-export async function sendCustomLeadEmail(
-  leadId: string,
-  opts: { subject: string; body: string }
-): Promise<{ success: true } | { error: string }> {
-  await requireAuth()
-  const rows = await sql`SELECT email FROM client_leads WHERE id = ${leadId}`
-  const lead = rows[0] as { email: string | null } | undefined
-  if (!lead) return { error: 'Kontakt nenalezen.' }
-  if (!lead.email) return { error: 'Kontakt nemá vyplněný email.' }
-  if (!opts.subject.trim() || !opts.body.trim()) return { error: 'Předmět i text zprávy musí být vyplněné.' }
-
-  const ok = await sendPlainEmail({ to: lead.email, subject: opts.subject, text: opts.body })
-  if (!ok) return { error: 'Nepodařilo se odeslat email. Zkontrolujte prosím emailové nastavení.' }
-
-  await markPortfolioSent(leadId)
-  return { success: true }
 }

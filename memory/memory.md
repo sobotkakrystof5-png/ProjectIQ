@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-18 · **AI asistent jako CRM** (R-120): Přehled, Kontakty
+> **Poslední aktualizace:** 2026-11-20 · **E-maily z Hovorů** (R-121): tlačítko „Poslat e-mail"
+> se třemi šablonami — Portfolio, Nabídka (cena za zakázku) a Schůzka s Google Meet (termín,
+> odkaz na Meet, vizeon.cz; všechno nebo nic). Bez migrace. **V kódu na větvi
+> `claude/email-templates-conversations-1692ea`, nenasazeno; naživo s Googlem a Resendem neověřeno.**
+>
+> Předchozí: 2026-11-18 · **AI asistent jako CRM** (R-120): Přehled, Kontakty
 > s filtry a detail klienta (ukázka, všechny hovory s přepisem, e-maily, časová osa),
 > kontrakt v2 s Growth OS a zpětný kanál, migrace 119. **Na produkci od 2026-11-18 (`4408221`);**
 > Growth OS zatím posílá v1, takže detail ukáže jen poslední hovor, dokud se nesplní zadání
@@ -1198,9 +1203,39 @@ držet adresu a klíč autopilota a výpadek se dožene sám.
 ať admin běží i bez nových sloupců. Odkaz na ukázku z adminu nese `?od=admin` (Growth OS ho nemá
 počítat). Strana Growth OS je zadání `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`,
 tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozšiřuje R-112 a R-118.
+### R-121 · E-maily z Hovorů: tři šablony a schůzka s Meetem bez odkladu (2026-11-20)
+**Rozhodnutí:** v Hovorech tlačítko „Poslat e-mail" otevře okno se třemi šablonami — **Portfolio**
+(dosavadní text), **Nabídka** (cena za tuhle zakázku) a **Schůzka s Google Meet** (termín, tlačítko
+Připojit se, vizeon.cz). Výběr šablony → text se načte a jde přepsat → Odeslat, jeden krok. Schůzka
+vytvoří skutečný odkaz na Meet, přepíše příští akci kontaktu na „Schůzka přes Google Meet", posune
+propojenou událost v kalendáři a pošle e-mail z krystof@vizeon.cz **hned**, bez 15s odkladu a „Zpět"
+(na rozdíl od firem od asistenta, R-114): text vidí Kryštof v okně. Postup je všechno nebo nic —
+selže-li Google nebo e-mail, termín se vrátí a Meet se smaže. Adresát je vždy e-mail uloženého
+kontaktu.
+**Proč:** zadání Kryštofa 2026-11-20 („mít možnost poslat e-mail s nabídkou a e-mail s datem,
+vizeonem a odkazem na Google Meet, celkem tři šablony, vyberu a odešlu"). Třetí šablonu zadání
+nejmenovalo — zvolil jsem dosavadní Portfolio, ať nic z toho, co Kryštof používal, nezmizelo.
+Cena v nabídce se **nebere z ceníku na webu** (Kryštof 2026-11-20: ceník je jen rozmezí, u každé zakázky
+říká cenu jinak): píše se do pole u každé nabídky, výchozí je odhadovaná hodnota kontaktu.
+**Důsledek:** zanikla rychlá akce „Poslat portfolio (odešle ihned)" a okno „Napsat jinou zprávu"
+(`sendPortfolioEmail`, `sendCustomLeadEmail`, `PortfolioEmailModal`). Nabídka bez ceny nejde
+odeslat. Schůzka z Hovorů nepotřebuje migraci
+(použije 105 a 115, které na produkci jsou), ale bez propojeného Googlu a `VIZEON_RESEND_API_KEY`
+je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #040, technika
+`docs/admin/AGENTS-ADMIN.md` → „Poslat e-mail z Hovorů".
+
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **E-maily z Hovorů (R-121) — projít naživo:** v prohlížeči ověřené jen okno na fiktivním
+  kontaktu (390 a 800 px) a logika testy nad PGlite s podstrčeným Googlem a Resendem. Zbývá po
+  nasazení: (1) Profil → Propojit Google účet, pokud ještě není (jinak je karta schůzky vypnutá),
+  (2) Hovory → u kontaktu s vlastním e-mailem pošli Nabídku a Schůzku na vlastní adresu: v e-mailu
+  má být termín, tlačítko Připojit se, odkaz na vizeon.cz, v Google Kalendáři událost s Meetem,
+  v Hovorech příští akce „Schůzka přes Google Meet" a poznámka s odkazem, (3) kontakt s propojenou
+  událostí v kalendáři: událost se posune a dostane „Připojit se", (4) Nabídka: pole Cena se
+  předvyplní z odhadované hodnoty kontaktu. **Doručení a skutečný Meet nikdo nezkusil** · Kryštof · od 2026-11-20
 
 - [ ] **AI asistent jako CRM (R-120) — propojit s Growth OS:** ~~migrace 119~~ na produkci
   (Kryštof 2026-11-18), ~~merge a deploy~~ (`4408221`, 2026-11-18). Zbývá:
@@ -1512,76 +1547,25 @@ tam rozhodnutí D-106. Bezpečnost `.claude/security/DECISIONS.md` #039. Rozši�
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
-### 2026-11-18 (AI asistent jako CRM — R-120)
-- **chore** **Na produkci** (2026-11-18): migraci 119 pustil Kryštof, větev `admin/ai-asistent-crm`
-  → `main` fast-forward (`32e27a9` → `4408221`), build Ready asi za 4 min. Ověřeno veřejně: `/`
-  a `/login` 200, `/dashboard/ai-asistent` i detail 307, `/api/public/outreach/handled` 401 bez klíče,
-  `POST /api/public/outreach` 401, náhled ukázky 401 bez přihlášení, smazaná cesta nahrávek 404,
-  15 min po nasazení žádná běhová chyba. **Za přihlášením okem nikdo nic neviděl.**
-- **feat** Sekce AI asistent: nový **Přehled** (dnešek a 7 dní, „Na tahu jste vy", cesta k zakázce za
-  30 dní, poslední hovory, provoz — čerstvost dat z Growth OS, kredit Odoriku a ElevenLabs), **Kontakty**
-  s filtry (Na tahu, Ukázka odeslaná, Otevřeli, Odpověď a schůzka, Vyřízené, Všichni) a hledáním
-  i podle číslic telefonu, **detail klienta** `/dashboard/ai-asistent/kontakt/[id]` (co dál, kontakt,
-  ukázka s náhledem, všechny hovory s přepisem, sesbíranými daty a kritérii, e-maily od
-  asistenta, časová osa, rešerše). Přehled, Kontakty a detail se obnovují každých 30 s. Oznámení ve
-  zvonku vedou na detail. Odkazy na ukázku z adminu nesou `?od=admin`. Soubory:
-  `app/dashboard/ai-asistent/{page.tsx,kontakt/[id]/}`, `components/admin/ai-asistent/{overview-view,contacts-view,contact-detail,call-card,auto-refresh}.tsx`,
-  `components/admin/outreach-lead-actions.tsx`, `lib/admin/{outreach-crm,outreach-crm-view,outreach-calls,outreach-demo}.ts`.
-- **feat** Kontrakt v2 s Growth OS (zpětně kompatibilní): ke snímku firmy všechny hovory, e-maily,
-  historie stavů, rešerše a víc o ukázce; tělo 1 MB. Chybějící hodnota nic nepřepíše, starší snímek
-  nevrátí hovoru starý výsledek. Report smí nést tatáž pole a `stats.account` / `costCzk`. Zpětný
-  kanál `GET /api/public/outreach/handled`, náhled `/api/outreach/leads/[id]/nahled` (jen
-  navrhy.vizeon.cz). Přehrávání nahrávek bylo hotové, ale na přání Kryštofa vypuštěné — stačí přepis. Soubory:
-  `types/outreach{,-report}.ts`, `lib/admin/outreach{,-reports}.ts`, `app/api/public/outreach/{route.ts,handled/}`,
-  `app/api/outreach/`, cron `client-retention` (`purge_outreach_emails`).
-- **db** Migrace 119 `ai_asistent_crm` (aplikována: produkce, podle Kryštofa 2026-11-18; agent neověřil).
-- **fix** Bezpečnostní kontrola před nasazením (`web-security-review`): náhled ukázky četl celou
-  odpověď do paměti před kontrolou velikosti — teď čte se stropem 2 MB. `.claude/security/AUDIT-LOG.md`.
-- **docs** Zadání pro Claude Code v Growth OS: `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`
-  (kontrakt v2, okamžité odeslání po hovoru, Resend webhook, měření ukázky, náhled, ceny z Odoriku,
-  zpětný kanál). `docs/admin/GROWTH-OS-PLAN.md` (kontrakt v2, kroky 6 a 9), `docs/admin/AGENTS-ADMIN.md`,
-  `.claude/security/DECISIONS.md` #039, `STATE.md`.
-- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-ai-asistent-crm.test.ts` (16 testů nad
-  PGlite se SQL 114, 116 a 119 včetně dvojího běhu 119 a databáze bez 119), plná sada 1401/1403
-  (selhávají jen známé `ws-schema` mezera po 113 a `ws-email` pevné datum), `npm run build`
-  (napoprvé ho zastavila známá hláška Next o zranitelnosti, podruhé prošel). Vzhled na dočasné stránce
-  s vymyšlenými daty (Playwright, 390 a 1280 px): bez vodorovného posouvání, stránka smazaná. Agent
-  ElevenLabs „Vizeon hovory" přečtený přes MCP (jen nastavení): post-call webhook bez audia, agent se
-  hned představí jako AI. **Naživo s produkční databází, ElevenLabs
-  a Growth OS neověřeno.**
-- **decision** **R-120**, DECISIONS #039. Archiv: dny 2026-11-17 přesunuté do `archiv/2026-11.md`.
+### 2026-11-20 (e-maily z Hovorů — R-121)
+- **feat** V Hovorech tlačítko „Poslat e-mail" otevře okno se třemi šablonami: Portfolio,
+  Nabídka (cena za zakázku) a Schůzka s Google Meet. Výběr → text se načte a jde přepsat →
+  Odeslat. Schůzka vytvoří odkaz na Meet v Google Kalendáři, přepíše příští akci kontaktu,
+  posune propojenou událost a pošle e-mail z krystof@vizeon.cz s termínem, tlačítkem Připojit se
+  a odkazem na vizeon.cz; všechno nebo nic (selže-li Google nebo e-mail, termín se vrátí a Meet se
+  smaže). Soubory: `components/LeadEmailDialog.tsx`, `app/lead-mail-actions.ts`,
+  `lib/admin/{lead-mail-templates,lead-meeting}.ts`, `components/LeadsTable.tsx`,
+  `app/dashboard/calls/page.tsx`. Bez migrace.
+- **refactor** Zanikla rychlá akce „Poslat portfolio (odešle ihned)" a okno „Napsat jinou zprávu"
+  (`sendPortfolioEmail`, `sendCustomLeadEmail`, `components/PortfolioEmailModal.tsx`); portfolio je
+  jedna ze tří šablon.
+- **chore** Ověřeno: `npx tsc --noEmit`, nové testy `lib/__tests__/admin-hovory-{sablony,akce}.test.ts`
+  (20, schůzka nad PGlite s migracemi 008, 044, 105, 115), plná sada 1416 prošlo, 4 selhaly:
+  `ws-schema` (mezera po 113) a `ws-email` (pevné datum) jsou známé, `admin-hovory-asistent` a
+  `admin-ai-asistent-crm` padly na 5s limit při startu druhé PGlite instance (počítač měl load 35;
+  s `--testTimeout=90000` 22/22). Okno ověřeno v prohlížeči na dočasné stránce s fiktivním
+  kontaktem (800 a 375 px, bez chyb v konzoli, stránka smazána). **Naživo s Googlem a Resendem
+  neověřeno.**
+- **decision** **R-121**, DECISIONS #040. Archiv: dny 2026-11-18 přesunuté do `archiv/2026-11.md`.
 
-### 2026-11-18 (dotazník spokojenosti na jednu minutu — R-119)
-- **chore** **Na produkci** (2026-11-18): migraci 118 pustil Kryštof, merge `admin/dotaznik` → `main`
-  fast-forward (`ae2cdb5` → `70abbed`, s ním i sekce AI asistent R-118), build `dpl_7vS8Z…` Ready
-  za 103 s v `fra1`. Ověřeno veřejně: `/` a `/login` 200, `/h/<neznámý token>` i s `?znamka=9`
-  404, `/dashboard/profil` a `/dashboard/ai-asistent` 307, `POST /api/public/outreach/reports`
-  bez klíče 401, za hodinu po nasazení žádná běhová chyba. Bezpečnostní kontrola
-  `web-security-review` bez nálezu (AUDIT-LOG 2026-11-18). **Za přihlášením okem nikdo nic neviděl.**
-- **feat** Nový dotazník: známka 0–10 jako jediná povinná otázka (uloží se hned po výběru),
-  čtyři nepovinné oblasti (Výsledek, Komunikace, Termín, Cena), text podle známky, souhlas ve
-  třech úrovních a recenze na Googlu se zkopírovaným textem. Stránka `/h` nese Kryštofa
-  a VIZEON místo „Powered by ZakazIQ". Soubory: `components/SurveyForm.tsx`, `app/h/[token]/page.tsx`,
-  `app/portal-actions.ts` (`saveSurveyScore`, `submitSurvey`, `recordGoogleReviewClick`),
-  `lib/admin/{survey-model,survey-answers,survey-notify}.ts`, `lib/feedback-schema.ts`.
-- **feat** E-mail s dotazníkem z krystof@vizeon.cz přes Resend, řada 0–10 přímo v e-mailu;
-  připomínka po 7 dnech stejně. Soubory: `lib/admin/survey-email.ts`, `lib/admin/surveys.ts`.
-- **fix** Dokončení zakázky **formulářem** (stav Hotovo/Zaplaceno) dotazník neposílalo, jen zprávu
-  „projekt byl aktualizován". Teď stejně jako rychlá změna stavu: po 15 s dotazník, jinak obvyklá
-  zpráva. Soubor: `app/actions.ts`.
-- **feat** Hodnocení v Profilu: NPS za období, průměr oblastí s nejslabší oblastí, nespokojení
-  s „Ozval jsem se" a Zpět, nový typ oznámení „Nespokojený klient", karta Recenze na Googlu.
-  Soubory: `components/HodnoceniDashboard.tsx`, `components/PerformanceOverview.tsx`,
-  `components/admin/google-review-card.tsx`, `app/closed-actions.ts`, `app/dashboard/profil/page.tsx`,
-  `lib/admin/{closed,reference}.ts`, `lib/notifications.ts`, `components/NotificationList.tsx`.
-- **db** Migrace 118 `dotaznik_nps` (aplikována: ne, nikde).
-- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-dotaznik.test.ts` (24 testů nad
-  PGlite včetně dvojího běhu migrace), plná sada 1385/1387 (selhávají jen známé `ws-schema`
-  mezera po 113 a `ws-email` pevné datum) a `next build`. Vzhled na dočasné stránce
-  s vymyšlenými daty (Playwright, 390 a 1280 px): formulář prázdný, 9 a 3, e-mail, Hodnocení;
-  bez vodorovného posouvání, plochy 44 px, konzole bez chyb. **Naživo se skutečnou databází
-  a doručením e-mailu neověřeno.** Větev `admin/dotaznik` nad `admin/growth-hovory`, migrace
-  118 a R-119 (117 a R-117/118 obsadila souběžná sezení).
-- **decision** **R-119**.
-
-*Starší dny (2026-11-17 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*
+*Starší dny (2026-11-18 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*

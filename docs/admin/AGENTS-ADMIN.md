@@ -1171,7 +1171,7 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
   milisekund až sekundy a uložení na něj nemá čekat: `import { after } from 'next/server'`
   a odeslání dovnitř. Platí to i pro `createNotification` — plovoucí `void promise` může
   skončit s odpovědí dřív, než se zápis dokončí. Výjimka jsou akce, **jejichž smyslem je
-  ten e-mail** (`sendPortfolioEmail`, `sendCustomLeadEmail`): tam UI hlásí, jestli odešel,
+  ten e-mail** (`sendLeadEmail` v `app/lead-mail-actions.ts`): tam UI hlásí, jestli odešel,
   a po odpovědi už by se to uživatel nedozvěděl. Strop drží
   `lib/__tests__/admin-after-emails.test.ts`.
 - Emaily se neodešlou, pokud chybí odpovídající dvojice `*_USER`/`*_APP_PASSWORD` — v dev prostředí appka funguje i bez nich, jen nechodí maily.
@@ -1224,6 +1224,35 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - Daně a odvody počítej **jen** přes `lib/tax.ts` + `lib/tax-constants.ts`; daňové termíny jsou pevný kalendář v `lib/tax-deadlines.ts`
 - AI přepis faktury **nikdy neblokuje** ruční uložení — bez `ANTHROPIC_API_KEY` musí appka fungovat dál
 - Částky v různých měnách (CZK/EUR) se **nikdy** nesčítají do jednoho čísla
+
+## Poslat e-mail z Hovorů: tři šablony a schůzka s Meetem (R-121)
+
+- Tlačítko v řádku kontaktu (jen s e-mailem) otevře `components/LeadEmailDialog.tsx`: vyberete
+  **Portfolio**, **Nabídka** nebo **Schůzka s Google Meet**, text se načte, jde přepsat, pak
+  Odeslat. Jediný krok — co je v okně, to odejde. Dřívější „Poslat portfolio (odešle ihned)"
+  a okno „Napsat jinou zprávu" zanikly (`sendPortfolioEmail`, `sendCustomLeadEmail`
+  a `PortfolioEmailModal` jsou smazané).
+- Šablony jsou v `lib/admin/lead-mail-templates.ts` (čistý soubor, čte ho okno i server).
+  **Cena v Nabídce se nebere z ceníku na vizeon.cz** — ten je jen rozmezí a u každé zakázky se
+  cena domlouvá zvlášť (Kryštof 2026-11-20). Píše se do pole „Cena za tuhle zakázku", výchozí
+  hodnota je odhadovaná hodnota kontaktu (`estimated_value`); bez ceny se Nabídka odeslat nedá.
+  Za odkazem v textu nesmí být tečka — e-mail z něj dělá odkaz po první mezeře.
+- `sendLeadEmail` (`app/lead-mail-actions.ts`): adresát je **vždy e-mail uloženého kontaktu**,
+  z prohlížeče nepřijde; Zod, předmět na jeden řádek, text bez nedopsaných míst
+  `[DOPLNIT…]` / `[Sem …]`. Portfolio a Nabídka jdou přes `sendPlainEmail` (Resend z
+  krystof@vizeon.cz), zapíše se `portfolio_sent_at` a poznámka „Odeslán e-mail …".
+- Schůzka (`lib/admin/lead-meeting.ts`, `sendLeadMeetingEmail`) je **všechno nebo nic**:
+  (1) příští akce kontaktu → „Schůzka přes Google Meet" a posun propojené události
+  (`admin_lead_reschedule`, migrace 105; kolize se ukáže dřív, než vznikne cokoli dalšího),
+  (2) událost s Meetem v Google Kalendáři, (3) e-mail přes `renderMeetingEmail` (termín, tlačítko
+  Připojit se, vizeon.cz, podpis). Selže-li 2 nebo 3, termín se vrátí a Meet se smaže.
+  **Bez odkladu a „Zpět"** (na rozdíl od firem od asistenta, R-114): text vidí Kryštof v okně
+  před odesláním. Propojená událost dostane `meet_url`, do poznámek jde den a odkaz.
+- Vyžaduje propojený Google (Profil) a `VIZEON_RESEND_API_KEY`; bez nich je karta schůzky
+  s odkazem na Profil a Odeslat vypnuté (`googleStatus()` a `vizeonMailConfigured()` počítá
+  `app/dashboard/calls/page.tsx`).
+- Testy: `lib/__tests__/admin-hovory-sablony.test.ts` (šablony, schůzka nad PGlite se
+  skutečnými migracemi 008, 044, 105, 115), `admin-hovory-akce.test.ts` (akce).
 
 ## AI asistent: kontakty, reporty a analýza z Growth OS (R-118, R-120)
 
