@@ -1227,8 +1227,12 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 ## Poslat e-mail z Hovorů: tři šablony a schůzka s Meetem (R-121)
 
-- Tlačítko **Poslat e-mail** ve sloupci E-mail (záložky Hovory i Čekání na odpověď; jen u kontaktu
-  s e-mailem) otevře `components/LeadEmailDialog.tsx`: vyberete
+- Tlačítko **Poslat e-mail** (jen u adresáta s e-mailem) otevře `components/LeadEmailDialog.tsx`. Je na
+  pěti místech: **Hovory** (sloupec E-mail v záložkách Hovory i Čekání na odpověď), **Kontakty**
+  (sloupec E-mail v seznamu a tlačítko v záhlaví karty kontaktu; sloučený kontakt ho nemá),
+  **AI asistent** (fronta Hovory › Od asistenta a karta Kontakt v detailu klienta). Mimo Hovory ho
+  kreslí `components/admin/send-email-button.tsx` (`readiness` počítá `lib/admin/mail-readiness.ts`).
+  Zakázky ho zatím nemají. V okně vyberete
   **Portfolio**, **Nabídka** nebo **Schůzka s Google Meet**, text se načte, jde přepsat, pak
   Odeslat. Jediný krok — co je v okně, to odejde. Dřívější „Poslat portfolio (odešle ihned)"
   a okno „Napsat jinou zprávu" zanikly (`sendPortfolioEmail`, `sendCustomLeadEmail`
@@ -1238,22 +1242,29 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
   cena domlouvá zvlášť (Kryštof 2026-11-20). Píše se do pole „Cena za tuhle zakázku", výchozí
   hodnota je odhadovaná hodnota kontaktu (`estimated_value`); bez ceny se Nabídka odeslat nedá.
   Za odkazem v textu nesmí být tečka — e-mail z něj dělá odkaz po první mezeře.
-- `sendLeadEmail` (`app/lead-mail-actions.ts`): adresát je **vždy e-mail uloženého kontaktu**,
-  z prohlížeče nepřijde; Zod, předmět na jeden řádek, text bez nedopsaných míst
+- `sendLeadEmail` (`app/lead-mail-actions.ts`): adresát je **vždy e-mail uloženého kontaktu**
+  (`lead` z Hovorů, `contact` z `contacts`, `outreach` od asistenta; adresu čte
+  `lib/admin/lead-mail-target.ts` z databáze podle id), z prohlížeče nepřijde; Zod, předmět na jeden řádek, text bez nedopsaných míst
   `[DOPLNIT…]` / `[Sem …]`. Portfolio a Nabídka jdou přes `sendPlainEmail` (Resend z
-  krystof@vizeon.cz), zapíše se `portfolio_sent_at` a poznámka „Odeslán e-mail …".
+  krystof@vizeon.cz), zapíše se `portfolio_sent_at` a poznámka „Odeslán e-mail …" — **jen u adresáta,
+  který má řádek v Hovorech**; kontakt ani firma bez něj žádnou historii nemají a nic se kvůli
+  obyčejnému e-mailu nezakládá ani firma od asistenta nepřebírá.
 - Schůzka (`lib/admin/lead-meeting.ts`, `sendLeadMeetingEmail`) je **všechno nebo nic**:
   (1) příští akce kontaktu → „Schůzka přes Google Meet" a posun propojené události
   (`admin_lead_reschedule`, migrace 105; kolize se ukáže dřív, než vznikne cokoli dalšího),
   (2) událost s Meetem v Google Kalendáři, (3) e-mail přes `renderMeetingEmail` (termín, tlačítko
   Připojit se, vizeon.cz, podpis). Selže-li 2 nebo 3, termín se vrátí a Meet se smaže.
+  Adresát bez řádku v Hovorech (kontakt z Kontaktů, firma od asistenta) ho při schůzce dostane
+  (`ensureLeadFor`, příští akce „Domluvit schůzku"); když schůzka nevyjde, kontakt se zase zahodí,
+  a firma od asistenta se převezme z fronty až po úspěchu. Kontakt má přednost otevřený řádek
+  v Hovorech, hotový (`converted`) nebo ztracený se nepřepisuje.
   **Bez odkladu a „Zpět"** (na rozdíl od firem od asistenta, R-114): text vidí Kryštof v okně
   před odesláním. Propojená událost dostane `meet_url`, do poznámek jde den a odkaz.
 - Vyžaduje propojený Google (Profil) a `VIZEON_RESEND_API_KEY`; bez nich je karta schůzky
   s odkazem na Profil a Odeslat vypnuté (`googleStatus()` a `vizeonMailConfigured()` počítá
   `app/dashboard/calls/page.tsx`).
 - Testy: `lib/__tests__/admin-hovory-sablony.test.ts` (šablony, schůzka nad PGlite se
-  skutečnými migracemi 008, 044, 105, 115), `admin-hovory-akce.test.ts` (akce).
+  skutečnými migracemi 008, 044, 105, 115), `admin-hovory-akce.test.ts` (akce a všechny tři druhy adresáta).
 
 ## AI asistent: kontakty, reporty a analýza z Growth OS (R-118, R-120)
 

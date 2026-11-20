@@ -1217,6 +1217,10 @@ vizeonem a odkazem na Google Meet, celkem tři šablony, vyberu a odešlu"). Tř
 nejmenovalo — zvolil jsem dosavadní Portfolio, ať nic z toho, co Kryštof používal, nezmizelo.
 Cena v nabídce se **nebere z ceníku na webu** (Kryštof 2026-11-20: ceník je jen rozmezí, u každé zakázky
 říká cenu jinak): píše se do pole u každé nabídky, výchozí je odhadovaná hodnota kontaktu.
+**Rozšíření téhož dne:** okno je nejen v Hovorech, ale i v **Kontaktech** (seznam a karta kontaktu)
+a v **AI asistentu** (fronta Od asistenta, detail klienta); Zakázky zatím ne. Adresát je kontakt z Hovorů,
+kontakt z `contacts` nebo firma od asistenta. Obyčejný e-mail nic nezakládá; schůzka adresáta bez řádku
+v Hovorech v Hovorech založí (a při neúspěchu zahodí), firmu od asistenta převezme z fronty až po úspěchu.
 **Důsledek:** zanikla rychlá akce „Poslat portfolio (odešle ihned)" a okno „Napsat jinou zprávu"
 (`sendPortfolioEmail`, `sendCustomLeadEmail`, `PortfolioEmailModal`). Nabídka bez ceny nejde
 odeslat. Schůzka z Hovorů nepotřebuje migraci
@@ -1574,6 +1578,13 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #040, te
 - **fix** Tlačítko „Poslat e-mail" bylo jen ikonou ve sloupci úplně vpravo v tabulce široké
   1100 px a v záložce Čekání na odpověď chybělo — Kryštof ho po nasazení nenašel. Teď je
   popsané tlačítko přímo ve sloupci E-mail v obou záložkách. Soubor: `components/LeadsTable.tsx`.
+- **feat** Tlačítko „Poslat e-mail" i v **Kontaktech** (sloupec E-mail v seznamu, záhlaví karty kontaktu)
+  a v **AI asistentu** (fronta Od asistenta, karta Kontakt v detailu klienta); Kryštof ho chtěl ke
+  kontaktům, hovorům i asistentovi. Adresát může být kontakt z Hovorů, z Kontaktů nebo firma od
+  asistenta; schůzka adresáta bez řádku v Hovorech založí a při neúspěchu zahodí. Soubory:
+  `components/admin/send-email-button.tsx`, `lib/admin/{lead-mail-target,mail-readiness}.ts`,
+  `app/lead-mail-actions.ts`, `app/dashboard/kontakty/{page.tsx,[id]/page.tsx}`,
+  `components/admin/{outreach-lead-actions.tsx,ai-asistent/contact-detail.tsx}`. Testy 31 + širší sada 969 prošla.
 - **decision** **R-121**, DECISIONS #040. Archiv: dny 2026-11-18 přesunuté do `archiv/2026-11.md`.
 
 *Starší dny (2026-11-18 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*

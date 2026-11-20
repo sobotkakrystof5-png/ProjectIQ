@@ -23,18 +23,32 @@ import {
 } from '@/lib/admin/lead-mail-templates'
 import { getPragueTodayISO, isoToPragueDateAndTime, pragueDateTimeToISO } from '@/lib/prague-time'
 import { cn } from '@/lib/utils'
-import type { ClientLead } from '@/lib/types'
 
 /**
- * „Poslat e-mail" kontaktu z Hovorů (R-121). Nejdřív se vybere jedna ze tří
+ * „Poslat e-mail" kontaktu (R-121). Nejdřív se vybere jedna ze tří
  * šablon, text se načte a jde přepsat, potom se klikne na Odeslat. Co
  * uvidíte v okně, to odejde — žádný další krok.
  *
- * Adresát je e-mail uloženého kontaktu (server ho bere z databáze). Schůzka
- * navíc vytvoří odkaz na Google Meet a zapíše termín do Hovorů a kalendáře.
+ * Adresát je e-mail uloženého kontaktu (server ho čte z databáze podle `kind`
+ * a `id`). Okno je v Hovorech, na kartě kontaktu a u firem od AI asistenta.
+ * Schůzka navíc vytvoří odkaz na Google Meet a zapíše termín do Hovorů
+ * a kalendáře.
  */
 
 export type LeadEmailReadiness = { google: boolean; mail: boolean }
+
+/** Komu se píše. Jen údaje, které okno ukazuje; adresu si server načte sám. */
+export type LeadEmailTarget = {
+  kind: 'lead' | 'contact' | 'outreach'
+  id: string
+  company: string
+  email: string
+  /** Příští akce kontaktu z Hovorů — z ní je výchozí termín schůzky a text portfolia. */
+  nextActionDate?: string | Date | null
+  nextActionTime?: string | null
+  /** Odhadovaná hodnota z Hovorů; výchozí cena v Nabídce. */
+  estimatedValue?: number | string | null
+}
 
 const TEMPLATE_ICON: Record<LeadMailTemplateId, React.ReactNode> = {
   portfolio: <Briefcase size={18} strokeWidth={1.5} aria-hidden="true" />,
@@ -46,8 +60,8 @@ const fieldClass =
   'w-full rounded-box border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
 
 /** Termín schůzky: příští akce kontaktu, je-li v budoucnu; jinak zítra v 10:00. */
-function initialSlot(lead: ClientLead): { date: string; time: string } {
-  const planned = pragueDateTimeToISO(lead.next_action_date, lead.next_action_time?.slice(0, 5))
+function initialSlot(target: LeadEmailTarget): { date: string; time: string } {
+  const planned = pragueDateTimeToISO(target.nextActionDate, target.nextActionTime?.slice(0, 5))
   if (planned && Date.parse(planned) > Date.now()) {
     const { date, time } = isoToPragueDateAndTime(planned)
     return { date, time: time.slice(0, 5) }
@@ -57,24 +71,24 @@ function initialSlot(lead: ClientLead): { date: string; time: string } {
 }
 
 export function LeadEmailDialog({
-  lead,
+  target,
   readiness,
   onClose,
 }: {
-  lead: ClientLead
+  target: LeadEmailTarget
   readiness: LeadEmailReadiness
   onClose: () => void
 }) {
   const [pending, start] = useTransition()
   const [template, setTemplate] = useState<LeadMailTemplateId | null>(null)
-  const first = useMemo(() => initialSlot(lead), [lead])
+  const first = useMemo(() => initialSlot(target), [target])
   const [date, setDate] = useState(first.date)
   const [time, setTime] = useState(first.time)
   const [minutes, setMinutes] = useState(30)
   const [subjectEdited, setSubjectEdited] = useState<string | null>(null)
   const [bodyEdited, setBodyEdited] = useState<string | null>(null)
   // Cena se u každé zakázky říká jinak; výchozí je odhadovaná hodnota kontaktu.
-  const [price, setPrice] = useState(formatPrice(lead.estimated_value))
+  const [price, setPrice] = useState(formatPrice(target.estimatedValue))
 
   const startsAt = pragueDateTimeToISO(date, time)
   const defaults = useMemo(
@@ -82,12 +96,12 @@ export function LeadEmailDialog({
       template
         ? leadMailDefaults(template, {
             todayISO: getPragueTodayISO(),
-            nextCallDate: lead.next_action_date,
+            nextCallDate: target.nextActionDate ?? null,
             startsAt,
             price,
           })
         : null,
-    [template, lead.next_action_date, startsAt, price],
+    [template, target.nextActionDate, startsAt, price],
   )
   const subject = subjectEdited ?? defaults?.subject ?? ''
   const body = bodyEdited ?? defaults?.body ?? ''
@@ -122,7 +136,7 @@ export function LeadEmailDialog({
     start(async () => {
       const result = await sendLeadEmail({
         template,
-        leadId: lead.id,
+        target: { kind: target.kind, id: target.id },
         subject,
         body,
         ...(meeting ? { date, time, minutes } : {}),
@@ -140,9 +154,9 @@ export function LeadEmailDialog({
     <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose() }}>
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Poslat e-mail: {lead.company_name}</DialogTitle>
+          <DialogTitle>Poslat e-mail: {target.company}</DialogTitle>
           <DialogDescription>
-            Komu: <span className="font-medium text-ink">{lead.email}</span>
+            Komu: <span className="font-medium text-ink">{target.email}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -262,8 +276,8 @@ export function LeadEmailDialog({
             )}
             {meeting && (
               <p className="text-xs text-quiet">
-                Po odeslání se příští akce tohoto kontaktu změní na schůzku a zapíše se do kalendáře i do vašeho
-                Google Kalendáře.
+                Po odeslání se příští akce tohoto kontaktu v Hovorech změní na schůzku (nemá-li tam řádek, založí se) a zapíše se
+                do kalendáře i do vašeho Google Kalendáře.
               </p>
             )}
           </>

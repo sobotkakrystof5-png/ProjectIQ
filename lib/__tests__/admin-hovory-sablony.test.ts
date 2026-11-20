@@ -315,6 +315,12 @@ describe('schůzka s Google Meet z Hovorů', () => {
     expect(new Date((await eventTimes(eventId!)).starts).toISOString()).toBe('2026-12-01T08:00:00.000Z')
   })
 
+  it('adresát z databáze (kontakt, firma od asistenta) má přednost a nahradí chybějící e-mail řádku', async () => {
+    const { leadId } = await lead({ email: null })
+    expect((await sendLeadMeetingEmail(input(leadId, { to: 'jana@example.cz' }), deps)).ok).toBe(true)
+    expect(send.mock.calls[0]![0].to).toBe('jana@example.cz')
+  })
+
   it('nic nezačne bez e-mailu kontaktu, s časem v minulosti ani s absurdní délkou', async () => {
     const { leadId } = await lead({ email: null })
     expect(await sendLeadMeetingEmail(input(leadId), deps)).toEqual({ ok: false, error: 'Kontakt nemá vyplněný e-mail.' })

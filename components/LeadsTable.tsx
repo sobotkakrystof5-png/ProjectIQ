@@ -1219,7 +1219,20 @@ export default function LeadsTable({
 
       {emailLead && (
         // `key` ať si každý kontakt začne s čistým výběrem šablony a textu.
-        <LeadEmailDialog key={emailLead.id} lead={emailLead} readiness={meeting} onClose={() => setEmailLead(null)} />
+        <LeadEmailDialog
+          key={emailLead.id}
+          target={{
+            kind: 'lead',
+            id: emailLead.id,
+            company: emailLead.company_name,
+            email: emailLead.email ?? '',
+            nextActionDate: emailLead.next_action_date,
+            nextActionTime: emailLead.next_action_time,
+            estimatedValue: emailLead.estimated_value,
+          }}
+          readiness={meeting}
+          onClose={() => setEmailLead(null)}
+        />
       )}
     </div>
   )

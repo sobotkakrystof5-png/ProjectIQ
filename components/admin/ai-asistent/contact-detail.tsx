@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardHead, SECTION_LABEL } from '@/components/admin/card'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { OutreachLeadActions } from '@/components/admin/outreach-lead-actions'
+import { SendEmailButton } from '@/components/admin/send-email-button'
 import type { MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
 import { CallCard } from '@/components/admin/ai-asistent/call-card'
 import {
@@ -144,7 +145,7 @@ export function ContactDetailView({
           ) : closed ? (
             <p className="text-sm text-quiet">S touhle firmou už asistent skončil. Kdyby se ozvala, vrátí se do fronty sama.</p>
           ) : (
-            <OutreachLeadActions row={row} nowIso={nowIso} meeting={meeting} />
+            <OutreachLeadActions row={row} nowIso={nowIso} meeting={meeting} showEmail={false} />
           )}
         </div>
       </Card>
@@ -156,6 +157,13 @@ export function ContactDetailView({
           <Card>
             <CardHead title="Kontakt" />
             <ContactActions phone={lead.phone} email={lead.email} context={{ projectName: lead.company }} emptyHint="Growth OS neposlal telefon ani e-mail." />
+            {/* Portfolio, Nabídka nebo Schůzka s Google Meet (R-121), i u firmy, kterou už jste převzal. */}
+            <SendEmailButton
+              className="mt-3"
+              appearance="primary"
+              readiness={meeting}
+              target={{ kind: 'outreach', id: row.id, company: row.company, email: row.email }}
+            />
             <dl className="mt-4 flex flex-col gap-2 text-sm">
               {lead.contactName && <Fact label="Jméno" value={lead.contactName} />}
               {lead.phone && <Fact label="Telefon" value={<span className="font-num">{lead.phone}</span>} />}

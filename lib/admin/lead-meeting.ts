@@ -29,6 +29,8 @@ export const MEETING_ACTION = 'Schůzka přes Google Meet'
 
 export type LeadMeetingInput = {
   leadId: string
+  /** Adresát z databáze (kontakt nebo firma od asistenta); bez něj e-mail kontaktu v Hovorech. */
+  to?: string | null
   /** Začátek schůzky jako okamžik (ISO). */
   startsAt: string
   minutes: number
@@ -137,7 +139,8 @@ export async function sendLeadMeetingEmail(input: LeadMeetingInput, deps: Deps =
   `
   const lead = rows[0]
   if (!lead) return { ok: false, error: 'Kontakt nenalezen.' }
-  if (!lead.email) return { ok: false, error: 'Kontakt nemá vyplněný e-mail.' }
+  const to = input.to?.trim() || lead.email
+  if (!to) return { ok: false, error: 'Kontakt nemá vyplněný e-mail.' }
 
   const next = isoToPragueDateAndTime(start.toISOString())
   const previous: Schedule = {
@@ -201,7 +204,7 @@ export async function sendLeadMeetingEmail(input: LeadMeetingInput, deps: Deps =
       meetUrl: meet.meetUrl,
       demoUrl: null,
     })
-    result = await send({ to: lead.email, subject: input.subject, text, html })
+    result = await send({ to, subject: input.subject, text, html })
   } catch (err) {
     result = { ok: false, error: (err as Error).message }
   }

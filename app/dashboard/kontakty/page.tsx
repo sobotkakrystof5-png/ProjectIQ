@@ -3,6 +3,8 @@ import { PillNav } from '@/components/ws/app/toolbar'
 import { DataTable, type AdminColumn } from '@/components/admin/data-table'
 import { TableSearch } from '@/components/admin/table-search'
 import { Badge } from '@/components/ui/badge'
+import { SendEmailButton } from '@/components/admin/send-email-button'
+import { loadMailReadiness } from '@/lib/admin/mail-readiness'
 import { CONTACT_SORT, loadContactsScreen, type ContactRow, type ContactView } from '@/lib/admin/contacts'
 import { parseTableParams, tableHref, tableLinks } from '@/lib/admin-table'
 import { formatDate } from '@/lib/utils'
@@ -37,7 +39,9 @@ function occurrences(row: ContactRow): React.ReactNode {
   return <span className="text-quiet">{parts.join(' · ')}</span>
 }
 
-const COLUMNS: AdminColumn<ContactRow>[] = [
+function columnsFor(readiness: { google: boolean; mail: boolean }): AdminColumn<ContactRow>[] {
+  return [
+
   {
     key: 'jmeno',
     header: 'Jméno',
@@ -52,7 +56,27 @@ const COLUMNS: AdminColumn<ContactRow>[] = [
     sortable: true,
     cell: (c) => (c.phone !== null ? <span className="font-num">{c.phone}</span> : dash),
   },
-  { key: 'email', header: 'E-mail', sortable: true, cell: (c) => c.email ?? dash },
+  {
+    key: 'email',
+    header: 'E-mail',
+    sortable: true,
+    // Sloučený kontakt už nepíšeme — e-mail patří tomu, do kterého je sloučený.
+    cell: (c) =>
+      c.email === null ? (
+        dash
+      ) : (
+        <div className="flex flex-col items-start gap-1">
+          <span>{c.email}</span>
+          {c.merged_into === null && (
+            <SendEmailButton
+              appearance="chip"
+              readiness={readiness}
+              target={{ kind: 'contact', id: c.id, company: c.company ?? c.display_name, email: c.email }}
+            />
+          )}
+        </div>
+      ),
+  },
   { key: 'kde', header: 'Kde se objevuje', cell: (c) => occurrences(c) },
   {
     key: 'naposledy',
@@ -70,7 +94,8 @@ const COLUMNS: AdminColumn<ContactRow>[] = [
         <Badge variant="outline">Sloučen do {c.merged_into_name ?? 'jiného'}</Badge>
       ) : null,
   },
-]
+  ]
+}
 
 const EMPTY: Record<ContactView, { title: string; description: string }> = {
   aktivni: {
@@ -102,7 +127,10 @@ export default async function KontaktyPage(props: {
     pageSize: 50,
     tiebreak: 'c.created_at',
   })
-  const { rows, total, counts } = await loadContactsScreen(view, q ?? null, params)
+  const [{ rows, total, counts }, readiness] = await Promise.all([
+    loadContactsScreen(view, q ?? null, params),
+    loadMailReadiness(),
+  ])
   const links = tableLinks(PATH, searchParams)
 
   return (
@@ -115,7 +143,7 @@ export default async function KontaktyPage(props: {
 
       <DataTable
         rows={rows}
-        columns={COLUMNS}
+        columns={columnsFor(readiness)}
         rowKey={(c) => c.id}
         href={(c) => `${PATH}/${c.id}`}
         sort={{ params, links }}
