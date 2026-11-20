@@ -13,6 +13,8 @@ export type ClientRetentionRun = {
   messages: number
   feedback_texts: number
   invites: number
+  /** Od migrace 127: témata konzultací po lhůtě. Do té doby chybí. */
+  consultation_topics?: number
 }
 
 export async function purgeClientRetention(): Promise<ClientRetentionRun> {

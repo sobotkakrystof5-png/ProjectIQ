@@ -83,7 +83,12 @@ export async function ClientShell({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ThreadList threads={threads} activeId={activeProjectId} hrefBase="/klient/zpravy" viewer="client" empty="Zatím tu žádná zakázka není." />
         </div>
-        <form action={signOutClient} className="border-t border-navy-100 p-2">
+        <div className="border-t border-navy-100 px-2 pt-2">
+          <Link href="/klient/soukromi" className="flex min-h-11 w-full items-center rounded-chip px-3 text-sm text-quiet hover:bg-navy-50 hover:text-ink">
+            Vaše údaje
+          </Link>
+        </div>
+        <form action={signOutClient} className="p-2 pt-0">
           <button type="submit" className="flex min-h-11 w-full items-center rounded-chip px-3 text-sm text-quiet hover:bg-navy-50 hover:text-ink">
             Odhlásit
           </button>

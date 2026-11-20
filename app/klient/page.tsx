@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { requireClient } from '@/lib/portal/context'
 import { listClientThreads } from '@/lib/portal/chat'
 import { loadClientOverview } from '@/lib/portal/overview'
@@ -60,6 +61,12 @@ export default async function KlientPage() {
               )}
             </>
           )}
+          {/* Na telefonu levý sloupec chybí — odkaz na údaje je tady. */}
+          <p className="mt-8 text-center md:hidden">
+            <Link href="/klient/soukromi" className="inline-flex min-h-11 items-center px-3 text-sm text-quiet hover:text-ink">
+              Vaše údaje
+            </Link>
+          </p>
         </div>
       </div>
     </ClientShell>

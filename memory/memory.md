@@ -113,7 +113,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna (**kód hotov 2026-11-20 na větvi `klient/kp14-konzultace`, migrace 123 neaplikovaná**, R-126), KP15 chat s klientem a rozvržení jako Slack (**kód hotov 2026-11-20 na větvi `klient/kp15-chat`, migrace 124 neaplikovaná**, R-127), KP16 přehled klienta (**kód hotov 2026-11-20 na větvi `klient/kp16-prehled`, migrace 125 neaplikovaná**, R-128), KP17 poptávky z webu klienta (D-K16 a D-K20 = jen počet rozhodnuto 2026-11-20, **kód hotov 2026-11-20 na větvi `klient/kp17-poptavky-webu`, migrace 126 neaplikovaná**, R-129, R-130). Větve KP11–KP17 jdou za sebou, žádná není na produkci. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna (**kód hotov 2026-11-20 na větvi `klient/kp14-konzultace`, migrace 123 neaplikovaná**, R-126), KP15 chat s klientem a rozvržení jako Slack (**kód hotov 2026-11-20 na větvi `klient/kp15-chat`, migrace 124 neaplikovaná**, R-127), KP16 přehled klienta (**kód hotov 2026-11-20 na větvi `klient/kp16-prehled`, migrace 125 neaplikovaná**, R-128), KP17 poptávky z webu klienta (D-K16 a D-K20 = jen počet rozhodnuto 2026-11-20, **kód hotov 2026-11-20 na větvi `klient/kp17-poptavky-webu`, migrace 126 neaplikovaná**, R-129, R-130). KP10 audit a GDPR (**kroky 1–5 a 9 hotové 2026-11-20 na větvi `klient/kp10-audit`, migrace 127 neaplikovaná**, R-131; kroky 6–8 nasazení, pilot a živý audit čekají na souhlas Kryštofa). Větve KP11–KP17 a KP10 jdou za sebou, žádná není na produkci. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1369,6 +1369,19 @@ jsou malá. Dva odstíny navy pro dva druhy neprošly validátorem barev (stejn�
 13 měsíců). Migrace 126, `lib/client-web/`, `lib/portal/web-leads.ts`, `app/api/public/web-udalost/`,
 karta v detailu zakázky, návod `docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md`. Nový zdroj
 událostí jde jen přes `recordWebEvent`. Bezpečnost `.claude/security/DECISIONS.md` #046.
+
+### R-131 · GDPR v klientském prostoru: výmaz a export skriptem, retence i pro nová data (2026-11-20)
+**Rozhodnutí:** (1) Žádost člena klienta o kopii nebo výmaz vyřizuje Kryštof skriptem
+`scripts/portal-gdpr.mjs` (`--export`, `--vymaz`, `--ano`, `--ponechat-zpravy`) nad funkcemi
+`portal_export_member` a `portal_erase_member` z migrace 127; tlačítko v adminu není. (2) Výmaz
+standardně maže i zprávy člena s přílohami a jeho účet v Supabase; faktury, dotazník za firmu
+a události v Google Kalendáři ne (postup `docs/klientsky-prostor/GDPR.md`). (3) Retence R-076 nově
+maže téma konzultací, slovní části dotazníku a stav čtení vláken. (4) Klient má stránku
+`/klient/soukromi`. (5) Kritéria spuštění pilotu a prostoru pro všechny jsou v plánu, oddíl 11.1.
+**Proč:** zadání KP10. Do teď neexistovala žádná cesta k výmazu člena a retence neznala data
+z KP14–KP16. Agent zvolil výklad, který jde vrátit; text stránky a výklad ověří Kryštof (R-079).
+**Důsledek:** nová tabulka s údaji člena = doplnit `portal_export_member`, `portal_erase_member`
+a `purge_client_retention` (zvažovat i v testu `kp10-gdpr`). Bezpečnost DECISIONS #047.
 ---
 
 ## 3. Otevřené problémy
@@ -1453,6 +1466,14 @@ událostí jde jen přes `recordWebEvent`. Bezpečnost `.claude/security/DECISIO
   (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
   i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
   s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **KP10 — zbývají kroky 6–8 (jen se souhlasem Kryštofa v daném kroku):** (6) migrace 113,
+  121–127 na produkci, `node scripts/portal-create-role.js`, Supabase (SMTP, HTTPS hook, bucket
+  `chat-prilohy`, šablona hesla), `SUPABASE_AUTH_HOOK_SECRET` ve Vercelu, merge KP11–KP17 a KP10 do
+  `main` a push; (7) pilot s jedním klientem; (8) `web-security-audit` na živé adrese. Dál: DPA
+  zpracovatelů a regiony Resendu a Googlu v `docs/klientsky-prostor/GDPR.md` (**[DOPLNIT]**),
+  kontrola textu `/klient/soukromi` Kryštofem, ruční ověření oddělení dvou firem na databázi.
+  Kritéria v plánu, oddíl 11.1. Stránka `/klient/soukromi` je za přihlášením, v prohlížeči ji nikdo
+  neviděl · od 2026-11-20
 - [ ] **KP17 nasadit a projít naživo:** kód na větvi `klient/kp17-poptavky-webu` (nad `klient/kp16-prehled`),
   nic nenasazené. Před nasazením migrace 121–126 (aditivní) a `node scripts/portal-create-role.js`.
   Nová env není (`AGENT_KEY_PEPPER` už ve Vercelu je). Projít: zakázka → Poptávky z webu → Vytvořit
@@ -1756,6 +1777,22 @@ událostí jde jen přes `recordWebEvent`. Bezpečnost `.claude/security/DECISIO
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-20 (KP10 — audit, GDPR a příprava spuštění)
+- **decision** **R-131**: výmaz a export člena skriptem, retence i pro témata konzultací, dotazník
+  a stav čtení, stránka `/klient/soukromi`, kritéria spuštění.
+- **fix** `/api/public/web-udalost` a `/api/agent/…/reports` utnou tělo po stropu i bez
+  `Content-Length` (`readJsonLimited`). Soubory: obě `route.ts`, test hlášení.
+- **db** Migrace 127 `gdpr_klientsky_prostor` (aplikována: ne, nikde): `portal_export_member`,
+  `portal_erase_member`, doplněná `purge_client_retention`.
+- **feat** Skript `scripts/portal-gdpr.mjs`, stránka `app/klient/soukromi/`, odkaz „Vaše údaje"
+  v `components/portal/client-shell.tsx` a na Přehledu.
+- **docs** `docs/klientsky-prostor/GDPR.md` (zpracovatelé, inventura, postup), plán oddíl 5 (hrozby
+  se stavem ověření) a 11.1 (kritéria spuštění).
+- **chore** Ověřeno: `npx tsc --noEmit`; nový `lib/__tests__/kp10-gdpr.test.ts` (7 testů nad PGlite);
+  v testu hlášení pokus o únik a tělo přes 32 kB; v `kp17` otočení a zneplatnění klíče hlášení.
+  Bezpečnostní kontrola celého prostoru: 4 drobnosti opravené, 0 zneužitelných (AUDIT-LOG).
+  **Nic nenasazené, nic naživo.**
 
 ### 2026-11-20 (KP17 — poptávky z webu klienta)
 - **decision** **R-130**: D-K20 = jen počet (Kryštof), události místo projekce, pepř `AGENT_KEY_PEPPER`.

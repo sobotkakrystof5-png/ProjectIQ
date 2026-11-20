@@ -167,18 +167,28 @@ poptávka sama jde klientovi e-mailem jako dnes.
 
 ## 5. Bezpečnostní model
 
-| Hrozba | Opatření | Kde |
+Stav ověření k 2026-11-20 (KP10): **test** = automatický test (PGlite nebo route handler), **ručně**
+= prošel člověk v prohlížeči nebo na databázi, **neověřeno** = ani jedno. Nic z KP11–KP17 není na
+produkci, takže „ručně“ zatím nemá nic.
+
+| Hrozba | Opatření | Stav ověření |
 |---|---|---|
-| Klient vidí cizí projekt | schéma `portal`, role bez práv do `public`, RLS, složené klíče, test oddělení | KP05 |
-| Únik agentského klíče | klíč jen pro zápis konceptu do jednoho projektu, HMAC v DB, rotace, rate limit | KP04 |
-| Citlivé údaje v hlášení (klíče, `.env`, cesty) | zakrývání na serveru, příznak „citlivé“, koncept se schvaluje člověkem, nikdy surový diff | KP03, KP04 |
-| Prompt injection v textu nebo nahrávce klienta | text jen jako data v citaci, AI jen shrnuje, žádné automatické spuštění, člověk čte | hotovo, KP09 |
-| Pozvánka přeposlaná dál | jednorázová, vyprší, hash v DB, odebrání člena, volitelná vazba na e-mail | KP05 |
-| Zneužití nákladů (OpenAI, Claude) | limity po IP a po projektu, strop velikosti, počítání i neúspěšných volání | hotovo, KP07 |
-| Osobní údaje a nahrávky | audio se neukládá, DPA a evropská rezidence OpenAI k ověření, retence a výmaz | KP10 |
-| Token v `/p/[token]` | nahradí přihlášení; po přechodu jde vypnout per projekt | KP06, KP10 |
-| Hook nebo skript u Kryštofa | skript jen odesílá, nic nestahuje ani nespouští, verze pevně v repu | KP04 |
-| CSP a Clerk mimo `/w` | změna `proxy.ts` a CSP zapsaná v `.claude/security/CSP-LOG.md`, žádné `unsafe-inline` | KP05 |
+| Klient vidí cizí zakázku, etapy, peníze, faktury, konzultace, zprávy, čísla z webu | schéma `portal`, role `portal_app` bez práv do `public`, RLS na `app.client_id`, složené klíče, úzké funkce s kontrolou člena | **test** (`portal-isolation`, `kp12`–`kp17`, klient B nic z A ani přes id); **neověřeno** ručně na DB se dvěma firmami |
+| Cizí PDF faktury nebo příloha přes přímé URL | `/api/klient/faktury/[id]/pdf` a `/api/klient/prilohy/[id]` ověří přihlášení a členství, funkce `portal.invoice_pdf` / `attachment_file` | **test** (route PDF, `kp15`); **neověřeno** ručně |
+| Registrace cizího účtu | hook `/api/auth/supabase-hook`: podpis Standard Webhooks, otisk platné pozvánky, shodný e-mail, ne `ADMIN_EMAIL`, fail-closed | **test** (`portal-supabase-auth`); **neověřeno** naživo (HTTPS hook v Supabase ještě není zapnutý) |
+| Pozvánka přeposlaná dál | jednorázová, 14 dní, HMAC v DB, vázaná na e-mail, odebrání člena | **test** (`portal-pozvani-zakazka`); **neověřeno** naživo |
+| Únik klíče pro hlášení z Claude Code | klíč jen pro koncept do jedné zakázky, HMAC s pepřem, otočení, limity 60/h IP a 20/h klíč, tělo do 32 kB i bez `Content-Length` | **test** (route hlášení, otočení a zneplatnění v `kp17`) |
+| Citlivé údaje v hlášení (klíče, `.env`, connection string, cesty) | zakrývání na serveru, příznak „citlivé“ blokuje schválení, koncept schvaluje člověk | **test** (pokus o únik: klíč Stripe, `DATABASE_URL` s heslem, `RESEND_API_KEY` najednou) |
+| Únik klíče webu klienta (KP17) | jen zápis počtu do jedné zakázky, HMAC, otočení, jen ze serveru (`Origin` = 403), 60/h klíč, 300/h IP, tělo do 1 kB | **test** (`kp17`) |
+| Prompt injection v textu, nahrávce nebo zprávě klienta | text jen jako data v citaci, AI jen shrnuje, žádné automatické spuštění, zadání vkládá Kryštof | **test** částečně (`client-requests`); hlavní pojistka je, že zadání čte a vkládá člověk |
+| Zneužití nákladů (OpenAI, Claude, Google, Resend) | limity po IP a členovi, strop velikosti nahrávky 4 MB, e-mail druhé straně nejvýš 1×/h, etapa 1×/24 h | **test** (`transcribe`, `kp15`, `kp16`) |
+| Rezervace konzultace mimo volno, souběh, spam | jen funkcemi `portal.book_/move_/cancel_consultation`, kolize pod zámkem, lhůta 24 h, limity 30/10 min | **test** (`kp14`); Google Meet a Resend **neověřeno** naživo |
+| Velké nebo škodlivé přílohy | 4 MB na odeslání, typ podle obsahu, soukromý bucket, výdej přes server s `nosniff` a sandbox CSP | **test** (`kp15`); Supabase Storage **neověřeno** naživo |
+| Osobní údaje a nahrávky | audio se neukládá; retence R-076 včetně témat konzultací, dotazníku a stavu čtení (migrace 127); export a výmaz na žádost skriptem | **test** (`kp10-gdpr`); DPA zpracovatelů viz `GDPR.md` (část **neověřeno**) |
+| Token v `/p/[token]` | tvar tokenu ověřený před dotazem, výměna odkazu, odkaz do prostoru | **test** (`public-token`); vypnutí `/p` per zakázka **neudělané** |
+| Session v `/klient` | Supabase cookie `httpOnly`, `getClaims()`, `next` jen uvnitř `/klient` | **test** částečně; **neověřeno** naživo |
+| Hook nebo skript u Kryštofa | skript jen odesílá, nic nestahuje ani nespouští | **ručně** při KP04 |
+| CSP | `/klient` vynucená s nonce, žádné `unsafe-inline` ve skriptech, KP11–KP17 CSP neměnily | **test** (`csp`) |
 
 Každé sezení s veřejným vstupem nebo databází končí `web-security-review`, KP10 `web-security-audit`.
 
@@ -198,7 +208,7 @@ Jedno sezení = jedna nová konverzace v Claude Code. Velikost: S ≈ půl dne, 
 | **KP07** | Klientský prostor III: požadavky (text i hlas) a zprávy pod přihlášením, historie | M | 09x | KP05, hotový krok 1 | částečně | kód hotov (096 neaplikovaná), neověřeno |
 | **KP08** | Soubory a přílohy (volitelné) | M | 09x | D-K8, KP07 | ne | nezačato (odloženo, D-K8) |
 | **KP09** | Předání do Claude Code: úroveň 2, experiment s úrovní 3 | M | — | D-K7, KP07 | ne | úroveň 2 hotova; úroveň 3 se nedělá bez experimentu a rozhodnutí |
-| **KP10** | Audit, GDPR, právní texty, pilot s jedním klientem, spuštění | M | — | vše | ano | nezačato; prompt aktualizovaný 2026-11-20 na stav po KP11–KP16 (Supabase místo Clerku, chat, přílohy, Resend, migrace 113 a 121–125) |
+| **KP10** | Audit, GDPR, právní texty, pilot s jedním klientem, spuštění | M | — | vše | ano | **kroky 1–5 a 9 hotové 2026-11-20** na větvi `klient/kp10-audit` (audit, GDPR, migrace 127 neaplikovaná, `GDPR.md`, kritéria v 11.1, R-131); kroky 6–8 (nasazení, pilot, živý audit) čekají na souhlas |
 | **KP11** | Přihlášení naostro a pozvání jedním klikem: převzít F1 z `auth/supabase-klient`, seznam nastavení Supabase pro Kryštofa, tlačítko „Pozvat klienta do prostoru", průchod v prohlížeči | M | — (113 z F1) | R-107 F1, D-K12 | částečně | kód hotov na větvi `klient/kp11-prihlaseni` (2026-11-18): F1 převzatá, pozvání jedním klikem s potvrzením cizího prostoru; čeká na nastavení Supabase a migraci 113, v prohlížeči jen karta s vymyšlenými daty |
 | **KP12** | Služby a etapy: číselník služeb, šablony etap v Nastavení, předvyplnění u nové zakázky, etapy v detailu zakázky, úkoly pro klienta, projekce do `portal` | L | ano | KP11, D-K14 | **ano** | kód hotov 2026-11-18 na větvi `klient/kp12-etapy`: Nastavení › Služby a etapy, výběr služby u nové zakázky, karta Etapy v detailu, osa etap a „Mám hotovo" v `/klient`, postup v % z etap; migrace 121 neaplikovaná, ověřeno v PGlite a na dočasné stránce s vymyšlenými daty |
 | **KP13** | Peníze v prostoru: zaplaceno, zbývá, faktury s PDF a QR, projekce do `portal` | M | ano | KP11, D-K15 | částečně | kód hotov 2026-11-18 na větvi `klient/kp13-penize`: sekce Peníze v detailu projektu (cena, zaplaceno, zbývá, faktury se stavem, PDF, QR), `GET /api/klient/faktury/[id]/pdf`, zaplacené faktury nově snižují „zbývá" i v adminu (R-125), archivní PDF úzkou funkcí (DECISIONS #042); migrace 122 neaplikovaná, ověřeno v PGlite a na dočasné stránce s vymyšlenými daty |
@@ -281,6 +291,23 @@ Online platby klientů (klient od R-121 vidí faktury a platí převodem nebo QR
 - Z úvodní stránky admina jsou požadavky, schvalování a faktury po splatnosti **na 1 klik**.
 - Hodnocení klienta se nabídne samo; Kryštof už nikomu neposílá odkaz ani QR kód.
 - Test oddělení klientů v PGlite ověřuje, že klient A nikdy nevidí data klienta B ani koncepty a interní pole.
+
+### 11.1 Kritéria spuštění pro všechny klienty (KP10, rozhoduje Kryštof)
+
+Pilot s jedním klientem (R-066) smí začít, až platí 1–5. Prostor pro všechny klienty až po pilotu
+a když platí i 6–9.
+
+1. Migrace 113, 121–127 na produkci a `node scripts/portal-create-role.js` prošel bez chyby.
+2. Supabase: SMTP, HTTPS hook s tajemstvím, soukromý bucket `chat-prilohy`, šablona „Reset Password";
+   ve Vercelu `SUPABASE_AUTH_HOOK_SECRET` před deployem.
+3. Větve KP11–KP17 a KP10 v `main`, produkce na novém buildu, `/klient/prihlaseni` 200, cron 401.
+4. `web-security-audit` na živé adrese bez chyby (varování zapsaná).
+5. Admin má zapnutý druhý faktor (dnes nemá, Otevřené problémy).
+6. Pilotní klient prošel pozvánka → heslo → první obrazovka do 2 minut → zpráva → schválení
+   → konzultace → faktura → dotazník; zjištění opravená nebo zapsaná.
+7. Oddělení dvou firem ověřené ručně na produkční databázi (dva testovací klienti), ne jen testem.
+8. DPA zpracovatelů v `GDPR.md` přijaté a zapsané (Neon, Supabase, Vercel, Resend, Google, OpenAI).
+9. Text `/klient/soukromi` zkontrolovaný Kryštofem; zpracovatelé doplnění do smlouvy s klientem.
 
 ## 12. Zápis do paměti
 

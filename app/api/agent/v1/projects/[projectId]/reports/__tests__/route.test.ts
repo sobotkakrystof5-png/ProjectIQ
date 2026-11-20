@@ -136,6 +136,35 @@ describe('POST /api/agent/v1/projects/{id}/reports', () => {
     expect(values).toContain(true)
   })
 
+  it('tělo přes 32 kB odmítne i bez hlavičky délky a nic nezapíše', async () => {
+    const key = generateAgentKey()
+    const inserts = db(PROJECT, key)
+    const res = await call({ key: key.key, raw: JSON.stringify({ title: 'a', body: 'b'.repeat(40 * 1024) }) })
+    expect(res.status).toBe(413)
+    expect(inserts).toEqual([])
+  })
+
+  it('pokus o únik (KP10): klíč, řádek .env a connection string se zakryjí najednou', async () => {
+    const key = generateAgentKey()
+    const inserts = db(PROJECT, key)
+    const secrets = [
+      // Vymyšlený klíč skládaný za běhu, ať ho skener tajemství v gitu nebere jako skutečný.
+      ['sk', 'live', '51Habcdefghijklmnopqrstuvwxyz0123'].join('_'),
+      'DATABASE_URL=postgres://neondb_owner:Tajne-heslo-123@ep-cool-1.eu-central-1.aws.neon.tech/neondb',
+      'RESEND_API_KEY=re_AbCdEfGh_1234567890abcdef',
+    ]
+    const res = await call({
+      key: key.key,
+      body: { title: 'Nasazení', body: `Hotovo.\n${secrets.join('\n')}\nKlient může zkoušet.` },
+    })
+    expect(res.status).toBe(201)
+    const stored = inserts[0].join(' ')
+    for (const s of ['sk_live_51Habcdefghij', 'Tajne-heslo-123', 'neondb_owner:', 're_AbCdEfGh']) expect(stored).not.toContain(s)
+    expect(stored).toContain('[skryto]')
+    // Příznak „citlivé“ = koncept nejde schválit bez úpravy (canApproveActivity).
+    expect(inserts[0]).toContain(true)
+  })
+
   it('bez pepře odpoví 503 a nic nezapíše', async () => {
     delete process.env.AGENT_KEY_PEPPER
     expect((await call({ key: 'x' })).status).toBe(503)

@@ -5,6 +5,7 @@ import { getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { bearerFrom, isAgentKeyConfigured, resolveAgentKey, touchAgentKey } from '@/lib/agent-keys'
 import { createNotification } from '@/lib/notifications'
+import { readJsonLimited } from '@/lib/security/request-body'
 import {
   prepareActivity,
   reportInputSchema,
@@ -50,15 +51,10 @@ export async function POST(
   if (await isApiRateLimited(keyEndpoint, 'key', KEY_WINDOW_MINUTES, KEY_MAX)) return fail(429, 'RATE_LIMITED')
   await recordApiRequest(keyEndpoint, 'key')
 
-  const declared = Number(req.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return fail(413, 'TOO_LARGE')
-
-  let raw: unknown
-  try {
-    raw = await req.json()
-  } catch {
-    return fail(400, 'INVALID_BODY')
-  }
+  // Strop platí i pro tělo bez Content-Length (chunked): čtení se utne po 32 kB.
+  const body = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!body.ok) return body.reason === 'too-large' ? fail(413, 'TOO_LARGE') : fail(400, 'INVALID_BODY')
+  const raw = body.value
   const parsed = reportInputSchema.safeParse(raw)
   if (!parsed.success) return fail(400, 'INVALID_BODY')
 

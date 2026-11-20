@@ -24,6 +24,7 @@ import { issueWebKey, loadProjectWebLeads, revokeWebKey } from '@/lib/client-web
 import { buildWebLeadStats, leadsLabel, webLeadsSummary } from '@/lib/client-web/stats'
 import { loadProjectWebLeads as loadPortalWebLeads } from '@/lib/portal/web-leads'
 import { loadClientOverview } from '@/lib/portal/overview'
+import { issueAgentKey, resolveAgentKey, revokeAgentKey } from '@/lib/agent-keys'
 
 // KP17 (D-K16, D-K20 = jen počet, R-129): poptávky z webu klienta. Migrace 126
 // dvakrát po sobě nad PGlite, veřejný vstup přes skutečný route handler,
@@ -112,6 +113,7 @@ beforeAll(async () => {
   await db.exec('CREATE TABLE client_feedback (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE, nps integer NOT NULL, content text, created_at timestamptz DEFAULT now())')
   await db.exec(read('migrations', '092_client_requests.sql'))
   await db.exec(read('migrations', '093_project_activity.sql'))
+  await db.exec(read('migrations', '094_project_agent_keys.sql'))
   await db.exec(read('migrations', '095_portal_schema.sql'))
   await preparePortalMoneyTables(db)
   await prepareConsultationTables(db)
@@ -352,5 +354,23 @@ describe('výpočet čísel', () => {
     expect([1, 3, 5, 1200].map(leadsLabel)).toEqual(['1 poptávka', '3 poptávky', '5 poptávek', '1 200 poptávek'])
     expect(webLeadsSummary(buildWebLeadStats([], '2026-11'))).toContain('zatím žádná')
     expect(webLeadsSummary(buildWebLeadStats([{ month: '2026-03', poptavky: 4, objednavky: 0 }], '2026-11'))).toContain('březen 2026')
+  })
+})
+
+describe('klíč pro hlášení z Claude Code (KP10, krok 3)', () => {
+  it('otočení zneplatní starý klíč, zneplatnění vypne i nový', async () => {
+    const old = await issueAgentKey(PA, 'admin')
+    expect((await resolveAgentKey(old))?.projectId).toBe(PA)
+    const fresh = await issueAgentKey(PA, 'admin')
+    expect(await resolveAgentKey(old)).toBeNull()
+    expect((await resolveAgentKey(fresh))?.projectId).toBe(PA)
+    const active = await db.query('SELECT 1 FROM project_agent_keys WHERE project_id = $1 AND revoked_at IS NULL', [PA])
+    expect(active.rows).toHaveLength(1)
+    expect(await revokeAgentKey(PA, 'admin')).toBe(true)
+    expect(await resolveAgentKey(fresh)).toBeNull()
+    // V databázi není klíč, jen prefix a hash.
+    const stored = JSON.stringify((await db.query('SELECT * FROM project_agent_keys')).rows)
+    expect(stored).not.toContain(fresh)
+    expect(stored).not.toContain(old)
   })
 })

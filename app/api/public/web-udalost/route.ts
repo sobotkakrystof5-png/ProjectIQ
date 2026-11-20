@@ -4,6 +4,7 @@ import { getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { bearerFrom, isAgentKeyConfigured } from '@/lib/agent-keys'
 import { recordWebEvent, resolveWebKey } from '@/lib/client-web/keys'
+import { readJsonLimited } from '@/lib/security/request-body'
 
 // Událost z webu klienta (KP17, D-K20 = jen počet, R-129, migrace 126).
 //
@@ -56,23 +57,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (await isApiRateLimited(keyEndpoint, 'key', KEY_WINDOW_MINUTES, KEY_MAX)) return fail(429, 'RATE_LIMITED')
   await recordApiRequest(keyEndpoint, 'key')
 
-  const declared = Number(req.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return fail(413, 'TOO_LARGE')
-  // Content-Length může chybět nebo lhát (chunked) — délka se ověří i na skutečném těle.
-  let text: string
-  try {
-    text = await req.text()
-  } catch {
-    return fail(400, 'INVALID_BODY')
-  }
-  if (Buffer.byteLength(text, 'utf8') > MAX_BODY_BYTES) return fail(413, 'TOO_LARGE')
-
-  let raw: unknown
-  try {
-    raw = JSON.parse(text)
-  } catch {
-    return fail(400, 'INVALID_BODY')
-  }
+  // Strop platí i pro tělo bez Content-Length (chunked): čtení se utne po 1 kB.
+  const body = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!body.ok) return body.reason === 'too-large' ? fail(413, 'TOO_LARGE') : fail(400, 'INVALID_BODY')
+  const raw = body.value
   const parsed = bodySchema.safeParse(raw)
   if (!parsed.success) return fail(400, 'INVALID_BODY')
 

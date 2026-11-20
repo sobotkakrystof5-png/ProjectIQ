@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-20 — review: klientský prostor celý před spuštěním (KP10, R-131)
+Spouštěč: KP10 před nasazením KP11–KP17 (skill `web-security-review`)
+Rozsah: všechny veřejné vstupy prostoru — `/api/agent/v1/projects/[id]/reports`, `/api/auth/supabase-hook`, přihlášení a pozvánky `/klient/*`, server actions prostoru, `/api/klient/{zpravy,prilohy,faktury,transcribe}`, `/api/public/{portal,web-udalost}`, `/p/[token]`, `/h/[token]`, crony `client-retention` a `send-reminders`; model hrozeb v `docs/klientsky-prostor/PLAN.md` oddíl 5 bod po bodu; inventura osobních údajů v migracích 092–126.
+Výsledek: 0 zneužitelných nálezů, 4 drobnosti opravené.
+Nálezy: (1) `/api/public/web-udalost` a (2) `/api/agent/…/reports` četly tělo celé do paměti a velikost kontrolovaly až potom — tělo bez `Content-Length` (chunked) šlo přes strop (zbýval jen limit platformy 4,5 MB). (3) Retence R-076 neznala téma konzultací (KP14), slovní části dotazníku (R-119) ani stav čtení vláken (KP15). (4) Výmaz člena na žádost neexistoval: odebrání nechávalo účet v Supabase, zprávy, přílohy i pozvánky.
+Opraveno: (1)(2) `readJsonLimited` utne čtení po 1 kB / 32 kB (test i bez hlavičky délky); (3)(4) migrace 127 — doplněná `purge_client_retention`, `portal_export_member`, `portal_erase_member` jen pro vlastníka, skript `scripts/portal-gdpr.mjs`, test `kp10-gdpr`. Test odhalil, že `consultation_slots.client_wish` je NOT NULL — výmaz píše prázdný text, ne NULL. Dál ověřeno testem: pokus o únik v hlášení (klíč Stripe, `DATABASE_URL` s heslem a `RESEND_API_KEY` najednou) se zakryje a koncept nejde schválit; otočení a zneplatnění klíče hlášení. Přepis hlasu (`formData`) má strop těla podle hlavičky, server actions `bodySizeLimit` 5 MB a Vercel 4,5 MB — přijato. Stav každé hrozby je v plánu, oddíl 5.
+Zůstává: nic není nasazené; ruční ověření oddělení na databázi se dvěma firmami, DPA zpracovatelů a živý `web-security-audit` čekají na krok 6 KP10 (se souhlasem Kryštofa) — DECISIONS #047, `docs/klientsky-prostor/GDPR.md`.
+
 ## 2026-11-20 — review: poptávky z webu klienta (KP17, R-129)
 Spouštěč: před commitem (skill `web-security-review`)
 Rozsah: migrace 126 (`project_web_keys`, `project_web_events`, `portal.web_lead_months`), `scripts/portal-grants.sql`, nový veřejný vstup `POST /api/public/web-udalost`, `lib/client-web/{keys,stats,setup}.ts`, `lib/portal/web-leads.ts`, akce `app/project-web-key-actions.ts`, karta „Poptávky z webu" v detailu zakázky, čísla v `/klient` (Přehled, panel O zakázce, detail projektu), export `randomToken` z `lib/agent-keys.ts`.
