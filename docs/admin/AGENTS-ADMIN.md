@@ -1208,6 +1208,14 @@ Migrace 121. Admin:
 - Bez migrace 121 vrací `loadServices`/`loadProjectPhases` `null`: karta i výběr služby se
   schovají, `/dashboard/sluzby` řekne, že to ještě není zapnuté. Testy `lib/__tests__/kp12-sluzby-etapy.test.ts`.
 
+**E-mail klientovi o hotové etapě (KP16, R-128, migrace 125).** Když se etapa přepne na Hotovo
+(`setPhaseStatusAction`), za 15 s (čas na „Zpět") pošle `lib/admin/phase-email.ts` všem aktivním
+členům klienta e-mail z krystof@vizeon.cz: co je hotové, na čem se pracuje teď a do kdy, co je potřeba
+od klienta, odkaz do prostoru. Nejvýš jednou za 24 h na zakázku — zabírá `portal_phase_email_claim`
+(tabulka `project_phase_emails`, sloupec `project_phases.client_notified_at`); co se nevešlo, dopošle
+ranní cron `send-reminders`. Zakázka mimo klientský prostor e-mail nedostane; když e-mail nikomu
+neodejde, zabrání se vrátí.
+
 ## Peníze a faktury v klientském prostoru (KP13, R-125)
 
 - Admin se kvůli tomu nemění v obrazovkách, jen ve výpočtu doplatku (R-125, viz „Zálohy a ruční

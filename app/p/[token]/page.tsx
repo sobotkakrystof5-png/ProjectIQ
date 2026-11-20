@@ -33,7 +33,7 @@ export default async function ClientPortalPage(props: PageProps) {
 
   const project = projectRows[0] as Pick<Project, 'id' | 'client_name' | 'description' | 'focus' | 'status' | 'progress' | 'deadline' | 'updated_at' | 'project_url'>
 
-  const [msgRows, progressRows, freeRows, activityRows] = await Promise.all([
+  const [msgRows, progressRows, freeRows, activityRows, spaceRows] = await Promise.all([
     sql`
       SELECT id, content, created_at
       FROM client_messages
@@ -61,7 +61,16 @@ export default async function ClientPortalPage(props: PageProps) {
       ORDER BY published_at DESC
       LIMIT 50
     `.catch(() => []),
+    // Má zakázka klientský prostor s aspoň jedním členem? Pak nenápadný odkaz
+    // na přihlášení (KP16). Bez schématu portal nic.
+    sql`
+      SELECT 1 FROM portal.projects pp
+      JOIN portal.members m ON m.client_id = pp.client_id AND m.removed_at IS NULL
+      WHERE pp.id = ${project.id}
+      LIMIT 1
+    `.catch(() => []),
   ])
+  const hasClientSpace = spaceRows.length > 0
 
   const messages = msgRows as Pick<ClientMessage, 'id' | 'content' | 'created_at'>[]
   const progressUpdates = progressRows as Pick<ProgressUpdate, 'id' | 'progress_from' | 'progress_to' | 'description' | 'created_at'>[]
@@ -234,6 +243,15 @@ export default async function ClientPortalPage(props: PageProps) {
               </div>
             </div>
           </div>
+
+          {hasClientSpace && (
+            <p className="mt-5 text-center text-sm text-quiet">
+              Zprávy, faktury a konzultace máte i ve vašem prostoru.{' '}
+              <a href="/klient/prihlaseni" className="inline-flex min-h-11 items-center font-semibold text-navy-700 underline-offset-2 hover:underline">
+                Přihlásit se do vašeho prostoru
+              </a>
+            </p>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-2.5 mt-6">

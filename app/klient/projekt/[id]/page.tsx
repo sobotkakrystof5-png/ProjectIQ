@@ -4,8 +4,9 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, ExternalLink, MessagesSquare } from 'lucide-react'
 import { z } from 'zod'
 import { requireClient } from '@/lib/portal/context'
-import { loadClientProject, loadProjectExtras } from '@/lib/portal/projects'
-import { FeedbackCard } from '@/components/portal/feedback-card'
+import { loadClientProject } from '@/lib/portal/projects'
+import { loadClientSurvey } from '@/lib/portal/survey'
+import { SurveyCard } from '@/components/portal/survey-card'
 import { PhaseTimeline } from '@/components/portal/phase-timeline'
 import { loadClientPhases } from '@/lib/portal/phases'
 import { ProjectMoney } from '@/components/portal/project-money'
@@ -26,13 +27,12 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
   const data = await loadClientProject(ctx.clientId, id)
   if (!data) notFound()
   const { project, activity } = data
-  const [{ rated }, phases, { money, invoices }, consultations] = await Promise.all([
-    loadProjectExtras(ctx.clientId, id, ctx.memberId),
+  const [survey, phases, { money, invoices }, consultations] = await Promise.all([
+    loadClientSurvey(ctx.clientId, ctx.memberId, id),
     loadClientPhases(ctx.clientId, id),
     loadClientMoney(ctx.clientId, id),
     loadClientConsultations(ctx.clientId, id),
   ])
-  const isDone = project.status === 'done' || project.status === 'paid'
 
   return (
     <ClientShell ctx={ctx} section="prehled" activeProjectId={null}>
@@ -91,11 +91,7 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
         />
       )}
 
-      {isDone && !rated && (
-        <div className="mt-5">
-          <FeedbackCard projectId={project.id} />
-        </div>
-      )}
+      {survey && <SurveyCard survey={survey} />}
 
       <section className="mt-5" aria-labelledby="co-se-delo">
         <h2 id="co-se-delo" className="mb-3 text-sm font-semibold uppercase tracking-wider text-quiet">Co se dělo</h2>

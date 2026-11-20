@@ -25,10 +25,6 @@ type ActionResult = { success: boolean; error?: string }
 
 const projectIdSchema = z.string().uuid()
 const messageSchema = z.object({ body: z.string().trim().min(1, 'Napište prosím zprávu.').max(2000, 'Zpráva může mít nejvýše 2000 znaků.') })
-const feedbackSchema = z.object({
-  nps: z.number().int().min(1).max(10),
-  content: z.string().trim().max(2000, 'Komentář může mít nejvýše 2000 znaků.').optional(),
-})
 
 const GENERIC = 'Něco se nepovedlo. Zkuste to prosím znovu.'
 
@@ -156,34 +152,8 @@ export async function sendMessage(projectId: string, raw: { body: string }): Pro
   return { success: true }
 }
 
-export async function sendFeedback(projectId: string, raw: { nps: number; content?: string }): Promise<ActionResult> {
-  const ctx = await getPortalContext()
-  if (!ctx) return { success: false, error: 'Přihlaste se prosím znovu.' }
-  const id = projectIdSchema.safeParse(projectId)
-  const parsed = feedbackSchema.safeParse(raw)
-  if (!id.success) return { success: false, error: 'Tenhle projekt nebyl nalezen.' }
-  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Zkontrolujte prosím hodnocení.' }
-
-  try {
-    await portalDb({ clientId: ctx.clientId })`
-      SELECT portal.submit_feedback(${id.data}, ${ctx.memberId}, ${parsed.data.nps}, ${parsed.data.content ?? null})
-    `
-  } catch (err) {
-    return { success: false, error: explain(err, GENERIC) }
-  }
-
-  const info = await adminProjectInfo(id.data)
-  if (info) {
-    void createNotification({
-      type: 'feedback_submitted',
-      title: `Nové hodnocení od klienta — ${info.client_name}`,
-      body: `NPS: ${parsed.data.nps}/10${parsed.data.content ? ' · ' + parsed.data.content : ''}`,
-      link: projectPath(id.data),
-    })
-  }
-  revalidatePath(`/klient/projekt/${id.data}`)
-  return { success: true }
-}
+// Hodnocení hotové zakázky jde od KP16 přes dotazník R-119 (/h/<token>,
+// lib/admin/survey-answers.ts), ne přes portal.submit_feedback.
 
 const taskStateSchema = z.object({ taskId: z.string().uuid(), done: z.boolean() })
 
@@ -225,7 +195,10 @@ export async function setTaskDone(projectId: string, raw: { taskId: string; done
       })
     }
   }
+  // Úkol je vidět i v Přehledu a v panelu O zakázce u chatu (KP16).
   revalidatePath(`/klient/projekt/${project}`)
+  revalidatePath(`/klient/zpravy/${project}`)
+  revalidatePath('/klient')
   return { success: true }
 }
 

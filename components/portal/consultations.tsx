@@ -18,6 +18,9 @@ import { CHANNEL_LABELS } from '@/lib/types'
 
 export type ClientConsultation = {
   id: string
+  /** Na souhrnné stránce Konzultace — ke které zakázce patří. */
+  projectId?: string
+  projectName?: string
   startsAt: string
   endsAt: string
   topic: string
@@ -42,19 +45,25 @@ export function ProjectConsultations({
   today,
   upcoming,
   freeSlots,
+  projects = [],
+  title = 'Konzultace',
 }: {
   projectId: string
   today: string
   upcoming: ClientConsultation[]
   freeSlots: FreeSlot[]
+  /** Souhrnná stránka: víc zakázek — klient vybere, ke které konzultace patří. */
+  projects?: { id: string; name: string }[]
+  title?: string
 }) {
+  const [bookFor, setBookFor] = useState(projectId)
   const [mode, setMode] = useState<Mode>({ kind: 'idle' })
   const [day, setDay] = useState<string | null>(null)
   const [start, setStart] = useState<string | null>(null)
   const [topic, setTopic] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [cancelled, setCancelled] = useState<{ startsAt: string; topic: string } | null>(null)
+  const [cancelled, setCancelled] = useState<{ startsAt: string; topic: string; projectId: string } | null>(null)
   const [pending, startTransition] = useTransition()
 
   function open(next: Mode) {
@@ -70,7 +79,7 @@ export function ProjectConsultations({
     if (!start) return setError('Vyberte prosím den a čas.')
     if (topic.trim().length < 3) return setError('Napište prosím pár slov, o čem se chcete bavit.')
     startTransition(async () => {
-      const res = await bookConsultation(projectId, { startsAt: start, topic: topic.trim() })
+      const res = await bookConsultation(bookFor, { startsAt: start, topic: topic.trim() })
       if (!res.success) return setError(res.error ?? 'Rezervace se nepovedla. Zkuste to prosím znovu.')
       setMode({ kind: 'idle' })
       setTopic('')
@@ -94,7 +103,7 @@ export function ProjectConsultations({
     startTransition(async () => {
       const res = await cancelConsultation(c.id)
       if (!res.success) return setError(res.error ?? 'Zrušení se nepovedlo. Zkuste to prosím znovu.')
-      setCancelled({ startsAt: c.startsAt, topic: c.topic })
+      setCancelled({ startsAt: c.startsAt, topic: c.topic, projectId: c.projectId ?? projectId })
     })
   }
 
@@ -102,7 +111,7 @@ export function ProjectConsultations({
     if (!cancelled) return
     const again = cancelled
     startTransition(async () => {
-      const res = await bookConsultation(projectId, { startsAt: again.startsAt, topic: again.topic || 'Konzultace' })
+      const res = await bookConsultation(again.projectId, { startsAt: again.startsAt, topic: again.topic || 'Konzultace' })
       setCancelled(null)
       if (!res.success) return setError(res.error ?? 'Konzultaci se nepodařilo vrátit. Vyberte prosím nový čas.')
       setNotice('Konzultace je zpátky. Nový odkaz na Google Meet vám přijde e-mailem.')
@@ -116,7 +125,7 @@ export function ProjectConsultations({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="konzultace" className="flex items-center gap-2 text-base font-semibold text-ink">
           <CalendarClock size={18} strokeWidth={1.5} className="text-navy-600" aria-hidden="true" />
-          Konzultace
+          {title}
         </h2>
         {!picking && freeSlots.length > 0 && (
           <button type="button" className={primary} onClick={() => open({ kind: 'book' })}>
@@ -139,7 +148,7 @@ export function ProjectConsultations({
         <p className="mt-2 text-sm text-quiet">
           {freeSlots.length > 0
             ? 'Chcete něco probrat? Vyberte si čas, kdy mám volno, a spojíme se přes Google Meet.'
-            : 'Volný termín teď nemám. Napište mi prosím zprávu níž a domluvíme se.'}
+            : 'Volný termín teď nemám. Napište mi prosím zprávu a domluvíme se.'}
         </p>
       )}
 
@@ -149,6 +158,7 @@ export function ProjectConsultations({
             const changeable = canClientChange(c.startsAt)
             return (
               <li key={c.id} className="rounded-chip border border-navy-100 p-4">
+                {projects.length > 1 && c.projectName && <p className="mb-0.5 truncate text-xs font-medium text-quiet">{c.projectName}</p>}
                 <p className="font-medium text-ink">
                   {consultationWhen(c.startsAt, today)}
                   <span className="font-normal text-quiet"> · {minutesBetween(c.startsAt, c.endsAt)} minut</span>
@@ -187,6 +197,21 @@ export function ProjectConsultations({
 
       {picking && (
         <div className="mt-4 space-y-4 border-t border-navy-100 pt-4">
+          {mode.kind === 'book' && projects.length > 1 && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="konzultace-zakazka" className="text-sm font-medium text-ink">Ke které zakázce?</label>
+              <select
+                id="konzultace-zakazka"
+                value={bookFor}
+                onChange={(e) => setBookFor(e.target.value)}
+                className="min-h-11 w-full rounded-chip border border-navy-100 bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-navy-700"
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <p className="text-sm font-medium text-ink">
             {mode.kind === 'move' ? 'Vyberte nový čas' : 'Kdy se vám to hodí?'}
           </p>

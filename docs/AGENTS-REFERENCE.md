@@ -329,6 +329,20 @@ schválení `answerApproval`; přečteno `touchThread`; obnovení `GET /api/klie
 požadavky jsou ve vlákně. Sdílené: `lib/chat/`, `components/chat/`. Env `SUPABASE_SERVICE_ROLE_KEY`
 (jen server) a soukromý bucket `chat-prilohy`. Bezpečnost DECISIONS #044.
 
+**Přehled klienta (KP16, migrace 125, R-128).** `/klient` (Přehled) nahoře ukazuje „Čeká na vás"
+v pořadí schválení návrhu, úkol z nehotové etapy („Mám hotovo" rovnou v řádku), nepřečtené zprávy,
+faktura po splatnosti, hodnocení; pod tím kartu každé zakázky (etapa s termínem, peníze, nejbližší
+konzultace, poslední zpráva o práci). Všechno čte `loadClientOverview` (`lib/portal/overview.ts`) jedním
+požadavkem; chybějící část schématu se čte zvlášť a je prázdná. Panel O zakázce
+(`components/portal/project-aside.tsx`) u chatu od 1280 px napevno, pod tím `AsideSheet` z tlačítka
+v záhlaví. `/klient/faktury` a `/klient/konzultace` jsou souhrn přes všechny zakázky (`?zakazka=` zúží
+nebo předvybere). Po přihlášení bez `next` vede `/klient/start` do chatu s nepřečtenou zprávou, jinak na
+Přehled. Hodnocení hotové zakázky = dotazník R-119 (`components/portal/survey-card.tsx`, token z
+`portal.client_surveys`, `lib/portal/survey.ts`); stará `FeedbackCard` je pryč. E-mail o hotové etapě:
+`lib/admin/phase-email.ts` (`setPhaseStatusAction` přes `after()` po 15 s, cron `send-reminders`),
+nejvýš 1× za 24 h na zakázku (`portal_phase_email_claim`). `/p/[token]` má odkaz do prostoru, když
+zakázka patří klientovi s aspoň jedním členem. Bezpečnost DECISIONS #045.
+
 ### Jak je to v kódu (S07, R-037)
 
 | Co | Kde |

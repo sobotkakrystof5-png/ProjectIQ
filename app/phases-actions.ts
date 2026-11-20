@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth'
 import { projectPath } from '@/lib/lead-origins'
@@ -23,6 +24,7 @@ import {
   setPhaseDueDate,
   setPhaseStatus,
 } from '@/lib/admin/phases'
+import { PHASE_EMAIL_DELAY_MS, sendPhaseEmailIfDue } from '@/lib/admin/phase-email'
 
 // Služby a etapy zakázky (KP12, R-121). Všechno za přihlášením adminu, vstup
 // přes Zod, výsledek jako `Result` bez výjimky do UI. Do klientského prostoru
@@ -150,6 +152,17 @@ export async function setPhaseStatusAction(phaseId: string, status: PhaseStatus)
     const result = await setPhaseStatus(idOk.data, statusOk.data)
     if (!result) return { ok: false, error: 'Etapa nebyla nalezena. Možná ji mezitím někdo smazal.' }
     revalidatePath(projectPath(result.projectId))
+    // Hotová etapa = e-mail klientovi (KP16, R-128), až uplyne čas na „Zpět".
+    // Když se etapa mezitím vrátí, není co poslat; nejvýš jednou za 24 h.
+    if (statusOk.data === 'done' && result.previous !== 'done') {
+      const projectId = result.projectId
+      after(async () => {
+        await new Promise((resolve) => setTimeout(resolve, PHASE_EMAIL_DELAY_MS))
+        await sendPhaseEmailIfDue(projectId).catch((err: unknown) =>
+          console.error('[etapy] e-mail o etapě selhal:', err instanceof Error ? err.name : 'unknown'),
+        )
+      })
+    }
     return { ok: true, previous: result.previous }
   } catch (err) {
     return fail(err, 'stav etapy')

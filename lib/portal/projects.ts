@@ -26,7 +26,7 @@ export interface PortalActivity {
   publishedAt: string
 }
 
-type ProjectRow = {
+export type ProjectRow = {
   id: string
   name: string
   description: string | null
@@ -41,7 +41,7 @@ type ProjectRow = {
 const isStatus = (v: string): v is ProjectStatus => v in STATUS_LABELS
 const iso = (v: string | Date): string => new Date(v).toISOString()
 
-function toProject(r: ProjectRow): PortalProject {
+export function projectFromRow(r: ProjectRow): PortalProject {
   const status: ProjectStatus = isStatus(r.status) ? r.status : 'new'
   return {
     id: r.id,
@@ -56,7 +56,7 @@ function toProject(r: ProjectRow): PortalProject {
   }
 }
 
-const SELECT = `
+export const PROJECT_SELECT_SQL = `
   SELECT p.id, p.name, p.description, p.status, p.progress, p.deadline, p.project_url,
          (SELECT a.title FROM portal.activity a WHERE a.client_id = p.client_id AND a.project_id = p.id ORDER BY a.published_at DESC LIMIT 1) AS last_title,
          (SELECT a.published_at FROM portal.activity a WHERE a.client_id = p.client_id AND a.project_id = p.id ORDER BY a.published_at DESC LIMIT 1) AS last_at
@@ -73,7 +73,7 @@ export async function listClientProjects(clientId: string): Promise<PortalProjec
     WHERE p.client_id = ${clientId}
     ORDER BY p.updated_at DESC
   `
-  return rows.map(toProject)
+  return rows.map(projectFromRow)
 }
 
 export async function loadClientProject(
@@ -82,7 +82,7 @@ export async function loadClientProject(
 ): Promise<{ project: PortalProject; activity: PortalActivity[] } | null> {
   const db = portalDb({ clientId })
   const [projects, activity] = await db.batch([
-    { text: `${SELECT} WHERE p.client_id = $1 AND p.id = $2`, params: [clientId, projectId] },
+    { text: `${PROJECT_SELECT_SQL} WHERE p.client_id = $1 AND p.id = $2`, params: [clientId, projectId] },
     {
       text: `SELECT id, kind, title, body, published_at FROM portal.activity
              WHERE client_id = $1 AND project_id = $2 ORDER BY published_at DESC LIMIT 100`,
@@ -92,7 +92,7 @@ export async function loadClientProject(
   const row = projects[0] as ProjectRow | undefined
   if (!row) return null
   return {
-    project: toProject(row),
+    project: projectFromRow(row),
     activity: (activity as { id: string; kind: ActivityKind; title: string; body: string; published_at: string }[]).map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -100,65 +100,5 @@ export async function loadClientProject(
       body: a.body,
       publishedAt: iso(a.published_at),
     })),
-  }
-}
-
-export interface PortalRequest {
-  id: string
-  body: string
-  status: 'new' | 'done' | 'dismissed'
-  createdAt: string
-}
-
-export interface PortalMessage {
-  id: string
-  author: 'client' | 'admin'
-  body: string
-  createdAt: string
-}
-
-export const REQUEST_STATUS_LABELS: Record<PortalRequest['status'], string> = {
-  new: 'Odesláno',
-  done: 'Vyřízeno',
-  dismissed: 'Uzavřeno',
-}
-
-/** Požadavky, zprávy a stav hodnocení jedné zakázky (KP07). */
-export async function loadProjectExtras(
-  clientId: string,
-  projectId: string,
-  memberId: string,
-): Promise<{ requests: PortalRequest[]; messages: PortalMessage[]; rated: boolean }> {
-  const db = portalDb({ clientId })
-  const [requests, messages, feedback] = await db.batch([
-    {
-      text: `SELECT id, body, status, created_at FROM portal.requests
-             WHERE client_id = $1 AND project_id = $2 ORDER BY created_at DESC LIMIT 20`,
-      params: [clientId, projectId],
-    },
-    {
-      text: `SELECT id, author, body, created_at FROM portal.messages
-             WHERE client_id = $1 AND project_id = $2 ORDER BY created_at ASC LIMIT 200`,
-      params: [clientId, projectId],
-    },
-    {
-      text: `SELECT 1 FROM portal.feedback WHERE client_id = $1 AND project_id = $2 AND member_id = $3 LIMIT 1`,
-      params: [clientId, projectId, memberId],
-    },
-  ])
-  return {
-    requests: (requests as { id: string; body: string; status: PortalRequest['status']; created_at: string }[]).map((r) => ({
-      id: r.id,
-      body: r.body,
-      status: r.status,
-      createdAt: iso(r.created_at),
-    })),
-    messages: (messages as { id: string; author: 'client' | 'admin'; body: string; created_at: string }[]).map((m) => ({
-      id: m.id,
-      author: m.author,
-      body: m.body,
-      createdAt: iso(m.created_at),
-    })),
-    rated: feedback.length > 0,
   }
 }

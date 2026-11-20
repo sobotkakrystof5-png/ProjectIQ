@@ -76,7 +76,7 @@ const customerSchema = z.object({
   dic: z.string().max(20).nullish(),
 })
 
-const INVOICE_COLUMNS = `id, number, kind, issued_on, supplied_on, due_on, paid_on, cancelled_at, amount, vat_total,
+export const INVOICE_COLUMNS = `id, number, kind, issued_on, supplied_on, due_on, paid_on, cancelled_at, amount, vat_total,
   currency, items, issuer, customer, printed_note, has_pdf, pdf_md5`
 
 /**
@@ -121,7 +121,7 @@ export function pdfInvoiceFromRow(row: PortalRow): PdfInvoice | null {
   }
 }
 
-function toInvoice(row: PortalRow, todayIso: string): PortalInvoice {
+export function invoiceFromRow(row: PortalRow, todayIso: string): PortalInvoice {
   const kind: PortalInvoiceKind = row.kind === 'issued' ? 'issued' : 'archived'
   const pdf = kind === 'issued' ? pdfInvoiceFromRow(row) : null
   const spayd = pdf ? spaydPaymentString(pdf) : null
@@ -175,7 +175,7 @@ export async function loadClientMoney(
   return {
     // Bez ceny není co ukazovat — „zaplaceno 0 z 0" by klienta jen mátlo.
     money: m && price > 0 ? { price, paid: num(m.paid), remaining: num(m.remaining), currency: 'CZK' } : null,
-    invoices: invoiceRows.map((r) => toInvoice(r, todayIso)),
+    invoices: invoiceRows.map((r) => invoiceFromRow(r, todayIso)),
   }
 }
 

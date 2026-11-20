@@ -12,6 +12,7 @@ import { remindPendingSurveys } from '@/lib/admin/surveys'
 import { sendOverdueInvites } from '@/lib/admin/meetings'
 import { finishUnfinishedConsultations } from '@/lib/admin/consultations'
 import { prepareRecurringDrafts } from '@/lib/admin/invoice-drafts'
+import { flushPhaseEmails } from '@/lib/admin/phase-email'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -223,6 +224,12 @@ export async function GET(req: NextRequest) {
     // potvrzení klientovi. Jen pojistka — běžně doběhnou hned přes `after()`.
     finishUnfinishedConsultations().catch((err) => {
       console.error('[cron] Pojistka konzultací selhala:', (err as Error).message)
+      return 0
+    }),
+    // E-maily o hotových etapách (KP16, R-128), které se nevešly do 24 h
+    // nebo jim nedoběhl `after()`. Nejvýš jeden e-mail za 24 h na zakázku.
+    flushPhaseEmails().catch((err) => {
+      console.error('[cron] E-maily o etapách selhaly:', (err as Error).message)
       return 0
     }),
     // Pravidelné faktury (R-117): jednou za měsíc koncept ke schválení.

@@ -52,3 +52,7 @@ GRANT EXECUTE ON FUNCTION portal.post_message(uuid, uuid, text, text, uuid, json
 GRANT EXECUTE ON FUNCTION portal.answer_approval(uuid, uuid, text, text) TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.touch_thread(uuid, uuid, boolean) TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.attachment_file(uuid, uuid) TO portal_app;
+
+-- Přehled klienta (migrace 125, KP16). Hodnocení jde přes dotazník R-119:
+-- funkce vrátí členovi token dotazníku jeho hotových zakázek a stav odpovědi.
+GRANT EXECUTE ON FUNCTION portal.client_surveys(uuid) TO portal_app;

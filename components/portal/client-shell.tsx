@@ -7,6 +7,7 @@ import { ChatLive } from '@/components/chat/chat-live'
 import { ThreadList } from '@/components/chat/thread-list'
 import { listClientThreads, totalUnread } from '@/lib/portal/chat'
 import type { PortalContext } from '@/lib/portal/context'
+import type { ChatThreadSummary } from '@/lib/chat/types'
 import { cn } from '@/lib/utils'
 
 /**
@@ -31,6 +32,7 @@ export async function ClientShell({
   section,
   activeProjectId = null,
   fullScreenOnPhone = false,
+  threads: given,
   children,
 }: {
   ctx: PortalContext
@@ -38,9 +40,11 @@ export async function ClientShell({
   activeProjectId?: string | null
   /** Chat na telefonu přes celou obrazovku, bez spodní lišty. */
   fullScreenOnPhone?: boolean
+  /** Vlákna, když je stránka už načetla (přehled je potřebuje taky). */
+  threads?: ChatThreadSummary[]
   children: React.ReactNode
 }) {
-  const threads = await listClientThreads(ctx.clientId).catch(() => [])
+  const threads = given ?? (await listClientThreads(ctx.clientId).catch(() => []))
   const unread = totalUnread(threads)
 
   return (

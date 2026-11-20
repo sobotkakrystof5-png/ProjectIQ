@@ -1,17 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Info } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
 import { requireClient } from '@/lib/portal/context'
 import { loadClientProject } from '@/lib/portal/projects'
 import { loadClientThread } from '@/lib/portal/chat'
-import { loadClientPhases } from '@/lib/portal/phases'
+import { currentPhase, loadClientPhases } from '@/lib/portal/phases'
 import { loadClientMoney } from '@/lib/portal/money'
 import { loadClientConsultations } from '@/lib/portal/consultations'
 import { isTranscriptionConfigured } from '@/lib/transcribe'
 import { ClientShell } from '@/components/portal/client-shell'
 import { ProjectAside } from '@/components/portal/project-aside'
+import { AsideSheet } from '@/components/portal/aside-sheet'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { ChatThread } from '@/components/chat/chat-thread'
 import { answerApproval } from '../actions'
 
@@ -25,13 +27,24 @@ export default async function KlientChatPage({ params }: { params: Promise<{ id:
   const ctx = await requireClient()
   const data = await loadClientProject(ctx.clientId, id)
   if (!data) notFound()
-  const [thread, phases, { money }, consultations] = await Promise.all([
+  const [thread, phases, { money, invoices }, consultations] = await Promise.all([
     loadClientThread(ctx.clientId, id),
     loadClientPhases(ctx.clientId, id),
     loadClientMoney(ctx.clientId, id),
     loadClientConsultations(ctx.clientId, id),
   ])
-  const current = phases.find((p) => p.status === 'running')
+  const current = currentPhase(phases)
+  const aside = (
+    <ProjectAside
+      project={data.project}
+      phases={phases}
+      money={money}
+      invoices={invoices}
+      consultations={consultations.upcoming}
+      activity={data.activity}
+      today={getPragueTodayISO()}
+    />
+  )
 
   return (
     <ClientShell ctx={ctx} section="zpravy" activeProjectId={id} fullScreenOnPhone>
@@ -45,9 +58,7 @@ export default async function KlientChatPage({ params }: { params: Promise<{ id:
               <h1 className="truncate text-base font-semibold text-ink">{data.project.name}</h1>
               <p className="truncate text-xs text-quiet">{current ? current.name : data.project.statusLabel}</p>
             </div>
-            <Link href={`/klient/projekt/${id}`} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-quiet hover:bg-navy-50 xl:hidden" aria-label="O zakázce">
-              <Info size={20} strokeWidth={1.5} />
-            </Link>
+            <AsideSheet projectName={data.project.name}>{aside}</AsideSheet>
           </header>
           <ChatThread
             viewer="client"
@@ -62,7 +73,7 @@ export default async function KlientChatPage({ params }: { params: Promise<{ id:
           />
         </section>
         <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-navy-100 bg-surface xl:block" aria-label="O zakázce">
-          <ProjectAside project={data.project} phases={phases} money={money} nextConsultation={consultations.upcoming[0] ?? null} />
+          {aside}
         </aside>
       </div>
     </ClientShell>

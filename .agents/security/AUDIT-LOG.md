@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-20 — review: přehled klienta (KP16, R-128)
+Spouštěč: před commitem (skill `web-security-review`)
+Rozsah: migrace 125 (`project_phases.client_notified_at`, `project_phase_emails`, funkce `portal_phase_email_claim`, `portal_phase_email_release`, `portal.client_surveys`), `scripts/portal-grants.sql`, `lib/portal/{overview,survey}.ts`, `lib/admin/phase-email.ts`, `setPhaseStatusAction` (`after()` s e-mailem), cron `send-reminders`, stránky `/klient`, `/klient/start`, `/klient/faktury`, `/klient/konzultace`, `/klient/projekt/[id]` (dotazník R-119 místo `FeedbackCard`), odkaz do prostoru na `/p/[token]`, komponenty `components/portal/{overview,project-aside,aside-sheet,survey-card}.tsx`.
+Výsledek: 0 zneužitelných nálezů, 1 drobnost opravená.
+Nálezy: (1) klíč idempotence e-mailu o etapě obsahoval celou adresu příjemce — u velmi dlouhé adresy by překročil délku, kterou Resend přijme, a e-mail by neodešel.
+Opraveno: v klíči je místo adresy otisk SHA-256 (16 znaků). Dál ověřeno: `?zakazka=` jen jako UUID a jen ze zakázek přihlášeného klienta; `/klient/start` přesměrovává jen na `/klient/zpravy/<id z databáze>` nebo `/klient`; `portal.client_surveys` ověří člena proti `app.client_id` (cizí člen `P0002`, test) a vrací jen hotové klientské zakázky bez nepotvrzené poptávky; token dotazníku je tentýž, který klient dostal e-mailem, odpověď jde stejnou veřejnou cestou `/h/<token>` do `project_surveys` a zapíše se jednou na zakázku (test); odkaz na recenzi Google jen `https://`; zabírání e-mailů o etapách a tabulka 24 h jen pro vlastníka (`portal_app` `42501`, test); text e-mailu escapovaný (test s `<b>`), předmět bez konců řádků hlídá `sendVizeonMail`; e-mail jen aktivním členům klienta, jemuž zakázka patří; přehled čte všechno přes `portalDb(clientId)` s RLS a výslovným filtrem `client_id`, klient B nevidí etapy, úkoly ani návrhy A (test); text klienta i admina se vykresluje jako text. Žádná nová závislost ani změna CSP.
+Zůstává: kdokoli z členů klienta může dotazník vyplnit za firmu (záměr) — DECISIONS #045.
+
 ## 2026-11-20 — review: chat s klientem a schránka Zprávy (KP15, R-127)
 Spouštěč: před commitem (skill `web-security-review`)
 Rozsah: migrace 124 (sloupce `portal.messages`, `portal.thread_state`, `portal.message_attachments`, fronta `storage_deletions`, funkce `insert_message`, `post_message`, `portal_admin_post`, `answer_approval`, `touch_thread`, `portal_admin_touch`, `portal_thread_claim_notify`, `attachment_file`, přepsaná `sync_request_status`), `scripts/portal-grants.sql`, routy `POST /api/klient/zpravy`, `POST /api/zpravy`, `GET /api/klient/zpravy/stav`, `GET /api/zpravy/stav`, `GET /api/klient/prilohy/[id]`, `GET /api/zpravy/prilohy/[id]`, akce `touchThread`, `answerApproval`, `adminTouchThread`, `makeRequestFromMessages`, `lib/chat/{storage,http,map,types}.ts`, `lib/{portal,admin}/chat.ts`, komponenty chatu a kostry.

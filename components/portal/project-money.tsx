@@ -1,6 +1,7 @@
 import QRCode from 'qrcode'
 import { Check, FileDown, QrCode } from 'lucide-react'
 import type { PortalInvoice, PortalMoney } from '@/lib/portal/money'
+import { formatMoney } from '@/lib/portal/format'
 import { cn, formatDate } from '@/lib/utils'
 
 // Peníze zakázky v klientském prostoru (KP13, R-121, R-125). Tři čísla nahoře
@@ -21,23 +22,7 @@ const STATE_STYLE = {
   cancelled: 'border border-navy-100 bg-ground text-quiet',
 } as const
 
-const formatters = new Map<string, Intl.NumberFormat>()
-
-function money(amount: number, currency: string): string {
-  const whole = Number.isInteger(amount)
-  const key = `${currency}:${whole}`
-  let f = formatters.get(key)
-  if (!f) {
-    f = new Intl.NumberFormat('cs-CZ', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: whole ? 0 : 2,
-      maximumFractionDigits: 2,
-    })
-    formatters.set(key, f)
-  }
-  return f.format(amount)
-}
+const money = formatMoney
 
 /** IBAN po čtveřicích, jak se opisuje do bankovnictví. */
 const groupIban = (iban: string) => iban.replace(/(.{4})/g, '$1 ').trim()
@@ -66,10 +51,11 @@ function PaymentQr({ spayd }: { spayd: string }) {
   )
 }
 
-function InvoiceRow({ invoice }: { invoice: PortalInvoice }) {
+export function InvoiceRow({ invoice, projectName }: { invoice: PortalInvoice; projectName?: string }) {
   const { state } = invoice
   return (
-    <li className="rounded-box border border-navy-100 bg-surface p-5">
+    <li id={`faktura-${invoice.id}`} className="scroll-mt-4 rounded-box border border-navy-100 bg-surface p-5">
+      {projectName && <p className="mb-1 truncate text-xs font-medium text-quiet">{projectName}</p>}
       <div className="flex items-baseline justify-between gap-3">
         <p className="min-w-0 break-words font-medium text-ink">
           Faktura <span className="font-num">{invoice.number}</span>

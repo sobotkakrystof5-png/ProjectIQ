@@ -34,6 +34,19 @@ function pgCode(err: unknown): string | undefined {
 const iso = (v: unknown): string => new Date(v as string).toISOString()
 const CHANNELS = new Set(['whatsapp', 'teams', 'meet', 'phone', 'other'])
 
+/** Řádek projekce portal.consultations → tvar pro stránku. Meet jen z meet.google.com. */
+export function consultationFromRow(r: Record<string, unknown>): PortalConsultation {
+  return {
+    id: String(r.id),
+    startsAt: iso(r.starts_at),
+    endsAt: iso(r.ends_at),
+    topic: String(r.topic ?? ''),
+    channel: (CHANNELS.has(String(r.channel)) ? r.channel : 'other') as PortalConsultation['channel'],
+    meetUrl: typeof r.meet_url === 'string' && r.meet_url.startsWith('https://meet.google.com/') ? r.meet_url : null,
+    meetPending: r.meet_pending === true,
+  }
+}
+
 export async function loadClientConsultations(clientId: string, projectId: string): Promise<PortalConsultations> {
   const now = new Date()
   const until = new Date(now.getTime() + CONSULTATION_LIST_DAYS * 86_400_000)
@@ -50,15 +63,7 @@ export async function loadClientConsultations(clientId: string, projectId: strin
     ])
     return {
       enabled: true,
-      upcoming: rows.map((r) => ({
-        id: String(r.id),
-        startsAt: iso(r.starts_at),
-        endsAt: iso(r.ends_at),
-        topic: String(r.topic ?? ''),
-        channel: (CHANNELS.has(String(r.channel)) ? r.channel : 'other') as PortalConsultation['channel'],
-        meetUrl: typeof r.meet_url === 'string' && r.meet_url.startsWith('https://meet.google.com/') ? r.meet_url : null,
-        meetPending: r.meet_pending === true,
-      })),
+      upcoming: rows.map(consultationFromRow),
       freeSlots: slots.map((s) => ({ startsAt: iso(s.starts_at), endsAt: iso(s.ends_at) })),
     }
   } catch (err) {

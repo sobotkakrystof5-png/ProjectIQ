@@ -55,6 +55,11 @@ export async function loadClientPhases(clientId: string, projectId: string): Pro
     if (TOLERATED.has(code)) return []
     throw err
   }
+  return phasesFromRows(phases, tasks)
+}
+
+/** Řádky projekcí portal.phases a portal.phase_tasks (seřazené podle pořadí) → etapy s úkoly. */
+export function phasesFromRows(phases: Record<string, unknown>[], tasks: Record<string, unknown>[]): PortalPhase[] {
   const byPhase = new Map<string, PortalTask[]>()
   for (const t of tasks) {
     const list = byPhase.get(String(t.phase_id)) ?? []
@@ -70,4 +75,14 @@ export async function loadClientPhases(clientId: string, projectId: string): Pro
     doneAt: iso(p.done_at),
     tasks: byPhase.get(String(p.id)) ?? [],
   }))
+}
+
+/** Etapa, na které se teď pracuje: probíhající, jinak první čekající. */
+export function currentPhase(phases: PortalPhase[]): PortalPhase | null {
+  return phases.find((p) => p.status === 'running') ?? phases.find((p) => p.status === 'waiting') ?? null
+}
+
+/** Úkoly pro klienta v etapách, které ještě nejsou hotové (u hotové etapy už nejsou potřeba). */
+export function openTasks(phases: PortalPhase[]): { task: PortalTask; phase: PortalPhase }[] {
+  return phases.flatMap((phase) => (phase.status === 'done' ? [] : phase.tasks.filter((t) => !t.doneAt).map((task) => ({ task, phase }))))
 }

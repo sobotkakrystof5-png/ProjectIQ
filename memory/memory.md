@@ -113,7 +113,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna v kalendáři, KP15 chat s klientem a rozvržení jako Slack (R-122, R-123), KP16 přehled klienta, KP17 analýza (čeká na rozhodnutí). KP14–KP17 nejsou v kódu. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna (**kód hotov 2026-11-20 na větvi `klient/kp14-konzultace`, migrace 123 neaplikovaná**, R-126), KP15 chat s klientem a rozvržení jako Slack (**kód hotov 2026-11-20 na větvi `klient/kp15-chat`, migrace 124 neaplikovaná**, R-127), KP16 přehled klienta (**kód hotov 2026-11-20 na větvi `klient/kp16-prehled`, migrace 125 neaplikovaná**, R-128), KP17 poptávky z webu klienta (D-K16 rozhodnuto 2026-11-20, R-129; **čeká na D-K20 — jak se poptávka z webu klienta dostane do ZakazIQ**, prompt připravený, není v kódu). Větve KP11–KP16 jdou za sebou, žádná není na produkci. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1320,6 +1320,37 @@ už existuje a klíč je ve Vercelu, Neon by rostl soubory a Vercel Blob na Hobb
 nasazením založit bucket a ověřit `SUPABASE_SERVICE_ROLE_KEY` ve Vercelu. Nová zpráva jde jen přes
 `portal.post_message` / `portal_admin_post`. Schválení zatím nesplní úkol etapy (KP12) a smazání
 vlastní zprávy do 10 minut se nedělalo. Bezpečnost DECISIONS #044.
+
+### R-128 · Přehled klienta: „Čeká na vás" nahoře, hodnocení přes dotazník R-119, e-mail o hotové etapě (2026-11-20)
+**Rozhodnutí:** (1) Přehled v `/klient` začíná jedinou kartou „Čeká na vás" v pořadí: schválení
+návrhu, úkol z nehotové etapy (s „Mám hotovo" přímo v řádku), nepřečtené zprávy, faktura **po
+splatnosti**, hodnocení hotové zakázky; když nic, klidná věta. Faktura před splatností se ukáže jen
+na kartě zakázky. Úkoly hotové etapy už nečekají. (2) Po přihlášení bez `next` vede `/klient/start`
+do chatu s nejnovější nepřečtenou zprávou, jinak na Přehled; položka Přehled v menu vede vždy na
+Přehled. (3) Hodnocení jde přes dotazník R-119 (stejný token jako v e-mailu, `portal.client_surveys`),
+jedna odpověď na zakázku, kterýkoli člen klienta; stará `FeedbackCard` a `sendFeedback` (do
+`client_feedback`, kterou Hodnocení v adminu nečte) zmizely. (4) E-mail klientovi jen když etapa
+přejde na **Hotovo** (ne při změně termínu ani při startu etapy), 15 s po kliknutí kvůli „Zpět",
+všem aktivním členům, nejvýš 1× za 24 h na zakázku; co se nevešlo, pošle ranní cron. Etapy hotové
+před migrací se nehlásí. (5) Faktury a Konzultace v levém sloupci jsou souhrn přes všechny
+zakázky; u konzultace si klient vybere zakázku, `?zakazka=` z panelu ji předvybere.
+**Proč:** zadání KP16 (klient má do 5 s vědět, jestli po něm něco chcete). Otázky nebyly — agent
+zvolil výklad, který jde ověřit testy a vrátit. Faktura před splatností jako „čeká na vás" by
+klienta zbytečně honila; e-mail při každé změně termínu by byl hluk.
+**Důsledek:** migrace 125 (aplikována: ne), `lib/portal/{overview,survey,format}.ts`,
+`lib/admin/phase-email.ts`, `components/portal/{overview,project-aside,aside-sheet,survey-card}.tsx`,
+`app/klient/{page,start,faktury,konzultace}`. Nová cesta, která etapu dokončí jinak než
+`setPhaseStatusAction`, e-mail spustí až ranní cron. Bezpečnost DECISIONS #045.
+
+### R-129 · Analýza pro klienta = poptávky z jeho webu (D-K16, 2026-11-20)
+**Rozhodnutí:** KP17 ukáže klientovi, kolik lidí napsalo nebo se objednalo přes jeho web, po
+měsících. Návštěvnost webu se teď nedělá; kolik práce a peněz projekt stál, ukazují KP13 a KP16.
+**Proč:** vybral Kryštof 2026-11-20 (otázka D-K16 v jiném sezení, předané sem).
+**Důsledek:** weby klientů se **nesmí** napojit na `lib/web-leads.ts` ani `LEAD_ORIGINS` — ten příjem
+zakládá zakázky v Kryštofově schránce Poptávky, zákazníci klienta by se tvářili jako jeho poptávky.
+Jak se poptávka z webu klienta do ZakazIQ dostane, je otevřené rozhodnutí **D-K20**
+(`docs/klientsky-prostor/PLAN.md` oddíl 7; doporučení: jen počet bez osobních údajů s klíčem
+zakázky). Prompt `new - area of zakaziq/prompty/klientsky-prostor/KP17-poptavky-z-webu-klienta.md`.
 ---
 
 ## 3. Otevřené problémy
@@ -1404,6 +1435,14 @@ vlastní zprávy do 10 minut se nedělalo. Bezpečnost DECISIONS #044.
   (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
   i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
   s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **KP16 nasadit a projít naživo:** kód na větvi `klient/kp16-prehled` (nad `klient/kp15-chat`),
+  nic nenasazené. Před nasazením: migrace 121–125 na produkci (aditivní; 125 potřebuje 106, 107, 118
+  a 121), pak `node scripts/portal-create-role.js`. Projít na 390 / 768 / 1280 / 1440 px: přihlášení
+  s nepřečtenou zprávou otevře chat, bez ní Přehled; „Čeká na vás" (schválení, „Mám hotovo",
+  faktura po splatnosti, hodnocení); panel O zakázce u chatu a na telefonu z tlačítka (i);
+  Faktury a Konzultace přes víc zakázek; hodnocení hotové zakázky se objeví v Hodnocení adminu;
+  etapa na Hotovo → za 15 s e-mail klientovi z krystof@vizeon.cz, druhá do 24 h nepřijde; odkaz
+  „Přihlásit se do vašeho prostoru" na `/p`. **Resend ani skutečná data nikdo nezkusil** · od 2026-11-20
 - [ ] **KP15 nasadit a projít naživo:** kód na větvi `klient/kp15-chat` (nad `klient/kp14-konzultace`),
   nic nenasazené. Před nasazením: migrace 121–124 na produkci (aditivní), pak
   `node scripts/portal-create-role.js`; v Supabase založit **soukromý** bucket `chat-prilohy`
@@ -1691,6 +1730,40 @@ vlastní zprávy do 10 minut se nedělalo. Bezpečnost DECISIONS #044.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-20 (D-K16 a příprava KP17, KP10)
+- **decision** **R-129**: analýza pro klienta = poptávky z jeho webu po měsících (D-K16). Otevřená
+  otázka D-K20 (jak se poptávka z webu klienta dostane do ZakazIQ) v plánu, oddíl 7.
+- **docs** Prompt `KP17-poptavky-z-webu-klienta.md` (varianta a, odbočky b a c), prompt KP10
+  aktualizovaný na stav po KP11–KP16 (Supabase místo Clerku, chat, přílohy, Resend, migrace 113
+  a 121–125, pořadí nasazení), `docs/klientsky-prostor/PLAN.md` (4.7, 6, 7), rozcestník promptů.
+
+### 2026-11-20 (KP16 — přehled klienta)
+- **feat** Přehled `/klient`: „Čeká na vás" (schválení, úkol s „Mám hotovo", nepřečtené zprávy,
+  faktura po splatnosti, hodnocení) a karta každé zakázky (etapa s termínem, peníze, konzultace,
+  poslední práce), hotové zakázky zvlášť. Načtení jedním požadavkem (`lib/portal/overview.ts`).
+  Soubory: `app/klient/page.tsx`, `components/portal/overview.tsx`, `lib/portal/format.ts`.
+- **feat** Panel O zakázce u chatu: osa etap, úkoly „Mám hotovo", zaplaceno a zbývá s odkazem na
+  faktury, nejbližší konzultace s Meet, co se dělo, živá verze; pod 1280 px výsuvný panel z tlačítka
+  v záhlaví. Soubory: `components/portal/{project-aside,aside-sheet}.tsx`, `app/klient/zpravy/[id]/page.tsx`.
+- **feat** Faktury a Konzultace jako souhrn přes všechny zakázky (`?zakazka=`, výběr zakázky
+  u rezervace), po přihlášení `/klient/start` (chat s nepřečtenou zprávou, jinak Přehled), odkaz do
+  prostoru na `/p/[token]`. Soubory: `app/klient/{faktury,konzultace,start,prihlaseni}`,
+  `components/portal/{consultations,project-money}.tsx`, `lib/portal/paths.ts`, `app/p/[token]/page.tsx`.
+- **feat** Hodnocení hotové zakázky přes dotazník R-119 (`components/portal/survey-card.tsx`,
+  `lib/portal/survey.ts`); `FeedbackCard`, `sendFeedback` a `loadProjectExtras` odstraněné.
+- **feat** E-mail klientovi o hotové etapě (`lib/admin/phase-email.ts`): 15 s po kliknutí přes
+  `after()`, nejvýš 1× za 24 h na zakázku, zbytek ranní cron `send-reminders`.
+- **db** Migrace 125 `prehled_klienta` (aplikována: ne, nikde), grant v `scripts/portal-grants.sql`.
+- **chore** Ověřeno: `npx tsc --noEmit`; nový `lib/__tests__/kp16-prehled.test.ts` (12 testů nad
+  PGlite, migrace dvakrát po sobě); testy KP12–KP15 a oddělení klientů s migrací 125 (106/106);
+  celá sada 1512 prošlo, 4 známá selhání (`ws-schema` mezera po 120, `ws-email` pevné datum, dva
+  časové limity pod zátěží, samostatně 22/22); `npm run build` napodruhé (napoprvé známá hláška
+  Next). Vzhled na dočasné stránce s vymyšlenými daty včetně krajních případů (dlouhé názvy, 11
+  zakázek, 10 faktur, euro, prázdná zakázka) na 390 / 768 / 1280 / 1440 px: bez vodorovného
+  posouvání, plochy ≥ 44 px, konzole bez chyb; stránka smazaná. Bezpečnostní kontrola: 1 drobnost
+  opravená (AUDIT-LOG). **Naživo s databází a Resendem neověřeno.**
+- **decision** **R-128**, DECISIONS #045.
 
 ### 2026-11-20 (KP15 — chat s klientem a rozvržení jako Slack)
 - **feat** Klientský prostor jako Slack: vlevo firma, Přehled, zakázky jako kanály s nepřečtenými

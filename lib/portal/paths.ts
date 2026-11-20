@@ -1,6 +1,8 @@
 // Cesty klientského prostoru (KP05, od R-107 přihlášení přes Supabase). Bez
 // závislostí, aby je šlo importovat v proxy.ts.
 export const PORTAL_HOME_PATH = '/klient'
+/** Po přihlášení bez `next`: chat s nepřečtenou zprávou, jinak přehled (KP16). */
+export const PORTAL_START_PATH = '/klient/start'
 export const PORTAL_SIGN_IN_PATH = '/klient/prihlaseni'
 /** Jen přesměrování na přihlášení — účet se zakládá z pozvánky. */
 export const PORTAL_SIGN_UP_PATH = '/klient/registrace'

@@ -1,6 +1,6 @@
 # Prompty pro Claude Code — klientský prostor, hlášení práce a nový admin
 
-Sezení KP00–KP16 (KP17 analýza čeká na rozhodnutí D-K16 a prompt nemá). Druhá vlna KP11–KP16 (R-121, R-122) je popsaná níž v oddílu „Druhá vlna". **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa `ZakazIQ`.
+Sezení KP00–KP17 (KP17 poptávky z webu klienta: D-K16 rozhodnuto 2026-11-20, před začátkem rozhodnout D-K20). Druhá vlna KP11–KP16 (R-121, R-122) je popsaná níž v oddílu „Druhá vlna". **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa `ZakazIQ`.
 Každé sezení začíná přečtením paměti a končí jejím zápisem, takže na sebe navazují i bez kontextu z minula.
 Zdroj pravdy je plán `docs/klientsky-prostor/PLAN.md` (architektura, bezpečnostní model, rozhodnutí D-K1–D-K11, tabulka sezení).
 
@@ -42,8 +42,9 @@ KP00–KP04 nepotřebují přihlášení klientů a dávají užitek hned. KP05�
 | KP14 | Konzultace z volna v kalendáři | workspace-backend, web-security-*, design-dilky | KP11, D-K13 | ano |
 | KP15 | Chat a rozvržení jako Slack, přečteno jako WhatsApp, schránka zpráv v adminu | workspace-backend, web-security-*, design-dilky, mobile-native | KP11, D-K17, D-K18 | ano |
 | KP16 | Přehled klienta | design-dilky, impeccable, break-ui | KP12–KP15 | částečně |
+| KP17 | Poptávky z webu klienta | workspace-backend, web-security-review, design-dilky | KP16, D-K20 | ano |
 
-KP11 první, KP12–KP15 v libovolném pořadí, KP16 po nich, pak KP10. Pro druhou vlnu platí místo zastaralých bodů níž: práce na nové větvi z aktuálního `main` (admin i prostor jsou na produkci z `main`), regrese `/login`, `/dashboard`, `/dashboard/finance`, `/p/[token]` (`/alteno` a `/hub` už jen přesměrovávají), merge do `main` a push jen se souhlasem.
+KP11 první, KP12–KP15 v libovolném pořadí, KP16 po nich, KP17 po rozhodnutí D-K20, pak KP10. Pro druhou vlnu platí místo zastaralých bodů níž: práce na nové větvi z aktuálního `main` (admin i prostor jsou na produkci z `main`), regrese `/login`, `/dashboard`, `/dashboard/finance`, `/p/[token]` (`/alteno` a `/hub` už jen přesměrovávají), merge do `main` a push jen se souhlasem.
 
 ## Společná pravidla (platí v každém sezení)
 
