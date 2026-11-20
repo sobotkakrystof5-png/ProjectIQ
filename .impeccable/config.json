@@ -14,6 +14,12 @@
         "value": "invoicemono",
         "createdAt": "2026-11-12T20:16:52.513Z",
         "reason": "PDF: vnitřní název pro JetBrains Mono vloženou jako woff2 (lib/invoice-pdf/assets/OFL-JetBrains-Mono.txt); převzato beze změny z lib/ws/money/pdf.ts"
+      },
+      {
+        "rule": "overused-font",
+        "value": "instrument sans",
+        "createdAt": "2026-11-20T15:27:25.242Z",
+        "reason": "DESIGN.md: Instrument Sans je závazné písmo design systému Dílky (R-021); e-mailový fallback stejně jako lib/admin/meeting-email.ts"
       }
     ]
   }

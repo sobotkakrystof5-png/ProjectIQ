@@ -41,3 +41,14 @@ GRANT EXECUTE ON FUNCTION portal.free_consultation_slots(timestamptz, timestampt
 GRANT EXECUTE ON FUNCTION portal.book_consultation(uuid, uuid, timestamptz, text) TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.move_consultation(uuid, uuid, timestamptz) TO portal_app;
 GRANT EXECUTE ON FUNCTION portal.cancel_consultation(uuid, uuid) TO portal_app;
+
+-- Chat s klientem (migrace 124, KP15). Zprávy klient píše jen funkcemi
+-- (limity, příloha jen do vlastní složky). Ze stavu vlákna smí číst jen
+-- „přečteno" — kdy byl admin naposledy aktivní, klient nevidí (D-K19).
+-- Cestu k souboru přílohy nevidí; soubor vydá jen attachment_file.
+GRANT SELECT (project_id, client_id, side, last_read_at, last_read_member) ON portal.thread_state TO portal_app;
+GRANT SELECT (id, client_id, project_id, message_id, mime, size_bytes, filename, created_at) ON portal.message_attachments TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.post_message(uuid, uuid, text, text, uuid, jsonb) TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.answer_approval(uuid, uuid, text, text) TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.touch_thread(uuid, uuid, boolean) TO portal_app;
+GRANT EXECUTE ON FUNCTION portal.attachment_file(uuid, uuid) TO portal_app;

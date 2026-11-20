@@ -35,6 +35,7 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   client_task_done:      { icon: ListChecks,        color: ICON, label: 'Klient splnil úkol' },
   consultation_changed:  { icon: Calendar,          color: ICON, label: 'Změna konzultace' },
   consultation_meet_failed: { icon: MailWarning,    color: ICON, label: 'Chybí odkaz na Meet' },
+  client_message:        { icon: MessageSquarePlus, color: ICON, label: 'Zpráva od klienta' },
 }
 
 function timeAgo(iso: string): string {

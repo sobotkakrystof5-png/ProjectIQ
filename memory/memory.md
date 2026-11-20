@@ -1303,6 +1303,23 @@ kolizi s volnem samotným; nástěnný čas proto, aby opakování drželo „č
 `lib/portal/consultations.ts`, `lib/consultations/rules.ts` (čísla jsou i v migraci — změna jedné =
 změna druhé). Nová cesta k rezervaci jde přes `consultation_book`, ne přímým INSERT. Smazání volna
 existující rezervace neruší. Bezpečnost DECISIONS #043.
+
+### R-127 · Chat s klientem: Požadavky v chatu, přílohy v Supabase Storage, aktivitu vidí jen Kryštof (2026-11-20)
+**Rozhodnutí:** (1) **D-K17:** sekce Požadavky v klientském prostoru zmizela, klient dává veškerou
+zpětnou vazbu do chatu u zakázky (text, hlas, obrázek, PDF); zadání pro Claude Code dělá Kryštof
+ve schránce Zprávy z vybraných zpráv. Staré požadavky zůstaly ve vlákně. (2) **D-K18:** přílohy
+v soukromém bucketu `chat-prilohy` v Supabase Storage (projekt `zakaziq`), soubory jen přes náš
+server; 4 MB na odeslání (limit Vercelu), větší fotky prohlížeč zmenší. (3) **D-K19:** přečteno
+(dvě fajfky) vidí obě strany, kdy byl klient naposledy v prostoru vidí jen Kryštof, Kryštofovu
+aktivitu klient ne. (4) Stav zadání u zprávy má tři hodnoty (Přijato, Hotovo, Uzavřeno) podle
+`client_requests.status` — „Dělám na tom" ze zadání KP15 by potřeboval nový stav, nedělal se.
+**Proč:** Kryštof 2026-11-20 vybral doporučené varianty všech tří. Supabase Storage proto, že projekt
+už existuje a klíč je ve Vercelu, Neon by rostl soubory a Vercel Blob na Hobby nejde komerčně.
+**Důsledek:** migrace 124 (aplikována: ne), `lib/chat/`, `lib/{portal,admin}/chat.ts`,
+`components/chat/`, `components/portal/client-shell.tsx`, schránka `/dashboard/zpravy`. Před
+nasazením založit bucket a ověřit `SUPABASE_SERVICE_ROLE_KEY` ve Vercelu. Nová zpráva jde jen přes
+`portal.post_message` / `portal_admin_post`. Schválení zatím nesplní úkol etapy (KP12) a smazání
+vlastní zprávy do 10 minut se nedělalo. Bezpečnost DECISIONS #044.
 ---
 
 ## 3. Otevřené problémy
@@ -1387,6 +1404,15 @@ existující rezervace neruší. Bezpečnost DECISIONS #043.
   (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
   i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
   s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **KP15 nasadit a projít naživo:** kód na větvi `klient/kp15-chat` (nad `klient/kp14-konzultace`),
+  nic nenasazené. Před nasazením: migrace 121–124 na produkci (aditivní), pak
+  `node scripts/portal-create-role.js`; v Supabase založit **soukromý** bucket `chat-prilohy`
+  (Storage › New bucket, Public vypnuto) a ověřit, že `SUPABASE_SERVICE_ROLE_KEY` je ve Vercelu
+  (spravuje ho integrace). Projít na 390 / 768 / 1280 / 1440 px: klient napíše, nadiktuje a pošle
+  screenshot → do 10 s ve Zprávách adminu, zvonek; odpověď z telefonu; dvě fajfky po přečtení;
+  e-mail klientovi jen když chat nemá otevřený; „Ke schválení" → Schvaluji / Chci změny; „Udělat
+  z toho zadání" → Požadavky klientů; foto z telefonu nad 4 MB se zmenší. **Supabase Storage, Resend
+  ani přepis hlasu v chatu nikdo nezkusil naživo** · od 2026-11-20
 - [ ] **KP14 nasadit a projít naživo:** kód na větvi `klient/kp14-konzultace` (nad `klient/kp13-penize`),
   nic nenasazené. Před nasazením: migrace 121, 122 **a** 123 na produkci (všechny aditivní; 123 potřebuje
   095, 096, 105 a 115), teprve pak `node scripts/portal-create-role.js` (granty pro `portal_app`) — bez
@@ -1665,6 +1691,32 @@ existující rezervace neruší. Bezpečnost DECISIONS #043.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-20 (KP15 — chat s klientem a rozvržení jako Slack)
+- **feat** Klientský prostor jako Slack: vlevo firma, Přehled, zakázky jako kanály s nepřečtenými
+  (tučně s počtem), Faktury, Konzultace; chat `/klient/zpravy/[id]` s panelem O zakázce; telefon
+  jako WhatsApp (spodní lišta, chat přes celou obrazovku). Sekce Požadavky zmizela (D-K17), detail
+  zakázky odkazuje do chatu. Soubory: `components/portal/{client-shell,project-aside}.tsx`,
+  `app/klient/{page.tsx,zpravy/,faktury/,konzultace/,projekt/[id]/page.tsx}`.
+- **feat** Sdílené vlákno: bubliny, dny, „Nové zprávy", fajfky odesláno/přečteno („Přečteno 14:32 ·
+  jméno"), citace, hlas (přepis, audio se neukládá), obrázky a PDF, „Ke schválení" (Schvaluji / Chci
+  změny jednou), stav zadání u zprávy, Enter odešle, obnovení po 10 s s ETagem a počet v titulku.
+  Soubory: `components/chat/{chat-thread,chat-live,thread-list,use-voice}.tsx|ts`, `lib/chat/`.
+- **feat** Admin: schránka **Zprávy** (`/dashboard/zpravy`) ve stejném rozvržení, odznak v menu,
+  poslední aktivita klienta, „Udělat z toho zadání", zpráva ke schválení; totéž vlákno v detailu
+  zakázky. E-mail klientovi z krystof@vizeon.cz a Kryštofovi jen když chat nemají otevřený, 1×/h.
+  Soubory: `app/dashboard/zpravy/`, `components/admin/chat/`, `lib/admin/chat.ts`, routy `app/api/zpravy/`
+  a `app/api/klient/{zpravy,prilohy}/`, `lib/admin-{nav,counts}.ts`, cron `client-retention` (mazání souborů).
+- **db** Migrace 124 `chat_s_klientem` (aplikována: ne, nikde).
+- **fix** Bezpečnostní kontrola: přílohy pod limitem těla funkce na Vercelu (4 MB na odeslání),
+  fotky zmenšuje prohlížeč. `.claude/security/{AUDIT-LOG,DECISIONS,STATE}.md`, #044.
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/kp15-chat.test.ts` (15 testů nad PGlite,
+  migrace dvakrát po sobě, klient jako `portal_app`), testy KP12–KP14 a izolace s migrací 124,
+  `admin-db-rounds` (odznaky dál jedno kolo, čtyři dotazy), `npm run build`. Plná sada: známé chyby
+  `ws-schema`, `ws-email` a časové limity testů, které zakládají novou PGlite. Vzhled na dočasné
+  stránce s vymyšlenými daty (375 a 1280 px, bez vodorovného posouvání, tlačítka 44 px; fajfka
+  přečteno 32 px), stránka smazaná. **Naživo s databází, Supabase Storage a Resendem neověřeno.**
+- **decision** **R-127**, DECISIONS #044.
 
 ### 2026-11-20 (KP14 — konzultace z volna)
 - **feat** Kalendář adminu: **Volno pro klienty** v okně Přidat (den, od–do, délka konzultace, týdenní

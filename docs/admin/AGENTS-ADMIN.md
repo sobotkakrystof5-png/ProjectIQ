@@ -520,6 +520,22 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - Od AD02 má **každá** zakázka všechny záložky — i poptávky z alteno.cz mají Fakturaci, dokončení a poznámky ze schůzek. V záhlaví je štítek zdroje (`lead_origin`).
 - Změna stavu jedním klikem se „Zpět“ je od AD11 hotová (`setProjectStatus` / `undoProjectStatus` v `app/actions.ts`): e-mail klientovi odchází v `after()` se zpožděním a před odesláním se stav načte z databáze znovu, takže se po „Zpět“ neodešle. Kontrola je v databázi, ne v paměti — „Zpět“ může doletět na jinou instanci funkce.
 
+### `/dashboard/zpravy` (KP15, R-127)
+- Schránka **Zprávy**: chat s klienty u zakázek propojených s klientským prostorem, ve stejném
+  rozvržení jako prostor klienta — vlevo konverzace (`listAdminThreads`, nepřečtené od klientů),
+  uprostřed vlákno (`components/chat/chat-thread.tsx`, sdílené s klientem), vpravo klient
+  a zakázka s poslední aktivitou klienta (D-K19). Na telefonu seznam → chat.
+- Odpověď textem, hlasem (`/api/ai-assistant/prepis`), s přílohou nebo **ke schválení** (odkaz na
+  náhled) jde přes `POST /api/zpravy` → `portal_admin_post` (migrace 124). Přílohy v soukromém
+  bucketu `chat-prilohy` (Supabase Storage, `lib/chat/storage.ts`), ven přes `/api/zpravy/prilohy/[id]`.
+- **Udělat z toho zadání**: zaškrtnout zprávy klienta → `makeRequestFromMessages` založí
+  `client_requests` (AI shrnutí a zadání pro Claude Code jako R-069) a zprávy nesou `request_status`
+  (trigger `portal.sync_request_status`).
+- Živé obnovení `GET /api/zpravy/stav` (ETag, 304) po 10 s; přečteno `adminTouchThread`. Odznak
+  „Zprávy" v menu = nepřečtené zprávy klientů (`loadAdminCounts`, čtvrtý dotaz v dávce).
+- Detail zakázky (záložka Zprávy) ukazuje totéž vlákno (`AdminProjectChat`). E-mail klientovi
+  z krystof@vizeon.cz jen když chat nemá otevřený a nejvýš 1× za hodinu (`notifyNewMessage`).
+
 ### `/dashboard/calendar`
 - Globální kalendář (Měsíc / Týden / Den) — konzultace, deadliny, plánované hovory z Hovorů
   a ruční události i blokace. Po AD02 bez filtru zdroje.

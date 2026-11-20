@@ -4,6 +4,8 @@ import { purgeClientRetention } from '@/lib/client-retention'
 import { purgeMemoryRetention } from '@/lib/admin/memory/store'
 import { purgeOutreachRetention } from '@/lib/admin/outreach-reports'
 import { purgeOutreachEmails } from '@/lib/admin/outreach-calls'
+import { purgeDeletedAttachments } from '@/lib/admin/chat'
+import { chatStorageConfigured, deleteStoredFiles } from '@/lib/chat/storage'
 
 // Denní úklid dat klientů po dokončených zakázkách (D-K10, R-076, vercel.json).
 //
@@ -25,7 +27,12 @@ export async function GET(req: NextRequest) {
     const outreach = await purgeOutreachRetention().catch(() => null)
     // E-maily od robota po 12 měsících (R-120, migrace 119).
     const outreachEmails = await purgeOutreachEmails().catch(() => null)
-    return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails })
+    // Soubory příloh chatu, jejichž zprávy zmizely (KP15, migrace 124).
+    const attachments = await purgeDeletedAttachments(deleteStoredFiles, chatStorageConfigured()).catch((err: unknown) => {
+      console.error('[cron] mazání příloh selhalo:', err instanceof Error ? err.message : 'unknown')
+      return null
+    })
+    return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails, attachments })
   } catch (e) {
     console.error('cron.client-retention: úklid selhal', { error: e instanceof Error ? e.message : 'unknown' })
     return NextResponse.json({ success: false, error: 'Retention failed' }, { status: 500 })

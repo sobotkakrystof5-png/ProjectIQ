@@ -25,7 +25,8 @@ import { ClientRequestCard, type ClientRequestCardData } from '@/components/Clie
 import { ContactActions } from '@/components/admin/contact-actions'
 import { ProjectActivityPanel } from '@/components/ProjectActivityPanel'
 import { AgentKeyPanel } from '@/components/AgentKeyPanel'
-import { PortalReplyPanel, type PortalThreadMessage } from '@/components/admin/portal-reply-panel'
+import type { PortalThreadMessage } from '@/components/admin/portal-reply-panel'
+import { AdminProjectChat } from '@/components/admin/chat/project-chat'
 import { PortalAccessCard } from '@/components/admin/portal-access-card'
 import { loadProjectPortalAccess } from '@/lib/portal/project-access'
 import { ProjectPhasesCard } from '@/components/admin/phases/project-phases-card'
@@ -480,9 +481,9 @@ function MessagesTab({ project, rows }: { project: Project; rows: AdminRow[][] }
         <Card>
           <CardHead
             title="Zprávy v klientském prostoru"
-            hint="Klient vám píše ze svého přihlášeného prostoru. Vaše odpověď se mu ukáže tam."
+            hint="Chat s klientem u zakázky (KP15). Klient dostane e-mail, když chat nemá otevřený."
           />
-          <PortalReplyPanel projectId={project.id} messages={portalThread} />
+          <AdminProjectChat projectId={project.id} />
         </Card>
       )}
 

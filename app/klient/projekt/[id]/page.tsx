@@ -1,13 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ExternalLink, MessagesSquare } from 'lucide-react'
 import { z } from 'zod'
 import { requireClient } from '@/lib/portal/context'
-import { loadClientProject, loadProjectExtras, REQUEST_STATUS_LABELS } from '@/lib/portal/projects'
-import { ClientRequestBlock } from '@/components/ClientRequestBlock'
+import { loadClientProject, loadProjectExtras } from '@/lib/portal/projects'
 import { FeedbackCard } from '@/components/portal/feedback-card'
-import { MessageThread } from '@/components/portal/message-thread'
 import { PhaseTimeline } from '@/components/portal/phase-timeline'
 import { loadClientPhases } from '@/lib/portal/phases'
 import { ProjectMoney } from '@/components/portal/project-money'
@@ -15,9 +13,7 @@ import { loadClientMoney } from '@/lib/portal/money'
 import { ProjectConsultations } from '@/components/portal/consultations'
 import { loadClientConsultations } from '@/lib/portal/consultations'
 import { getPragueTodayISO } from '@/lib/prague-time'
-import { isTranscriptionConfigured } from '@/lib/transcribe'
-import { sendRequest } from './actions'
-import { PortalFrame } from '@/components/portal/portal-frame'
+import { ClientShell } from '@/components/portal/client-shell'
 import { ACTIVITY_KIND_LABELS } from '@/lib/project-activity'
 import { formatDate } from '@/lib/utils'
 
@@ -30,7 +26,7 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
   const data = await loadClientProject(ctx.clientId, id)
   if (!data) notFound()
   const { project, activity } = data
-  const [{ requests, messages, rated }, phases, { money, invoices }, consultations] = await Promise.all([
+  const [{ rated }, phases, { money, invoices }, consultations] = await Promise.all([
     loadProjectExtras(ctx.clientId, id, ctx.memberId),
     loadClientPhases(ctx.clientId, id),
     loadClientMoney(ctx.clientId, id),
@@ -39,11 +35,22 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
   const isDone = project.status === 'done' || project.status === 'paid'
 
   return (
-    <PortalFrame clientName={ctx.clientName}>
-      <Link href="/klient" className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-quiet hover:text-ink">
-        <ArrowLeft size={16} strokeWidth={1.5} aria-hidden="true" />
-        Všechny projekty
-      </Link>
+    <ClientShell ctx={ctx} section="prehled" activeProjectId={null}>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+      <div className="mx-auto max-w-3xl">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link href="/klient" className="inline-flex min-h-[44px] items-center gap-1.5 text-sm text-quiet hover:text-ink">
+          <ArrowLeft size={16} strokeWidth={1.5} aria-hidden="true" />
+          Všechny projekty
+        </Link>
+        <Link
+          href={`/klient/zpravy/${project.id}`}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-chip bg-navy-700 px-4 text-sm font-semibold text-white hover:bg-navy-800"
+        >
+          <MessagesSquare size={16} strokeWidth={1.5} aria-hidden="true" />
+          Zprávy k zakázce
+        </Link>
+      </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight text-ink">{project.name}</h1>
@@ -112,38 +119,13 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
         )}
       </section>
 
-      <section className="mt-8" aria-labelledby="pozadavky">
-        <h2 id="pozadavky" className="mb-3 text-sm font-semibold uppercase tracking-wider text-quiet">Máte požadavek nebo změnu?</h2>
-        <div className="rounded-box border border-navy-100 bg-surface p-5">
-          <ClientRequestBlock
-            submit={sendRequest.bind(null, project.id)}
-            transcribeUrl="/api/klient/transcribe"
-            voiceEnabled={isTranscriptionConfigured()}
-          />
-          {requests.length > 0 && (
-            <ul className="mt-5 space-y-2 border-t border-navy-100 pt-4">
-              {requests.map((r) => (
-                <li key={r.id} className="flex items-start justify-between gap-3 text-sm">
-                  <span className="min-w-0">
-                    <span className="line-clamp-2 text-ink">{r.body}</span>
-                    <span className="text-xs text-quiet">{formatDate(r.createdAt)}</span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
-                    {REQUEST_STATUS_LABELS[r.status]}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      <section className="mt-8" aria-labelledby="zpravy">
-        <h2 id="zpravy" className="mb-3 text-sm font-semibold uppercase tracking-wider text-quiet">Zprávy</h2>
-        <div className="rounded-box border border-navy-100 bg-surface p-5">
-          <MessageThread projectId={project.id} messages={messages} />
-        </div>
-      </section>
-    </PortalFrame>
+      <p className="mt-8 rounded-box border border-navy-100 bg-surface p-5 text-sm text-quiet">
+        Požadavky, zpětnou vazbu i dotazy teď pište do{' '}
+        <Link href={`/klient/zpravy/${project.id}`} className="font-semibold text-navy-700 hover:underline">zpráv k zakázce</Link>
+        . Můžete je i nadiktovat nebo přidat screenshot.
+      </p>
+      </div>
+      </div>
+    </ClientShell>
   )
 }

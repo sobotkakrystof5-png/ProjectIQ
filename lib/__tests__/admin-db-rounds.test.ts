@@ -49,7 +49,9 @@ describe('kola do databáze — admin po AD06', () => {
     await loadAdminCounts()
     expect(probe.rounds()).toBe(1)
     expect(probe.waves()).toBe(1)
-    expect(probe.queries()).toHaveLength(3)
+    // Čtvrtý dotaz jsou nepřečtené zprávy od klientů (KP15). Je zvlášť, aby
+    // databáze bez schématu portal neshodila ostatní počty (batchTolerant).
+    expect(probe.queries()).toHaveLength(4)
   })
 
   it('kostra + Dnes dohromady: dvě kola ve dvou vlnách', async () => {

@@ -33,6 +33,8 @@ export type NotificationType =
   | 'consultation_changed'
   /** Ke konzultaci se nevytvořil odkaz na Google Meet (KP14, R-126). */
   | 'consultation_meet_failed'
+  /** Nová zpráva od klienta v chatu u zakázky (KP15, R-122). */
+  | 'client_message'
 
 export async function createNotification(params: {
   type: NotificationType

@@ -136,7 +136,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 
 | Skupina | Proměnné |
 |---------|----------|
-| DB + auth | `DATABASE_URL`, `NEXTAUTH_URL` (už jen záložní adresa pro odkazy), `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_USER_ID` (nepovinné, připne admina na id účtu, R-107), `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_AUTH_HOOK_SECRET` (R-105, R-107) |
+| DB + auth | `DATABASE_URL`, `NEXTAUTH_URL` (už jen záložní adresa pro odkazy), `NEXT_PUBLIC_APP_URL`, `ADMIN_EMAIL`, `ADMIN_USER_ID` (nepovinné, připne admina na id účtu, R-107), `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_AUTH_HOOK_SECRET` (R-105, R-107), `SUPABASE_SERVICE_ROLE_KEY` (jen server, přílohy chatu v bucketu `chat-prilohy`, KP15) |
 | Workspace DB | `DATABASE_URL_WS` (role `ws_app`, jen schéma `ws`, pod RLS — čte `lib/ws/db.ts`; zakládá `scripts/ws-create-role.js`) |
 | Workspace přihlášení | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (publikovatelný, z něj i host Clerku v CSP), `CLERK_SECRET_KEY` (jen server), `CLERK_WEBHOOK_SECRET` (`/api/clerk/webhook`, bez něj 503). Lokálně přes `clerk env pull` (aplikace propojená `clerk link`) |
 | Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení, hash klíčů rate limitu a (odvozeným klíčem) podpis odkazů v e-mailech. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) a e-maily s odkazy nevzniknou. Změna zneplatní klíče i odeslané odkazy |
@@ -317,6 +317,17 @@ Plán a rozhodnutí: `docs/klientsky-prostor/PLAN.md` (R-070 a dál v `memory/me
 - Jedna doména: landing na `/`, aplikace na `/w/*`, jedna Clerk instance (R-017). Cesty veřejných částí viz Hranice v repu (R-016).
 - Jeden `proxy.ts` (dřív `proxy.ts`, Next 16, Node runtime): veřejné cesty; Workspace přes Clerk; admin cesty přes NextAuth token jako dnes. Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
 - Webhook Clerk (`/api/clerk/webhook`, ověření podpisu) synchronizuje účty a členy do `ws`.
+
+
+**Chat a rozvržení jako Slack (KP15, migrace 124, R-127).** `/klient` je jedna aplikace
+(`components/portal/client-shell.tsx`): vlevo firma, Přehled, zakázky jako kanály s nepřečtenými,
+Faktury (`/klient/faktury`), Konzultace (`/klient/konzultace`); chat `/klient/zpravy/[id]` s panelem
+O zakázce (od 1280 px). Na telefonu spodní lišta a chat přes celou obrazovku. Zprávy klient posílá
+`POST /api/klient/zpravy` (multipart, ≤ 4 MB, typ souboru podle obsahu) → `portal.post_message`;
+schválení `answerApproval`; přečteno `touchThread`; obnovení `GET /api/klient/zpravy/stav` (ETag,
+304); přílohy `GET /api/klient/prilohy/[id]`. Sekce Požadavky v prostoru zmizela (D-K17), staré
+požadavky jsou ve vlákně. Sdílené: `lib/chat/`, `components/chat/`. Env `SUPABASE_SERVICE_ROLE_KEY`
+(jen server) a soukromý bucket `chat-prilohy`. Bezpečnost DECISIONS #044.
 
 ### Jak je to v kódu (S07, R-037)
 

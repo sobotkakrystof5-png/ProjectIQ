@@ -1,6 +1,6 @@
 import {
   Bell, Bot, Building2, CalendarDays, CircleCheck, FileText, Inbox, Layers, ListChecks, Megaphone,
-  MessageSquarePlus, PhoneCall, Receipt, Rocket, Sun, UserCircle, Users, Wallet, FolderOpen,
+  MessageSquarePlus, MessagesSquare, PhoneCall, Receipt, Rocket, Sun, UserCircle, Users, Wallet, FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
 import type { NavIcon } from '@/lib/admin-nav'
@@ -25,6 +25,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   profile: UserCircle,
   assistant: Bot,
   services: ListChecks,
+  messages: MessagesSquare,
 }
 
 export function NavGlyph({ name, size = 18 }: { name: NavIcon; size?: number }) {

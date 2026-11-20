@@ -1,5 +1,6 @@
 import { batchTolerant, q } from '@/lib/admin/db'
 import type { AdminCounts } from '@/lib/admin-nav'
+import { unreadClientMessagesSql } from '@/lib/admin/chat'
 
 /**
  * Počty pro odznaky v menu administrace. Od AD06 jedním požadavkem místo tří:
@@ -10,7 +11,7 @@ import type { AdminCounts } from '@/lib/admin-nav'
  * jedna chybějící tabulka shodila v transakci i počty, které existují.
  */
 export async function loadAdminCounts(): Promise<AdminCounts> {
-  const [base, requests, drafts] = await batchTolerant([
+  const [base, requests, drafts, messages] = await batchTolerant([
     q`
       SELECT
         (SELECT count(*)::int FROM projects WHERE lead_pending) AS leads,
@@ -18,6 +19,8 @@ export async function loadAdminCounts(): Promise<AdminCounts> {
     `,
     q`SELECT count(*)::int AS count FROM client_requests WHERE status = 'new'`,
     q`SELECT count(*)::int AS count FROM project_activity WHERE status = 'draft'`,
+    // Nepřečtené zprávy od klientů (KP15, migrace 124).
+    { text: unreadClientMessagesSql(), params: [] },
   ])
   const row = (base[0] ?? {}) as { leads?: number; notifications?: number }
   const count = (rows: Record<string, unknown>[]): number =>
@@ -27,5 +30,6 @@ export async function loadAdminCounts(): Promise<AdminCounts> {
     notifications: Number(row.notifications ?? 0),
     requests: count(requests),
     drafts: count(drafts),
+    messages: count(messages),
   }
 }

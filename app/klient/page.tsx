@@ -2,19 +2,22 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { requireClient } from '@/lib/portal/context'
 import { listClientProjects } from '@/lib/portal/projects'
-import { PortalFrame } from '@/components/portal/portal-frame'
+import { ClientPageHeader, ClientShell } from '@/components/portal/client-shell'
 import { formatDate } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Přehled' }
 
 // Přehled klienta (KP06): stav, fáze a poslední aktivita každé zakázky na první obrazovce.
+// Od KP15 v rozvržení jako Slack (ClientShell); doplní ho KP16.
 export default async function KlientPage() {
   const ctx = await requireClient()
   const projects = await listClientProjects(ctx.clientId)
 
   return (
-    <PortalFrame clientName={ctx.clientName}>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Vaše projekty</h1>
+    <ClientShell ctx={ctx} section="prehled">
+      <ClientPageHeader title="Vaše projekty" clientName={ctx.clientName} />
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 sm:px-6">
+      <div className="mx-auto max-w-3xl">
       {projects.length === 0 ? (
         <div className="mt-6 rounded-box border border-navy-100 bg-surface p-6">
           <p className="font-medium text-ink">Zatím tu nic není.</p>
@@ -50,6 +53,8 @@ export default async function KlientPage() {
           ))}
         </ul>
       )}
-    </PortalFrame>
+      </div>
+      </div>
+    </ClientShell>
   )
 }

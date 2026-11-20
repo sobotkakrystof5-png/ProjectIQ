@@ -9,9 +9,9 @@
 export type NavIcon =
   | 'today' | 'projects' | 'done' | 'requests' | 'inbox'
   | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
-  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services'
+  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services' | 'messages'
 
-export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts'
+export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts' | 'messages'
 
 export interface NavItem {
   href: string
@@ -45,6 +45,8 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: '/dashboard/zakazky/dokoncene', label: 'Dokončené', icon: 'done' },
       // Jeden inbox pro všechny weby (AD02); staré adresy přesměrují, viz lib/legacy-redirects.mjs.
       { href: '/dashboard/poptavky', label: 'Poptávky z webů', icon: 'inbox', count: 'leads' },
+      // Chat s klienty u zakázek (KP15, R-122) — nepřečtené zprávy od klientů.
+      { href: '/dashboard/zpravy', label: 'Zprávy', icon: 'messages', count: 'messages' },
       { href: '/dashboard/pozadavky', label: 'Požadavky klientů', icon: 'requests', count: 'requests' },
       { href: '/dashboard/calls', label: 'Hovory', icon: 'calls' },
       // Hovory z Growth OS: kontakty od robota, denní reporty a analýza (R-118).
@@ -120,4 +122,4 @@ export function activeHref(pathname: string): string | null {
 export const formatBadge = (n: number): string => (n > 99 ? '99+' : String(n))
 
 export type AdminCounts = Record<CountKey, number>
-export const EMPTY_COUNTS: AdminCounts = { requests: 0, leads: 0, notifications: 0, drafts: 0 }
+export const EMPTY_COUNTS: AdminCounts = { requests: 0, leads: 0, notifications: 0, drafts: 0, messages: 0 }
