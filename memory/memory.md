@@ -1571,6 +1571,9 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #040, te
   žádná běhová chyba. Nabídka po úpravě Kryštofa nese cenu zadanou u zakázky (ne ceník webu).
   **Za přihlášením okem nikdo nic neviděl.** Formální `web-security-review` se nepouštěl, jen
   vlastní kontrola v DECISIONS #040.
+- **fix** Tlačítko „Poslat e-mail" bylo jen ikonou ve sloupci úplně vpravo v tabulce široké
+  1100 px a v záložce Čekání na odpověď chybělo — Kryštof ho po nasazení nenašel. Teď je
+  popsané tlačítko přímo ve sloupci E-mail v obou záložkách. Soubor: `components/LeadsTable.tsx`.
 - **decision** **R-121**, DECISIONS #040. Archiv: dny 2026-11-18 přesunuté do `archiv/2026-11.md`.
 
 *Starší dny (2026-11-18 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*

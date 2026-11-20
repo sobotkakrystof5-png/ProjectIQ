@@ -1227,7 +1227,8 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 ## Poslat e-mail z Hovorů: tři šablony a schůzka s Meetem (R-121)
 
-- Tlačítko v řádku kontaktu (jen s e-mailem) otevře `components/LeadEmailDialog.tsx`: vyberete
+- Tlačítko **Poslat e-mail** ve sloupci E-mail (záložky Hovory i Čekání na odpověď; jen u kontaktu
+  s e-mailem) otevře `components/LeadEmailDialog.tsx`: vyberete
   **Portfolio**, **Nabídka** nebo **Schůzka s Google Meet**, text se načte, jde přepsat, pak
   Odeslat. Jediný krok — co je v okně, to odejde. Dřívější „Poslat portfolio (odešle ihned)"
   a okno „Napsat jinou zprávu" zanikly (`sendPortfolioEmail`, `sendCustomLeadEmail`

@@ -365,7 +365,13 @@ function PhoneCell({ lead }: { lead: ClientLead }) {
   )
 }
 
-function EmailCell({ lead }: { lead: ClientLead }) {
+/** Viditelné tlačítko přímo ve sloupci E-mail — ikona úplně vpravo v široké tabulce zapadla. */
+const emailButton =
+  'inline-flex min-h-11 items-center gap-1.5 rounded-chip bg-navy-700 px-3 text-sm font-semibold text-white ' +
+  'transition-colors hover:bg-navy-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-700 ' +
+  'focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40'
+
+function EmailCell({ lead, onOpenEmail, disabled }: { lead: ClientLead; onOpenEmail?: () => void; disabled?: boolean }) {
   return (
     <td className="px-3 py-2.5">
       {lead.email && (
@@ -377,6 +383,12 @@ function EmailCell({ lead }: { lead: ClientLead }) {
             <Mail size={13} strokeWidth={1.5} aria-hidden="true" />
             <span className="truncate">{lead.email}</span>
           </a>
+          {onOpenEmail && (
+            <button type="button" onClick={onOpenEmail} disabled={disabled} className={emailButton}>
+              <Send size={14} strokeWidth={1.5} aria-hidden="true" />
+              Poslat e-mail
+            </button>
+          )}
           {lead.portfolio_sent_at && (
             <span className="flex items-center gap-1 text-[11px] text-navy-700" title="Portfolio bylo odesláno">
               <CheckCircle2 size={11} strokeWidth={1.5} />
@@ -464,7 +476,7 @@ function LeadRow({
           isPending={isPending}
         />
       </td>
-      <EmailCell lead={lead} />
+      <EmailCell lead={lead} onOpenEmail={onOpenEmail} disabled={isPending} />
       <td className="px-3 py-2.5">
         <StatusBadge status={lead.lead_status} />
       </td>
@@ -492,17 +504,6 @@ function LeadRow({
       <ValueCell lead={lead} />
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1">
-          {lead.email && (
-            <button
-              onClick={onOpenEmail}
-              disabled={isPending}
-              title="Poslat e-mail (portfolio, nabídka, schůzka)"
-              aria-label="Poslat e-mail"
-              className={iconActionPrimary}
-            >
-              <Send size={15} strokeWidth={1.5} aria-hidden="true" />
-            </button>
-          )}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={onConvert}
@@ -746,6 +747,7 @@ function WaitingRow({
   onConvert,
   onMoveBack,
   onDelete,
+  onOpenEmail,
   isPending,
   highlighted,
 }: {
@@ -755,6 +757,7 @@ function WaitingRow({
   onConvert: () => void
   onMoveBack: () => void
   onDelete: () => void
+  onOpenEmail: () => void
   isPending: boolean
   highlighted: boolean
 }) {
@@ -770,7 +773,7 @@ function WaitingRow({
       <CompanyCell lead={lead} notes={notes} />
       <ContactCell lead={lead} />
       <PhoneCell lead={lead} />
-      <EmailCell lead={lead} />
+      <EmailCell lead={lead} onOpenEmail={onOpenEmail} disabled={isPending} />
       <td className="px-3 py-2.5">
         {lastNote ? (
           <span className="block max-w-[200px] truncate text-sm text-quiet">{lastNote.content}</span>
@@ -1099,6 +1102,7 @@ export default function LeadsTable({
                       onConvert={() => handleConvert(lead.id)}
                       onMoveBack={() => handleMoveFromWaiting(lead.id)}
                       onDelete={() => handleDelete(lead.id)}
+                      onOpenEmail={() => setEmailLead(lead)}
                       isPending={isPending}
                       highlighted={highlightedId === lead.id}
                     />
