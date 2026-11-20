@@ -16,6 +16,13 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-20 — review: poptávky z webu klienta (KP17, R-129)
+Spouštěč: před commitem (skill `web-security-review`)
+Rozsah: migrace 126 (`project_web_keys`, `project_web_events`, `portal.web_lead_months`), `scripts/portal-grants.sql`, nový veřejný vstup `POST /api/public/web-udalost`, `lib/client-web/{keys,stats,setup}.ts`, `lib/portal/web-leads.ts`, akce `app/project-web-key-actions.ts`, karta „Poptávky z webu" v detailu zakázky, čísla v `/klient` (Přehled, panel O zakázce, detail projektu), export `randomToken` z `lib/agent-keys.ts`.
+Výsledek: 0 nálezů.
+Ověřeno: klíč jen v hlavičce, v DB jen prefix a HMAC s pepřem, ukáže se jednou, porovnání v konstantním čase; špatný, cizí tvar (`zk_agent_…`), pozměněný i zneplatněný klíč 401 stejně (test); otočení zneplatní starý (test); požadavek s `Origin` 403 a nic se neuloží (test); tělo nad 1 kB 413 podle hlavičky i skutečné délky, pole navíc 400 (`.strict()`, test s e-mailem v těle); limit na klíč 60/h a na IP 300/h včetně neúspěšných pokusů (testy); bez pepře 503; tabulka událostí nemá sloupec pro jméno, kontakt, text ani IP (test na sloupce); `portal_app` nečte události ani klíče (`42501`, test); `portal.web_lead_months` ověří člena (`P0002` pro cizího, test) a vrací jen součty zakázek klienta, klient A nevidí čísla B ani přes id (test); zkušební událost se do čísel nepočítá (test); akce klíče za `requireAuth` s UUID; návod a příkaz pro web klíč neobsahují, jen název proměnné (`ZAKAZIQ_WEB_KEY`, ne `NEXT_PUBLIC_`); vše se vykresluje jako text. CORS ani CSP se nemění, žádná nová závislost.
+Zůstává: nafouknutí čísel uniklým klíčem do 60/h — DECISIONS #046.
+
 ## 2026-11-20 — review: přehled klienta (KP16, R-128)
 Spouštěč: před commitem (skill `web-security-review`)
 Rozsah: migrace 125 (`project_phases.client_notified_at`, `project_phase_emails`, funkce `portal_phase_email_claim`, `portal_phase_email_release`, `portal.client_surveys`), `scripts/portal-grants.sql`, `lib/portal/{overview,survey}.ts`, `lib/admin/phase-email.ts`, `setPhaseStatusAction` (`after()` s e-mailem), cron `send-reminders`, stránky `/klient`, `/klient/start`, `/klient/faktury`, `/klient/konzultace`, `/klient/projekt/[id]` (dotazník R-119 místo `FeedbackCard`), odkaz do prostoru na `/p/[token]`, komponenty `components/portal/{overview,project-aside,aside-sheet,survey-card}.tsx`.

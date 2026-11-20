@@ -7,6 +7,8 @@ import type { PortalConsultation } from '@/lib/portal/consultations'
 import { TaskDoneButton } from '@/components/portal/task-done-button'
 import { countLabel, formatMoney } from '@/lib/portal/format'
 import { consultationWhen } from '@/lib/consultations/rules'
+import type { WebLeadStats } from '@/lib/client-web/stats'
+import { WebLeadsChart } from '@/components/client-web/web-leads-chart'
 import { cn, formatDate } from '@/lib/utils'
 
 /**
@@ -26,6 +28,7 @@ export function ProjectAside({
   invoices,
   consultations,
   activity,
+  webLeads = null,
   today,
 }: {
   project: PortalProject
@@ -34,6 +37,8 @@ export function ProjectAside({
   invoices: PortalInvoice[]
   consultations: PortalConsultation[]
   activity: PortalActivity[]
+  /** Poptávky z webu (KP17); `null` = zakázka nemá napojený web. */
+  webLeads?: WebLeadStats | null
   today: string
 }) {
   const current = currentPhase(phases)
@@ -152,6 +157,13 @@ export function ProjectAside({
           Domluvit konzultaci
         </Link>
       </section>
+
+      {webLeads && (
+        <section>
+          <h2 className={cn(LABEL, 'mb-2')}>Poptávky z vašeho webu</h2>
+          <WebLeadsChart stats={webLeads} compact />
+        </section>
+      )}
 
       {activity.length > 0 && (
         <section>

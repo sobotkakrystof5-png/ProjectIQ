@@ -1,6 +1,6 @@
 # Prompty pro Claude Code — klientský prostor, hlášení práce a nový admin
 
-Sezení KP00–KP17 (KP17 poptávky z webu klienta: D-K16 rozhodnuto 2026-11-20, před začátkem rozhodnout D-K20). Druhá vlna KP11–KP16 (R-121, R-122) je popsaná níž v oddílu „Druhá vlna". **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa `ZakazIQ`.
+Sezení KP00–KP17 (KP17 poptávky z webu klienta: D-K16 i D-K20 = jen počet rozhodnuto 2026-11-20, kód hotov na větvi `klient/kp17-poptavky-webu`). Druhá vlna KP11–KP16 (R-121, R-122) je popsaná níž v oddílu „Druhá vlna". **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa `ZakazIQ`.
 Každé sezení začíná přečtením paměti a končí jejím zápisem, takže na sebe navazují i bez kontextu z minula.
 Zdroj pravdy je plán `docs/klientsky-prostor/PLAN.md` (architektura, bezpečnostní model, rozhodnutí D-K1–D-K11, tabulka sezení).
 

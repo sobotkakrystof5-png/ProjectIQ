@@ -343,6 +343,20 @@ Přehled. Hodnocení hotové zakázky = dotazník R-119 (`components/portal/surv
 nejvýš 1× za 24 h na zakázku (`portal_phase_email_claim`). `/p/[token]` má odkaz do prostoru, když
 zakázka patří klientovi s aspoň jedním členem. Bezpečnost DECISIONS #045.
 
+**Poptávky z webu klienta (KP17, migrace 126, R-129, R-130).** Server webu, který Kryštof klientovi
+postavil, po odeslání formuláře volá `POST /api/public/web-udalost` (`app/api/public/web-udalost/route.ts`)
+s `Authorization: Bearer zk_web_…` a tělem `{ "druh": "poptavka" | "objednavka", "test"?: true }`.
+Jen ze serveru (hlavička `Origin` = 403), bez CORS, tělo do 1 kB, limity 60/h na klíč a 300/h na IP
+(`api_requests`), odpovědi 202/400/401/403/413/429/503. Ukládá se jen `project_web_events` (zakázka,
+klíč, druh, čas, `is_test`) — žádné osobní údaje; **nikdy přes `lib/web-leads.ts`** (Kryštofova
+schránka). Klíč webu: `lib/client-web/keys.ts` (`project_web_keys`, HMAC s `AGENT_KEY_PEPPER`, jeden
+platný na zakázku, akce `app/project-web-key-actions.ts`). Čísla: `lib/client-web/stats.ts` (12 měsíců
+v pražském čase), admin `loadProjectWebLeads` v kartě „Poptávky z webu" (Přehled detailu zakázky),
+klient `portal.web_lead_months(member)` přes `lib/portal/web-leads.ts` — v Přehledu, panelu O zakázce
+a detailu projektu; zakázka bez klíče a bez události za 12 měsíců sekci nemá. Graf
+`components/client-web/web-leads-chart.tsx` (jedna řada, bez knihovny). Návod pro web
+`docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md`. Bezpečnost DECISIONS #046.
+
 ### Jak je to v kódu (S07, R-037)
 
 | Co | Kde |

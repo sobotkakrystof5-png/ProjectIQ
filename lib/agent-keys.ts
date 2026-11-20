@@ -15,7 +15,7 @@ const KEY_PREFIX = 'zk_agent_'
 const KEY_RE = /^zk_agent_([A-Za-z0-9]{10})_([A-Za-z0-9]{32})$/
 
 /** Náhodný řetězec z písmen a číslic bez zkreslení (zamítá bajty nad 247). */
-function randomToken(length: number): string {
+export function randomToken(length: number): string {
   let out = ''
   while (out.length < length) {
     const bytes = randomBytes(length * 2)

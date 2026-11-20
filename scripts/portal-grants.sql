@@ -56,3 +56,7 @@ GRANT EXECUTE ON FUNCTION portal.attachment_file(uuid, uuid) TO portal_app;
 -- Přehled klienta (migrace 125, KP16). Hodnocení jde přes dotazník R-119:
 -- funkce vrátí členovi token dotazníku jeho hotových zakázek a stav odpovědi.
 GRANT EXECUTE ON FUNCTION portal.client_surveys(uuid) TO portal_app;
+
+-- Poptávky z webu klienta (migrace 126, KP17). Klient čte jen měsíční součty
+-- svých zakázek; k událostem ani klíčům webu přístup nemá.
+GRANT EXECUTE ON FUNCTION portal.web_lead_months(uuid) TO portal_app;

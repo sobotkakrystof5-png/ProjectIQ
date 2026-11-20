@@ -28,6 +28,10 @@ import { AgentKeyPanel } from '@/components/AgentKeyPanel'
 import type { PortalThreadMessage } from '@/components/admin/portal-reply-panel'
 import { AdminProjectChat } from '@/components/admin/chat/project-chat'
 import { PortalAccessCard } from '@/components/admin/portal-access-card'
+import { WebKeyPanel } from '@/components/admin/web-key-panel'
+import { WebLeadsChart } from '@/components/client-web/web-leads-chart'
+import { loadProjectWebLeads } from '@/lib/client-web/keys'
+import { buildWebEnvBlock, buildWebSnippet, buildWebTestCommand } from '@/lib/client-web/setup'
 import { loadProjectPortalAccess } from '@/lib/portal/project-access'
 import { ProjectPhasesCard } from '@/components/admin/phases/project-phases-card'
 import { loadProjectPhases, loadServices } from '@/lib/admin/phases'
@@ -264,11 +268,14 @@ function surveyState(project: Project): string {
 async function OverviewTab({ project }: { project: Project }) {
   const publicUrl = getPublicUrl(project.public_token)
   // Klientský prostor (KP11): kdo v něm je a kdo čeká na pozvánku. Vlastní projekt nemá koho zvát.
-  const [portalAccess, phases, services] = await Promise.all([
-    project.project_type === 'personal' ? null : loadProjectPortalAccess(project.id),
+  const personal = project.project_type === 'personal'
+  const [portalAccess, phases, services, webLeads] = await Promise.all([
+    personal ? null : loadProjectPortalAccess(project.id),
     // Etapy (KP12). `null` = migrace 121 ještě neběžela — karta se neukáže.
     loadProjectPhases(project.id),
     loadServices(),
+    // Poptávky z webu klienta (KP17). `null` = migrace 126 ještě neběžela.
+    personal ? null : loadProjectWebLeads(project.id),
   ])
 
   return (
@@ -330,6 +337,8 @@ async function OverviewTab({ project }: { project: Project }) {
         />
       )}
 
+      {webLeads && <WebLeadsBlock projectId={project.id} data={webLeads} />}
+
       <Card>
         <CardHead title={project.closed_at ? 'Uzavřená zakázka' : 'Uzavřít zakázku'} />
         {project.closed_at ? (
@@ -364,6 +373,35 @@ async function OverviewTab({ project }: { project: Project }) {
         <DeleteButton projectId={project.id} />
       </Card>
     </>
+  )
+}
+
+/** Poptávky z webu klienta (KP17, R-129): čísla po měsících a klíč webu. */
+async function WebLeadsBlock({ projectId, data }: { projectId: string; data: NonNullable<Awaited<ReturnType<typeof loadProjectWebLeads>>> }) {
+  const baseUrl = await appBaseUrl()
+  const connected = Boolean(data.key) || data.stats.total > 0
+  return (
+    <Card id="poptavky-z-webu">
+      <CardHead
+        title="Poptávky z webu"
+        hint="Kolik lidí napsalo nebo objednalo přes web klienta. Totéž vidí klient ve svém prostoru."
+      />
+      {connected && (
+        <div className="mb-5">
+          <WebLeadsChart stats={data.stats} emptyText="Z webu zatím nepřišla žádná poptávka." />
+        </div>
+      )}
+      <WebKeyPanel
+        projectId={projectId}
+        active={data.key}
+        lastTestAt={data.lastTestAt}
+        lastEventAt={data.lastEventAt}
+        envBlock={buildWebEnvBlock(baseUrl)}
+        snippet={buildWebSnippet()}
+        testCommand={buildWebTestCommand(baseUrl)}
+        configured={isAgentKeyConfigured()}
+      />
+    </Card>
   )
 }
 

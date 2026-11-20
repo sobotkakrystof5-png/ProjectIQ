@@ -141,7 +141,8 @@ export function OverviewProjectCard({ p, today }: { p: OverviewProject; today: s
   const toPay = p.invoices
     .filter((i) => i.state === 'open' || i.state === 'overdue')
     .sort((a, b) => (a.dueOn ?? '').localeCompare(b.dueOn ?? ''))
-  const hasDetails = Boolean(money || toPay.length || p.consultations.length || project.lastActivity)
+  const web = p.webLeads
+  const hasDetails = Boolean(money || toPay.length || p.consultations.length || project.lastActivity || web)
   const next = p.consultations[0] ?? null
   return (
     <li className="rounded-box border border-navy-100 bg-surface p-5">
@@ -191,6 +192,21 @@ export function OverviewProjectCard({ p, today }: { p: OverviewProject; today: s
             <dd className="flex items-center gap-1.5 text-ink">
               <CalendarClock size={14} strokeWidth={1.5} className="shrink-0 text-navy-600" aria-hidden="true" />
               {consultationWhen(next.startsAt, today)}
+            </dd>
+          </div>
+        )}
+        {web && (
+          <div>
+            <dt className="text-xs text-quiet">Poptávky z webu</dt>
+            <dd className="text-ink">
+              {web.total === 0 ? (
+                'Zatím žádná'
+              ) : (
+                <>
+                  Tento měsíc <span className="font-num font-semibold">{web.thisMonth}</span>
+                  <span className="text-quiet"> · minulý <span className="font-num">{web.lastMonth}</span></span>
+                </>
+              )}
             </dd>
           </div>
         )}

@@ -113,7 +113,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna (**kód hotov 2026-11-20 na větvi `klient/kp14-konzultace`, migrace 123 neaplikovaná**, R-126), KP15 chat s klientem a rozvržení jako Slack (**kód hotov 2026-11-20 na větvi `klient/kp15-chat`, migrace 124 neaplikovaná**, R-127), KP16 přehled klienta (**kód hotov 2026-11-20 na větvi `klient/kp16-prehled`, migrace 125 neaplikovaná**, R-128), KP17 poptávky z webu klienta (D-K16 rozhodnuto 2026-11-20, R-129; **čeká na D-K20 — jak se poptávka z webu klienta dostane do ZakazIQ**, prompt připravený, není v kódu). Větve KP11–KP16 jdou za sebou, žádná není na produkci. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna (**kód hotov 2026-11-20 na větvi `klient/kp14-konzultace`, migrace 123 neaplikovaná**, R-126), KP15 chat s klientem a rozvržení jako Slack (**kód hotov 2026-11-20 na větvi `klient/kp15-chat`, migrace 124 neaplikovaná**, R-127), KP16 přehled klienta (**kód hotov 2026-11-20 na větvi `klient/kp16-prehled`, migrace 125 neaplikovaná**, R-128), KP17 poptávky z webu klienta (D-K16 a D-K20 = jen počet rozhodnuto 2026-11-20, **kód hotov 2026-11-20 na větvi `klient/kp17-poptavky-webu`, migrace 126 neaplikovaná**, R-129, R-130). Větve KP11–KP17 jdou za sebou, žádná není na produkci. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1351,6 +1351,24 @@ zakládá zakázky v Kryštofově schránce Poptávky, zákazníci klienta by se
 Jak se poptávka z webu klienta do ZakazIQ dostane, je otevřené rozhodnutí **D-K20**
 (`docs/klientsky-prostor/PLAN.md` oddíl 7; doporučení: jen počet bez osobních údajů s klíčem
 zakázky). Prompt `new - area of zakaziq/prompty/klientsky-prostor/KP17-poptavky-z-webu-klienta.md`.
+
+### R-130 · Poptávky z webu klienta jen jako počet, klíč webu na zakázku (D-K20, 2026-11-20)
+**Rozhodnutí:** (1) **D-K20 = (a) jen počet** (vybral Kryštof 2026-11-20): server webu klienta po
+odeslání formuláře pošle `POST /api/public/web-udalost` s klíčem webu zakázky a druhem `poptavka`
+nebo `objednavka`; jméno, kontakt ani text do ZakazIQ nejdou, poptávka jde klientovi e-mailem jako
+dřív. (2) Ukládají se jednotlivé události (`project_web_events`: zakázka, klíč, druh, čas, příznak
+zkoušky), ne měsíční součty v projekci; měsíce počítá při čtení funkce `portal.web_lead_months`
+a admin. Události žijí se zakázkou, vlastní retenci nemají. (3) Klíč `zk_web_…` hashuje stejný
+`AGENT_KEY_PEPPER` jako klíče pro Claude Code — žádná nová proměnná ve Vercelu. (4) Graf je jedna
+řada (oba druhy dohromady), rozdělení na poptávky a objednávky je textem. (5) Sekci má jen zakázka
+s platným klíčem nebo událostí za 12 měsíců; zkušební událost (`test: true`) se uloží, ale nepočítá.
+**Proč:** zadání KP17 a doporučení v plánu. Jednotlivé události s `key_id` dovolí po úniku klíče
+smazat přesně to, co přes něj přišlo; projekce by k tomu potřebovala trigger a přepočet a čísla
+jsou malá. Dva odstíny navy pro dva druhy neprošly validátorem barev (stejný odstín, slabá sytost).
+**Důsledek:** odchylka od promptu KP17 (projekce `portal.web_lead_months` jako tabulka, retence
+13 měsíců). Migrace 126, `lib/client-web/`, `lib/portal/web-leads.ts`, `app/api/public/web-udalost/`,
+karta v detailu zakázky, návod `docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md`. Nový zdroj
+událostí jde jen přes `recordWebEvent`. Bezpečnost `.claude/security/DECISIONS.md` #046.
 ---
 
 ## 3. Otevřené problémy
@@ -1435,6 +1453,14 @@ zakázky). Prompt `new - area of zakaziq/prompty/klientsky-prostor/KP17-poptavky
   (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
   i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
   s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **KP17 nasadit a projít naživo:** kód na větvi `klient/kp17-poptavky-webu` (nad `klient/kp16-prehled`),
+  nic nenasazené. Před nasazením migrace 121–126 (aditivní) a `node scripts/portal-create-role.js`.
+  Nová env není (`AGENT_KEY_PEPPER` už ve Vercelu je). Projít: zakázka → Poptávky z webu → Vytvořit
+  klíč → klíč do env webu klienta → zkušební příkaz (`{"ok":true}`, v kartě „Zkušební událost
+  dorazila") → skutečné odeslání formuláře → číslo v adminu i v `/klient` (Přehled, panel O zakázce,
+  detail projektu). Napojit první web klienta podle `docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md`
+  (práce v repozitáři webu klienta). **Vstup ani karta naživo neověřené**; vzhled jen na dočasné
+  stránce s vymyšlenými daty · od 2026-11-20
 - [ ] **KP16 nasadit a projít naživo:** kód na větvi `klient/kp16-prehled` (nad `klient/kp15-chat`),
   nic nenasazené. Před nasazením: migrace 121–125 na produkci (aditivní; 125 potřebuje 106, 107, 118
   a 121), pak `node scripts/portal-create-role.js`. Projít na 390 / 768 / 1280 / 1440 px: přihlášení
@@ -1730,6 +1756,28 @@ zakázky). Prompt `new - area of zakaziq/prompty/klientsky-prostor/KP17-poptavky
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-20 (KP17 — poptávky z webu klienta)
+- **decision** **R-130**: D-K20 = jen počet (Kryštof), události místo projekce, pepř `AGENT_KEY_PEPPER`.
+- **feat** Veřejný vstup `POST /api/public/web-udalost`: server webu klienta pošle druh `poptavka`
+  nebo `objednavka` s klíčem webu zakázky; jen ze serveru (`Origin` = 403), tělo do 1 kB, limity
+  60/h na klíč a 300/h na IP, zkušební událost se nepočítá. Soubory: `app/api/public/web-udalost/route.ts`,
+  `lib/client-web/{keys,stats,setup}.ts`, `lib/agent-keys.ts` (export `randomToken`).
+- **feat** Admin: karta „Poptávky z webu" v Přehledu detailu zakázky (graf 12 měsíců, klíč vytvořit,
+  otočit, zneplatnit, návod pro web a zkušební příkaz). Soubory: `components/admin/web-key-panel.tsx`,
+  `app/project-web-key-actions.ts`, `components/admin/project-detail-view.tsx`.
+- **feat** Klientský prostor: řádek „Poptávky z webu" na kartě zakázky v Přehledu, graf v panelu
+  O zakázce a v detailu projektu. Soubory: `components/client-web/web-leads-chart.tsx`,
+  `lib/portal/{web-leads,overview}.ts`, `components/portal/{overview,project-aside}.tsx`,
+  `app/klient/{zpravy,projekt}/[id]/page.tsx`.
+- **db** Migrace 126 `poptavky_z_webu` (aplikována: ne, nikde), grant v `scripts/portal-grants.sql`.
+- **docs** Návod `docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md`, D-K20 v plánu, reference, index.
+- **chore** Ověřeno: `npx tsc --noEmit`; nový `lib/__tests__/kp17-poptavky-webu.test.ts` (18 testů nad
+  PGlite přes skutečný route handler: migrace dvakrát, klíče, `Origin`, limity, velké tělo, oddělení
+  klientů, pražské měsíce, zkušební událost); testy KP12–KP16 a oddělení klientů s migrací 126.
+  Vzhled na dočasné stránce s vymyšlenými daty (nula, jeden měsíc, rok, velká čísla) na 375 a 800 px:
+  bez vodorovného posouvání, plochy ≥ 44 px; stránka smazaná. Bezpečnostní kontrola bez nálezu
+  (AUDIT-LOG). **Naživo s databází a webem klienta neověřeno.**
 
 ### 2026-11-20 (D-K16 a příprava KP17, KP10)
 - **decision** **R-129**: analýza pro klienta = poptávky z jeho webu po měsících (D-K16). Otevřená

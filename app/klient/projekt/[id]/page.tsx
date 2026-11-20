@@ -7,6 +7,8 @@ import { requireClient } from '@/lib/portal/context'
 import { loadClientProject } from '@/lib/portal/projects'
 import { loadClientSurvey } from '@/lib/portal/survey'
 import { SurveyCard } from '@/components/portal/survey-card'
+import { loadProjectWebLeads } from '@/lib/portal/web-leads'
+import { WebLeadsChart } from '@/components/client-web/web-leads-chart'
 import { PhaseTimeline } from '@/components/portal/phase-timeline'
 import { loadClientPhases } from '@/lib/portal/phases'
 import { ProjectMoney } from '@/components/portal/project-money'
@@ -27,11 +29,12 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
   const data = await loadClientProject(ctx.clientId, id)
   if (!data) notFound()
   const { project, activity } = data
-  const [survey, phases, { money, invoices }, consultations] = await Promise.all([
+  const [survey, phases, { money, invoices }, consultations, webLeads] = await Promise.all([
     loadClientSurvey(ctx.clientId, ctx.memberId, id),
     loadClientPhases(ctx.clientId, id),
     loadClientMoney(ctx.clientId, id),
     loadClientConsultations(ctx.clientId, id),
+    loadProjectWebLeads(ctx.clientId, ctx.memberId, id),
   ])
 
   return (
@@ -89,6 +92,13 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
           upcoming={consultations.upcoming}
           freeSlots={consultations.freeSlots}
         />
+      )}
+
+      {webLeads && (
+        <section className="mt-5 rounded-box border border-navy-100 bg-surface p-5" aria-labelledby="poptavky-z-webu">
+          <h2 id="poptavky-z-webu" className="mb-3 text-base font-semibold text-ink">Poptávky z vašeho webu</h2>
+          <WebLeadsChart stats={webLeads} />
+        </section>
       )}
 
       {survey && <SurveyCard survey={survey} />}

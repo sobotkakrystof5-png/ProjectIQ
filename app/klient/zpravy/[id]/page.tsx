@@ -12,6 +12,7 @@ import { loadClientConsultations } from '@/lib/portal/consultations'
 import { isTranscriptionConfigured } from '@/lib/transcribe'
 import { ClientShell } from '@/components/portal/client-shell'
 import { ProjectAside } from '@/components/portal/project-aside'
+import { loadProjectWebLeads } from '@/lib/portal/web-leads'
 import { AsideSheet } from '@/components/portal/aside-sheet'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { ChatThread } from '@/components/chat/chat-thread'
@@ -27,11 +28,12 @@ export default async function KlientChatPage({ params }: { params: Promise<{ id:
   const ctx = await requireClient()
   const data = await loadClientProject(ctx.clientId, id)
   if (!data) notFound()
-  const [thread, phases, { money, invoices }, consultations] = await Promise.all([
+  const [thread, phases, { money, invoices }, consultations, webLeads] = await Promise.all([
     loadClientThread(ctx.clientId, id),
     loadClientPhases(ctx.clientId, id),
     loadClientMoney(ctx.clientId, id),
     loadClientConsultations(ctx.clientId, id),
+    loadProjectWebLeads(ctx.clientId, ctx.memberId, id),
   ])
   const current = currentPhase(phases)
   const aside = (
@@ -42,6 +44,7 @@ export default async function KlientChatPage({ params }: { params: Promise<{ id:
       invoices={invoices}
       consultations={consultations.upcoming}
       activity={data.activity}
+      webLeads={webLeads}
       today={getPragueTodayISO()}
     />
   )

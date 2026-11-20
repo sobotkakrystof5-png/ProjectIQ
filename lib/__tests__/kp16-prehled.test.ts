@@ -127,6 +127,7 @@ beforeAll(async () => {
     await db.exec(read('migrations', '123_konzultace_z_volna.sql'))
     await db.exec(read('migrations', '124_chat_s_klientem.sql'))
     await db.exec(read('migrations', '125_prehled_klienta.sql'))
+    await db.exec(read('migrations', '126_poptavky_z_webu.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')
@@ -226,7 +227,7 @@ describe('přehled klienta', () => {
   it('pořadí „Čeká na vás": schválení, úkol, zprávy, faktura po splatnosti, hodnocení', () => {
     const base = (id: string, over: Partial<OverviewProject>): OverviewProject => ({
       project: { id, name: id, description: null, status: 'in_progress', statusLabel: '', progress: 0, deadline: null, projectUrl: null, lastActivity: null },
-      phases: [], current: null, money: null, invoices: [], consultations: [], unread: 0, survey: null, ...over,
+      phases: [], current: null, money: null, invoices: [], consultations: [], unread: 0, survey: null, webLeads: null, ...over,
     })
     const invoice = (state: 'overdue' | 'open') => ({
       id: `f-${state}`, number: '2026001', kind: 'issued' as const, issuedOn: '2026-11-01', dueOn: '2026-11-15', paidOn: null,

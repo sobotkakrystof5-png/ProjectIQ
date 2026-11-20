@@ -8,6 +8,8 @@ import { currentPhase, openTasks, phasesFromRows, type PortalPhase } from './pha
 import { INVOICE_COLUMNS, invoiceFromRow, type PortalInvoice, type PortalMoney } from './money'
 import { consultationFromRow, type PortalConsultation } from './consultations'
 import { CLIENT_SURVEYS_SQL, surveyFromRow, type ClientSurvey } from './survey'
+import { WEB_LEADS_SQL, webLeadsByProject } from './web-leads'
+import type { WebLeadStats } from '@/lib/client-web/stats'
 
 /**
  * Přehled klienta (KP16, R-121, R-123): všechny zakázky klienta jedním
@@ -28,6 +30,8 @@ export interface OverviewProject {
   consultations: PortalConsultation[]
   unread: number
   survey: ClientSurvey | null
+  /** Poptávky z webu po měsících (KP17); `null` = zakázka nemá napojený web. */
+  webLeads: WebLeadStats | null
 }
 
 export type { ClientSurvey }
@@ -94,7 +98,7 @@ export async function loadClientOverview(
 ): Promise<ClientOverview> {
   const now = new Date()
   const until = new Date(now.getTime() + CONSULTATION_LIST_DAYS * 86_400_000)
-  const [projectRows, phaseRows, taskRows, moneyRows, invoiceRows, consultationRows, slotRows, approvalRows, surveyRows] =
+  const [projectRows, phaseRows, taskRows, moneyRows, invoiceRows, consultationRows, slotRows, approvalRows, surveyRows, webLeadRows] =
     await tolerantBatch(clientId, [
       { text: `${PROJECT_SELECT_SQL} WHERE p.client_id = $1 ORDER BY p.updated_at DESC`, params: [clientId] },
       pq`SELECT id, project_id, name, description, due_date, status, done_at FROM portal.phases
@@ -115,11 +119,13 @@ export async function loadClientOverview(
          WHERE client_id = ${clientId} AND kind = 'approval' AND approval_state = 'pending'
          ORDER BY created_at`,
       CLIENT_SURVEYS_SQL(memberId),
+      WEB_LEADS_SQL(memberId),
     ])
 
   const todayIso = getPragueTodayISO()
   const rowsOf = (rows: PortalRow[] | null, projectId: string) => (rows ?? []).filter((r) => String(r.project_id) === projectId)
   const unreadBy = new Map(threads.map((t) => [t.projectId, t.unread]))
+  const webLeads = webLeadsByProject(webLeadRows)
 
   const projects: OverviewProject[] = (projectRows ?? []).map((row) => {
     const project = projectFromRow(row as unknown as ProjectRow)
@@ -136,6 +142,7 @@ export async function loadClientOverview(
       consultations: rowsOf(consultationRows, project.id).map(consultationFromRow),
       unread: unreadBy.get(project.id) ?? 0,
       survey: surveyFromRow(s),
+      webLeads: webLeads.get(project.id) ?? null,
     }
   })
 
