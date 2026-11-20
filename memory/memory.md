@@ -4,8 +4,8 @@
 >
 > **Poslední aktualizace:** 2026-11-20 · **E-maily z Hovorů** (R-121): tlačítko „Poslat e-mail"
 > se třemi šablonami — Portfolio, Nabídka (cena za zakázku) a Schůzka s Google Meet (termín,
-> odkaz na Meet, vizeon.cz; všechno nebo nic). Bez migrace. **V kódu na větvi
-> `claude/email-templates-conversations-1692ea`, nenasazeno; naživo s Googlem a Resendem neověřeno.**
+> odkaz na Meet, vizeon.cz; všechno nebo nic). Bez migrace. **Na produkci od 2026-11-20 (`2c0ddb8`);
+> naživo s Googlem a Resendem neověřeno.**
 >
 > Předchozí: 2026-11-18 · **AI asistent jako CRM** (R-120): Přehled, Kontakty
 > s filtry a detail klienta (ukázka, všechny hovory s přepisem, e-maily, časová osa),
@@ -1566,6 +1566,11 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #040, te
   s `--testTimeout=90000` 22/22). Okno ověřeno v prohlížeči na dočasné stránce s fiktivním
   kontaktem (800 a 375 px, bez chyb v konzoli, stránka smazána). **Naživo s Googlem a Resendem
   neověřeno.**
+- **chore** **Na produkci** (2026-11-20): fast-forward `main` `5c9ccec` → `2c0ddb8`, build Ready
+  za ~65 s. Ověřeno veřejně: `/` a `/login` 200, `/dashboard/calls` 307 na přihlášení, za 15 min
+  žádná běhová chyba. Nabídka po úpravě Kryštofa nese cenu zadanou u zakázky (ne ceník webu).
+  **Za přihlášením okem nikdo nic neviděl.** Formální `web-security-review` se nepouštěl, jen
+  vlastní kontrola v DECISIONS #040.
 - **decision** **R-121**, DECISIONS #040. Archiv: dny 2026-11-18 přesunuté do `archiv/2026-11.md`.
 
 *Starší dny (2026-11-18 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*
