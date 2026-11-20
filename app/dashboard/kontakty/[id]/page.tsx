@@ -4,6 +4,8 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { Badge } from '@/components/ui/badge'
 import { ContactActions } from '@/components/admin/contact-actions'
+import { SendEmailButton } from '@/components/admin/send-email-button'
+import { loadMailReadiness } from '@/lib/admin/mail-readiness'
 import { ContactForm } from '@/components/admin/contacts/contact-form'
 import { MergeButton, UnmergeButton } from '@/components/admin/contacts/merge-actions'
 import { MemoryCard } from '@/components/admin/memory/memory-card'
@@ -50,7 +52,7 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
   const { id } = await props.params
   if (!UUID.test(id)) notFound()
 
-  const detail = await loadContactDetail(id)
+  const [detail, readiness] = await Promise.all([loadContactDetail(id), loadMailReadiness()])
   if (detail === null) notFound()
 
   const { contact, merged, occurrences, candidates } = detail
@@ -99,6 +101,14 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
           context={{ projectName: contact.company ?? contact.display_name }}
           emptyHint="Kontakt nemá telefon ani e-mail. Doplňte je v Údajích a zavoláte jedním klikem."
         />
+        {/* Portfolio, Nabídka nebo Schůzka s Google Meet (R-132). Sloučený kontakt nepíšeme: e-mail patří tomu, do kterého je sloučený. */}
+        {contact.merged_into === null && (
+          <SendEmailButton
+            appearance="primary"
+            readiness={readiness}
+            target={{ kind: 'contact', id: contact.id, company: contact.company ?? contact.display_name, email: contact.email }}
+          />
+        )}
         {/*
           Nová zakázka odsud, ne z prázdného formuláře (AD15): s `?kontakt=`
           se předvyplní jméno, kontakt, druh práce i poslední cena.

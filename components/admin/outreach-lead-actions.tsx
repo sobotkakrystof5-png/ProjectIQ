@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { dismissOutreachLead, takeOverOutreachLead, undoDismissOutreachLead } from '@/app/outreach-actions'
 import { ScheduleMeetingDialog, type MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
+import { SendEmailButton } from '@/components/admin/send-email-button'
 import { formatWhen, type OutreachQueueRow } from '@/lib/admin/outreach-view'
 
 /**
@@ -18,11 +19,14 @@ export function OutreachLeadActions({
   nowIso,
   meeting,
   className,
+  showEmail = true,
 }: {
   row: OutreachQueueRow
   nowIso: string
   meeting: MeetingReadiness
   className?: string
+  /** Detail klienta má Poslat e-mail v kartě Kontakt, tam se tady neopakuje. */
+  showEmail?: boolean
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -63,6 +67,12 @@ export function OutreachLeadActions({
             ? `Poslat pozvánku na ${formatWhen(row.callbackAt, now)}`
             : 'Domluvit schůzku'}
         </Button>
+        {showEmail && (
+          <SendEmailButton
+            readiness={meeting}
+            target={{ kind: 'outreach', id: row.id, company: row.company, email: row.email }}
+          />
+        )}
         <Button type="button" variant="outline" onClick={prevzit} disabled={pending}>
           Převzít do Hovorů
         </Button>

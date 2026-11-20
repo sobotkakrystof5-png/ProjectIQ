@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-18 · **AI asistent jako CRM** (R-120): Přehled, Kontakty
+> **Poslední aktualizace:** 2026-11-20 · **E-maily z Hovorů** (R-132): tlačítko „Poslat e-mail"
+> se třemi šablonami — Portfolio, Nabídka (cena za zakázku) a Schůzka s Google Meet (termín,
+> odkaz na Meet, vizeon.cz; všechno nebo nic). Bez migrace. **Na produkci od 2026-11-20 (`2c0ddb8`);
+> naživo s Googlem a Resendem neověřeno.**
+>
+> Předchozí: 2026-11-18 · **AI asistent jako CRM** (R-120): Přehled, Kontakty
 > s filtry a detail klienta (ukázka, všechny hovory s přepisem, e-maily, časová osa),
 > kontrakt v2 s Growth OS a zpětný kanál, migrace 119. **Na produkci od 2026-11-18 (`4408221`);**
 > Growth OS zatím posílá v1, takže detail ukáže jen poslední hovor, dokud se nesplní zadání
@@ -1382,9 +1387,44 @@ maže téma konzultací, slovní části dotazníku a stav čtení vláken. (4) 
 z KP14–KP16. Agent zvolil výklad, který jde vrátit; text stránky a výklad ověří Kryštof (R-079).
 **Důsledek:** nová tabulka s údaji člena = doplnit `portal_export_member`, `portal_erase_member`
 a `purge_client_retention` (zvažovat i v testu `kp10-gdpr`). Bezpečnost DECISIONS #047.
+
+### R-132 · E-maily z Hovorů: tři šablony a schůzka s Meetem bez odkladu (2026-11-20)
+*Na `main` vzniklo jako R-121 (a DECISIONS #040); obě čísla už měl klientský prostor, přečíslováno při sloučení 2026-11-20.*
+**Rozhodnutí:** v Hovorech tlačítko „Poslat e-mail" otevře okno se třemi šablonami — **Portfolio**
+(dosavadní text), **Nabídka** (cena za tuhle zakázku) a **Schůzka s Google Meet** (termín, tlačítko
+Připojit se, vizeon.cz). Výběr šablony → text se načte a jde přepsat → Odeslat, jeden krok. Schůzka
+vytvoří skutečný odkaz na Meet, přepíše příští akci kontaktu na „Schůzka přes Google Meet", posune
+propojenou událost v kalendáři a pošle e-mail z krystof@vizeon.cz **hned**, bez 15s odkladu a „Zpět"
+(na rozdíl od firem od asistenta, R-114): text vidí Kryštof v okně. Postup je všechno nebo nic —
+selže-li Google nebo e-mail, termín se vrátí a Meet se smaže. Adresát je vždy e-mail uloženého
+kontaktu.
+**Proč:** zadání Kryštofa 2026-11-20 („mít možnost poslat e-mail s nabídkou a e-mail s datem,
+vizeonem a odkazem na Google Meet, celkem tři šablony, vyberu a odešlu"). Třetí šablonu zadání
+nejmenovalo — zvolil jsem dosavadní Portfolio, ať nic z toho, co Kryštof používal, nezmizelo.
+Cena v nabídce se **nebere z ceníku na webu** (Kryštof 2026-11-20: ceník je jen rozmezí, u každé zakázky
+říká cenu jinak): píše se do pole u každé nabídky, výchozí je odhadovaná hodnota kontaktu.
+**Rozšíření téhož dne:** okno je nejen v Hovorech, ale i v **Kontaktech** (seznam a karta kontaktu)
+a v **AI asistentu** (fronta Od asistenta, detail klienta); Zakázky zatím ne. Adresát je kontakt z Hovorů,
+kontakt z `contacts` nebo firma od asistenta. Obyčejný e-mail nic nezakládá; schůzka adresáta bez řádku
+v Hovorech v Hovorech založí (a při neúspěchu zahodí), firmu od asistenta převezme z fronty až po úspěchu.
+**Důsledek:** zanikla rychlá akce „Poslat portfolio (odešle ihned)" a okno „Napsat jinou zprávu"
+(`sendPortfolioEmail`, `sendCustomLeadEmail`, `PortfolioEmailModal`). Nabídka bez ceny nejde
+odeslat. Schůzka z Hovorů nepotřebuje migraci
+(použije 105 a 115, které na produkci jsou), ale bez propojeného Googlu a `VIZEON_RESEND_API_KEY`
+je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, technika
+`docs/admin/AGENTS-ADMIN.md` → „Poslat e-mail z Hovorů".
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **E-maily z Hovorů (R-132) — projít naživo:** v prohlížeči ověřené jen okno na fiktivním
+  kontaktu (390 a 800 px) a logika testy nad PGlite s podstrčeným Googlem a Resendem. Zbývá po
+  nasazení: (1) Profil → Propojit Google účet, pokud ještě není (jinak je karta schůzky vypnutá),
+  (2) Hovory → u kontaktu s vlastním e-mailem pošli Nabídku a Schůzku na vlastní adresu: v e-mailu
+  má být termín, tlačítko Připojit se, odkaz na vizeon.cz, v Google Kalendáři událost s Meetem,
+  v Hovorech příští akce „Schůzka přes Google Meet" a poznámka s odkazem, (3) kontakt s propojenou
+  událostí v kalendáři: událost se posune a dostane „Připojit se", (4) Nabídka: pole Cena se
+  předvyplní z odhadované hodnoty kontaktu. **Doručení a skutečný Meet nikdo nezkusil** · Kryštof · od 2026-11-20
 
 - [ ] **AI asistent jako CRM (R-120) — propojit s Growth OS:** ~~migrace 119~~ na produkci
   (Kryštof 2026-11-18), ~~merge a deploy~~ (`4408221`, 2026-11-18). Zbývá:
@@ -1913,164 +1953,40 @@ a `purge_client_retention` (zvažovat i v testu `kp10-gdpr`). Bezpečnost DECISI
   konzole čistá), stránka smazaná. **Naživo s databází, Googlem a Resendem neověřeno.**
 - **decision** **R-126**, DECISIONS #043.
 
-### 2026-11-18 (KP13 — peníze a faktury v klientském prostoru)
-- **feat** Klientský prostor › detail projektu: sekce Peníze s cenou, zaplaceno a zbývá doplatit, seznam
-  faktur se stavem (zaplaceno, čeká, po splatnosti klidně, stornováno), Stáhnout PDF a Zaplatit QR
-  kódem (jen nezaplacená v Kč s IBANem). Soubory: `components/portal/project-money.tsx`,
-  `lib/portal/money.ts`, `app/klient/projekt/[id]/page.tsx`.
-- **feat** `GET /api/klient/faktury/[id]/pdf`: vystavená faktura se vyrobí z projekce stejným
-  rendererem jako v adminu, archivní PDF přes `portal.invoice_pdf`; ETag, limit 20 za 10 min na člena.
-  Chromium pro trasu v `outputFileTracingIncludes` (`next.config.mjs`), jinak by na Vercelu vracela 503.
-- **fix** Admin: zaplacená faktura zakázky teď snižuje „zbývá doplatit" (R-125) — `remainingSql`,
-  souhrn výpisu zakázek (`SummaryBar`), předvyplněná částka faktury, doplatek u „Peníze dorazily".
-  Soubory: `lib/admin/{project-payments,projects,invoice-issue}.ts`, `components/SummaryBar.tsx`,
-  `app/actions.ts`.
-- **db** Migrace 122 `portal_penize_faktury` (aplikována: ne, nikde). Granty v `scripts/portal-grants.sql`.
-- **decision** R-125, DECISIONS #042, AUDIT-LOG 2026-11-18 (1 nález opravený).
-- **chore** Ověřeno: `npx tsc --noEmit`; nové testy `lib/__tests__/kp13-penize-faktury.test.ts` (19 nad
-  PGlite: migrace dvakrát, čísla klienta = admin, EUR zvlášť, storno, koncept a přijatá faktura nikdy,
-  klient B nic, `portal_app` bez `public`) a `app/api/klient/faktury/[id]/pdf/__tests__/route.test.ts`
-  (6); testy KP12 a oddělení klientů pouští i 122 (`lib/__tests__/helpers/portal-money-tables.ts`),
-  zjednodušené tabulky v `admin-zalohy`, `admin-prijem-datum` a `ai-dotazy` dostaly `invoices.project_id`
-  / `source_invoice_id` jako v produkci. Celá sada 1464/1469 (2 selhání známá: `ws-email` pevná data,
-  `ws-schema` mezera po 120; 3 přeskočené). `npm run build` prošel napodruhé (první běh zastavila známá
-  hláška Next o upgradu). Regrese na vývojovém serveru: `/`, `/login`, `/klient/prihlaseni` 200,
-  `/dashboard` a `/dashboard/finance` 307, cizí `/p` 404, PDF trasa bez přihlášení 401 (`next start`
-  v prostředí agenta spojení resetoval, proto dev). Vzhled na dočasné stránce s vymyšlenými daty
-  (Playwright, 390 a 1280 px): bez vodorovného posouvání, plochy ≥ 44 px, konzole bez chyb; stránka
-  smazaná. Naživo neověřeno.
+### 2026-11-20 (e-maily z Hovorů — R-132)
+- **feat** V Hovorech tlačítko „Poslat e-mail" otevře okno se třemi šablonami: Portfolio,
+  Nabídka (cena za zakázku) a Schůzka s Google Meet. Výběr → text se načte a jde přepsat →
+  Odeslat. Schůzka vytvoří odkaz na Meet v Google Kalendáři, přepíše příští akci kontaktu,
+  posune propojenou událost a pošle e-mail z krystof@vizeon.cz s termínem, tlačítkem Připojit se
+  a odkazem na vizeon.cz; všechno nebo nic (selže-li Google nebo e-mail, termín se vrátí a Meet se
+  smaže). Soubory: `components/LeadEmailDialog.tsx`, `app/lead-mail-actions.ts`,
+  `lib/admin/{lead-mail-templates,lead-meeting}.ts`, `components/LeadsTable.tsx`,
+  `app/dashboard/calls/page.tsx`. Bez migrace.
+- **refactor** Zanikla rychlá akce „Poslat portfolio (odešle ihned)" a okno „Napsat jinou zprávu"
+  (`sendPortfolioEmail`, `sendCustomLeadEmail`, `components/PortfolioEmailModal.tsx`); portfolio je
+  jedna ze tří šablon.
+- **chore** Ověřeno: `npx tsc --noEmit`, nové testy `lib/__tests__/admin-hovory-{sablony,akce}.test.ts`
+  (20, schůzka nad PGlite s migracemi 008, 044, 105, 115), plná sada 1416 prošlo, 4 selhaly:
+  `ws-schema` (mezera po 113) a `ws-email` (pevné datum) jsou známé, `admin-hovory-asistent` a
+  `admin-ai-asistent-crm` padly na 5s limit při startu druhé PGlite instance (počítač měl load 35;
+  s `--testTimeout=90000` 22/22). Okno ověřeno v prohlížeči na dočasné stránce s fiktivním
+  kontaktem (800 a 375 px, bez chyb v konzoli, stránka smazána). **Naživo s Googlem a Resendem
+  neověřeno.**
+- **chore** **Na produkci** (2026-11-20): fast-forward `main` `5c9ccec` → `2c0ddb8`, build Ready
+  za ~65 s. Ověřeno veřejně: `/` a `/login` 200, `/dashboard/calls` 307 na přihlášení, za 15 min
+  žádná běhová chyba. Nabídka po úpravě Kryštofa nese cenu zadanou u zakázky (ne ceník webu).
+  **Za přihlášením okem nikdo nic neviděl.** Formální `web-security-review` se nepouštěl, jen
+  vlastní kontrola v DECISIONS #048.
+- **fix** Tlačítko „Poslat e-mail" bylo jen ikonou ve sloupci úplně vpravo v tabulce široké
+  1100 px a v záložce Čekání na odpověď chybělo — Kryštof ho po nasazení nenašel. Teď je
+  popsané tlačítko přímo ve sloupci E-mail v obou záložkách. Soubor: `components/LeadsTable.tsx`.
+- **feat** Tlačítko „Poslat e-mail" i v **Kontaktech** (sloupec E-mail v seznamu, záhlaví karty kontaktu)
+  a v **AI asistentu** (fronta Od asistenta, karta Kontakt v detailu klienta); Kryštof ho chtěl ke
+  kontaktům, hovorům i asistentovi. Adresát může být kontakt z Hovorů, z Kontaktů nebo firma od
+  asistenta; schůzka adresáta bez řádku v Hovorech založí a při neúspěchu zahodí. Soubory:
+  `components/admin/send-email-button.tsx`, `lib/admin/{lead-mail-target,mail-readiness}.ts`,
+  `app/lead-mail-actions.ts`, `app/dashboard/kontakty/{page.tsx,[id]/page.tsx}`,
+  `components/admin/{outreach-lead-actions.tsx,ai-asistent/contact-detail.tsx}`. Testy 31 + širší sada 969 prošla.
+- **decision** **R-132**, DECISIONS #048. Archiv: dny 2026-11-18 přesunuté do `archiv/2026-11.md`.
 
-### 2026-11-18 (KP12 — služby a etapy zakázky)
-- **feat** Nastavení › Služby a etapy (`/dashboard/sluzby`): služby s etapami, typickou délkou, popisem
-  a úkoly pro klienta, řazení přetažením, smazání se Zpět, čtyři prázdné služby jedním kliknutím.
-  Soubory: `app/dashboard/sluzby/`, `components/admin/phases/services-settings.tsx`, `lib/admin-nav.ts`.
-- **feat** Nová zakázka: výběr služby předvyplní etapy s termíny od začátku práce, jdou upravit, smazat
-  a přidat; etapy jsou kopie šablony. Detail zakázky: karta Etapy (stav jedním klikem se Zpět, termín,
-  úkoly klienta), u zakázky bez etap „Uložit etapy" ze služby. Soubory: `components/ProjectForm.tsx`,
-  `components/admin/phases/`, `components/admin/project-detail-view.tsx`, `app/actions.ts`,
-  `app/phases-actions.ts`, `lib/admin/{phase-model,phases}.ts`.
-- **feat** Klientský prostor: osa etap s aktuální etapou a termíny, úkoly s „Mám hotovo" a Vrátit,
-  zvonek `client_task_done` Kryštofovi. Soubory: `lib/portal/phases.ts`, `components/portal/`,
-  `app/klient/projekt/[id]/`.
-- **db** Migrace 121 `sluzby_a_etapy` (aplikována: ne, nikde). Granty v `scripts/portal-grants.sql`.
-- **decision** R-124 (postup v % z etap, D-K14), DECISIONS #041, AUDIT-LOG 2026-11-18.
-- **chore** Ověřeno: `npx tsc --noEmit`; nový `lib/__tests__/kp12-sluzby-etapy.test.ts` (18 testů nad
-  PGlite, migrace dvakrát po sobě); celá sada 1435/1444 před opravou mocku v `admin-after-emails`
-  (teď 6/6), zbylá selhání známá (`ws-email` pevná data, `ws-schema` mezera po 120, dva testy
-  asistenta na časový limit pod zátěží). Vzhled na dočasné stránce s vymyšlenými daty (Playwright,
-  390 a 1280 px): bez vodorovného posouvání, konzole bez chyb; stránka smazaná. Naživo neověřeno.
-
-### 2026-11-18 (KP11 — nastavení Supabase a Vercelu, rozpracované)
-- **chore** Migrace 113 na produkčním Neonu (pustil Kryštof v SQL editoru, agent neověřil).
-- **chore** Supabase (projekt `zakaziq`, přes Chrome): Confirm email vypnuté, Site URL
-  `https://www.zakaziq.cz`, Redirect URLs `…/klient/auth/potvrzeni` a `…/potvrzeni?**`. Vercel
-  Production: `ADMIN_USER_ID` nově, `NEXT_PUBLIC_APP_URL` → `https://www.zakaziq.cz` (R-075; dosud
-  apex). SMTP, HTTPS hook a `SUPABASE_AUTH_HOOK_SECRET` čekají na Kryštofa (tajné hodnoty), větev
-  se nesloučila. Zbytek v Otevřených problémech.
-
-### 2026-11-18 (KP11 — přihlášení a pozvání do klientského prostoru)
-- **chore** Worktree `../ZakazIQ-klient`, větev `klient/kp11-prihlaseni` z `main` (`5c9ccec`): v hlavním
-  stromu leží necommitnuté změny kalendáře z jiného sezení, ty zůstaly netknuté. Plán druhé vlny
-  commitnutý zvlášť (`7717d91`).
-- **feat** Převzata F1 (R-107) z `auth/supabase-klient` (`ba226aa` → `3d913cb`): `/klient` přes
-  Supabase e-mailem a heslem, hook registrace, migrace 113 (aplikována: ne). Konflikty jen v AUDIT-LOG
-  a DECISIONS (#031 nechal `main` volné). Druhý commit větve (`712cb66`) se nepřenášel, na `main` je
-  jako `153b312`. Do paměti doplněno chybějící R-107. `ws-schema` je tím zelený (mezera po 113 zmizela).
-- **feat** „Pozvat do prostoru" v přehledu zakázky (R-121, D-K12): `inviteToClientSpace` najde nebo
-  založí klienta, propojí zakázku, vytvoří pozvánku vázanou na e-mail a po 13 s ji pošle z
-  krystof@vizeon.cz; „Zpět" vše vrátí. Kdo už v prostoru je, dostane jen zprávu o nové zakázce. Do
-  prostoru, kam e-mail už patří, jen s potvrzením (nález vlastní kontroly, DECISIONS #040). Karta
-  ukazuje členy, čekající pozvánky („Poslat znovu", „Zrušit") a jednorázově „Zkopírovat odkaz".
-  Neodeslaný e-mail = oznámení `portal_invite_failed`. Soubory: `app/portal-admin-actions.ts`,
-  `lib/portal/{project-access,invite-email,invite-delay}.ts`, `components/admin/portal-access-card.tsx`,
-  `components/admin/project-detail-view.tsx`, `lib/notifications.ts`, `components/NotificationList.tsx`.
-- **chore** Ověřeno: `npx tsc --noEmit`; nový `lib/__tests__/portal-pozvani-zakazka.test.ts` (13 testů nad
-  PGlite); plná sada 1420/1426, padají `ws-email` (známé pevné datum) a pod zátěží `admin-ai-asistent-crm`
-  a `admin-hovory-asistent` (samostatně procházejí); `npm run build` napodruhé (napoprvé známý
-  `SecurityFatalError`). Karta na dočasné stránce s vymyšlenými daty (Playwright, 390 a 1280 px): bez
-  přetečení, plochy ≥ 44 px, akce bez přihlášení odmítnuta. **Pozvánku naživo nikdo neposlal**, čeká se
-  na nastavení Supabase a migraci 113. Bezpečnost: AUDIT-LOG 2026-11-18, DECISIONS #040.
-
-### 2026-11-18 (klientský prostor 2 — plán)
-- **decision** **R-121**: heslo si klient nastaví sám z pozvánky, etapy ze šablony podle druhu služby,
-  konzultace jen ve volnu označeném v kalendáři, každý klient vidí své peníze a faktury.
-- **decision** **R-122**: chat s klientem jako přes WhatsApp pro veškerou zpětnou vazbu (KP15).
-- **decision** **R-123**: klientský prostor i schránka Zprávy v adminu rozvržené jako Slack, jen jednodušší;
-  odesláno a přečteno jako ve WhatsAppu.
-- **docs** `docs/klientsky-prostor/PLAN.md`: architektura 4.7 s náčrtem, sezení KP11–KP17, rozhodnutí D-K12–D-K19,
-  sekce 10 (online platby mimo rozsah, faktury v rozsahu). Prompty KP11–KP16 a rozcestník
-  v `new - area of zakaziq/prompty/klientsky-prostor/`. Kód beze změny.
-
-### 2026-11-18 (AI asistent jako CRM — R-120)
-- **chore** **Na produkci** (2026-11-18): migraci 119 pustil Kryštof, větev `admin/ai-asistent-crm`
-  → `main` fast-forward (`32e27a9` → `4408221`), build Ready asi za 4 min. Ověřeno veřejně: `/`
-  a `/login` 200, `/dashboard/ai-asistent` i detail 307, `/api/public/outreach/handled` 401 bez klíče,
-  `POST /api/public/outreach` 401, náhled ukázky 401 bez přihlášení, smazaná cesta nahrávek 404,
-  15 min po nasazení žádná běhová chyba. **Za přihlášením okem nikdo nic neviděl.**
-- **feat** Sekce AI asistent: nový **Přehled** (dnešek a 7 dní, „Na tahu jste vy", cesta k zakázce za
-  30 dní, poslední hovory, provoz — čerstvost dat z Growth OS, kredit Odoriku a ElevenLabs), **Kontakty**
-  s filtry (Na tahu, Ukázka odeslaná, Otevřeli, Odpověď a schůzka, Vyřízené, Všichni) a hledáním
-  i podle číslic telefonu, **detail klienta** `/dashboard/ai-asistent/kontakt/[id]` (co dál, kontakt,
-  ukázka s náhledem, všechny hovory s přepisem, sesbíranými daty a kritérii, e-maily od
-  asistenta, časová osa, rešerše). Přehled, Kontakty a detail se obnovují každých 30 s. Oznámení ve
-  zvonku vedou na detail. Odkazy na ukázku z adminu nesou `?od=admin`. Soubory:
-  `app/dashboard/ai-asistent/{page.tsx,kontakt/[id]/}`, `components/admin/ai-asistent/{overview-view,contacts-view,contact-detail,call-card,auto-refresh}.tsx`,
-  `components/admin/outreach-lead-actions.tsx`, `lib/admin/{outreach-crm,outreach-crm-view,outreach-calls,outreach-demo}.ts`.
-- **feat** Kontrakt v2 s Growth OS (zpětně kompatibilní): ke snímku firmy všechny hovory, e-maily,
-  historie stavů, rešerše a víc o ukázce; tělo 1 MB. Chybějící hodnota nic nepřepíše, starší snímek
-  nevrátí hovoru starý výsledek. Report smí nést tatáž pole a `stats.account` / `costCzk`. Zpětný
-  kanál `GET /api/public/outreach/handled`, náhled `/api/outreach/leads/[id]/nahled` (jen
-  navrhy.vizeon.cz). Přehrávání nahrávek bylo hotové, ale na přání Kryštofa vypuštěné — stačí přepis. Soubory:
-  `types/outreach{,-report}.ts`, `lib/admin/outreach{,-reports}.ts`, `app/api/public/outreach/{route.ts,handled/}`,
-  `app/api/outreach/`, cron `client-retention` (`purge_outreach_emails`).
-- **db** Migrace 119 `ai_asistent_crm` (aplikována: produkce, podle Kryštofa 2026-11-18; agent neověřil).
-- **fix** Bezpečnostní kontrola před nasazením (`web-security-review`): náhled ukázky četl celou
-  odpověď do paměti před kontrolou velikosti — teď čte se stropem 2 MB. `.claude/security/AUDIT-LOG.md`.
-- **docs** Zadání pro Claude Code v Growth OS: `new - area of zakaziq/prompty/admin/growth-os-ai-asistent-crm.md`
-  (kontrakt v2, okamžité odeslání po hovoru, Resend webhook, měření ukázky, náhled, ceny z Odoriku,
-  zpětný kanál). `docs/admin/GROWTH-OS-PLAN.md` (kontrakt v2, kroky 6 a 9), `docs/admin/AGENTS-ADMIN.md`,
-  `.claude/security/DECISIONS.md` #039, `STATE.md`.
-- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-ai-asistent-crm.test.ts` (16 testů nad
-  PGlite se SQL 114, 116 a 119 včetně dvojího běhu 119 a databáze bez 119), plná sada 1401/1403
-  (selhávají jen známé `ws-schema` mezera po 113 a `ws-email` pevné datum), `npm run build`
-  (napoprvé ho zastavila známá hláška Next o zranitelnosti, podruhé prošel). Vzhled na dočasné stránce
-  s vymyšlenými daty (Playwright, 390 a 1280 px): bez vodorovného posouvání, stránka smazaná. Agent
-  ElevenLabs „Vizeon hovory" přečtený přes MCP (jen nastavení): post-call webhook bez audia, agent se
-  hned představí jako AI. **Naživo s produkční databází, ElevenLabs
-  a Growth OS neověřeno.**
-- **decision** **R-120**, DECISIONS #039. Archiv: dny 2026-11-17 přesunuté do `archiv/2026-11.md`.
-
-### 2026-11-18 (dotazník spokojenosti na jednu minutu — R-119)
-- **chore** **Na produkci** (2026-11-18): migraci 118 pustil Kryštof, merge `admin/dotaznik` → `main`
-  fast-forward (`ae2cdb5` → `70abbed`, s ním i sekce AI asistent R-118), build `dpl_7vS8Z…` Ready
-  za 103 s v `fra1`. Ověřeno veřejně: `/` a `/login` 200, `/h/<neznámý token>` i s `?znamka=9`
-  404, `/dashboard/profil` a `/dashboard/ai-asistent` 307, `POST /api/public/outreach/reports`
-  bez klíče 401, za hodinu po nasazení žádná běhová chyba. Bezpečnostní kontrola
-  `web-security-review` bez nálezu (AUDIT-LOG 2026-11-18). **Za přihlášením okem nikdo nic neviděl.**
-- **feat** Nový dotazník: známka 0–10 jako jediná povinná otázka (uloží se hned po výběru),
-  čtyři nepovinné oblasti (Výsledek, Komunikace, Termín, Cena), text podle známky, souhlas ve
-  třech úrovních a recenze na Googlu se zkopírovaným textem. Stránka `/h` nese Kryštofa
-  a VIZEON místo „Powered by ZakazIQ". Soubory: `components/SurveyForm.tsx`, `app/h/[token]/page.tsx`,
-  `app/portal-actions.ts` (`saveSurveyScore`, `submitSurvey`, `recordGoogleReviewClick`),
-  `lib/admin/{survey-model,survey-answers,survey-notify}.ts`, `lib/feedback-schema.ts`.
-- **feat** E-mail s dotazníkem z krystof@vizeon.cz přes Resend, řada 0–10 přímo v e-mailu;
-  připomínka po 7 dnech stejně. Soubory: `lib/admin/survey-email.ts`, `lib/admin/surveys.ts`.
-- **fix** Dokončení zakázky **formulářem** (stav Hotovo/Zaplaceno) dotazník neposílalo, jen zprávu
-  „projekt byl aktualizován". Teď stejně jako rychlá změna stavu: po 15 s dotazník, jinak obvyklá
-  zpráva. Soubor: `app/actions.ts`.
-- **feat** Hodnocení v Profilu: NPS za období, průměr oblastí s nejslabší oblastí, nespokojení
-  s „Ozval jsem se" a Zpět, nový typ oznámení „Nespokojený klient", karta Recenze na Googlu.
-  Soubory: `components/HodnoceniDashboard.tsx`, `components/PerformanceOverview.tsx`,
-  `components/admin/google-review-card.tsx`, `app/closed-actions.ts`, `app/dashboard/profil/page.tsx`,
-  `lib/admin/{closed,reference}.ts`, `lib/notifications.ts`, `components/NotificationList.tsx`.
-- **db** Migrace 118 `dotaznik_nps` (aplikována: ne, nikde).
-- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-dotaznik.test.ts` (24 testů nad
-  PGlite včetně dvojího běhu migrace), plná sada 1385/1387 (selhávají jen známé `ws-schema`
-  mezera po 113 a `ws-email` pevné datum) a `next build`. Vzhled na dočasné stránce
-  s vymyšlenými daty (Playwright, 390 a 1280 px): formulář prázdný, 9 a 3, e-mail, Hodnocení;
-  bez vodorovného posouvání, plochy 44 px, konzole bez chyb. **Naživo se skutečnou databází
-  a doručením e-mailu neověřeno.** Větev `admin/dotaznik` nad `admin/growth-hovory`, migrace
-  118 a R-119 (117 a R-117/118 obsadila souběžná sezení).
-- **decision** **R-119**.
-
-*Starší dny (2026-11-17 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*
+*Starší dny (2026-11-18 a dřív): `archiv/2026-11.md`, `archiv/2026-10.md`.*

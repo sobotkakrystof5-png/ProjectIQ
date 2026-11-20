@@ -2,16 +2,16 @@
 
 import { Fragment, useEffect, useOptimistic, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, MessageSquareText, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { Badge, badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ws/brand'
 import { toast } from '@/components/ui/toast'
 import { LEAD_ACTION_TONE, LEAD_STATUS_TONE, toneVariant } from '@/lib/admin-status'
-import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, sendPortfolioEmail, addLeadNote, deleteLeadNote, getLeadNotes } from '@/app/calls-actions'
+import { createLead, updateLead, deleteLead, convertLeadToProject, setCallAnswered, moveLeadToWaiting, moveLeadFromWaiting, addLeadNote, deleteLeadNote, getLeadNotes } from '@/app/calls-actions'
 import type { LeadPayload } from '@/app/calls-actions'
 import type { SortDir } from '@/lib/admin-table'
-import { PortfolioEmailModal } from '@/components/PortfolioEmailModal'
+import { LeadEmailDialog, type LeadEmailReadiness } from '@/components/LeadEmailDialog'
 import { cn, formatDate } from '@/lib/utils'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { formatPhone, mailtoHref, telHref } from '@/lib/contacts/href'
@@ -365,7 +365,13 @@ function PhoneCell({ lead }: { lead: ClientLead }) {
   )
 }
 
-function EmailCell({ lead }: { lead: ClientLead }) {
+/** Viditelné tlačítko přímo ve sloupci E-mail — ikona úplně vpravo v široké tabulce zapadla. */
+const emailButton =
+  'inline-flex min-h-11 items-center gap-1.5 rounded-chip bg-navy-700 px-3 text-sm font-semibold text-white ' +
+  'transition-colors hover:bg-navy-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-700 ' +
+  'focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40'
+
+function EmailCell({ lead, onOpenEmail, disabled }: { lead: ClientLead; onOpenEmail?: () => void; disabled?: boolean }) {
   return (
     <td className="px-3 py-2.5">
       {lead.email && (
@@ -377,6 +383,12 @@ function EmailCell({ lead }: { lead: ClientLead }) {
             <Mail size={13} strokeWidth={1.5} aria-hidden="true" />
             <span className="truncate">{lead.email}</span>
           </a>
+          {onOpenEmail && (
+            <button type="button" onClick={onOpenEmail} disabled={disabled} className={emailButton}>
+              <Send size={14} strokeWidth={1.5} aria-hidden="true" />
+              Poslat e-mail
+            </button>
+          )}
           {lead.portfolio_sent_at && (
             <span className="flex items-center gap-1 text-[11px] text-navy-700" title="Portfolio bylo odesláno">
               <CheckCircle2 size={11} strokeWidth={1.5} />
@@ -411,8 +423,7 @@ function LeadRow({
   onConvert,
   onMoveToWaiting,
   onToggleAnswered,
-  onSendPortfolio,
-  onOpenCustomMessage,
+  onOpenEmail,
   onAddNote,
   onDeleteNote,
   isPending,
@@ -427,8 +438,7 @@ function LeadRow({
   onConvert: () => void
   onMoveToWaiting: () => void
   onToggleAnswered: (val: boolean | null) => void
-  onSendPortfolio: () => void
-  onOpenCustomMessage: () => void
+  onOpenEmail: () => void
   onAddNote: (content: string) => void
   onDeleteNote: (id: string) => void
   isPending: boolean
@@ -466,7 +476,7 @@ function LeadRow({
           isPending={isPending}
         />
       </td>
-      <EmailCell lead={lead} />
+      <EmailCell lead={lead} onOpenEmail={onOpenEmail} disabled={isPending} />
       <td className="px-3 py-2.5">
         <StatusBadge status={lead.lead_status} />
       </td>
@@ -494,26 +504,6 @@ function LeadRow({
       <ValueCell lead={lead} />
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1">
-          {lead.email && lead.next_action_date && (
-            <button
-              onClick={onSendPortfolio}
-              disabled={isPending}
-              title="Poslat portfolio (odešle ihned)"
-              className={iconActionPrimary}
-            >
-              <Send size={13} strokeWidth={1.5} />
-            </button>
-          )}
-          {lead.email && (
-            <button
-              onClick={onOpenCustomMessage}
-              disabled={isPending}
-              title="Napsat jinou zprávu"
-              className={iconAction}
-            >
-              <MessageSquareText size={13} strokeWidth={1.5} />
-            </button>
-          )}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={onConvert}
@@ -757,6 +747,7 @@ function WaitingRow({
   onConvert,
   onMoveBack,
   onDelete,
+  onOpenEmail,
   isPending,
   highlighted,
 }: {
@@ -766,6 +757,7 @@ function WaitingRow({
   onConvert: () => void
   onMoveBack: () => void
   onDelete: () => void
+  onOpenEmail: () => void
   isPending: boolean
   highlighted: boolean
 }) {
@@ -781,7 +773,7 @@ function WaitingRow({
       <CompanyCell lead={lead} notes={notes} />
       <ContactCell lead={lead} />
       <PhoneCell lead={lead} />
-      <EmailCell lead={lead} />
+      <EmailCell lead={lead} onOpenEmail={onOpenEmail} disabled={isPending} />
       <td className="px-3 py-2.5">
         {lastNote ? (
           <span className="block max-w-[200px] truncate text-sm text-quiet">{lastNote.content}</span>
@@ -903,6 +895,7 @@ export default function LeadsTable({
   dir,
   sortLinks,
   focusLeadId,
+  meeting,
 }: {
   initialLeads: LeadWithNotes[]
   /** `true` = pohled „Čekání na odpověď". */
@@ -912,6 +905,8 @@ export default function LeadsTable({
   /** Odkaz na řazení pro každý sloupec, spočítaný na serveru. */
   sortLinks: Record<string, string>
   focusLeadId?: string
+  /** Je propojený Google a nastavené odesílání z vizeon.cz? Bez toho nejde poslat schůzku. */
+  meeting: LeadEmailReadiness
 }) {
   /**
    * Řádky se vykreslují **z propů** (AD17). Dřív si je komponenta kopírovala
@@ -931,7 +926,7 @@ export default function LeadsTable({
   const [addingNew, setAddingNew] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingWaitingId, setEditingWaitingId] = useState<string | null>(null)
-  const [portfolioModalLead, setPortfolioModalLead] = useState<ClientLead | null>(null)
+  const [emailLead, setEmailLead] = useState<ClientLead | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -1020,17 +1015,6 @@ export default function LeadsTable({
   const handleToggleAnswered = (id: string, val: boolean | null) =>
     optimisticky({ type: 'answered', id, value: val }, () => setCallAnswered(id, val))
 
-  const handleSendPortfolio = (id: string) => {
-    startTransition(async () => {
-      const result = await sendPortfolioEmail(id)
-      if ('error' in result) {
-        toast.error(result.error)
-        return
-      }
-      toast.success('Portfolio odesláno')
-    })
-  }
-
   const handleAddNote = (leadId: string, content: string) => {
     startTransition(async () => {
       const created = await addLeadNote(leadId, content)
@@ -1118,6 +1102,7 @@ export default function LeadsTable({
                       onConvert={() => handleConvert(lead.id)}
                       onMoveBack={() => handleMoveFromWaiting(lead.id)}
                       onDelete={() => handleDelete(lead.id)}
+                      onOpenEmail={() => setEmailLead(lead)}
                       isPending={isPending}
                       highlighted={highlightedId === lead.id}
                     />
@@ -1217,8 +1202,7 @@ export default function LeadsTable({
                     onConvert={() => handleConvert(lead.id)}
                     onMoveToWaiting={() => handleMoveToWaiting(lead.id)}
                     onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
-                    onSendPortfolio={() => handleSendPortfolio(lead.id)}
-                    onOpenCustomMessage={() => setPortfolioModalLead(lead)}
+                    onOpenEmail={() => setEmailLead(lead)}
                     onAddNote={(content) => handleAddNote(lead.id, content)}
                     onDeleteNote={handleDeleteNote}
                     isPending={isPending}
@@ -1233,13 +1217,23 @@ export default function LeadsTable({
         </div>
       </div>
 
-      <PortfolioEmailModal
-        isOpen={!!portfolioModalLead}
-        lead={portfolioModalLead}
-        onClose={() => setPortfolioModalLead(null)}
-        // Odeslání zapisuje `portfolio_sent_at` a revaliduje, nový řádek přijde ze serveru.
-        onSent={() => {}}
-      />
+      {emailLead && (
+        // `key` ať si každý kontakt začne s čistým výběrem šablony a textu.
+        <LeadEmailDialog
+          key={emailLead.id}
+          target={{
+            kind: 'lead',
+            id: emailLead.id,
+            company: emailLead.company_name,
+            email: emailLead.email ?? '',
+            nextActionDate: emailLead.next_action_date,
+            nextActionTime: emailLead.next_action_time,
+            estimatedValue: emailLead.estimated_value,
+          }}
+          readiness={meeting}
+          onClose={() => setEmailLead(null)}
+        />
+      )}
     </div>
   )
 }
