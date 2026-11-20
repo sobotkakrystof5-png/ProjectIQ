@@ -19,6 +19,8 @@ import {
   type IssuerSettings,
 } from '@/lib/admin/invoice-issue'
 import { issueInvoiceSchema, issuerProfileSchema } from '@/lib/admin/invoice-issue-schema'
+import { invoiceEmailTemplateSchema } from '@/lib/admin/invoice-email-template'
+import { loadInvoiceEmailTemplate, saveInvoiceEmailTemplate } from '@/lib/admin/invoice-email-settings'
 import { lookupIco } from '@/lib/ares'
 import { ledgerSql, withLedger } from '@/lib/admin/ledger'
 import type { InvoiceAiExtract } from '@/lib/types'
@@ -679,6 +681,22 @@ export async function saveIssuer(raw: unknown): Promise<{ error?: string }> {
   } catch {
     return { error: 'Profil se nepodařilo uložit. Zkuste to prosím znovu.' }
   }
+}
+
+/** Text e-mailu, kterým faktura odchází klientovi (R-139). */
+export async function getInvoiceEmailTemplate() {
+  await requireAuth()
+  return loadInvoiceEmailTemplate()
+}
+
+export async function saveInvoiceEmail(raw: unknown): Promise<{ error?: string }> {
+  await requireAuth()
+  const parsed = invoiceEmailTemplateSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Text e-mailu nesedí.' }
+  const saved = await saveInvoiceEmailTemplate(parsed.data)
+  if (!saved.ok) return { error: saved.error }
+  revalidatePath('/dashboard/faktury/dodavatel')
+  return {}
 }
 
 export async function issueNewInvoice(

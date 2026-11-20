@@ -82,6 +82,7 @@
 | Faktury | `app/dashboard/finance/invoice-actions.ts`, `lib/invoices.ts`, `lib/invoice-ai.ts`, `components/Invoice*`, `docs/FINANCE_SYSTEM_PLAN.md` |
 | Vystavit fakturu v adminu (číslo z řady, položky, PDF s QR, ARES) | `migrations/107_fakturace_vystavovani.sql`, `lib/admin/{invoice-issue,invoice-issue-schema}.ts`, `lib/invoice-pdf/{render,totals}.ts`, `lib/ares.ts`, `app/dashboard/faktury/{nova,dodavatel}/`, `components/admin/invoices/{issue-form,issuer-form,issued-actions}.tsx`, R-086, R-098 (AD12) |
 | Koncepty faktur ke schválení, „Schválit a poslat", pravidelné faktury | `migrations/117_faktury_koncepty.sql`, `lib/admin/{invoice-drafts,invoice-draft-schema,invoice-send}.ts`, `app/api/invoices/drafts/[id]/send/`, `app/dashboard/faktury/{koncepty-actions.ts,pravidelne/}`, `components/admin/invoices/{drafts-panel,recurring-manager}.tsx`, R-117 |
+| Text e-mailu, kterým faktura odchází klientovi (šablona, proměnné, náhled) | `migrations/129_faktury_sablona_emailu.sql`, `lib/admin/{invoice-email-template,invoice-email-settings,invoice-send}.ts`, `components/admin/invoices/email-template-form.tsx`, `app/dashboard/faktury/dodavatel/page.tsx`, R-139 |
 | Daně | `lib/tax.ts`, `lib/tax-constants.ts`, `lib/tax-deadlines.ts`, `lib/tax-news.ts`, `components/Tax*` |
 | Náklady | `app/costs-actions.ts`, `components/CostsManager.tsx` |
 | Šablony webu | `app/block-templates-actions.ts`, `app/project-blocks-actions.ts`, `components/Block*`, `ProjectBlockList.tsx` |

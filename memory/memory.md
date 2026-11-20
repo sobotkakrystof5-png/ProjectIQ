@@ -1505,9 +1505,29 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 **Rozhodnutí:** (1) Cizí text do HTML jen přes `lib/security/html.ts`; test `xss-guard.test.ts` hlídá zdroják a nová výjimka je nové rozhodnutí. (2) DDoS se řeší ve vrstvách: Vercel WAF (zatím nenastavený) → brána v `proxy.ts` → paměťová předbrána před databázovými limity → limity vstupů; Chromium přes semafor, těla nahrávek a formulářů se stropem i bez `content-length`.
 **Proč:** zadání Kryštofa 2026-11-20 („zohledňovat XSS a postavit ochranu proti DDoS"). Aplikace sama útok, který stojí funkce už tím, že se spouštějí, nezastaví (landing je dynamická kvůli nonce, R-033) — proto WAF; to, co zastavit umí, je zahlcení databáze a paměti.
 **Důsledek:** `.claude/security/STATE.md` → „Ochrana proti XSS a DDoS", `docs/AGENTS-REFERENCE.md` → B13, DECISIONS #050. Nový endpoint na IP limit používá `isApiRateLimited`/`hitLimit` (předbrána je v nich), nová drahá operace semafor, nové tělo `readJsonLimited`/`readFormDataLimited`. Nový `href` z cizího zdroje `safeHttpUrl`. Nový e-mail **nesmí mít vlastní `escapeHtml`** — test spadne. Vypínač brány `FRONT_GATE=off`.
+
+### R-139 · Text e-mailu s fakturou je šablona z Údajů dodavatele (2026-11-20, v `main` 2026-11-23)
+*Na větvi vzniklo jako R-121 s migrací 120; obě čísla už byla obsazená, přečíslováno při sloučení.*
+**Rozhodnutí:** předmět a text e-mailu, kterým faktura odchází klientovi, jsou šablona uložená v
+`admin_settings.invoice_email_template` (migrace 129), upravuje se v Faktury › Údaje dodavatele s náhledem na
+ukázkových údajích. Proměnné `{cislo}`, `{castka}`, `{splatnost}`, `{odberatel}`, `{dodavatel}`; překlep v proměnné
+se neuloží. Bez uložené šablony, bez migrace i s poškozeným záznamem se použije **přesně dosavadní text** (čtení
+nikdy nespadne). Platí pro „Poslat e-mailem" i „Schválit a poslat" (obojí jde přes `sendIssuedInvoice`);
+`subject`/`text` zadané přímo v požadavku mají přednost. Zůstává prostý text bez brandové hlavičky.
+**Proč:** Kryštof 2026-11-20 („Ano, udělat") chtěl mít obecný text od VIZEONu bez zásahu do kódu; 2026-11-23
+„Dokončit a sloučit". Prostý text: faktura má dorazit jako osobní e-mail, ne jako notifikace (R-116). Dosazuje se
+jedním průchodem, takže `{cislo}` ve jménu odběratele se nerozbalí; předmět je vždy jeden řádek.
+**Důsledek:** `lib/admin/invoice-email-template.ts` (schéma, dosazení, náhled, formát částky),
+`lib/admin/invoice-email-settings.ts` (čtení/zápis), `components/admin/invoices/email-template-form.tsx`,
+`app/dashboard/finance/invoice-actions.ts` (`getInvoiceEmailTemplate`, `saveInvoiceEmail`). Nový text e-mailu
+s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro jednu fakturu před odesláním. Upřesňuje R-117.
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Text e-mailu s fakturou (R-139) — migrace 129 a průchod:** bez migrace 129 na produkci odchází dosavadní
+  text a uložení šablony vrátí hlášku „chybí migrace". Po migraci projít Faktury › Údaje dodavatele (uložit, náhled,
+  překlep v proměnné) a odeslat fakturu na vlastní e-mail. **Uložení ani odeslání přes Resend naživo neověřené** · od 2026-11-23
 
 - [ ] **Ochrana proti DDoS (R-138) — zapnout WAF a projít:** (1) Vercel WAF pravidla z `.claude/security/STATE.md`
   (strop `/api/public`, přihlášení, celý web; nejdřív v režimu `log`) — MCP pro firewall vrací 404, nastaví Kryštof
@@ -1930,6 +1950,22 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (text e-mailu s fakturou do `main` — R-139)
+- **feat** Předmět a text e-mailu, kterým faktura odchází klientovi, jde upravit v Faktury › Údaje dodavatele:
+  proměnné `{cislo}`, `{castka}`, `{splatnost}`, `{odberatel}`, `{dodavatel}` tlačítkem na místo kurzoru, náhled ze
+  stejných funkcí jako skutečný e-mail, překlep se neuloží, „Vrátit výchozí text". Platí pro „Poslat e-mailem"
+  i „Schválit a poslat". Hotové na větvi `claude/invoice-automation-templates-b0cd18` z 2026-11-20, převedené na
+  `main`; úprava `escapeHtml` v `lib/email.ts` z větve odpadla, uvozovky escapuje od R-138 sdílený modul.
+  Soubory: `lib/admin/{invoice-email-template,invoice-email-settings,invoice-send}.ts`,
+  `components/admin/invoices/{email-template-form,issued-actions}.tsx`, `app/dashboard/faktury/dodavatel/page.tsx`,
+  `app/dashboard/finance/invoice-actions.ts`.
+- **db** Migrace 129 `faktury_sablona_emailu` (na větvi 120, to číslo má oprava kalendáře) — sloupec
+  `admin_settings.invoice_email_template` (aplikována: ne, nikde). Aditivní, kód bez ní běží s výchozím textem.
+- **chore** Ověřeno: `npx tsc --noEmit`, `admin-faktury-sablona-emailu` (PGlite bez migrace, po ní a po dvojím běhu),
+  `email-route`, `email-resend`, `ws-schema` (číslování bez mezer) — 209 prošlo. Formulář v prohlížeči ověřený
+  2026-11-20 na dočasné stránce (1280 a 375 px). **Uložení do databáze a skutečné odeslání neověřené.**
+- **decision** **R-139** (přečíslováno z R-121).
 
 ### 2026-11-23 (ochrana proti XSS a DDoS do `main` — R-138)
 - **feat** Audit z 2026-11-20 (necommitnutý ve worktree `claude/xss-ddos-protection-75bcd7`) převedený na dnešní `main`.

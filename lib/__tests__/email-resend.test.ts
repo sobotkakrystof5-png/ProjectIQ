@@ -40,6 +40,19 @@ describe('lib/email přes Resend (R-116)', () => {
     expect(body.attachments).toEqual([{ filename: 'f.pdf', content: Buffer.from('PDF').toString('base64'), content_type: 'application/pdf' }])
   })
 
+  it('uvozovky v textu se escapují, jméno odběratele nevloží atribut do odkazu (R-139)', async () => {
+    await sendInvoiceEmail({
+      to: 'k@example.cz',
+      subject: 'Faktura',
+      text: 'Pro: https://x.cz"onmouseover="alert(1) a <b>tučně</b>',
+      pdfs: [{ filename: 'f.pdf', content: Buffer.from('PDF') }],
+    })
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.html).not.toContain('"onmouseover=')
+    expect(body.html).toContain('&quot;onmouseover=')
+    expect(body.html).not.toContain('<b>')
+  })
+
   it('chyba Resendu vrátí false', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ message: 'nope' }), { status: 403 }))
     expect(await sendPlainEmail({ to: 'k@example.cz', subject: 'A', text: 'B' })).toBe(false)

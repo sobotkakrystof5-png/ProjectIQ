@@ -757,6 +757,22 @@ Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a ad
 - **Vystavení:** `POST /api/invoices/drafts/[id]/send` (Chromium v `outputFileTracingIncludes`). `issueDraft` zamkne koncept (`sending`, zaseknutý se uvolní po 5 min), zkontroluje `draftGaps` a `issueInvoiceSchema` a vystaví **jedním příkazem** `UPDATE invoice_drafts SET invoice_id = admin_invoice_issue(…)`. Když selže e-mail, faktura už má číslo — odpověď 502 to řekne a vede na detail faktury („Poslat znovu").
 - **Bez migrace 117:** `isDraftsReady()` vrátí false, panel ani stránka pravidelných faktur se neukážou, spouštěče nic nedělají a detail faktury čte `client_email` přes `to_jsonb(i)`, takže nespadne.
 
+### Text e-mailu s fakturou (R-139)
+
+- **Kde:** předmět a text jsou šablona v `admin_settings.invoice_email_template` (jsonb, migrace 129), upravuje se na
+  `/dashboard/faktury/dodavatel` pod údaji dodavatele. Odesílá ji `sendIssuedInvoice` (`lib/admin/invoice-send.ts`) —
+  tedy „Poslat e-mailem“ i „Schválit a poslat“; `subject`/`text` zadané volajícím mají přednost.
+- **Sdílený kód** `lib/admin/invoice-email-template.ts` (bez `server-only`): schéma, `renderInvoiceEmail`, ukázkové hodnoty,
+  formát částky a data. Totéž počítá náhled ve formuláři a skutečný e-mail. Pět proměnných (`{cislo}`, `{castka}`,
+  `{splatnost}`, `{odberatel}`, `{dodavatel}`); neznámá se neuloží. Dosazuje se **jedním průchodem** (hodnota se podruhé
+  nerozbalí) a předmět je vždy jeden řádek.
+- **Čtení nikdy nespadne** (`lib/admin/invoice-email-settings.ts`): bez migrace 129, bez řádku i s poškozeným záznamem se
+  použije dosavadní výchozí text. Čte se přes `to_jsonb(řádek)`. Uložení bez migrace vrátí českou hlášku.
+- **Prostý text:** šablona se nikdy nevkládá jako HTML; `buildPlainLayout` ji při odeslání escapuje. Brandovaná hlavička
+  ani úprava textu pro jednu konkrétní fakturu před odesláním zatím nejsou.
+- Test `lib/__tests__/admin-faktury-sablona-emailu.test.ts` (dosazení, odmítnutí překlepu, PGlite s migrací a bez ní),
+  použití šablony při odeslání `app/api/invoices/[id]/email/__tests__/email-route.test.ts`.
+
 ### Náprava financí (AD13, R-099)
 
 Migrace **109** je jedna migrace o pěti věcech. `lib/admin/ledger.ts` zjistí stav **ze samotného

@@ -111,6 +111,14 @@ Nálezy: (1) `lib/email.ts` — `escapeHtml` bez uvozovek a `href="${cta.href}"`
 Opraveno: `lib/security/{html,client-ip,memory-limiter,semaphore,front-gate}.ts`, brána v `proxy.ts`, předbrány v `lib/api-rate-limit.ts` a `lib/ws/intake/rate-limit.ts`, semafor v `lib/invoice-pdf/render.ts`, `readFormDataLimited` (tři přepisy hlasu, `invoices/parse`), `linkifyHtml`, ověření adres při načtení RSS a při vykreslení. Testy: `lib/security/__tests__/*` (+ `xss-guard`), `lib/__tests__/{email-xss,api-rate-limit-predbrana}.test.ts`, rozšířené `tax-news` a `request-body`. DECISIONS #050 (na větvi původně #040, přečíslováno při sloučení 2026-11-23).
 Zůstává: Vercel WAF pravidla (návrh ve STATE.md, čeká na Kryštofa); Trusted Types a hlášení porušení CSP (otevřená položka); sdílený limit mezi instancemi (nepotřeba, dokud WAF).
 
+## 2026-11-20 — review: šablona e-mailu s fakturou (R-139; na větvi R-121, v `main` 2026-11-23)
+Spouštěč: před commitem
+Rozsah: `lib/admin/invoice-email-{template,settings}.ts`, `invoice-send.ts`, akce `saveInvoiceEmail`/`getInvoiceEmailTemplate`, formulář v Údajích dodavatele, `escapeHtml`/`linkify` v `lib/email.ts`, migrace 129.
+Výsledek: 1 nález opraven, zbytek OK (přihlášení v obou akcích, Zod s délkami, parametrizovaný SQL, žádné tajemství, CSP beze změny).
+Nálezy: `escapeHtml` v `lib/email.ts` neescapoval uvozovky a `linkify` vkládá text do `href="…"`. Do té doby tam putoval jen text, který píše admin; šablona ale dosazuje `{odberatel}`, tedy jméno z veřejné poptávky. Jméno s `"` by v e-mailu s fakturou přidalo atribut do odkazu (e-mailové klienty skripty nespustí, ale jde o klamavý vzhled a o stejnou třídu chyby jako XSS).
+Opraveno: `escapeHtml` escapuje i `"` a `'` (všech osm použití je v textovém kontextu), test v `lib/__tests__/email-resend.test.ts` (v `main` to od R-138 dělá sdílený `lib/security/html.ts`). Předmět je vždy jeden řádek (hlavička e-mailu), hodnoty proměnných se dosazují jedním průchodem.
+Zůstává: nic. Šablona je prostý text a nikdy se nevkládá jako HTML.
+
 ## 2026-11-18 — review: AI asistent jako CRM (R-120)
 Spouštěč: `web-security-review` před commitem a nasazením na produkci (větev `admin/ai-asistent-crm`).
 Rozsah: nové `GET /api/public/outreach/handled` a `GET /api/outreach/leads/[id]/nahled`, upravené `POST /api/public/outreach` (kontrakt v2, tělo 1 MB), `lib/admin/{outreach,outreach-calls,outreach-crm,outreach-crm-view,outreach-reports,outreach-demo}.ts`, `types/outreach{,-report}.ts`, komponenty `components/admin/ai-asistent/*`, `components/admin/outreach-lead-actions.tsx`, stránka `/dashboard/ai-asistent/kontakt/[id]`, migrace 119, cron `client-retention`.

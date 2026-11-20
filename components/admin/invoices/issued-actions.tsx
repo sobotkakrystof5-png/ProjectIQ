@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Ban, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -110,6 +111,12 @@ export function IssuedInvoiceActions({
           <Button type="button" variant="ghost" onClick={() => setComposing(false)}>
             Zpět
           </Button>
+          <Link
+            href="/dashboard/faktury/dodavatel"
+            className="inline-flex h-11 items-center text-sm text-quiet underline-offset-4 hover:text-ink hover:underline"
+          >
+            Upravit text e-mailu
+          </Link>
         </div>
       ) : (
         <Button type="button" variant="outline" onClick={() => setComposing(true)}>

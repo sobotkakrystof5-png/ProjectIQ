@@ -21,6 +21,9 @@ vi.mock('@/lib/db', () => ({ sql: (...args: unknown[]) => sqlMock(...args) }))
 vi.mock('@/lib/admin/invoice-issue', () => ({ loadIssuedInvoiceForPdf: (...a: unknown[]) => loadIssuedMock(...a) }))
 vi.mock('@/lib/invoice-pdf/render', () => ({ renderInvoicePdf: (...a: unknown[]) => renderMock(...a) }))
 vi.mock('@/lib/email', () => ({ sendInvoiceEmail: (...a: unknown[]) => sendMock(...a) }))
+// Text e-mailu je šablona z Údajů dodavatele (R-139); tady se jen podstrčí.
+const templateMock = vi.fn()
+vi.mock('@/lib/admin/invoice-email-settings', () => ({ loadInvoiceEmailTemplate: (...a: unknown[]) => templateMock(...a) }))
 // Předávací dokument (AD16) — přikládá se jen na zaškrtnutí.
 const handoverMock = vi.fn()
 const handoverRenderMock = vi.fn()
@@ -34,6 +37,7 @@ vi.mock('@/lib/api-rate-limit', () => ({
   recordApiRequest: async () => {},
 }))
 
+import { DEFAULT_INVOICE_EMAIL_TEMPLATE } from '@/lib/admin/invoice-email-template'
 import { POST } from '../route'
 
 const ID = '11111111-1111-4111-8111-111111111111'
@@ -43,6 +47,9 @@ const invoice = {
   invoice: {
     number: '2026001',
     issuer: { name: 'Kryštof Sobotka' },
+    counterparty: { name: 'Jan Novák' },
+    amount: 12500,
+    currency: 'CZK',
     dueOn: '2026-11-26',
     cancelled: false,
   },
@@ -61,6 +68,7 @@ beforeEach(() => {
   loadIssuedMock.mockReset().mockResolvedValue(invoice)
   renderMock.mockReset().mockResolvedValue(Buffer.from('%PDF-1.4 test'))
   sendMock.mockReset().mockResolvedValue(true)
+  templateMock.mockReset().mockResolvedValue({ template: { ...DEFAULT_INVOICE_EMAIL_TEMPLATE }, custom: false })
   sqlMock.mockReset().mockResolvedValue([])
   limitedMock.mockReset().mockResolvedValue(false)
   adminDbMock.mockReset().mockResolvedValue([{ project_id: '22222222-2222-4222-8222-222222222222' }])
@@ -106,6 +114,41 @@ describe('POST /api/invoices/[id]/email', () => {
       expect(res.status).toBe(400)
     }
     expect(renderMock).not.toHaveBeenCalled()
+  })
+
+  it('bez uložené šablony odejde dosavadní výchozí text', async () => {
+    const res = await POST(request({ to: 'klient@example.cz' }), { params })
+    expect(res.status).toBe(200)
+    const [opts] = sendMock.mock.calls[0] as [{ subject: string; text: string }]
+    expect(opts.subject).toBe('Faktura 2026001')
+    expect(opts.text).toBe(
+      'Dobrý den,\n\nposílám fakturu 2026001 se splatností 26. 11. 2026.\nNajdete ji v příloze.\n\nDěkuju,\nKryštof Sobotka',
+    )
+  })
+
+  it('předmět a text se berou z uložené šablony', async () => {
+    templateMock.mockResolvedValue({
+      template: {
+        subject: 'Faktura {cislo} pro {odberatel}',
+        body: 'Ahoj,\n\nfaktura {cislo} na {castka} je splatná {splatnost}.\n\n{dodavatel}',
+      },
+      custom: true,
+    })
+    const res = await POST(request({ to: 'klient@example.cz' }), { params })
+    expect(res.status).toBe(200)
+    const [opts] = sendMock.mock.calls[0] as [{ subject: string; text: string }]
+    expect(opts.subject).toBe('Faktura 2026001 pro Jan Novák')
+    expect(opts.text.replace(/[\u00a0\u202f]/g, ' ')).toBe(
+      'Ahoj,\n\nfaktura 2026001 na 12 500 Kč je splatná 26. 11. 2026.\n\nKryštof Sobotka',
+    )
+  })
+
+  it('předmět a text zadané přímo v požadavku mají přednost před šablonou', async () => {
+    const res = await POST(request({ to: 'klient@example.cz', subject: 'Vlastní předmět', text: 'Vlastní text' }), { params })
+    expect(res.status).toBe(200)
+    const [opts] = sendMock.mock.calls[0] as [{ subject: string; text: string }]
+    expect(opts.subject).toBe('Vlastní předmět')
+    expect(opts.text).toBe('Vlastní text')
   })
 
   it('archiv cizího PDF ani cizí adresa nejsou k odeslání', async () => {

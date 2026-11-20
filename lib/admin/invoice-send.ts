@@ -6,6 +6,8 @@ import { loadHandoverForPdf } from '@/lib/admin/handover'
 import { renderInvoicePdf } from '@/lib/invoice-pdf/render'
 import { renderHandoverPdf } from '@/lib/invoice-pdf/handover'
 import { sendInvoiceEmail } from '@/lib/email'
+import { loadInvoiceEmailTemplate } from '@/lib/admin/invoice-email-settings'
+import { invoiceEmailValues, renderInvoiceEmail } from '@/lib/admin/invoice-email-template'
 
 /**
  * Odeslání vystavené faktury klientovi s PDF v příloze.
@@ -39,10 +41,22 @@ export async function sendIssuedInvoice(
     return { ok: false, error: 'PDF se nepovedlo připravit, e-mail jsem neposlal.', status: 503 }
   }
 
-  const subject = opts.subject || `Faktura ${issued.invoice.number}`
-  const text =
-    opts.text ||
-    `Dobrý den,\n\nposílám fakturu ${issued.invoice.number} se splatností ${czDate(issued.invoice.dueOn)}.\nNajdete ji v příloze.\n\nDěkuju,\n${issued.invoice.issuer.name}`
+  // Text e-mailu je šablona z Údajů dodavatele (R-139); bez uložené šablony je
+  // to dosavadní výchozí text. Předmět a text zadané přímo v volání mají přednost.
+  const { template } = await loadInvoiceEmailTemplate()
+  const rendered = renderInvoiceEmail(
+    template,
+    invoiceEmailValues({
+      number: issued.invoice.number,
+      amount: issued.invoice.amount,
+      currency: issued.invoice.currency,
+      dueOn: issued.invoice.dueOn,
+      counterpartyName: issued.invoice.counterparty.name,
+      issuerName: issued.invoice.issuer.name,
+    }),
+  )
+  const subject = opts.subject || rendered.subject
+  const text = opts.text || rendered.text
 
   // Předávací dokument se přikládá jen na výslovné zaškrtnutí a jen když
   // u zakázky je vyplněný. Když se nepodaří, e-mail se **neodešle** —
@@ -94,11 +108,4 @@ export async function sendIssuedInvoice(
     }
   }
   return { ok: true, number: issued.invoice.number }
-}
-
-/** 2026-11-30 → 30. 11. 2026 — v e-mailu klientovi, ne ISO. */
-function czDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  if (!y || !m || !d) return iso
-  return `${d}. ${m}. ${y}`
 }
