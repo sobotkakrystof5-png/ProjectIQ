@@ -1818,6 +1818,19 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
+### 2026-11-21 (nasazení klientského prostoru KP11–KP17 a KP10 na produkci)
+- **chore** `main` `d3380ce` → `fa79603` (fast-forward, 14 commitů: KP11–KP17, KP10, merge e-mailů z Hovorů).
+  První push zablokoval GitHub push protection (testovací Stripe klíč v `f01c08e`); Kryštof
+  výslovně souhlasil s přepisem nepushnuté historie, klíč se odstranil `git filter-branch`
+  z celého rozsahu `origin/main..HEAD` (výsledný strom shodný, záloha ve větvi
+  `backup/kp10-pred-prepisem`). Hashe KP commitů se tím změnily.
+- **chore** Vercel `dpl_9XSm7yLWPFbETb2NxgpDac1KiaxM` READY za ~100 s, `fra1`, aliasy `www.zakaziq.cz`
+  a `zakaziq.cz`. Ověřeno veřejně: `/`, `/login`, `/klient/prihlaseni`, `/w/prihlaseni`, `/podminky`
+  200; `/dashboard` a `/klient/soukromi` 307 na přihlášení; cron 401; `POST /api/public/web-udalost`
+  bez klíče 401, s hlavičkou `Origin` 403. **Za přihlášením nikdo nic neviděl.**
+- **chore** Zbývá (na straně Kryštofa): KP10 krok 6 (SMTP v Supabase, hook na HTTPS a
+  `SUPABASE_AUTH_HOOK_SECRET`, bucket `chat-prilohy`), krok 7 pilot, krok 8 `web-security-audit`.
+
 ### 2026-11-20 (migrace klientského prostoru na produkci)
 - **db** Migrace 121, 122, 123, 124, 125, 126 a 127 **aplikované na produkčním Neonu** (projekt
   Projectiq, větev `production`), každá v jedné transakci přes Neon MCP; 113 už tam byla (ověřeno
