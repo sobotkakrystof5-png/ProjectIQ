@@ -1831,11 +1831,19 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 - **chore** Po nasazení (téhož dne): soukromý bucket `chat-prilohy` založen v Supabase `zakaziq`
   SQL vložením do `storage.buckets` (`public = false`, limit 4 MB, jen PNG/JPEG/WebP/PDF; stejné
   hodnoty jako `lib/chat/storage.ts`). Ověřeno čtením: 1 uživatel v `auth.users`, **0 ověřených
-  faktorů MFA**, bucket existuje. Hook, SMTP a šablona v dashboardu zatím nezměněné.
-- **chore** Zbývá (na straně Kryštofa): KP10 krok 6 (SMTP v Supabase, hook na HTTPS a
-  `SUPABASE_AUTH_HOOK_SECRET`; ~~bucket `chat-prilohy`~~ hotovo), krok 7 pilot, krok 8
-  `web-security-audit`. Hook, heslo SMTP a tajemství nastavuje člověk (jsou to přihlašovací údaje
-  a bezpečnostní nastavení; agent je zadávat nesmí).
+  faktorů MFA**, bucket existuje.
+- **chore** KP10 krok 6 hotový (2026-11-21): hook Before User Created přepnutý na HTTPS
+  (`https://www.zakaziq.cz/api/auth/supabase-hook`, Postgres hook smazán), tajemství ve Vercelu
+  jako `SUPABASE_AUTH_HOOK_SECRET` + redeploy (nepodepsaný požadavek teď vrací 401, předtím 403),
+  vlastní SMTP přes Resend (`info@zakaziq.cz`), česká šablona Reset Password
+  (`docs/klientsky-prostor/supabase-sablona-reset-hesla.html`, diakritika jako HTML entity — vložení
+  přes schránku rozbilo kódování). Hook, tajemství a heslo SMTP zadal Kryštof, agent v Chrome vyplnil
+  jen název proměnné, bucket a šablonu.
+- **chore** KP10 krok 8: `web-security-audit` na živé adrese, **0 skutečných chyb** (skript 28/4/1,
+  vše zbylé jsou falešné poplachy, detail `.claude/security/AUDIT-LOG.md` 2026-11-21). DNS apexu
+  (CAA, SPF, `rua`) dál chybí, beze změny od 2026-11-14.
+- **chore** Zbývá: naostro projít pozvánku → heslo → obnovu hesla (e-mail z Resendu), `ADMIN_USER_ID`
+  ve Vercelu, TOTP u admina, krok 7 pilot, DPA v `GDPR.md`, kontrola `/klient/soukromi` Kryštofem.
 
 ### 2026-11-20 (migrace klientského prostoru na produkci)
 - **db** Migrace 121, 122, 123, 124, 125, 126 a 127 **aplikované na produkčním Neonu** (projekt

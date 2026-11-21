@@ -914,3 +914,26 @@ test obnovy zálohy Neonu; CI proměnná `SITE_URL`.
 vracet challenge 403 (`Vercel Security Checkpoint`) a druhý běh skriptu kvůli tomu
 vypadal mnohem hůř (10/7/7) a hlásil chybějící `security.txt`, který na produkci je.
 Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
+
+## 2026-11-21 — audit po nasazení klientského prostoru (KP11–KP17, KP10 krok 8)
+- Target: https://www.zakaziq.cz (build `5f66f0f`, poté redeploy s `SUPABASE_AUTH_HOOK_SECRET`)
+- Result: 28 prošlo / 4 varování / 1 chyba (skript), po ručním ověření **0 skutečných chyb**
+- Findings:
+  - **Chyba „nepodařilo se načíst certifikát“ a „TLS 1.3 nepodporováno“ je falešný poplach skriptu**
+    (OpenSSL 4.1 nezná jeho přepínače). Ručně: TLS 1.3 funguje, certifikát Let's Encrypt platí do
+    2027-01-16, ověření OK.
+  - **`security.txt` „chybí“ je falešný poplach:** Vercel po sérii požadavků ze skriptu vrací
+    challenge 403 (`x-vercel-mitigated: challenge`), stejně jako 2026-11-14. Platí výsledek z auditu
+    2026-11-14 (soubor na produkci je). Sken pouštět jednou, ne v cyklu.
+  - **CAA a DNSSEC „OK“ je také falešné** — skript dotazuje `www`, což je CNAME na Vercel. Na apexu
+    `zakaziq.cz` (DoH dotaz) CAA dál **chybí**, TXT/SPF **chybí**, DMARC je `v=DMARC1; p=none;` bez `rua`.
+  - Hlavičky, CSP (bez `unsafe-inline`/`unsafe-eval` ve `script-src`), HSTS, COOP/CORP, citlivé cesty
+    a cookies bez nálezu.
+  - Hook registrace: nepodepsaný `POST /api/auth/supabase-hook` vrací 401 (tajemství nastavené, podpis
+    se ověřuje); před nastavením vracel 403 (fail-closed).
+- Fixed: nic v kódu. V Supabase (`zakaziq`) nastaveno 2026-11-21: HTTPS hook místo Postgres hooku,
+  vlastní SMTP přes Resend, česká šablona Reset Password, soukromý bucket `chat-prilohy` (4 MB,
+  PNG/JPEG/WebP/PDF).
+- Left open: DNS apexu (CAA, SPF, `rua` v DMARC) a zápis HSTS preload — Kryštof u WEDOS, beze změny
+  od 2026-11-14; druhý faktor adminu (0 ověřených faktorů); naživo neověřené odeslání e-mailu
+  s obnovou hesla přes Resend a průchod pozvánka → heslo; `ADMIN_USER_ID` ve Vercelu.
