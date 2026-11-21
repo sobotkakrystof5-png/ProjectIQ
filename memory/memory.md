@@ -1851,7 +1851,10 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
   v `auth.users` zůstalo prázdné i po doručení e-mailu, takže se na něj nedá spoléhat jako na důkaz.
   Úklid: smazán testovací klient, člen a pozvánka (Neon `portal.*`) i uživatel `+test` (Supabase),
   zůstal jen admin; ostatní data nedotčena.
-- **chore** Zbývá: `ADMIN_USER_ID` ve Vercelu (neověřeno), TOTP u admina, krok 7 pilot s jedním
+- **chore** `ADMIN_USER_ID` je ve Vercelu Production (ověřeno 2026-11-21 výpisem proměnných; hodnota je
+  šifrovaná, takže přímé porovnání s id admina nejde — nepřímo ho potvrzuje úspěšné přihlášení admina po
+  posledním redeployi).
+- **chore** Zbývá: TOTP u admina, krok 7 pilot s jedním
   klientem, DPA v `GDPR.md`, kontrola `/klient/soukromi` Kryštofem, DNS apexu (CAA, SPF, `rua`).
 
 ### 2026-11-20 (migrace klientského prostoru na produkci)
