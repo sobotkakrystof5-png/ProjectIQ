@@ -1854,6 +1854,17 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 - **chore** `ADMIN_USER_ID` je ve Vercelu Production (ověřeno 2026-11-21 výpisem proměnných; hodnota je
   šifrovaná, takže přímé porovnání s id admina nejde — nepřímo ho potvrzuje úspěšné přihlášení admina po
   posledním redeployi).
+- **fix** **Preview četl produkční databázi** — `DATABASE_URL` pro Preview (všechny větve) mířil na
+  Neon „Projectiq". Opraveno: Kryštof přes Vercel CLI nastavil testovací connection string z `.env.local`
+  („ZakazIQ RD test"); ověřeno v Preview `preview/test` (Dnes ukazuje ukázková data, Klienti Workspace
+  2 testovací účty). Detail `.claude/security/AUDIT-LOG.md` 2026-11-21.
+- **db** Testovací Neon „ZakazIQ RD test" (větev `rd-test`): migrace 103, 105, 106, 108–119, 121–127
+  aplikované `scripts/apply-migration.js` (22 souborů, 0 chyb). Produkce beze změny.
+- **chore** Preview: admin se přihlásí přes Supabase `zakaziq` (jen identita; `SUPABASE_URL`,
+  `SUPABASE_PUBLISHABLE_KEY`, `ADMIN_EMAIL`, `ADMIN_USER_ID` pro Preview), data z testovací DB.
+  Klientský prostor v Preview přihlásit nejde — druhý Supabase projekt nejde založit (limit 2 free
+  projektů), Kryštof zvolil „bez Supabase v Preview". Kontrolní větev `preview/test` (prázdné commity
+  kvůli novému sestavení; `main` beze změny).
 - **chore** Zbývá: TOTP u admina, krok 7 pilot s jedním
   klientem, DPA v `GDPR.md`, kontrola `/klient/soukromi` Kryštofem, DNS apexu (CAA, SPF, `rua`).
 

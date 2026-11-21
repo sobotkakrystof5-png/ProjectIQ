@@ -937,3 +937,24 @@ Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
 - Left open: DNS apexu (CAA, SPF, `rua` v DMARC) a zápis HSTS preload — Kryštof u WEDOS, beze změny
   od 2026-11-14; druhý faktor adminu (0 ověřených faktorů); naživo neověřené odeslání e-mailu
   s obnovou hesla přes Resend a průchod pozvánka → heslo; `ADMIN_USER_ID` ve Vercelu.
+
+## 2026-11-21 — nález: Preview četl produkční databázi
+- Target: Vercel Preview (`project-iq`, všechny Preview větve)
+- Result: **opraveno** téhož dne
+- Findings:
+  - `DATABASE_URL` pro Preview (bez vazby na větev, upravený 2026-11-03) mířil na **produkční** Neon
+    „Projectiq". Zjištěno, když přihlášený admin v Preview `preview/test` viděl skutečné záznamy
+    („U CERHU" je jen v produkci, testovací DB 0). Každé Preview nasazení libovolné větve tak četlo
+    a mohlo zapisovat produkční data; přihlášení admina do Preview do té doby nefungovalo, protože
+    Preview mělo jiné `SUPABASE_URL`/klíč, takže reálně šlo hlavně o kód větví běžící nad produkcí.
+  - `DATABASE_URL_WS` pro Preview mířil správně na testovací DB.
+- Fixed: Kryštof přes Vercel CLI smazal `DATABASE_URL` pro Preview a přidal testovací connection string
+  („ZakazIQ RD test", `ep-shiny-union-b922fwm5`, z lokálního `.env.local`, typ Sensitive). Agent
+  hodnotu neviděl ani nezadával. Preview `preview/test` znovu sestaven a ověřen v prohlížeči: Dnes
+  ukazuje ukázková data („Kavárna Ukázková", `UKAZKA-2026-…`), Klienti Workspace 2 testovací účty.
+  Testovací DB dostala migrace 103–127 (22 souborů) přes `scripts/apply-migration.js`.
+  Preview přihlášení admina: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (projekt `zakaziq`),
+  `ADMIN_EMAIL`, `ADMIN_USER_ID` pro Preview nastavené — Supabase slouží jen jako identita admina.
+- Left open: klientský prostor v Preview nejde přihlásit (druhý Supabase projekt nejde založit, limit
+  2 free projektů; rozhodnutí Kryštofa „bez Supabase v Preview"). Preview stále sdílí identitu admina
+  s produkcí. Před každým novým `DATABASE_URL*` pro Preview ověřit hostitele (`ep-shiny-union` = test).

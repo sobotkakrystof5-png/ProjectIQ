@@ -128,6 +128,8 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar a zji�
 - Závislosti: `npm audit` **0 zranitelností** i s dev závislostmi (2026-11-14). Historie gitu čistá přes všech **311 commitů** — každý nález tvaru klíče je zástupná hodnota z dokumentace; `.env` nikdy nebyl ve verzích
 - Zálohy: Neon point-in-time restore (podle plánu Neonu) — test obnovy nikdy neproběhl
 
+- **Vercel Preview (od 2026-11-21):** `DATABASE_URL` a `DATABASE_URL_WS` míří na testovací Neon „ZakazIQ RD test“ (`ep-shiny-union-b922fwm5`), ne na produkci — do té doby `DATABASE_URL` pro Preview mířil na produkci (AUDIT-LOG 2026-11-21). Přihlášení admina v Preview přes Supabase `zakaziq` (jen identita), klientský prostor v Preview přihlásit nejde. Kontrolní větev `preview/test`.
+
 ## Otevřené položky
 
 | Položka | Proč | Kdo | Kdy |
