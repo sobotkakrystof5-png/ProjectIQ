@@ -1,7 +1,7 @@
 # Z klientského prostoru k platícímu zákazníkovi ZakazIQ — analýza a plán
 
-> **Stav:** návrh 2026-11-21, nic z toho není v kódu. Rozhodnutí D-KV1–D-KV9 (oddíl 9) čekají na Kryštofa.
-> Sezení KV00–KV09 (oddíl 8) se spouští až po rozhodnutí. Admin se v nich mění jen s výslovným zadáním
+> **Stav:** 2026-11-21 rozhodnuto D-KV1–D-KV9 (oddíl 9, `memory/memory.md` R-134 a R-135), nic z toho
+> není v kódu. Sezení KV00 je tím hotové. Admin se v dalších sezeních mění jen s výslovným zadáním
 > (AGENTS.md → Hranice v repu).
 >
 > **Otázka:** jak z klienta, kterému Kryštof staví web a který má klientský prostor `/klient`, udělat
@@ -72,11 +72,11 @@ nejde použít naostro.
   přihlašovací stránce s nápisem *Development mode*. To samo o sobě srazí důvěru, ještě než zadá
   e-mail. Je-li ve Vercel Production opravdu testovací klíč Stripe, platí navíc: skutečná karta se
   odmítne, a kdo zná testovací kartu Stripe, založí si na produkční databázi předplatné, které nic
-  nestojí. **Ověřit klíč ve Vercelu.** Do spuštění zvážit, jestli hlavní akce landing page nemá vést
-  na kontaktní formulář („Chci to vyzkoušet, ozvěte se mi") místo registrace (D-KV2).
+  nestojí. **Ověřit klíč ve Vercelu.** Rozhodnuto (D-KV2): Workspace se spustí až na Supabase
+  a do té doby vede hlavní akce landing page na formulář „Chci to vyzkoušet" místo registrace.
 - **B2 — Vercel Hobby a placený SaaS (R-133).** Podle podmínek Vercelu je Hobby jen pro nekomerční
-  použití. Ve chvíli, kdy první klient zaplatí 249 Kč, je provoz komerční. R-133 riziko přijalo,
-  ale před první platbou je dobré se k němu vrátit (D-KV8).
+  použití. Ve chvíli, kdy první klient zaplatí 249 Kč, je provoz komerční. Rozhodnuto (D-KV8, R-135):
+  při prvním platícím klientovi přesun na Cloudflare, dopředu se nepřipravuje.
 - **B3 — Dva oddělené světy.** Klient se do prostoru přihlašuje přes Supabase, do Workspace by musel
   přes Clerk s novým účtem. Každý další účet a heslo je místo, kde lidé odpadnou. R-107 už rozhodlo,
   že Workspace přejde na Supabase (fáze F2) — potom stačí jedno přihlášení na obojí.
@@ -234,7 +234,7 @@ Den předání záměrně ne: klient řeší spuštění a nemá ještě žádno
 
 ### 3.6 Nabídka
 
-Co klient dostane (návrh, rozhoduje D-KV3 a D-KV4):
+Co klient dostane (rozhodnuto D-KV3 a D-KV4, R-134):
 
 - ZakazIQ připravený předem: jeho firma, obor, služby, otevírací doba, napojený web.
 - 20 minut nastavení s Kryštofem přes Google Meet (konzultace, kterou si zarezervuje sám).
@@ -319,19 +319,18 @@ W1–W3 pomůžou i lidem, kteří přijdou z landing page. Vyplatí se postavit
 
 ### 5.4 Web klienta
 
-Každý nový web stavět **připravený na ZakazIQ**: formulář umí dva režimy.
+Rozhodnuto (D-KV7, R-134): weby se na Workspace napojují **až na přání klienta**, ne předem.
 
-- **Bez Workspace** (dnes): poptávka jde klientovi e-mailem a ZakazIQ dostane jen počet (KP17, D-K20 = a).
-- **S Workspace**: poptávka jde do Workspace přes API v1 (`/api/public/v1/requests`) a e-mail
-  pošle Workspace (R-045).
-
-Přepíná se jednou proměnnou prostředí na webu klienta, bez úpravy kódu. Při konverzi tak Kryštof
-nemusí web znovu nasazovat. Návod doplnit do `docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md`
-a do skillu `zakaziq-napojeni`.
+- **Bez Workspace** (výchozí): poptávka jde klientovi e-mailem a ZakazIQ dostane jen počet
+  (KP17, D-K20 = a).
+- **S Workspace** (když klient Workspace chce): poptávka jde do Workspace přes API v1
+  (`/api/public/v1/requests`) a e-mail pošle Workspace (R-045). Kryštof napojí formulář podle
+  skillu `zakaziq-napojeni` a nasadí web znovu; počítá se s tím při plánování konzultace (krok 4
+  v oddílu 7).
 
 Pozor: v režimu s Workspace se ZakazIQ stává zpracovatelem údajů zákazníků klienta. To kryje
 zpracovatelská smlouva Workspace (R-079), kterou klient přijímá při registraci. Bez registrace
-se do režimu s Workspace nepřepíná.
+se web na Workspace nenapojuje.
 
 ## 6. Mantinely
 
@@ -350,9 +349,9 @@ Klienti webu jsou pro Kryštofa cennější než jedno předplatné: doporučuj�
 
 **E-maily s nabídkou** podléhají zákonu č. 480/2004 Sb., § 7: obchodní sdělení e-mailem jen se
 souhlasem, výjimka platí pro vlastní obdobné produkty stávajícímu zákazníkovi s možností odmítnout.
-Jestli je Workspace „obdobný" webu, je výklad, který nikdo neověřil. Bezpečná cesta: nabídka jen
-v prostoru a osobně, e-mailem jen servisní výsledky webu bez nabídky, a nabídky e-mailem až po
-výslovném souhlasu (D-KV5). Tohle není právní rada.
+Jestli je Workspace „obdobný" webu, je výklad, který nikdo neověřil. Rozhodnuto (D-KV5): nabídka
+jen v prostoru a osobně, e-mailem jen servisní výsledky webu bez nabídky. Nabídky e-mailem by
+potřebovaly nové rozhodnutí a výslovný souhlas. Tohle není právní rada.
 
 ## 7. Fáze 1 bez kódu: ručně a osobně
 
@@ -362,7 +361,8 @@ Hned, jak půjde zaplatit (KV01). Kódu skoro žádný, rozhoduje rozhovor.
    Prvnímu z nich platí R-066 (pilot zdarma).
 2. **Připravit Workspace** přes „Pozvat klienta" (S17): firma, obor, služby, otevírací doba.
 3. **Domluvit 20 minut** přes konzultaci v prostoru nebo telefonem.
-4. **Ukázat živě** na jeho datech a spolu přepnout web do režimu s Workspace.
+4. **Ukázat živě** na jeho datech. Když Workspace chce, Kryštof napojí formulář webu na Workspace
+   a web nasadí znovu (D-KV7).
 5. **Po 7 dnech se ozvat:** „Přišla už poptávka? Jak se vám potvrzovala?"
 6. **4 dny před koncem** zkušební doby rekapitulace osobně.
 7. **Zapsat námitky** doslova. Podle nich se upraví texty v P2 a W2.
@@ -384,33 +384,38 @@ Jedno sezení = jedna konverzace v Claude Code. S ≈ půl dne, M ≈ den, L ≈
 
 | Sezení | Co | Velikost | Závisí na | Oblast |
 |---|---|---|---|---|
-| **KV00** | Rozhodnutí D-KV1–D-KV9 a zápis do paměti | S | — | `memory/` |
-| **KV01** | Odblokovat placení: produkční přihlášení Workspace, Stripe live, ověřit klíč Stripe v Production, plán Vercelu | L (hlavně Kryštof) | D-KV2, D-KV8, `docs/workspace/LAUNCH-PLAN.md` | externí služby |
+| **KV00** | ~~Rozhodnutí D-KV1–D-KV9 a zápis do paměti~~ hotovo 2026-11-21 (R-134, R-135) | S | — | `memory/` |
+| **KV01a** | Landing do spuštění: hlavní akce „Vyzkoušet" → formulář „Chci to vyzkoušet" (do Hovorů, R-065); ověřit klíč Stripe ve Vercel Production | S | — | landing |
+| **KV01** | Odblokovat placení: Workspace na Supabase (R-107, F2), Stripe live, po spuštění vrátit akci landing page na registraci | L | KV01a, `docs/AUTH-SUPABASE-PLAN.md`, `docs/workspace/LAUNCH-PLAN.md` | přihlášení, externí služby |
+| **KV01b** | Přesun z Vercelu na Cloudflare (R-135) — až s prvním platícím klientem; PDF přes Chromium, crony, `after()`, DPA | L | první platba | provoz |
 | **KV02** | Fáze 1: zdroj účtu (W4), delší zkušební doba pro pozvané klienty, „Pozvat klienta" předvyplněné ze zakázky (A2), dotaz na kandidáty jako skript | M | KV01, D-KV3 | Workspace, admin (výjimka) |
 | **KV03** | Prostor: `portal.member_prompts`, P1–P6, napojení na export, výmaz a retenci | M | KV00 | `app/klient`, `components/portal`, `lib/portal`, migrace |
 | **KV04** | Vracecí smyčky: první poptávka z webu, měsíční výsledky (denní cron odešle 1. dne), rok webu; odhlášení | M | KV03 | prostor, cron |
 | **KV05** | Workspace zkušební doba: W1, W2, W3, W5 | M | KV01 | Workspace, e-maily |
 | **KV06** | Admin: kandidáti (A1), trychtýř (A3), příznak oboru (A4) | M | KV03 | admin (výjimka) |
-| **KV07** | Web připravený na ZakazIQ: dva režimy formuláře, návod, skill `zakaziq-napojeni` | S | KV01 | `docs/`, skill |
-| **KV08** | Jedno přihlášení z prostoru do Workspace (R-107, F2) a P7 | L | rozhodnutí o pořadí F2 | přihlášení, bezpečnost |
+| ~~**KV07**~~ | ~~Web připravený na ZakazIQ jako výchozí~~ — **nedělá se** (D-KV7: napojení až na přání) | — | — | — |
+| **KV08** | Jedno přihlášení z prostoru do Workspace a P7 — vyplyne z F2 v KV01, zbývá propojit účet klienta a Workspace | M | KV01 | přihlášení, bezpečnost |
 | **KV09** | Reference a doporučení od platících klientů | M | 3–5 platících | Workspace, landing |
 
-Doporučené pořadí: KV00 → KV01 → KV02 + Fáze 1 (ručně) → KV05 → KV03 → KV04 → KV06 → KV07 → KV08 → KV09.
-KV05 jde před háčky v prostoru, protože pomáhá všem registracím, nejen klientům webu.
+Pořadí: KV01a → KV01 → KV02 + Fáze 1 (ručně) → KV05 → KV03 → KV04 → KV06 → KV08 → KV09;
+KV01b, až zaplatí první klient. KV05 jde před háčky v prostoru, protože pomáhá všem registracím,
+nejen klientům webu.
 
-## 9. Rozhodnutí pro Kryštofa
+## 9. Rozhodnutí
 
-| # | Otázka | Možnosti | Doporučení |
-|---|---|---|---|
-| D-KV1 | Jak první klienti přejdou do Workspace | (a) osobně přes „Pozvat klienta" a konzultaci; (b) samoobsluhou z prostoru | (a) pro prvních 5, (b) až s daty |
-| D-KV2 | Pořadí přihlášení a co do té doby s landing page | (a) produkční Clerk teď, F2 později; (b) nejdřív F2 (R-107), Workspace spustit až na Supabase; do spuštění hlavní akce landing page → formulář „Chci to vyzkoušet" | (b), protože produkční Clerk by byl práce navíc, kterou F2 zahodí, a F2 přinese jedno přihlášení s prostorem; landing do té doby na formulář |
-| D-KV3 | Nabídka pro klienty webu | (a) 14 dní jako všichni; (b) 30 dní; (c) první měsíc zdarma kupónem; (d) Workspace v ceně údržby webu | (b) + nastavení spolu, cena beze slevy |
-| D-KV4 | Karta při zkušební době | (a) ponechat (R-038); (b) bez karty pro pozvané klienty | (a) s poctivou připomínkou před první platbou |
-| D-KV5 | Nabídky e-mailem | (a) jen v prostoru a osobně; (b) se souhlasem (nezaškrtnuté políčko v prostoru); (c) bez souhlasu jako stávajícímu zákazníkovi | (a) hned, (b) později; (c) ne bez ověření výkladu |
-| D-KV6 | Komu nabízet | (a) všem s webem; (b) jen označeným vhodným oborem a bez hodnocení 0–6 | (b) |
-| D-KV7 | Nové weby připravené na ZakazIQ jako výchozí | ano / ne | ano |
-| D-KV8 | Vercel před první platbou (R-133) | (a) zůstat na Hobby; (b) přejít na Pro v den první platby | (b) — vrátit se k R-133 novým rozhodnutím |
-| D-KV9 | Jak představit značku | (a) ZakazIQ jako Kryštofův produkt, VIZEON jako jeho studio; (b) ZakazIQ samostatně | (a); v prostoru věta „Tenhle prostor běží na ZakazIQ" |
+Všechna rozhodl Kryštof 2026-11-21 (`memory/memory.md` R-134, D-KV8 jako R-135).
+
+| # | Otázka | Rozhodnuto |
+|---|---|---|
+| D-KV1 | Jak první klienti přejdou do Workspace | osobně přes „Pozvat klienta" a konzultaci, prvních 5; samoobsluha z prostoru až s daty |
+| D-KV2 | Pořadí přihlášení a landing page | nejdřív Supabase (F2, R-107), produkční Clerk se nedělá; do spuštění hlavní akce landing page → formulář „Chci to vyzkoušet" |
+| D-KV3 | Nabídka pro klienty webu | 30 dní zkušební doby a nastavení spolu, cena 249 Kč beze slevy |
+| D-KV4 | Karta při zkušební době | zůstává (R-038), s poctivou připomínkou před první platbou |
+| D-KV5 | Nabídky e-mailem | jen v prostoru a osobně; e-mailem jen výsledky webu bez nabídky |
+| D-KV6 | Komu nabízet | jen označenému vhodnému oboru a bez hodnocení 0–6 |
+| D-KV7 | Nové weby připravené na ZakazIQ | **ne** — napojení na Workspace až na přání klienta (odchylka od doporučení) |
+| D-KV8 | Provoz při prvním platícím klientovi (R-133) | **přesun na Cloudflare**, dopředu se nepřipravuje (odchylka od doporučení Vercel Pro; R-135) |
+| D-KV9 | Jak představit značku | ZakazIQ jako Kryštofův produkt, VIZEON jako jeho studio; v prostoru věta „Tenhle prostor běží na ZakazIQ" |
 
 ## 10. Rizika
 
@@ -420,8 +425,16 @@ KV05 jde před háčky v prostoru, protože pomáhá všem registracím, nejen k
   klientů unese.
 - **Nevhodný obor.** E-shop nebo automatizace z Workspace nic mít nemusí. Proti: příznak vhodného oboru.
 - **Zpracování údajů.** Režim webu s Workspace mění roli ZakazIQ na zpracovatele (oddíl 5.4).
-- **Vercel Hobby** (R-133) a **Supabase Free** u Workspace (uspání po týdnu bez provozu, sdílený
-  projekt s adminem) — otevřené z R-107.
+- **Přesun na Cloudflare až s prvním platícím klientem** (R-135). Mezi první platbou a dokončením
+  přesunu běží placený provoz na Vercel Hobby. Přesun není na jeden den: PDF faktur a předávacích
+  dokumentů vyrábí `puppeteer-core` s `@sparticuz/chromium`, které na Cloudflare Workers neběží;
+  šest cronů z `vercel.json` musí jinam; `after()`, `proxy.ts` a běh Next.js 16 na Cloudflare
+  (adaptér OpenNext) nikdo neověřil; DPA a regiony Cloudflare doplnit do `docs/klientsky-prostor/GDPR.md`.
+  Čím později se začne, tím déle to okno trvá.
+- **Supabase Free** u Workspace (uspání po týdnu bez provozu, sdílený projekt s adminem) — otevřené
+  z R-107, teď předpoklad spuštění (D-KV2).
+- **Napojení webu až na přání** (D-KV7) znamená při každé konverzi úpravu a nové nasazení webu
+  klienta. Počítat s tím v čase Kryštofa u každého klienta.
 - **Dvě značky.** E-maily chodí z krystof@vizeon.cz, prostor je ZakazIQ. Bez jasné věty (D-KV9)
   se klient může ptát, co je co.
 - **Málo dat.** Pár klientů nedá statisticky nic. Rozhodovat podle rozhovorů, čísla brát jako vodítko.

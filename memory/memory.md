@@ -1417,6 +1417,37 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 **Rozhodnutí:** Kryštof 2026-11-21: Vercel Pro platit nebude, projekt zůstává na Hobby.
 **Proč:** náklad není ospravedlněný; rozhodl Kryštof.
 **Důsledek:** DPA Vercelu platí podle jeho podmínek jen pro Pro a Enterprise, takže zpracování u Vercelu (provoz, logy požadavků) **nemá smlouvu o zpracování** — kritérium 8 v `docs/klientsky-prostor/PLAN.md` 11.1 je u Vercelu vědomě přijaté riziko, ne splněné. Hobby je podle podmínek Vercelu jen pro nekomerční použití; riziko přijal Kryštof (otevřený bod výše). Vypadne i to, co Pro přinášelo: častější crony (R-006, R-050) a Observability. Kdyby se rozhodnutí měnilo (první placení klienti, tlak klienta na DPA), vrátit se k tomu přes nový R-xxx.
+**Upřesněno:** R-135 (2026-11-21) — při prvním platícím klientovi přesun na Cloudflare.
+
+### R-134 · Klienti webu do Workspace osobně, nabídka bez nátlaku (2026-11-21)
+**Rozhodnutí:** Kryštof prošel D-KV1–D-KV9 z `docs/klientsky-prostor/KONVERZE-PLAN.md`:
+(1) prvních 5 klientů webu převádí osobně — připraví jim Workspace přes „Pozvat klienta" a projde
+ho s nimi na 20minutové konzultaci, samoobsluha z prostoru až s daty (D-KV1);
+(2) **Workspace se spustí až na Supabase** (R-107, F2), produkční Clerk se nedělá; do té doby vede
+hlavní akce landing page na formulář „Chci to vyzkoušet", ne do registrace (D-KV2);
+(3) klienti webu dostanou **30 dní** zkušební doby místo 14 a nastavení s Kryštofem, cena 249 Kč
+beze slevy (D-KV3); (4) karta hned na začátku zůstává (R-038) s poctivou připomínkou před první
+platbou (D-KV4); (5) nabídka Workspace **jen v prostoru a osobně**, e-mailem jen výsledky webu bez
+nabídky (D-KV5); (6) aktivně jen klientům označeným v adminu jako vhodný obor a bez hodnocení 0–6
+(D-KV6); (7) weby se na Workspace napojují **až na přání klienta**, ne předem (D-KV7);
+(8) ZakazIQ je Kryštofův produkt, VIZEON jeho studio, nabídka jde od Kryštofa osobně (D-KV9).
+**Proč:** klientů webu je málo a Kryštofovi věří; osobní rozhovor je převede líp než automat
+a nepoškodí vztah (doporučení, údržba). Produkční Clerk by byla práce, kterou F2 zahodí, a F2 dá
+klientovi jeden účet na prostor i Workspace. 14 dní je pro malou firmu málo poptávek na aktivaci.
+**Důsledek:** upřesňuje R-038 (delší zkušební doba jen pro pozvané klienty webu, nastaví se
+v Checkoutu podle zdroje účtu) a R-107 (F2 je předpoklad spuštění Workspace). KV07 se nedělá jako
+výchozí stav webů. Pořadí sezení a prvky v plánu, oddíl 8.
+
+### R-135 · Při prvním platícím klientovi z Vercelu na Cloudflare (2026-11-21)
+**Rozhodnutí:** až přijde první platící klient Workspace, provoz se přesune z Vercelu na Cloudflare.
+Přesun se **dopředu nepřipravuje**, řeší se až v tu chvíli (D-KV8).
+**Proč:** rozhodl Kryštof místo přechodu na Vercel Pro; Hobby je podle podmínek Vercelu jen pro
+nekomerční provoz.
+**Důsledek:** upřesňuje R-133. Do dokončení přesunu běží placený provoz na Hobby (riziko přijal
+Kryštof). Přesun není na jeden den: PDF faktur a předávacích dokumentů vyrábí `puppeteer-core`
+s `@sparticuz/chromium`, které na Cloudflare Workers neběží; šest cronů z `vercel.json`, `after()`,
+`proxy.ts`, regiony a DPA Cloudflare je potřeba ověřit samostatným plánem. Detail plán konverze,
+oddíl 10.
 
 ---
 
@@ -1424,9 +1455,9 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 
 - [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
   www.zakaziq.cz otevře registraci vývojové instance Clerku (nápis *Development mode*, ověřeno
-  2026-11-21). Ověřit, jestli Vercel Production nemá testovací klíč Stripe — pak by si kdokoli
-  s testovací kartou založil na produkci předplatné zdarma. Do spuštění zvážit hlavní akci landing
-  page na formulář (D-KV2 v `docs/klientsky-prostor/KONVERZE-PLAN.md`) · Kryštof · od 2026-11-21
+  2026-11-21). Rozhodnuto (R-134): do spuštění Workspace na Supabase vede hlavní akce na formulář
+  „Chci to vyzkoušet" — **zatím neudělané**. Ověřit, jestli Vercel Production nemá testovací klíč
+  Stripe — pak by si kdokoli s testovací kartou založil na produkci předplatné zdarma · od 2026-11-21
 
 - [ ] **E-maily z Hovorů (R-132) — projít naživo:** v prohlížeči ověřené jen okno na fiktivním
   kontaktu (390 a 800 px) a logika testy nad PGlite s podstrčeným Googlem a Resendem. Zbývá po
@@ -1731,7 +1762,7 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
   v `app/portal-actions.ts`. Ověřeno na dev serveru (404 pro nesmysl i pro `abc' OR '1'='1`).
 - [ ] **Výpadek 2026-11-04 — dohledat:** ověřit, jestli během výpadku (nejpozději 10:38–14:35) nepropadla poptávka z vizeon.cz nebo alteno.cz (veřejné endpointy vracely chybu); přihlášený `/hub` po opravě ověřit okem · `.claude/security/AUDIT-LOG.md` · od 2026-11-04
 - [ ] **Landing — zbytek auditu R-078:** (1) na telefonu 390 px je v Jak to funguje úsek asi 3 100 px skoro bez obsahu (velké mezery mezi kroky), (2) žádná fotka, (3) ozdoby: tenké a čárkované čáry, stíny v klidu, modrá záře v hero, plovoucí navigace ve tvaru pilulky, (4) 21 velikostí písma a texty pod 13 px, (5) karty Funkce se stejným rámečkem · `components/marketing/` · od 2026-11-03
-- [ ] **Vercel Hobby a komerční provoz (R-133: Pro se platit nebude, riziko přijato):** podle podmínek Vercelu je Hobby jen pro nekomerční osobní použití; placený Workspace potřebuje Pro. Pro zároveň dovolí častější crony (připomínky 2 h předem, rychlejší fronta e-mailů, R-006, R-050) a Observability. Rozhodnutí a platba: Kryštof · před spuštěním · od 2026-11-03
+- [ ] **Vercel Hobby a komerční provoz (R-133, R-135):** podle podmínek Vercelu je Hobby jen pro nekomerční osobní použití. Při prvním platícím klientovi se jde na Cloudflare, přesun se dopředu nepřipravuje; do jeho dokončení běží placený provoz na Hobby. Pozor na PDF přes Chromium, crony a `after()` (R-135) · Kryštof · od 2026-11-03
 - [ ] **Přihlášení přes Supabase nikdo nezkusil naživo (R-105):** projekt `zakaziq` má
   **nula uživatelů**, takže se do adminu nepřihlásí nikdo, dokud účet nevznikne. Zbývá:
   (1) Kryštof založí účet v Supabase (Authentication → Users → Add user, e-mail musí být
@@ -1835,6 +1866,10 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
   žebřík malých ano, okamžiky nabídky, vracecí smyčky, prvky P1–P7, W1–W5, A1–A4, mantinely proti
   temným vzorům, sezení KV00–KV09 a rozhodnutí D-KV1–D-KV9 (čekají na Kryštofa). Soubor
   `docs/klientsky-prostor/KONVERZE-PLAN.md`, řádek v `memory/index.md`. Bez změny kódu.
+- **decision** **R-134** (D-KV1–D-KV7, D-KV9: osobně prvních 5, Workspace až na Supabase a landing
+  do té doby na formulář, 30 dní pro klienty webu, karta zůstává, nabídka jen v prostoru a osobně,
+  jen vhodný obor, weby na Workspace až na přání, ZakazIQ jako Kryštofův produkt) a **R-135**
+  (při prvním platícím klientovi z Vercelu na Cloudflare, dopředu se nepřipravuje). Plán upravený.
 - **chore** Ověřeno při analýze: `npx tsc --noEmit` čisté; `npx vitest run` 1572 prošlo, 3 selhaly
   (známé: `ws-schema` mezera po 120, `ws-email` pevné datum, `admin-ai-asistent-crm` časový limit);
   `zakaziq.cz` → 308 na www, canonical www; `/w/registrace` 200, ale Clerk v režimu *Development mode*.
