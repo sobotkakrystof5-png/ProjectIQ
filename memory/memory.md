@@ -1413,6 +1413,11 @@ odeslat. Schůzka z Hovorů nepotřebuje migraci
 (použije 105 a 115, které na produkci jsou), ale bez propojeného Googlu a `VIZEON_RESEND_API_KEY`
 je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, technika
 `docs/admin/AGENTS-ADMIN.md` → „Poslat e-mail z Hovorů".
+### R-133 · Vercel zůstává na plánu Hobby, bez Pro (2026-11-21)
+**Rozhodnutí:** Kryštof 2026-11-21: Vercel Pro platit nebude, projekt zůstává na Hobby.
+**Proč:** náklad není ospravedlněný; rozhodl Kryštof.
+**Důsledek:** DPA Vercelu platí podle jeho podmínek jen pro Pro a Enterprise, takže zpracování u Vercelu (provoz, logy požadavků) **nemá smlouvu o zpracování** — kritérium 8 v `docs/klientsky-prostor/PLAN.md` 11.1 je u Vercelu vědomě přijaté riziko, ne splněné. Hobby je podle podmínek Vercelu jen pro nekomerční použití; riziko přijal Kryštof (otevřený bod výše). Vypadne i to, co Pro přinášelo: častější crony (R-006, R-050) a Observability. Kdyby se rozhodnutí měnilo (první placení klienti, tlak klienta na DPA), vrátit se k tomu přes nový R-xxx.
+
 ---
 
 ## 3. Otevřené problémy
@@ -1720,7 +1725,7 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
   v `app/portal-actions.ts`. Ověřeno na dev serveru (404 pro nesmysl i pro `abc' OR '1'='1`).
 - [ ] **Výpadek 2026-11-04 — dohledat:** ověřit, jestli během výpadku (nejpozději 10:38–14:35) nepropadla poptávka z vizeon.cz nebo alteno.cz (veřejné endpointy vracely chybu); přihlášený `/hub` po opravě ověřit okem · `.claude/security/AUDIT-LOG.md` · od 2026-11-04
 - [ ] **Landing — zbytek auditu R-078:** (1) na telefonu 390 px je v Jak to funguje úsek asi 3 100 px skoro bez obsahu (velké mezery mezi kroky), (2) žádná fotka, (3) ozdoby: tenké a čárkované čáry, stíny v klidu, modrá záře v hero, plovoucí navigace ve tvaru pilulky, (4) 21 velikostí písma a texty pod 13 px, (5) karty Funkce se stejným rámečkem · `components/marketing/` · od 2026-11-03
-- [ ] **Vercel Hobby a komerční provoz:** podle podmínek Vercelu je Hobby jen pro nekomerční osobní použití; placený Workspace potřebuje Pro. Pro zároveň dovolí častější crony (připomínky 2 h předem, rychlejší fronta e-mailů, R-006, R-050) a Observability. Rozhodnutí a platba: Kryštof · před spuštěním · od 2026-11-03
+- [ ] **Vercel Hobby a komerční provoz (R-133: Pro se platit nebude, riziko přijato):** podle podmínek Vercelu je Hobby jen pro nekomerční osobní použití; placený Workspace potřebuje Pro. Pro zároveň dovolí častější crony (připomínky 2 h předem, rychlejší fronta e-mailů, R-006, R-050) a Observability. Rozhodnutí a platba: Kryštof · před spuštěním · od 2026-11-03
 - [ ] **Přihlášení přes Supabase nikdo nezkusil naživo (R-105):** projekt `zakaziq` má
   **nula uživatelů**, takže se do adminu nepřihlásí nikdo, dokud účet nevznikne. Zbývá:
   (1) Kryštof založí účet v Supabase (Authentication → Users → Add user, e-mail musí být
@@ -1819,6 +1824,7 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-21 (nasazení klientského prostoru KP11–KP17 a KP10 na produkci)
+- **decision** **R-133**: Vercel zůstává na Hobby, Pro se platit nebude (Kryštof). DPA Vercelu tím u klientských dat zůstává nepokryté, přijaté riziko; v `GDPR.md` označeno.
 - **chore** KP10 kritérium 8: v dashboardu Vercelu potvrzeno, že tým je na plánu **Hobby** (DPA Vercelu platí jen pro Pro a Enterprise). Do vyřešení přechodu na Pro zůstává Vercel bez smlouvy o zpracování. Text `/klient/soukromi` přečten ze zdroje a předán Kryštofovi ke kontrole (bod 9 čeká na jeho schválení).
 - **chore** KP10 kritérium 8, částečně: v dashboardu Supabase potvrzeno (Organization → Legal Documents), že DPA je součástí Terms of Service a nic se nepodepisuje. Google Admin (vyžaduje přístupový klíč) a OpenAI (odhlášený) agent neověřil, Vercel MCP plán neukazuje. Zbývá Google CDPA, OpenAI, Vercel plán a body 5 (TOTP), 6 (pilot), 9 (text soukromí).
 - **chore** KP10 kritérium 7: oddělení dvou firem ověřené na produkční databázi (Neon, větev `production`). Dva testovací klienti a zakázky založené v jedné transakci a vrácené `RAISE EXCEPTION` (rollback ověřen: 0 testovacích řádků, žádné zůstatkové členství v roli). V roli `portal_app` s `app.client_id` A a B: každý vidí jen svoji zakázku a aktivitu, na id druhé firmy nevidí nic, bez kontextu 0 řádků ve všech 14 čitelných tabulkách, `public.projects`, `portal.invites` a zápis do projekcí zakázané, koncept aktivity A klient nevidí, `portal_app` bez BYPASSRLS. Pozn.: `neondb_owner` měl v roli členství bez práva SET, test si ho dal `GRANT … WITH SET TRUE` jen uvnitř vratné transakce. Na produkci zůstal klient „dobry den" z 2026-11-17 (nedotčen, kdo ho založil, nevíme).

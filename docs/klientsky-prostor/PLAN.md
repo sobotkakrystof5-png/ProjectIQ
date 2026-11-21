@@ -306,7 +306,7 @@ a když platí i 6–9.
 6. Pilotní klient prošel pozvánka → heslo → první obrazovka do 2 minut → zpráva → schválení
    → konzultace → faktura → dotazník; zjištění opravená nebo zapsaná.
 7. Oddělení dvou firem ověřené ručně na produkční databázi (dva testovací klienti), ne jen testem. **Hotovo 2026-11-21** (vratná transakce přes Neon MCP, viz paměť).
-8. DPA zpracovatelů v `GDPR.md` přijaté a zapsané (Neon, Supabase, Vercel, Resend, Google, OpenAI).
+8. DPA zpracovatelů v `GDPR.md` přijaté a zapsané (Neon, Supabase, Vercel, Resend, Google, OpenAI). **Stav 2026-11-21:** Supabase ověřeno, Resend předpodepsané; Vercel na Hobby bez DPA — riziko přijaté (R-133); Neon, Google a OpenAI v účtech neověřeno.
 9. Text `/klient/soukromi` zkontrolovaný Kryštofem; zpracovatelé doplnění do smlouvy s klientem.
 
 ## 12. Zápis do paměti
