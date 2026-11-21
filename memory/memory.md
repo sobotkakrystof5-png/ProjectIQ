@@ -1819,6 +1819,7 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-21 (nasazení klientského prostoru KP11–KP17 a KP10 na produkci)
+- **docs** DPA zpracovatelů v `docs/klientsky-prostor/GDPR.md` doplněno z veřejných podmínek (ověřeno 2026-11-21): Resend má DPA předpodepsané, ale zpracovává v USA (SCC + DPF); Vercel DPA platí podle podmínek jen pro Pro/Enterprise, projekt je na Hobby, takže smlouva zpracování nemusí pokrývat; Supabase, Neon a Google beze změny — přijetí v účtech nikdo neověřil. Zbývá ověřit v dashboardech (Supabase Organization → Legal, Google Admin → Legal and compliance, OpenAI) a vyřešit Vercel Pro.
 - **chore** `main` `d3380ce` → `fa79603` (fast-forward, 14 commitů: KP11–KP17, KP10, merge e-mailů z Hovorů).
   První push zablokoval GitHub push protection (testovací Stripe klíč v `f01c08e`); Kryštof
   výslovně souhlasil s přepisem nepushnuté historie, klíč se odstranil `git filter-branch`

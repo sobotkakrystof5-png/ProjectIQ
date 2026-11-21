@@ -9,13 +9,13 @@
 Správce: Kryštof Sobotka, IČO 29977231 (VIZEON). Klient je firma (B2B); osobní údaje jsou údaje
 jejích lidí, kteří do prostoru chodí, a co napíšou.
 
-| Zpracovatel | Co | Kde | Stav smlouvy |
+| Zpracovatel | Co | Kde | Stav smlouvy (veřejné podmínky ověřeny 2026-11-21) |
 |---|---|---|---|
-| Neon | databáze | eu-central-1 (Frankfurt) | DPA v podmínkách služby — **neověřeno, že je přijaté** |
-| Supabase | přihlášení (`auth.users`), soubory chatu (bucket `chat-prilohy`) | eu-central-1 | DPA na vyžádání v dashboardu — **neověřeno** |
-| Vercel | provoz, logy požadavků | funkce `fra1`, CDN globálně | DPA v podmínkách — **neověřeno** |
-| Resend | e-maily z vizeon.cz | **[DOPLNIT]** region | **[DOPLNIT]** |
-| Google Workspace | Kalendář a Meet ke konzultacím | **[DOPLNIT]** | Cloud Data Processing Addendum — **neověřeno** |
+| Neon | databáze | eu-central-1 (Frankfurt) | DPA `neon.com/dpa` je podle jejich podmínek součástí smlouvy odkazem; zpracovatelé na `neon.com/subprocessors`. Nic se nepodepisuje, **nepotvrzeno v účtu** |
+| Supabase | přihlášení (`auth.users`), soubory chatu (bucket `chat-prilohy`) | eu-central-1 | DPA `supabase.com/legal/dpa` (SCC začleněny); zda stačí přijetí podmínek, nebo se podepisuje v dashboardu, z veřejných zdrojů **nevyšlo jednoznačně** — ověřit v Organization → Legal |
+| Vercel | provoz, logy požadavků | funkce `fra1`, CDN globálně | DPA `vercel.com/legal/dpa` **platí podle podmínek pro plány Pro a Enterprise**; projekt běží na Hobby, takže smlouva zpracování **nemusí pokrývat** (otevřený bod Vercel Pro, viz paměť) |
+| Resend | e-maily z vizeon.cz a zakaziq.cz | zpracování **v USA** (oblast odesílání EU určuje jen směrování, ne uložení); SCC a EU-U.S. Data Privacy Framework | DPA je podle `resend.com/security/gdpr` předpodepsané a platí pro každý účet od registrace — nic k podpisu |
+| Google Workspace | Kalendář a Meet ke konzultacím | podle výchozích podmínek kdekoli, kde Google a jeho zpracovatelé působí; volba datové oblasti jen u vybraných edic | Cloud Data Processing Addendum: pokud ho smlouva neobsahuje odkazem, přijímá se v Admin konzoli (Account settings → Legal and compliance, super admin) — **přijetí neověřeno** |
 | OpenAI | přepis hlasu (audio se neukládá) | USA, SCC | ověřeno 2026-11-01 (plán 8.1), přijetí DPA v organizaci **neověřeno** |
 | Anthropic | shrnutí požadavků a zadání pro Claude Code | USA, SCC | ověřeno 2026-11-01 (plán 8.1) |
 
