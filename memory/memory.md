@@ -1565,9 +1565,9 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
   · od 2026-11-18
 - [ ] **`ws-schema` test je na větvích `klient/*` červený:** číslo 120 drží necommitnutá oprava
   kalendáře v hlavním stromu, KP12 proto vzala 121. Zmizí, až bude 120 v historii · od 2026-11-18
-- [ ] **Admin v Supabase nemá druhý faktor:** účet adminu má 0 ověřených TOTP faktorů (zjištěno
+- [x] ~~**Admin v Supabase nemá druhý faktor:** účet adminu má 0 ověřených TOTP faktorů (zjištěno
   2026-11-18), přihlášení do adminu tedy stojí jen na hesle. Zapnout v `/dashboard/profil` →
-  Přihlášení · Kryštof · od 2026-11-18
+  Přihlášení · Kryštof · od 2026-11-18~~ — zapnuto 2026-11-21 (viz changelog).
 - [ ] **KP11 naživo neověřené:** pozvání z detailu zakázky běží jen v testech a na dočasné stránce.
   Po nastavení Supabase (předchozí bod) projít: zakázka → Pozvat do prostoru → e-mail z krystof@vizeon.cz
   → nastavit heslo → klient vidí zakázku; „Zpět" do 10 s nic nepošle; druhá zakázka stejného klienta se
@@ -1824,6 +1824,7 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-21 (nasazení klientského prostoru KP11–KP17 a KP10 na produkci)
+- **chore** KP10 kritérium 5: **TOTP u admina zapnuté** 2026-11-21 (produkční `/dashboard/profil` → Přihlášení, ověřovací aplikace). Kryštof naskenoval QR a zadal kód sám, agent kód ani heslo nezadával; QR se nefotil. Po novém načtení stránky ukazuje „Dvoufázové ověření je zapnuté“. Zkoušky přes Playwright CLI v samostatném okně selhaly (okno nebylo vidět, přihlášení proběhlo jinde), použil se přihlášený Chrome přes rozšíření. Dál zbývá: pilot, Google CDPA, OpenAI.
 - **docs** Kontrolní seznam pilotu `docs/klientsky-prostor/PILOT.md` (příprava, 14 kroků průchodu, kritéria hotovo, tabulka zjištění), řádek v `memory/index.md`.
 - **decision** **R-133**: Vercel zůstává na Hobby, Pro se platit nebude (Kryštof). DPA Vercelu tím u klientských dat zůstává nepokryté, přijaté riziko; v `GDPR.md` označeno.
 - **chore** KP10 kritérium 8: v dashboardu Vercelu potvrzeno, že tým je na plánu **Hobby** (DPA Vercelu platí jen pro Pro a Enterprise). Do vyřešení přechodu na Pro zůstává Vercel bez smlouvy o zpracování. Text `/klient/soukromi` přečten ze zdroje a předán Kryštofovi ke kontrole (bod 9 čeká na jeho schválení).
