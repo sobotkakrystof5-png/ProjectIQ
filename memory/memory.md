@@ -1824,6 +1824,7 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-21 (nasazení klientského prostoru KP11–KP17 a KP10 na produkci)
+- **docs** Kontrolní seznam pilotu `docs/klientsky-prostor/PILOT.md` (příprava, 14 kroků průchodu, kritéria hotovo, tabulka zjištění), řádek v `memory/index.md`.
 - **decision** **R-133**: Vercel zůstává na Hobby, Pro se platit nebude (Kryštof). DPA Vercelu tím u klientských dat zůstává nepokryté, přijaté riziko; v `GDPR.md` označeno.
 - **chore** KP10 kritérium 8: v dashboardu Vercelu potvrzeno, že tým je na plánu **Hobby** (DPA Vercelu platí jen pro Pro a Enterprise). Do vyřešení přechodu na Pro zůstává Vercel bez smlouvy o zpracování. Text `/klient/soukromi` přečten ze zdroje a předán Kryštofovi ke kontrole (bod 9 čeká na jeho schválení).
 - **chore** KP10 kritérium 8, částečně: v dashboardu Supabase potvrzeno (Organization → Legal Documents), že DPA je součástí Terms of Service a nic se nepodepisuje. Google Admin (vyžaduje přístupový klíč) a OpenAI (odhlášený) agent neověřil, Vercel MCP plán neukazuje. Zbývá Google CDPA, OpenAI, Vercel plán a body 5 (TOTP), 6 (pilot), 9 (text soukromí).
