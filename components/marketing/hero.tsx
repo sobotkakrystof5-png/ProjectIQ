@@ -1,6 +1,6 @@
 import { getAdminSession } from '@/lib/auth'
 import { AccentHeading } from '@/components/ws/brand'
-import { CTA_LABEL, ROUTES, SUPPORT_FORM_HREF } from './content'
+import { CTA, SIGNUP_OPEN, SUPPORT_FORM_HREF } from './content'
 import { HeroBackdrop } from './hero-backdrop'
 import { Header } from './header'
 import { LiveDemo } from './live-demo'
@@ -34,17 +34,20 @@ export async function Hero() {
             </p>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 animate-zq-rise [animation-delay:240ms]">
               <a
-                href={ROUTES.signUp}
+                href={CTA.href}
                 className="inline-flex min-h-[54px] items-center rounded-full bg-white px-7 text-lg font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50 sm:text-[19px]"
               >
-                {CTA_LABEL}
+                {CTA.label}
               </a>
-              <a
-                href={SUPPORT_FORM_HREF}
-                className="inline-flex min-h-[44px] items-center text-lg text-navy-100 underline decoration-navy-400 underline-offset-[6px] transition-colors hover:text-white hover:decoration-white"
-              >
-                Napište nám
-              </a>
+              {/* Dokud registrace není otevřená, vede hlavní akce na tentýž formulář. */}
+              {SIGNUP_OPEN && (
+                <a
+                  href={SUPPORT_FORM_HREF}
+                  className="inline-flex min-h-[44px] items-center text-lg text-navy-100 underline decoration-navy-400 underline-offset-[6px] transition-colors hover:text-white hover:decoration-white"
+                >
+                  Napište nám
+                </a>
+              )}
             </div>
             <ul
               aria-label="Podmínky zkušební doby"

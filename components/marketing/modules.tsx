@@ -2,7 +2,7 @@
 
 import { useState, type ComponentType } from 'react'
 import { cn } from '@/lib/ws/utils'
-import { CTA_LABEL, MODULES, ROUTES } from './content'
+import { CTA, MODULES } from './content'
 import {
   CalendarPreview,
   CustomersPreview,
@@ -218,10 +218,10 @@ export function Modules() {
           Všechno, co tu vidíte, je v ceně. 14 dní zdarma, potom 249 Kč měsíčně.
         </p>
         <a
-          href={ROUTES.signUp}
+          href={CTA.href}
           className="inline-flex min-h-[54px] shrink-0 items-center justify-center rounded-full bg-navy-700 px-7 text-lg font-semibold text-white transition-colors duration-200 ease-zq hover:bg-navy-800"
         >
-          {CTA_LABEL}
+          {CTA.label}
         </a>
       </div>
     </section>

@@ -53,6 +53,8 @@ Tohle je nejdůležitější část zadání a platí pro každé rozhodnutí n�
 
 **Obory** (pás oborů, šablony): Kadeřnictví, Kosmetika, Zámečnictví, Studnařství, Likvidace azbestu, Autoservis, Úklid, Stavba a řemesla.
 
+> **Do spuštění Workspace na Supabase (R-134, D-KV2):** přepínač `SIGNUP_OPEN = false` v `components/marketing/content.ts`. Všechna tlačítka „Vyzkoušet 14 dní zdarma" se jmenují „Chci to vyzkoušet" a vedou na `/#vyzkouset` (kontaktní formulář s předvyplněnou zprávou), „Přihlásit" vede do `/klient/prihlaseni`, vedlejší „Napište nám" v úvodu se neukazuje a nadpis patičky je „Přístup vám nastavím osobně.". Níže popsaný stav platí po přepnutí na `true`.
+
 **Cíl stránky:** registrace (`/w/registrace`). Jedna hlavní akce na celé stránce: „Vyzkoušet 14 dní zdarma“. Vedlejší cesta je kontakt na podporu, pro lidi, kteří se chtějí nejdřív zeptat. Podmínky u CTA vždy jasně uvádějí kartu při registraci, první platbu po 14 dnech, cenu 249 Kč měsíčně a možnost kdykoli zrušit.
 
 **Tón:** přímý, v první osobě zakladatele („Web vám postavím a rovnou napojím.“), bez superlativů, oslovení „vy“. Čtenář je kadeřnice nebo zámečník s telefonem v ruce, žádný IT člověk. Pravidla a slovník: skill `zakaziq-ux-texty-cs` (v textech „funkce“, ne „modul“; „skupina“, ne „segment“; „účet“, ne „workspace“). Žádné technické termíny mimo sekci Napojení, kde smí padnout „kód“.

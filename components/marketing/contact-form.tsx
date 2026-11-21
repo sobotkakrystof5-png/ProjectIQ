@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { submitContactForm, type ContactFormState } from '../../app/(marketing)/actions'
-import { ROUTES, SUPPORT_EMAIL, SUPPORT_MAILTO } from './content'
+import { ROUTES, SIGNUP_OPEN, SUPPORT_EMAIL, SUPPORT_MAILTO, TRY_ANCHOR, TRY_MESSAGE } from './content'
 
 const inputClass = 'mt-2 min-h-[50px] w-full rounded-chip border border-navy-100 bg-surface px-4 text-base text-ink outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-100'
 const initialContactFormState: ContactFormState = { status: 'idle', message: '' }
@@ -10,9 +10,22 @@ const initialContactFormState: ContactFormState = { status: 'idle', message: '' 
 export function ContactForm() {
   const [state, formAction, pending] = useActionState(submitContactForm, initialContactFormState)
   const startedAt = useRef<HTMLInputElement>(null)
+  const message = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (startedAt.current) startedAt.current.value = String(Date.now())
+  }, [])
+
+  // Po „Chci to vyzkoušet" (kotva #vyzkouset, R-134) předvyplní zprávu, ať
+  // Kryštof v Hovorech pozná zájem o přístup. Rozepsaný text nepřepíše.
+  useEffect(() => {
+    const prefill = () => {
+      const el = message.current
+      if (el && window.location.hash === `#${TRY_ANCHOR}` && el.value.trim() === '') el.value = TRY_MESSAGE
+    }
+    prefill()
+    window.addEventListener('hashchange', prefill)
+    return () => window.removeEventListener('hashchange', prefill)
   }, [])
 
   return (
@@ -35,7 +48,7 @@ export function ContactForm() {
 
       <label className="block text-[15px] font-medium text-ink">
         S čím vám můžeme pomoct?
-        <textarea className={`${inputClass} min-h-32 resize-y py-3`} name="message" minLength={3} maxLength={3000} rows={5} required />
+        <textarea ref={message} className={`${inputClass} min-h-32 resize-y py-3`} name="message" minLength={3} maxLength={3000} rows={5} required />
       </label>
 
       <p id="contact-privacy" className="text-sm leading-relaxed text-quiet">
@@ -51,7 +64,7 @@ export function ContactForm() {
           disabled={pending}
           className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-navy-700 px-6 text-base font-semibold text-white transition-colors hover:bg-navy-800 disabled:cursor-wait disabled:opacity-70"
         >
-          {pending ? 'Odesílám…' : 'Odeslat dotaz'}
+          {pending ? 'Odesílám…' : SIGNUP_OPEN ? 'Odeslat dotaz' : 'Odeslat'}
         </button>
         <p className="text-sm text-quiet">Ozveme se do 24 hodin.</p>
       </div>

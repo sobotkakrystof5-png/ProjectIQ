@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
 import { Logo } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
-import { NAV, ROUTES } from './content'
+import { CTA, NAV, ROUTES } from './content'
 
 /**
  * Přihlášený admin uvidí místo „Přihlásit" odkaz do administrace — dřív ho
@@ -25,7 +25,7 @@ function SignInLink({ className, signedIn }: { className?: string; signedIn: boo
     )
   }
   return (
-    <a href={ROUTES.signIn} className={className}>
+    <a href={CTA.signInHref} className={className}>
       Přihlásit
     </a>
   )
@@ -139,11 +139,11 @@ export function Header({ variant = 'hero', signedIn = false }: { variant?: 'hero
       <div className="flex items-center gap-1.5">
         <SignInLink signedIn={signedIn} className="hidden min-h-[44px] items-center rounded-full px-4 text-base text-navy-100 transition-colors hover:text-white sm:inline-flex" />
         <a
-          href={ROUTES.signUp}
+          href={CTA.href}
           className="inline-flex min-h-[44px] items-center rounded-full bg-white px-5 text-base font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50"
         >
-          <span className="sm:hidden">Zkusit zdarma</span>
-          <span className="hidden sm:inline">14 dní zdarma</span>
+          <span className="sm:hidden">{CTA.tiny}</span>
+          <span className="hidden sm:inline">{CTA.short}</span>
         </a>
         <button
           type="button"

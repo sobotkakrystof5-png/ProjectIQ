@@ -1456,7 +1456,9 @@ oddíl 10.
 - [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
   www.zakaziq.cz otevře registraci vývojové instance Clerku (nápis *Development mode*, ověřeno
   2026-11-21). Rozhodnuto (R-134): do spuštění Workspace na Supabase vede hlavní akce na formulář
-  „Chci to vyzkoušet" — **zatím neudělané**. Ověřit, jestli Vercel Production nemá testovací klíč
+  „Chci to vyzkoušet" — **v kódu hotové 2026-11-21 na větvi `claude/app-analysis-client-psychology-7a5735`,
+  na produkci není** (merge do `main` a push jen se souhlasem). Po spuštění F2 přepnout
+  `SIGNUP_OPEN` v `components/marketing/content.ts` na `true`. Ověřit, jestli Vercel Production nemá testovací klíč
   Stripe — pak by si kdokoli s testovací kartou založil na produkci předplatné zdarma · od 2026-11-21
 
 - [ ] **E-maily z Hovorů (R-132) — projít naživo:** v prohlížeči ověřené jen okno na fiktivním
@@ -1861,6 +1863,16 @@ oddíl 10.
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
 ### 2026-11-21 (analýza a plán konverze klientů na Workspace)
+- **feat** Landing do spuštění Workspace (R-134, D-KV2, KV01a): přepínač `SIGNUP_OPEN = false`
+  v `components/marketing/content.ts`. Pět tlačítek „Vyzkoušet 14 dní zdarma" (hlavička, úvod, funkce,
+  ceník, patička) je teď „Chci to vyzkoušet" → `/#vyzkouset`, kde formulář předvyplní „Chci vyzkoušet
+  ZakazIQ. Moje firma: " (dotaz jde do Hovorů, R-065). „Přihlásit" vede do `/klient/prihlaseni`
+  (jediní, kdo se dnes přihlašují, jsou klienti webu), sekce kontaktu má nadpis „Chcete to vyzkoušet?",
+  patička „Přístup vám nastavím osobně.". Soubory: `components/marketing/{content,header,hero,modules,pricing,footer,contact-section,contact-form}.tsx|ts`,
+  test `components/marketing/__tests__/trial-cta.test.ts`, poznámka v `docs/landing/PROJECT-BRIEF.md`.
+  Ověřeno: `tsc`, testy landing page 9/9, lokálně v prohlížeči 1280 a 390 px (odkazy, předvyplnění,
+  posun ke formuláři, bez vodorovného přetečení, konzole čistá). Odeslání formuláře nezkoušeno
+  (worktree nemá `.env.local`). Na produkci není.
 - **docs** Analýza od A do Z a plán, jak z klienta webu s klientským prostorem udělat platícího uživatele
   Workspace: psychologie klienta, „zrcadlo" (co klient zažil v prostoru, dostanou jeho zákazníci od něj),
   žebřík malých ano, okamžiky nabídky, vracecí smyčky, prvky P1–P7, W1–W5, A1–A4, mantinely proti

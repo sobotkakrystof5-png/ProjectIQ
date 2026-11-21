@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
 import { AccentHeading } from '@/components/ws/brand'
 import { cn } from '@/lib/ws/utils'
-import { CTA_LABEL, PRICE_INCLUDES, ROUTES } from './content'
+import { CTA, PRICE_INCLUDES } from './content'
 
 /** Statické pole dílků 56 px za cenou: každý pátý plný, ostatní jen obrys (LP-D). */
 function PriceTiles() {
@@ -57,10 +57,10 @@ export function Pricing() {
             </ul>
           </div>
           <a
-            href={ROUTES.signUp}
+            href={CTA.href}
             className="inline-flex min-h-[54px] items-center justify-center self-start rounded-full bg-white px-7 text-lg font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50 sm:text-[19px]"
           >
-            {CTA_LABEL}
+            {CTA.label}
           </a>
         </div>
       </div>

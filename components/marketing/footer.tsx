@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { AccentHeading, Logo } from '@/components/ws/brand'
-import { CTA_LABEL, ROUTES, SUPPORT_LABEL, SUPPORT_MAILTO } from './content'
+import { CTA, ROUTES, SUPPORT_LABEL, SUPPORT_MAILTO } from './content'
 import { OPERATOR_LINE } from './legal'
 
 const linkClass = 'inline-flex min-h-[44px] items-center text-[17px] text-navy-200 transition-colors hover:text-white'
@@ -12,13 +12,13 @@ export function Footer() {
       <div className="mx-auto max-w-[1200px] px-5 pb-8 pt-14 sm:px-7 md:pt-20">
         <div className="flex flex-col gap-8 border-b border-navy-800 pb-12 lg:flex-row lg:items-end lg:justify-between">
           <AccentHeading as="h2" size="section" onDark className="max-w-[640px]">
-            První poptávku můžete přijmout ještě dnes.
+            {CTA.footerHeading}
           </AccentHeading>
           <a
-            href={ROUTES.signUp}
+            href={CTA.href}
             className="inline-flex min-h-[54px] items-center justify-center self-start rounded-full bg-white px-7 text-lg font-semibold text-navy-950 transition-colors duration-200 ease-zq hover:bg-navy-50 sm:text-[19px] lg:self-auto"
           >
-            {CTA_LABEL}
+            {CTA.label}
           </a>
         </div>
 

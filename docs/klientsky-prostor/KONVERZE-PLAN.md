@@ -385,7 +385,7 @@ Jedno sezení = jedna konverzace v Claude Code. S ≈ půl dne, M ≈ den, L ≈
 | Sezení | Co | Velikost | Závisí na | Oblast |
 |---|---|---|---|---|
 | **KV00** | ~~Rozhodnutí D-KV1–D-KV9 a zápis do paměti~~ hotovo 2026-11-21 (R-134, R-135) | S | — | `memory/` |
-| **KV01a** | Landing do spuštění: hlavní akce „Vyzkoušet" → formulář „Chci to vyzkoušet" (do Hovorů, R-065); ověřit klíč Stripe ve Vercel Production | S | — | landing |
+| **KV01a** | Landing do spuštění: hlavní akce „Vyzkoušet" → formulář „Chci to vyzkoušet" (do Hovorů, R-065); ověřit klíč Stripe ve Vercel Production | S | — | landing — **kód hotov 2026-11-21** (přepínač `SIGNUP_OPEN`), na produkci není; klíč Stripe neověřen |
 | **KV01** | Odblokovat placení: Workspace na Supabase (R-107, F2), Stripe live, po spuštění vrátit akci landing page na registraci | L | KV01a, `docs/AUTH-SUPABASE-PLAN.md`, `docs/workspace/LAUNCH-PLAN.md` | přihlášení, externí služby |
 | **KV01b** | Přesun z Vercelu na Cloudflare (R-135) — až s prvním platícím klientem; PDF přes Chromium, crony, `after()`, DPA | L | první platba | provoz |
 | **KV02** | Fáze 1: zdroj účtu (W4), delší zkušební doba pro pozvané klienty, „Pozvat klienta" předvyplněné ze zakázky (A2), dotaz na kandidáty jako skript | M | KV01, D-KV3 | Workspace, admin (výjimka) |

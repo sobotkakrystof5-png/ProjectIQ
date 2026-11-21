@@ -18,6 +18,7 @@ export const DATA_LOCATION = 'Databáze běží v Evropské unii, ve Frankfurtu 
 export const ROUTES = {
   signUp: '/w/registrace',
   signIn: '/w/prihlaseni',
+  clientSignIn: '/klient/prihlaseni',
   admin: '/login',
   adminHome: '/dashboard',
   terms: '/podminky',
@@ -26,7 +27,61 @@ export const ROUTES = {
 } as const
 
 export const PRICE_LABEL = '249 Kč'
-export const CTA_LABEL = 'Vyzkoušet 14 dní zdarma'
+
+/**
+ * Jde se do Workspace zaregistrovat sám? (R-134, D-KV2)
+ *
+ * Do spuštění Workspace na Supabase (R-107, F2) ne: registrace na produkci
+ * běží na vývojové instanci Clerku a Stripe v sandboxu, takže by ji nikdo
+ * nedokončil. Hlavní akce proto vede na formulář do Hovorů (R-065) a přístup
+ * nastavuje Kryštof osobně. „Přihlásit" vede do klientského prostoru — jediní,
+ * kdo se dnes z landing page skutečně přihlašují, jsou klienti webu.
+ *
+ * Po spuštění přepnout na `true`: vrátí se registrace, „Přihlásit" do
+ * Workspace i původní texty.
+ */
+export const SIGNUP_OPEN = false
+
+/** Kotva formuláře s předvyplněnou zprávou „Chci vyzkoušet ZakazIQ". */
+export const TRY_ANCHOR = 'vyzkouset'
+
+export type TrialCta = {
+  href: string
+  /** Velká tlačítka (úvod, funkce, ceník, patička). */
+  label: string
+  /** Hlavička od 640 px. */
+  short: string
+  /** Hlavička na telefonu. */
+  tiny: string
+  signInHref: string
+  /** Nadpis výzvy v patičce. */
+  footerHeading: string
+}
+
+export function trialCta(open: boolean = SIGNUP_OPEN): TrialCta {
+  return open
+    ? {
+        href: ROUTES.signUp,
+        label: 'Vyzkoušet 14 dní zdarma',
+        short: '14 dní zdarma',
+        tiny: 'Zkusit zdarma',
+        signInHref: ROUTES.signIn,
+        footerHeading: 'První poptávku můžete přijmout ještě dnes.',
+      }
+    : {
+        href: `/#${TRY_ANCHOR}`,
+        label: 'Chci to vyzkoušet',
+        short: 'Chci to vyzkoušet',
+        tiny: 'Vyzkoušet',
+        signInHref: ROUTES.clientSignIn,
+        footerHeading: 'Přístup vám nastavím osobně.',
+      }
+}
+
+export const CTA = trialCta()
+
+/** Text, kterým se zpráva předvyplní po kliknutí na „Chci to vyzkoušet". */
+export const TRY_MESSAGE = 'Chci vyzkoušet ZakazIQ. Moje firma: '
 
 /** Kotvy v hlavičce (scrollspy). */
 export const NAV = [
