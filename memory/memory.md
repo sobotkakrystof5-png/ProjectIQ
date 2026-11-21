@@ -1842,8 +1842,17 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 - **chore** KP10 krok 8: `web-security-audit` na živé adrese, **0 skutečných chyb** (skript 28/4/1,
   vše zbylé jsou falešné poplachy, detail `.claude/security/AUDIT-LOG.md` 2026-11-21). DNS apexu
   (CAA, SPF, `rua`) dál chybí, beze změny od 2026-11-14.
-- **chore** Zbývá: naostro projít pozvánku → heslo → obnovu hesla (e-mail z Resendu), `ADMIN_USER_ID`
-  ve Vercelu, TOTP u admina, krok 7 pilot, DPA v `GDPR.md`, kontrola `/klient/soukromi` Kryštofem.
+- **chore** Průchod naostro (2026-11-21): admin v Chrome založil testovacího klienta „Test KP10
+  (smazat)“ a pozvánku na alias `+test`; Kryštof ji v anonymním okně uplatnil a nastavil heslo (hook
+  pozvaného propustil, `auth.users` získal účet), požádal o obnovu hesla a **e-mail z Resendu přišel**,
+  česky, správný odesílatel i odkaz (potvrdil Kryštof). Pozvánka při přihlášeném adminu správně
+  odmítla uplatnění pod cizím účtem. Zjištění: admin se přes `/klient/zapomenute-heslo` záměrně
+  neobnovuje (`app/klient/actions.ts`), test šel jen s ne-adminským účtem; `recovery_sent_at`
+  v `auth.users` zůstalo prázdné i po doručení e-mailu, takže se na něj nedá spoléhat jako na důkaz.
+  Úklid: smazán testovací klient, člen a pozvánka (Neon `portal.*`) i uživatel `+test` (Supabase),
+  zůstal jen admin; ostatní data nedotčena.
+- **chore** Zbývá: `ADMIN_USER_ID` ve Vercelu (neověřeno), TOTP u admina, krok 7 pilot s jedním
+  klientem, DPA v `GDPR.md`, kontrola `/klient/soukromi` Kryštofem, DNS apexu (CAA, SPF, `rua`).
 
 ### 2026-11-20 (migrace klientského prostoru na produkci)
 - **db** Migrace 121, 122, 123, 124, 125, 126 a 127 **aplikované na produkčním Neonu** (projekt
