@@ -1422,6 +1422,12 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 
 ## 3. Otevřené problémy
 
+- [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
+  www.zakaziq.cz otevře registraci vývojové instance Clerku (nápis *Development mode*, ověřeno
+  2026-11-21). Ověřit, jestli Vercel Production nemá testovací klíč Stripe — pak by si kdokoli
+  s testovací kartou založil na produkci předplatné zdarma. Do spuštění zvážit hlavní akci landing
+  page na formulář (D-KV2 v `docs/klientsky-prostor/KONVERZE-PLAN.md`) · Kryštof · od 2026-11-21
+
 - [ ] **E-maily z Hovorů (R-132) — projít naživo:** v prohlížeči ověřené jen okno na fiktivním
   kontaktu (390 a 800 px) a logika testy nad PGlite s podstrčeným Googlem a Resendem. Zbývá po
   nasazení: (1) Profil → Propojit Google účet, pokud ještě není (jinak je karta schůzky vypnutá),
@@ -1822,6 +1828,16 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-21 (analýza a plán konverze klientů na Workspace)
+- **docs** Analýza od A do Z a plán, jak z klienta webu s klientským prostorem udělat platícího uživatele
+  Workspace: psychologie klienta, „zrcadlo" (co klient zažil v prostoru, dostanou jeho zákazníci od něj),
+  žebřík malých ano, okamžiky nabídky, vracecí smyčky, prvky P1–P7, W1–W5, A1–A4, mantinely proti
+  temným vzorům, sezení KV00–KV09 a rozhodnutí D-KV1–D-KV9 (čekají na Kryštofa). Soubor
+  `docs/klientsky-prostor/KONVERZE-PLAN.md`, řádek v `memory/index.md`. Bez změny kódu.
+- **chore** Ověřeno při analýze: `npx tsc --noEmit` čisté; `npx vitest run` 1572 prošlo, 3 selhaly
+  (známé: `ws-schema` mezera po 120, `ws-email` pevné datum, `admin-ai-asistent-crm` časový limit);
+  `zakaziq.cz` → 308 na www, canonical www; `/w/registrace` 200, ale Clerk v režimu *Development mode*.
 
 ### 2026-11-21 (nasazení klientského prostoru KP11–KP17 a KP10 na produkci)
 - **chore** KP10 kritérium 5: **TOTP u admina zapnuté** 2026-11-21 (produkční `/dashboard/profil` → Přihlášení, ověřovací aplikace). Kryštof naskenoval QR a zadal kód sám, agent kód ani heslo nezadával; QR se nefotil. Po novém načtení stránky ukazuje „Dvoufázové ověření je zapnuté“. Zkoušky přes Playwright CLI v samostatném okně selhaly (okno nebylo vidět, přihlášení proběhlo jinde), použil se přihlášený Chrome přes rozšíření. Dál zbývá: pilot, Google CDPA, OpenAI.
