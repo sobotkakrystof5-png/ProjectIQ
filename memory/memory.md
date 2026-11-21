@@ -1828,8 +1828,14 @@ je karta schůzky vypnutá. Bezpečnost `.claude/security/DECISIONS.md` #048, te
   a `zakaziq.cz`. Ověřeno veřejně: `/`, `/login`, `/klient/prihlaseni`, `/w/prihlaseni`, `/podminky`
   200; `/dashboard` a `/klient/soukromi` 307 na přihlášení; cron 401; `POST /api/public/web-udalost`
   bez klíče 401, s hlavičkou `Origin` 403. **Za přihlášením nikdo nic neviděl.**
+- **chore** Po nasazení (téhož dne): soukromý bucket `chat-prilohy` založen v Supabase `zakaziq`
+  SQL vložením do `storage.buckets` (`public = false`, limit 4 MB, jen PNG/JPEG/WebP/PDF; stejné
+  hodnoty jako `lib/chat/storage.ts`). Ověřeno čtením: 1 uživatel v `auth.users`, **0 ověřených
+  faktorů MFA**, bucket existuje. Hook, SMTP a šablona v dashboardu zatím nezměněné.
 - **chore** Zbývá (na straně Kryštofa): KP10 krok 6 (SMTP v Supabase, hook na HTTPS a
-  `SUPABASE_AUTH_HOOK_SECRET`, bucket `chat-prilohy`), krok 7 pilot, krok 8 `web-security-audit`.
+  `SUPABASE_AUTH_HOOK_SECRET`; ~~bucket `chat-prilohy`~~ hotovo), krok 7 pilot, krok 8
+  `web-security-audit`. Hook, heslo SMTP a tajemství nastavuje člověk (jsou to přihlašovací údaje
+  a bezpečnostní nastavení; agent je zadávat nesmí).
 
 ### 2026-11-20 (migrace klientského prostoru na produkci)
 - **db** Migrace 121, 122, 123, 124, 125, 126 a 127 **aplikované na produkčním Neonu** (projekt
