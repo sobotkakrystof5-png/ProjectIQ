@@ -91,7 +91,7 @@ export function toLeadOrigin(value: string | null | undefined): LeadOrigin {
  * za ostatní weby.
  */
 export const LEAD_ORIGIN_KEYS: Record<LeadOrigin, { booking: string | null; lead: string | null }> = {
-  vizeon: { booking: 'VIZEON_API_KEY', lead: null },
+  vizeon: { booking: 'VIZEON_API_KEY', lead: 'VIZEON_LEAD_WEBHOOK_SECRET' },
   alteno: { booking: 'ALTENO_API_KEY', lead: 'ALTENO_LEAD_WEBHOOK_SECRET' },
   prvotka: { booking: null, lead: 'PRVOTKA_LEAD_WEBHOOK_SECRET' },
   jiny: { booking: null, lead: null },

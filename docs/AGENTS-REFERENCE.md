@@ -173,6 +173,7 @@ TEAMS_MEETING_LINK=        # Teams meeting link
 VIZEON_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/booking (vizeon.cz)
 ALTENO_API_KEY=            # Klíč pro veřejný booking endpoint /api/public/booking/alteno (alteno.cz)
 PRVOTKA_LEAD_WEBHOOK_SECRET= # Podpis pro /api/public/prvotka-leads (prvotka.cz, AD02)
+VIZEON_LEAD_WEBHOOK_SECRET= # Podpis pro /api/public/vizeon-leads (kontaktní formulář vizeon.cz, R-136)
 ```
 
 Přidáváš novou env proměnnou → zapiš ji do `.env.example` **i** do tabulky výše a připomeň uživateli, že ji musí nastavit ve Vercelu.

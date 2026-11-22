@@ -166,6 +166,7 @@ describe('zdroje poptávek', () => {
 
   it('klíče zůstávají ty, které volají cizí repozitáře', () => {
     expect(LEAD_ORIGIN_KEYS.vizeon.booking).toBe('VIZEON_API_KEY')
+    expect(LEAD_ORIGIN_KEYS.vizeon.lead).toBe('VIZEON_LEAD_WEBHOOK_SECRET')
     expect(LEAD_ORIGIN_KEYS.alteno.booking).toBe('ALTENO_API_KEY')
     expect(LEAD_ORIGIN_KEYS.alteno.lead).toBe('ALTENO_LEAD_WEBHOOK_SECRET')
     expect(LEAD_ORIGIN_KEYS.prvotka.lead).toBe('PRVOTKA_LEAD_WEBHOOK_SECRET')

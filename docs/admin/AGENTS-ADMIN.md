@@ -448,6 +448,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `POST /api/public/booking/alteno` | `x-api-key` = `ALTENO_API_KEY` | Rezervace z alteno.cz |
 | `POST /api/public/alteno-leads` | `x-alteno-lead-signature` = `ALTENO_LEAD_WEBHOOK_SECRET` | Kontaktní formulář alteno.cz → nepotvrzená poptávka |
 | `POST /api/public/prvotka-leads` | `x-prvotka-lead-signature` = `PRVOTKA_LEAD_WEBHOOK_SECRET` | Kontaktní formulář prvotka.cz → nepotvrzená poptávka (AD02; web ještě napojený není) |
+| `POST /api/public/vizeon-leads` | `x-vizeon-lead-signature` = `VIZEON_LEAD_WEBHOOK_SECRET` | Kontaktní formulář vizeon.cz → nepotvrzená poptávka (R-136; web volá `www.zakaziq.cz`) |
 | `POST /api/public/leads` | `N8N_API_KEY` | Leady z n8n chatbota → Hovory |
 | `POST /api/public/agent-leads` | Bearer `VIZEON_AGENT_API_KEY` | AI-scorované leady z `vizeon-lead-agent` |
 | `GET /api/google/connect`, `GET /api/google/callback` | session (kontrola v route) + `state` a PKCE v HttpOnly cookie | Propojení Google Kalendáře pro schůzky s Meet (R-114, DECISIONS #035). Obnovovací token zašifrovaný `GOOGLE_TOKEN_KEY` v `admin_settings.google_oauth` |
@@ -1148,7 +1149,7 @@ VIZEON a ALTENO už nejsou dvě firmy. Je to **jeden byznys**, který přijímá
 
 | Zdroj | Doména | `projects.source` | Endpointy |
 |---|---|---|---|
-| `vizeon` | vizeon.cz | `vizeon_web` | `POST /api/public/booking` (`VIZEON_API_KEY`) |
+| `vizeon` | vizeon.cz | `vizeon_web` | `POST /api/public/booking` (`VIZEON_API_KEY`), `POST /api/public/vizeon-leads` (`VIZEON_LEAD_WEBHOOK_SECRET`, R-136) |
 | `alteno` | alteno.cz | `alteno_web` | `POST /api/public/booking/alteno` (`ALTENO_API_KEY`), `POST /api/public/alteno-leads` (`ALTENO_LEAD_WEBHOOK_SECRET`) |
 | `prvotka` | prvotka.cz | `prvotka_web` | `POST /api/public/prvotka-leads` (`PRVOTKA_LEAD_WEBHOOK_SECRET`) — web napojený ještě není |
 | `jiny` | — | — | jen štítek pro data bez webu |

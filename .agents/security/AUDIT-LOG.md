@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-22 — review: nový vstup /api/public/vizeon-leads (R-136)
+Spouštěč: nový veřejný endpoint pro kontaktní formulář vizeon.cz (skill `web-security-review`)
+Rozsah: `app/api/public/vizeon-leads/route.ts`, `lib/lead-origins.ts` (`LEAD_ORIGIN_KEYS.vizeon.lead`), sdílený `webLeadPostHandler` v `lib/web-leads.ts`; v repu webu VIZEON `lib/zakaziq.ts`.
+Výsledek: 0 nálezů v ZakazIQ, 1 nález ve webu VIZEON (opraveno).
+Nálezy: (1) web VIZEON volal `https://zakaziq.cz/…`; apex odpovídá 308 na `www` a `fetch` v Node při přechodu na jiný host hlavičku s klíčem zahodí — ověřeno vymyšleným klíčem (apex „Chybí klíč", www „Klíč nesedí"). Klíč by tak nikdy nedorazil a každá poptávka by skončila v záložním e-mailu.
+Opraveno: endpoint nepřidává logiku, jen napojí `webLeadPostHandler('vizeon')` — vlastní klíč `VIZEON_LEAD_WEBHOOK_SECRET` (ne `VIZEON_API_KEY` z bookingu, který zakládá termíny), hlavička `x-vizeon-lead-signature`, porovnání v konstantním čase, selže zavřeně bez env, vlastní okno limitu `vizeon_lead` (10/min na IP), tělo do 64 kB, Zod se stropy délek, `section` musí být `vizeon`, SQL vázanými parametry, bez CORS hlaviček (volá se jen ze serveru webu). Test `app/api/public/vizeon-leads/__tests__/route.test.ts` (10 případů, mj. klíč Altena a podpis v cizí hlavičce = 401). Web posílá na `https://www.zakaziq.cz/api/public/vizeon-leads`, klíč jen v serverové env `ZAKAZIQ_LEAD_SECRET` (sensitive ve Vercelu), nikdy v logu.
+Zůstává: endpoint nemá idempotenci — opakovaný pokus webu po síťové chybě může založit poptávku dvakrát (web zkouší znovu jen při chybě sítě nebo 5xx; přijato, ztracená poptávka je horší). Preview ZakazIQ klíč nemá, endpoint tam odmítá vše.
+
 ## 2026-11-20 — review: klientský prostor celý před spuštěním (KP10, R-131)
 Spouštěč: KP10 před nasazením KP11–KP17 (skill `web-security-review`)
 Rozsah: všechny veřejné vstupy prostoru — `/api/agent/v1/projects/[id]/reports`, `/api/auth/supabase-hook`, přihlášení a pozvánky `/klient/*`, server actions prostoru, `/api/klient/{zpravy,prilohy,faktury,transcribe}`, `/api/public/{portal,web-udalost}`, `/p/[token]`, `/h/[token]`, crony `client-retention` a `send-reminders`; model hrozeb v `docs/klientsky-prostor/PLAN.md` oddíl 5 bod po bodu; inventura osobních údajů v migracích 092–126.

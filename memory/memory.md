@@ -1447,11 +1447,33 @@ nekomerční provoz.
 Kryštof). Přesun není na jeden den: PDF faktur a předávacích dokumentů vyrábí `puppeteer-core`
 s `@sparticuz/chromium`, které na Cloudflare Workers neběží; šest cronů z `vercel.json`, `after()`,
 `proxy.ts`, regiony a DPA Cloudflare je potřeba ověřit samostatným plánem. Detail plán konverze,
+
+### R-136 · Poptávky z formuláře vizeon.cz chodí do adminu vlastním vstupem (2026-11-22)
+**Rozhodnutí:** kontaktní formulář vizeon.cz posílá poptávky do **adminu**, ne do Workspace: `POST
+https://www.zakaziq.cz/api/public/vizeon-leads` (`webLeadPostHandler('vizeon')`) s vlastním klíčem
+`VIZEON_LEAD_WEBHOOK_SECRET` v hlavičce `x-vizeon-lead-signature`; ve webu se jmenuje `ZAKAZIQ_LEAD_SECRET`.
+VIZEON žádný byznys ve Workspace nemá (na produkci je jen testovací „ahoj“). Rozhodl Kryštof 2026-11-22
+(„ne na admin“, „Nový vstup v adminu“) místo tajného klíče `sk_live_…` do Workspace i místo návratu přes
+`vizeon-lead-agent`.
+**Proč:** R-088 — vizeon.cz je zdroj poptávek adminu, Workspace je produkt pro klienty. Rozpracovaná úprava
+webu posílala do Workspace API v1, kde VIZEON nemá účet. Vlastní klíč místo `VIZEON_API_KEY`, protože ten
+zakládá termíny v kalendáři.
+**Důsledek:** admin u kontaktní poptávky neposílá e-mail zákazníkovi ani majiteli, jen oznámení do zvonku;
+web posílá e-mail jen jako zálohu při chybě. Vstup nemá idempotenci (opakovaný pokus webu může založit
+poptávku dvakrát). Web musí volat **www** — apex přesměrovává 308 a `fetch` hlavičku s klíčem zahodí;
+web má `redirect: "error"`, takže chybná adresa skončí záložním e-mailem. Mimo produkci web nic neposílá.
+Bezpečnost `.claude/security/AUDIT-LOG.md` 2026-11-22.
 oddíl 10.
 
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Poptávky z vizeon.cz do adminu (R-136) — nasadit a ověřit:** klíč je ve Vercelu ZakazIQ
+  (`VIZEON_LEAD_WEBHOOK_SECRET`, jen Production) i webu VIZEON (`ZAKAZIQ_LEAD_SECRET`, jen Production)
+  a v `.env.local` webu. Zbývá: (1) nasadit ZakazIQ s `/api/public/vizeon-leads`, (2) zkušební poptávka
+  na produkci, (3) nasadit web VIZEON s novým `lib/zakaziq.ts` (rozpracovaná práce v jeho repu),
+  (4) smazat starý `ZAKAZIQ_API_KEY` ve Vercelu webu (nic ho nečte). Preview ZakazIQ klíč nemá · od 2026-11-22
 
 - [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
   www.zakaziq.cz otevře registraci vývojové instance Clerku (nápis *Development mode*, ověřeno
@@ -1861,6 +1883,17 @@ oddíl 10.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-22 (poptávky z vizeon.cz do adminu)
+- **feat** Nový vstup `POST /api/public/vizeon-leads` pro kontaktní formulář vizeon.cz (R-136): stejný
+  handler jako Prvotka, vlastní klíč `VIZEON_LEAD_WEBHOOK_SECRET`, okno limitu `vizeon_lead`. Soubory:
+  `app/api/public/vizeon-leads/route.ts` (+ test, 10 případů), `lib/lead-origins.ts`, `.env.example`,
+  `docs/AGENTS-REFERENCE.md`, `docs/admin/AGENTS-ADMIN.md`, `.claude/security/{STATE,AUDIT-LOG}.md`.
+  Bez migrace. Klíč vygenerován a uložen přes stdin do Vercelu ZakazIQ i webu VIZEON (Production,
+  sensitive). Ve webu VIZEON (jeho repo, necommitnuto) přepsaný `lib/zakaziq.ts` na nový vstup s www.
+- **chore** Zjištěno: produkční proměnné ZakazIQ jsou typu sensitive (58 ze 70) a `vercel env pull` vrací
+  prázdné hodnoty, i když `vercel env ls` ukazuje „Encrypted“. Klíče s pepřem (`sk_live_…`) proto nejde
+  vyrobit skriptem z počítače, jen běžící aplikací.
 
 ### 2026-11-21 (analýza a plán konverze klientů na Workspace)
 - **feat** Landing do spuštění Workspace (R-134, D-KV2, KV01a): přepínač `SIGNUP_OPEN = false`
