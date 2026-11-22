@@ -1469,11 +1469,6 @@ oddíl 10.
 
 ## 3. Otevřené problémy
 
-- [ ] **Web VIZEON běží na produkci z necommitnutých změn (R-136):** formulář poptávky s napojením na
-  `/api/public/vizeon-leads` je na vizeon.cz od 2026-11-22 (deploy `dod9trs23` přes `vercel deploy --prod`
-  z pracovní složky), ale v gitu webu je jen `cb4f110` bez téhle práce. Kdo pushne do `main` webu dřív,
-  než se změny commitnou, vrátí produkci ke starému formuláři (`LEAD_AGENT_URL` ve Vercelu není → jen
-  záložní e-mail). Commitnout v repu webu · od 2026-11-22
 
 - [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
   www.zakaziq.cz otevře registraci vývojové instance Clerku (nápis *Development mode*, ověřeno
@@ -1902,6 +1897,8 @@ oddíl 10.
   odeslaný naostro dorazil do adminu (telefon `+420…`, zájem a stránka v popisu). Obě zkušební poptávky smazány
   stejně jako tlačítko v Poptávkách (`DELETE … AND lead_pending`), jejich oznámení označena jako přečtená.
   `ZAKAZIQ_API_KEY` z Vercelu webu odstraněn (nic ho nečetlo).
+- **chore** Změny webu VIZEON commitnuté v jeho repu (`7150c17`) a pushnuté; deploy z gitu `n05dmp40a` je na
+  vizeon.cz, `/api/contact` odpovídá. Produkce webu teď odpovídá gitu.
 
 ### 2026-11-21 (analýza a plán konverze klientů na Workspace)
 - **feat** Landing do spuštění Workspace (R-134, D-KV2, KV01a): přepínač `SIGNUP_OPEN = false`
