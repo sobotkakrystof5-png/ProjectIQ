@@ -1469,11 +1469,12 @@ oddíl 10.
 
 ## 3. Otevřené problémy
 
-- [ ] **Poptávky z vizeon.cz do adminu (R-136) — nasadit a ověřit:** klíč je ve Vercelu ZakazIQ
-  (`VIZEON_LEAD_WEBHOOK_SECRET`, jen Production) i webu VIZEON (`ZAKAZIQ_LEAD_SECRET`, jen Production)
-  a v `.env.local` webu. Zbývá: (1) nasadit ZakazIQ s `/api/public/vizeon-leads`, (2) zkušební poptávka
-  na produkci, (3) nasadit web VIZEON s novým `lib/zakaziq.ts` (rozpracovaná práce v jeho repu),
-  (4) smazat starý `ZAKAZIQ_API_KEY` ve Vercelu webu (nic ho nečte). Preview ZakazIQ klíč nemá · od 2026-11-22
+- [ ] **Poptávky z vizeon.cz do adminu (R-136) — dokončit ve webu:** vstup je na produkci od 2026-11-22
+  (`7d2e821`) a zkušební poptávka prošla. Klíč je ve Vercelu ZakazIQ (`VIZEON_LEAD_WEBHOOK_SECRET`)
+  i webu VIZEON (`ZAKAZIQ_LEAD_SECRET`), obojí jen Production, a v `.env.local` webu. Zbývá: (1) nasadit
+  web VIZEON s novým `lib/zakaziq.ts` (rozpracovaná práce v jeho repu) a odeslat formulář naostro,
+  (2) zamítnout zkušební poptávku „Zkouška napojení VIZEON“ v Poptávkách, (3) smazat starý
+  `ZAKAZIQ_API_KEY` ve Vercelu webu (nic ho nečte). Preview ZakazIQ klíč nemá · Kryštof · od 2026-11-22
 
 - [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
   www.zakaziq.cz otevře registraci vývojové instance Clerku (nápis *Development mode*, ověřeno
@@ -1894,6 +1895,10 @@ oddíl 10.
 - **chore** Zjištěno: produkční proměnné ZakazIQ jsou typu sensitive (58 ze 70) a `vercel env pull` vrací
   prázdné hodnoty, i když `vercel env ls` ukazuje „Encrypted“. Klíče s pepřem (`sk_live_…`) proto nejde
   vyrobit skriptem z počítače, jen běžící aplikací.
+- **chore** **Na produkci od 2026-11-22 (`7d2e821`)**, build Ready. Ověřeno na www.zakaziq.cz: bez klíče 401,
+  se správným klíčem a cizím `section` 400 (klíč přijat, nic nezapsáno), zkušební poptávka 201 — v produkční
+  DB řádek s `lead_origin = vizeon`, `source = vizeon_web`, `lead_pending = true` a oznámení do zvonku.
+  Web VIZEON s novým `lib/zakaziq.ts` nasazený není.
 
 ### 2026-11-21 (analýza a plán konverze klientů na Workspace)
 - **feat** Landing do spuštění Workspace (R-134, D-KV2, KV01a): přepínač `SIGNUP_OPEN = false`
