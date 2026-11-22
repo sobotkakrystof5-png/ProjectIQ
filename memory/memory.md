@@ -1469,12 +1469,11 @@ oddíl 10.
 
 ## 3. Otevřené problémy
 
-- [ ] **Poptávky z vizeon.cz do adminu (R-136) — dokončit ve webu:** vstup je na produkci od 2026-11-22
-  (`7d2e821`) a zkušební poptávka prošla. Klíč je ve Vercelu ZakazIQ (`VIZEON_LEAD_WEBHOOK_SECRET`)
-  i webu VIZEON (`ZAKAZIQ_LEAD_SECRET`), obojí jen Production, a v `.env.local` webu. Zbývá: (1) nasadit
-  web VIZEON s novým `lib/zakaziq.ts` (rozpracovaná práce v jeho repu) a odeslat formulář naostro,
-  (2) zamítnout zkušební poptávku „Zkouška napojení VIZEON“ v Poptávkách, (3) smazat starý
-  `ZAKAZIQ_API_KEY` ve Vercelu webu (nic ho nečte). Preview ZakazIQ klíč nemá · Kryštof · od 2026-11-22
+- [ ] **Web VIZEON běží na produkci z necommitnutých změn (R-136):** formulář poptávky s napojením na
+  `/api/public/vizeon-leads` je na vizeon.cz od 2026-11-22 (deploy `dod9trs23` přes `vercel deploy --prod`
+  z pracovní složky), ale v gitu webu je jen `cb4f110` bez téhle práce. Kdo pushne do `main` webu dřív,
+  než se změny commitnou, vrátí produkci ke starému formuláři (`LEAD_AGENT_URL` ve Vercelu není → jen
+  záložní e-mail). Commitnout v repu webu · od 2026-11-22
 
 - [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
   www.zakaziq.cz otevře registraci vývojové instance Clerku (nápis *Development mode*, ověřeno
@@ -1898,7 +1897,11 @@ oddíl 10.
 - **chore** **Na produkci od 2026-11-22 (`7d2e821`)**, build Ready. Ověřeno na www.zakaziq.cz: bez klíče 401,
   se správným klíčem a cizím `section` 400 (klíč přijat, nic nezapsáno), zkušební poptávka 201 — v produkční
   DB řádek s `lead_origin = vizeon`, `source = vizeon_web`, `lead_pending = true` a oznámení do zvonku.
-  Web VIZEON s novým `lib/zakaziq.ts` nasazený není.
+- **chore** Web VIZEON nasazený přes Vercel CLI (`vercel deploy --prod`, deploy `dod9trs23`, aliasy vizeon.cz
+  a www): build prošel lokálně i na Vercelu, `/`, `/kontakt`, `/sluzby`, `/zakaziq` 200. Formulář `/api/contact`
+  odeslaný naostro dorazil do adminu (telefon `+420…`, zájem a stránka v popisu). Obě zkušební poptávky smazány
+  stejně jako tlačítko v Poptávkách (`DELETE … AND lead_pending`), jejich oznámení označena jako přečtená.
+  `ZAKAZIQ_API_KEY` z Vercelu webu odstraněn (nic ho nečetlo).
 
 ### 2026-11-21 (analýza a plán konverze klientů na Workspace)
 - **feat** Landing do spuštění Workspace (R-134, D-KV2, KV01a): přepínač `SIGNUP_OPEN = false`
