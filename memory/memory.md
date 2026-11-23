@@ -5,7 +5,9 @@
 > **Poslední aktualizace:** 2026-11-23 · **Schůzky z kalendáře s připomínkami** (R-137):
 > přepínač „Schůzka přes Google Meet" v okně události, pozvánka s upravitelným textem a `.ics`,
 > připomínky den předem (e-mail + SMS), hodinu předem (e-mail) a 10 minut předem (SMS),
-> zpráva o přesunu. SMS přes Odorik, spouštěč každou minutu mimo Vercel. Migrace 128.
+> zpráva o přesunu. SMS přes Odorik, spouštěč každou minutu pg_cron v Supabase. Migrace 128.
+> **Na produkci od 2026-11-23 (`c23adf5`, spolu s Next.js 16.4.6)**; spouštěč ověřený (200 každou
+> minutu), za přihlášením ani se skutečnou schůzkou to zatím nikdo nezkusil.
 >
 > Předchozí: 2026-11-20 · **E-maily z Hovorů** (R-132): tlačítko „Poslat e-mail"
 > se třemi šablonami — Portfolio, Nabídka (cena za zakázku) a Schůzka s Google Meet (termín,
@@ -1495,15 +1497,13 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 
 ## 3. Otevřené problémy
 
-- [ ] **Připomínky schůzek (R-137) — zbývá nasadit, SMS a projít naživo:** ~~migrace 128 a 120
-  na produkci~~ (2026-11-23 přes Neon, v evidenci), ~~`MEETING_REMINDERS_SECRET` ve Vercelu~~,
-  ~~spouštěč~~ (pg_cron `zakaziq-meeting-reminders` v Supabase, každou minutu, klíč z Vault).
-  Zbývá: (1) **push větve `admin/schuzky-pripominky` na `main`** (agentovi zamítnuto oprávněním),
-  (2) `ODORIK_API_USER` + `ODORIK_API_PASSWORD` do Vercelu (doporučeně údaje **linky**, ne API heslo
-  účtu) a redeploy — do té doby jdou připomínky jen e-mailem, (3) zkušební schůzka na vlastní
-  e-mail a telefon za ~70 minut: pozvánka s `.ics`, připomínka hodinu a 10 minut předem, přesun
-  (zpráva o změně, čas v Googlu), smazání (zmizí z Googlu). **Naživo nic nezkoušeno.** Cenu SMS
-  Odoriku zjistit v jeho ceníku · Kryštof · od 2026-11-23
+- [ ] **Připomínky schůzek (R-137) — projít naživo:** ~~migrace 128 a 120~~, ~~klíče ve Vercelu~~
+  (`MEETING_REMINDERS_SECRET`, `ODORIK_API_USER`, `ODORIK_API_PASSWORD` — nasazení `dpl_5TCi…`
+  vzniklo až po nich), ~~spouštěč~~ (pg_cron v Supabase, 200 každou minutu, `reminders_tick_at` se
+  zapisuje), ~~nasazení~~ (`c23adf5`, 2026-11-23, bez běhových chyb). Zbývá **zkušební schůzka**
+  na vlastní e-mail a telefon za ~70 minut: pozvánka s `.ics`, připomínka hodinu a 10 minut předem
+  (první skutečná SMS ověří i údaje Odoriku), přesun (zpráva o změně, čas v Googlu), smazání
+  (zmizí z Googlu). Cenu SMS Odoriku zjistit v jeho ceníku · Kryštof · od 2026-11-23
 - [ ] **Potvrzení účasti na schůzce (R-137, další krok):** stránka schůzky s „Potvrdit účast /
   Potřebuji jiný termín" a upozorněním „nepotvrdil, zavolej mu". Nepostaveno; v pozvánce je zatím
   „odpovězte na e-mail" · od 2026-11-23
@@ -1911,6 +1911,16 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (schůzky a Next.js 16.4.6 na produkci)
+- **chore** Nasazeno: `main` → `c23adf5` (push Kryštof), nasazení `dpl_5TCifpK4ihePTZmWiyHyJWsn4eTe`
+  Ready. Před ním migrace 120 a 128 na produkčním Neonu (agent přes Neon, zapsané v
+  `schema_migrations`; 120 doplnila `lead_id` u 3 událostí) a ve Vercelu `MEETING_REMINDERS_SECRET`
+  (agent), `ODORIK_API_USER` a `ODORIK_API_PASSWORD` (Kryštof). Ověřeno: spouštěč pg_cron dostává
+  každou minutu 200 a produkce zapisuje `admin_settings.reminders_tick_at`; `/`, `/login`,
+  `/w/prihlaseni`, `/klient/prihlaseni` 200, admin 307, `/p/<nesmysl>` 404, endpoint připomínek bez
+  klíče i se špatným klíčem 401; 20 minut po nasazení žádná běhová chyba. Za přihlášením okem nikdo
+  nic neviděl.
 
 ### 2026-11-23 (Next.js 16.4.6 — bezpečnostní upgrade)
 - **chore** `next` 16.4.2 → **16.4.6**: zavírá sedm středně závažných nálezů v Next 16.0.0–16.4.4
