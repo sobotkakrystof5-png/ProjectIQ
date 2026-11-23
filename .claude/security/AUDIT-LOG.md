@@ -16,6 +16,22 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-23 — review: upgrade Next.js 16.4.2 → 16.4.6
+Spouštěč: `npm audit` a `next build` (`SecurityFatalError`) hlásily zranitelný Next; zadání Kryštofa „upgradovat a zabezpečit"
+Rozsah: `package.json`, `package-lock.json`; ověření celého repa podle R-053 a B12.
+Výsledek: `npm audit` 0 nálezů (dřív 7× moderate u `next`), build bez `SecurityFatalError`.
+Nálezy: Next 16.0.0–16.4.4: GHSA-f3mh-rxg3-f5g2 (HttpOnly cookie přes interní hlavičku na Edge — `proxy.ts` běží na Node, ale riziko zavřeno tak jako tak), GHSA-7qx7-33qx-rqx2 (SVG v optimalizaci obrázků; `next/image` repo nepoužívá), GHSA-pc58-hwjq-p385 (self-hosted přeposílání odpovědí; běžíme na Vercelu) a čtyři úniky/otrava cache přes `'use cache'` a `unstable_cache` (repo nepoužívá). Skutečný dopad na ZakazIQ byl malý, upgrade zavírá všechny.
+Opraveno: `next` 16.4.6 (opravná verze řady 16.4, vydaná 2026-11-09), commit `1c57ec1`. Ověřeno: `tsc`, plná sada testů (padají jen známé nestabilní a `ws-email`/`ws-schema`), `next build`, `next start` a regresní adresy `/`, `/login`, `/dashboard`, `/dashboard/finance`, `/p/…`, `/h/…`, `/w/prihlaseni`.
+Zůstává: dřívější high nález picomatch (Tailwind 3) audit už nehlásí. Další hlavní verze (Next 17) je samostatný krok.
+
+## 2026-11-23 — review: schůzky z kalendáře a připomínky e-mailem a SMS (R-137)
+Spouštěč: nová funkce před commitem a nasazením (skill `web-security-review`)
+Rozsah: `app/api/cron/meeting-reminders/route.ts`, nové server actions v `app/meeting-actions.ts` a `app/calendar-actions.ts` (obnova smazané schůzky ze snímku), `lib/admin/{meeting-reminders,sms,meeting-ics,meetings,lead-meeting}.ts`, migrace 128; spouštěč pg_cron v Supabase.
+Výsledek: 0 nálezů k okamžité opravě.
+Nálezy: žádné zneužitelné. Endpoint ověřuje vlastní Bearer klíč v konstantním čase a nečte tělo; všechny akce mají `requireAuth` a Zod s limity délek (snímek pro „Zpět" ověřuje Meet jen `https://meet.google.com/`, telefon `+…`); SQL všude parametrizované; údaje Odoriku jen v `server-only` modulu; text pro SMS jen ze základní sady GSM, v e-mailu escapovaný; žádné stahování URL od uživatele.
+Opraveno: odložené mazání události v Googlu zkráceno z 20 s na 10 s, ať se vejde do limitu běhu funkce. Commit `73be373`.
+Zůstává: klíč spouštěče `MEETING_REMINDERS_SECRET` při nastavení jednou prošel konverzací agenta (umí jen poslat připomínky, které jsou na řadě; výměna ve Vault i ve Vercelu). Spouštěč stojí na projektu Supabase Free (DECISIONS #049).
+
 ## 2026-11-22 — review: nový vstup /api/public/vizeon-leads (R-136)
 Spouštěč: nový veřejný endpoint pro kontaktní formulář vizeon.cz (skill `web-security-review`)
 Rozsah: `app/api/public/vizeon-leads/route.ts`, `lib/lead-origins.ts` (`LEAD_ORIGIN_KEYS.vizeon.lead`), sdílený `webLeadPostHandler` v `lib/web-leads.ts`; v repu webu VIZEON `lib/zakaziq.ts`.

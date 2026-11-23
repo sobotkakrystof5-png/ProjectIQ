@@ -1565,11 +1565,6 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
   a 1280 px: Kontakty → Poslat pozvánku (termín a úvod s dnem hovoru), Reporty a detail dne,
   Analýza a zkopírování promptu. Bez migrace 116 endpoint vrací 503 a autopilot po každém reportu
   pošle notifikaci · Kryštof · od 2026-11-17
-- [ ] **Next 16.4.2 má nové zranitelnosti (zjištěno 2026-11-17):** `next build` se při prvním
-  běhu zastaví hláškou `SecurityFatalError` (opakovaný běh projde). `npm audit`: Next 16.2.0–16.4.4
-  moderate (GHSA-mfr8-8qww-v76h, GHSA-vc7v-qv4w-wrv8 — únik přes `'use cache'`/`unstable_cache`;
-  repo ani jedno nepoužívá) a picomatch high (ReDoS, oprava jen přes Tailwind 4). Upgrade Next je
-  podle R-053 samostatný krok s ověřením celého repa · od 2026-11-17
 - [ ] **`outreach_leads` bez retence:** drží jména a telefony lidí, kterým se volalo nevyžádaně,
   i když zájem nemají. Návrh 12 měsíců od posledního snímku · DECISIONS #033 · od 2026-11-17
 - [ ] **Growth OS neeviduje otevření ukázky ani e-mailu:** `demos.views` a `emails.opened_at`
@@ -1916,6 +1911,16 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (Next.js 16.4.6 — bezpečnostní upgrade)
+- **chore** `next` 16.4.2 → **16.4.6**: zavírá sedm středně závažných nálezů v Next 16.0.0–16.4.4
+  (HttpOnly cookie na Edge, SVG v optimalizaci obrázků, úniky z `'use cache'`/`unstable_cache`,
+  self-hosted přeposílání odpovědí). Opravná verze řady 16.4, ne hlavní (R-053). Udělané ve
+  worktree `../ZakazIQ-next-security` (větev `chore/next-security`, commit `1c57ec1`) a přenesené na
+  `admin/schuzky-pripominky`, ať jde na produkci jedním pushem. Ověřeno: `npm audit` 0 nálezů,
+  `tsc`, plná sada testů (padají jen známé nestabilní a `ws-email`/`ws-schema`), `next build`
+  bez `SecurityFatalError`, `next start` a regresní adresy. Uzavírá otevřený problém z 2026-11-17.
+  `.claude/security/AUDIT-LOG.md` 2026-11-23.
 
 ### 2026-11-23 (schůzky z kalendáře a připomínky klientovi — R-137)
 - **feat** V okně události v kalendáři přepínač **Schůzka přes Google Meet**: odkaz na Meet,
