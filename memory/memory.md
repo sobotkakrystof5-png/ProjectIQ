@@ -131,7 +131,7 @@ S `prefers-reduced-motion: reduce` neběží jediná animace. **Co ověřit neš
 `/dashboard/profil` padá na `column "company" does not exist` — testovací Neon nemá migraci 106,
 takže se vykreslila jen kostra, ne obsah. Odchylky: **R-104**.
 
-**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121, naplánováno 2026-11-18):** KP11 přihlášení naostro a pozvání jedním klikem (**kód hotov 2026-11-18 na větvi `klient/kp11-prihlaseni`, čeká na nastavení Supabase**), KP12 služby a etapy (**kód hotov 2026-11-18 na větvi `klient/kp12-etapy`, commitnutý, nepushnutý, migrace 121 neaplikovaná**, R-124), KP13 peníze a faktury (**kód hotov 2026-11-18 na větvi `klient/kp13-penize` nad KP12, pushnutý na GitHub, migrace 122 neaplikovaná**, R-125), KP14 konzultace z volna (**kód hotov 2026-11-20 na větvi `klient/kp14-konzultace`, migrace 123 neaplikovaná**, R-126), KP15 chat s klientem a rozvržení jako Slack (**kód hotov 2026-11-20 na větvi `klient/kp15-chat`, migrace 124 neaplikovaná**, R-127), KP16 přehled klienta (**kód hotov 2026-11-20 na větvi `klient/kp16-prehled`, migrace 125 neaplikovaná**, R-128), KP17 poptávky z webu klienta (D-K16 a D-K20 = jen počet rozhodnuto 2026-11-20, **kód hotov 2026-11-20 na větvi `klient/kp17-poptavky-webu`, migrace 126 neaplikovaná**, R-129, R-130). KP10 audit a GDPR (**kroky 1–5 a 9 hotové 2026-11-20 na větvi `klient/kp10-audit`**, R-131). **Migrace 113 a 121–127 a práva `portal_app` jsou na produkčním Neonu od 2026-11-20** (agent přes Neon MCP na výslovné zadání Kryštofa, ověřeno: md5 těl 42 funkcí = soubory, RLS na všech tabulkách `portal`, `portal_app` bez přístupu k událostem, cestám souborů a výmazu, evidence v `public.schema_migrations`, kterou tím agent na produkci založil). Kód KP11–KP17 a KP10 na produkci zatím není: větve jdou za sebou, merge do `main` čeká. Plán: `docs/klientsky-prostor/PLAN.md` sekce 4.7 a 6.
+**Klientský prostor (R-070–R-073), stav po sezení 2026-11-01:** kód KP01–KP07 a KP09 (úroveň 2) je commitnutý (`41c6873`) a od 2026-11-14 na produkci (`8210f04`). Migrace 092–096 jsou **aplikované na produkčním Neonu** (projekt `projectiq`, ověřeno čtecím dotazem), role `portal_app` je tam vytvořená (`scripts/portal-create-role.js`, kontrola skriptu prošla: bez BYPASSRLS, bez přístupu do `public`). Ve Vercelu nastaveno: `DATABASE_URL_PORTAL` (jen Production; Preview míří na testovací DB bez schématu `portal`), `PORTAL_INVITE_PEPPER`, `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`, `CLIENT_REQUEST_AI_MODEL=claude-haiku-5-5` (poslední tři Production i Preview). Preview https://project-iq-git-ws-redesign-app-sobotkakrystof5-pngs-projects.vercel.app vrací 200 na `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`. Ověřeno testy (PGlite oddělení klientů, nav, Dnes, hlášení, aktivita, CSP) a `tsc`/`build:check`; **v prohlížeči nic z toho ověřeno není** (admin lokálně nemá data, přihlášení Clerku na `/klient` nikdo neprošel). Zbývá KP08 (soubory, odloženo), KP10 (audit, GDPR, pilot) a úroveň 3 předání. **Druhá vlna (R-121–R-131) je od 2026-11-21 na produkci** (`fa79603`): KP11 přihlášení přes Supabase a pozvání jedním klikem, KP12 služby a etapy (R-124), KP13 peníze a faktury (R-125), KP14 konzultace z volna (R-126), KP15 chat a rozvržení jako Slack (R-127), KP16 přehled klienta (R-128), KP17 poptávky z webu klienta (R-129, R-130) a KP10 audit a GDPR (R-131). Migrace 113 a 121–127 a práva `portal_app` jsou na produkčním Neonu od 2026-11-20 (Neon MCP, ověřeno md5 těl funkcí, RLS a práva; evidence v `public.schema_migrations`). Supabase je nastavený 2026-11-21 (HTTPS hook, SMTP přes Resend, šablona hesla, bucket `chat-prilohy`), živý audit 0 chyb, oddělení dvou firem ověřené na produkční DB. Naostro prošla jen pozvánka → heslo → e-mail s obnovou hesla. **Zbývá:** pilot s jedním klientem (KP10 krok 7, `docs/klientsky-prostor/PILOT.md`), před ním druhý faktor u adminu (kritérium 5), průchod KP12–KP17 naživo, DPA Neonu, Googlu a OpenAI a souhlas Kryštofa s textem `/klient/soukromi`. Mimo to KP08 (odloženo) a úroveň 3 předání (KP09). Stav sezení: `docs/klientsky-prostor/PLAN.md` sekce 6 a 11.1.
 
 **Workspace + landing:** všechna sezení S00–S18 a redesign RD01–RD14, RD16 jsou v kódu na větvi `ws/redesign-app` (RD15 vizuální audit rozpracovaný). Plán rozsahu `docs/workspace/PLAN.md`, redesign `docs/workspace/REDESIGN-APP-PLAN.md`, technika `docs/AGENTS-REFERENCE.md` část B, spuštění `docs/workspace/LAUNCH.md`. Nic z Workspace není na produkci.
 
@@ -1612,94 +1612,57 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 
 - [ ] **Asistent (R-111) na produkci, ale v prohlížeči neověřený:** projít s přihlášením na produkci na 390 a 1280 px — diktování (povolení mikrofonu, Safari `audio/mp4`), věta se dvěma akcemi, toast „Zpět", „Vrátit" u kroku, faktura na klepnutí, věta na detailu zakázky (nesmí se provést sama). Dotazy na data (A4) projít na produkčních datech — testovací Neon nemá tabulky adminu, takže živě běžely jen nad podstrčenými daty · `docs/admin/ASISTENT-PLAN.md` · od 2026-11-16
 
-- [ ] **Supabase pro `/klient` — dokončit nastavení a nasadit (R-107, F1):** kód je na větvi
-  `klient/kp11-prihlaseni` (KP11 ho převzala z `auth/supabase-klient`), na produkci není.
-  **Hotovo 2026-11-18:** migrace 113 na produkci (podle Kryštofa, agent neověřil); v Supabase
-  Confirm email vypnuté, Site URL `https://www.zakaziq.cz` (dřív adresa `vercel.app`), Redirect URLs
-  `https://www.zakaziq.cz/klient/auth/potvrzeni` a `…/potvrzeni?**` (kvůli `?next=`); ve Vercelu
-  Production `ADMIN_USER_ID` (jediný účet v Supabase, admin) a `NEXT_PUBLIC_APP_URL` přepnuté
-  z `https://zakaziq.cz` na `https://www.zakaziq.cz` (R-075; proměnná platí pro Production i Preview,
-  projeví se až dalším deployem — canonical, sitemapa a odkazy v e-mailech přejdou na www).
-  **Zbývá, v tomhle pořadí:** (1) Kryštof: SMTP v Supabase (Emails › SMTP Settings — vyplněno
-  `prihlaseni@zakaziq.cz`, jméno ZakazIQ, `smtp.resend.com`, 465, uživatel `resend`; chybí heslo =
-  klíč Resendu jen pro odesílání z zakaziq.cz, pak Save), (2) Kryštof: hook Before User Created
-  přepnout na HTTPS `https://www.zakaziq.cz/api/auth/supabase-hook` → Generate secret → Update hook
-  (do té doby běží Postgres hook z R-106 a pouští jen e-mail adminu, takže vypnuté potvrzení e-mailu
-  nic neotevřelo), (3) Kryštof: `vercel env add SUPABASE_AUTH_HOOK_SECRET production` (Sensitive) —
-  **před** deployem, jinak endpoint odmítne každou registraci, (4) agent: česká šablona „Reset
-  Password" s odkazem `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery` (funguje i na
-  jiném zařízení; šablony jdou upravit až po uložení SMTP), (5) agent: fast-forward main →
-  `klient/kp11-prihlaseni` a push (Kryštof schválil 2026-11-18), (6) průchod pozvánka → přístup →
-  přehled → odhlášení → přihlášení → zapomenuté heslo na 390 a 1280 px. Tajné hodnoty agent
-  nevkládá (R-115). Detail `docs/AUTH-SUPABASE-PLAN.md` → F1 · od 2026-11-15
-- [ ] **KP12 nasadit a projít naživo:** kód na větvi `klient/kp12-etapy` (nad `klient/kp11-prihlaseni`),
-  commitnutý 2026-11-18; na GitHubu je uvnitř větve `klient/kp13-penize` (sama větev pushnutá není). Před nasazením: migrace 121 na produkci (aditivní, starý build ji přežije), pak
-  `node scripts/portal-create-role.js` (granty pro `portal_app`). Projít: Nastavení › Služby (založit
-  čtyři služby, napsat etapy Webu, přetáhnout pořadí, smazat a Zpět), nová zakázka se službou Web
-  (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín, procenta v hlavičce
-  i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite a dočasnou stránkou
-  s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
-- [ ] **KP10 — zbývají kroky 6–8 (jen se souhlasem Kryštofa v daném kroku):** (6) ~~migrace 113,
-  121–127 na produkci, práva `portal_app`~~ hotovo 2026-11-20 přes Neon MCP; zbývá Supabase (SMTP, HTTPS hook, bucket
-  `chat-prilohy`, šablona hesla), `SUPABASE_AUTH_HOOK_SECRET` ve Vercelu, merge KP11–KP17 a KP10 do
-  `main` a push; (7) pilot s jedním klientem; (8) `web-security-audit` na živé adrese. Dál: DPA
-  zpracovatelů a regiony Resendu a Googlu v `docs/klientsky-prostor/GDPR.md` (**[DOPLNIT]**),
-  kontrola textu `/klient/soukromi` Kryštofem, ruční ověření oddělení dvou firem na databázi.
-  Kritéria v plánu, oddíl 11.1. Stránka `/klient/soukromi` je za přihlášením, v prohlížeči ji nikdo
-  neviděl · od 2026-11-20
-- [ ] **KP17 nasadit a projít naživo:** kód na větvi `klient/kp17-poptavky-webu` (nad `klient/kp16-prehled`),
-  nic nenasazené. Před nasazením migrace 121–126 (aditivní) a `node scripts/portal-create-role.js`.
-  Nová env není (`AGENT_KEY_PEPPER` už ve Vercelu je). Projít: zakázka → Poptávky z webu → Vytvořit
-  klíč → klíč do env webu klienta → zkušební příkaz (`{"ok":true}`, v kartě „Zkušební událost
-  dorazila") → skutečné odeslání formuláře → číslo v adminu i v `/klient` (Přehled, panel O zakázce,
-  detail projektu). Napojit první web klienta podle `docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md`
-  (práce v repozitáři webu klienta). **Vstup ani karta naživo neověřené**; vzhled jen na dočasné
-  stránce s vymyšlenými daty · od 2026-11-20
-- [ ] **KP16 nasadit a projít naživo:** kód na větvi `klient/kp16-prehled` (nad `klient/kp15-chat`),
-  nic nenasazené. Před nasazením: migrace 121–125 na produkci (aditivní; 125 potřebuje 106, 107, 118
-  a 121), pak `node scripts/portal-create-role.js`. Projít na 390 / 768 / 1280 / 1440 px: přihlášení
-  s nepřečtenou zprávou otevře chat, bez ní Přehled; „Čeká na vás" (schválení, „Mám hotovo",
-  faktura po splatnosti, hodnocení); panel O zakázce u chatu a na telefonu z tlačítka (i);
-  Faktury a Konzultace přes víc zakázek; hodnocení hotové zakázky se objeví v Hodnocení adminu;
-  etapa na Hotovo → za 15 s e-mail klientovi z krystof@vizeon.cz, druhá do 24 h nepřijde; odkaz
-  „Přihlásit se do vašeho prostoru" na `/p`. **Resend ani skutečná data nikdo nezkusil** · od 2026-11-20
-- [ ] **KP15 nasadit a projít naživo:** kód na větvi `klient/kp15-chat` (nad `klient/kp14-konzultace`),
-  nic nenasazené. Před nasazením: migrace 121–124 na produkci (aditivní), pak
-  `node scripts/portal-create-role.js`; v Supabase založit **soukromý** bucket `chat-prilohy`
-  (Storage › New bucket, Public vypnuto) a ověřit, že `SUPABASE_SERVICE_ROLE_KEY` je ve Vercelu
-  (spravuje ho integrace). Projít na 390 / 768 / 1280 / 1440 px: klient napíše, nadiktuje a pošle
-  screenshot → do 10 s ve Zprávách adminu, zvonek; odpověď z telefonu; dvě fajfky po přečtení;
+- [ ] **KP12 projít naživo:** na produkci od 2026-11-21 (`fa79603`), migrace 121 od 2026-11-20. Projít:
+  Nastavení › Služby (založit čtyři služby, napsat etapy Webu, přetáhnout pořadí, smazat a Zpět), nová
+  zakázka se službou Web (termíny od začátku, úprava etapy), detail (stav jedním klikem se Zpět, termín,
+  procenta v hlavičce i formuláři), `/klient` (osa, „Mám hotovo", Vrátit, zvonek). Ověřeno jen PGlite
+  a dočasnou stránkou s vymyšlenými daty na 390 a 1280 px · od 2026-11-18
+- [ ] **KP10 — zbývá krok 7, pilot s jedním klientem:** kroky 6 (nasazení, Supabase) a 8 (živý audit,
+  0 chyb) hotové 2026-11-21. Pilot podle `docs/klientsky-prostor/PILOT.md` smí začít, až bude mít admin
+  druhý faktor (kritérium 5, samostatný bod níž). Pro prostor pro všechny dál: DPA Neonu, Googlu a OpenAI
+  v účtech neověřené (`GDPR.md`, Vercel bez DPA přijato v R-133), kontrola textu `/klient/soukromi`
+  Kryštofem a zpracovatelé ve smlouvě s klientem. Kritéria v plánu, oddíl 11.1 · od 2026-11-20
+- [ ] **KP17 projít naživo:** na produkci od 2026-11-21 (`fa79603`), migrace 126 od 2026-11-20, nová env
+  není. Projít: zakázka → Poptávky z webu → Vytvořit klíč → klíč do env webu klienta → zkušební příkaz
+  (`{"ok":true}`, v kartě „Zkušební událost dorazila") → skutečné odeslání formuláře → číslo v adminu
+  i v `/klient` (Přehled, panel O zakázce, detail projektu). **Žádný web klienta zatím napojený** —
+  napojení podle `docs/klientsky-prostor/NAPOJENI-WEBU-KLIENTA.md` je práce v repozitáři webu klienta.
+  Vzhled ověřen jen na dočasné stránce s vymyšlenými daty · od 2026-11-20
+- [ ] **KP16 projít naživo:** na produkci od 2026-11-21 (`fa79603`), migrace 125 od 2026-11-20. Projít
+  na 390 / 768 / 1280 / 1440 px: přihlášení s nepřečtenou zprávou otevře chat, bez ní Přehled; „Čeká
+  na vás" (schválení, „Mám hotovo", faktura po splatnosti, hodnocení); panel O zakázce u chatu a na
+  telefonu z tlačítka (i); Faktury a Konzultace přes víc zakázek; hodnocení hotové zakázky se objeví
+  v Hodnocení adminu; etapa na Hotovo → za 15 s e-mail klientovi z krystof@vizeon.cz, druhá do 24 h
+  nepřijde; odkaz „Přihlásit se do vašeho prostoru" na `/p`. **Resend ani skutečná data nikdo
+  nezkusil** · od 2026-11-20
+- [ ] **KP15 projít naživo:** na produkci od 2026-11-21 (`fa79603`), migrace 124 od 2026-11-20, bucket
+  `chat-prilohy` založen 2026-11-21. Projít na 390 / 768 / 1280 / 1440 px: klient napíše, nadiktuje
+  a pošle screenshot → do 10 s ve Zprávách adminu, zvonek; odpověď z telefonu; dvě fajfky po přečtení;
   e-mail klientovi jen když chat nemá otevřený; „Ke schválení" → Schvaluji / Chci změny; „Udělat
   z toho zadání" → Požadavky klientů; foto z telefonu nad 4 MB se zmenší. **Supabase Storage, Resend
   ani přepis hlasu v chatu nikdo nezkusil naživo** · od 2026-11-20
-- [ ] **KP14 nasadit a projít naživo:** kód na větvi `klient/kp14-konzultace` (nad `klient/kp13-penize`),
-  nic nenasazené. Před nasazením: migrace 121, 122 **a** 123 na produkci (všechny aditivní; 123 potřebuje
-  095, 096, 105 a 115), teprve pak `node scripts/portal-create-role.js` (granty pro `portal_app`) — bez
-  123 skončí granty chybou. Projít: Kalendář › Přidat › Volno pro klienty (jednou i každý týden),
-  plocha v Týdnu a Dni, detail volna a smazání jen dne i celé řady se Zpět; `/klient` › projekt ›
-  Domluvit konzultaci (den, čas, popis) → do minuty odkaz na Meet v e-mailu z krystof@vizeon.cz,
-  v kalendáři adminu i v Hovorech; Přesunout a Zrušit (+ Vrátit); `/p` rezervace jen ve volnu, bez volna
-  věta „Volný termín teď nemám". **Google Meet ani Resend nikdo nezkusil naživo** (jen testy
-  s podstrčenými odpověďmi); vzhled ověřen na dočasné stránce s vymyšlenými daty na 375 a 1280 px · od 2026-11-20
-- [ ] **KP13 nasadit a projít naživo:** kód na větvi `klient/kp13-penize` (nad `klient/kp12-etapy`),
-  commitnutý a pushnutý na GitHub 2026-11-19 (jen tahle větev, `main` beze změny). Před nasazením: migrace 121 **a** 122 na produkci (obě aditivní; 122 vyžaduje 107
-  a 121), teprve pak `node scripts/portal-create-role.js` — `portal-grants.sql` z téhle větve odkazuje
-  na tabulky ze 122 a bez ní skončí chybou. Projít: zakázka propojená s klientem → `/klient` › projekt
-  ukáže Cenu, Zaplaceno, Zbývá; vystavit fakturu → objeví se „Čeká na zaplacení", Stáhnout PDF (shodné
-  s PDF v adminu), Zaplatit QR kódem v bance (jen s IBANem v profilu dodavatele); označit zaplaceno →
-  Zbývá klesne v adminu i u klienta; storno; archivní faktura s nahraným PDF. **Změna adminu (R-125):**
-  po nasazení zkontrolovat „Nezaplaceno" ve výpisu zakázek a v Podnikání — u zakázek se zaplacenou
-  fakturou bez „Peníze dorazily" teď klesne. Ověřeno jen PGlite a dočasnou stránkou na 390 a 1280 px
-  · od 2026-11-18
-- [ ] **`ws-schema` test je na větvích `klient/*` červený:** číslo 120 drží necommitnutá oprava
-  kalendáře v hlavním stromu, KP12 proto vzala 121. Zmizí, až bude 120 v historii · od 2026-11-18
+- [ ] **KP14 projít naživo:** na produkci od 2026-11-21 (`fa79603`), migrace 123 od 2026-11-20. Projít:
+  Kalendář › Přidat › Volno pro klienty (jednou i každý týden), plocha v Týdnu a Dni, detail volna
+  a smazání jen dne i celé řady se Zpět; `/klient` › projekt › Domluvit konzultaci (den, čas, popis)
+  → do minuty odkaz na Meet v e-mailu z krystof@vizeon.cz, v kalendáři adminu i v Hovorech; Přesunout
+  a Zrušit (+ Vrátit); `/p` rezervace jen ve volnu, bez volna věta „Volný termín teď nemám". **Google
+  Meet ani Resend nikdo nezkusil naživo** (jen testy s podstrčenými odpověďmi); vzhled ověřen na
+  dočasné stránce s vymyšlenými daty na 375 a 1280 px · od 2026-11-20
+- [ ] **KP13 projít naživo:** na produkci od 2026-11-21 (`fa79603`), migrace 122 od 2026-11-20. Projít:
+  zakázka propojená s klientem → `/klient` › projekt ukáže Cenu, Zaplaceno, Zbývá; vystavit fakturu →
+  objeví se „Čeká na zaplacení", Stáhnout PDF (shodné s PDF v adminu), Zaplatit QR kódem v bance (jen
+  s IBANem v profilu dodavatele); označit zaplaceno → Zbývá klesne v adminu i u klienta; storno;
+  archivní faktura s nahraným PDF. **Změna adminu (R-125):** zkontrolovat „Nezaplaceno" ve výpisu
+  zakázek a v Podnikání — u zakázek se zaplacenou fakturou bez „Peníze dorazily" teď klesne. Ověřeno
+  jen PGlite a dočasnou stránkou na 390 a 1280 px · od 2026-11-18
+- [ ] **KP11 — zbytek průchodu:** naostro 2026-11-21 prošla pozvánka → nastavení hesla → e-mail
+  s obnovou hesla (z Resendu, česky). Neověřené zůstává: pozvání z detailu zakázky (Pozvat do prostoru
+  → e-mail z krystof@vizeon.cz), „Zpět" do 10 s nic nepošle, druhá zakázka stejného klienta se zeptá
+  na prostor, „Zkopírovat odkaz", klient po přihlášení vidí svou zakázku, odhlášení a přihlášení na
+  390 a 1280 px · od 2026-11-18
 - [x] ~~**Admin v Supabase nemá druhý faktor:** účet adminu má 0 ověřených TOTP faktorů (zjištěno
   2026-11-18), přihlášení do adminu tedy stojí jen na hesle. Zapnout v `/dashboard/profil` →
   Přihlášení · Kryštof · od 2026-11-18~~ — zapnuto 2026-11-21 (viz changelog).
-- [ ] **KP11 naživo neověřené:** pozvání z detailu zakázky běží jen v testech a na dočasné stránce.
-  Po nastavení Supabase (předchozí bod) projít: zakázka → Pozvat do prostoru → e-mail z krystof@vizeon.cz
-  → nastavit heslo → klient vidí zakázku; „Zpět" do 10 s nic nepošle; druhá zakázka stejného klienta se
-  zeptá na prostor; „Zkopírovat odkaz" · větev `klient/kp11-prihlaseni` · od 2026-11-18
 - [ ] **Člověk ve dvou prostorech vidí jen ten první:** `portal.member_lookup` vrací členství podle data
   vzniku a `/klient` bere první. Pozvání proto stejný e-mail drží v jednom prostoru (s potvrzením); kdyby
   měl někdo pracovat pro dvě firmy, chce to výběr prostoru v `/klient` · `lib/portal/context.ts` · od 2026-11-18
@@ -1809,9 +1772,6 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 - [ ] **Odeslání faktury e-mailem nikdo nezkusil naživo (AD12):** `POST /api/invoices/[id]/email`
   posílá přes Gmail SMTP (`lib/email.ts`, R-004) s PDF v příloze. Ověřit skutečné doručení,
   velikost přílohy a jak to vypadá v Gmailu a Apple Mailu · od 2026-11-12
-- [ ] **`ws-schema` test je na větvi `admin/ad12-fakturace` červený:** hlídá migrace bez mezer
-  a číslo **106 drží souběžné sezení AD11**. Není to chyba AD12 — zmizí po rebase na větev,
-  kde 106 je. Před mergem do `admin/modernizace` pustit `npm test` znovu · od 2026-11-12
 - [ ] **AD10 — co prohlížeč ověřit nemohl:** headless Chrome potvrdil tvar odkazů, plochy 44 px
   i šířky, ale ne chování **operačního systému**: jestli `mailto:` otevře skutečně předvyplněnou
   zprávu v poštovním klientovi a jestli `sms:+420…?&body=` sedí na iPhonu i Androidu (tvar
@@ -1882,8 +1842,13 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 - [ ] **Testy s pevnými daty:** 16 testových souborů míchá pevná data z listopadu 2026 se skutečnými hodinami (`now()`); jak dny projdou, můžou padat jako `ws-email.test.ts` 2026-11-03. Převést na `vi.setSystemTime` nebo data od dneška · `lib/ws/__tests__`, `lib/__tests__` · od 2026-11-03
 
 - [ ] **Požadavky klientů (R-069) — před nasazením:** (1) ~~migrace 092~~ aplikovaná na produkci, (2) ~~`OPENAI_API_KEY`~~ ve Vercelu (Production i Preview), (3) ověřit v prohlížeči mikrofon a nahrávání (Chrome, Safari iOS `audio/mp4`) a že hlavička `Permissions-Policy` na `/p/*` má `microphone=(self)`, (4) ~~ověřit rezidenci a DPA~~ ověřeno 2026-11-01 (`docs/klientsky-prostor/PLAN.md` 8.1: OpenAI i Anthropic zpracovávají v USA na SCC; EU přepis jen s žádostí u OpenAI; zda je DPA OpenAI přijaté automaticky, ověřit v nastavení organizace), zbývá doplnit zpracovatele do právních textů, (5) nahrávku klienta zatím nikdo nevyzkoušel s češtinou · od 2026-11-01
-- [ ] **Klientský prostor — před nasazením (R-070–R-073):** (1) ~~migrace 092–096 a role `portal_app`~~ hotovo na produkci, (2) ~~env ve Vercelu~~ nastaveno (`DATABASE_URL_PORTAL` jen Production), (3) **průchod v prohlížeči nikdo neprošel** (jde jen na Neon větvi `projectiq` s migracemi 092–096 a `portal_app`, nebo na produkci se souhlasem; Preview míří na testovací DB bez schématu `portal`): pozvánka → registrace v Clerku → přijetí → přehled → požadavek (text i hlas) → zpráva → hodnocení; kostra adminu, Dnes, záložky detailu, schvalování hlášení a klíč projektu na datech; telefon 390 px, (4) Clerk je jen dev instance, `/klient` s ním ověřit až s produkční, (5) test hlášení ze skriptu `zakaziq-report.mjs` proti běžící aplikaci, (6) souhrnný e-mail o aktivitě se neposlal nikdy naostro · od 2026-11-01
-- [ ] **KP08 a KP10:** soubory od klienta jsou odložené (D-K8). KP10: ~~retence 3 roky~~ v kódu (R-076, migrace 098), ~~DPA a rezidence AI~~ ověřeno; zbývá audit `web-security-audit` a pilot s jedním klientem (~~právní texty se zpracovateli a retencí~~ R-079) · od 2026-11-01
+- [ ] **Klientský prostor první vlny (R-070–R-073) — projít naživo:** migrace 092–096, role `portal_app`
+  i env jsou na produkci a přihlášení je od R-107 na Supabase (Clerk v `/klient` už není). Zbývá průchod
+  na skutečných datech: kostra adminu, Dnes, záložky detailu, schvalování hlášení a klíč projektu, test
+  hlášení ze skriptu `zakaziq-report.mjs` proti produkci a první souhrnný e-mail o aktivitě naostro;
+  telefon 390 px · od 2026-11-01
+- [ ] **KP08:** soubory a podklady od klienta jsou odložené (D-K8). Obrázky a PDF v chatu už řeší KP15
+  (D-K18); samostatné úložiště podkladů jen, kdyby bylo potřeba · od 2026-11-01
 - [ ] **Předání do Claude Code úroveň 3** (Routines API) se nedělá, dokud nebude experiment a samostatné rozhodnutí (D-K7) · od 2026-11-01
 - [ ] **Nestabilní testy nad PGlite:** `ws-intake` a `admin-calendar` padaly při plném běhu na časový limit v `beforeAll` (samostatně jsou hotové za 7 s). AD09 zvedl `hookTimeout` ve `vitest.config.ts` na 60 s — databází ve WASM startuje najednou víc a 30 s nestačilo. Kdyby to padalo dál, příčina je někde jinde · `vitest.config.ts`, `lib/ws/__tests__` · od 2026-11-01
 - [ ] **Nestabilní test limitu veřejných poptávek:** opakovaná plná sada jednou vrátila 400 místo očekávaného 429; samostatný test prošel. Limit používá pevná minutová okna, přechod mezi okny během 21 požadavků je možná příčina, zatím neprokázaná. Upravit test tak, aby nezávisel na hranici minuty · `lib/ws/__tests__/ws-intake.test.ts` · od 2026-10-31
@@ -1950,6 +1915,16 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (úklid stavu, větví a worktree)
+- **docs** Převzaté rozdělané srovnání stavu z 2026-11-21 (worktree `claude/k-incomplete-phases-537efe`): tabulka
+  KP a kritéria 11.1 v `docs/klientsky-prostor/PLAN.md` (kritérium 5 — druhý faktor — opravené na hotové),
+  řádek F1 v `docs/AUTH-SUPABASE-PLAN.md`, Aktuální stav a body „nasadit" u KP11–KP17 přepsané na „projít naživo".
+- **fix** Otevřené problémy: zmizely dva body o červeném testu `ws-schema` — číslování migrací je od migrace 120
+  na `main` souvislé a test prochází.
+- **chore** Úklid: odstraněné worktree a lokální větve, jejichž práce je celá v `main` a kde se nepracovalo;
+  větev `admin/dotaznik-bez-google` zahozená (Kryštof 2026-11-23: recenze na Googlu v dotazníku zůstává, R-119).
+  Na GitHubu se nic nemazalo.
 
 ### 2026-11-23 (text e-mailu s fakturou do `main` — R-139)
 - **feat** Předmět a text e-mailu, kterým faktura odchází klientovi, jde upravit v Faktury › Údaje dodavatele:
@@ -2094,6 +2069,7 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 
 ### 2026-11-21 (nasazení klientského prostoru KP11–KP17 a KP10 na produkci)
 - **chore** KP10 kritérium 5: **TOTP u admina zapnuté** 2026-11-21 (produkční `/dashboard/profil` → Přihlášení, ověřovací aplikace). Kryštof naskenoval QR a zadal kód sám, agent kód ani heslo nezadával; QR se nefotil. Po novém načtení stránky ukazuje „Dvoufázové ověření je zapnuté“. Zkoušky přes Playwright CLI v samostatném okně selhaly (okno nebylo vidět, přihlášení proběhlo jinde), použil se přihlášený Chrome přes rozšíření. Dál zbývá: pilot, Google CDPA, OpenAI.
+- **docs** Stav sezení KP srovnaný s nasazením: tabulka a kritéria 11.1 v `docs/klientsky-prostor/PLAN.md`, řádek F1 v `docs/AUTH-SUPABASE-PLAN.md`, obnova hesla jako ověřená v `.claude/security/STATE.md` (+ `.agents/`), Aktuální stav a Otevřené problémy (body „nasadit" u KP11–KP17 přepsané na „projít naživo", hotové nastavení Supabase smazané). Při tom zjištěno: `ws-schema` test je po sloučení červený i na `main` (chybí migrace 120).
 - **docs** Kontrolní seznam pilotu `docs/klientsky-prostor/PILOT.md` (příprava, 14 kroků průchodu, kritéria hotovo, tabulka zjištění), řádek v `memory/index.md`.
 - **decision** **R-133**: Vercel zůstává na Hobby, Pro se platit nebude (Kryštof). DPA Vercelu tím u klientských dat zůstává nepokryté, přijaté riziko; v `GDPR.md` označeno.
 - **chore** KP10 kritérium 8: v dashboardu Vercelu potvrzeno, že tým je na plánu **Hobby** (DPA Vercelu platí jen pro Pro a Enterprise). Do vyřešení přechodu na Pro zůstává Vercel bez smlouvy o zpracování. Text `/klient/soukromi` přečten ze zdroje a předán Kryštofovi ke kontrole (bod 9 čeká na jeho schválení).
