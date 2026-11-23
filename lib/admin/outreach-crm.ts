@@ -89,7 +89,7 @@ function toContactRow(r: Json): ContactRow {
     demoEmailSentAt: iso(r.demo_email_sent_at),
     emailOpenedAt: iso(r.email_opened_at),
     emailRepliedAt: iso(r.email_replied_at),
-    meetingAt: iso(r.meeting_at),
+    meetingAt: iso(r.admin_meeting_at) ?? iso(r.meeting_at),
     callbackAt: iso(r.callback_at),
     handledReason: str(r.handled_reason),
     updatedAt: iso(r.source_updated_at) ?? iso(r.received_at) ?? new Date(0).toISOString(),
@@ -239,19 +239,38 @@ export async function loadContacts(filter: ContactFilter, q: string | undefined,
     .map(([key, where]) => `count(*) FILTER (WHERE ${where})::int AS "${key}"`)
     .join(',\n          ')
 
+  // Schůzka z kalendáře adminu (nejbližší budoucí, jinak poslední) má přednost
+  // před tou, kterou poslal Growth OS. Bez migrace 115 (outreach_lead_id) se
+  // dotaz zopakuje bez ní.
+  const listQuery = (withMeeting: boolean) => ({
+    text: `
+      SELECT ${J} - 'call_summary' - 'status_history' - 'research'
+             ${
+               withMeeting
+                 ? `|| jsonb_build_object('admin_meeting_at', (
+                      SELECT e.starts_at FROM calendar_events e
+                       WHERE e.outreach_lead_id = l.id
+                       ORDER BY (e.starts_at >= now()) DESC, abs(extract(epoch FROM e.starts_at - now()))
+                       LIMIT 1))`
+                 : ''
+             } AS row
+        FROM outreach_leads l
+       WHERE ${FILTER_WHERE[filter]} AND ${searchSql}
+       ORDER BY source_updated_at DESC
+       LIMIT ${LIST_LIMIT}`,
+    params,
+  })
+  const countQuery = { text: `SELECT ${countSql} FROM outreach_leads l`, params: [] }
+
   try {
-    const [rows, counts] = await adminDb.batch([
-      {
-        text: `
-          SELECT ${J} - 'call_summary' - 'status_history' - 'research' AS row
-            FROM outreach_leads l
-           WHERE ${FILTER_WHERE[filter]} AND ${searchSql}
-           ORDER BY source_updated_at DESC
-           LIMIT ${LIST_LIMIT}`,
-        params,
-      },
-      { text: `SELECT ${countSql} FROM outreach_leads l`, params: [] },
-    ])
+    let rows: Record<string, unknown>[]
+    let counts: Record<string, unknown>[]
+    try {
+      ;[rows, counts] = await adminDb.batch([listQuery(true), countQuery])
+    } catch (err) {
+      if (!['42703', '42P01'].includes((err as { code?: string })?.code ?? '')) throw err
+      ;[rows, counts] = await adminDb.batch([listQuery(false), countQuery])
+    }
     const c = (counts[0] ?? {}) as Record<string, unknown>
     const queue = filter === 'na-tahu' && !search ? (await loadOutreachQueue(now)).rows : null
     return {

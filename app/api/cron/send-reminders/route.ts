@@ -11,6 +11,7 @@ import { proposeMemoryDrafts } from '@/lib/admin/memory/drafts'
 import { remindPendingSurveys } from '@/lib/admin/surveys'
 import { sendOverdueInvites } from '@/lib/admin/meetings'
 import { finishUnfinishedConsultations } from '@/lib/admin/consultations'
+import { processDueReminders, warnIfTriggerStopped } from '@/lib/admin/meeting-reminders'
 import { prepareRecurringDrafts } from '@/lib/admin/invoice-drafts'
 import { flushPhaseEmails } from '@/lib/admin/phase-email'
 import { verifyCronSecret } from '@/lib/api-auth'
@@ -232,6 +233,14 @@ export async function GET(req: NextRequest) {
       console.error('[cron] E-maily o etapách selhaly:', (err as Error).message)
       return 0
     }),
+    // Připomínky schůzek (R-137) běžně posílá každou minutu externí cron.
+    // Tady pojistka: pošle, co čeká, a když spouštěč stojí, upozorní do zvonku.
+    processDueReminders()
+      .then(() => warnIfTriggerStopped())
+      .catch((err) => {
+        console.error('[cron] Pojistka připomínek schůzek selhala:', (err as Error).message)
+        return false
+      }),
     // Pravidelné faktury (R-117): jednou za měsíc koncept ke schválení.
     // Nic neodchází — koncept čeká ve Fakturách, odesílá se až kliknutím.
     prepareRecurringDrafts()

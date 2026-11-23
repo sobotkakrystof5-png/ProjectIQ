@@ -225,7 +225,7 @@ Ruční admin události/blokace v globálním kalendáři (`/dashboard/calendar`
 | project_id | uuid | FK → projects.id, ON DELETE SET NULL (migrace 007) |
 | consultation_slot_id | uuid | FK → consultation_slots.id, ON DELETE SET NULL (migrace 105) — druhá strana dvojice s rezervací |
 
-**Propojení s Hovory (migrace 051):** vytvoření kalendářní události automaticky založí odpovídající řádek v `client_leads` (company_name = název události, next_action = popis, next_action_date/time odvozeno z `starts_at` v Europe/Prague) a propojí obě strany přes `calendar_events.lead_id` / `client_leads.calendar_event_id`. Smazání jedné strany smaže i druhou (`deleteCalendarEvent` / `deleteLead` v `app/calendar-actions.ts` a `app/calls-actions.ts`). Kalendářová stránka proto z `client_leads` do zobrazení bere jen řádky s `calendar_event_id IS NULL` — jinak by se termín zdvojil (jednou jako reálná `calendar_events` událost, podruhé jako virtuální položka z `next_action`).
+**Propojení s Hovory (migrace 051):** vytvoření kalendářní události automaticky založí odpovídající řádek v `client_leads` (company_name = název události, next_action = popis, next_action_date/time odvozeno z `starts_at` v Europe/Prague) a propojí obě strany přes `calendar_events.lead_id` / `client_leads.calendar_event_id`. Obě id generuje `insertEvent` předem (`randomUUID`) a vloží je jedním příkazem — řádek vložený v CTE další část téhož příkazu nevidí, takže dřívější dodatečný `UPDATE … SET lead_id` nikdy nic nezapsal a události založené do 2026-11-18 mají `lead_id` prázdné (srovná migrace 120). Čtení kalendáře proto hledá dvojici z obou stran a `updateCalendarEvent` chybějící `lead_id` doplní, případně chybějící kontakt v Hovorech založí. Smazání jedné strany smaže i druhou (`deleteCalendarEvent` / `deleteLead` v `app/calendar-actions.ts` a `app/calls-actions.ts`). Kalendářová stránka proto z `client_leads` do zobrazení bere jen řádky s `calendar_event_id IS NULL` — jinak by se termín zdvojil (jednou jako reálná `calendar_events` událost, podruhé jako virtuální položka z `next_action`).
 
 **Čas drží obě strany pohromadě (migrace 105, AD10).** `updateLead` přepisoval jen
 `client_leads.next_action_date/time` a termín v kalendáři nechával na starém čase. Od AD10 jde
@@ -475,6 +475,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 | Endpoint | Kdy (UTC) | Co |
 |----------|-----------|----|
 | `/api/cron/send-reminders` | denně 7:00 | Připomínky konzultací a lead akcí (idempotentní příznaky proti duplicitám). **Od AD08 tu vznikají i opakované transakce** — fixní náklady i cash-flow šablony (`lib/recurring-transactions.ts`). Dřív je zakládal render stránky Finance. Od AD14 tu propadají nevyřízené návrhy asistenta, od AD15 vznikají návrhy paměti a od AD16 odchází **jediná připomínka dotazníku** po sedmi dnech (`remindPendingSurveys`). |
+| `/api/cron/meeting-reminders` | **každou minutu z cron-job.org** (ne `vercel.json`, Hobby pustí cron jen denně) | Připomínky schůzek e-mailem a SMS (R-137, `lib/admin/meeting-reminders.ts`) a pojistka pozvánek. Bearer `MEETING_REMINDERS_SECRET` (projde i `CRON_SECRET`), GET i POST. Denní `send-reminders` je pojistka a hlídá, jestli spouštěč běží (`admin_settings.reminders_tick_at`). |
 | `/api/cron/tax-news` | pondělí 5:00 | Stažení legislativních novinek (`ON CONFLICT DO NOTHING`) |
 | `/api/cron/client-retention` | denně 3:30 | Retence D-K10 (R-076, migrace 098): `public.purge_client_retention(3)` — dokončená zakázka (`done`/`paid`) bez pohybu 3 roky přijde o aktivitu, požadavky (`client_requests`, `portal.requests`), zprávy a slovní hodnocení; zakázka, cena a číselné hodnocení zůstávají. Pozvánky 90 dní po použití/zrušení/vypršení. `lib/client-retention.ts` |
 
@@ -574,8 +575,10 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
   `getHours()` v kalendáři nepoužívej — zahazuje minuty i zónu (AD08 to byla jedna
   ze tří nahlášených chyb).
 - **Z detailu události jde zavolat (AD10).** Dotaz okna přibírá kontakt zrcadlený v Hovorech
-  (`LEFT JOIN client_leads l ON l.id = e.lead_id` → `contact_name/phone/email`
-  v `RawCalendarEvent`) a `SmartCalendar` ho dá do `meta.contact`. Detail vykreslí tentýž
+  (`LEFT JOIN LATERAL` na `client_leads` přes `lead_id` **nebo** `calendar_event_id` →
+  `contact_name/contact_person/phone/email` v `RawCalendarEvent`) a `SmartCalendar` ho dá
+  do `meta.contact`. Do formuláře úpravy jde jen `contact_person` (jméno bez náhradního
+  názvu firmy), jinak by se název události uložil jako jméno kontaktu. Detail vykreslí tentýž
   `ContactActions` jako zbytek adminu. U řádků druhu `call` se dál používá `meta.lead`
   (nese navíc stav a hodnotu), u blokace se kontakt nehledá vůbec. Nová časová tabulka, která
   se bude kreslit v kalendáři, si kontakt musí dotáhnout stejně — detail si ho sám nedohledá.
@@ -1381,6 +1384,14 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
   D-105). Tlačítko „Poslat pozvánku na …" otevře `ScheduleMeetingDialog` s termínem od robota;
   úvod e-mailu navazuje na den hovoru (`defaultIntro(hasDemo, lastCallAt)`). Odeslání = Meet,
   událost v kalendáři, kontakt v Hovorech, e-mail za 15 s (R-114).
+  **„Schůzka domluvena"** (`components/admin/arranged-meeting.tsx`, akce `recordMeeting`,
+  `recordArrangedMeeting` v `lib/admin/meetings.ts`) zapíše termín domluvený jinde — den, čas, délka,
+  nepovinné „kde a o čem" — **bez Googlu a bez e-mailu**: událost v kalendáři (`outreach_lead_id`),
+  kontakt v Hovorech, firma převzatá. Je ve frontě, na konci každého řádku seznamu a v detailu
+  (i u převzaté nebo uzavřené firmy); kdo už má budoucí schůzku, tlačítko nemá. Zápis do adminu
+  sdílí se „Domluvit schůzku" (`writeMeeting`), „Zpět" je `cancelMeeting` (kontakt v Hovorech
+  zůstane bez termínu). Seznam bere termín schůzky přednostně z kalendáře adminu (`admin_meeting_at`,
+  bez migrace 115 se dotaz zopakuje bez něj).
 - **Reporty** (`?pohled=reporty`, detail `&den=RRRR-MM-DD`) — za den souhrn dne, jinak poslední report po
   kole; hovory s rozbalitelným přepisem (`<details>`, jen text).
 - **Analýza** (`?pohled=analyza&obdobi=7|30|90`) — `lib/admin/outreach-analysis.ts` (čisté funkce):
@@ -1418,3 +1429,44 @@ Growth OS si to čte `GET /api/public/outreach/handled?since=`.
 **Úklid:** `purge_outreach_emails()` (e-maily po 12 měsících) volá cron `client-retention` vedle
 `purge_outreach_retention()`. Nahrávky ZakazIQ nečte ani neukládá.
 
+
+## Schůzky přes Google Meet z kalendáře a připomínky klientovi (R-137)
+
+- **Kde:** okno „Přidat do kalendáře" / „Upravit v kalendáři" (`components/AdminEventModal.tsx`) má
+  u události přepínač **Schůzka přes Google Meet**. Ukáže se jen s migrací 128
+  (`getMeetingReadiness` → `remindersAvailable`); bez propojeného Googlu nebo klíče Resendu
+  přepínač řekne proč. Nová schůzka = `createCalendarMeeting` → `scheduleCalendarMeeting`
+  (`lib/admin/meetings.ts`): Google → kontakt v Hovorech + událost v jedné transakci → pozvánka
+  za 15 s (`after()` + `sendDueInvite`) → připomínky. Existující událost = `makeEventMeeting` →
+  `convertEventToMeeting`. „Zpět" v toastu = `undoCalendarMeeting` (`delete` u nové, `revert`
+  u převedené), jen dokud pozvánka neodešla.
+- **Pozvánka** má text, který Kryštof před odesláním upraví (`calendarIntro`), větu o připomínkách
+  (`remindersNote`) a přílohu `schuzka.ics` (`lib/admin/meeting-ics.ts`, UID `schuzka-<id události>@vizeon.cz`).
+  Totéž platí pro „Domluvit schůzku" z AI asistenta (checkbox Připomenout klientovi).
+- **Připomínky:** fronta `meeting_reminders` (migrace 128), jeden řádek = jedna zpráva.
+  Plán `REMINDER_STEPS`: den předem e-mail + SMS, hodinu předem e-mail, 10 minut předem SMS;
+  `changed` = zpráva o změně termínu. Kanál bez kontaktu se vynechá, denní připomínka do 6 h
+  od naplánování se přeskočí (klient právě dostal pozvánku). E-mail jde na `invite_to`, SMS na
+  `calendar_events.meeting_phone` (`+420…`).
+- **Text se skládá až při odeslání** (`reminderIntro`, `reminderSubject`, `reminderSms`
+  v `lib/admin/meeting-email.ts`) z aktuálního času schůzky a „teď" — „zítra v 15:00",
+  „Začínáme za 10 minut (15:00)". Zpráva, na kterou je pozdě, se zahodí (`stillUseful`:
+  denní nejpozději 3 h před, hodinová 15 min před, 10minutová do začátku).
+- **Změna času jde vždy přes `updateCalendarEvent`** (okno kalendáře i asistent). Ten pozná
+  schůzku a zavolá `syncMeetingAfterEdit`: přesun v Googlu (`moveGoogleEvent`, PATCH bez hostů),
+  nový plán (`planReminders` — řádek s nezměněným časem nechá, odeslaný s novým časem vrátí do
+  fronty) a zprávu o změně jen s `notifyClient` (zaškrtávátko v okně, výchozí zapnuté; asistent
+  ji neposílá). Selhání Googlu změnu v adminu nevrací, jen varuje.
+- **Odesílání:** `processDueReminders` zamkne řádky `pending` → `sending` jedním UPDATE
+  s `FOR UPDATE SKIP LOCKED`, pošle (Resend `sendVizeonMail`, SMS `lib/admin/sms.ts` přes Odorik),
+  `sent`/`failed`. Přechodná chyba (síť, `gateway_failed`) se zkusí 3×, pak oznámení
+  `meeting_reminder_failed` do zvonku. **SMS se naslepo neopakuje** — řádek visící v `sending`
+  přes 10 minut skončí jako `failed`.
+- **SMS:** Odorik do ČR pustí odesílatele jen „Odorik.cz", „smsinfo" nebo „5517" (`ODORIK_SMS_SENDER`),
+  proto je podpis v textu. Text bez diakritiky a jen ze základní sady GSM (`toSmsText`), aby se
+  vešel do jedné SMS (160 znaků); `reminderSms` vybere variantu, která odkaz na Meet neusekne.
+  Odložené odeslání Odoriku se nepoužívá (nejde zrušit).
+- **Detail události** v kalendáři ukazuje stav připomínek (`getMeetingStatus`, načítá se až při
+  otevření) a varuje, když spouštěč neběží. Smazání schůzky ji smaže i v Google Kalendáři, ale
+  až po 10 s a jen když ji „Zpět" neobnovilo (obnova vrací stejné id i s připomínkami).
+- Testy: `lib/__tests__/admin-pripominky.test.ts` (PGlite se SQL 114, 115, 128).

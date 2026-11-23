@@ -3,8 +3,11 @@ import { randomUUID } from 'node:crypto'
 import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import { ensureContact } from '@/lib/admin/contacts'
 import { loadOutreachSource } from '@/lib/admin/outreach'
-import { createMeetEvent, deleteGoogleEvent } from '@/lib/admin/google/calendar'
-import { renderMeetingEmail } from '@/lib/admin/meeting-email'
+import { createMeetEvent, deleteGoogleEvent, moveGoogleEvent } from '@/lib/admin/google/calendar'
+import { normalizePhone } from '@/lib/contacts/normalize'
+import { remindersNote, renderMeetingEmail } from '@/lib/admin/meeting-email'
+import { buildMeetingIcs } from '@/lib/admin/meeting-ics'
+import { icsSequence, planReminders, queueChangeNotice } from '@/lib/admin/meeting-reminders'
 import { sendVizeonMail } from '@/lib/admin/vizeon-mail'
 import { isoToPragueDateAndTime } from '@/lib/prague-time'
 import { DEFAULT_LEAD_ORIGIN } from '@/lib/lead-origins'
@@ -20,6 +23,9 @@ import { DEFAULT_LEAD_ORIGIN } from '@/lib/lead-origins'
  *     Když selže (překryv s jiným termínem), událost v Googlu se smaže.
  *  3. **E-mail** — čeká `INVITE_DELAY_MS` na „Zpět" a pak odejde jedním UPDATE,
  *     který řádek zamkne (`pending` → `sending`), takže dvakrát neodejde.
+ *
+ * „Schůzka domluvena" (`recordArrangedMeeting`) je jen krok 2: termín, který
+ * Kryštof s klientem domluvil jinde, se zapíše bez Googlu a bez e-mailu.
  */
 
 export const INVITE_DELAY_MS = 15_000
@@ -35,6 +41,8 @@ export type ScheduleInput = {
   inviteTo: string | null
   subject: string
   intro: string
+  /** Připomínky e-mailem a SMS (R-137). Bez migrace 128 se tiše vynechají. */
+  reminders?: boolean
 }
 
 export type ScheduleResult =
@@ -83,10 +91,69 @@ export async function scheduleOutreachMeeting(input: ScheduleInput, deps: Deps =
 
   // 2) Admin
   const eventId = randomUUID()
+  let leadId: string
+  try {
+    leadId = await writeMeeting(source, {
+      outreachId: input.outreachId,
+      eventId,
+      start,
+      end,
+      title,
+      description,
+      nextAction: 'Schůzka přes Google Meet',
+      meet,
+      invite: inviteTo
+        ? {
+            to: inviteTo,
+            subject: input.subject.trim().slice(0, 200),
+            body: input.intro.trim().slice(0, 4000),
+            demoUrl: source.demo_url,
+          }
+        : null,
+    })
+  } catch (err) {
+    await deleteMeet(meet.googleEventId).catch((e) => console.error('[meeting] Úklid v Googlu selhal:', (e as Error).message))
+    if ((err as { code?: string })?.code === '23P01') {
+      return { ok: false, error: OVERLAP_ERROR }
+    }
+    throw err
+  }
+
+  if (input.reminders) {
+    await applyMeetingSettings(eventId, { phone: normalizePhone(source.phone), remindersOn: true })
+    await planReminders(eventId)
+  }
+
+  return { ok: true, eventId, leadId, meetUrl: meet.meetUrl, inviteQueued: inviteTo !== null }
+}
+
+const OVERLAP_ERROR = 'V tu dobu už máte v kalendáři něco jiného.'
+
+type OutreachSource = NonNullable<Awaited<ReturnType<typeof loadOutreachSource>>>
+
+/**
+ * Zápis schůzky do adminu jednou transakcí: kontakt v Hovorech (stávající,
+ * nebo nový), událost v kalendáři a firma od asistenta převzatá. Společné
+ * pro „Domluvit schůzku" (s Meetem a e-mailem) i „Schůzka domluvena" (jen
+ * termín). Vrací id kontaktu v Hovorech; překryv termínů vyhodí `23P01`.
+ */
+async function writeMeeting(
+  source: OutreachSource,
+  m: {
+    outreachId: string
+    eventId: string
+    start: Date
+    end: Date
+    title: string
+    description: string
+    nextAction: string
+    meet: { googleEventId: string; meetUrl: string } | null
+    invite: { to: string; subject: string; body: string; demoUrl: string | null } | null
+  },
+): Promise<string> {
   const existingLead = source.client_lead_id
   const leadId = existingLead ?? randomUUID()
-  const { date, time } = isoToPragueDateAndTime(start.toISOString())
-  const nextAction = `Schůzka přes Google Meet`
+  const { date, time } = isoToPragueDateAndTime(m.start.toISOString())
 
   const queries: AdminQuery[] = []
   if (existingLead) {
@@ -99,7 +166,7 @@ export async function scheduleOutreachMeeting(input: ScheduleInput, deps: Deps =
       email: source.email,
       phone: source.phone,
       source: 'growth-os',
-      seenAt: start.toISOString(),
+      seenAt: m.start.toISOString(),
     })
     queries.push({
       text: `INSERT INTO client_leads (id, company_name, contact_name, phone, email, lead_status, next_action,
@@ -111,7 +178,7 @@ export async function scheduleOutreachMeeting(input: ScheduleInput, deps: Deps =
         source.contact_name,
         source.phone,
         source.email,
-        nextAction,
+        m.nextAction,
         date,
         time,
         source.demo_url ? `Z Growth OS. Ukázka: ${source.demo_url}` : 'Z Growth OS.',
@@ -127,21 +194,21 @@ export async function scheduleOutreachMeeting(input: ScheduleInput, deps: Deps =
              VALUES ($1, $2, $3, $4, $5, 'manual', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                      CASE WHEN $11::text = 'pending' THEN now() + make_interval(secs => $16) END)`,
       params: [
-        eventId,
-        title,
-        description,
-        start.toISOString(),
-        end.toISOString(),
+        m.eventId,
+        m.title,
+        m.description,
+        m.start.toISOString(),
+        m.end.toISOString(),
         DEFAULT_LEAD_ORIGIN,
         leadId,
-        meet.meetUrl,
-        meet.googleEventId,
-        input.outreachId,
-        inviteTo ? 'pending' : null,
-        inviteTo,
-        inviteTo ? input.subject.trim().slice(0, 200) : null,
-        inviteTo ? input.intro.trim().slice(0, 4000) : null,
-        source.demo_url,
+        m.meet?.meetUrl ?? null,
+        m.meet?.googleEventId ?? null,
+        m.outreachId,
+        m.invite ? 'pending' : null,
+        m.invite?.to ?? null,
+        m.invite?.subject ?? null,
+        m.invite?.body ?? null,
+        m.invite?.demoUrl ?? null,
         INVITE_DELAY_MS / 1000,
       ],
     },
@@ -150,28 +217,76 @@ export async function scheduleOutreachMeeting(input: ScheduleInput, deps: Deps =
                 SET calendar_event_id = $2, next_action = $3, next_action_type = 'meeting',
                     next_action_date = $4::date, next_action_time = $5::time
               WHERE id = $1`,
-      params: [leadId, eventId, nextAction, date, time],
+      params: [leadId, m.eventId, m.nextAction, date, time],
     },
     {
       text: `UPDATE outreach_leads
                 SET handled_at = now(), handled_reason = 'prevzato',
                     client_lead_id = coalesce(client_lead_id, $2::uuid), updated_at = now()
               WHERE id = $1`,
-      params: [input.outreachId, leadId],
+      params: [m.outreachId, leadId],
     },
   )
 
+  await adminDb.batch(queries)
+  return leadId
+}
+
+export type ArrangedInput = {
+  outreachId: string
+  startsAt: string
+  minutes: number
+  /** Kde a o čem, volitelně. Jde do popisu události i do Hovorů. */
+  note: string
+}
+
+export type ArrangedResult = { ok: true; eventId: string; leadId: string } | { ok: false; error: string }
+
+/**
+ * „Schůzka domluvena": s klientem je termín už domluvený (telefonem, osobně),
+ * takže se jen zapíše — událost v kalendáři a kontakt v Hovorech. Žádný
+ * Google ani e-mail. „Zpět" je stejné jako u schůzky s Meetem (`cancelMeeting`).
+ */
+export async function recordArrangedMeeting(input: ArrangedInput): Promise<ArrangedResult> {
+  const start = new Date(input.startsAt)
+  if (Number.isNaN(start.getTime())) return { ok: false, error: 'Neplatný čas schůzky.' }
+  if (start.getTime() < Date.now() - 5 * 60_000) return { ok: false, error: 'Schůzka nemůže být v minulosti.' }
+  const minutes = Math.round(input.minutes)
+  if (minutes < MIN_MINUTES || minutes > MAX_MINUTES) return { ok: false, error: 'Délka schůzky musí být 15 až 180 minut.' }
+  const end = new Date(start.getTime() + minutes * 60_000)
+
+  const source = await loadOutreachSource(input.outreachId)
+  if (!source) return { ok: false, error: 'Firma nenalezena.' }
+
+  const note = input.note.trim().slice(0, 300)
+  const description = [
+    note || null,
+    source.contact_name ? `Kontakt: ${source.contact_name}` : null,
+    source.phone ? `Telefon: ${source.phone}` : null,
+    source.demo_url ? `Ukázka: ${source.demo_url}` : null,
+    'Domluveno s klientem, firma od AI asistenta (Growth OS).',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const eventId = randomUUID()
   try {
-    await adminDb.batch(queries)
+    const leadId = await writeMeeting(source, {
+      outreachId: input.outreachId,
+      eventId,
+      start,
+      end,
+      title: `Schůzka: ${source.company_name}`.slice(0, 120),
+      description,
+      nextAction: note ? `Schůzka — ${note}`.slice(0, 200) : 'Schůzka',
+      meet: null,
+      invite: null,
+    })
+    return { ok: true, eventId, leadId }
   } catch (err) {
-    await deleteMeet(meet.googleEventId).catch((e) => console.error('[meeting] Úklid v Googlu selhal:', (e as Error).message))
-    if ((err as { code?: string })?.code === '23P01') {
-      return { ok: false, error: 'V tu dobu už máte v kalendáři něco jiného.' }
-    }
+    if ((err as { code?: string })?.code === '23P01') return { ok: false, error: OVERLAP_ERROR }
     throw err
   }
-
-  return { ok: true, eventId, leadId, meetUrl: meet.meetUrl, inviteQueued: inviteTo !== null }
 }
 
 export type SendInviteResult = 'sent' | 'failed' | 'skipped'
@@ -193,10 +308,15 @@ export async function sendDueInvite(
     meet_url: string
     starts_at: string | Date
     ends_at: string | Date
+    reminders_on: string | null
+    meeting_phone: string | null
   }>`
     UPDATE calendar_events SET invite_status = 'sending'
      WHERE id = ${eventId} AND invite_status = 'pending' AND invite_send_after <= now()
-    RETURNING invite_to, invite_subject, invite_body, invite_demo_url, meet_url, starts_at, ends_at
+    RETURNING invite_to, invite_subject, invite_body, invite_demo_url, meet_url, starts_at, ends_at,
+              -- Přes to_jsonb, ať pozvánka odejde i bez migrace 128.
+              to_jsonb(calendar_events) ->> 'reminders_on' AS reminders_on,
+              to_jsonb(calendar_events) ->> 'meeting_phone' AS meeting_phone
   `
   const row = rows[0]
   if (!row) return 'skipped'
@@ -205,14 +325,35 @@ export async function sendDueInvite(
   const minutes = Math.round((new Date(row.ends_at).getTime() - new Date(row.starts_at).getTime()) / 60_000)
   let result: Awaited<ReturnType<typeof sendVizeonMail>>
   try {
+    const remindersOn = row.reminders_on === 'true'
     const { text, html } = renderMeetingEmail({
       intro: row.invite_body,
       startsAt,
       minutes,
       meetUrl: row.meet_url,
       demoUrl: row.invite_demo_url,
+      note: remindersOn ? remindersNote(Boolean(row.meeting_phone)) : null,
     })
-    result = await send({ to: row.invite_to, subject: row.invite_subject, text, html, idempotencyKey: `meeting-invite:${eventId}` })
+    // Soubor do kalendáře (R-137): klient si schůzku uloží i s vlastní připomínkou.
+    const ics = buildMeetingIcs({
+      eventId,
+      startsAt,
+      endsAt: new Date(row.ends_at).toISOString(),
+      title: 'Schůzka s Kryštofem Sobotkou (VIZEON)',
+      meetUrl: row.meet_url,
+      description: `Připojit se: ${row.meet_url}`,
+      sequence: icsSequence(),
+    })
+    result = await send({
+      to: row.invite_to,
+      subject: row.invite_subject,
+      text,
+      html,
+      idempotencyKey: `meeting-invite:${eventId}`,
+      attachments: [
+        { filename: 'schuzka.ics', contentType: 'text/calendar; charset=utf-8; method=PUBLISH', content: Buffer.from(ics, 'utf8') },
+      ],
+    })
   } catch (err) {
     result = { ok: false, error: (err as Error).message }
   }
@@ -295,6 +436,308 @@ export async function cancelMeeting(eventId: string, deps: Deps = {}): Promise<C
     SELECT id::text FROM del
   `
   if (!deleted[0]) return { ok: false, error: 'E-mail klientovi už odešel. Schůzku zrušte v kalendáři a dejte mu vědět.' }
+
+  if (row.google_event_id) {
+    await deleteMeet(row.google_event_id).catch((e) =>
+      console.error('[meeting] Smazání v Googlu selhalo:', (e as Error).message),
+    )
+  }
+  return { ok: true }
+}
+
+// ─── Schůzka přímo z kalendáře (R-137) ────────────────────────────────────────
+// Přepínač „Schůzka přes Google Meet" v okně události. Pořadí je stejné jako
+// u schůzky z AI asistenta: Google → admin v jedné transakci → pozvánka po
+// odkladu na „Zpět" → připomínky ve frontě `meeting_reminders`.
+
+function isMissingSchema(err: unknown): boolean {
+  const code = (err as { code?: string })?.code
+  return code === '42P01' || code === '42703'
+}
+
+/**
+ * Telefon pro SMS a zapnutí připomínek u události. Bez migrace 128 nedělá
+ * nic, ať schůzka z AI asistenta funguje i bez ní.
+ */
+export async function applyMeetingSettings(
+  eventId: string,
+  settings: { phone: string | null; remindersOn: boolean; email?: string | null },
+): Promise<void> {
+  try {
+    await adminDb`
+      UPDATE calendar_events
+         SET meeting_phone = ${settings.phone},
+             reminders_on = ${settings.remindersOn},
+             invite_to = COALESCE(${settings.email ?? null}::text, invite_to)
+       WHERE id = ${eventId}
+    `
+  } catch (err) {
+    if (!isMissingSchema(err)) throw err
+  }
+}
+
+export type MeetingDraft = {
+  /** E-mail klienta, kam jde pozvánka a připomínky. */
+  email: string
+  /** Telefon pro SMS v mezinárodním tvaru, nebo `null` = bez SMS. */
+  phone: string | null
+  subject: string
+  intro: string
+  demoUrl: string | null
+  reminders: boolean
+}
+
+export type CalendarMeetingInput = MeetingDraft & {
+  title: string
+  description: string | null
+  startsAt: string
+  endsAt: string
+  contactName: string | null
+  /** Telefon tak, jak ho Kryštof napsal — do Hovorů. */
+  phoneRaw: string | null
+}
+
+export type MeetingSetupResult = { ok: true; eventId: string; meetUrl: string } | { ok: false; error: string }
+
+function checkMeetingTime(startsAt: string, endsAt: string): string | null {
+  const start = Date.parse(startsAt)
+  const end = Date.parse(endsAt)
+  if (Number.isNaN(start) || Number.isNaN(end)) return 'Neplatný čas schůzky.'
+  if (start < Date.now() - 5 * 60_000) return 'Schůzka nemůže být v minulosti.'
+  if (end <= start) return 'Čas konce musí být po čase začátku.'
+  if (end - start > 12 * 3_600_000) return 'Schůzka může trvat nejvýš 12 hodin.'
+  return null
+}
+
+/** Nová událost v kalendáři rovnou jako schůzka s Google Meet. */
+export async function scheduleCalendarMeeting(
+  input: CalendarMeetingInput,
+  deps: Deps = {},
+): Promise<MeetingSetupResult> {
+  const createMeet = deps.createMeet ?? createMeetEvent
+  const deleteMeet = deps.deleteMeet ?? deleteGoogleEvent
+  const timeError = checkMeetingTime(input.startsAt, input.endsAt)
+  if (timeError) return { ok: false, error: timeError }
+
+  const title = input.title.trim().slice(0, 120)
+  const description = input.description?.trim() || null
+
+  let meet: { googleEventId: string; meetUrl: string }
+  try {
+    meet = await createMeet({
+      title,
+      description: [description, input.contactName ? `Kontakt: ${input.contactName}` : null, `E-mail: ${input.email}`]
+        .filter(Boolean)
+        .join('\n'),
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+    })
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+
+  const eventId = randomUUID()
+  const leadId = randomUUID()
+  const { date, time } = isoToPragueDateAndTime(input.startsAt)
+  try {
+    const contactId = await ensureContact({
+      name: input.contactName,
+      email: input.email,
+      phone: input.phoneRaw,
+      source: 'manual',
+      seenAt: input.startsAt,
+    })
+    // Kontakt v Hovorech nejdřív (událost na něj ukazuje), pak událost, pak
+    // zpětný odkaz — v jedné transakci, takže vznikne všechno, nebo nic.
+    await adminDb.batch([
+      {
+        text: `INSERT INTO client_leads (id, company_name, contact_name, phone, email, lead_status, next_action,
+                                         next_action_type, next_action_date, next_action_time, contact_id)
+               VALUES ($1, $2, $3, $4, $5, 'cold', $6, 'meeting', $7::date, $8::time, $9)`,
+        params: [
+          leadId,
+          title,
+          input.contactName,
+          input.phoneRaw,
+          input.email,
+          description ?? 'Schůzka přes Google Meet',
+          date,
+          time,
+          contactId,
+        ],
+      },
+      {
+        text: `INSERT INTO calendar_events (id, title, description, starts_at, ends_at, event_type, lead_origin, lead_id,
+                                            meet_url, google_event_id, invite_status, invite_to, invite_subject,
+                                            invite_body, invite_demo_url, invite_send_after, meeting_phone, reminders_on)
+               VALUES ($1, $2, $3, $4, $5, 'manual', $6, $7, $8, $9, 'pending', $10, $11, $12, $13,
+                       now() + make_interval(secs => $14), $15, $16)`,
+        params: [
+          eventId,
+          title,
+          description,
+          input.startsAt,
+          input.endsAt,
+          DEFAULT_LEAD_ORIGIN,
+          leadId,
+          meet.meetUrl,
+          meet.googleEventId,
+          input.email,
+          input.subject.trim().slice(0, 200),
+          input.intro.trim().slice(0, 4000),
+          input.demoUrl,
+          INVITE_DELAY_MS / 1000,
+          input.phone,
+          input.reminders,
+        ],
+      },
+      {
+        text: `UPDATE client_leads SET calendar_event_id = $2 WHERE id = $1`,
+        params: [leadId, eventId],
+      },
+    ])
+  } catch (err) {
+    await deleteMeet(meet.googleEventId).catch((e) => console.error('[meeting] Úklid v Googlu selhal:', (e as Error).message))
+    if ((err as { code?: string })?.code === '23P01') return { ok: false, error: 'Tento termín se překrývá s jinou událostí v kalendáři.' }
+    throw err
+  }
+
+  await planReminders(eventId)
+  return { ok: true, eventId, meetUrl: meet.meetUrl }
+}
+
+/** Existující událost se stane schůzkou: odkaz na Meet, pozvánka, připomínky. */
+export async function convertEventToMeeting(
+  eventId: string,
+  draft: MeetingDraft,
+  deps: Deps = {},
+): Promise<MeetingSetupResult> {
+  const createMeet = deps.createMeet ?? createMeetEvent
+  const deleteMeet = deps.deleteMeet ?? deleteGoogleEvent
+
+  const [event] = await adminDb<{ title: string; description: string | null; starts_at: string | Date; ends_at: string | Date; meet_url: string | null }>`
+    SELECT title, description, starts_at, ends_at, meet_url
+      FROM calendar_events WHERE id = ${eventId} AND event_type = 'manual'
+  `
+  if (!event) return { ok: false, error: 'Událost nenalezena.' }
+  if (event.meet_url) return { ok: false, error: 'Tahle událost už schůzka je.' }
+  const startsAt = new Date(event.starts_at).toISOString()
+  const endsAt = new Date(event.ends_at).toISOString()
+  const timeError = checkMeetingTime(startsAt, endsAt)
+  if (timeError) return { ok: false, error: timeError }
+
+  let meet: { googleEventId: string; meetUrl: string }
+  try {
+    meet = await createMeet({
+      title: event.title,
+      description: [event.description, `E-mail: ${draft.email}`].filter(Boolean).join('\n'),
+      startsAt,
+      endsAt,
+    })
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+
+  const updated = await adminDb<{ id: string }>`
+    UPDATE calendar_events
+       SET meet_url = ${meet.meetUrl}, google_event_id = ${meet.googleEventId},
+           invite_status = 'pending', invite_to = ${draft.email},
+           invite_subject = ${draft.subject.trim().slice(0, 200)}, invite_body = ${draft.intro.trim().slice(0, 4000)},
+           invite_demo_url = ${draft.demoUrl}, invite_error = NULL,
+           invite_send_after = now() + make_interval(secs => ${INVITE_DELAY_MS / 1000}),
+           meeting_phone = ${draft.phone}, reminders_on = ${draft.reminders}
+     WHERE id = ${eventId} AND meet_url IS NULL
+    RETURNING id::text
+  `
+  if (!updated[0]) {
+    await deleteMeet(meet.googleEventId).catch(() => {})
+    return { ok: false, error: 'Tahle událost už schůzka je.' }
+  }
+  await planReminders(eventId)
+  return { ok: true, eventId, meetUrl: meet.meetUrl }
+}
+
+/**
+ * Po změně události, která je schůzkou (R-137): přesun v Googlu a nový plán
+ * připomínek. Volá ji `updateCalendarEvent`, takže to platí pro okno kalendáře
+ * i pro asistenta. Zprávu klientovi o změně posílá jen na výslovné přání.
+ * Selhání Googlu změnu v adminu nevrací — vrátí jen varování.
+ */
+export async function syncMeetingAfterEdit(
+  eventId: string,
+  change: { timeChanged: boolean; notifyClient: boolean },
+  deps: { moveMeet?: typeof moveGoogleEvent } = {},
+): Promise<{ warning: string | null; noticeQueued: boolean }> {
+  const moveMeet = deps.moveMeet ?? moveGoogleEvent
+  const rows = await adminDb<{ title: string; starts_at: string | Date; ends_at: string | Date; meet_url: string | null; google_event_id: string | null }>`
+    SELECT title, starts_at, ends_at, meet_url, google_event_id FROM calendar_events WHERE id = ${eventId}
+  `
+  const event = rows[0]
+  if (!event?.meet_url) return { warning: null, noticeQueued: false }
+
+  let warning: string | null = null
+  if (change.timeChanged && event.google_event_id) {
+    try {
+      await moveMeet(event.google_event_id, {
+        startsAt: new Date(event.starts_at).toISOString(),
+        endsAt: new Date(event.ends_at).toISOString(),
+      })
+    } catch (err) {
+      console.error('[meeting] Přesun v Googlu selhal:', (err as Error).message)
+      warning = 'V Google Kalendáři se čas nezměnil. Upravte ho tam prosím ručně.'
+    }
+  }
+  await planReminders(eventId)
+  const noticeQueued = change.timeChanged && change.notifyClient ? await queueChangeNotice(eventId) : false
+  return { warning, noticeQueued }
+}
+
+/**
+ * „Zpět" do odeslání pozvánky u schůzky z kalendáře. `delete` smaže celou
+ * nově založenou událost i s kontaktem v Hovorech, `revert` vrátí existující
+ * událost na obyčejnou. Po odeslání pozvánky už nejde.
+ */
+export async function undoMeetingSetup(
+  eventId: string,
+  mode: 'delete' | 'revert',
+  deps: Deps = {},
+): Promise<CancelResult> {
+  const deleteMeet = deps.deleteMeet ?? deleteGoogleEvent
+  const sentError = 'Pozvánka už klientovi odešla. Schůzku zrušte v kalendáři a dejte mu vědět.'
+  const [row] = await adminDb<{ google_event_id: string | null }>`
+    SELECT google_event_id FROM calendar_events
+     WHERE id = ${eventId} AND outreach_lead_id IS NULL
+       AND (invite_status IS NULL OR invite_status IN ('pending', 'cancelled', 'failed'))
+  `
+  if (!row) return { ok: false, error: sentError }
+
+  if (mode === 'delete') {
+    const deleted = await adminDb<{ id: string }>`
+      WITH ev AS (
+        DELETE FROM calendar_events
+         WHERE id = ${eventId} AND outreach_lead_id IS NULL
+           AND (invite_status IS NULL OR invite_status IN ('pending', 'cancelled', 'failed'))
+        RETURNING id, lead_id
+      ), ld AS (
+        DELETE FROM client_leads WHERE id IN (SELECT lead_id FROM ev) OR calendar_event_id IN (SELECT id FROM ev)
+        RETURNING id
+      )
+      SELECT id::text FROM ev
+    `
+    if (!deleted[0]) return { ok: false, error: sentError }
+  } else {
+    const reverted = await adminDb<{ id: string }>`
+      UPDATE calendar_events
+         SET meet_url = NULL, google_event_id = NULL, invite_status = NULL, invite_to = NULL,
+             invite_subject = NULL, invite_body = NULL, invite_demo_url = NULL, invite_send_after = NULL,
+             invite_error = NULL, meeting_phone = NULL, reminders_on = false
+       WHERE id = ${eventId} AND outreach_lead_id IS NULL
+         AND (invite_status IS NULL OR invite_status IN ('pending', 'cancelled', 'failed'))
+      RETURNING id::text
+    `
+    if (!reverted[0]) return { ok: false, error: sentError }
+    await adminDb`DELETE FROM meeting_reminders WHERE event_id = ${eventId}`
+  }
 
   if (row.google_event_id) {
     await deleteMeet(row.google_event_id).catch((e) =>

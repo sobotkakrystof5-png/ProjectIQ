@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'framer-motion'
 import {
@@ -12,7 +12,8 @@ import {
 import {
   deleteCalendarEvent, restoreCalendarEvent, deleteClientAvailability, restoreClientAvailability,
 } from '@/app/calendar-actions'
-import { resendMeetingInvite } from '@/app/meeting-actions'
+import { getMeetingStatus, resendMeetingInvite } from '@/app/meeting-actions'
+import type { MeetingStatus, ReminderRow } from '@/lib/admin/meeting-reminders'
 import { toast } from '@/components/ui/toast'
 import {
   CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS,
@@ -107,6 +108,13 @@ interface UnifiedEvent {
       name: string | null
       phone: string | null
       email: string | null
+    }
+    /** Schůzka s Google Meet (R-114, R-121): kam jdou připomínky. */
+    meeting?: {
+      inviteStatus: string | null
+      inviteTo: string | null
+      phone: string | null
+      remindersOn: boolean
     }
   }
 }
@@ -256,11 +264,21 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
           e.event_type !== 'block' && (e.contact_phone !== null || e.contact_email !== null)
             ? { name: e.contact_name, phone: e.contact_phone, email: e.contact_email }
             : undefined,
-        contactDraft: { name: e.contact_name, phone: e.contact_phone, email: e.contact_email },
+        // Do úpravy jen jméno člověka — název firmy (= název události) by se
+        // při uložení zapsal jako jméno kontaktu.
+        contactDraft: { name: e.contact_person ?? null, phone: e.contact_phone, email: e.contact_email },
         // Schůzka s Google Meet (R-112): tlačítko „Připojit se" a stav e-mailu klientovi.
         meetingLink: e.meet_url ?? null,
         inviteNote: inviteNote(e.invite_status ?? null),
         inviteFailed: e.invite_status === 'failed',
+        meeting: e.meet_url
+          ? {
+              inviteStatus: e.invite_status ?? null,
+              inviteTo: e.invite_to ?? null,
+              phone: e.meeting_phone ?? null,
+              remindersOn: e.reminders_on === 'true',
+            }
+          : undefined,
       },
     })
   }
@@ -470,6 +488,87 @@ function inviteNote(status: string | null): string | null {
   }
 }
 
+const REMINDER_KIND: Record<ReminderRow['kind'], string> = {
+  h24: 'Den předem',
+  h1: 'Hodinu předem',
+  m10: '10 minut předem',
+  changed: 'Změna termínu',
+}
+
+function shortDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('cs-CZ', {
+    timeZone: 'Europe/Prague',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(iso))
+}
+
+function reminderState(r: ReminderRow): string {
+  switch (r.status) {
+    case 'pending':
+      return `čeká na ${shortDateTime(r.sendAt)}`
+    case 'sending':
+      return 'odesílá se'
+    case 'sent':
+      return r.sentAt ? `odešla ${shortDateTime(r.sentAt)}` : 'odešla'
+    case 'failed':
+      return 'neodešla'
+    case 'skipped':
+      return 'vynechaná'
+    case 'cancelled':
+      return 'zrušená'
+  }
+}
+
+/**
+ * Stav připomínek klientovi u schůzky (R-137). Načítá se až při otevření
+ * detailu, ať kalendář nečte frontu pro každou událost v okně.
+ */
+function MeetingReminders({ eventId }: { eventId: string }) {
+  const [status, setStatus] = useState<MeetingStatus | null | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    getMeetingStatus(eventId)
+      .then((s) => { if (alive) setStatus(s) })
+      .catch(() => { if (alive) setStatus(null) })
+    return () => { alive = false }
+  }, [eventId])
+
+  if (!status) return null
+  const visible = status.reminders.filter((r) => r.status !== 'cancelled')
+  if (!status.remindersOn && visible.length === 0) {
+    return <p className="text-xs text-quiet">Připomínky klientovi jsou vypnuté.</p>
+  }
+  const waiting = visible.some((r) => r.status === 'pending')
+  return (
+    <div>
+      <p className="mb-1 font-num text-xs font-medium uppercase tracking-[0.12em] text-quiet">Připomínky klientovi</p>
+      <ul className="flex flex-col gap-1 text-xs">
+        {visible.map((r) => (
+          <li key={`${r.kind}-${r.channel}`} className="flex flex-wrap justify-between gap-x-3">
+            <span className="text-ink">
+              {REMINDER_KIND[r.kind]} · {r.channel === 'sms' ? 'SMS' : 'e-mail'}
+            </span>
+            <span className={r.status === 'failed' ? 'text-danger' : 'text-quiet'} title={r.error ?? undefined}>
+              {reminderState(r)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {waiting && status.triggerOk !== true && (
+        <p className="mt-2 text-xs text-quiet">
+          {status.triggerOk === null
+            ? 'Spouštěč připomínek ještě neběžel, připomínky zatím čekají.'
+            : 'Spouštěč připomínek teď neběží. Připomínky odejdou, až se rozběhne.'}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function EventDetailModal({
   event,
   onClose,
@@ -501,7 +600,10 @@ function EventDetailModal({
         toast.error('Událost už neexistuje.')
         return
       }
-      toast.success('Událost je smazaná.', {
+      const clientKnows = snapshot.meeting?.invite_status === 'sent'
+      toast.success(clientKnows ? 'Schůzka je smazaná.' : 'Událost je smazaná.', {
+        // Pozvánka už odešla: o zrušení se klient sám nedozví (R-137).
+        description: clientKnows ? 'Klient o zrušení zatím neví, dejte mu prosím vědět.' : undefined,
         undo: async () => {
           try {
             await restoreCalendarEvent(snapshot)
@@ -642,6 +744,8 @@ function EventDetailModal({
                 {event.meta.inviteFailed && <ResendInviteButton eventId={event.id} />}
               </div>
             )}
+
+            {event.meta.meeting && <MeetingReminders eventId={event.id} />}
 
             {/* Description */}
             {event.meta.description && (
@@ -1522,6 +1626,7 @@ export function SmartCalendar({
                 contactName: ev.meta.contactDraft?.name ?? null,
                 phone: ev.meta.contactDraft?.phone ?? null,
                 email: ev.meta.contactDraft?.email ?? null,
+                meeting: ev.meta.meeting ?? null,
               },
             })
           }}
@@ -1545,6 +1650,7 @@ export function SmartCalendar({
       {createModal.open && (
         <AdminEventModal
           onClose={handleCreateClose}
+          onReload={reloadCurrent}
           defaultDate={createModal.date}
           defaultHour={createModal.hour}
           editing={createModal.editing}

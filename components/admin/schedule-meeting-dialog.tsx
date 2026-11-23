@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { scheduleMeeting, undoMeeting } from '@/app/meeting-actions'
 import { defaultIntro, defaultSubject } from '@/lib/admin/meeting-email'
+import { MEETING_LENGTHS, approxIso, initialSlot } from '@/lib/admin/meeting-slot'
 import type { OutreachQueueRow } from '@/lib/admin/outreach-view'
 
 /**
@@ -25,30 +26,6 @@ import type { OutreachQueueRow } from '@/lib/admin/outreach-view'
  */
 
 export type MeetingReadiness = { google: boolean; mail: boolean }
-
-const PRAGUE = 'Europe/Prague'
-
-function pragueParts(at: Date): { date: string; time: string } {
-  const date = new Intl.DateTimeFormat('en-CA', { timeZone: PRAGUE }).format(at)
-  const time = new Intl.DateTimeFormat('en-GB', { timeZone: PRAGUE, hour: '2-digit', minute: '2-digit', hour12: false }).format(at)
-  return { date, time }
-}
-
-/** Výchozí termín: čas, který si klient řekl, jinak zítra v 10:00. */
-function initialSlot(row: OutreachQueueRow, nowIso: string): { date: string; time: string } {
-  if (row.callbackAt && Date.parse(row.callbackAt) > Date.parse(nowIso)) return pragueParts(new Date(row.callbackAt))
-  return { date: pragueParts(new Date(Date.parse(nowIso) + 86_400_000)).date, time: '10:00' }
-}
-
-/** Náhled předmětu potřebuje okamžik; přibližný převod stačí (server počítá přesně). */
-function approxIso(date: string, time: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
-  const guess = new Date(`${date}T${time}:00Z`)
-  const shown = pragueParts(guess)
-  const diffMin =
-    (Date.parse(`${shown.date}T${shown.time}:00Z`) - guess.getTime()) / 60_000
-  return new Date(guess.getTime() - diffMin * 60_000).toISOString()
-}
 
 const fieldClass =
   'w-full rounded-box border border-input bg-surface px-3.5 py-2.5 text-[15px] text-ink placeholder:text-quiet focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30'
@@ -68,7 +45,7 @@ export function ScheduleMeetingDialog({
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const first = initialSlot(row, nowIso)
+  const first = initialSlot(row.callbackAt, nowIso)
   const [date, setDate] = useState(first.date)
   const [time, setTime] = useState(first.time)
   const [minutes, setMinutes] = useState(30)
@@ -76,6 +53,7 @@ export function ScheduleMeetingDialog({
   const [inviteTo, setInviteTo] = useState(row.email ?? '')
   const [subjectEdited, setSubjectEdited] = useState<string | null>(null)
   const [intro, setIntro] = useState(defaultIntro(Boolean(row.demoUrl), row.lastCallAt))
+  const [reminders, setReminders] = useState(true)
 
   const iso = approxIso(date, time)
   const autoSubject = useMemo(() => (iso ? defaultSubject(iso) : 'Naše schůzka'), [iso])
@@ -115,6 +93,7 @@ export function ScheduleMeetingDialog({
         inviteTo: sendInvite ? inviteTo.trim() : null,
         subject,
         intro,
+        reminders: sendInvite && reminders,
       })
       if (!result.ok) {
         toast.error(result.error)
@@ -165,7 +144,7 @@ export function ScheduleMeetingDialog({
               onChange={(e) => setMinutes(Number(e.target.value))}
               className="h-11 w-full rounded-chip border border-input bg-surface px-3.5 text-[15px] text-ink focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
             >
-              {[15, 30, 45, 60, 90].map((m) => (
+              {MEETING_LENGTHS.map((m) => (
                 <option key={m} value={m}>
                   {m} minut
                 </option>
@@ -216,8 +195,22 @@ export function ScheduleMeetingDialog({
             <p className="flex items-start gap-2 text-xs text-quiet">
               <Video size={14} strokeWidth={1.5} aria-hidden="true" className="mt-0.5 shrink-0" />
               Pod text sami doplníme termín, tlačítko Připojit se ke schůzce
-              {row.demoUrl ? ', odkaz na ukázku' : ''}, vizeon.cz a váš podpis.
+              {row.demoUrl ? ', odkaz na ukázku' : ''}, vizeon.cz a váš podpis. Přiložíme i soubor do kalendáře.
             </p>
+            <label className="flex min-h-11 items-start gap-3 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={reminders}
+                onChange={(e) => setReminders(e.target.checked)}
+                className="mt-0.5 size-5 shrink-0 accent-navy-700"
+              />
+              <span>
+                Připomenout klientovi
+                <span className="block text-xs text-quiet">
+                  Den předem a hodinu předem e-mailem{row.phone ? ', den předem a 10 minut předem SMS' : ''}.
+                </span>
+              </span>
+            </label>
           </div>
         )}
 

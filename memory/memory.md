@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-20 · **E-maily z Hovorů** (R-132): tlačítko „Poslat e-mail"
+> **Poslední aktualizace:** 2026-11-23 · **Schůzky z kalendáře s připomínkami** (R-137):
+> přepínač „Schůzka přes Google Meet" v okně události, pozvánka s upravitelným textem a `.ics`,
+> připomínky den předem (e-mail + SMS), hodinu předem (e-mail) a 10 minut předem (SMS),
+> zpráva o přesunu. SMS přes Odorik, spouštěč každou minutu mimo Vercel. Migrace 128.
+>
+> Předchozí: 2026-11-20 · **E-maily z Hovorů** (R-132): tlačítko „Poslat e-mail"
 > se třemi šablonami — Portfolio, Nabídka (cena za zakázku) a Schůzka s Google Meet (termín,
 > odkaz na Meet, vizeon.cz; všechno nebo nic). Bez migrace. **Na produkci od 2026-11-20 (`2c0ddb8`);
 > naživo s Googlem a Resendem neověřeno.**
@@ -1465,9 +1470,44 @@ web má `redirect: "error"`, takže chybná adresa skončí záložním e-mailem
 Bezpečnost `.claude/security/AUDIT-LOG.md` 2026-11-22.
 oddíl 10.
 
+### R-137 · Schůzky z kalendáře s připomínkami e-mailem a SMS (2026-11-23)
+**Rozhodnutí:** (1) Událost v kalendáři jde přepínačem označit jako **schůzku přes Google Meet**:
+klient hned dostane pozvánku z krystof@vizeon.cz (text Kryštof před odesláním upraví, 15 s na
+„Zpět", příloha `.ics`). (2) **Připomínky**: den předem e-mail a SMS, hodinu předem e-mail,
+10 minut předem SMS; připomínka do 6 h po pozvánce se vynechá. (3) Po přesunu se připomínky
+přepočítají a klient dostane **zprávu o změně** (volba v okně, výchozí zapnutá; asistent ji
+neposílá). (4) **SMS přes Odorik** (účet už je kvůli Growth OS), text bez diakritiky do jedné
+SMS, odesílatel jen „Odorik.cz"/„smsinfo"/„5517". (5) **Spouštěč každou minutu je cron-job.org**
+s vlastním klíčem `MEETING_REMINDERS_SECRET`, Vercel Pro ne. (6) Smazaná schůzka zmizí i z
+Google Kalendáře. Potvrzení účasti klientem (stránka schůzky) je další krok, zatím nepostavený.
+**Proč:** Kryštof 2026-11-23: „aby klienti nezapomínali a opravdu jednali", 24 h, hodinu
+a 10 minut předem SMS i e-mailem, zprávu upravit a odeslat; „Vercel Pro není třeba". Kanály
+rozložené tak, aby nepřišlo sedm zpráv (návrh přijat „pojďme na to"). Odložené SMS Odoriku nejdou
+zrušit a naplánované e-maily Resendu by SMS nepokryly — jedna fronta pro obojí.
+**Důsledek:** migrace 128 (`meeting_reminders`, `calendar_events.meeting_phone`, `reminders_on`,
+`admin_settings.reminders_tick_at`). **Každá změna času události musí jít přes `updateCalendarEvent`**,
+jinak se Google ani připomínky nepřesunou. Nová zpráva klientovi ke schůzce = nový `kind`
+ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Mění R-114 v části
+„schůzka jen z AI asistenta" a zavírá jeho přijaté riziko (smazaná schůzka v Googlu). Technika
+`docs/admin/AGENTS-ADMIN.md` → „Schůzky přes Google Meet z kalendáře", bezpečnost DECISIONS #049.
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Připomínky schůzek (R-137) — zapnout a projít naživo:** (1) migrace 128 na produkci,
+  (2) do Vercelu `MEETING_REMINDERS_SECRET` (vygenerovat) a `ODORIK_API_USER` + `ODORIK_API_PASSWORD`
+  (doporučeně údaje **linky**, ne API heslo účtu), volitelně `ODORIK_SMS_SENDER`, (3) na cron-job.org
+  úloha každou minutu: `GET https://www.zakaziq.cz/api/cron/meeting-reminders`, hlavička
+  `Authorization: Bearer <MEETING_REMINDERS_SECRET>`, (4) deploy, (5) zkušební schůzka na vlastní
+  e-mail a telefon za ~70 minut: pozvánka s `.ics`, připomínka hodinu a 10 minut předem, přesun
+  (zpráva o změně, čas v Googlu), smazání (zmizí z Googlu). **Nic z toho nikdo nezkusil naživo;**
+  ověřeno jen testy nad PGlite s podstrčeným Googlem, Resendem a Odorikem. Cenu SMS Odoriku
+  zjistit v jeho ceníku. Kryštof · od 2026-11-23
+- [ ] **Potvrzení účasti na schůzce (R-137, další krok):** stránka schůzky s „Potvrdit účast /
+  Potřebuji jiný termín" a upozorněním „nepotvrdil, zavolej mu". Nepostaveno; v pozvánce je zatím
+  „odpovězte na e-mail" · od 2026-11-23
+- [ ] **„Direktor" v textu pozvánky:** Kryštof chtěl v pozvánce doporučit „mít otevřený direktor",
+  nevíme, co tím myslí; do výchozího textu se nedalo · od 2026-11-23
 
 
 - [ ] **Landing vede do registrace, která nejde dokončit naostro:** „Vyzkoušet 14 dní zdarma" na
@@ -1524,9 +1564,6 @@ oddíl 10.
   a 1280 px: Kontakty → Poslat pozvánku (termín a úvod s dnem hovoru), Reporty a detail dne,
   Analýza a zkopírování promptu. Bez migrace 116 endpoint vrací 503 a autopilot po každém reportu
   pošle notifikaci · Kryštof · od 2026-11-17
-- [ ] **Schůzka smazaná v kalendáři adminu zůstane v Google Kalendáři:** běžné mazání
-  (`deleteCalendarEvent`) Google nezná; ruší ji jen „Zpět" do odeslání e-mailu. Doplnit mazání
-  v Googlu, nebo mazat ručně · `app/calendar-actions.ts` · od 2026-11-17
 - [ ] **Next 16.4.2 má nové zranitelnosti (zjištěno 2026-11-17):** `next build` se při prvním
   běhu zastaví hláškou `SecurityFatalError` (opakovaný běh projde). `npm audit`: Next 16.2.0–16.4.4
   moderate (GHSA-mfr8-8qww-v76h, GHSA-vc7v-qv4w-wrv8 — únik přes `'use cache'`/`unstable_cache`;
@@ -1878,6 +1915,30 @@ oddíl 10.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (schůzky z kalendáře a připomínky klientovi — R-137)
+- **feat** V okně události v kalendáři přepínač **Schůzka přes Google Meet**: odkaz na Meet,
+  pozvánka z krystof@vizeon.cz s upravitelným textem za 15 s se „Zpět" a soubor `schuzka.ics`
+  v příloze. Jde i u existující události. Pak **připomínky**: den předem e-mail a SMS, hodinu
+  předem e-mail, 10 minut předem SMS. Po přesunu se připomínky přepočítají a klient dostane
+  zprávu o změně (zaškrtávátko v okně), událost se posune i v Google Kalendáři. Smazaná schůzka
+  zmizí i z Google Kalendáře (dřív zůstávala). Detail události ukazuje stav připomínek.
+  „Domluvit schůzku" u AI asistenta má připomínky taky. Soubory: `lib/admin/{meeting-reminders,sms,meeting-ics}.ts`,
+  `lib/admin/{meetings,meeting-email,calendar}.ts`, `lib/admin/google/calendar.ts` (`moveGoogleEvent`),
+  `app/{calendar-actions,meeting-actions}.ts`, `app/api/cron/meeting-reminders/route.ts`,
+  `app/api/cron/send-reminders/route.ts` (pojistka a hlídání spouštěče), `components/AdminEventModal.tsx`,
+  `components/SmartCalendar.tsx`, `components/admin/schedule-meeting-dialog.tsx`, migrace 128 (aplikována: ne).
+- **feat** SMS přes Odorik (`POST /api/v1/sms`, ověřeno v jeho dokumentaci 2026-11-23): text bez
+  diakritiky do 160 znaků, odesílatel do ČR jen Odorik.cz / smsinfo / 5517. Odložené SMS Odoriku
+  se nepoužívají (nejdou zrušit). Spouštěč každou minutu = cron-job.org s `MEETING_REMINDERS_SECRET`
+  (Vercel Pro Kryštof nechce).
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-pripominky.test.ts` (29 testů
+  nad PGlite se SQL 114, 115, 128), všechny testy adminu (473), `npm run build:check` (napoprvé ho
+  shodily staré typy v `.next/dev/types` po smazané dočasné stránce `app/ukazka-schuzka-tmp`;
+  složka smazána, podruhé prošel). Plná sada: selhávají jen známé `ws-email`, `ws-schema` (mezera
+  po 113) a nestabilní testy pod zátěží. **V prohlížeči, se skutečným Googlem, Resendem ani
+  Odorikem neověřeno.** Necommitnuto.
+- **decision** **R-137**, DECISIONS #049.
 
 ### 2026-11-22 (poptávky z vizeon.cz do adminu)
 - **feat** Nový vstup `POST /api/public/vizeon-leads` pro kontaktní formulář vizeon.cz (R-136): stejný

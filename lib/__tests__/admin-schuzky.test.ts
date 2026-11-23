@@ -16,7 +16,13 @@ vi.mock('@/lib/db', () => ({ sql: async () => [] }))
 
 import { setAdminDbForTests } from '@/lib/admin/db'
 import { ingestOutreachLeads, loadOutreachQueue } from '@/lib/admin/outreach'
-import { cancelMeeting, scheduleOutreachMeeting, sendDueInvite, sendOverdueInvites } from '@/lib/admin/meetings'
+import {
+  cancelMeeting,
+  recordArrangedMeeting,
+  scheduleOutreachMeeting,
+  sendDueInvite,
+  sendOverdueInvites,
+} from '@/lib/admin/meetings'
 import { outreachPayloadSchema } from '@/types/outreach'
 import { pgliteAdminDriver } from './helpers/admin-pglite'
 
@@ -227,5 +233,89 @@ describe('domluvit schůzku', () => {
     const ev = await db.query<{ invite_status: string; invite_error: string }>(`SELECT invite_status, invite_error FROM calendar_events`)
     expect(ev.rows[0].invite_status).toBe('failed')
     expect(ev.rows[0].invite_error).toContain('VIZEON_RESEND_API_KEY')
+  })
+})
+
+describe('schůzka domluvena (jen do kalendáře)', () => {
+  const arranged = (outreachId: string, extra: Record<string, unknown> = {}) => ({
+    outreachId,
+    startsAt: START,
+    minutes: 60,
+    note: 'U nich v provozovně',
+    ...extra,
+  })
+
+  it('zapíše událost a kontakt v Hovorech bez Googlu a bez e-mailu, firma odejde z fronty', async () => {
+    const id = await firm()
+    const result = await recordArrangedMeeting(arranged(id))
+    expect(result).toMatchObject({ ok: true })
+    if (!result.ok) return
+    expect(createMeet).not.toHaveBeenCalled()
+
+    const ev = await db.query<{
+      title: string
+      description: string
+      meet_url: string | null
+      invite_status: string | null
+      lead_id: string
+      outreach_lead_id: string
+      minutes: number
+    }>(
+      `SELECT title, description, meet_url, invite_status, lead_id::text, outreach_lead_id::text,
+              extract(epoch FROM ends_at - starts_at)::int / 60 AS minutes
+         FROM calendar_events`,
+    )
+    expect(ev.rows).toHaveLength(1)
+    expect(ev.rows[0]).toMatchObject({
+      title: 'Schůzka: Topenářství Testové',
+      meet_url: null,
+      invite_status: null,
+      lead_id: result.leadId,
+      outreach_lead_id: id,
+      minutes: 60,
+    })
+    expect(ev.rows[0].description).toContain('U nich v provozovně')
+
+    const lead = await db.query<{ calendar_event_id: string; next_action_type: string; next_action: string }>(
+      `SELECT calendar_event_id::text, next_action_type, next_action FROM client_leads`,
+    )
+    expect(lead.rows[0]).toEqual({
+      calendar_event_id: result.eventId,
+      next_action_type: 'meeting',
+      next_action: 'Schůzka — U nich v provozovně',
+    })
+    expect((await loadOutreachQueue()).rows).toHaveLength(0)
+    const firmRow = await db.query<{ handled_reason: string }>(`SELECT handled_reason FROM outreach_leads`)
+    expect(firmRow.rows[0].handled_reason).toBe('prevzato')
+  })
+
+  it('„Zpět" událost smaže a kontakt zůstane bez termínu', async () => {
+    const id = await firm()
+    const result = await recordArrangedMeeting(arranged(id, { note: '' }))
+    if (!result.ok) throw new Error(result.error)
+    expect(await cancelMeeting(result.eventId, deps)).toEqual({ ok: true })
+    expect(deleteMeet).not.toHaveBeenCalled()
+    expect((await db.query(`SELECT 1 FROM calendar_events`)).rows).toHaveLength(0)
+    const lead = await db.query<{ next_action_date: string | null }>(`SELECT next_action_date::text FROM client_leads`)
+    expect(lead.rows[0].next_action_date).toBeNull()
+  })
+
+  it('u převzaté firmy použije stávající kontakt', async () => {
+    const id = await firm()
+    const first = await scheduleOutreachMeeting(input(id, { sendInvite: false, inviteTo: null }), deps)
+    if (!first.ok) throw new Error(first.error)
+    const later = new Date(FUTURE.getTime() + 86_400_000).toISOString()
+    expect(await recordArrangedMeeting(arranged(id, { startsAt: later }))).toMatchObject({ ok: true, leadId: first.leadId })
+    expect((await db.query(`SELECT 1 FROM client_leads`)).rows).toHaveLength(1)
+  })
+
+  it('termín v minulosti, moc dlouhý nebo u neexistující firmy odmítne', async () => {
+    const id = await firm()
+    expect(await recordArrangedMeeting(arranged(id, { startsAt: '2020-01-01T10:00:00Z' }))).toMatchObject({ ok: false })
+    expect(await recordArrangedMeeting(arranged(id, { minutes: 600 }))).toMatchObject({ ok: false })
+    expect(
+      await recordArrangedMeeting(arranged('00000000-0000-4000-8000-000000000000')),
+    ).toEqual({ ok: false, error: 'Firma nenalezena.' })
+    expect((await db.query(`SELECT 1 FROM calendar_events`)).rows).toHaveLength(0)
   })
 })

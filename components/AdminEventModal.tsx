@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { Loader2, CalendarPlus, Lock, CalendarClock } from 'lucide-react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { Loader2, CalendarPlus, Lock, CalendarClock, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,7 +10,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
+import { toast } from '@/components/ui/toast'
 import { createCalendarEvent, createClientAvailability, updateCalendarEvent } from '@/app/calendar-actions'
+import {
+  createCalendarMeeting,
+  getMeetingReadiness,
+  makeEventMeeting,
+  saveMeetingSettings,
+  undoCalendarMeeting,
+  type MeetingReadiness,
+} from '@/app/meeting-actions'
+import { calendarIntro, defaultSubject } from '@/lib/admin/meeting-email'
 import { CONSULTATION_DEFAULT_MINUTES, CONSULTATION_SLOT_MINUTES } from '@/lib/consultations/rules'
 import { cn } from '@/lib/utils'
 import { getPragueTodayISO, isoToPragueDateAndTime, parsePragueDatetimeLocalToISO } from '@/lib/prague-time'
@@ -19,6 +30,8 @@ import type { CalendarEventType } from '@/lib/types'
 interface AdminEventModalProps {
   /** `saved` říká, jestli se má kalendář přečíst znovu. */
   onClose: (saved: boolean) => void
+  /** Přečíst kalendář znovu i po zavření okna (třeba po „Zpět" v toastu). */
+  onReload?: () => void
   defaultDate?: string   // 'YYYY-MM-DD' pre-fill the date field
   defaultHour?: number   // pre-fill the start hour
   /** Úprava existující události — formulář se předvyplní a uloží se jako změna. */
@@ -35,6 +48,13 @@ export type EditableEvent = {
   contactName: string | null
   phone: string | null
   email: string | null
+  /** Událost je schůzka s Google Meet (R-114, R-121). */
+  meeting?: {
+    inviteStatus: string | null
+    inviteTo: string | null
+    phone: string | null
+    remindersOn: boolean
+  } | null
 }
 
 /** ISO okamžik → hodnota pro `datetime-local` v pražském čase. */
@@ -90,7 +110,37 @@ const EVENT_TYPES: { id: FormType; label: string; description: string; icon: typ
   },
 ]
 
-export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: AdminEventModalProps) {
+function safeIso(local: string): string | null {
+  try {
+    const iso = parsePragueDatetimeLocalToISO(local)
+    return Number.isNaN(Date.parse(iso)) ? null : iso
+  } catch {
+    return null
+  }
+}
+
+/** Co klient dostane, podle toho, jestli je telefon a jestli jsou SMS nastavené. */
+function remindersPlanText(hasPhone: boolean, smsReady: boolean): string {
+  if (hasPhone && smsReady) return 'Den předem e-mail a SMS, hodinu předem e-mail, 10 minut předem SMS.'
+  if (hasPhone) return 'Den předem a hodinu předem e-mailem. SMS zatím nejsou nastavené.'
+  return 'Den předem a hodinu předem e-mailem. Pro SMS doplňte telefon.'
+}
+
+function inviteStatusText(status: string | null): string {
+  switch (status) {
+    case 'sent':
+      return 'Pozvánka klientovi odešla.'
+    case 'pending':
+    case 'sending':
+      return 'Pozvánka se odesílá.'
+    case 'failed':
+      return 'Pozvánka klientovi neodešla. Pošlete ji znovu z detailu.'
+    default:
+      return 'Pozvánka se klientovi neposílala.'
+  }
+}
+
+export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, editing }: AdminEventModalProps) {
   const today = getPragueTodayISO()
   const initDate = defaultDate ?? today
   const initHour = defaultHour ?? 10
@@ -116,6 +166,38 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
   )
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // ─── Schůzka přes Google Meet (R-137) ───
+  const existingMeeting = editing?.meeting ?? null
+  const [readiness, setReadiness] = useState<MeetingReadiness | null>(null)
+  const [meetingOn, setMeetingOn] = useState(false)
+  const [subjectEdited, setSubjectEdited] = useState<string | null>(null)
+  const [introEdited, setIntroEdited] = useState<string | null>(null)
+  const [demoUrl, setDemoUrl] = useState('')
+  const [reminders, setReminders] = useState(existingMeeting ? existingMeeting.remindersOn : true)
+  const [notifyChange, setNotifyChange] = useState(true)
+
+  useEffect(() => {
+    if (eventType !== 'manual' || readiness) return
+    let alive = true
+    getMeetingReadiness()
+      .then((r) => { if (alive) setReadiness(r) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [eventType, readiness])
+
+  const startsIso = useMemo(() => safeIso(startsAt), [startsAt])
+  const endsIso = useMemo(() => safeIso(endsAt), [endsAt])
+  const subject = subjectEdited ?? (startsIso ? defaultSubject(startsIso) : 'Naše schůzka')
+  const intro = introEdited ?? (startsIso ? calendarIntro(startsIso, Boolean(demoUrl.trim())) : '')
+  const timeChanged =
+    Boolean(editing) &&
+    (startsIso === null || endsIso === null ||
+      Date.parse(startsIso) !== Date.parse(editing!.startsAt) ||
+      Date.parse(endsIso) !== Date.parse(editing!.endsAt))
+  const inviteSent = existingMeeting?.inviteStatus === 'sent'
+  const canMeet = Boolean(readiness?.available && readiness.google && readiness.mail)
+  const settingUp = eventType === 'manual' && !existingMeeting && meetingOn
 
   // Žádné „vrať formulář na dnes 10:00" — stav umírá s odmountováním, takže
   // druhá událost v sezení začíná tam, kam uživatel klikl (AD08).
@@ -162,9 +244,42 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
       setError('Čas konce musí být po čase začátku.')
       return
     }
+    if (settingUp && !email.trim()) {
+      setError('Zadejte prosím e-mail klienta. Pošleme na něj pozvánku.')
+      return
+    }
+    if (settingUp && !canMeet) {
+      setError('Schůzku přes Google Meet teď nejde založit. Podívejte se na upozornění u přepínače.')
+      return
+    }
     setError(null)
     startTransition(async () => {
       try {
+        const draft = {
+          email: email.trim(),
+          phone: phone.trim() || null,
+          subject,
+          intro,
+          demoUrl: demoUrl.trim() || null,
+          reminders,
+        }
+
+        // Nová schůzka: Meet, pozvánka za 15 s s „Zpět", připomínky.
+        if (!editing && settingUp) {
+          const res = await createCalendarMeeting({
+            title: title.trim(),
+            description: description.trim() || null,
+            startsAt: localDatetimeToISO(startsAt),
+            endsAt: localDatetimeToISO(endsAt),
+            contactName: contactName.trim() || null,
+            draft,
+          })
+          if (!res.ok) { setError(res.error); return }
+          close(true)
+          announceInvite(res.eventId, 'delete')
+          return
+        }
+
         const payload = {
           title: title.trim(),
           description: description.trim() || null,
@@ -177,12 +292,50 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
           phone: eventType === 'manual' ? phone.trim() || null : null,
           email: eventType === 'manual' ? email.trim() || null : null,
         }
-        if (editing) await updateCalendarEvent(editing.id, payload)
-        else await createCalendarEvent(payload)
+        if (!editing) {
+          await createCalendarEvent(payload)
+          close(true)
+          return
+        }
+
+        const update = await updateCalendarEvent(editing.id, payload, {
+          notifyClient: Boolean(existingMeeting) && inviteSent && timeChanged && notifyChange,
+        })
+        if (existingMeeting && readiness?.available) {
+          const saved = await saveMeetingSettings({
+            eventId: editing.id,
+            email: email.trim() || null,
+            phone: phone.trim() || null,
+            reminders,
+          })
+          if (!saved.ok) { setError(saved.error); return }
+        }
+        if (settingUp) {
+          const res = await makeEventMeeting({ eventId: editing.id, draft })
+          if (!res.ok) { setError(res.error); return }
+          close(true)
+          announceInvite(res.eventId, 'revert')
+          return
+        }
         close(true)
+        if (update.warning) toast.error(update.warning)
+        else if (update.noticeQueued) toast.success('Uloženo. Klient dostane zprávu o změně termínu.')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Chyba serveru.')
       }
+    })
+  }
+
+  function announceInvite(eventId: string, mode: 'delete' | 'revert') {
+    toast.success('Schůzka je v kalendáři. Pozvánka odejde za 15 s.', {
+      description: reminders ? 'Připomínky klientovi jsou naplánované.' : undefined,
+      duration: 15_000,
+      undo: async () => {
+        const undone = await undoCalendarMeeting(eventId, mode)
+        if (undone.ok) toast.success(mode === 'delete' ? 'Schůzka zrušená, pozvánka neodešla.' : 'Pozvánka neodešla, událost zůstala.')
+        else toast.error(undone.error)
+        onReload?.()
+      },
     })
   }
 
@@ -192,7 +345,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
 
   return (
     <Dialog open onOpenChange={open => { if (!open) close(false) }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className={settingUp ? 'max-w-lg' : 'max-w-md'}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-600" aria-hidden="true" />
@@ -344,11 +497,124 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="E-mail"
+                placeholder={settingUp ? 'E-mail (povinný)' : 'E-mail'}
+                required={settingUp}
                 maxLength={200}
                 className={inputCls}
               />
             </div>
+          </div>
+        )}
+
+        {/* Schůzka přes Google Meet (R-137) — jen u událostí */}
+        {eventType === 'manual' && existingMeeting && (
+          <div className="flex flex-col gap-2 rounded-chip border border-navy-100 bg-navy-50/40 p-3">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
+              <Video size={14} strokeWidth={1.5} aria-hidden="true" className="text-navy-700" />
+              Schůzka přes Google Meet
+            </p>
+            <p className="text-[11px] leading-snug text-quiet">{inviteStatusText(existingMeeting.inviteStatus)}</p>
+            {readiness?.available && (
+              <ReminderCheckbox
+                checked={reminders}
+                onChange={setReminders}
+                hint={remindersPlanText(Boolean(phone.trim()), Boolean(readiness.sms))}
+              />
+            )}
+            {inviteSent && timeChanged && (
+              <label className="flex min-h-11 items-start gap-3 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={notifyChange}
+                  onChange={(e) => setNotifyChange(e.target.checked)}
+                  className="mt-0.5 size-5 shrink-0 accent-navy-700"
+                />
+                <span>
+                  Poslat klientovi zprávu o změně termínu
+                  <span className="block text-[11px] leading-snug text-quiet">
+                    {existingMeeting.phone ? 'E-mailem a SMS' : 'E-mailem'} s novým časem. Odkaz na připojení zůstává.
+                  </span>
+                </span>
+              </label>
+            )}
+            {reminders && readiness?.available && readiness.trigger !== true && <TriggerWarning neverRan={readiness.trigger === null} />}
+          </div>
+        )}
+
+        {eventType === 'manual' && !existingMeeting && readiness?.available && (
+          <div className="flex flex-col gap-3 rounded-chip border border-navy-100 p-3">
+            <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
+              <span className="flex flex-col">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                  <Video size={14} strokeWidth={1.5} aria-hidden="true" className="text-navy-700" />
+                  Schůzka přes Google Meet
+                </span>
+                <span className="text-[11px] leading-snug text-quiet">Klient dostane pozvánku s odkazem a připomínky.</span>
+              </span>
+              <Switch checked={meetingOn} onCheckedChange={setMeetingOn} aria-label="Schůzka přes Google Meet" />
+            </label>
+
+            {meetingOn && !readiness.google && (
+              <p className="text-xs text-quiet">
+                Odkaz na Meet vzniká ve vašem Google Kalendáři. Nejdřív ho propojte{' '}
+                <a href="/dashboard/profil#google" className="font-semibold text-navy-700 underline-offset-4 hover:underline">
+                  v Profilu
+                </a>
+                .
+              </p>
+            )}
+            {meetingOn && readiness.google && !readiness.mail && (
+              <p className="text-xs text-quiet">Odesílání e-mailů z vizeon.cz není nastavené, pozvánka by neodešla.</p>
+            )}
+
+            {meetingOn && canMeet && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="meeting-subject" className="text-sm font-medium text-ink">Předmět</label>
+                  <input
+                    id="meeting-subject"
+                    type="text"
+                    value={subject}
+                    maxLength={200}
+                    onChange={(e) => setSubjectEdited(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="meeting-intro" className="text-sm font-medium text-ink">Text pozvánky</label>
+                  <textarea
+                    id="meeting-intro"
+                    value={intro}
+                    rows={8}
+                    maxLength={4000}
+                    onChange={(e) => setIntroEdited(e.target.value)}
+                    className={cn(inputCls, 'resize-y')}
+                  />
+                  <p className="flex items-start gap-1.5 text-[11px] leading-snug text-quiet">
+                    Pod text sami doplníme termín, tlačítko Připojit se, ukázku a váš podpis. Přiložíme i soubor do kalendáře.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="meeting-demo" className="text-sm font-medium text-ink">Odkaz na ukázku (nepovinné)</label>
+                  <input
+                    id="meeting-demo"
+                    type="url"
+                    inputMode="url"
+                    value={demoUrl}
+                    maxLength={500}
+                    placeholder="https://…"
+                    onChange={(e) => setDemoUrl(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <ReminderCheckbox
+                  checked={reminders}
+                  onChange={setReminders}
+                  hint={remindersPlanText(Boolean(phone.trim()), readiness.sms)}
+                />
+                {reminders && readiness.trigger !== true && <TriggerWarning neverRan={readiness.trigger === null} />}
+              </div>
+            )}
           </div>
         )}
 
@@ -385,7 +651,7 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
           >
             {isPending
               ? <><Loader2 size={14} strokeWidth={1.5} className="animate-spin" /> Ukládám…</>
-              : editing ? 'Uložit změny' : eventType === 'availability' ? 'Uložit volno' : 'Uložit událost'
+              : settingUp ? 'Poslat pozvánku' : editing ? 'Uložit změny' : eventType === 'availability' ? 'Uložit volno' : 'Uložit událost'
             }
           </button>
           <button
@@ -399,5 +665,40 @@ export function AdminEventModal({ onClose, defaultDate, defaultHour, editing }: 
       </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ReminderCheckbox({
+  checked,
+  onChange,
+  hint,
+}: {
+  checked: boolean
+  onChange: (value: boolean) => void
+  hint: string
+}) {
+  return (
+    <label className="flex min-h-11 items-start gap-3 text-sm text-ink">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 size-5 shrink-0 accent-navy-700"
+      />
+      <span>
+        Připomenout klientovi
+        <span className="block text-[11px] leading-snug text-quiet">{hint}</span>
+      </span>
+    </label>
+  )
+}
+
+function TriggerWarning({ neverRan }: { neverRan: boolean }) {
+  return (
+    <p className="rounded-chip border border-navy-100 bg-surface px-3 py-2 text-[11px] leading-snug text-quiet">
+      {neverRan
+        ? 'Spouštěč připomínek ještě neběžel. Dokud ho nenastavíte, připomínky počkají.'
+        : 'Spouštěč připomínek teď neběží. Připomínky odejdou, až se zase rozběhne.'}
+    </p>
   )
 }

@@ -3,6 +3,7 @@ import { ChevronRight, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { PillNav } from '@/components/ws/app/toolbar'
 import { OutreachQueue } from '@/components/admin/outreach-queue'
+import { ArrangedMeetingButton } from '@/components/admin/arranged-meeting'
 import type { MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
 import { CONTACT_FILTERS, statusLabel, type ContactFilter, type ContactRow } from '@/lib/admin/outreach-crm-view'
 import { formatWhen } from '@/lib/admin/outreach-view'
@@ -10,7 +11,8 @@ import type { ContactsScreen } from '@/lib/admin/outreach-crm'
 
 /**
  * AI asistent › Kontakty (R-120): všechny firmy z Growth OS. „Na tahu" je
- * fronta s akcemi (R-112), ostatní filtry seznam s odkazem na detail.
+ * fronta s akcemi (R-112), ostatní filtry seznam s odkazem na detail
+ * a „Schůzka domluvena" na konci řádku (dokud firma budoucí schůzku nemá).
  * Filtr i hledání jsou v adrese — obyčejný formulář GET, funguje bez JS.
  */
 
@@ -23,8 +25,14 @@ function href(filter: ContactFilter, q?: string): string {
   return `${PATH}?${p.toString()}`
 }
 
-/** Jedna věta, co se s firmou naposledy stalo. */
+/** Má firma schůzku, která ještě nebyla? */
+function upcomingMeeting(row: ContactRow, now: Date): boolean {
+  return row.meetingAt !== null && Date.parse(row.meetingAt) > now.getTime()
+}
+
+/** Jedna věta, co se s firmou naposledy stalo. Budoucí schůzka má přednost. */
 function lastStep(row: ContactRow, now: Date): string {
+  if (row.meetingAt && upcomingMeeting(row, now)) return `Schůzka ${formatWhen(row.meetingAt, now)}`
   if (row.emailRepliedAt) return `Odpověděl na e-mail ${formatWhen(row.emailRepliedAt, now)}`
   if (row.meetingAt) return `Schůzka ${formatWhen(row.meetingAt, now)}`
   if (row.demoViews > 0) return row.demoViews === 1 ? 'Otevřel ukázku' : `Otevřel ukázku ${row.demoViews}×`
@@ -95,10 +103,10 @@ export function ContactsView({
       ) : (
         <ul className="flex flex-col divide-y divide-navy-100 overflow-hidden rounded-box border border-navy-100 bg-surface">
           {data.rows.map((row) => (
-            <li key={row.id}>
+            <li key={row.id} className="flex items-stretch">
               <Link
                 href={`/dashboard/ai-asistent/kontakt/${row.id}`}
-                className="flex min-h-11 items-center gap-3 px-4 py-3 transition-colors hover:bg-navy-50"
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-3 px-4 py-3 transition-colors hover:bg-navy-50"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-ink">{row.company}</span>
@@ -120,6 +128,13 @@ export function ContactsView({
                 </Badge>
                 <ChevronRight size={16} strokeWidth={1.5} aria-hidden="true" className="shrink-0 text-quiet" />
               </Link>
+              {!upcomingMeeting(row, now) && (
+                <ArrangedMeetingButton
+                  firm={{ id: row.id, company: row.company, callbackAt: row.callbackAt }}
+                  nowIso={nowIso}
+                  appearance="row"
+                />
+              )}
             </li>
           ))}
         </ul>

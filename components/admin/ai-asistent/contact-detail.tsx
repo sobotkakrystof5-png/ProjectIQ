@@ -5,6 +5,7 @@ import { Card, CardHead, SECTION_LABEL } from '@/components/admin/card'
 import { ContactActions } from '@/components/admin/contact-actions'
 import { OutreachLeadActions } from '@/components/admin/outreach-lead-actions'
 import { SendEmailButton } from '@/components/admin/send-email-button'
+import { ArrangedMeetingButton } from '@/components/admin/arranged-meeting'
 import type { MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
 import { CallCard } from '@/components/admin/ai-asistent/call-card'
 import {
@@ -79,6 +80,8 @@ export function ContactDetailView({
   const row = toQueueRow(lead)
   const reason = queueReason(row, now)
   const closed = lead.doNotCall || (CLOSED_STATUSES as readonly string[]).includes(lead.status)
+  // Budoucí schůzka už v kalendáři je — druhou „Schůzka domluvena" nenabízet, přesouvá se v kalendáři.
+  const upcomingMeeting = data.meeting !== null && Date.parse(data.meeting.startsAt) > now.getTime()
   const timeline = buildTimeline(lead, calls, emails, now)
   const totalCost = calls.reduce<number | null>((sum, c) => (c.costCzk === null ? sum : (sum ?? 0) + c.costCzk), null)
   const talked = calls.reduce((sum, c) => sum + (c.durationS ?? 0), 0)
@@ -141,9 +144,13 @@ export function ContactDetailView({
                   Otevřít v Hovorech
                 </Link>
               )}
+              {!upcomingMeeting && <ArrangedMeetingButton firm={row} nowIso={nowIso} />}
             </div>
           ) : closed ? (
-            <p className="text-sm text-quiet">S touhle firmou už asistent skončil. Kdyby se ozvala, vrátí se do fronty sama.</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-quiet">S touhle firmou už asistent skončil. Kdyby se ozvala, vrátí se do fronty sama.</p>
+              {!upcomingMeeting && <ArrangedMeetingButton firm={row} nowIso={nowIso} />}
+            </div>
           ) : (
             <OutreachLeadActions row={row} nowIso={nowIso} meeting={meeting} showEmail={false} />
           )}

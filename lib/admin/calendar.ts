@@ -53,12 +53,21 @@ export type RawCalendarEvent = {
    * kalendáře" ho od AD10 ukládá.
    */
   contact_name: string | null
+  /**
+   * Jen jméno člověka, bez náhradního názvu firmy. Předvyplňuje se do úpravy,
+   * jinak by se název události při uložení zapsal jako jméno kontaktu.
+   */
+  contact_person: string | null
   contact_phone: string | null
   contact_email: string | null
   /** Schůzka s Google Meet (R-112, migrace 115). Bez migrace null. */
   meet_url?: string | null
   invite_status?: string | null
   invite_sent_at?: string | null
+  /** Kam jdou pozvánka a připomínky (R-137, migrace 128). Bez migrace null. */
+  invite_to?: string | null
+  meeting_phone?: string | null
+  reminders_on?: string | null
 }
 
 export type RawLead = {
@@ -143,13 +152,25 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
       SELECT
         e.id, e.title, e.description, e.starts_at, e.ends_at, e.event_type, e.project_id,
         COALESCE(NULLIF(l.contact_name, ''), NULLIF(l.company_name, '')) AS contact_name,
+        NULLIF(l.contact_name, '') AS contact_person,
         l.phone AS contact_phone,
         l.email AS contact_email,
         to_jsonb(e) ->> 'meet_url' AS meet_url,
         to_jsonb(e) ->> 'invite_status' AS invite_status,
-        to_jsonb(e) ->> 'invite_sent_at' AS invite_sent_at
+        to_jsonb(e) ->> 'invite_sent_at' AS invite_sent_at,
+        to_jsonb(e) ->> 'invite_to' AS invite_to,
+        to_jsonb(e) ->> 'meeting_phone' AS meeting_phone,
+        to_jsonb(e) ->> 'reminders_on' AS reminders_on
       FROM calendar_events e
-      LEFT JOIN client_leads l ON l.id = e.lead_id
+      -- Dvojice z obou stran: události založené z kalendáře do 2026-11-18
+      -- mají prázdné lead_id a kontakt na ně ukazuje jen přes calendar_event_id.
+      LEFT JOIN LATERAL (
+        SELECT cl.contact_name, cl.company_name, cl.phone, cl.email
+        FROM client_leads cl
+        WHERE cl.id = e.lead_id OR cl.calendar_event_id = e.id
+        ORDER BY (cl.id = e.lead_id) DESC NULLS LAST
+        LIMIT 1
+      ) l ON true
       WHERE e.starts_at >= ${fromInstant} AND e.starts_at < ${toInstant}
       ORDER BY e.starts_at
     `,

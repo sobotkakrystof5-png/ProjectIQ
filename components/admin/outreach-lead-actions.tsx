@@ -7,12 +7,13 @@ import { toast } from '@/components/ui/toast'
 import { dismissOutreachLead, takeOverOutreachLead, undoDismissOutreachLead } from '@/app/outreach-actions'
 import { ScheduleMeetingDialog, type MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
 import { SendEmailButton } from '@/components/admin/send-email-button'
+import { ArrangedMeetingButton } from '@/components/admin/arranged-meeting'
 import { formatWhen, type OutreachQueueRow } from '@/lib/admin/outreach-view'
 
 /**
  * Co se dá s firmou od AI asistenta udělat (R-112): domluvit schůzku
- * (Google Meet + e-mail, R-114), převzít do Hovorů, nebo odložit „Nemá zájem"
- * se Zpět. Stejná tlačítka ve frontě i v detailu klienta (R-120).
+ * (Google Meet + e-mail, R-114), zapsat schůzku domluvenou jinde jen do
+ * kalendáře, převzít do Hovorů, nebo odložit „Nemá zájem" se Zpět. Stejná tlačítka ve frontě i v detailu klienta (R-120).
  */
 export function OutreachLeadActions({
   row,
@@ -73,6 +74,7 @@ export function OutreachLeadActions({
             target={{ kind: 'outreach', id: row.id, company: row.company, email: row.email }}
           />
         )}
+        <ArrangedMeetingButton firm={row} nowIso={nowIso} />
         <Button type="button" variant="outline" onClick={prevzit} disabled={pending}>
           Převzít do Hovorů
         </Button>

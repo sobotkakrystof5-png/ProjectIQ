@@ -3,6 +3,9 @@ import { adminDb, q, type AdminQuery } from '@/lib/admin/db'
 import { createMeetEvent, deleteGoogleEvent } from '@/lib/admin/google/calendar'
 import { meetingWhen, renderMeetingEmail } from '@/lib/admin/meeting-email'
 import { sendVizeonMail } from '@/lib/admin/vizeon-mail'
+import { applyMeetingSettings } from '@/lib/admin/meetings'
+import { planReminders } from '@/lib/admin/meeting-reminders'
+import { normalizePhone } from '@/lib/contacts/normalize'
 import { isoToPragueDateAndTime } from '@/lib/prague-time'
 
 /**
@@ -233,9 +236,14 @@ export async function sendLeadMeetingEmail(input: LeadMeetingInput, deps: Deps =
   if (lead.calendar_event_id) {
     try {
       await adminDb`
-        UPDATE calendar_events SET meet_url = ${meet.meetUrl}, google_event_id = ${meet.googleEventId}
+        UPDATE calendar_events SET meet_url = ${meet.meetUrl}, google_event_id = ${meet.googleEventId},
+               invite_to = ${to}, invite_status = 'sent', invite_sent_at = now()
          WHERE id = ${lead.calendar_event_id}
       `
+      // Připomínky klientovi (R-137): stejné jako u schůzky z kalendáře.
+      // Bez migrace 128 se tiše vynechají.
+      await applyMeetingSettings(lead.calendar_event_id, { phone: normalizePhone(lead.phone), remindersOn: true })
+      await planReminders(lead.calendar_event_id)
       // Dřívější Meet téže události už neplatí, ať v Googlu nezůstane dvojník.
       if (lead.event_google_id && lead.event_google_id !== meet.googleEventId) {
         await deleteMeet(lead.event_google_id).catch((e) =>

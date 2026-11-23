@@ -35,6 +35,8 @@ export type NotificationType =
   | 'consultation_meet_failed'
   /** Nová zpráva od klienta v chatu u zakázky (KP15, R-122). */
   | 'client_message'
+  /** Připomínka schůzky klientovi neodešla, nebo neběží spouštěč (R-137). */
+  | 'meeting_reminder_failed'
 
 export async function createNotification(params: {
   type: NotificationType

@@ -289,6 +289,13 @@ describe('Kontakty a Přehled', () => {
     // Zástupné znaky z hledání se berou doslova.
     expect((await loadContacts('vse', '%')).rows).toEqual([])
     expect((await loadContacts('na-tahu', undefined)).queue?.length).toBe(2)
+
+    // Schůzka zapsaná v adminu („Schůzka domluvena") se v seznamu ukáže.
+    const beta = (await db.query<{ id: string }>(`SELECT id FROM outreach_leads WHERE company_name = 'Beta'`)).rows[0].id
+    const at = new Date(Date.now() + 2 * 86_400_000)
+    at.setUTCSeconds(0, 0)
+    await db.query(`INSERT INTO calendar_events (starts_at, outreach_lead_id) VALUES ($1, $2)`, [at.toISOString(), beta])
+    expect((await loadContacts('otevreli', undefined)).rows[0].meetingAt).toBe(at.toISOString())
   })
 
   it('Přehled počítá dnešek a odkazuje poslední hovor na klienta', async () => {
