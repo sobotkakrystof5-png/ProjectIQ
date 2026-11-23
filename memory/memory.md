@@ -6,7 +6,7 @@
 > z 2026-11-20 ležel tři dny necommitnutý ve worktree; teď je převedený na dnešní `main`. Jeden modul
 > pro cizí text v HTML a test, který hlídá kopie (hned našel čtyři nové z klientského prostoru), brána
 > na IP v `proxy.ts`, předbrány před databázovými limity, semafor na Chromium a strop těla u nahrávek.
-> Spolu s ním šablona e-mailu s fakturou (R-139, migrace 129 zatím neaplikovaná). **Na produkci od 2026-11-23
+> Spolu s ním šablona e-mailu s fakturou (R-139, migrace 129 na produkci). **Na produkci od 2026-11-23
 > (`d622689`)**, veřejné adresy a hlavičky v pořádku, bez běhových chyb. **Vercel WAF zapnutý není** (čeká na
 > Kryštofa), v prohlížeči nic neověřeno.
 >
@@ -1527,8 +1527,7 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 
 ## 3. Otevřené problémy
 
-- [ ] **Text e-mailu s fakturou (R-139) — migrace 129 a průchod:** bez migrace 129 na produkci odchází dosavadní
-  text a uložení šablony vrátí hlášku „chybí migrace". Po migraci projít Faktury › Údaje dodavatele (uložit, náhled,
+- [ ] **Text e-mailu s fakturou (R-139) — projít naživo:** migrace 129 je na produkci od 2026-11-23. Projít Faktury › Údaje dodavatele (uložit, náhled,
   překlep v proměnné) a odeslat fakturu na vlastní e-mail. **Uložení ani odeslání přes Resend naživo neověřené** · od 2026-11-23
 
 - [ ] **Ochrana proti DDoS (R-138) — zapnout WAF a projít:** (1) Vercel WAF pravidla z `.claude/security/STATE.md`
@@ -1932,7 +1931,10 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
   řádek F1 v `docs/AUTH-SUPABASE-PLAN.md`, Aktuální stav a body „nasadit" u KP11–KP17 přepsané na „projít naživo".
 - **fix** Otevřené problémy: zmizely dva body o červeném testu `ws-schema` — číslování migrací je od migrace 120
   na `main` souvislé a test prochází.
-- **chore** Úklid: odstraněné worktree a lokální větve, jejichž práce je celá v `main` a kde se nepracovalo;
+- **chore** Úklid: odstraněné worktree a lokální větve, jejichž práce je celá v `main` a kde se nepracovalo, a na
+  přání Kryštofa i staré pokusy z 7.–10. 11. (landing 4 bloky, opora pro hovor, šablony oborů), `auth/supabase-klient`,
+  `downloads-snapshot`, `ws/redesign` a záloha `backup/kp10-pred-prepisem`. Zůstaly pokusy s přechodem Workspace na
+  Supabase (`ws/supabase`, dva worktree `migrate-*-supabase`) jako podklad pro F2 a worktree `ZakazIQ-dotaznik`;
   větev `admin/dotaznik-bez-google` zahozená (Kryštof 2026-11-23: recenze na Googlu v dotazníku zůstává, R-119).
   Na GitHubu se nic nemazalo.
 
@@ -1946,7 +1948,8 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
   `components/admin/invoices/{email-template-form,issued-actions}.tsx`, `app/dashboard/faktury/dodavatel/page.tsx`,
   `app/dashboard/finance/invoice-actions.ts`.
 - **db** Migrace 129 `faktury_sablona_emailu` (na větvi 120, to číslo má oprava kalendáře) — sloupec
-  `admin_settings.invoice_email_template` (aplikována: ne, nikde). Aditivní, kód bez ní běží s výchozím textem.
+  `admin_settings.invoice_email_template` (aplikována: produkce 2026-11-23 přes Neon MCP na souhlas Kryštofa,
+  zapsaná v `public.schema_migrations`, ověřený sloupec `jsonb`; testovací Neon ne). Aditivní.
 - **chore** Ověřeno: `npx tsc --noEmit`, `admin-faktury-sablona-emailu` (PGlite bez migrace, po ní a po dvojím běhu),
   `email-route`, `email-resend`, `ws-schema` (číslování bez mezer) — 209 prošlo. Formulář v prohlížeči ověřený
   2026-11-20 na dočasné stránce (1280 a 375 px). **Uložení do databáze a skutečné odeslání neověřené.**
