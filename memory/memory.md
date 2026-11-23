@@ -1500,10 +1500,11 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 - [ ] **Připomínky schůzek (R-137) — projít naživo:** ~~migrace 128 a 120~~, ~~klíče ve Vercelu~~
   (`MEETING_REMINDERS_SECRET`, `ODORIK_API_USER`, `ODORIK_API_PASSWORD` — nasazení `dpl_5TCi…`
   vzniklo až po nich), ~~spouštěč~~ (pg_cron v Supabase, 200 každou minutu, `reminders_tick_at` se
-  zapisuje), ~~nasazení~~ (`c23adf5`, 2026-11-23, bez běhových chyb). Zbývá **zkušební schůzka**
-  na vlastní e-mail a telefon za ~70 minut: pozvánka s `.ics`, připomínka hodinu a 10 minut předem
-  (první skutečná SMS ověří i údaje Odoriku), přesun (zpráva o změně, čas v Googlu), smazání
-  (zmizí z Googlu). Cenu SMS Odoriku zjistit v jeho ceníku · Kryštof · od 2026-11-23
+  zapisuje), ~~nasazení~~ (`c23adf5`, 2026-11-23, bez běhových chyb), ~~fronta a e-mail přes Resend
+  na produkci~~ (2026-11-23, 17 zkušebních schůzek, viz changelog). Zbývá, co jde jen přes
+  přihlášený admin a skutečný telefon: **zkušební schůzka** na vlastní e-mail a telefon za ~70 minut
+  — pozvánka s `.ics` (Google Meet), SMS 10 minut předem (ověří údaje Odoriku), přesun (čas
+  v Googlu), smazání (zmizí z Googlu). Cenu SMS Odoriku zjistit v jeho ceníku · Kryštof · od 2026-11-23
 - [ ] **Potvrzení účasti na schůzce (R-137, další krok):** stránka schůzky s „Potvrdit účast /
   Potřebuji jiný termín" a upozorněním „nepotvrdil, zavolej mu". Nepostaveno; v pozvánce je zatím
   „odpovězte na e-mail" · od 2026-11-23
@@ -1911,6 +1912,16 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (zkouška připomínek schůzek na produkci)
+- **chore** Ověřena fronta `meeting_reminders` naostro: 17 zkušebních schůzek v produkční DB s adresou
+  `delivered@resend.dev` (testovací schránka Resendu), bez telefonu, pak smazané i s frontou a upozorněním.
+  Výsledek: e-mail hodinu předem, den předem a zpráva o přesunu s `.ics` odešly do 1 s od běhu spouštěče
+  (id od Resendu); pozdní přeskočena, vypnuté připomínky a SMS bez čísla zrušené, předčasná se posunula
+  na správný čas; pět spuštění naráz poslalo každou zprávu jednou (1 pokus, různá id); neplatná adresa
+  tři pokusy po minutě, pak „neodešlo" s důvodem a upozornění do zvonku. Vercel bez běhových chyb.
+  Automatické testy připomínek a kalendáře 5× po sobě 45/45. Neověřeno: SMS přes Odorik, Google Meet
+  (vytvoření, přesun, smazání) a pozvánka — jdou jen přes přihlášený admin.
 
 ### 2026-11-23 (schůzky a Next.js 16.4.6 na produkci)
 - **chore** Nasazeno: `main` → `c23adf5` (push Kryštof), nasazení `dpl_5TCifpK4ihePTZmWiyHyJWsn4eTe`
