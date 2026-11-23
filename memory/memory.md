@@ -6,7 +6,9 @@
 > z 2026-11-20 ležel tři dny necommitnutý ve worktree; teď je převedený na dnešní `main`. Jeden modul
 > pro cizí text v HTML a test, který hlídá kopie (hned našel čtyři nové z klientského prostoru), brána
 > na IP v `proxy.ts`, předbrány před databázovými limity, semafor na Chromium a strop těla u nahrávek.
-> **Vercel WAF zapnutý není** (čeká na Kryštofa), v prohlížeči nic neověřeno.
+> Spolu s ním šablona e-mailu s fakturou (R-139, migrace 129 zatím neaplikovaná). **Na produkci od 2026-11-23
+> (`d622689`)**, veřejné adresy a hlavičky v pořádku, bez běhových chyb. **Vercel WAF zapnutý není** (čeká na
+> Kryštofa), v prohlížeči nic neověřeno.
 >
 > Předchozí: 2026-11-23 · **Schůzky z kalendáře s připomínkami** (R-137):
 > přepínač „Schůzka přes Google Meet" v okně události, pozvánka s upravitelným textem a `.ics`,
@@ -1915,6 +1917,14 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (nasazení R-138 a R-139)
+- **chore** **Na produkci** (2026-11-23): fast-forward `main` `6e6f9d0` → `d622689`, build Ready (`dpl_BmXV…`, `fra1`).
+  Ověřeno veřejně: `/`, `/login`, `/podminky`, `/w/prihlaseni`, `/klient/prihlaseni`, `/robots.txt` 200; `/dashboard`
+  a `/dashboard/faktury/dodavatel` 307; `/p/<nesmysl>` 404; cron 401; `POST /api/public/leads` a `vizeon-leads` bez klíče
+  401; CSP, HSTS a `X-Frame-Options` na `/`. 20 min po nasazení žádná běhová chyba. Brána proti zahlcení se na produkci
+  nezkoušela (stovky požadavků). Build v čistém worktree bez `.env.local` padá na předvykreslení `/dashboard/faktury/nova`
+  (bez Supabase env stránka nesáhne na cookies) — s env i na Vercelu prochází. **Za přihlášením nikdo nic neviděl.**
 
 ### 2026-11-23 (úklid stavu, větví a worktree)
 - **docs** Převzaté rozdělané srovnání stavu z 2026-11-21 (worktree `claude/k-incomplete-phases-537efe`): tabulka
