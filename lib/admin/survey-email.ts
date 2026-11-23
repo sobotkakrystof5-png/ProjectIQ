@@ -12,6 +12,7 @@
  */
 
 import { SIGNATURE } from '@/lib/admin/meeting-email'
+import { escapeHtml } from '@/lib/security/html'
 
 // E-mailové klienty CSS proměnné neumí — hodnoty tokenů Dílků zapsané napřímo
 // (výjimka z „barvy natvrdo" jen pro e-maily, stejně jako `meeting-email.ts`).
@@ -33,15 +34,6 @@ export type SurveyEmailInput = {
   /** Adresa dotazníku `https://…/h/<token>`. */
   surveyUrl: string
   reminder: boolean
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 /** Odkaz s předvybranou známkou. */

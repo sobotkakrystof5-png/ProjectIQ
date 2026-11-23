@@ -32,6 +32,30 @@ export async function readBodyLimited(
 }
 
 /**
+ * Tělo jako `multipart/form-data` (nahrávka, PDF) s pevným stropem. `req.formData()`
+ * přečte vše, co klient pošle, a kontrola `content-length` nestačí: hlavičku
+ * u chunked těla nemusí být, nebo lže. Proto se tělo čte po částech a při
+ * překročení stropu se přeruší; teprve omezená kopie se rozebere na pole.
+ *
+ * `'too-large'` = tělo přes limit (413), `'invalid'` = není to platný formulář (400).
+ */
+export async function readFormDataLimited(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; form: FormData } | { ok: false; reason: 'too-large' | 'invalid' }> {
+  const bounded = await readBodyLimited(request, maxBytes)
+  if (!bounded.ok) return { ok: false, reason: 'too-large' }
+  try {
+    const replay = new Response(new Blob([new Uint8Array(bounded.bytes)]), {
+      headers: { 'content-type': request.headers.get('content-type') ?? '' },
+    })
+    return { ok: true, form: await replay.formData() }
+  } catch {
+    return { ok: false, reason: 'invalid' }
+  }
+}
+
+/**
  * Tělo jako JSON s pevným stropem. `req.json()` přečte, co pošle klient — bez
  * stropu je veřejná routa cesta k vyčerpání paměti funkce. Workspace to má přes
  * `readJson()` v `lib/ws/intake/http.ts` (64 kB); tohle je totéž pro veřejná

@@ -1,5 +1,6 @@
 import type { Transporter } from 'nodemailer'
 import { sendVizeonMail, vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
+import { escapeHtml, linkifyHtml, safeHttpUrl } from '@/lib/security/html'
 
 // Jeden byznys = jedna odesílací schránka (AD02, R-088). Pošta jde z vlastní
 // schránky info@vizeon.cz (VIZEON_GMAIL_USER + VIZEON_GMAIL_APP_PASSWORD);
@@ -90,10 +91,6 @@ async function deliver(mail: {
   }
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
 export interface EmailField {
   label: string
   value: string
@@ -120,10 +117,14 @@ function buildLayout(opts: {
     .join('')
 
   const ctasHtml = (opts.ctas ?? [])
+    // Odkaz jde do atributu `href`: jen http(s) a escapovaný. CTA s jiným odkazem
+    // se vynechá — e-mail bez tlačítka je lepší než tlačítko s cizím schématem.
+    .map((cta) => ({ ...cta, href: safeHttpUrl(cta.href) }))
+    .filter((cta): cta is typeof cta & { href: string } => cta.href !== null)
     .map((cta) =>
       cta.primary !== false
-        ? `<a href="${cta.href}" style="display:inline-block;background:linear-gradient(135deg,#1b3868,#23478b);color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;margin-right:12px;">${escapeHtml(cta.label)} →</a>`
-        : `<a href="${cta.href}" style="display:inline-block;background:#fff;color:#1b3868;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;border:1px solid #c7d2fe;">${escapeHtml(cta.label)} →</a>`
+        ? `<a href="${escapeHtml(cta.href)}" style="display:inline-block;background:linear-gradient(135deg,#1b3868,#23478b);color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;margin-right:12px;">${escapeHtml(cta.label)} →</a>`
+        : `<a href="${escapeHtml(cta.href)}" style="display:inline-block;background:#fff;color:#1b3868;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;border:1px solid #c7d2fe;">${escapeHtml(cta.label)} →</a>`
     )
     .join('')
 
@@ -159,16 +160,12 @@ export async function sendBrandedEmail(opts: {
   return deliver({ to: opts.to, subject: opts.subject, html: buildLayout(opts), from: NOTIFY_FROM })
 }
 
-function linkify(escaped: string): string {
-  return escaped.replace(/https?:\/\/[^\s]+/g, (url) => `<a href="${url}" style="color:#1b3868;">${url}</a>`)
-}
-
 function buildPlainLayout(text: string): string {
   const paragraphs = text
     .split(/\n{2,}/)
     .map(
       (block) =>
-        `<p style="margin:0 0 18px;color:#1f2937;font-size:15px;line-height:1.7;white-space:pre-line;">${linkify(escapeHtml(block))}</p>`
+        `<p style="margin:0 0 18px;color:#1f2937;font-size:15px;line-height:1.7;white-space:pre-line;">${linkifyHtml(block, 'color:#1b3868;')}</p>`
     )
     .join('')
 

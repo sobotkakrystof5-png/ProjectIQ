@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/lib/auth'
 import { adminDb } from '@/lib/admin/db'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
+import { readFormDataLimited } from '@/lib/security/request-body'
 import {
   MAX_AUDIO_BYTES,
   PROMPT_MAX_CHARS,
@@ -92,15 +93,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return fail(429, 'Moc nahrávek za sebou. Zkuste to za chvíli.')
   }
 
-  const declared = Number(req.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return fail(413, 'Nahrávka je moc dlouhá. Zkuste kratší.')
-
-  let audio: FormDataEntryValue | null
-  try {
-    audio = (await req.formData()).get('audio')
-  } catch {
-    return fail(400, 'Nahrávka se nepodařila. Zkuste to znovu.')
+  // Strop platí i pro tělo bez `content-length` (chunked) — `req.formData()` by ho přečetlo celé.
+  const form = await readFormDataLimited(req, MAX_BODY_BYTES)
+  if (!form.ok) {
+    return form.reason === 'too-large'
+      ? fail(413, 'Nahrávka je moc dlouhá. Zkuste kratší.')
+      : fail(400, 'Nahrávka se nepodařila. Zkuste to znovu.')
   }
+  const audio = form.form.get('audio')
   if (!(audio instanceof Blob) || audio.size === 0) return fail(400, 'Nahrávka je prázdná.')
   if (audio.size > MAX_AUDIO_BYTES) return fail(413, 'Nahrávka je moc dlouhá. Zkuste kratší.')
   if (!isAllowedAudioType(audio.type)) return fail(415, 'Tenhle formát nahrávky neumím přepsat.')

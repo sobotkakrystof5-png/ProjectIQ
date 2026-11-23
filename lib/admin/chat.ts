@@ -7,6 +7,7 @@ import { adminEmail, projectPath } from '@/lib/lead-origins'
 import { createNotification } from '@/lib/notifications'
 import { sendVizeonMail } from '@/lib/admin/vizeon-mail'
 import { SIGNATURE } from '@/lib/admin/meeting-email'
+import { escapeHtml as esc } from '@/lib/security/html'
 
 /**
  * Schránka Zprávy v adminu (KP15, R-122, R-123). Čte vlastníkem tabulek přes
@@ -183,7 +184,6 @@ export async function notifyNewMessage(
   `
   const link = `${appUrl()}/klient/zpravy/${projectId}`
   const plain = ['Dobrý den,', '', `u zakázky ${String(p.name)} máte novou zprávu:`, '', text, '', `Odpovědět můžete tady: ${link}`, '', ...SIGNATURE].join('\n')
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   const html = `<!doctype html><html lang="cs"><body style="margin:0;padding:24px;font-family:'Instrument Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#0c1a36">
 <div style="max-width:560px"><p>Dobrý den,</p><p>u zakázky ${esc(String(p.name))} máte novou zprávu:</p>
 <blockquote style="margin:0 0 16px;padding:10px 14px;border-left:3px solid #dce7f7;white-space:pre-wrap">${esc(text)}</blockquote>

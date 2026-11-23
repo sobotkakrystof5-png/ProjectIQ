@@ -4,6 +4,7 @@ import { applyCookies, checkAdminSession, checkUserSession } from '@/lib/supabas
 import { clerkAuthorizedParties } from '@/lib/security/clerk'
 import { buildCsp, clerkFrontendApiHost, cspProfileFor, createNonce, hasPrefix } from '@/lib/security/csp'
 import { frameAncestorsFor } from '@/lib/security/embed'
+import { frontGate } from '@/lib/security/front-gate'
 import { embedOriginsForSlug, orderSlugFromPath } from '@/lib/ws/intake/embed-origins'
 import { WS_SIGN_IN_PATH, WS_SIGN_UP_PATH } from '@/lib/ws/paths'
 import { PORTAL_PUBLIC_PATHS, PORTAL_SIGN_IN_PATH } from '@/lib/portal/paths'
@@ -67,6 +68,11 @@ async function portal(req: NextRequest): Promise<NextResponse> {
 
 export default async function proxy(req: NextRequest, event: NextFetchEvent) {
   const { pathname } = req.nextUrl
+
+  // Strop požadavků na IP dřív, než se spustí Clerk, Supabase nebo dotaz do databáze
+  // (`lib/security/front-gate.ts`, DECISIONS #050). Vypnutí při potížích: FRONT_GATE=off.
+  const limited = frontGate(req)
+  if (limited) return limited
 
   if (hasPrefix(pathname, '/klient')) return portal(req)
 

@@ -12,6 +12,7 @@
  */
 
 import { SIGNATURE } from '@/lib/admin/meeting-email'
+import { escapeHtml } from '@/lib/security/html'
 
 // E-mailové klienty CSS proměnné neumí — hodnoty tokenů Dílků zapsané napřímo
 // (výjimka z „barvy natvrdo" jen pro e-maily, stejně jako `survey-email.ts`).
@@ -38,15 +39,6 @@ export type PortalInviteEmailInput =
       projectTitle: string
       url: string
     }
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
 
 function pragueDate(d: Date): string {
   return new Intl.DateTimeFormat('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Europe/Prague' })

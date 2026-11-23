@@ -7,6 +7,7 @@
 // Bez importů serveru: stejná funkce dělá náhled v Nastavení i odeslaný e-mail.
 // Každý vstup (jméno firmy, texty klienta, údaje zákazníka) se escapuje.
 
+import { escapeHtml, linkifyHtml } from '../../security/html'
 import { usableAccent } from '../accent'
 import { accentGradient } from '../accent'
 import { loyaltyCardView, type LoyaltyCardStatus } from '../loyalty-card-view'
@@ -62,14 +63,9 @@ export type EmailContent = {
 
 export type RenderedEmail = { subject: string; html: string; text: string }
 
-export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
+// Sdílená implementace (`lib/security/html.ts`), tady jen znovu vyexportovaná
+// pro ostatní šablony e-mailů.
+export { escapeHtml }
 
 /** Jen https (a http pro lokální vývoj) — žádné javascript: ani data:. */
 export function safeUrl(url: string): string | null {
@@ -90,9 +86,7 @@ function paragraphs(text: string, accent: string): string {
     .trim()
     .split(/\n{2,}/)
     .map((p) => {
-      const html = escapeHtml(p)
-        .replace(/https?:\/\/[^\s<]+/g, (m) => `<a href="${m}" style="color:${accent};text-decoration:underline">${m}</a>`)
-        .replace(/\n/g, '<br>')
+      const html = linkifyHtml(p, `color:${accent};text-decoration:underline`).replace(/\n/g, '<br>')
       return `<p style="margin:0 0 16px;font:400 16px/1.55 ${SANS};color:${C.ink}">${html}</p>`
     })
     .join('')

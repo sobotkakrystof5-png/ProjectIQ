@@ -4,6 +4,8 @@ import path from 'path'
 import { lookup } from 'dns/promises'
 import https from 'https'
 import { isIP } from 'net'
+import { escapeHtml } from '../security/html'
+import { createSemaphore } from '../security/semaphore'
 import { itemTotals } from './totals'
 
 /**
@@ -140,19 +142,29 @@ export async function documentStyles(extraCss: string): Promise<string> {
   return tokens + (await fontCss()) + extraCss
 }
 
-/** Escapování do HTML. Uživatelská hodnota se nikdy nevykreslí jako značky. */
-export function escapeHtml(value: unknown): string {
-  return String(value ?? '').replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  )
-}
+// Escapování do HTML žije v `lib/security/html.ts`; odtud se jen předává dál,
+// protože ho importují šablony dalších dokladů.
+export { escapeHtml }
 
 /**
  * Chromium, který z HTML udělá PDF. Bez JavaScriptu a bez sítě: pustit se smí
  * jen `data:` URL, takže dokument nemá jak stařit na cizím serveru.
  */
-export async function renderPdf(html: string): Promise<Buffer> {
+export function renderPdf(html: string): Promise<Buffer> {
+  return pdfSlots.run(() => renderPdfNow(html))
+}
+
+/**
+ * Souběžně smí běžet jen {@link PDF_CONCURRENCY} Chromia na jednu instanci funkce.
+ * Každé stojí stovky MB paměti; bez stropu stačí pár souběžných stažení PDF
+ * (každé z nich za svým limitem na IP nebo účet), aby instanci zabil nedostatek
+ * paměti i s ostatními požadavky, které na ní běží. Čekající se po 25 s vzdají
+ * chybou — volající ji stejně jako jiné selhání převedou na hlášku „zkuste později".
+ */
+const PDF_CONCURRENCY = 2
+const pdfSlots = createSemaphore(PDF_CONCURRENCY, 25_000)
+
+async function renderPdfNow(html: string): Promise<Buffer> {
   const puppeteer = (await import('puppeteer-core')).default
   const chromium = process.env.VERCEL ? (await import('@sparticuz/chromium')).default : null
   const browser = await puppeteer.launch({

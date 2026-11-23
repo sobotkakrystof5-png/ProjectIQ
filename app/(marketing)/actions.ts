@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { z } from 'zod'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { sql } from '@/lib/db'
+import { clientIpFromHeaders } from '@/lib/security/client-ip'
 import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
 
 export type ContactFormState = {
@@ -55,9 +56,7 @@ export async function submitContactForm(
 
   try {
     const requestHeaders = await headers()
-    const ip = requestHeaders.get('x-real-ip')
-      || requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || 'unknown'
+    const ip = clientIpFromHeaders(requestHeaders)
 
     if (await isApiRateLimited(RATE_LIMIT_ENDPOINT, ip, 15, 5)) {
       return failure('Dnes už přišlo několik zpráv. Zkuste to prosím později nebo napište na info@vizeon.cz.')

@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { headers } from 'next/headers'
 
 import { sql } from './db'
+import { clientIpFromHeaders } from './security/client-ip'
 import { createSupabaseServerClient } from './supabase/server'
 import { isAdminUser, supabaseConfigured } from './supabase/config'
 import { sessionTooOld } from './supabase/session-age'
@@ -24,8 +25,7 @@ export type AdminSession = {
 }
 
 export async function clientIp(): Promise<string> {
-  const value = (await headers()).get('x-forwarded-for')
-  return value ? value.split(',')[0].trim() : 'unknown'
+  return clientIpFromHeaders(await headers())
 }
 
 /** Zápis pokusu o přihlášení (jen evidence, nic neblokuje — DECISIONS #030). */

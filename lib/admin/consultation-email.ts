@@ -1,4 +1,5 @@
 import { meetingWhen, SIGNATURE } from '@/lib/admin/meeting-email'
+import { escapeHtml } from '@/lib/security/html'
 
 /**
  * Potvrzení konzultace klientovi (KP14, R-126) — po rezervaci i po přesunu.
@@ -22,15 +23,6 @@ export type ConsultationEmailInput = {
   channelLabel: string
   /** Kde jde konzultaci přesunout nebo zrušit (klientský prostor). */
   manageUrl: string | null
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 export function safeJoinUrl(url: string | null): string | null {

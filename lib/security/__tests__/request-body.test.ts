@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readBodyLimited } from '../request-body'
+import { readBodyLimited, readFormDataLimited } from '../request-body'
 
 function requestWithChunks(chunks: string[]) {
   return new Request('https://example.test/webhook', {
@@ -34,5 +34,47 @@ describe('readBodyLimited', () => {
     })
     const result = await readBodyLimited(request, 10)
     expect(result).toEqual({ ok: false })
+  })
+})
+
+describe('readFormDataLimited', () => {
+  function multipart(audio: string) {
+    const form = new FormData()
+    form.append('audio', new Blob([audio], { type: 'audio/webm' }), 'a.webm')
+    return new Request('https://example.test/transcribe', { method: 'POST', body: form })
+  }
+
+  it('rozebere formulář pod limitem', async () => {
+    const result = await readFormDataLimited(multipart('nahravka'), 4096)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      const file = result.form.get('audio')
+      expect(file).toBeInstanceOf(Blob)
+      expect(await (file as Blob).text()).toBe('nahravka')
+    }
+  })
+
+  it('odmítne obří formulář, i když content-length chybí (chunked)', async () => {
+    const chunked = new Request('https://example.test/transcribe', {
+      method: 'POST',
+      headers: { 'content-type': 'multipart/form-data; boundary=x' },
+      duplex: 'half',
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (let i = 0; i < 10; i += 1) controller.enqueue(new Uint8Array(1024))
+          controller.close()
+        },
+      }),
+    } as RequestInit & { duplex: 'half' })
+    expect(await readFormDataLimited(chunked, 2048)).toEqual({ ok: false, reason: 'too-large' })
+  })
+
+  it('odmítne obsah, který není formulář', async () => {
+    const request = new Request('https://example.test/transcribe', {
+      method: 'POST',
+      headers: { 'content-type': 'multipart/form-data; boundary=x' },
+      body: 'to neni multipart',
+    })
+    expect(await readFormDataLimited(request, 4096)).toEqual({ ok: false, reason: 'invalid' })
   })
 })

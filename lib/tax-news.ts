@@ -1,4 +1,5 @@
 import { sql } from '@/lib/db'
+import { isSafeHttpUrl } from '@/lib/security/html'
 import type { TaxNewsSource } from '@/lib/types'
 
 /**
@@ -137,6 +138,9 @@ export function parseRssItems(xml: string): ParsedNewsItem[] {
     if (!link || !title) continue
 
     const cleanLink = decodeEntities(link)
+    // Obsah RSS je cizí. Odkaz se vykreslí jako `href`, takže `javascript:` ani `data:` nesmí
+    // projít ani do databáze. Hodnota se jen ověří, ne přepisuje — `guid` na ní může stát.
+    if (!isSafeHttpUrl(cleanLink)) continue
     const rawDate = tagContent(itemXml, 'pubDate') ?? tagContent(itemXml, 'dc:date')
     const parsedDate = rawDate ? new Date(rawDate) : null
     const summary = tagContent(itemXml, 'description')

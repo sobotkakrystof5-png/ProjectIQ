@@ -51,7 +51,7 @@ export async function unsubscribeNews(token: string): Promise<boolean> {
   return rows.length > 0
 }
 
-const escapeIcs = (s: string) => s.replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
+const escapeIcs = (s: string) => s.replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/\r/g, '').replace(/,/g, '\\,').replace(/;/g, '\\;')
 const icsTime = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
 
 /** Termín jako .ics (jen potvrzená návštěva). Null = odkaz neplatí nebo termín už není. */

@@ -3,7 +3,7 @@
 > Současný stav. Přepisuje se — historie je v ostatních souborech.
 > Čti na začátku každého sezení, které sahá na hlavičky, CSP, proxy, API nebo vstupy.
 
-**Poslední aktualizace:** 2026-11-15, **klientský prostor `/klient` přešel z vývojové instance Clerku na Supabase Auth** (e-mail a heslo, registrace jen přes hook s otiskem pozvánky, pozvánka vždy vázaná na e-mail; DECISIONS #031, AUDIT-LOG 2026-11-15) a portál `/p` dostal výměnu odkazu a omezení rezervace. Předchozí téhož dne: **přihlášení do adminu přešlo na Supabase Auth** (e-mail, heslo, TOTP; DECISIONS #029). NextAuth, `ADMIN_PASSWORD_HASH` a `bcryptjs` z repa odešly, cookie se session je zpevněná proti výchozímu stavu `@supabase/ssr` (`httpOnly`, 12 h místo 400 dní) a **CSP se nemění** — prohlížeč na Supabase nesahá. Zbývá vytvořit admin účet, doplnit env do Vercelu, vypnout veřejnou registraci a omezit délku session (Otevřené položky); naživo to nikdo nezkusil. Předchozí: 2026-11-14, **úplný audit od A do Z** (AUDIT-LOG 2026-11-14): živý sken produkce 30 prošlo / 3 varování / **0 chyb**, code review celého stromu (37 routů, 47 souborů server actions, CSP, CORS, nahrávání, SQL, rate limity, CI, 311 commitů historie). Opraveno: fail-open kontrola DNS v auditním skriptu (DECISIONS #028), 500 místo 404 na čtyřech veřejných odkazech adminu, chybějící strop těla na pěti veřejných JSON routech, pět tvarů tajemství, které pouštěl `redactSensitive()`, `Vary: Origin` a localhost v CORS leadů, `Secure` u cookie motivu, očištění názvu nahraného PDF, širší `Permissions-Policy`. **Skutečný stav DNS je horší, než tu dřív stálo** — viz sekce DNS. Předchozí: 2026-11-13 nasazení modernizace (celá AD00–AD18 je na produkci od 2026-11-14, `8210f04`)
+**Poslední aktualizace:** 2026-11-23, **ochrana proti XSS a DDoS** (DECISIONS #050; audit z 2026-11-20, do `main` sloučený 2026-11-23): jeden modul pro cizí text v HTML (`lib/security/html.ts`) + test, který hlídá nebezpečné vzory ve zdrojáku, brána na IP v `proxy.ts`, paměťová předbrána před databázovými limity, strop souběhu Chromia a strop těla u nahrávek. Firewall platformy (Vercel WAF) z kódu nenastavíš — pravidla jsou navržená níž a čekají na Kryštofa. Předchozí: 2026-11-15, **klientský prostor `/klient` přešel z vývojové instance Clerku na Supabase Auth** (e-mail a heslo, registrace jen přes hook s otiskem pozvánky, pozvánka vždy vázaná na e-mail; DECISIONS #031, AUDIT-LOG 2026-11-15) a portál `/p` dostal výměnu odkazu a omezení rezervace. Předchozí téhož dne: **přihlášení do adminu přešlo na Supabase Auth** (e-mail, heslo, TOTP; DECISIONS #029). NextAuth, `ADMIN_PASSWORD_HASH` a `bcryptjs` z repa odešly, cookie se session je zpevněná proti výchozímu stavu `@supabase/ssr` (`httpOnly`, 12 h místo 400 dní) a **CSP se nemění** — prohlížeč na Supabase nesahá. Zbývá vytvořit admin účet, doplnit env do Vercelu, vypnout veřejnou registraci a omezit délku session (Otevřené položky); naživo to nikdo nezkusil. Předchozí: 2026-11-14, **úplný audit od A do Z** (AUDIT-LOG 2026-11-14): živý sken produkce 30 prošlo / 3 varování / **0 chyb**, code review celého stromu (37 routů, 47 souborů server actions, CSP, CORS, nahrávání, SQL, rate limity, CI, 311 commitů historie). Opraveno: fail-open kontrola DNS v auditním skriptu (DECISIONS #028), 500 místo 404 na čtyřech veřejných odkazech adminu, chybějící strop těla na pěti veřejných JSON routech, pět tvarů tajemství, které pouštěl `redactSensitive()`, `Vary: Origin` a localhost v CORS leadů, `Secure` u cookie motivu, očištění názvu nahraného PDF, širší `Permissions-Policy`. **Skutečný stav DNS je horší, než tu dřív stálo** — viz sekce DNS. Předchozí: 2026-11-13 nasazení modernizace (celá AD00–AD18 je na produkci od 2026-11-14, `8210f04`)
 
 ## Projekt
 
@@ -131,6 +131,62 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar a zji�
 
 - **Vercel Preview (od 2026-11-21):** `DATABASE_URL` a `DATABASE_URL_WS` míří na testovací Neon „ZakazIQ RD test“ (`ep-shiny-union-b922fwm5`), ne na produkci — do té doby `DATABASE_URL` pro Preview mířil na produkci (AUDIT-LOG 2026-11-21). Přihlášení admina v Preview přes Supabase `zakaziq` (jen identita), klientský prostor v Preview přihlásit nejde. Kontrolní větev `preview/test`.
 
+## Ochrana proti XSS a DDoS (2026-11-20, DECISIONS #050)
+
+### XSS — kde se cizí text mění v HTML
+
+Obrana má čtyři vrstvy, od nejsilnější: **(1)** CSP s nonce a `strict-dynamic` (žádný inline skript, cizí `<script>` se nespustí ani po vložení), **(2)** React escapuje vše v JSX, **(3)** jediný modul pro ruční HTML — `lib/security/html.ts`: `escapeHtml` (`& < > " '`), `safeHttpUrl`/`isSafeHttpUrl` (jen `http(s)`, bez `user:heslo@`, bez řídicích znaků), `linkifyHtml`, `jsonForScript`, `stripControlChars`, **(4)** test `lib/security/__tests__/xss-guard.test.ts`, který selže, když se ve zdrojáku objeví:
+
+| Vzor | Povoleno |
+|---|---|
+| `dangerouslySetInnerHTML` | jen JSON-LD přes `jsonLdString()` a konstanta s motivem v `ws-root.tsx` |
+| `.innerHTML =`, `.outerHTML =`, `insertAdjacentHTML`, `document.write` | jen `components/TradingViewChart.tsx` (konfigurační JSON vlastního kódu) |
+| `eval(`, `new Function(` | nikde |
+| `<iframe srcDoc=…>` | jen se `sandbox=""` (náhled e-mailu v Novinkách a v Nastavení › E-maily) |
+| vlastní `function escapeHtml` nebo ruční `.replace(/&/g, '&amp;')` | nikde mimo `lib/security/html.ts` |
+| `href="${…}"` v e-mailových šablonách | jen s `escapeHtml(`, `safeUrl(` nebo `safeHttpUrl(` |
+
+Co se opravilo 2026-11-20 (nález = konkrétní díra, ne teoretická): `lib/email.ts` escapoval jen `& < >` a vkládal `href` bez kontroly — uvozovka v textu odstavce vložila do odkazu další atribut (`linkifyHtml` escapuje díly zvlášť); `lib/ws/email/layout.ts` dosazoval do `href` text s `&quot;` (stejná oprava); hromadný e-mail ze Startupu vkládal `live_url` z databáze; odkazy z cizího RSS daňových novinek šly do `href` bez kontroly schématu (zahazují se už při načtení i při vykreslení); ICS ponechal osamělé `\r` (vložení řádku); `/p/[token]` a `/klient/projekt` vykreslovaly adresu ukázky bez kontroly schématu. Zbylá místa s cizím obsahem jsou v pořádku a zůstávají beze změny: widget `/embed/*.js` (JSON s escapem `<`, `textContent`), PDF (Chromium bez JavaScriptu a sítě, vstup přes `escapeHtml`), CSV (buňky začínající `= + - @` dostanou apostrof), obrázek novinky (typ podle bajtů).
+
+### DDoS — vrstvy a co která dělá
+
+| Vrstva | Kde | Co zastaví | Stav |
+|---|---|---|---|
+| 0. Síť (L3/L4) | Vercel, automaticky | objemové útoky na síť | platforma, bez zásahu |
+| 1. Firewall (L7) | **Vercel WAF** (Firewall v dashboardu) | záplavu požadavků **dřív, než se spustí funkce** — jediná vrstva, která šetří i počet spuštění a tím limity Hobby | ❌ **nenastaveno** — viz návrh pravidel níž, čeká na Kryštofa |
+| 2. Brána aplikace | `proxy.ts` → `lib/security/front-gate.ts` | 240 stránek / 120 API požadavků za 10 s z jedné IP (IPv6 po /64), 429 + `Retry-After`; dřív než Clerk, Supabase a databáze. Vypnutí při potížích: `FRONT_GATE=off` | ✅ v kódu, jen v produkci |
+| 3. Předbrána limiterů | `lib/api-rate-limit.ts`, `lib/ws/intake/rate-limit.ts` | klient, který pošle 4× (`hitLimit` 2×) povolený počet za okno, se zahodí **bez dotazu do Neonu** — dřív stál každý zahozený požadavek 3 dotazy | ✅ |
+| 4. Limity vstupů | databáze (`api_requests`, `ws.rate_limits`) | přesné počty na endpoint, IP, účet, odkaz | ✅ beze změny; úklid `api_requests` už ne při každém požadavku (2 %) |
+| 5. Drahé operace | `lib/invoice-pdf/render.ts` → `lib/security/semaphore.ts` | nejvýš 2 Chromia najednou na instanci, čekající po 25 s vzdají; dřív stačilo pár souběžných stažení PDF na vyčerpání paměti | ✅ |
+| 6. Velikost těla | `lib/security/request-body.ts` | `readJsonLimited`, `readFormDataLimited`: strop platí i pro `chunked` tělo bez `content-length`; nově u přepisu hlasu (3 routy) a nahrání PDF faktury | ✅ |
+
+**Co aplikace nezvládne sama (a nesmí se tvrdit opak):** brána i předbrána žijí v paměti jedné instance, takže při škálování se útok rozdělí mezi instance a každá povolí celý strop. Zastaví klienta, který zatěžuje databázi, a drží paměť instance — nezastaví útok, který stojí funkce (a Hobby limity) už tím, že se spouštějí. Landing page je navíc `force-dynamic` kvůli nonce (R-033), takže každý požadavek na `/` spustí funkci a nejde ho obsloužit z CDN cache. Proto je vrstva 1 nutná.
+
+**IP klienta** (`lib/security/client-ip.ts`): `x-vercel-forwarded-for` → `x-forwarded-for` → `x-real-ip`, hodnota se ověří jako IP (`unknown`, když není); na Vercelu hlavičky nastavuje platforma a klientovy zahazuje. Brána a předbrány bez IP nikoho nezamykají (jinak by první robot zamkl všechny).
+
+**Návrh pravidel pro Vercel WAF** (nic z toho není zapnuté; MCP integrace dostává pro firewall 404, takže je nastaví Kryštof z dashboardu nebo CLI — `vercel pricing firewall` ukáže, co Hobby dovoluje; počet pravidel a rate limit pravidel na Hobby **neověřeno**). Pravidla vytvářet nejdřív v režimu `log` (`--rate-limit-action log`), po týdnu bez falešných zásahů přepnout na `deny`/`challenge`:
+
+```bash
+# 1) veřejné API — strop na IP (aplikace má vlastní 10/min na endpoint)
+vercel firewall rules add "Veřejné API – strop" \
+  --condition '{"type":"path","op":"pre","value":"/api/public"}' \
+  --action rate_limit --rate-limit-window 60 --rate-limit-requests 120 --rate-limit-keys ip --rate-limit-action deny --yes
+# 2) přihlášení a registrace
+vercel firewall rules add "Přihlášení – strop" \
+  --condition '{"type":"path","op":"pre","value":"/login"}' --or \
+  --condition '{"type":"path","op":"pre","value":"/w/prihlaseni"}' --or \
+  --condition '{"type":"path","op":"pre","value":"/w/registrace"}' --or \
+  --condition '{"type":"path","op":"pre","value":"/klient/prihlaseni"}' \
+  --action rate_limit --rate-limit-window 60 --rate-limit-requests 60 --rate-limit-keys ip --rate-limit-action deny --yes
+# 3) celý web — velkorysý strop (započítává i soubory z /_next/static, proto vysoko)
+vercel firewall rules add "Celý web – strop" \
+  --condition '{"type":"path","op":"pre","value":"/"}' \
+  --action rate_limit --rate-limit-window 60 --rate-limit-requests 1200 --rate-limit-keys ip --rate-limit-action challenge --yes
+vercel firewall publish
+```
+
+**Při probíhajícím útoku** (`vercel firewall overview` ukáže provoz a zásahy): (1) zapnout `vercel firewall attack-mode enable --duration 1h` — **pozor, výzva zastaví i volání bez prohlížeče** (webhooky Stripe/Clerk/Resend, poptávky z webů klientů a z vizeon.cz, Growth OS, cron); jestli je Vercel propustí, jsem **neověřil**, takže po zapnutí hned zkontrolovat doručení webhooků a případně přidat `bypass` pravidlo pro `/api/stripe/webhook`, `/api/clerk/webhook`, `/api/resend/webhook`, `/api/cron`; (2) jednotlivou IP zablokovat `vercel firewall ip-blocks block <ip>`; (3) když brána aplikace škodí legitimním lidem, vypnout `FRONT_GATE=off` ve Vercelu (účinné po dalším nasazení); (4) nepouštět `web-security-audit` v cyklu (po patnácti dotazech Vercel vrací challenge); (5) po útoku zapsat do `AUDIT-LOG.md`.
+
 ## Otevřené položky
 
 | Položka | Proč | Kdo | Kdy |
@@ -138,6 +194,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar a zji�
 | Vstup do Workspace je veřejně dosažitelný na dev Clerku | **potvrzeno zvenku 2026-11-14:** `/w/registrace` vrací 200 a načítá `ultimate-chimp-4657.clerk.accounts.dev`; landing na ni vede tlačítkem (`components/marketing/content.ts` → `signUp`). Cizí člověk si založí účet, který přepnutí na produkční Clerk nepřežije, a projde „platbou" v sandboxu. Buď vstup schovat, dokud nebude Clerk i Stripe v produkčním režimu, nebo to vědomě nechat | Kryštof (rozhodnutí) | hned |
 | **SPF na apexu a `rua` v DMARC** | nejvážnější otevřená věc z auditu 2026-11-14: apex nemá SPF a DMARC je `p=none` bez reportů, přitom Workspace odesílá z adresy na apexu a doména má MX. Podvrhnout e-mail jménem `@zakaziq.cz` jde a nikdo se o tom nedozví. Hodnoty a cíle v sekci DNS | Kryštof (WEDOS) | hned |
 | **CAA a DNSSEC na apexu** | ověřeno autoritativně 2026-11-14: ani jedno. Bez CAA smí certifikát pro doménu vydat kdokoli | Kryštof (WEDOS) | před spuštěním |
+| **Vercel WAF pravidla** (strop na IP pro `/api/public`, přihlášení a celý web; Attack Challenge pohotovostně) | jediná vrstva, která zastaví záplavu dřív, než se spustí funkce; aplikace to nenahradí (sekce Ochrana proti XSS a DDoS). Návrh příkazů je tam. Vercel MCP pro firewall vrací 404 — buď znovu přihlásit integraci, nebo pustit příkazy z CLI. Začít v režimu `log` | Kryštof | před spuštěním |
 | Hlášení porušení CSP | politika je od S19 **vynucená** pro všechny cesty, ale bez `report-to`/`report-uri`. Porušení v produkci tedy nikdo nevidí — projeví se rozbitou obrazovkou u uživatele, ne záznamem. Potřebuje routu s limitem a řádek v CSP-LOG; přirozeně to patří k monitoringu chyb níž | Kryštof (rozhodnutí) + Claude | před spuštěním |
 | `DATABASE_URL_WS` do Vercelu (Production + Preview) | migrace `ws` i role `ws_app` jsou na Neonu od 2026-10-09 (ověřeno: bez BYPASSRLS, do `public` nevidí); bez proměnné ve Vercelu Workspace v produkci nemá DB. Roli jen přes `scripts/ws-create-role.js`, nikdy v konzoli | Kryštof | před nasazením `/w` |
 | Clerk produkční instance (`clerk deploy`, `clerk.zakaziq.cz`, produkční klíče, Google OAuth s vlastními údaji) | dev klíče mají limity a dev banner, dev instance nesmí do produkce | Kryštof + Claude | před spuštěním (S19) |
@@ -176,4 +233,8 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar a zji�
 - Workspace nikdy přes `DATABASE_URL` (admin role obchází RLS) — jen `DATABASE_URL_WS` / `lib/ws/db.ts`. RLS na `ws` se nevypíná a politika nikdy `USING (true)`.
 - Kontrola klíče **před** čtením těla ve veřejných API — jinak neověřený požadavek načte tělo do paměti funkce.
 - `publicToken()` před každým dotazem na `public_token`/`survey_token` — bez něj je nesmyslný token 500, ne 404.
+- `lib/security/html.ts` je jediné místo pro escapování HTML a ověření odkazů. Nová kopie `escapeHtml`, `dangerouslySetInnerHTML`, `innerHTML` ani `srcDoc` bez `sandbox=""` neprojde testem `xss-guard.test.ts` — výjimka je nové rozhodnutí v DECISIONS, ne úprava seznamu v testu (#050).
+- Brána v `proxy.ts` (`frontGate`) musí zůstat **před** Clerkem, Supabase a CSP; nezužovat `FRONT_GATE_LIMITS` pod hodnoty, které zamknou kancelář za jednou IP, a nepřidávat do ní webhooky (Stripe, Clerk, Resend posílají shluky z pár adres).
+- `renderPdf` vždy přes semafor; nikdy nové volání `puppeteer.launch` mimo `lib/invoice-pdf/render.ts`.
+- Nahrávky a formuláře přes `readFormDataLimited`, ne holé `req.formData()` — kontrola `content-length` nestačí.
 - DNS sekce auditního skriptu selhává **zavřeně** (DECISIONS #028) — nedostupný resolver nesmí znovu vycházet jako „záznam existuje".

@@ -19,6 +19,7 @@ import { getPragueTodayISO } from '@/lib/prague-time'
 import { ClientShell } from '@/components/portal/client-shell'
 import { ACTIVITY_KIND_LABELS } from '@/lib/project-activity'
 import { formatDate } from '@/lib/utils'
+import { safeHttpUrl } from '@/lib/security/html'
 
 export const metadata: Metadata = { title: 'Projekt' }
 
@@ -68,9 +69,9 @@ export default async function KlientProjektPage({ params }: { params: Promise<{ 
           </div>
           <p className="mt-1 text-xs text-quiet">Hotovo {project.progress} %{project.deadline ? ` · termín ${formatDate(project.deadline)}` : ''}</p>
         </div>
-        {project.projectUrl && (
+        {safeHttpUrl(project.projectUrl) && (
           <a
-            href={project.projectUrl}
+            href={safeHttpUrl(project.projectUrl)!}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-chip border border-navy-100 px-4 text-sm font-medium text-ink hover:border-navy-300"

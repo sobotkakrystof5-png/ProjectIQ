@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash } from 'crypto'
 import { adminDb } from '@/lib/admin/db'
 import { SIGNATURE } from '@/lib/admin/meeting-email'
+import { escapeHtml } from '@/lib/security/html'
 import { sendVizeonMail, type SendResult, type VizeonMail } from '@/lib/admin/vizeon-mail'
 
 /**
@@ -36,10 +37,6 @@ export type PhaseEmailContent = {
 
 const C = { ink: '#0c1a36', quiet: '#4a5878', line: '#dce7f7', navy700: '#23478b' } as const
 const SANS = "'Instrument Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
 
 /** 12. prosince 2026 — bez času, pražské datum etapy. */
 function czDate(iso: string): string {

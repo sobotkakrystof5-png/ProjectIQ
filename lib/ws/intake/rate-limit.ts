@@ -1,6 +1,8 @@
 import 'server-only'
 import { createHash, createHmac } from 'crypto'
 import { wsSystem } from '../db'
+import { clientIpFromHeaders, ipRateKey } from '../../security/client-ip'
+import { createMemoryLimiter, type MemoryLimiter } from '../../security/memory-limiter'
 
 // Rate limit veřejných vstupů Workspace (S11) nad ws.rate_limits (migrace 075):
 // pevné okno, jeden atomický upsert na požadavek. Klíč je hash — IP adresa ani
@@ -39,8 +41,27 @@ export function limitKey(limit: Limit, value: string): string {
   return `${limit.name}:${digest.slice(0, 40)}`
 }
 
+/**
+ * Paměťová pojistka před databází (`lib/security/memory-limiter.ts`): klient, který
+ * za jedno okno pošle dvojnásobek povoleného počtu, se zahodí bez dotazu do Neonu.
+ * Dvojnásobek proto, že okno v paměti začíná prvním požadavkem, kdežto databázové
+ * je zarovnané na čas — pojistka tedy nikdy nezamítne víc, než by zamítla databáze.
+ */
+const preGates = new Map<string, MemoryLimiter>()
+
+function preGateFor(limit: Limit): MemoryLimiter {
+  const id = `${limit.name}:${limit.max}:${limit.windowSec}`
+  let gate = preGates.get(id)
+  if (!gate) {
+    gate = createMemoryLimiter({ max: limit.max * 2, windowMs: limit.windowSec * 1000 })
+    preGates.set(id, gate)
+  }
+  return gate
+}
+
 /** Započítá požadavek. `true` = limit překročený, požadavek odmítnout. */
 export async function hitLimit(limit: Limit, value: string): Promise<boolean> {
+  if (preGateFor(limit).hit(value).limited) return true
   const key = limitKey(limit, value)
   const [row] = await wsSystem<{ count: number }>`
     INSERT INTO ws.rate_limits (key, window_start, count)
@@ -55,8 +76,10 @@ export async function hitLimit(limit: Limit, value: string): Promise<boolean> {
   return Number(row?.count ?? 0) > limit.max
 }
 
-/** IP klienta z hlavičky Vercelu (první adresa v x-forwarded-for). */
+/**
+ * Klíč klienta pro limity: IP z hlavičky Vercelu, u IPv6 sražená na prefix /64
+ * (jinak by limit šlo obejít střídáním koncovky adresy). Do DB jde jen hash.
+ */
 export function clientIp(headers: Headers): string {
-  const fwd = headers.get('x-forwarded-for')
-  return (fwd ? fwd.split(',')[0].trim() : headers.get('x-real-ip')) || 'unknown'
+  return ipRateKey(clientIpFromHeaders(headers))
 }

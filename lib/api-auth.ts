@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'crypto'
 import type { NextRequest } from 'next/server'
+import { clientIpFromHeaders } from '@/lib/security/client-ip'
 
 // Constant-time comparison guards against timing attacks on the API key check.
 function constantTimeMatch(provided: string, expected: string): boolean {
@@ -40,7 +41,7 @@ export function verifyBearerApiKey(req: NextRequest, envVarName: string): boolea
   return constantTimeMatch(provided, expected)
 }
 
+/** IP klienta (ověřená jako IP), nebo `unknown`. Sdílená logika: `lib/security/client-ip.ts`. */
 export function getClientIp(req: NextRequest): string {
-  const fwd = req.headers.get('x-forwarded-for')
-  return fwd ? fwd.split(',')[0].trim() : 'unknown'
+  return clientIpFromHeaders(req.headers)
 }

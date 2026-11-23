@@ -1,6 +1,7 @@
 'use server'
 
 import { sql } from '@/lib/db'
+import { escapeHtml, safeHttpUrl } from '@/lib/security/html'
 import { loadWaitlistForExport } from '@/lib/admin/waitlist'
 import { neon } from '@neondatabase/serverless'
 import { Resend } from 'resend'
@@ -345,7 +346,8 @@ export async function sendLaunchEmailBlast(
   const row = project[0] as { waitlist_db_url: string | null; live_url: string | null } | undefined
   if (!row?.waitlist_db_url) return { sent: 0, failed: 0, total: 0, error: 'Projekt nemá nastavenou databázi waitlistu' }
   const dbUrl = row.waitlist_db_url
-  const appUrl = row.live_url || 'https://estatiq.cz'
+  // Adresa jde do `href` hromadného e-mailu: jen http(s), jinak výchozí (nikdy `javascript:` z databáze).
+  const appUrl = safeHttpUrl(row.live_url) ?? 'https://estatiq.cz'
 
   const from = opts.fromEmail ?? 'EstatIQ <onboarding@resend.dev>'
   const resend = new Resend(resendKey)
@@ -405,10 +407,6 @@ export async function sendLaunchEmailBlast(
   }
 }
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
 function launchEmailHtml(appUrl: string, name: string | null): string {
   const greeting = name ? `Ahoj ${escapeHtml(name)},` : 'Ahoj,'
   return `<!DOCTYPE html>
@@ -456,7 +454,7 @@ function launchEmailHtml(appUrl: string, name: string | null): string {
             <table cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td style="border-radius:12px;background:#059669;">
-                  <a href="${appUrl}" target="_blank"
+                  <a href="${escapeHtml(appUrl)}" target="_blank"
                     style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:-0.01em;">
                     Vstoupit do EstatIQ →
                   </a>

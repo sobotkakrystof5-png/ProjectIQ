@@ -8,6 +8,8 @@
  * se escapuje; odkazy jen https.
  */
 
+import { escapeHtml } from '@/lib/security/html'
+
 export const VIZEON_WEB = 'https://vizeon.cz'
 export const SIGNATURE = ['Kryštof Sobotka', 'VIZEON', 'krystof@vizeon.cz']
 
@@ -245,15 +247,6 @@ export function reminderSms(kind: ReminderKind, startsAt: string, meetUrl: strin
     }
   }
   return bodies[bodies.length - 1]
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 function safeHttps(url: string | null): string | null {

@@ -161,3 +161,24 @@ describe('TAX_NEWS_FEEDS', () => {
     expect(TAX_NEWS_FEEDS.every(f => f.url.startsWith('https://'))).toBe(true)
   })
 })
+
+describe('parseRssItems — cizí obsah feedu (XSS)', () => {
+  const feed = (link: string) =>
+    `<rss><channel><item><title>Titulek</title><link>${link}</link><pubDate>Thu, 03 Sep 2026 00:00:00 +02:00</pubDate></item></channel></rss>`
+
+  it.each([
+    'javascript:alert(document.cookie)',
+    'JAVASCRIPT:alert(1)',
+    'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
+    'vbscript:msgbox(1)',
+    '/relativni',
+  ])('položku s odkazem %s zahodí', (link) => {
+    expect(parseRssItems(feed(link))).toEqual([])
+  })
+
+  it('https odkaz projde beze změny (guid se z něj odvozuje)', () => {
+    const [item] = parseRssItems(feed('https://financnisprava.gov.cz/cs/x'))
+    expect(item?.link).toBe('https://financnisprava.gov.cz/cs/x')
+    expect(item?.guid).toBe('https://financnisprava.gov.cz/cs/x')
+  })
+})

@@ -88,6 +88,7 @@
 | Emaily | `lib/email.ts` (+ `adminEmail()` v `lib/lead-origins.ts`) |
 | Veřejná API — auth, rate limit | `lib/api-auth.ts`, `lib/api-rate-limit.ts` |
 | Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `proxy.ts`, `lib/security/`, `.claude/security/` |
+| Ochrana proti XSS (escapování, odkazy, hlídací test) a DDoS (brána, předbrány limitů, semafor PDF, strop těla, návrh pravidel Vercel WAF) | `lib/security/{html,client-ip,memory-limiter,semaphore,front-gate,request-body}.ts`, `lib/security/__tests__/xss-guard.test.ts`, `lib/api-rate-limit.ts`, `lib/ws/intake/rate-limit.ts`, `.claude/security/STATE.md` → Ochrana proti XSS a DDoS, DECISIONS #050, R-138 |
 | Crony | `vercel.json`, `app/api/cron/**` |
 | Osobní část adminu (dřív Hub) | `app/dashboard/{finance,projekty,startup}/**`, menu `lib/admin-nav.ts` |
 | Landing page | `../docs/landing/PROJECT-BRIEF.md`, `app/(marketing)/` |

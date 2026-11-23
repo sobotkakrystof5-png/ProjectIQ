@@ -2,7 +2,13 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-23 · **Schůzky z kalendáře s připomínkami** (R-137):
+> **Poslední aktualizace:** 2026-11-23 · **Ochrana proti XSS a DDoS v `main`** (R-138): audit
+> z 2026-11-20 ležel tři dny necommitnutý ve worktree; teď je převedený na dnešní `main`. Jeden modul
+> pro cizí text v HTML a test, který hlídá kopie (hned našel čtyři nové z klientského prostoru), brána
+> na IP v `proxy.ts`, předbrány před databázovými limity, semafor na Chromium a strop těla u nahrávek.
+> **Vercel WAF zapnutý není** (čeká na Kryštofa), v prohlížeči nic neověřeno.
+>
+> Předchozí: 2026-11-23 · **Schůzky z kalendáře s připomínkami** (R-137):
 > přepínač „Schůzka přes Google Meet" v okně události, pozvánka s upravitelným textem a `.ics`,
 > připomínky den předem (e-mail + SMS), hodinu předem (e-mail) a 10 minut předem (SMS),
 > zpráva o přesunu. SMS přes Odorik, spouštěč každou minutu pg_cron v Supabase. Migrace 128.
@@ -1493,9 +1499,21 @@ jinak se Google ani připomínky nepřesunou. Nová zpráva klientovi ke schůzc
 ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Mění R-114 v části
 „schůzka jen z AI asistenta" a zavírá jeho přijaté riziko (smazaná schůzka v Googlu). Technika
 `docs/admin/AGENTS-ADMIN.md` → „Schůzky přes Google Meet z kalendáře", bezpečnost DECISIONS #049.
+
+### R-138 · Ochrana proti XSS a DDoS: vrstvy místo jedné pojistky (2026-11-20, v `main` 2026-11-23)
+*Na větvi vzniklo jako R-121 a DECISIONS #040; obě čísla už měl klientský prostor, přečíslováno při sloučení.*
+**Rozhodnutí:** (1) Cizí text do HTML jen přes `lib/security/html.ts`; test `xss-guard.test.ts` hlídá zdroják a nová výjimka je nové rozhodnutí. (2) DDoS se řeší ve vrstvách: Vercel WAF (zatím nenastavený) → brána v `proxy.ts` → paměťová předbrána před databázovými limity → limity vstupů; Chromium přes semafor, těla nahrávek a formulářů se stropem i bez `content-length`.
+**Proč:** zadání Kryštofa 2026-11-20 („zohledňovat XSS a postavit ochranu proti DDoS"). Aplikace sama útok, který stojí funkce už tím, že se spouštějí, nezastaví (landing je dynamická kvůli nonce, R-033) — proto WAF; to, co zastavit umí, je zahlcení databáze a paměti.
+**Důsledek:** `.claude/security/STATE.md` → „Ochrana proti XSS a DDoS", `docs/AGENTS-REFERENCE.md` → B13, DECISIONS #050. Nový endpoint na IP limit používá `isApiRateLimited`/`hitLimit` (předbrána je v nich), nová drahá operace semafor, nové tělo `readJsonLimited`/`readFormDataLimited`. Nový `href` z cizího zdroje `safeHttpUrl`. Nový e-mail **nesmí mít vlastní `escapeHtml`** — test spadne. Vypínač brány `FRONT_GATE=off`.
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Ochrana proti DDoS (R-138) — zapnout WAF a projít:** (1) Vercel WAF pravidla z `.claude/security/STATE.md`
+  (strop `/api/public`, přihlášení, celý web; nejdřív v režimu `log`) — MCP pro firewall vrací 404, nastaví Kryštof
+  z dashboardu nebo CLI, (2) po nasazení hlídat, že brána nezastaví legitimní provoz (429 v runtime logách,
+  `FRONT_GATE=off` jako záchrana), (3) zkušební stažení PDF při souběhu, (4) e-maily s odkazem a tlačítkem vizuálně
+  v Gmailu a Apple Mailu. **Ověřeno jen testy, `tsc` a buildem** · od 2026-11-20
 
 - [ ] **Připomínky schůzek (R-137) — projít naživo:** ~~migrace 128 a 120~~, ~~klíče ve Vercelu~~
   (`MEETING_REMINDERS_SECRET`, `ODORIK_API_USER`, `ODORIK_API_PASSWORD` — nasazení `dpl_5TCi…`
@@ -1912,6 +1930,28 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-23 (ochrana proti XSS a DDoS do `main` — R-138)
+- **feat** Audit z 2026-11-20 (necommitnutý ve worktree `claude/xss-ddos-protection-75bcd7`) převedený na dnešní `main`.
+  **Jeden modul pro cizí text v HTML** `lib/security/html.ts` (`escapeHtml` s uvozovkami, `safeHttpUrl`, `linkifyHtml`,
+  `jsonForScript`, `stripControlChars`); kopie `escapeHtml` pryč z `lib/email.ts`, `lib/ws/email/layout.ts`,
+  `meeting-email`, `survey-email`, `invoice-pdf/render.ts` a nově i z `consultation-email`, `phase-email`,
+  `portal/invite-email` a `admin/chat.ts` (ty přibyly s klientským prostorem po auditu, správné, ale duplicitní;
+  v chatu chyběl apostrof, zneužít to nešlo).
+- **fix** XSS/HTML injekce: uvozovka v textu e-mailu vložila do odkazu další atribut (`lib/email.ts`, Workspace
+  `layout.ts`); `live_url` z databáze v `href` hromadného e-mailu; odkaz z cizího RSS daňových novinek; adresa ukázky
+  na `/p/[token]` a `/klient/projekt` jen http(s); ICS bez osamělého `\r`.
+- **feat** DDoS v aplikaci: brána na IP v `proxy.ts` (`lib/security/front-gate.ts`, 240 stránek / 120 API za 10 s,
+  IPv6 po /64, jen produkce, `FRONT_GATE=off`), paměťová předbrána před `isApiRateLimited` a `hitLimit`, `DELETE`
+  v `recordApiRequest` jen 2 %, semafor na Chromium (2 souběžně, čekání 25 s), `readFormDataLimited` u přepisu hlasu
+  a `invoices/parse`, jedna `clientIpFromHeaders` ověřená jako IP. Semafor navíc uvolní místo i při synchronní
+  výjimce úlohy (nový test).
+- **test** `lib/security/__tests__/xss-guard.test.ts` hlídá zdroják (vlastní `escapeHtml`, `dangerouslySetInnerHTML`,
+  `innerHTML`, `eval`, `srcDoc` bez `sandbox=""`, `href="${…}"` bez escapování).
+- **chore** Ověřeno: `npx tsc --noEmit`, plná sada 1685 prošlo / 3 selhaly — `ws-email` (pevné datum, známé)
+  a dva časové limity pod zátěží (`admin-ai-asistent-crm`, `admin-hovory-asistent`) + dva soubory na `hookTimeout`
+  (`ws-customers`, `ws-today`); samostatně všechny 4 soubory 48/48. **Vercel WAF nenastavený, v prohlížeči nic neověřeno.**
+- **decision** **R-138**, DECISIONS #050 (přečíslováno z R-121 / #040).
 
 ### 2026-11-23 (zkouška připomínek schůzek na produkci)
 - **chore** Ověřena fronta `meeting_reminders` naostro: 17 zkušebních schůzek v produkční DB s adresou

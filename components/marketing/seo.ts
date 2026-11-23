@@ -1,6 +1,7 @@
 // SEO landing page na jednom místě (S05, brief § 11): adresa webu, výchozí texty
 // pro vyhledávače a sdílení, strukturovaná data. Fakta o ceně: R-018, R-038.
 import type { Metadata } from 'next'
+import { jsonForScript } from '@/lib/security/html'
 import { PRICE_LABEL } from './content'
 
 /**
@@ -77,7 +78,7 @@ export function landingJsonLd() {
   }
 }
 
-/** JSON do `<script type="application/ld+json">`; `<` escapovaný, aby text nemohl ukončit značku. */
+/** JSON do `<script type="application/ld+json">`; `<` a spol. escapované, aby text nemohl ukončit značku. */
 export function jsonLdString(data: unknown): string {
-  return JSON.stringify(data).replace(/</g, '\\u003c')
+  return jsonForScript(data)
 }

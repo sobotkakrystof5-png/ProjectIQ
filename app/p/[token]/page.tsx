@@ -10,6 +10,7 @@ import { formatDate } from '@/lib/utils'
 import { ACTIVITY_KIND_LABELS, buildTimeline, type TimelineActivity } from '@/lib/project-activity'
 import { Calendar, RefreshCw, MessageSquare, TrendingUp, Star, ExternalLink } from 'lucide-react'
 import type { Project, ProjectStatus, ClientMessage, ProgressUpdate } from '@/lib/types'
+import { safeHttpUrl } from '@/lib/security/html'
 
 export const revalidate = 30
 
@@ -122,9 +123,9 @@ export default async function ClientPortalPage(props: PageProps) {
               </div>
 
               {/* Live preview link */}
-              {project.project_url && (
+              {safeHttpUrl(project.project_url) && (
                 <a
-                  href={project.project_url}
+                  href={safeHttpUrl(project.project_url)!}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 bg-navy-700 text-white text-sm font-medium px-4 py-2.5 rounded-chip shadow-sm hover:bg-navy-800 transition-colors"

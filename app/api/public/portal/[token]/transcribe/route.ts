@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { sql } from '@/lib/db'
 import { getClientIp } from '@/lib/api-auth'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
+import { readFormDataLimited } from '@/lib/security/request-body'
 import {
   MAX_AUDIO_BYTES,
   isAllowedAudioType,
@@ -54,17 +55,14 @@ export async function POST(
     return fail(429, 'Dnes už jste poslali hodně nahrávek. Napište prosím text, nebo to zkuste zítra.', 'RATE_LIMITED')
   }
 
-  const declared = Number(req.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
-    return fail(413, 'Nahrávka je příliš dlouhá. Zkuste kratší.', 'TOO_LARGE')
+  // Strop platí i pro tělo bez `content-length` (chunked) — `req.formData()` by ho přečetlo celé.
+  const form = await readFormDataLimited(req, MAX_BODY_BYTES)
+  if (!form.ok) {
+    return form.reason === 'too-large'
+      ? fail(413, 'Nahrávka je příliš dlouhá. Zkuste kratší.', 'TOO_LARGE')
+      : fail(400, 'Neplatná nahrávka.', 'INVALID_BODY')
   }
-
-  let audio: FormDataEntryValue | null
-  try {
-    audio = (await req.formData()).get('audio')
-  } catch {
-    return fail(400, 'Neplatná nahrávka.', 'INVALID_BODY')
-  }
+  const audio = form.form.get('audio')
   if (!(audio instanceof Blob) || audio.size === 0) return fail(400, 'Neplatná nahrávka.', 'INVALID_BODY')
   if (audio.size > MAX_AUDIO_BYTES) return fail(413, 'Nahrávka je příliš dlouhá. Zkuste kratší.', 'TOO_LARGE')
   if (!isAllowedAudioType(audio.type)) return fail(415, 'Tenhle formát nahrávky neumíme přepsat.', 'UNSUPPORTED_TYPE')

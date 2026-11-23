@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { markTaxNewsRead, markAllTaxNewsRead, refreshTaxNews } from '@/app/dashboard/finance/tax-news-actions'
 import type { TaxNewsData, TaxNewsItem } from '@/app/dashboard/finance/tax-news-actions'
+import { safeHttpUrl } from '@/lib/security/html'
 import { TAX_NEWS_SOURCE_LABELS } from '@/lib/types'
 
 function formatDate(value: string | null) {
@@ -38,15 +39,19 @@ function NewsRow({ item, onRead, isPending }: {
           <span className="text-[11px] text-quiet">{formatDate(item.published_at)}</span>
         </div>
 
-        <a
-          href={item.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group/link inline-flex items-start gap-1 text-sm font-medium text-ink transition-colors hover:text-navy-700"
-        >
-          <span className="min-w-0">{item.title}</span>
-          <ExternalLink size={11} strokeWidth={1.5} className="shrink-0 mt-1 opacity-40 group-hover/link:opacity-100 transition-opacity" />
-        </a>
+        {safeHttpUrl(item.link) ? (
+          <a
+            href={safeHttpUrl(item.link)!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group/link inline-flex items-start gap-1 text-sm font-medium text-ink transition-colors hover:text-navy-700"
+          >
+            <span className="min-w-0">{item.title}</span>
+            <ExternalLink size={11} strokeWidth={1.5} className="shrink-0 mt-1 opacity-40 group-hover/link:opacity-100 transition-opacity" />
+          </a>
+        ) : (
+          <span className="text-sm font-medium text-ink">{item.title}</span>
+        )}
 
         {item.summary && (
           <p className="text-xs text-quiet mt-1 leading-relaxed line-clamp-2">{item.summary}</p>

@@ -146,6 +146,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
 | Veřejná API | `VIZEON_API_KEY`, `ALTENO_API_KEY`, `ALTENO_LEAD_WEBHOOK_SECRET`, `N8N_API_KEY`, `VIZEON_AGENT_API_KEY`, `GROWTH_OS_API_KEY`, `INVOICES_API_KEY`; schůzky s Meet (R-112): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`, `VIZEON_RESEND_API_KEY`, `VIZEON_EMAIL_FROM`; připomínky schůzek (R-137): `ODORIK_API_USER`, `ODORIK_API_PASSWORD`, `ODORIK_SMS_SENDER` (SMS, bez nich jen e-mail), `MEETING_REMINDERS_SECRET` (`/api/cron/meeting-reminders`, volá ho každou minutu pg_cron v Supabase, klíč i ve Vault) |
 | Crony | `CRON_SECRET` |
+| Ochrana proti zahlcení | `FRONT_GATE` (volitelné; `off` vypne bránu na IP v `proxy.ts`, jinak je v produkci zapnutá; nouzový vypínač, R-138) |
 | Hub | `LERNSAX_USER`, `LERNSAX_PASS`, `BESTESCHULE_USER`, `BESTESCHULE_PASS`, `BESTESCHULE_URL`, `CHROME_PATH` (dev), `ANTHROPIC_API_KEY` |
 | Požadavky klientů (portál `/p`) | `OPENAI_API_KEY` (přepis hlasu; bez něj je mikrofon skrytý), `OPENAI_TRANSCRIBE_MODEL` (volitelně, výchozí `gpt-4o-transcribe`), `CLIENT_REQUEST_AI_MODEL` (volitelně, výchozí `claude-sonnet-5-5`; používá `ANTHROPIC_API_KEY`) |
 | Klientský prostor a hlášení (KP03–KP07) | `DATABASE_URL_PORTAL` (role `portal_app`, `scripts/portal-create-role.js` po migracích 093–096), `PORTAL_INVITE_PEPPER` (hash pozvánek i otisk pro hook registrace), `SUPABASE_AUTH_HOOK_SECRET` (podpis hooku Before User Created, R-107), `AGENT_KEY_PEPPER` (hash klíčů projektů pro hlášení z Claude Code); přepis hlasu a shrnutí jako u portálu `/p` |
@@ -679,7 +680,7 @@ Nejsou to stylové preference — porušení = skutečná zranitelnost v aplikac
 
 **Nikdy vstup bez validace na serveru.** Každá server action, route handler a veřejné API validuje Zodem a omezuje délku každého pole. Klientská validace je jen UX.
 
-**Nikdy nevykresluj nedůvěryhodný vstup jako HTML.** Žádné `innerHTML` ani `dangerouslySetInnerHTML` na čemkoli od uživatele, z URL nebo z API (poptávky, poznámky, jména zákazníků, vlastní kolonky). Když HTML být musí, nejdřív DOMPurify.
+**Cizí text do HTML jen přes `lib/security/html.ts`** (`escapeHtml`, `safeHttpUrl`, `linkifyHtml`, `jsonForScript`) — nikdy vlastní kopie `escapeHtml`, `href` z databáze nebo cizího zdroje bez `safeHttpUrl`; hlídá to `lib/security/__tests__/xss-guard.test.ts` (#050). **Ochrana proti zahlcení má vrstvy** (Vercel WAF → brána v `proxy.ts` → předbrána limiterů → limity vstupů; Chromium jen přes semafor v `renderPdf`; tělo nahrávek a formulářů přes `readFormDataLimited`) — popis a návrh pravidel WAF v `STATE.md` → „Ochrana proti XSS a DDoS". **Nikdy nevykresluj nedůvěryhodný vstup jako HTML.** Žádné `innerHTML` ani `dangerouslySetInnerHTML` na čemkoli od uživatele, z URL nebo z API (poptávky, poznámky, jména zákazníků, vlastní kolonky). Když HTML být musí, nejdřív DOMPurify.
 
 **Nikdy nečti ani nezapisuj data jiného účtu.** Každý dotaz do `ws` přes `requireWorkspace()` a `account_id = ctx.accountId` (B3); `account_id` nikdy z formuláře ani URL. RLS je druhá pojistka, nikdy se nevypíná a nikdy `USING (true)`.
 

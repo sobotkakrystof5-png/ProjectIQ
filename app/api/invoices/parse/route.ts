@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/lib/auth'
 import { readPdfUpload } from '@/lib/invoices'
+import { MAX_PDF_BYTES } from '@/lib/invoice-constants'
+import { readFormDataLimited } from '@/lib/security/request-body'
 import { extractInvoiceFromPdf } from '@/lib/invoice-ai'
 
 /**
@@ -23,14 +25,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ success: false, error: 'Neautorizovaný přístup' }, { status: 401 })
   }
 
-  let form: FormData
-  try {
-    form = await req.formData()
-  } catch {
-    return NextResponse.json({ success: false, error: 'Neplatný požadavek' }, { status: 400 })
+  // Strop těla i bez `content-length`: PDF smí mít `MAX_PDF_BYTES`, zbytek je rezerva na multipart.
+  const body = await readFormDataLimited(req, MAX_PDF_BYTES + 256 * 1024)
+  if (!body.ok) {
+    return NextResponse.json(
+      { success: false, error: body.reason === 'too-large' ? 'PDF je příliš velké' : 'Neplatný požadavek' },
+      { status: body.reason === 'too-large' ? 413 : 400 },
+    )
   }
 
-  const file = form.get('pdf')
+  const file = body.form.get('pdf')
   if (!(file instanceof File) || file.size === 0) {
     return NextResponse.json({ success: false, error: 'Chybí PDF ke zpracování' }, { status: 400 })
   }
