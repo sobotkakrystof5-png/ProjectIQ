@@ -3,12 +3,14 @@ import { verifyBearerApiKey, verifyCronSecret } from '@/lib/api-auth'
 import { processDueReminders } from '@/lib/admin/meeting-reminders'
 import { sendOverdueInvites } from '@/lib/admin/meetings'
 
-// Připomínky schůzek e-mailem a SMS (R-137). Volá ho **každou minutu externí
-// cron** (cron-job.org), protože Vercel Hobby pustí vlastní cron jen jednou
-// denně (R-006). Vlastní klíč `MEETING_REMINDERS_SECRET`: kdyby u třetí
-// strany unikl, umí jen poslat připomínky, kterým už nadešel čas — nic, co
-// hlídá `CRON_SECRET` (úklid dat, výmazy, faktury). `CRON_SECRET` projde
-// taky, ať jde endpoint zavolat i z denního cronu Vercelu.
+// Připomínky schůzek e-mailem a SMS (R-137). Volá ho **každou minutu úloha
+// pg_cron `zakaziq-meeting-reminders` v Supabase** (projekt zakaziq, pg_net),
+// protože Vercel Hobby pustí vlastní cron jen jednou denně (R-006). Vlastní
+// klíč `MEETING_REMINDERS_SECRET` (v Supabase Vault jako
+// `zakaziq_meeting_reminders_secret`): kdyby unikl, umí jen poslat připomínky,
+// kterým už nadešel čas — nic, co hlídá `CRON_SECRET` (úklid dat, výmazy,
+// faktury). `CRON_SECRET` projde taky, ať jde endpoint zavolat i z denního
+// cronu Vercelu.
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60

@@ -20,7 +20,7 @@ import { createNotification } from '@/lib/notifications'
  * odeslání z aktuálního času schůzky, takže přesun termínu stačí promítnout
  * do `send_at` (`planReminders`).
  *
- * Odesílá `processDueReminders`, kterou každou minutu volá externí cron přes
+ * Odesílá `processDueReminders`, kterou každou minutu volá úloha pg_cron v Supabase přes
  * `/api/cron/meeting-reminders` (Vercel Hobby pustí cron jen jednou denně,
  * R-006). Řádek si zamkne jeden UPDATE `pending` → `sending`, takže zpráva
  * neodejde dvakrát ani při dvou souběžných bězích. SMS se nikdy neposílá
@@ -395,7 +395,7 @@ export async function warnIfTriggerStopped(notify: typeof createNotification = c
   await notify({
     type: 'meeting_reminder_failed',
     title: 'Připomínky schůzek teď neodcházejí',
-    body: 'Spouštěč, který je posílá každou minutu, neběží. Zkontrolujte cron-job.org.',
+    body: 'Spouštěč, který je posílá každou minutu, neběží. Zkontrolujte úlohu zakaziq-meeting-reminders v Supabase (pg_cron).',
     link: '/dashboard/calendar',
   })
   return true

@@ -1477,13 +1477,14 @@ klient hned dostane pozvánku z krystof@vizeon.cz (text Kryštof před odeslán�
 10 minut předem SMS; připomínka do 6 h po pozvánce se vynechá. (3) Po přesunu se připomínky
 přepočítají a klient dostane **zprávu o změně** (volba v okně, výchozí zapnutá; asistent ji
 neposílá). (4) **SMS přes Odorik** (účet už je kvůli Growth OS), text bez diakritiky do jedné
-SMS, odesílatel jen „Odorik.cz"/„smsinfo"/„5517". (5) **Spouštěč každou minutu je cron-job.org**
-s vlastním klíčem `MEETING_REMINDERS_SECRET`, Vercel Pro ne. (6) Smazaná schůzka zmizí i z
+SMS, odesílatel jen „Odorik.cz"/„smsinfo"/„5517". (5) **Spouštěč každou minutu je pg_cron v Supabase**
+(úloha `zakaziq-meeting-reminders`, pg_net, klíč `MEETING_REMINDERS_SECRET` z Vault), Vercel Pro ne. (6) Smazaná schůzka zmizí i z
 Google Kalendáře. Potvrzení účasti klientem (stránka schůzky) je další krok, zatím nepostavený.
 **Proč:** Kryštof 2026-11-23: „aby klienti nezapomínali a opravdu jednali", 24 h, hodinu
 a 10 minut předem SMS i e-mailem, zprávu upravit a odeslat; „Vercel Pro není třeba". Kanály
 rozložené tak, aby nepřišlo sedm zpráv (návrh přijat „pojďme na to"). Odložené SMS Odoriku nejdou
-zrušit a naplánované e-maily Resendu by SMS nepokryly — jedna fronta pro obojí.
+zrušit a naplánované e-maily Resendu by SMS nepokryly — jedna fronta pro obojí. cron-job.org bez účtu Kryštofa
+nešlo nastavit z terminálu, Supabase už běží pro přihlášení.
 **Důsledek:** migrace 128 (`meeting_reminders`, `calendar_events.meeting_phone`, `reminders_on`,
 `admin_settings.reminders_tick_at`). **Každá změna času události musí jít přes `updateCalendarEvent`**,
 jinak se Google ani připomínky nepřesunou. Nová zpráva klientovi ke schůzce = nový `kind`
@@ -1494,15 +1495,15 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
 
 ## 3. Otevřené problémy
 
-- [ ] **Připomínky schůzek (R-137) — zapnout a projít naživo:** (1) migrace 128 na produkci,
-  (2) do Vercelu `MEETING_REMINDERS_SECRET` (vygenerovat) a `ODORIK_API_USER` + `ODORIK_API_PASSWORD`
-  (doporučeně údaje **linky**, ne API heslo účtu), volitelně `ODORIK_SMS_SENDER`, (3) na cron-job.org
-  úloha každou minutu: `GET https://www.zakaziq.cz/api/cron/meeting-reminders`, hlavička
-  `Authorization: Bearer <MEETING_REMINDERS_SECRET>`, (4) deploy, (5) zkušební schůzka na vlastní
+- [ ] **Připomínky schůzek (R-137) — zbývá nasadit, SMS a projít naživo:** ~~migrace 128 a 120
+  na produkci~~ (2026-11-23 přes Neon, v evidenci), ~~`MEETING_REMINDERS_SECRET` ve Vercelu~~,
+  ~~spouštěč~~ (pg_cron `zakaziq-meeting-reminders` v Supabase, každou minutu, klíč z Vault).
+  Zbývá: (1) **push větve `admin/schuzky-pripominky` na `main`** (agentovi zamítnuto oprávněním),
+  (2) `ODORIK_API_USER` + `ODORIK_API_PASSWORD` do Vercelu (doporučeně údaje **linky**, ne API heslo
+  účtu) a redeploy — do té doby jdou připomínky jen e-mailem, (3) zkušební schůzka na vlastní
   e-mail a telefon za ~70 minut: pozvánka s `.ics`, připomínka hodinu a 10 minut předem, přesun
-  (zpráva o změně, čas v Googlu), smazání (zmizí z Googlu). **Nic z toho nikdo nezkusil naživo;**
-  ověřeno jen testy nad PGlite s podstrčeným Googlem, Resendem a Odorikem. Cenu SMS Odoriku
-  zjistit v jeho ceníku. Kryštof · od 2026-11-23
+  (zpráva o změně, čas v Googlu), smazání (zmizí z Googlu). **Naživo nic nezkoušeno.** Cenu SMS
+  Odoriku zjistit v jeho ceníku · Kryštof · od 2026-11-23
 - [ ] **Potvrzení účasti na schůzce (R-137, další krok):** stránka schůzky s „Potvrdit účast /
   Potřebuji jiný termín" a upozorněním „nepotvrdil, zavolej mu". Nepostaveno; v pozvánce je zatím
   „odpovězte na e-mail" · od 2026-11-23
@@ -1930,8 +1931,8 @@ ve frontě a text v `lib/admin/meeting-email.ts`, ne vlastní odesílání. Měn
   `components/SmartCalendar.tsx`, `components/admin/schedule-meeting-dialog.tsx`, migrace 128 (aplikována: ne).
 - **feat** SMS přes Odorik (`POST /api/v1/sms`, ověřeno v jeho dokumentaci 2026-11-23): text bez
   diakritiky do 160 znaků, odesílatel do ČR jen Odorik.cz / smsinfo / 5517. Odložené SMS Odoriku
-  se nepoužívají (nejdou zrušit). Spouštěč každou minutu = cron-job.org s `MEETING_REMINDERS_SECRET`
-  (Vercel Pro Kryštof nechce).
+  se nepoužívají (nejdou zrušit). Spouštěč každou minutu = pg_cron `zakaziq-meeting-reminders`
+  v Supabase (pg_net, klíč `MEETING_REMINDERS_SECRET` z Vault); Vercel Pro Kryštof nechce.
 - **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-pripominky.test.ts` (29 testů
   nad PGlite se SQL 114, 115, 128), všechny testy adminu (473), `npm run build:check` (napoprvé ho
   shodily staré typy v `.next/dev/types` po smazané dočasné stránce `app/ukazka-schuzka-tmp`;
