@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-23 — review: sloučení ochrany XSS/DDoS (R-138) a šablony e-mailu s fakturou (R-139) do `main`
+Spouštěč: před deployem (`web-security-review`)
+Rozsah: diff `6e6f9d0..9ac592e` — brána v `proxy.ts` (pořadí s novým Supabase `portal()`), `lib/security/{html,client-ip,memory-limiter,semaphore,front-gate,request-body}.ts`, routy přepisu hlasu a `invoices/parse` (`readFormDataLimited`), e-maily (`lib/email.ts`, Workspace `layout.ts`, schůzky, dotazník, konzultace, etapy, pozvánka, chat), akce `getInvoiceEmailTemplate`/`saveInvoiceEmail`, formulář a náhled šablony, migrace 129, tajemství v diffu.
+Výsledek: 0 nálezů k opravě před nasazením.
+Nálezy: žádné zneužitelné. Při převedení na `main` našel `xss-guard.test.ts` čtyři nové vlastní kopie escapování z klientského prostoru (`consultation-email`, `phase-email`, `portal/invite-email`, `admin/chat.ts`); tři úplné, v chatu chyběl apostrof — atributy jsou ve dvojitých uvozovkách, takže zneužít to nešlo. Semafor na Chromium by při synchronní výjimce úlohy nechal místo obsazené.
+Opraveno: všechny čtyři kopie nahrazené `lib/security/html.ts`; semafor uvolní místo i při synchronní výjimce (test). Náhled šablony se vykresluje jako text v JSX, akce ověřují přihlášení a Zod s délkami, předmět je jeden řádek, hodnoty (i `{odberatel}` z veřejné poptávky) escapuje `linkifyHtml`. Webhooky (`/api/stripe`, `/api/clerk`, `/api/public/*`) do brány v `proxy.ts` nespadají (matcher), takže je nezastaví. V diffu žádné tajemství ani `NEXT_PUBLIC_`.
+Zůstává: Vercel WAF (R-138, STATE.md); brána je v paměti instance, takže při škálování platí strop na instanci (DECISIONS #050).
+
 ## 2026-11-23 — review: upgrade Next.js 16.4.2 → 16.4.6
 Spouštěč: `npm audit` a `next build` (`SecurityFatalError`) hlásily zranitelný Next; zadání Kryštofa „upgradovat a zabezpečit"
 Rozsah: `package.json`, `package-lock.json`; ověření celého repa podle R-053 a B12.
