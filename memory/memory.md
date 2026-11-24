@@ -2,7 +2,14 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-24 · **Jeden klient, jedny údaje** (R-141): kontakt je jediný
+> **Poslední aktualizace:** 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
+> náležitosti českého dokladu (údaj o zápisu, datum plnění, značka VIZEON, „Vystaveno v systému ZakazIQ" na
+> každé stránce) a před vystavením se vybírá druh — za celé dílo, zálohová, částečná, finální — s procentem
+> z ceny zakázky a pruhem zaplaceno / čeká / zbývá. **Na produkci od 2026-11-24 (`aaa3215`) i s migracemi
+> 131–133**; profil dodavatele přepsaný na skutečné údaje, **chybí IBAN** (bez něj faktura nemá účet ani QR).
+> Za přihlášením nikdo neviděl.
+>
+> Předchozí: 2026-11-24 · **Jeden klient, jedny údaje** (R-141): kontakt je jediný
 > zdroj e-mailu a telefonu klienta. Firma od AI asistenta, která řekla ano, dostane kontakt; oprava
 > v Kontaktech nebo v Hovorech se propíše do Hovorů, zakázek a budoucích schůzek (i SMS připomínky)
 > a okno události má našeptávač z Kontaktů. **Na produkci od 2026-11-24 (`44aa2e4`) i s migrací 130**
@@ -1568,12 +1575,6 @@ asistenta čte údaje přes `outreachContactOverlay`. Sloučení kontaktů propi
 (sloučení jde vrátit, propis ne). Uzavírá otevřený problém „Nový kontakt v Hovorech se na `contacts`
 nenapojuje". Strana Growth OS: nadiktovaný e-mail (`email_jiny`) musí jít do `leads.email`, jinak ho ZakazIQ
 nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md`. Bezpečnost DECISIONS #051.
----
-
-## 3. Otevřené problémy
-
-- [ ] **Jeden klient, jedny údaje (R-141) — projít naživo:** kód i migrace 130 jsou na produkci od 2026-11-24.
-  Projít: firma od asistenta se souhlasem má v detailu
 
 ### R-142 · Faktura splňuje povinné náležitosti, nese značku VIZEON a vždy „Vystaveno v systému ZakazIQ" (2026-11-24)
 **Rozhodnutí:** (1) Každá faktura z ZakazIQ (admin, Workspace, klientský prostor) obsahuje všechny povinné
@@ -1612,20 +1613,19 @@ nepřipravuje" — s migrací 132 vznikne finální koncept na zbytek. Nová ces
 `prepareKindIssue`, jinak se druh neuloží. Technika `docs/admin/AGENTS-ADMIN.md` → „Druh faktury a rozpis ceny
 zakázky (R-143)", DECISIONS #042 doplnění.
 
-  „Upravit telefon a e-mail", oprava e-mailu v Kontaktech se objeví v Hovorech, v okně schůzky a u budoucí
-  schůzky; okno události v kalendáři našeptá kontakt a vyplní telefon i e-mail (390 a 1280 px, Escape zavře
-  jen našeptávač). Ověřeno jen testy nad PGlite, `tsc` a buildem · od 2026-11-24
-- [ ] **Growth OS neposílá e-mail nadiktovaný v hovoru:** `email_jiny` jde do e-mailu s ukázkou, ale ne do
+---
+
+## 3. Otevřené problémy
+
 - [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
   skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
   Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
   dodavatele · Kryštof · od 2026-11-24
-- [ ] **Faktury R-142 a R-143 — ověřit po nasazení:** migrace 131–133 jsou na produkci od 2026-11-24, kód jde
-  na `main`. Po deployi zkontrolovat build a běhové chyby a projít Faktury › Nová faktura za přihlášením
+- [ ] **Faktury R-142 a R-143 — projít naživo:** na produkci od 2026-11-24 (`aaa3215`, migrace 131–133).
+  Formulář a pruh ověřené jen na dočasné stránce s vymyšlenými daty (1280 a 390 px), logika testy nad PGlite.
+  Projít za přihlášením: Údaje dodavatele (doplnit IBAN), zakázka s cenou → Zálohová 30 % → zaplatit →
+  Částečná → Finální, PDF všech tří, karta Platby za zakázku, koncept po přepnutí zakázky na Hotovo
   · od 2026-11-24
-- [ ] **Druh faktury (R-143) — projít naživo:** formulář a pruh ověřené jen na dočasné stránce s vymyšlenými
-  daty (1280 a 390 px), logika testy nad PGlite. Projít za přihlášením: zakázka s cenou → Zálohová 30 % →
-  zaplatit → Částečná → Finální, PDF všech tří, koncept po přepnutí zakázky na Hotovo · od 2026-11-24
 - [ ] **Workspace: údaj o zápisu na faktuře chybí:** profil Workspace (`ws.accounts.invoice_profile`, Nastavení ›
   Firma a fakturace) pole `registry` nemá, faktury firem z Workspace proto § 435 OZ nesplní. Doplnit pole
   a povinnost jako v adminu · `lib/ws/money/{schema,data}.ts` · od 2026-11-24
@@ -1633,6 +1633,12 @@ zakázky (R-143)", DECISIONS #042 doplnění.
   v eurech a kurz neukládáme. Admin (Kryštof je neplátce) se netýká, Workspace ano — zakázat EUR plátci, nebo
   ukládat kurz ČNB · od 2026-11-24
 
+- [ ] **Jeden klient, jedny údaje (R-141) — projít naživo:** kód i migrace 130 jsou na produkci od 2026-11-24.
+  Projít: firma od asistenta se souhlasem má v detailu
+  „Upravit telefon a e-mail", oprava e-mailu v Kontaktech se objeví v Hovorech, v okně schůzky a u budoucí
+  schůzky; okno události v kalendáři našeptá kontakt a vyplní telefon i e-mail (390 a 1280 px, Escape zavře
+  jen našeptávač). Ověřeno jen testy nad PGlite, `tsc` a buildem · od 2026-11-24
+- [ ] **Growth OS neposílá e-mail nadiktovaný v hovoru:** `email_jiny` jde do e-mailu s ukázkou, ale ne do
   `leads.email`, a v datech z hovoru je zakrytý. Zadání pro autopilota
   `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md` · od 2026-11-24
 - [ ] **Kontakty z Growth OS bez retence:** firma, která řekla ano, má od R-141 kontakt (`source = 'growth-os'`);
@@ -2021,12 +2027,6 @@ zakázky (R-143)", DECISIONS #042 doplnění.
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
-### 2026-11-24 (komu pozvánka na schůzku odešla — značky v kalendáři)
-- **feat** Kalendář adminu u každé události s klientem ukazuje, jestli dostal pozvánku: fajfka
-  „Pozvánka odešla", hodiny „se odesílá", červená obálka „neodešla", oranžová „Bez pozvánky"
-  (nadcházející událost s kontaktem nebo Meetem bez odeslané pozvánky). Nad kalendářem souhrn
-  za nadcházející schůzky zobrazeného období, v detailu kdy a kam pozvánka odešla a u „Bez
-  pozvánky" tlačítko „Poslat pozvánku" (úprava s předvoleným Meetem). Stejně v Dnes a Hovorech
 ### 2026-11-24 (druh faktury a zbývá doplatit — R-143)
 - **feat** Před vystavením se vybírá druh faktury: za celé dílo, zálohová (30 %), částečná (procento z ceny),
   finální (všechno, co zbývá). Pruh zaplaceno / čeká na zaplacení / zbývá vyfakturovat ve formuláři a nová karta
@@ -2045,7 +2045,10 @@ zakázky (R-143)", DECISIONS #042 doplnění.
   `admin-faktury-druhy.test.ts` (23 testů), testy faktur, prostoru a hlídání XSS/tříd 37 souborů / 494 testů,
   tři PDF prohlédnuté okem, formulář na dočasné stránce 1280 a 390 px (stránka smazaná). Celá sada 1797 prošlo /
   4 selhaly: `ws-email` (pevné datum, známé) a tři časové limity či limit požadavků pod zátěží, samostatně 60/60.
-  `npm run build` prošel.
+  `npm run build` prošel. Bezpečnostní review bez nálezu (AUDIT-LOG).
+- **chore** **Na produkci** 2026-11-24: commit `aaa3215`, nasazení `dpl_26Ns…` Ready (`fra1`), `www.zakaziq.cz`
+  na něm. Ověřeno veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard` a
+  `/dashboard/faktury/nova` 307, `/p/<nesmysl>` 404, cron 401; 30 min bez běhových chyb. Za přihlášením neověřeno.
 - **decision** **R-143**, DECISIONS #042 doplnění.
 
 ### 2026-11-24 (faktura s povinnými údaji a značkou VIZEON — R-142)
@@ -2067,6 +2070,12 @@ zakázky (R-143)", DECISIONS #042 doplnění.
   plátce se dvěma sazbami, 34 položek na 3 stránkách). Za přihlášením v adminu neověřeno, necommitnuto.
 - **decision** **R-142**, doplnění DECISIONS #042.
 
+### 2026-11-24 (komu pozvánka na schůzku odešla — značky v kalendáři)
+- **feat** Kalendář adminu u každé události s klientem ukazuje, jestli dostal pozvánku: fajfka
+  „Pozvánka odešla", hodiny „se odesílá", červená obálka „neodešla", oranžová „Bez pozvánky"
+  (nadcházející událost s kontaktem nebo Meetem bez odeslané pozvánky). Nad kalendářem souhrn
+  za nadcházející schůzky zobrazeného období, v detailu kdy a kam pozvánka odešla a u „Bez
+  pozvánky" tlačítko „Poslat pozvánku" (úprava s předvoleným Meetem). Stejně v Dnes a Hovorech
   (tentýž `SmartCalendar`). Bez migrace, čte `invite_status` z 115. „Odešla" = převzal Resend,
   doručení do schránky se nesleduje. Soubory: `lib/admin/invite-mark.ts`,
   `components/SmartCalendar.tsx`, `components/AdminEventModal.tsx`, `docs/admin/AGENTS-ADMIN.md`,
