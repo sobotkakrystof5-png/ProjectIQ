@@ -14,9 +14,14 @@ export function formatCurrency(amount: number | null): string {
   }).format(amount)
 }
 
+// Datum a čas v adminu vždy v pražské zóně, ne v zóně serveru: Vercel běží
+// v UTC a bez `timeZone` ukazoval čas o 1–2 h vedle a kolem půlnoci i jiný
+// den (audit 2026-11-24, #13). Samotné datum `YYYY-MM-DD` je půlnoc UTC, tedy
+// v Praze pořád týž den.
 export function formatDate(date: string | Date | null): string {
   if (!date) return '—'
   return new Intl.DateTimeFormat('cs-CZ', {
+    timeZone: 'Europe/Prague',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -26,6 +31,7 @@ export function formatDate(date: string | Date | null): string {
 export function formatDateTime(date: string | Date | null): string {
   if (!date) return '—'
   return new Intl.DateTimeFormat('cs-CZ', {
+    timeZone: 'Europe/Prague',
     day: 'numeric',
     month: 'short',
     year: 'numeric',

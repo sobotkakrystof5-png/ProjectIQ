@@ -22,8 +22,13 @@ export function ChatLive({
 }) {
   const router = useRouter()
   const etag = useRef<string | null>(null)
+  // Vlastní „přečteno" otisk nemění (audit 2026-11-24, #11), takže odznaky
+  // nepřečtených po otevření vlákna obnoví jedno obnovení stránky — jednou na vlákno.
+  const unreadRef = useRef(unread)
+  const refreshedFor = useRef<string | null>(null)
 
   useEffect(() => {
+    unreadRef.current = unread
     const base = document.title.replace(/^\(\d+\+?\)\s/, '')
     document.title = unread > 0 ? `(${unread > 99 ? '99+' : unread}) ${base}` : base
     return () => {
@@ -37,7 +42,13 @@ export function ChatLive({
 
     async function tick() {
       if (stopped || !visible()) return
-      if (projectId && touch) await touch(projectId, true).catch(() => {})
+      if (projectId && touch) {
+        const read = await touch(projectId, true).then(() => true, () => false)
+        if (read && unreadRef.current > 0 && refreshedFor.current !== projectId) {
+          refreshedFor.current = projectId
+          router.refresh()
+        }
+      }
       try {
         const res = await fetch(stateUrl, {
           headers: etag.current ? { 'If-None-Match': etag.current } : {},

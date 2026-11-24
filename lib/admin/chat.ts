@@ -103,11 +103,21 @@ export async function loadAdminThread(projectId: string): Promise<AdminThread | 
   }
 }
 
-/** Otisk schránky: nová zpráva kdekoli, schválení, přečteno. */
+/**
+ * Otisk schránky: nová zpráva kdekoli, schválení, a kolik mých zpráv klient
+ * přečetl (dvě fajfky). Vlastní „přečteno" sem nepatří a ani samotný čas
+ * čtení druhé strany: otevřený chat ho přepisuje každým tikem, takže by se
+ * otisk měnil každých 10 s a stránka se pořád obnovovala (audit 2026-11-24, #11).
+ */
 export async function adminChatStamp(): Promise<string> {
   const [messages, reads] = await adminDb.batch([
     { text: `SELECT count(*)::int AS n, max(updated_at) AS u FROM portal.messages`, params: [] },
-    { text: `SELECT count(*)::int AS n, max(last_read_at) AS r FROM portal.thread_state`, params: [] },
+    {
+      text: `SELECT count(*)::int AS r FROM portal.messages m
+             JOIN portal.thread_state ts ON ts.project_id = m.project_id AND ts.side = 'client'
+             WHERE m.author = 'admin' AND m.created_at <= ts.last_read_at`,
+      params: [],
+    },
   ])
   return chatEtag(['admin', messages[0], reads[0]])
 }
