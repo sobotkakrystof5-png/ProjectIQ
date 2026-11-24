@@ -232,6 +232,17 @@ describe('akce Kryštofa', () => {
     expect((await loadOutreachQueue(NOW)).rows).toHaveLength(0)
   })
 
+  it('dvojklik na převzetí založí v Hovorech jen jeden kontakt (audit #23)', async () => {
+    await ingestOutreachLeads([lead()])
+    const [row] = (await loadOutreachQueue(NOW)).rows
+
+    const [a, b] = await Promise.all([takeOverOutreachLead(row.id), takeOverOutreachLead(row.id)])
+    expect(a.ok && b.ok).toBe(true)
+    expect(a).toEqual(b)
+    const n = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM client_leads`)
+    expect(n.rows[0].n).toBe(1)
+  })
+
   it('„Nemá zájem" schová, „Zpět" vrátí a nová odpověď na e-mail ho vrátí sama', async () => {
     await ingestOutreachLeads([lead()])
     const [row] = (await loadOutreachQueue(NOW)).rows

@@ -25,8 +25,11 @@ vi.mock('@/lib/email', () => ({ sendPlainEmail: vi.fn() }))
 vi.mock('@/lib/admin/leads', () => ({ loadLeadNotes: vi.fn() }))
 vi.mock('@/lib/admin/contacts', () => ({ ensureContact: vi.fn(async () => null) }))
 vi.mock('@/app/actions', () => ({ notifyClientOfProjectChange: vi.fn() }))
+const googleDeleted: string[] = []
+vi.mock('@/lib/admin/google/calendar', () => ({ deleteGoogleEvent: async (id: string) => void googleDeleted.push(id) }))
 
-import { updateLead } from '@/app/calls-actions'
+import { deleteLead, updateLead } from '@/app/calls-actions'
+import { sql } from '@/lib/db'
 import type { LeadPayload } from '@/app/calls-actions'
 
 const ROOT = path.resolve(__dirname, '../..')
@@ -349,5 +352,58 @@ describe('rezervace z portálu', () => {
       `SELECT calendar_event_id::text AS event_id FROM consultation_slots WHERE id = $1`, [slotId],
     )
     expect(row.event_id).toBeNull()
+  })
+})
+
+describe('smazání kontaktu v Hovorech (audit 2026-11-24, #9)', () => {
+  beforeEach(() => {
+    googleDeleted.length = 0
+    vi.mocked(sql).mockImplementation((async (strings: TemplateStringsArray, ...params: unknown[]) => {
+      const text = strings.reduce((acc, part, i) => acc + part + (i < params.length ? `$${i + 1}` : ''), '')
+      return (await db.query(text, params as unknown[])).rows
+    }) as never)
+  })
+
+  it('smaže kontakt i termín a schůzku s Meetem pak i v Googlu', async () => {
+    await db.exec(`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS google_event_id text`)
+    const event = await one<{ id: string }>(`
+      INSERT INTO calendar_events (title, starts_at, ends_at, google_event_id)
+      VALUES ('Schůzka s Janou', '2026-12-02T09:00:00Z', '2026-12-02T10:00:00Z', 'g-123') RETURNING id::text AS id
+    `)
+    const lead = await one<{ id: string }>(`
+      INSERT INTO client_leads (company_name, calendar_event_id) VALUES ('Kavárna Ukázková', $1) RETURNING id::text AS id
+    `, [event.id])
+
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    try {
+      await deleteLead(lead.id)
+      await vi.advanceTimersByTimeAsync(10_000)
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect((await one<{ n: number }>(`SELECT count(*)::int AS n FROM client_leads`)).n).toBe(0)
+    expect((await one<{ n: number }>(`SELECT count(*)::int AS n FROM calendar_events`)).n).toBe(0)
+    expect(googleDeleted).toEqual(['g-123'])
+  })
+
+  it('zrcadlovou událost konzultace nechá rezervaci', async () => {
+    const project = await one<{ id: string }>(`INSERT INTO projects (client_name) VALUES ('Jana') RETURNING id::text AS id`)
+    const slot = await one<{ id: string }>(`
+      INSERT INTO consultation_slots (project_id, scheduled_at) VALUES ($1, '2026-12-03T09:00:00Z') RETURNING id::text AS id
+    `, [project.id])
+    const event = await one<{ id: string }>(`
+      INSERT INTO calendar_events (title, starts_at, ends_at, consultation_slot_id)
+      VALUES ('Konzultace', '2026-12-03T09:00:00Z', '2026-12-03T10:00:00Z', $1) RETURNING id::text AS id
+    `, [slot.id])
+    const lead = await one<{ id: string }>(`
+      INSERT INTO client_leads (company_name, calendar_event_id) VALUES ('Jana', $1) RETURNING id::text AS id
+    `, [event.id])
+
+    await deleteLead(lead.id)
+
+    expect((await one<{ n: number }>(`SELECT count(*)::int AS n FROM client_leads`)).n).toBe(0)
+    expect((await one<{ n: number }>(`SELECT count(*)::int AS n FROM calendar_events WHERE id = $1`, [event.id])).n).toBe(1)
+    expect(googleDeleted).toEqual([])
   })
 })

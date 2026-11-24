@@ -433,6 +433,22 @@ describe('přesun a nastavení', () => {
 })
 
 describe('odesílání', () => {
+  it('zabírá po jedné: co se do běhu nevejde, zůstane čekat, nic neuvízne ve „sending" (audit #26)', async () => {
+    const result = await scheduleCalendarMeeting(meetingInput(inDays(3)), deps)
+    if (!result.ok) throw new Error(result.error)
+    await makeDue(result.eventId, 'h24')
+
+    // Strop počtu: jen jedna zpráva, druhá počká na další běh.
+    expect(await processDueReminders({ mail, sms, notify, limit: 1 })).toEqual({ sent: 1, failed: 0, skipped: 0 })
+    const statuses = async () => (await reminders(result.eventId)).filter((r) => r.kind === 'h24').map((r) => r.status).sort()
+    expect(await statuses()).toEqual(['pending', 'sent'])
+    // Vyčerpaný čas: nezabere nic.
+    expect(await processDueReminders({ mail, sms, notify, budgetMs: 0 })).toEqual({ sent: 0, failed: 0, skipped: 0 })
+    expect(await statuses()).toEqual(['pending', 'sent'])
+    expect(await processDueReminders({ mail, sms, notify })).toEqual({ sent: 1, failed: 0, skipped: 0 })
+    expect(await statuses()).toEqual(['sent', 'sent'])
+  })
+
   it('pošle, co je na řadě, a podruhé nic', async () => {
     const result = await scheduleCalendarMeeting(meetingInput(inDays(3)), deps)
     if (!result.ok) throw new Error(result.error)

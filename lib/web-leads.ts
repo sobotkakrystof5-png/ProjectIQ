@@ -113,19 +113,21 @@ export function bookingPostHandler(origin: LeadOrigin) {
     const endsAtISO = new Date(new Date(scheduledAtISO).getTime() + 60 * 60 * 1000).toISOString()
 
     try {
-      const projectRows = await sql`
-        INSERT INTO projects (client_name, client_email, client_phone, service_type, description, status, source, lead_origin)
-        VALUES (${data.clientName}, ${data.clientEmail}, ${data.clientPhone ?? null}, ${data.projectType}, ${data.message ?? null}, 'new', ${cfg.source}, ${origin})
-        RETURNING id
-      `
-      const projectId = (projectRows[0] as { id: string }).id
-
-      const eventRows = await sql`
+      // Jeden příkaz: zakázka i termín vzniknou spolu, nebo vůbec. Dřív to byly
+      // dva INSERTy a při obsazeném termínu (23P01) zůstala v Poptávkách
+      // zakázka bez termínu, po dalším pokusu i dvakrát (audit 2026-11-24, #7).
+      const rows = await sql`
+        WITH new_project AS (
+          INSERT INTO projects (client_name, client_email, client_phone, service_type, description, status, source, lead_origin)
+          VALUES (${data.clientName}, ${data.clientEmail}, ${data.clientPhone ?? null}, ${data.projectType}, ${data.message ?? null}, 'new', ${cfg.source}, ${origin})
+          RETURNING id
+        )
         INSERT INTO calendar_events (title, description, starts_at, ends_at, event_type, project_id, lead_origin)
-        VALUES (${`Poptávka: ${data.clientName} (${data.projectType})`}, ${data.message ?? null}, ${scheduledAtISO}, ${endsAtISO}, 'manual', ${projectId}, ${origin})
-        RETURNING id
+        SELECT ${`Poptávka: ${data.clientName} (${data.projectType})`}, ${data.message ?? null}, ${scheduledAtISO}, ${endsAtISO}, 'manual', new_project.id, ${origin}
+        FROM new_project
+        RETURNING id::text AS id, project_id::text AS project_id
       `
-      const eventId = (eventRows[0] as { id: string }).id
+      const { id: eventId, project_id: projectId } = rows[0] as { id: string; project_id: string }
 
       // Web klienta na nic z toho nečeká (AD08): Gmail SMTP trvá stovky
       // milisekund až sekundy a poptávka je přitom už uložená. `after()`

@@ -252,7 +252,7 @@ async function deliver(row: Claimed, now: Date, senders: Required<ReminderSender
  * a denní cron jako pojistku. Zapíše čas běhu do `admin_settings`.
  */
 export async function processDueReminders(
-  options: { now?: Date; limit?: number } & ReminderSenders = {},
+  options: { now?: Date; limit?: number; budgetMs?: number } & ReminderSenders = {},
 ): Promise<TickResult> {
   const senders: Required<ReminderSenders> = {
     mail: options.mail ?? sendVizeonMail,
@@ -260,9 +260,11 @@ export async function processDueReminders(
     notify: options.notify ?? createNotification,
   }
   const limit = Math.min(Math.max(options.limit ?? 25, 1), 100)
+  // Běh smí trvat 60 s a jedno odeslání čeká až 10 s. Novou zprávu proto
+  // zabírá jen do 40 s, ať poslední odeslání i pojistka pozvánek doběhnou.
+  const deadline = Date.now() + (options.budgetMs ?? 40_000)
   const result: TickResult = { sent: 0, failed: 0, skipped: 0 }
 
-  let claimed: Claimed[]
   try {
     // Zpráva, která zůstala viset rozeslaná napůl (spadlá funkce), se znovu
     // neposílá — u SMS by mohla přijít dvakrát. Kryštof uvidí, že neodešla.
@@ -271,15 +273,27 @@ export async function processDueReminders(
          SET status = 'failed', error = 'Nejisté, jestli odešla. Odesílání se přerušilo.', updated_at = now()
        WHERE status = 'sending' AND updated_at < now() - interval '10 minutes'
     `
-    claimed = await adminDb<Claimed>`
+  } catch (err) {
+    if (isMissingSchema(err)) return result
+    throw err
+  }
+
+  // Zabírá se **po jedné**. Dřív se zamklo deset zpráv najednou, a když
+  // poskytovatel zpomalil, zbytek zůstal ve `sending` a po deseti minutách
+  // skončil jako „nejisté, jestli odešla" (audit 2026-11-24, #26). Co už tenhle
+  // běh zkusil (opakovaný pokus), další zábor vynechá — zkusí ho až příští běh.
+  const touched: string[] = []
+  const claimNext = async (): Promise<Claimed | null> => {
+    const rows = await adminDb<Claimed>`
       UPDATE meeting_reminders r
          SET status = 'sending', attempts = r.attempts + 1, updated_at = now()
         FROM calendar_events e
        WHERE r.id IN (
                SELECT id FROM meeting_reminders
                 WHERE status = 'pending' AND send_at <= now()
+                  AND NOT (id::text = ANY (string_to_array(${touched.join(',')}, ',')))
                 ORDER BY send_at
-                LIMIT ${limit}
+                LIMIT 1
                 FOR UPDATE SKIP LOCKED
              )
          AND e.id = r.event_id
@@ -287,12 +301,13 @@ export async function processDueReminders(
                 e.starts_at, e.ends_at, e.title, e.meet_url, e.invite_to, e.meeting_phone,
                 e.invite_demo_url, e.reminders_on
     `
-  } catch (err) {
-    if (isMissingSchema(err)) return result
-    throw err
+    return rows[0] ?? null
   }
 
-  for (const row of claimed) {
+  while (touched.length < limit && Date.now() < deadline) {
+    const row = await claimNext()
+    if (!row) break
+    touched.push(row.id)
     const now = options.now ?? new Date()
     const startsAt = new Date(row.starts_at)
     const recipient = row.channel === 'email' ? row.invite_to : row.meeting_phone
