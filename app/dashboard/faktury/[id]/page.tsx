@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { invoiceTone, toneVariant } from '@/lib/admin-status'
@@ -92,6 +93,7 @@ function aiRows(invoice: InvoiceDetail) {
 }
 
 export default async function InvoiceDetailPage(props: PageProps) {
+  await requireAdminPage()
   const params = await props.params
   const invoice = await getInvoiceDetail(params.id)
   if (!invoice) notFound()

@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { CLIENT_SORT, CLIENTS_PAGE_SIZE, listClients, type ClientList } from '@/lib/ws/admin/clients'
 import { INDUSTRY_TEMPLATES } from '@/lib/ws/templates'
 import { parseTableParams, tableLinks } from '@/lib/admin-table'
@@ -18,6 +19,7 @@ const EMPTY: ClientList = { rows: [], total: 0, byAccess: { none: 0, trialing: 0
 export default async function KlientiPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const params = parseTableParams(searchParams, {
     allowed: CLIENT_SORT,

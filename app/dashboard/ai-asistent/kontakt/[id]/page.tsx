@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
@@ -13,6 +14,7 @@ import { vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
 // ať hovor, který právě skončil, naskočí sám.
 
 export default async function OutreachContactPage(props: { params: Promise<{ id: string }> }) {
+  await requireAdminPage()
   const { id } = await props.params
   const [data, google] = await Promise.all([loadContact(id), googleStatus()])
   if (!data) notFound()

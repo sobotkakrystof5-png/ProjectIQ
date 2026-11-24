@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { ProjectDetailView } from '@/components/admin/project-detail-view'
 
 interface PageProps {
@@ -7,6 +8,7 @@ interface PageProps {
 
 // Detail zakázky VIZEON (KP02): záložky Přehled · Aktivita · Požadavky · Zprávy · Fakturace.
 export default async function ProjectDetailPage(props: PageProps) {
+  await requireAdminPage()
   const [{ id }, { zalozka }] = await Promise.all([props.params, props.searchParams])
   return <ProjectDetailView projectId={id} tabParam={zalozka} />
 }

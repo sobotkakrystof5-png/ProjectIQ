@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
 import { Pagination } from '@/components/admin/pagination'
@@ -29,6 +30,7 @@ const PATH = '/dashboard/calls'
 export default async function CallsPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const focusLead = Array.isArray(searchParams.lead) ? searchParams.lead[0] : searchParams.lead
   const waiting = searchParams.pohled === 'cekani'

@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { sql } from '@/lib/db'
 import { NotificationList } from '@/components/NotificationList'
@@ -16,6 +17,7 @@ export interface Notification {
 }
 
 export default async function NotificationsPage() {
+  await requireAdminPage()
   const rows = await sql`
     SELECT id, type, title, body, link, read, created_at
     FROM notifications

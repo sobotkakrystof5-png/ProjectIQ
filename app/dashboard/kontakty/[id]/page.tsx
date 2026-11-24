@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Plus } from 'lucide-react'
@@ -50,6 +51,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 }
 
 export default async function KontaktPage(props: { params: Promise<{ id: string }> }) {
+  await requireAdminPage()
   const { id } = await props.params
   if (!UUID.test(id)) notFound()
 

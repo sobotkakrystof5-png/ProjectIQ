@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default async function StartupDetailPage(props: Props) {
+  await requireAdminPage()
   const [params, searchParams] = await Promise.all([props.params, props.searchParams])
   const [project, improvements, changelog] = await Promise.all([
     getStartupProject(params.id),

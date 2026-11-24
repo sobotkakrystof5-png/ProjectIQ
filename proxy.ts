@@ -86,7 +86,7 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
       url.search = ''
       return applyCookies(NextResponse.redirect(url), cookiesToSet)
     }
-    // Druhý faktor a platnost hlídá ještě `getAdminSession()` na stránce samé.
+    // Druhý faktor hlídá proxy i `requireAdminPage()` na každé stránce (audit 2026-11-24, #2).
     return applyCookies(await withCsp(req), cookiesToSet)
   }
 

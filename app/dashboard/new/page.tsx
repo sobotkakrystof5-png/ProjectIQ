@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { ProjectForm } from '@/components/ProjectForm'
 import { loadProjectPrefill } from '@/lib/admin/memory/prefill'
-import { requireAuth } from '@/lib/auth'
+import { requireAdminPage } from '@/lib/auth'
 import { loadServices } from '@/lib/admin/phases'
 
 /**
@@ -17,7 +17,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export default async function NewProjectPage(props: { searchParams: Promise<{ kontakt?: string }> }) {
   // Stránka od AD15 čte data klienta, ne jen prázdný formulář — přihlášení
   // se proto ověřuje i tady, ne jen v `proxy.ts`.
-  await requireAuth()
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const contactId = typeof searchParams.kontakt === 'string' && UUID.test(searchParams.kontakt)
     ? searchParams.kontakt

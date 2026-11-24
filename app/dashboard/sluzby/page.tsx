@@ -3,7 +3,7 @@ import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { Card, CardHead } from '@/components/admin/card'
 import { ServicesSettings } from '@/components/admin/phases/services-settings'
 import { loadServices } from '@/lib/admin/phases'
-import { requireAuth } from '@/lib/auth'
+import { requireAdminPage } from '@/lib/auth'
 
 export const metadata: Metadata = { title: 'Služby a etapy' }
 
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'Služby a etapy' }
  * a úkoly pro klienta. U nové zakázky se z nich předvyplní etapy s termíny.
  */
 export default async function ServicesPage() {
-  await requireAuth()
+  await requireAdminPage()
   const services = await loadServices()
 
   return (

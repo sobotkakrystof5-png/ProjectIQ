@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { SmartCalendar } from '@/components/SmartCalendar'
 import { loadCalendarWindow } from '@/lib/admin/calendar'
@@ -12,6 +13,7 @@ import { getPragueTodayISO } from '@/lib/prague-time'
 export const revalidate = 0
 
 export default async function CalendarPage() {
+  await requireAdminPage()
   const today = getPragueTodayISO()
   const range = windowFor(today)
   const data = await loadCalendarWindow(range)

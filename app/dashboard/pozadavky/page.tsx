@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { batchTolerant } from '@/lib/admin/db'
 import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { buildTerminalCommand } from '@/lib/claude-code-handoff'
@@ -31,6 +32,7 @@ type JoinedRow = ClientRequestRow & {
 // Požadavky klientů z portálu — jedna fronta pro všechny zakázky.
 // Od AD07 se čte po stránkách a počty u pilulek počítá databáze.
 export default async function PozadavkyPage({ searchParams: raw }: PageProps) {
+  await requireAdminPage()
   const searchParams = await raw
   const showClosed = searchParams.stav === 'vyrizene'
   const params = parseTableParams(searchParams, {

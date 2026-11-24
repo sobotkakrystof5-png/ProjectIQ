@@ -5,7 +5,7 @@ import { getInvoiceProjectOptions, getIssuerSettings } from '@/app/dashboard/fin
 import { loadIssueDraft, type IssueDraft } from '@/lib/admin/invoice-issue'
 import { getDraft, isDraftsReady } from '@/lib/admin/invoice-drafts'
 import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
-import { requireAuth } from '@/lib/auth'
+import { requireAdminPage } from '@/lib/auth'
 import { isInvoiceKind, type InvoiceKind } from '@/lib/admin/invoice-kinds'
 import { isKindsReady, loadProjectBilling } from '@/lib/admin/project-billing'
 
@@ -29,7 +29,7 @@ export const metadata = { title: 'Nová faktura' }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export default async function NewInvoicePage(props: { searchParams: Promise<{ zakazka?: string; koncept?: string; druh?: string }> }) {
-  await requireAuth()
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const projectId = typeof searchParams.zakazka === 'string' && UUID.test(searchParams.zakazka) ? searchParams.zakazka : null
   const conceptId = typeof searchParams.koncept === 'string' && UUID.test(searchParams.koncept) ? searchParams.koncept : null

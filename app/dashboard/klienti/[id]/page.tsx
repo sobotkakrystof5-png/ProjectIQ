@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { notFound } from 'next/navigation'
 import { getClientDetail } from '@/lib/ws/admin/clients'
 import { ClientDetailView } from './detail-view'
@@ -7,6 +8,7 @@ import { ClientDetailView } from './detail-view'
 export const dynamic = 'force-dynamic'
 
 export default async function KlientDetailPage(props: { params: Promise<{ id: string }> }) {
+  await requireAdminPage()
   const params = await props.params
   const client = await getClientDetail(params.id)
   if (!client) notFound()
