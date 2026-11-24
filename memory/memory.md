@@ -2017,8 +2017,9 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
   a upozorní na jiné číslo u téhož e-mailu. Soubory: `lib/admin/contact-phone.ts`,
   `app/meeting-actions.ts` (`findClientPhone`), `components/AdminEventModal.tsx`, test
   `lib/__tests__/admin-telefon-podle-emailu.test.ts` (7). Ověřeno: test, `tsc`, dotazy jen
-  pro čtení na produkčním schématu. V prohlížeči neověřeno, nenasazeno, necommitnuto (strom
-  je na `main` spolu s rozdělaným R-141 jiného sezení).
+  pro čtení na produkčním schématu. **Na produkci od 2026-11-24 (`44aa2e4`)** spolu s R-140
+  a R-141; v prohlížeči neověřeno. Den předem ke schůzce 25. 11. v 17:00 odešel e-mail v čas;
+  první SMS přes Odorik vůbec půjde 25. 11. v 17:00 (schůzka 26. 11.).
 
 ### 2026-11-23 (schůzky přes Google Meet fialově — R-140)
 - **feat** Okno „Událost / schůzka": volba „Schůzka přes Google Meet? Ne / Ano" hned pod typem
