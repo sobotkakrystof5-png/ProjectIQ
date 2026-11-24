@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Loader2, CalendarPlus, Lock, CalendarClock, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,11 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
+import { ContactPicker, keepDialogForPicker } from '@/components/admin/contact-picker'
 import { createCalendarEvent, createClientAvailability, updateCalendarEvent } from '@/app/calendar-actions'
 import {
   createCalendarMeeting,
+  findClientPhone,
   getMeetingReadiness,
   makeEventMeeting,
   saveMeetingSettings,
@@ -22,6 +23,8 @@ import {
   type MeetingReadiness,
 } from '@/app/meeting-actions'
 import { calendarIntro, defaultSubject } from '@/lib/admin/meeting-email'
+import type { PhoneSource } from '@/lib/admin/contact-phone'
+import { normalizeEmail } from '@/lib/contacts/normalize'
 import { CONSULTATION_DEFAULT_MINUTES, CONSULTATION_SLOT_MINUTES } from '@/lib/consultations/rules'
 import { cn } from '@/lib/utils'
 import { getPragueTodayISO, isoToPragueDateAndTime, parsePragueDatetimeLocalToISO } from '@/lib/prague-time'
@@ -119,6 +122,15 @@ function safeIso(local: string): string | null {
   }
 }
 
+/** Odkud se vzal telefon doplněný podle e-mailu. */
+const PHONE_SOURCE_LABEL: Record<PhoneSource, string> = {
+  contacts: 'z Kontaktů',
+  calls: 'z Hovorů',
+  outreach: 'od AI asistenta',
+  projects: 'ze zakázky',
+  agent: 'z AI leadu',
+}
+
 /** Co klient dostane, podle toho, jestli je telefon a jestli jsou SMS nastavené. */
 function remindersPlanText(hasPhone: boolean, smsReady: boolean): string {
   if (hasPhone && smsReady) return 'Den předem e-mail a SMS, hodinu předem e-mail, 10 minut předem SMS.'
@@ -181,10 +193,44 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
     if (eventType !== 'manual' || readiness) return
     let alive = true
     getMeetingReadiness()
-      .then((r) => { if (alive) setReadiness(r) })
-      .catch(() => {})
+      .then((r) => {
+        if (!alive) return
+        setReadiness(r)
+        if (!r.available) setMeetingOn(false)
+      })
+      // Bez odpovědi serveru Meet nabídnout nejde; volba „Ano" se zamkne s vysvětlením.
+      .catch((err: unknown) => {
+        console.error('[kalendář] nastavení Google Meet se nenačetlo', err)
+        if (!alive) return
+        setReadiness({ available: false, google: false, mail: false, sms: false, trigger: null })
+        setMeetingOn(false)
+      })
     return () => { alive = false }
   }, [eventType, readiness])
+
+  // ─── Telefon podle e-mailu: bez něj nejdou SMS připomínky, ať se neopisuje ───
+  const [phoneFound, setPhoneFound] = useState<{ phone: string; source: PhoneSource; ambiguous: boolean } | null>(null)
+  // E-mail, pro který už se hledalo — smazaný doplněný telefon se znovu nevrátí.
+  const phoneLookedUp = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (eventType !== 'manual' || phone.trim()) return
+    const key = normalizeEmail(email)
+    if (!key || phoneLookedUp.current === key) return
+    let alive = true
+    const timer = setTimeout(() => {
+      phoneLookedUp.current = key
+      findClientPhone(key)
+        .then((found) => {
+          if (!alive || !found) return
+          // Číslo, které mezitím napsal Kryštof, má přednost.
+          setPhone((current) => (current.trim() ? current : found.phone))
+          setPhoneFound(found)
+        })
+        .catch((err: unknown) => console.error('[kalendář] telefon podle e-mailu se nenačetl', err))
+    }, 400)
+    return () => { alive = false; clearTimeout(timer) }
+  }, [eventType, email, phone])
 
   const startsIso = useMemo(() => safeIso(startsAt), [startsAt])
   const endsIso = useMemo(() => safeIso(endsAt), [endsAt])
@@ -249,7 +295,7 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
       return
     }
     if (settingUp && !canMeet) {
-      setError('Schůzku přes Google Meet teď nejde založit. Podívejte se na upozornění u přepínače.')
+      setError('Schůzku přes Google Meet teď nejde založit. Podívejte se na upozornění pod volbou Google Meet.')
       return
     }
     setError(null)
@@ -345,7 +391,7 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
 
   return (
     <Dialog open onOpenChange={open => { if (!open) close(false) }}>
-      <DialogContent className={settingUp ? 'max-w-lg' : 'max-w-md'}>
+      <DialogContent className={settingUp ? 'max-w-lg' : 'max-w-md'} onEscapeKeyDown={keepDialogForPicker}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <CalendarPlus size={16} strokeWidth={1.5} className="text-navy-600" aria-hidden="true" />
@@ -386,6 +432,48 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
             </button>
           ))}
         </div>}
+
+        {/* Google Meet ano/ne (R-140) — hned pod typem, ať je jasné, o jakou schůzku jde */}
+        {eventType === 'manual' && !existingMeeting && (
+          <div role="group" aria-labelledby="meet-choice-label" className="flex flex-col gap-1.5">
+            <span id="meet-choice-label" className="text-sm font-medium text-ink">Schůzka přes Google Meet?</span>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { on: false, label: 'Ne' },
+                { on: true, label: 'Ano' },
+              ] as const).map(({ on, label }) => {
+                const selected = meetingOn === on
+                const disabled = on && readiness !== null && !readiness.available
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={selected}
+                    disabled={disabled}
+                    onClick={() => setMeetingOn(on)}
+                    className={cn(
+                      'flex min-h-11 items-center justify-center gap-1.5 rounded-chip border px-3 text-sm font-medium transition-colors duration-150',
+                      'disabled:cursor-not-allowed disabled:opacity-50',
+                      selected
+                        ? 'border-navy-400 bg-navy-50 text-navy-800'
+                        : 'border-navy-100 bg-surface text-ink hover:border-navy-200 hover:bg-navy-50/50',
+                    )}
+                  >
+                    {on && <Video size={14} strokeWidth={1.5} aria-hidden="true" />}
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[11px] leading-snug text-quiet">
+              {readiness !== null && !readiness.available
+                ? 'Schůzku přes Google Meet teď nejde založit.'
+                : meetingOn
+                  ? 'Klient dostane pozvánku s odkazem a připomínky. V kalendáři bude fialová.'
+                  : 'Obyčejná událost bez odkazu a bez pozvánky.'}
+            </p>
+          </div>
+        )}
 
         {eventType === 'availability' && (
           <div className="space-y-3">
@@ -474,14 +562,17 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
               Kontakt (nepovinné)
             </p>
             <p className="text-[11px] leading-snug text-quiet">
-              Doplňte telefon nebo e-mail a z Hovorů i z kalendáře pak zavoláte jedním klikem.
+              Začněte psát jméno, firmu nebo telefon a vyberte z Kontaktů. Telefon a e-mail se doplní samy.
             </p>
-            <input
-              type="text"
+            <ContactPicker
               value={contactName}
-              onChange={e => setContactName(e.target.value)}
-              placeholder="Jméno"
-              maxLength={120}
+              onChange={setContactName}
+              onPick={(c) => {
+                setContactName(c.name)
+                // Prázdné pole se doplní, ručně napsané se přepíše jen tím, co kontakt opravdu má.
+                if (c.phone) setPhone(c.phone)
+                if (c.email) setEmail(c.email)
+              }}
               className={inputCls}
             />
             <div className="grid grid-cols-2 gap-2">
@@ -503,6 +594,12 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
                 className={inputCls}
               />
             </div>
+            {phoneFound && phone === phoneFound.phone && (
+              <p className="text-[11px] leading-snug text-quiet" aria-live="polite">
+                Telefon je doplněný podle e-mailu {PHONE_SOURCE_LABEL[phoneFound.source]}.
+                {phoneFound.ambiguous ? ' U klienta je uložené i jiné číslo, zkontrolujte ho.' : ''}
+              </p>
+            )}
           </div>
         )}
 
@@ -541,18 +638,16 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
           </div>
         )}
 
-        {eventType === 'manual' && !existingMeeting && readiness?.available && (
+        {eventType === 'manual' && !existingMeeting && meetingOn && !readiness && (
+          <p className="text-xs text-quiet">Načítám nastavení Google Meet…</p>
+        )}
+
+        {eventType === 'manual' && !existingMeeting && meetingOn && readiness?.available && (
           <div className="flex flex-col gap-3 rounded-chip border border-navy-100 p-3">
-            <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
-              <span className="flex flex-col">
-                <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
-                  <Video size={14} strokeWidth={1.5} aria-hidden="true" className="text-navy-700" />
-                  Schůzka přes Google Meet
-                </span>
-                <span className="text-[11px] leading-snug text-quiet">Klient dostane pozvánku s odkazem a připomínky.</span>
-              </span>
-              <Switch checked={meetingOn} onCheckedChange={setMeetingOn} aria-label="Schůzka přes Google Meet" />
-            </label>
+            <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
+              <Video size={14} strokeWidth={1.5} aria-hidden="true" className="text-navy-700" />
+              Pozvánka pro klienta
+            </p>
 
             {meetingOn && !readiness.google && (
               <p className="text-xs text-quiet">

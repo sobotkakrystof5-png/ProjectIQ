@@ -25,6 +25,7 @@ import { vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
 import { smsConfigured } from '@/lib/admin/sms'
 import { adminDb } from '@/lib/admin/db'
 import { normalizePhone } from '@/lib/contacts/normalize'
+import { findPhoneByEmail, type FoundPhone } from '@/lib/admin/contact-phone'
 import { pragueWallClockToISO } from '@/lib/prague-time'
 
 /**
@@ -161,6 +162,14 @@ export async function getMeetingReadiness(): Promise<MeetingReadiness> {
     sms: smsConfigured(),
     trigger,
   }
+}
+
+/** Telefon klienta podle e-mailu z Kontaktů, Hovorů, zakázek a od asistenta. */
+export async function findClientPhone(email: unknown): Promise<FoundPhone | null> {
+  await requireAuth()
+  const parsed = z.string().trim().max(254).email().safeParse(email)
+  if (!parsed.success) return null
+  return findPhoneByEmail(parsed.data)
 }
 
 const httpsUrl = z

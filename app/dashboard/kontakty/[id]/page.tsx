@@ -26,9 +26,10 @@ const KIND_LABEL: Record<ContactOccurrence['kind'], string> = {
   hovor: 'Hovory',
   konzultace: 'Konzultace',
   poptavka: 'Poptávky z webu',
+  asistent: 'Od AI asistenta',
 }
 
-const KIND_ORDER: ContactOccurrence['kind'][] = ['zakazka', 'hovor', 'konzultace', 'poptavka']
+const KIND_ORDER: ContactOccurrence['kind'][] = ['zakazka', 'hovor', 'konzultace', 'poptavka', 'asistent']
 
 const REASON_LABEL = {
   jmeno: 'stejné jméno',

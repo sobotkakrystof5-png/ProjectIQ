@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { adminDb } from '@/lib/admin/db'
 import { ensureContact } from '@/lib/admin/contacts'
+import { linkOutreachContact, propagateContact, syncOutreachContact } from '@/lib/admin/contact-sync'
 import {
   loadOutreachSource,
   markOutreachHandled,
@@ -36,13 +37,17 @@ export async function takeOverOutreachLead(id: string): Promise<OutreachResult> 
   if (!source) return { ok: false, error: 'Firma nenalezena.' }
   if (source.client_lead_id) return { ok: true, leadId: source.client_lead_id }
 
-  const contactId = await ensureContact({
-    name: source.contact_name ?? source.company_name,
-    company: source.company_name,
-    email: source.email,
-    phone: source.phone,
-    source: 'growth-os',
-  })
+  // Kontakt firmy (R-141): už propojený, jinak podle telefonu a e-mailu, jinak nový.
+  const contactId =
+    source.contact_id ??
+    (await ensureContact({
+      name: source.contact_name ?? source.company_name,
+      company: source.company_name,
+      email: source.email,
+      phone: source.phone,
+      source: 'growth-os',
+    }))
+  if (contactId) await linkOutreachContact(id, contactId)
 
   const callback = source.callback_at
     ? isoToPragueDateAndTime(new Date(source.callback_at).toISOString())
@@ -76,6 +81,13 @@ export async function takeOverOutreachLead(id: string): Promise<OutreachResult> 
   if (!leadId) return { ok: false, error: 'Kontakt se nepodařilo založit.' }
 
   await markOutreachHandled(id, 'prevzato', leadId)
+  if (contactId) {
+    try {
+      await propagateContact(contactId)
+    } catch (err) {
+      console.error('[outreach] doplnění údajů po převzetí selhalo', (err as Error).message)
+    }
+  }
   revalidatePath('/dashboard/calls')
   revalidatePath('/dashboard/ai-asistent')
   revalidatePath('/dashboard/kontakty')
@@ -99,4 +111,19 @@ export async function undoDismissOutreachLead(id: string): Promise<void> {
   await restoreOutreachLead(id)
   revalidatePath('/dashboard/calls')
   revalidatePath('/dashboard/ai-asistent')
+}
+
+/**
+ * „Uložit do Kontaktů" (R-141): firma dostane kontakt (najde se podle telefonu
+ * a e-mailu, jinak nový) a její údaje se propíšou. Vrací id kontaktu, ať jde
+ * rovnou otevřít jeho karta — tam se e-mail a telefon opravují pro všechny.
+ */
+export async function openOutreachContact(id: string): Promise<{ ok: true; contactId: string } | { ok: false; error: string }> {
+  await requireAuth()
+  if (!UUID.test(id)) return { ok: false, error: 'Firma nenalezena.' }
+  const contactId = await syncOutreachContact(id)
+  if (!contactId) return { ok: false, error: 'Kontakt nejde založit: firma nemá telefon ani e-mail.' }
+  revalidatePath('/dashboard/kontakty')
+  revalidatePath(`/dashboard/ai-asistent/kontakt/${id}`)
+  return { ok: true, contactId }
 }

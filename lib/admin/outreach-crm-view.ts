@@ -105,6 +105,8 @@ export type ContactRow = {
 export type ContactDetail = ContactRow & {
   phone: string | null
   email: string | null
+  /** Kontakt v Kontaktech (R-141): telefon a e-mail výš jsou pak z něj. */
+  contactId: string | null
   website: string | null
   segment: string | null
   sourceBatch: string | null
@@ -350,6 +352,8 @@ export function toQueueRow(d: ContactDetail): OutreachQueueRow {
     emailClickedAt: d.emailClickedAt,
     emailRepliedAt: d.emailRepliedAt,
     receivedAt: d.receivedAt,
+    contactId: d.contactId,
+    clientLeadId: d.clientLeadId,
   }
 }
 

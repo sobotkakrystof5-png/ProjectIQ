@@ -1,5 +1,5 @@
 import 'server-only'
-import { adminDb, type AdminQuery } from './db'
+import { adminDb, type AdminQuery, type AdminRow } from './db'
 import { normalizeDic, normalizeEmail, normalizeIco, normalizePhone, trimOrNull } from '@/lib/contacts/normalize'
 import type { TableParams } from '@/lib/admin-table'
 
@@ -153,7 +153,7 @@ export async function loadContactsScreen(
 
 /** Jedno místo, kde se kontakt objevuje — s textem, který ten řádek nese. */
 export type ContactOccurrence = {
-  kind: 'zakazka' | 'hovor' | 'konzultace' | 'poptavka'
+  kind: 'zakazka' | 'hovor' | 'konzultace' | 'poptavka' | 'asistent'
   id: string
   title: string
   /** Jak je kontakt v tom řádku napsaný (jméno, e-mail, telefon). */
@@ -246,11 +246,30 @@ export async function loadContactDetail(id: string): Promise<ContactDetail | nul
   const contact = (headRows[0] as unknown as ContactRow) ?? null
   if (contact === null) return null
 
+  // Firmy od AI asistenta (R-141) zvlášť: bez migrace 130 sloupec contact_id
+  // není a dávka výš by spadla celá.
+  let outreachRows: AdminRow[] = []
+  try {
+    ;[outreachRows] = await adminDb.batch([
+      {
+        text: `SELECT id::text, company_name AS title, coalesce(contact_name, phone, email) AS written,
+                      coalesce(last_call_at, received_at) AS at
+               FROM outreach_leads WHERE contact_id IN ${family}
+               ORDER BY coalesce(last_call_at, received_at) DESC LIMIT $2`,
+        params: [id, DETAIL_LIMIT],
+      },
+    ])
+  } catch (err) {
+    const code = (err as { code?: string })?.code
+    if (code !== '42P01' && code !== '42703') throw err
+  }
+
   const occurrences: ContactOccurrence[] = [
     ...projectRows.map((r) => ({ kind: 'zakazka' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: `/dashboard/${String(r.id)}` })),
     ...leadRows.map((r) => ({ kind: 'hovor' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: '/dashboard/calls' })),
     ...slotRows.map((r) => ({ kind: 'konzultace' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: '/dashboard/calendar' })),
     ...agentRows.map((r) => ({ kind: 'poptavka' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: '/dashboard/poptavky' })),
+    ...outreachRows.map((r) => ({ kind: 'asistent' as const, id: String(r.id), title: String(r.title), written: r.written as string | null, at: r.at as string | null, href: `/dashboard/ai-asistent/kontakt/${String(r.id)}` })),
   ]
 
   return {
@@ -286,6 +305,11 @@ export function normalizeContactFields(input: ContactFields): ContactFields {
 
 export type ContactWriteResult = { ok: true; id: string } | { ok: false; error: string }
 
+/** Úspěšné uložení nese i to, co kontakt měl předtím — podle toho se změna propíše dál (R-141). */
+export type ContactSaveResult =
+  | { ok: true; id: string; previous: { email: string | null; phone: string | null } }
+  | { ok: false; error: string }
+
 /** Kdo už ten telefon nebo e-mail má — pro hlášku místo kódu chyby. */
 async function holder(fields: ContactFields, exceptId: string | null): Promise<string | null> {
   const [rows] = await adminDb.batch([
@@ -304,7 +328,7 @@ const DUPLICATE = '23505'
 const isDuplicate = (e: unknown): boolean =>
   typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === DUPLICATE
 
-export async function saveContactFields(id: string, input: ContactFields): Promise<ContactWriteResult> {
+export async function saveContactFields(id: string, input: ContactFields): Promise<ContactSaveResult> {
   const fields = normalizeContactFields(input)
   if (fields.display_name === '') return { ok: false, error: 'Jméno kontaktu musí být vyplněné.' }
   if (trimOrNull(input.phone) !== null && fields.phone === null) {
@@ -317,15 +341,22 @@ export async function saveContactFields(id: string, input: ContactFields): Promi
   try {
     const [rows] = await adminDb.batch([
       {
-        text: `UPDATE contacts
+        // `old` vidí řádek před úpravou (stejný snímek příkazu).
+        text: `WITH old AS (SELECT id, email, phone FROM contacts WHERE id = $1)
+               UPDATE contacts c
                SET display_name = $2, company = $3, email = $4, phone = $5, ico = $6, dic = $7, note = $8
-               WHERE id = $1
-               RETURNING id::text`,
+               FROM old
+               WHERE c.id = old.id
+               RETURNING c.id::text, old.email AS old_email, old.phone AS old_phone`,
         params: [id, fields.display_name, fields.company, fields.email, fields.phone, fields.ico, fields.dic, fields.note],
       },
     ])
     if (rows.length === 0) return { ok: false, error: 'Kontakt už neexistuje.' }
-    return { ok: true, id: String(rows[0].id) }
+    return {
+      ok: true,
+      id: String(rows[0].id),
+      previous: { email: (rows[0].old_email as string | null) ?? null, phone: (rows[0].old_phone as string | null) ?? null },
+    }
   } catch (e) {
     if (!isDuplicate(e)) throw e
     const who = await holder(fields, id)
@@ -360,13 +391,21 @@ export async function ensureContact(input: EnsureContactInput): Promise<string |
   if (found !== null) {
     await adminDb.batch([
       {
-        // Doplňuje se jen firma a čas: telefon ani e-mail se nedosazují,
-        // protože by mohly patřit jinému kontaktu a zápis by spadl na unique.
-        text: `UPDATE contacts
-               SET last_seen_at = greatest(coalesce(last_seen_at, 'epoch'::timestamptz), coalesce($2::timestamptz, now())),
-                   company = coalesce(company, $3)
-               WHERE id = $1`,
-        params: [found, input.seenAt ?? null, trimOrNull(input.company)],
+        // Firma, čas a chybějící telefon nebo e-mail (R-141). Vyplněný údaj
+        // se nepřepisuje a údaj, který už má jiný kontakt, se nedosadí —
+        // to je duplicita ke sloučení, ne oprava (a zápis by spadl na unique).
+        text: `UPDATE contacts c
+               SET last_seen_at = greatest(coalesce(c.last_seen_at, 'epoch'::timestamptz), coalesce($2::timestamptz, now())),
+                   company = coalesce(c.company, $3),
+                   email = CASE WHEN c.email IS NULL AND $4::text IS NOT NULL AND NOT EXISTS (
+                             SELECT 1 FROM contacts d WHERE d.merged_into IS NULL AND d.id <> c.id
+                                AND d.email IS NOT NULL AND lower(d.email) = lower($4::text))
+                           THEN $4 ELSE c.email END,
+                   phone = CASE WHEN c.phone IS NULL AND $5::text IS NOT NULL AND NOT EXISTS (
+                             SELECT 1 FROM contacts d WHERE d.merged_into IS NULL AND d.id <> c.id AND d.phone = $5::text)
+                           THEN $5 ELSE c.phone END
+               WHERE c.id = $1`,
+        params: [found, input.seenAt ?? null, trimOrNull(input.company), email, phone],
       },
     ])
     return found
@@ -456,4 +495,43 @@ export async function unmergeContact(sourceId: string): Promise<ContactWriteResu
     if (!isDuplicate(e)) throw e
     return { ok: false, error: 'Rozdělit zpět to nejde: telefon nebo e-mail mezitím převzal jiný kontakt.' }
   }
+}
+
+export type ContactSuggestion = {
+  id: string
+  name: string
+  company: string | null
+  email: string | null
+  phone: string | null
+}
+
+/**
+ * Našeptávač kontaktů (R-141): okno události v kalendáři si po výběru vezme
+ * jméno, telefon a e-mail, ať se nemusí opisovat. Jen nesloučené kontakty,
+ * nejdřív ty, se kterými jste byli v kontaktu naposledy.
+ */
+export async function suggestContacts(raw: string, limit = 6): Promise<ContactSuggestion[]> {
+  const q = raw.trim().slice(0, 80)
+  if (q.length < 2) return []
+  const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+  const digits = q.replace(/\D/g, '')
+  const [rows] = await adminDb.batch([
+    {
+      text: `SELECT id::text AS id, display_name AS name, company, email, phone
+               FROM contacts
+              WHERE merged_into IS NULL
+                AND (display_name ILIKE $1 OR company ILIKE $1 OR email ILIKE $1
+                     OR ($2::text IS NOT NULL AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') LIKE $2))
+              ORDER BY last_seen_at DESC NULLS LAST, display_name
+              LIMIT $3`,
+      params: [like, digits.length >= 3 ? `%${digits}%` : null, Math.min(Math.max(limit, 1), 10)],
+    },
+  ])
+  return rows.map((r) => ({
+    id: String(r.id),
+    name: String(r.name),
+    company: (r.company as string | null) ?? null,
+    email: (r.email as string | null) ?? null,
+    phone: (r.phone as string | null) ?? null,
+  }))
 }

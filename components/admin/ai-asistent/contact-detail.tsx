@@ -8,6 +8,7 @@ import { SendEmailButton } from '@/components/admin/send-email-button'
 import { ArrangedMeetingButton } from '@/components/admin/arranged-meeting'
 import type { MeetingReadiness } from '@/components/admin/schedule-meeting-dialog'
 import { CallCard } from '@/components/admin/ai-asistent/call-card'
+import { OpenContactButton } from '@/components/admin/ai-asistent/open-contact-button'
 import {
   buildTimeline,
   czk,
@@ -26,7 +27,8 @@ import { cn } from '@/lib/utils'
  * Detail klienta z Growth OS (R-120): všechno na jednom místě — co dál,
  * ukázka, všechny hovory (shrnutí, přepis, co asistent zjistil), e-maily od robota
  * a časová osa. Údaje patří Growth OS (D1 je pravda o tom, komu robot volá);
- * tady se jen čtou a Kryštof s firmou jedná.
+ * tady se jen čtou a Kryštof s firmou jedná. Telefon a e-mail jsou z kontaktu,
+ * když ho firma má (R-141) — Kryštofova oprava v Kontaktech má přednost.
  */
 
 const ANGLE: Record<string, string> = {
@@ -179,6 +181,17 @@ export function ContactDetailView({
               {lead.city && <Fact label="Město" value={lead.city} />}
             </dl>
             {lead.website && <ExternalA href={lead.website} className="mt-2">Jeho současný web</ExternalA>}
+            {/* Telefon a e-mail jsou z Kontaktů a opravují se tam — pak platí všude (R-141). */}
+            {lead.contactId ? (
+              <Link
+                href={`/dashboard/kontakty/${lead.contactId}`}
+                className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-navy-700 underline-offset-4 hover:underline"
+              >
+                Upravit telefon a e-mail
+              </Link>
+            ) : (
+              (lead.phone || lead.email) && <OpenContactButton outreachId={lead.id} />
+            )}
           </Card>
 
           <Card id="ukazka" className="scroll-mt-24">

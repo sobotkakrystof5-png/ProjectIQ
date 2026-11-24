@@ -1078,7 +1078,9 @@ zůstala jen pro chybu:
 | „čeká to na vás" | `signal` — a nic jiného (R-091) |
 
 Mapování druhů událostí na tóny je v `components/SmartCalendar.tsx` (`CHANNEL_TONE`,
-`KIND_TONE`). Barva se vkládá **stylem**, ne třídou: tokeny jsou CSS proměnné a plocha
+`KIND_TONE`, `eventTone`). **Schůzka přes Google Meet je vždy fialová** (`--staff-3`,
+`MEETING_TONE`): ruční událost s odkazem na Meet i konzultace přes Meet; jiný druh
+fialovou nedostane (R-140). Barva se vkládá **stylem**, ne třídou: tokeny jsou CSS proměnné a plocha
 bloku je jejich nádech přes `color-mix`.
 
 **Výpis se vykresluje z propů.** `LeadsTable` si řádky kopíroval do `useState` a po každé
@@ -1446,6 +1448,40 @@ Growth OS si to čte `GET /api/public/outreach/handled?since=`.
 `purge_outreach_retention()`. Nahrávky ZakazIQ nečte ani neukládá.
 
 
+## Jeden klient, jedny údaje: kontakt je zdroj e-mailu a telefonu (R-141)
+
+E-mail a telefon klienta drží **kontakt** (`contacts`). Ostatní místa si údaj berou z něj, jádro je
+`lib/admin/contact-sync.ts`:
+
+| Funkce | Kdy | Co udělá |
+|---|---|---|
+| `propagateContact(id, staré)` | po uložení kontaktu (`saveContact`), po převzetí firmy, po sloučení (bez `staré`) | do `client_leads`, `projects.client_email`/`client_phone` celé rodiny kontaktu a do **budoucích** schůzek (`invite_to` ze staré adresy, `meeting_phone` i do prázdna, pak `planReminders`) |
+| `absorbIntoContact(id, nové, coSmíNahradit)` | údaj odjinud: úprava v Hovorech (`updateLead`), Growth OS, e-mail z pozvánky | zapíše do kontaktu jen místo prázdna nebo `coSmíNahradit`, pak `propagateContact` |
+| `syncOutreachContact(outreachId, minule)` | příjem snímku (firma se souhlasem, změna e-mailu či telefonu, nebo zatím bez kontaktu; nejvýš 40 na dávku), „Uložit do Kontaktů", schůzka od asistenta | najde nebo založí kontakt (`source = 'growth-os'`), uloží `outreach_leads.contact_id` (migrace 130), převezme údaje |
+| `outreachContactOverlay(firmy)` | fronta (`loadOutreachQueue`), detail firmy (`loadContact`), `loadOutreachSource` | e-mail a telefon z kontaktu mají přednost před snímkem; vazba přes `contact_id`, jinak přes `client_lead_id` |
+
+**Pravidlo propisu:** nová hodnota nahradí prázdné místo nebo starou hodnotu, jinou ručně zadanou nechá
+být. Telefon se porovnává podle posledních devíti číslic (`777 000 001` = `+420777000001`). Údaj, který už
+má jiný kontakt, se nedosadí — to je duplicita ke sloučení. Doklady se nemění. Propis nikdy neshodí hlavní
+akci: chybějící tabulka nebo sloupec (`42P01`, `42703`, `42883`) se přeskočí, jiná chyba se zaloguje.
+
+Firma od asistenta se „souhlasem" = `ACCEPTED_STATUSES` (`lib/admin/outreach-crm-view.ts`), hotová
+ukázka, nebo převzatá do Hovorů. Firma bez telefonu i e-mailu kontakt nedostane. `ensureContact`
+existujícímu kontaktu doplní chybějící e-mail a telefon (jinak nic nepřepisuje). `createLead` a `updateLead`
+v Hovorech řádek na kontakt napojí.
+
+**Kde to uvidíte:** detail firmy v AI asistentovi má „Upravit telefon a e-mail" (karta kontaktu) nebo
+„Uložit do Kontaktů" (`openOutreachContact`); karta kontaktu ukazuje „Od AI asistenta"; okno události
+v kalendáři má na poli Jméno našeptávač (`components/admin/contact-picker.tsx`, akce `findContacts`,
+dotaz `suggestContacts`), výběr vyplní telefon i e-mail. Radix zavírá dialog Escapem ve fázi zachycení,
+proto má `DialogContent` `onEscapeKeyDown={keepDialogForPicker}` — Escape v otevřeném našeptávači zavře
+jen seznam. Okno „Poslat e-mail" bere adresátovi z Hovorů chybějící e-mail z kontaktu.
+
+**Co ZakazIQ neví:** e-mail nadiktovaný v hovoru (`email_jiny`) Growth OS do snímku neposílá; zadání
+`new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md`.
+
+Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
+
 ## Schůzky přes Google Meet z kalendáře a připomínky klientovi (R-137)
 
 - **Kde:** okno „Přidat do kalendáře" / „Upravit v kalendáři" (`components/AdminEventModal.tsx`) má
@@ -1463,7 +1499,10 @@ Growth OS si to čte `GET /api/public/outreach/handled?since=`.
   Plán `REMINDER_STEPS`: den předem e-mail + SMS, hodinu předem e-mail, 10 minut předem SMS;
   `changed` = zpráva o změně termínu. Kanál bez kontaktu se vynechá, denní připomínka do 6 h
   od naplánování se přeskočí (klient právě dostal pozvánku). E-mail jde na `invite_to`, SMS na
-  `calendar_events.meeting_phone` (`+420…`).
+  `calendar_events.meeting_phone` (`+420…`). **Bez telefonu se SMS vůbec nenaplánuje**, proto
+  okno události telefon k napsanému e-mailu dohledá samo (`findClientPhone` →
+  `lib/admin/contact-phone.ts`): kořen kontaktu, Hovory, číslo od AI asistenta, zakázka, AI lead;
+  ručně napsané číslo nepřepíše a smazané znovu nevrátí, pod polem ukáže zdroj.
 - **Text se skládá až při odeslání** (`reminderIntro`, `reminderSubject`, `reminderSms`
   v `lib/admin/meeting-email.ts`) z aktuálního času schůzky a „teď" — „zítra v 15:00",
   „Začínáme za 10 minut (15:00)". Zpráva, na kterou je pozdě, se zahodí (`stillUseful`:

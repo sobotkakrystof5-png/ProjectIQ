@@ -8,6 +8,7 @@ import {
   upsertOutreachCalls,
   upsertOutreachEmails,
 } from '@/lib/admin/outreach-calls'
+import { outreachContactOverlay, outreachHasConsent, syncOutreachContact } from '@/lib/admin/contact-sync'
 import {
   CLOSED_STATUSES,
   QUEUE_STATUSES,
@@ -33,6 +34,9 @@ export type { OutreachQueueRow, QueueReason } from '@/lib/admin/outreach-view'
  *  3. Snímek nikdy nepřepíše, co s firmou udělal Kryštof (`handled_*`,
  *     `client_lead_id`). Výjimka: firma, kterou odložil jako „nemá zájem",
  *     se vrátí do fronty, když nově odpoví na e-mail.
+ *  4. Firma, která řekla ano ukázce, je klient: dostane kontakt a její e-mail
+ *     a telefon se propíšou do Kontaktů, Hovorů a schůzek (R-141). Zobrazuje
+ *     se pak údaj z kontaktu — Kryštofova oprava má přednost před snímkem.
  */
 
 // ─── Fronta ──────────────────────────────────────────────────────────────────
@@ -82,7 +86,25 @@ function toQueueRow(raw: Record<string, unknown>): OutreachQueueRow {
     emailClickedAt: iso(raw.email_clicked_at),
     emailRepliedAt: iso(raw.email_replied_at),
     receivedAt: iso(raw.received_at) ?? new Date(0).toISOString(),
+    contactId: str(raw.contact_id),
+    clientLeadId: str(raw.client_lead_id),
   }
+}
+
+/**
+ * E-mail a telefon z kontaktu mají přednost před tím, co poslal Growth OS
+ * (R-141). Firma bez kontaktu zůstane, jak přišla.
+ */
+async function withContactDetails<T extends { id: string; email: string | null; phone: string | null; contactId?: string | null; clientLeadId?: string | null }>(
+  rows: T[],
+): Promise<T[]> {
+  const overlay = await outreachContactOverlay(
+    rows.map((r) => ({ id: r.id, contactId: r.contactId ?? null, clientLeadId: r.clientLeadId ?? null })),
+  )
+  return rows.map((r) => {
+    const c = overlay.get(r.id)
+    return c ? { ...r, contactId: c.contactId, email: c.email ?? r.email, phone: c.phone ?? r.phone } : r
+  })
 }
 
 export type OutreachQueue = {
@@ -102,15 +124,17 @@ export async function loadOutreachQueue(now: Date = new Date()): Promise<Outreac
         text: `SELECT id::text, company_name, contact_name, phone, email, website, industry, city, status,
                       attempts, last_call_at, call_summary, callback_at, callback_text, demo_url, demo_status,
                       demo_views, demo_first_viewed_at, demo_email_sent_at, email_opened_at, email_clicked_at,
-                      email_replied_at, received_at
-                 FROM outreach_leads
+                      email_replied_at, received_at, client_lead_id::text AS client_lead_id,
+                      nullif(to_jsonb(l) ->> 'contact_id', '') AS contact_id
+                 FROM outreach_leads l
                 WHERE ${QUEUE_WHERE}
                 ORDER BY received_at DESC
                 LIMIT ${QUEUE_LIMIT}`,
         params: [],
       },
     ])
-    return { rows: sortQueue((rows as Record<string, unknown>[]).map(toQueueRow), now), available: true }
+    const queue = await withContactDetails((rows as Record<string, unknown>[]).map(toQueueRow))
+    return { rows: sortQueue(queue, now), available: true }
   } catch (err) {
     if ((err as { code?: string })?.code === '42P01') return { rows: [], available: false }
     throw err
@@ -135,6 +159,13 @@ type Prev = {
   demo_views: number
   email_replied_at: unknown
   handled_at: unknown
+  email: string | null
+  phone: string | null
+  demo_url: string | null
+  client_lead_id: string | null
+  contact_id: string | null
+  /** Má databáze sloupec `contact_id` (migrace 130)? */
+  has_contact_column: boolean
 }
 
 export type OutreachEvent = (
@@ -257,8 +288,10 @@ export async function ingestOutreachLeads(input: OutreachLeadPayload[], version 
   const ids = leads.map((l) => l.external_id)
 
   const prevRows = await adminDb<Prev>`
-    SELECT external_id, status, do_not_call, demo_views, email_replied_at, handled_at
-      FROM outreach_leads WHERE external_id = ANY(${ids}::text[])
+    SELECT external_id, status, do_not_call, demo_views, email_replied_at, handled_at, email, phone, demo_url,
+           client_lead_id::text AS client_lead_id, nullif(to_jsonb(l) ->> 'contact_id', '') AS contact_id,
+           (to_jsonb(l) ? 'contact_id') AS has_contact_column
+      FROM outreach_leads l WHERE external_id = ANY(${ids}::text[])
   `
   const prev = new Map(prevRows.map((r) => [r.external_id, r]))
 
@@ -307,7 +340,46 @@ export async function ingestOutreachLeads(input: OutreachLeadPayload[], version 
     ...e,
     leadId: idByExternal.get(externalId),
   }))
+  await syncContacts(fresh, prev, idByExternal)
   return { received: input.length, saved: savedIds.size, calls, emails, events }
+}
+
+/** Strop propisů do Kontaktů na jednu dávku; zbytek dožene další snímek. */
+const CONTACT_SYNC_LIMIT = 40
+
+/**
+ * Firmy, které řekly ano, propojí s kontaktem a propíšou jejich e-mail
+ * a telefon (R-141). Jen když je co dělat: nová firma v Kontaktech, nebo
+ * Growth OS poslal jiný e-mail či telefon než minule. Selhání snímek nezruší.
+ */
+async function syncContacts(
+  fresh: OutreachLeadPayload[],
+  prev: Map<string, Prev>,
+  idByExternal: Map<string, string>,
+): Promise<void> {
+  let done = 0
+  for (const lead of fresh) {
+    if (done >= CONTACT_SYNC_LIMIT) break
+    const id = idByExternal.get(lead.external_id)
+    const before = prev.get(lead.external_id)
+    if (!id) continue
+    const email = lead.email ?? null
+    const phone = lead.phone ?? null
+    if (!email && !phone) continue
+    if (!outreachHasConsent({ status: lead.status, demoUrl: lead.demo?.url, clientLeadId: before?.client_lead_id })) continue
+
+    const changed = !before || (before.email ?? null) !== email || (before.phone ?? null) !== phone
+    const unlinked = before ? before.has_contact_column && before.contact_id === null : true
+    const newlyConsented = before ? !outreachHasConsent({ status: before.status, demoUrl: before.demo_url, clientLeadId: before.client_lead_id }) : true
+    if (!changed && !unlinked && !newlyConsented) continue
+
+    done += 1
+    try {
+      await syncOutreachContact(id, { email: before?.email ?? null, phone: before?.phone ?? null })
+    } catch (err) {
+      console.error('[outreach] propsání údajů firmy do Kontaktů selhalo', lead.external_id, (err as Error).message)
+    }
+  }
 }
 
 async function upsertLeads(records: ReturnType<typeof toRecord>[], v2: boolean): Promise<{ external_id: string; id: string }[]> {
@@ -429,15 +501,22 @@ export type OutreachSource = {
   callback_text: string | null
   demo_url: string | null
   client_lead_id: string | null
+  /** Kontakt firmy (R-141); `null` = zatím žádný. */
+  contact_id: string | null
 }
 
+/** Údaje firmy pro akce. E-mail a telefon z kontaktu mají přednost (R-141). */
 export async function loadOutreachSource(id: string): Promise<OutreachSource | null> {
   const rows = await adminDb<OutreachSource>`
     SELECT company_name, contact_name, phone, email, website, call_summary, callback_at, callback_text,
-           demo_url, client_lead_id::text AS client_lead_id
-      FROM outreach_leads WHERE id = ${id} LIMIT 1
+           demo_url, client_lead_id::text AS client_lead_id, nullif(to_jsonb(l) ->> 'contact_id', '') AS contact_id
+      FROM outreach_leads l WHERE id = ${id} LIMIT 1
   `
-  return rows[0] ?? null
+  const source = rows[0]
+  if (!source) return null
+  const overlay = await outreachContactOverlay([{ id, contactId: source.contact_id, clientLeadId: source.client_lead_id }])
+  const c = overlay.get(id)
+  return c ? { ...source, contact_id: c.contactId, email: c.email ?? source.email, phone: c.phone ?? source.phone } : source
 }
 
 /** Poznámka do Hovorů: co víme z robota, odhad modelu jasně označený. */

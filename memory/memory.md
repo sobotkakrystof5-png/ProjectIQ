@@ -2,7 +2,14 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-23 · **Ochrana proti XSS a DDoS v `main`** (R-138): audit
+> **Poslední aktualizace:** 2026-11-24 · **Jeden klient, jedny údaje** (R-141): kontakt je jediný
+> zdroj e-mailu a telefonu klienta. Firma od AI asistenta, která řekla ano, dostane kontakt; oprava
+> v Kontaktech nebo v Hovorech se propíše do Hovorů, zakázek a budoucích schůzek (i SMS připomínky)
+> a okno události má našeptávač z Kontaktů. Migrace 130. **Nenasazeno, necommitnuto, v prohlížeči
+> neověřeno.** E-mail nadiktovaný v hovoru do ZakazIQ nedojde, dokud se nesplní zadání pro Growth OS
+> `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md`.
+>
+> Předchozí: 2026-11-23 · **Ochrana proti XSS a DDoS v `main`** (R-138): audit
 > z 2026-11-20 ležel tři dny necommitnutý ve worktree; teď je převedený na dnešní `main`. Jeden modul
 > pro cizí text v HTML a test, který hlídá kopie (hned našel čtyři nové z klientského prostoru), brána
 > na IP v `proxy.ts`, předbrány před databázovými limity, semafor na Chromium a strop těla u nahrávek.
@@ -1523,9 +1530,59 @@ jedním průchodem, takže `{cislo}` ve jménu odběratele se nerozbalí; předm
 `lib/admin/invoice-email-settings.ts` (čtení/zápis), `components/admin/invoices/email-template-form.tsx`,
 `app/dashboard/finance/invoice-actions.ts` (`getInvoiceEmailTemplate`, `saveInvoiceEmail`). Nový text e-mailu
 s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro jednu fakturu před odesláním. Upřesňuje R-117.
+
+### R-140 · Schůzka přes Google Meet je v kalendáři vždy fialová (2026-11-23)
+*Vzniklo lokálně jako R-138; to číslo mezitím dostala ochrana XSS a DDoS v `main`, přečíslováno 2026-11-24.*
+**Rozhodnutí:** (1) V okně „Událost / schůzka" je hned pod výběrem typu otázka „Schůzka přes
+Google Meet?" s volbami Ne / Ano (dřív přepínač až pod kontaktem). (2) Každá schůzka přes
+Google Meet je v kalendáři fialová (`--staff-3`): ruční událost s odkazem na Meet i konzultace
+přes Meet. Fialovou nemá nic jiného, konzultace přes Teams přešla na růžovou (`--staff-4`).
+**Proč:** Kryštof 2026-11-23: „chci určit, zda se jedná o Google Meet, a schůze budou vždy fialové".
+**Důsledek:** upřesňuje R-103 (kategorie v kalendáři berou tóny termínů): fialová je vyhrazená
+schůzkám. Nový druh události nedostane `MEETING_TONE`. Ostatní události bez Meetu zůstávají
+olivové. Bez migrace.
+
+### R-141 · Jeden klient, jedny údaje: kontakt je zdroj e-mailu a telefonu (2026-11-24)
+**Rozhodnutí:** (1) E-mail a telefon klienta drží **kontakt** (`contacts`); Hovory, zakázka a budoucí
+schůzka (`invite_to`, `meeting_phone`) z něj berou údaje. (2) Jedno pravidlo propisu všemi směry:
+nová hodnota nahradí **prázdné místo nebo starou hodnotu**, jinou ručně zadanou nechá být. (3) Odkud
+změna přijde: oprava v Kontaktech → všude; úprava e-mailu či telefonu v Hovorech → do kontaktu (když
+tam byla stará hodnota nebo nic) a dál; Growth OS → do kontaktu, jen když ho kontakt pořád drží z minula
+(Kryštofova oprava má přednost); e-mail zadaný v okně schůzky → do kontaktu, když žádný neměl.
+(4) **Firma od AI asistenta, která řekla ano** (stavy `ACCEPTED_STATUSES`, hotová ukázka, nebo převzatá),
+dostane kontakt sama při příjmu snímku (`source = 'growth-os'`); firma bez souhlasu do Kontaktů nejde.
+Fronta i detail firmy pak ukazují e-mail a telefon z kontaktu. (5) Nový i upravený řádek Hovorů se na
+kontakt napojí (`createLead`, `updateLead`). (6) Okno události v kalendáři má našeptávač z Kontaktů.
+(7) Doklady se nemění, nesou údaje z doby vystavení; `projects.client_email` a `client_phone` doklad
+nejsou a propisují se.
+**Proč:** Kryštof 2026-11-24: „ten systém zná údaje toho konkrétního klienta… chci, aby se přepsaly úplně
+všude… abych to nemusel furt kopírovat". Údaj žil na pěti místech zvlášť: e-mail z Growth OS se do okna
+schůzky nedostal, `ensureContact` existujícímu kontaktu nic nedoplnil a schůzky neměly telefon pro SMS
+(changelog 2026-11-24). Přepsat i jinou ručně zadanou adresu by smazalo vědomou výjimku (kancelářský
+e-mail u jedné zakázky), proto jen prázdné místo nebo stará hodnota.
+**Důsledek:** migrace 130 (`outreach_leads.contact_id`, jednorázové doplnění prázdných míst). Upřesňuje
+pravidlo z migrace 104 („`contact_id` = kdo to je, text = co bylo tehdy napsáno") — u Hovorů, zakázek
+a schůzek už text sleduje kontakt, u dokladů dál ne. Nová cesta, která mění e-mail nebo telefon klienta,
+volá `propagateContact` nebo `absorbIntoContact` z `lib/admin/contact-sync.ts`; nové zobrazení firmy od
+asistenta čte údaje přes `outreachContactOverlay`. Sloučení kontaktů propisuje jen do prázdných míst
+(sloučení jde vrátit, propis ne). Uzavírá otevřený problém „Nový kontakt v Hovorech se na `contacts`
+nenapojuje". Strana Growth OS: nadiktovaný e-mail (`email_jiny`) musí jít do `leads.email`, jinak ho ZakazIQ
+nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md`. Bezpečnost DECISIONS #051.
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Jeden klient, jedny údaje (R-141) — nasadit a projít:** (1) migrace 130 na produkci (aditivní,
+  smí před nasazením; vytvoří kontakty firmám se souhlasem a doplní prázdná místa v Hovorech a zakázkách —
+  aplikována: ne, nikde), (2) commit a nasazení, (3) projít naživo: firma od asistenta se souhlasem má v detailu
+  „Upravit telefon a e-mail", oprava e-mailu v Kontaktech se objeví v Hovorech, v okně schůzky a u budoucí
+  schůzky; okno události v kalendáři našeptá kontakt a vyplní telefon i e-mail (390 a 1280 px, Escape zavře
+  jen našeptávač). Ověřeno jen testy nad PGlite, `tsc` a buildem · od 2026-11-24
+- [ ] **Growth OS neposílá e-mail nadiktovaný v hovoru:** `email_jiny` jde do e-mailu s ukázkou, ale ne do
+  `leads.email`, a v datech z hovoru je zakrytý. Zadání pro autopilota
+  `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md` · od 2026-11-24
+- [ ] **Kontakty z Growth OS bez retence:** firma, která řekla ano, má od R-141 kontakt (`source = 'growth-os'`);
+  `contacts` žádnou retenci nemá (viz výmaz kontaktu níž). Rozhodnout spolu s retencí `outreach_leads` · DECISIONS #051 · od 2026-11-24
 
 - [ ] **Text e-mailu s fakturou (R-139) — projít naživo:** migrace 129 je na produkci od 2026-11-23. Projít Faktury › Údaje dodavatele (uložit, náhled,
   překlep v proměnné) a odeslat fakturu na vlastní e-mail. **Uložení ani odeslání přes Resend naživo neověřené** · od 2026-11-23
@@ -1786,11 +1843,6 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
   105 i na testovacím Neonu bylo 2026-11-12 zamítnuté, pouští ji Kryštof. Co ověřené je: nový
   build **nespadne** na databázi bez 105 — portál i `updateLead` odchytí `42883` a uloží aspoň
   svoje (test „uložení hovoru přežije databázi bez migrace 105") · od 2026-11-12
-- [ ] **Nový kontakt v Hovorech se na `contacts` nenapojuje (AD09/AD10):** `createLead`
-  a `updateLead` `contact_id` neplní — kontakt vzniká jen backfillem, převodem leadu na zakázku
-  (`convertLeadToProject`) a nově z okna kalendáře (`createCalendarEvent`). Ručně zapsaný hovor
-  tak na kartě kontaktu nebude. Doplnit s AD17, nebo až bude jasné, jak se má chovat překlep
-  v telefonu (nový kontakt vs. návrh sloučení) · od 2026-11-12
 - [ ] **Výmaz kontaktu na žádost GDPR neexistuje (AD09):** `contacts` drží jméno, telefon, e-mail a poznámku, ale `public.purge_client_retention` (R-076) o tabulce neví a admin žádnou cestu výmazu nemá. Při žádosti je od teď potřeba smazat i kontakt. Není to nová kategorie údajů (kontakt je odvozený z leadů a zakázek), ale patří to k AD16/KP10. **Od AD15 platí:** smazání kontaktu si paměť uklidí samo (trigger z migrace 111), chybí dál jen samotná cesta k výmazu a export · `.claude/security/AUDIT-LOG.md` 2026-11-12 · od 2026-11-12
 - [ ] **AD09 v prohlížeči neověřený:** projít na 390 / 768 / 1280 / 1440 px `/dashboard/kontakty` — tři pohledy (Kontakty, Možné duplicity, Sloučené), hledání podle telefonu zapsaného jinak, **karty místo tabulky pod 640 px** — a kartu kontaktu: uložení údajů (hlavně hláška u telefonu, kterému nejde rozumět, a kolize e-mailu), **Sloučit sem** a jeho „Zpět" v toastu, „Rozdělit zpět" u sloučeného kontaktu. Dál převod kontaktu na zakázku z Hovorů: musí skončit na nové zakázce, mít v ní poznámky z hovorů a navázaný termín v kalendáři · od 2026-11-12
 - [ ] **`notFound()` v adminu vrací 200, ne 404 (zjištěno 2026-11-12):** `/dashboard/<neexistující id>`, `/dashboard/faktury/<id>`, `/dashboard/kontakty/<id>` i neexistující stránka **vykreslí 404 obrazovku, ale se stavem 200**. Je to důsledek streamování kostry (AD06): hlavička odejde dřív, než stránka zjistí, že záznam není. Pro uživatele je to v pořádku (vidí „nenalezeno"), pro monitoring a roboty ne — `/dashboard` je sice `noindex`. Platí pro celý admin, ne jen pro nové obrazovky; opravit s AD18 (přístupnost a kvalita) · od 2026-11-12
@@ -1916,6 +1968,63 @@ s fakturou se píše tam, ne v `invoice-send.ts`. Neřešeno: úprava textu pro 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-24 (jeden klient, jedny údaje — R-141)
+- **feat** Kontakt je jediný zdroj e-mailu a telefonu klienta. `lib/admin/contact-sync.ts`: `propagateContact`
+  (kontakt → Hovory, zakázky, budoucí schůzky; přidaný telefon přeplánuje SMS připomínky), `absorbIntoContact`
+  (údaj odjinud → kontakt, jen místo prázdna nebo staré hodnoty), `syncOutreachContact` a `outreachContactOverlay`
+  (firma od asistenta ↔ kontakt). Napojeno: příjem snímků z Growth OS (firma se souhlasem dostane kontakt,
+  nejvýš 40 propisů na dávku), fronta a detail asistenta, převzetí do Hovorů, schůzka od asistenta (e-mail
+  z pozvánky si kontakt zapamatuje), okno „Poslat e-mail" (adresát z Hovorů bere chybějící e-mail z kontaktu),
+  Hovory (`createLead`, `updateLead` napojí kontakt a propíšou změnu), uložení a sloučení v Kontaktech.
+  `ensureContact` existujícímu kontaktu doplní chybějící e-mail a telefon. Soubory: `lib/admin/{contact-sync,
+  contacts,outreach,outreach-crm,outreach-crm-view,outreach-view,meetings,lead-mail-target}.ts`,
+  `app/{contacts,outreach,calls}-actions.ts`, `app/dashboard/kontakty/[id]/page.tsx`.
+- **feat** Okno události v kalendáři: pole Jméno je našeptávač z Kontaktů (jméno, firma, e-mail, telefon),
+  výběr vyplní telefon i e-mail; Escape zavře jen našeptávač. Detail firmy v AI asistentovi: „Upravit telefon
+  a e-mail" vede na kartu kontaktu, firma bez kontaktu má „Uložit do Kontaktů"; karta kontaktu ukazuje
+  „Od AI asistenta". Soubory: `components/admin/contact-picker.tsx`, `components/AdminEventModal.tsx`,
+  `components/admin/ai-asistent/{contact-detail,open-contact-button}.tsx`.
+- **db** Migrace 130 `kontakt_jeden_zdroj` — `outreach_leads.contact_id`, kontakty firmám se souhlasem,
+  doplnění prázdných e-mailů a telefonů (aplikována: ne, nikde).
+- **docs** Zadání pro Growth OS `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md`
+  (nadiktovaný e-mail do `leads.email`).
+- **chore** Rozdělaná „fialová schůzka" přenesená z `admin/schuzky-pripominky` na aktuální `main` (stash,
+  bez ztráty) a přečíslovaná z R-138 na **R-140** (R-138 je v `main` ochrana XSS a DDoS).
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts` (17 testů:
+  příjem snímku, přednost ruční opravy, propis do Hovorů/zakázky/schůzky, telefon zapsaný jinak, SMS po
+  doplnění telefonu, kolize e-mailu, sloučený kontakt, našeptávač, migrace 130 nad daty a dvakrát po sobě).
+  Plná sada 1753 prošlo / 3 selhaly: `ws-email` (pevné datum, známé) a dva časové limity pod zátěží
+  (`admin-ai-asistent-crm`, `admin-hovory-asistent` — samostatně 22/22). **V prohlížeči neověřeno.**
+- **decision** **R-141**, DECISIONS #051.
+
+### 2026-11-24 (proč nechodí SMS připomínky)
+- **chore** Kontrola fronty na produkci: e-mailové připomínky odcházejí (hodinová ke schůzce
+  24. 11. 16:00 odešla v 15:00:00), SMS nešla žádná, protože žádná z pěti schůzek neměla
+  telefon (ani schůzka, ani kontakt v Hovorech). Ke schůzce 26. 11. 17:00 doplněn telefon
+  z `outreach_leads` (shoda podle e-mailu, jeden záznam, `+420…`) a naplánované SMS den předem
+  (25. 11. 17:00) a 10 minut předem, přímo SQL na Kryštofovo zadání. U dalších tří schůzek
+  telefon v systému není.
+- **feat** Okno události v kalendáři dohledá telefon podle napsaného e-mailu (při psaní i při
+  otevření události bez telefonu): kořen kontaktu, Hovory, AI asistent, zakázka, AI lead (pořadí
+  sladěné s R-141). Ručně napsané číslo nepřepíše, smazané nevrátí, pod polem ukáže zdroj
+  a upozorní na jiné číslo u téhož e-mailu. Soubory: `lib/admin/contact-phone.ts`,
+  `app/meeting-actions.ts` (`findClientPhone`), `components/AdminEventModal.tsx`, test
+  `lib/__tests__/admin-telefon-podle-emailu.test.ts` (7). Ověřeno: test, `tsc`, dotazy jen
+  pro čtení na produkčním schématu. V prohlížeči neověřeno, nenasazeno, necommitnuto (strom
+  je na `main` spolu s rozdělaným R-141 jiného sezení).
+
+### 2026-11-23 (schůzky přes Google Meet fialově — R-140)
+- **feat** Okno „Událost / schůzka": volba „Schůzka přes Google Meet? Ne / Ano" hned pod typem
+  místo přepínače pod kontaktem; když Meet nejde založit, „Ano" je zamčené s vysvětlením (dřív
+  přepínač zmizel). Údaje pozvánky se ukážou až po „Ano". V kalendáři je každá schůzka přes Meet
+  fialová (ruční i konzultace), Teams přešly na růžovou, legenda má „Schůzka přes Google Meet".
+  Soubory: `components/AdminEventModal.tsx`, `components/SmartCalendar.tsx`,
+  `docs/admin/AGENTS-ADMIN.md`. Bez migrace.
+- **chore** Ověřeno: `npx tsc --noEmit`, testy `components/admin/__tests__` a
+  `admin-pripominky` (46/46), okno na dočasné stránce bez přihlášení na 1280 a 390 px (volby
+  44 px, bez vodorovného přetečení; stránka smazaná). Stav „Ano" s pozvánkou a fialová v kalendáři
+  za přihlášením neověřené.
 
 ### 2026-11-23 (nasazení R-138 a R-139)
 - **chore** **Na produkci** (2026-11-23): fast-forward `main` `6e6f9d0` → `d622689`, build Ready (`dpl_BmXV…`, `fra1`).

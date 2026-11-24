@@ -131,10 +131,16 @@ interface UnifiedEvent {
  * Barva se vkládá stylem, ne třídou: tokeny jsou CSS proměnné a plocha je
  * jejich nádech přes `color-mix`.
  */
+/**
+ * Schůzka přes Google Meet je vždy fialová (`--staff-3`, R-140): ruční událost
+ * s odkazem na Meet i konzultace přes Meet. Fialovou proto nemá nic jiného.
+ */
+const MEETING_TONE = 2
+
 const CHANNEL_TONE: Record<ConsultationChannel, number> = {
   whatsapp: 1,
-  teams: 2,
-  meet: 3,
+  teams: 3,
+  meet: MEETING_TONE,
   phone: 0,
   other: 4,
 }
@@ -154,8 +160,14 @@ export type EventStyle = {
   pill: React.CSSProperties
 }
 
+function eventTone(ev: UnifiedEvent): number {
+  if (ev.kind === 'consultation' && ev.channel) return CHANNEL_TONE[ev.channel]
+  if (ev.kind === 'manual' && (ev.meta.meeting || ev.meta.meetingLink)) return MEETING_TONE
+  return KIND_TONE[ev.kind] ?? 0
+}
+
 function getEventStyle(ev: UnifiedEvent): EventStyle {
-  const tone = ev.kind === 'consultation' && ev.channel ? CHANNEL_TONE[ev.channel] : (KIND_TONE[ev.kind] ?? 0)
+  const tone = eventTone(ev)
   const accent = staffAccent(null, tone)
   // Blokace je soukromá nedostupnost, ne něco, na co se kouká — proto tiše.
   if (ev.kind === 'block') {
@@ -1321,7 +1333,11 @@ function DayView({
 function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-quiet">
-      {(Object.keys(CHANNEL_TONE) as ConsultationChannel[]).map((ch) => (
+      <div className="flex items-center gap-1.5">
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, MEETING_TONE) }} />
+        <span>Schůzka přes Google Meet</span>
+      </div>
+      {(Object.keys(CHANNEL_TONE) as ConsultationChannel[]).filter((ch) => ch !== 'meet').map((ch) => (
         <div key={ch} className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, CHANNEL_TONE[ch]) }} />
           <span>{CHANNEL_LABELS[ch]}</span>

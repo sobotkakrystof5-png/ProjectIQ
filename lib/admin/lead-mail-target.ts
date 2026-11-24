@@ -1,6 +1,7 @@
 import 'server-only'
 import { adminDb, q, type AdminQuery } from '@/lib/admin/db'
 import { ensureContact } from '@/lib/admin/contacts'
+import { linkOutreachContact } from '@/lib/admin/contact-sync'
 import { loadOutreachSource, markOutreachHandled, takeoverNote } from '@/lib/admin/outreach'
 
 /**
@@ -43,8 +44,16 @@ export async function loadMailTarget(ref: MailTargetRef): Promise<MailTarget | n
   if (ref.kind === 'lead') {
     row = (
       await adminDb<TargetRow>`
-        SELECT id::text AS id, company_name, contact_name, phone, email, id::text AS lead_id
-          FROM client_leads WHERE id = ${ref.id}
+        -- Chybí-li e-mail nebo telefon v Hovorech, vezme se z kontaktu (R-141).
+        SELECT l.id::text AS id, l.company_name, l.contact_name,
+               coalesce(nullif(btrim(l.phone), ''), c.phone) AS phone,
+               coalesce(nullif(btrim(l.email), ''), c.email) AS email,
+               l.id::text AS lead_id
+          FROM client_leads l
+          LEFT JOIN contacts s ON s.id = l.contact_id
+          -- Sloučení přes JSON, ať dotaz běží i na zjednodušené tabulce kontaktů.
+          LEFT JOIN contacts c ON c.id = coalesce(nullif(to_jsonb(s) ->> 'merged_into', '')::uuid, s.id)
+         WHERE l.id = ${ref.id}
       `
     )[0]
   } else if (ref.kind === 'contact') {
@@ -96,13 +105,16 @@ export async function ensureLeadFor(target: MailTarget): Promise<{ leadId: strin
   let notes: string | null = null
   if (target.kind === 'outreach') {
     const source = await loadOutreachSource(target.id)
-    contactId = await ensureContact({
-      name: target.contactName ?? target.company,
-      company: target.company,
-      email: target.email,
-      phone: target.phone,
-      source: 'growth-os',
-    })
+    contactId =
+      source?.contact_id ??
+      (await ensureContact({
+        name: target.contactName ?? target.company,
+        company: target.company,
+        email: target.email,
+        phone: target.phone,
+        source: 'growth-os',
+      }))
+    if (contactId) await linkOutreachContact(target.id, contactId)
     notes = source ? takeoverNote(source) || null : null
   }
 

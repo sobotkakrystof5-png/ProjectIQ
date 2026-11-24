@@ -8,6 +8,7 @@ import { sql } from '@/lib/db'
 import { adminDb, q, type AdminRow } from '@/lib/admin/db'
 import { loadLeadNotes } from '@/lib/admin/leads'
 import { ensureContact } from '@/lib/admin/contacts'
+import { absorbIntoContact } from '@/lib/admin/contact-sync'
 import { notifyClientOfProjectChange } from '@/app/actions'
 import { pragueDateTimeToISO } from '@/lib/prague-time'
 import type { ClientLead, LeadNote, LeadStatus, LeadActionType } from '@/lib/types'
@@ -52,13 +53,35 @@ export async function deleteLeadNote(id: string) {
   revalidatePath('/dashboard/calls')
 }
 
+/**
+ * Kontakt v Kontaktech k řádku Hovorů (R-141): najde podle telefonu a e-mailu,
+ * jinak založí. Bez telefonu i e-mailu žádný — samotné jméno nikoho neurčí.
+ * Selhání uložení hovoru nezruší.
+ */
+async function contactFor(payload: Pick<LeadPayload, 'company_name' | 'contact_name' | 'phone' | 'email'>): Promise<string | null> {
+  if (!payload.phone?.trim() && !payload.email?.trim()) return null
+  try {
+    return await ensureContact({
+      name: payload.contact_name ?? payload.company_name,
+      company: payload.contact_name ? payload.company_name : null,
+      email: payload.email,
+      phone: payload.phone,
+      source: 'lead',
+    })
+  } catch (err) {
+    console.error('[Hovory] kontakt se nepodařilo napojit', (err as Error).message)
+    return null
+  }
+}
+
 export async function createLead(payload: LeadPayload) {
   await requireAuth()
+  const contactId = await contactFor(payload)
   const rows = await sql`
     INSERT INTO client_leads (
       company_name, contact_name, phone, email,
       lead_status, next_action, next_action_date, next_action_time, next_action_type,
-      notes, estimated_value, call_answered
+      notes, estimated_value, call_answered, contact_id
     ) VALUES (
       ${payload.company_name},
       ${payload.contact_name},
@@ -71,7 +94,8 @@ export async function createLead(payload: LeadPayload) {
       ${payload.next_action_type},
       ${payload.notes},
       ${payload.estimated_value},
-      ${payload.call_answered}
+      ${payload.call_answered},
+      ${contactId}
     )
     RETURNING id, created_at
   `
@@ -88,8 +112,10 @@ export async function updateLead(id: string, payload: LeadPayload) {
   // po síti (R-092).
   // Rozpad času dělá `lib/prague-time.ts`, ne SQL (R-093).
   const instant = pragueDateTimeToISO(payload.next_action_date, payload.next_action_time)
+  // `old` vidí řádek před úpravou — podle něj se změna e-mailu a telefonu propíše do kontaktu (R-141).
   const update = q`
-    UPDATE client_leads SET
+    WITH old AS (SELECT id, email, phone, contact_id FROM client_leads WHERE id = ${id})
+    UPDATE client_leads cl SET
       company_name = ${payload.company_name},
       contact_name = ${payload.contact_name},
       phone = ${payload.phone},
@@ -111,8 +137,10 @@ export async function updateLead(id: string, payload: LeadPayload) {
           OR next_action_time IS DISTINCT FROM ${payload.next_action_time}
         THEN false ELSE reminder_2h_before_sent END,
       updated_at = now()
-    WHERE id = ${id}
-    RETURNING reminder_day_before_sent, reminder_2h_before_sent, updated_at
+    FROM old
+    WHERE cl.id = old.id
+    RETURNING cl.reminder_day_before_sent, cl.reminder_2h_before_sent, cl.updated_at,
+              old.email AS old_email, old.phone AS old_phone, old.contact_id::text AS contact_id
   `
 
   let rows: AdminRow[]
@@ -137,10 +165,42 @@ export async function updateLead(id: string, payload: LeadPayload) {
     rows = (await adminDb.batch([update]))[0]
   }
 
+  const saved = rows[0]
+  if (saved) await syncLeadContact(id, payload, saved)
+
   revalidatePath('/dashboard/calls')
   // Termín se mohl posunout i v kalendáři.
   if (instant !== null) revalidatePath('/dashboard/calendar')
-  return rows[0] as unknown as Pick<ClientLead, 'reminder_day_before_sent' | 'reminder_2h_before_sent' | 'updated_at'>
+  return {
+    reminder_day_before_sent: saved?.reminder_day_before_sent,
+    reminder_2h_before_sent: saved?.reminder_2h_before_sent,
+    updated_at: saved?.updated_at,
+  } as unknown as Pick<ClientLead, 'reminder_day_before_sent' | 'reminder_2h_before_sent' | 'updated_at'>
+}
+
+/**
+ * Po úpravě v Hovorech (R-141): řádek bez kontaktu se napojí, a když se
+ * změnil e-mail nebo telefon, kontakt si ho vezme — pokud tam měl prázdno,
+ * nebo právě tu starou hodnotu. Pak se propíše do zakázek a schůzek.
+ * Selhání uložení hovoru nezruší.
+ */
+async function syncLeadContact(id: string, payload: LeadPayload, saved: AdminRow): Promise<void> {
+  try {
+    const oldEmail = (saved.old_email as string | null) ?? null
+    const oldPhone = (saved.old_phone as string | null) ?? null
+    let contactId = (saved.contact_id as string | null) ?? null
+    if (!contactId) {
+      contactId = await contactFor(payload)
+      if (contactId) await adminDb`UPDATE client_leads SET contact_id = ${contactId} WHERE id = ${id} AND contact_id IS NULL`
+    }
+    if (!contactId) return
+    const changed = (oldEmail ?? '') !== (payload.email ?? '') || (oldPhone ?? '') !== (payload.phone ?? '')
+    if (!changed) return
+    await absorbIntoContact(contactId, { email: payload.email, phone: payload.phone }, { email: oldEmail, phone: oldPhone })
+    revalidatePath('/dashboard/kontakty')
+  } catch (err) {
+    console.error('[Hovory] propsání e-mailu a telefonu do kontaktu selhalo', (err as Error).message)
+  }
 }
 
 export async function setCallAnswered(id: string, answered: boolean | null) {

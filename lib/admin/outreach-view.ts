@@ -46,6 +46,10 @@ export type OutreachQueueRow = {
   emailClickedAt: string | null
   emailRepliedAt: string | null
   receivedAt: string
+  /** Kontakt firmy (R-141): e-mail a telefon výš jsou pak z něj. */
+  contactId?: string | null
+  /** Kontakt v Hovorech, když ho Kryštof převzal. */
+  clientLeadId?: string | null
 }
 
 export type QueueReason = {

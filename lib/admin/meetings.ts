@@ -2,6 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { adminDb, type AdminQuery } from '@/lib/admin/db'
 import { ensureContact } from '@/lib/admin/contacts'
+import { absorbIntoContact, linkOutreachContact, syncOutreachContact } from '@/lib/admin/contact-sync'
 import { loadOutreachSource } from '@/lib/admin/outreach'
 import { createMeetEvent, deleteGoogleEvent, moveGoogleEvent } from '@/lib/admin/google/calendar'
 import { normalizePhone } from '@/lib/contacts/normalize'
@@ -123,11 +124,25 @@ export async function scheduleOutreachMeeting(input: ScheduleInput, deps: Deps =
     await applyMeetingSettings(eventId, { phone: normalizePhone(source.phone), remindersOn: true })
     await planReminders(eventId)
   }
+  await rememberMeetingEmail(input.outreachId, inviteTo)
 
   return { ok: true, eventId, leadId, meetUrl: meet.meetUrl, inviteQueued: inviteTo !== null }
 }
 
 const OVERLAP_ERROR = 'V tu dobu už máte v kalendáři něco jiného.'
+
+/**
+ * E-mail, na který šla pozvánka, si kontakt firmy zapamatuje (R-141) — jen
+ * když žádný neměl. Příště se předvyplní všude. Selhání schůzku nezruší.
+ */
+async function rememberMeetingEmail(outreachId: string, inviteTo: string | null): Promise<void> {
+  try {
+    const contactId = await syncOutreachContact(outreachId)
+    if (contactId && inviteTo) await absorbIntoContact(contactId, { email: inviteTo, phone: null })
+  } catch (err) {
+    console.error('[meeting] zapamatování e-mailu u kontaktu selhalo', (err as Error).message)
+  }
+}
 
 type OutreachSource = NonNullable<Awaited<ReturnType<typeof loadOutreachSource>>>
 
@@ -160,14 +175,17 @@ async function writeMeeting(
     // Kontakt smí mít jen jednu spárovanou událost (migrace 051) — starou odpojit.
     queries.push({ text: `UPDATE calendar_events SET lead_id = NULL WHERE lead_id = $1`, params: [leadId] })
   } else {
-    const contactId = await ensureContact({
-      name: source.contact_name ?? source.company_name,
-      company: source.company_name,
-      email: source.email,
-      phone: source.phone,
-      source: 'growth-os',
-      seenAt: m.start.toISOString(),
-    })
+    const contactId =
+      source.contact_id ??
+      (await ensureContact({
+        name: source.contact_name ?? source.company_name,
+        company: source.company_name,
+        email: source.email,
+        phone: source.phone,
+        source: 'growth-os',
+        seenAt: m.start.toISOString(),
+      }))
+    if (contactId) await linkOutreachContact(m.outreachId, contactId)
     queries.push({
       text: `INSERT INTO client_leads (id, company_name, contact_name, phone, email, lead_status, next_action,
                                        next_action_type, next_action_date, next_action_time, notes, contact_id)

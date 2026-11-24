@@ -6,13 +6,20 @@ import { requireAuth } from '@/lib/auth'
 import {
   mergeContact,
   saveContactFields,
+  suggestContacts,
   unmergeContact,
+  type ContactSuggestion,
   type ContactWriteResult,
   type MergeResult,
 } from '@/lib/admin/contacts'
+import { propagateContact } from '@/lib/admin/contact-sync'
 
 /**
  * Kontakty (AD09): úprava údajů a sloučení duplicit.
+ *
+ * Kontakt je jediný zdroj e-mailu a telefonu klienta (R-141): po uložení se
+ * nový údaj propíše do Hovorů, zakázek a budoucích schůzek. Selhání propisu
+ * uložení nezruší — kontakt je uložený a propis doběhne při další úpravě.
  *
  * Sloučení se nikdy nedělá samo — vždy na kliknutí a vždy se dá vzít zpět
  * (`unmerge`), protože se při něm nic nemaže. Výsledek se vrací jako
@@ -49,8 +56,17 @@ export async function saveContact(id: string, raw: unknown): Promise<ContactWrit
   }
 
   const result = await saveContactFields(contactId.data, parsed.data)
-  if (result.ok) refresh(contactId.data)
-  return result
+  if (!result.ok) return result
+  try {
+    await propagateContact(result.id, result.previous)
+  } catch (err) {
+    console.error('[kontakty] propsání údajů do Hovorů a schůzek selhalo', (err as Error).message)
+  }
+  refresh(contactId.data)
+  revalidatePath('/dashboard/calls')
+  revalidatePath('/dashboard/calendar')
+  revalidatePath('/dashboard/ai-asistent')
+  return { ok: true, id: result.id }
 }
 
 export async function mergeDuplicate(sourceId: string, targetId: string): Promise<MergeResult> {
@@ -60,7 +76,15 @@ export async function mergeDuplicate(sourceId: string, targetId: string): Promis
   if (!source.success || !target.success) return { ok: false, error: 'Kontakt neexistuje.' }
 
   const result = await mergeContact(source.data, target.data)
-  if (result.ok) refresh(source.data, target.data)
+  if (result.ok) {
+    // Sloučené řádky dostanou údaje cíle jen tam, kde žádné nemají — sloučení jde vzít zpět, propis ne.
+    try {
+      await propagateContact(result.target)
+    } catch (err) {
+      console.error('[kontakty] doplnění údajů po sloučení selhalo', (err as Error).message)
+    }
+    refresh(source.data, target.data)
+  }
   return result
 }
 
@@ -72,4 +96,12 @@ export async function undoMerge(sourceId: string): Promise<ContactWriteResult> {
   const result = await unmergeContact(source.data)
   if (result.ok) refresh(source.data)
   return result
+}
+
+/** Našeptávač kontaktů v okně události (R-141). */
+export async function findContacts(raw: unknown): Promise<ContactSuggestion[]> {
+  await requireAuth()
+  const query = z.string().trim().min(2).max(80).safeParse(raw)
+  if (!query.success) return []
+  return suggestContacts(query.data)
 }

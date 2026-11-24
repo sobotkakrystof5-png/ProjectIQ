@@ -1,6 +1,7 @@
 import 'server-only'
 import { adminDb, batchTolerant } from '@/lib/admin/db'
 import { QUEUE_WHERE, loadOutreachQueue, type OutreachQueueRow } from '@/lib/admin/outreach'
+import { outreachContactOverlay } from '@/lib/admin/contact-sync'
 import { CLOSED_STATUSES } from '@/lib/admin/outreach-view'
 import {
   ACCEPTED_STATUSES,
@@ -102,6 +103,7 @@ function toContactDetail(r: Json): ContactDetail {
     ...toContactRow(r),
     phone: str(r.phone),
     email: str(r.email),
+    contactId: str(r.contact_id),
     website: str(r.website),
     segment: str(r.segment),
     sourceBatch: str(r.source_batch),
@@ -312,7 +314,12 @@ export async function loadContact(id: string): Promise<ContactScreen | null> {
     throw err
   }
   if (!leadRow) return null
-  const lead = toContactDetail(leadRow)
+  const raw = toContactDetail(leadRow)
+  // Telefon a e-mail z kontaktu mají přednost před snímkem z Growth OS (R-141).
+  const contact = (await outreachContactOverlay([{ id, contactId: raw.contactId, clientLeadId: raw.clientLeadId }])).get(id)
+  const lead = contact
+    ? { ...raw, contactId: contact.contactId, email: contact.email ?? raw.email, phone: contact.phone ?? raw.phone }
+    : raw
 
   // Hovory (116), e-maily (119) a schůzka (115) nemusí na každé databázi být.
   const [calls, emails, meetings] = await batchTolerant([
