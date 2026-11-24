@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-24 — review: jeden klient, jedny údaje (R-141), fialová schůzka (R-140), telefon podle e-mailu
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: necommitnutý diff nad `e01bb11` — `lib/admin/contact-sync.ts` (propis kontakt → Hovory, zakázky, budoucí schůzky), `ensureContact`, `saveContactFields`, `suggestContacts`, příjem snímků z Growth OS (`ingestOutreachLeads` → kontakty), akce `findContacts`, `openOutreachContact`, `findClientPhone` (druhé sezení), `createLead`/`updateLead`, `lead-mail-target`, schůzka od asistenta, migrace 130, našeptávač v okně události, tajemství v diffu.
+Výsledek: 0 nálezů k opravě před commitem, 1 přijaté riziko.
+Nálezy: (1) Nové akce mají `requireAuth` a Zod s délkami (`findContacts` 2–80 znaků, `findClientPhone` e-mail do 254, `openOutreachContact` uuid). (2) SQL je celé parametrizované; skládané kusy (`ROOT`, `FAMILY`, `DIGITS`) jsou konstanty, `ILIKE` má escapované zástupné znaky, dávka firem jde přes `jsonb_to_recordset`. (3) Našeptávač a detail firmy vykreslují údaje jako text v JSX, odkazy vedou jen na interní cesty s uuid. (4) **Přijaté riziko:** snímek z Growth OS teď smí změnit e-mail a telefon kontaktu (jen když kontakt drží hodnotu, kterou poslal Growth OS minule) a ten se propíše do budoucích schůzek. Kdo by získal `GROWTH_OS_API_KEY`, mohl by u takové firmy přesměrovat pozvánku a připomínky (s odkazem na Meet) na svou adresu. Dřív stejný klíč dodával e-mail, na který se pozvánka posílala, jen při zakládání schůzky — DECISIONS #051 (d).
+Opraveno: `syncOutreachContact` nezaloží kontakt firmě bez telefonu i e-mailu (jinak by vznikl kontakt jen se jménem). V diffu žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění.
+Zůstává: retence kontaktů z Growth OS (DECISIONS #051 (a)); v prohlížeči neověřeno.
+
 ## 2026-11-23 — review: sloučení ochrany XSS/DDoS (R-138) a šablony e-mailu s fakturou (R-139) do `main`
 Spouštěč: před deployem (`web-security-review`)
 Rozsah: diff `6e6f9d0..9ac592e` — brána v `proxy.ts` (pořadí s novým Supabase `portal()`), `lib/security/{html,client-ip,memory-limiter,semaphore,front-gate,request-body}.ts`, routy přepisu hlasu a `invoices/parse` (`readFormDataLimited`), e-maily (`lib/email.ts`, Workspace `layout.ts`, schůzky, dotazník, konzultace, etapy, pozvánka, chat), akce `getInvoiceEmailTemplate`/`saveInvoiceEmail`, formulář a náhled šablony, migrace 129, tajemství v diffu.
