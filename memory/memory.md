@@ -1980,7 +1980,9 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
   dočasná stránka s vymyšlenými schůzkami (Playwright CLI) na 1280 px — Měsíc, Týden, Den, oba
   detaily — a 390 px bez vodorovného přetečení; stránka smazaná. Za přihlášením na skutečných datech
   neověřeno. Na produkci v tu chvíli 5 nadcházejících schůzek s odeslanou pozvánkou a 9 událostí
-  bez Meetu. Push na `main` schválil Kryštof (s ním odešel i úklidový commit `04941fe`).
+  bez Meetu. **Na produkci od 2026-11-24 (`22682a0`)**, s ním i úklidový commit `04941fe`; build Ready
+  (`dpl_EiVw…`, `fra1`), `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard` 307,
+  `/p/<nesmysl>` 404, bez běhových chyb.
 
 ### 2026-11-24 (úklid repa podle ponytail-audit)
 - **chore** Kontrola celého repa postupem `ponytail-audit` (github.com/DietrichGebert/ponytail, jen jako
