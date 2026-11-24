@@ -2,25 +2,44 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Trash2 } from 'lucide-react'
+import { Check, Plus, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { itemTotals, invoiceTotal } from '@/lib/invoice-pdf/totals'
-import { issueNewInvoice, lookupCompany } from '@/app/dashboard/finance/invoice-actions'
+import { getProjectBilling, issueNewInvoice, lookupCompany } from '@/app/dashboard/finance/invoice-actions'
 import { saveInvoiceDraft } from '@/app/dashboard/faktury/koncepty-actions'
 import type { InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 import type { IssueDraft } from '@/lib/admin/invoice-issue'
 import type { InvoiceIssueItem } from '@/lib/admin/invoice-issue-schema'
 import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
+import {
+  DEFAULT_DEPOSIT_PERCENT,
+  INVOICE_KINDS,
+  KIND_HINTS,
+  KIND_LABELS,
+  billingOverview,
+  formatPercent,
+  kindAvailability,
+  kindItemDescription,
+  resolveKindPlan,
+  type InvoiceKind,
+  type ProjectBilling,
+} from '@/lib/admin/invoice-kinds'
+import { cn } from '@/lib/utils'
+import { BillingBar } from './billing-bar'
 
 /**
  * Vystavení faktury (AD12). Cíl je hotovo do půl minuty: datum, splatnost
  * i odběratel jsou předvyplněné, zbývá napsat, co fakturuješ.
  *
  * Číslo faktury tu není — přiděluje ho databáze v okamžiku vystavení, aby
- * dvě faktury nikdy nedostaly totéž číslo. Proto ani nejde „uložit rozpracované":
- * doklad vzniká až kliknutím na Vystavit.
+ * dvě faktury nikdy nedostaly totéž číslo.
+ *
+ * Nahoře se vždy rozhoduje, o jakou fakturu jde (R-143): za celé dílo,
+ * zálohová, částečná, nebo finální. U zálohové a částečné se zadá procento
+ * z ceny zakázky, finální vezme všechno, co zbývá. Pruh pod volbou ukazuje,
+ * kolik je zaplaceno, kolik čeká na platbu a kolik zbývá vyfakturovat.
  */
 
 type Party = IssueDraft['counterparty']
@@ -58,8 +77,16 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
+/** „30 000 Kč", „249,50 Kč" — haléře jen tehdy, když nejsou nulové. */
 function money(amount: number, currency: string): string {
-  return new Intl.NumberFormat('cs-CZ', { style: 'currency', currency }).format(amount)
+  const whole = Math.round(amount * 100) % 100 === 0
+  return new Intl.NumberFormat('cs-CZ', { style: 'currency', currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 }).format(amount)
+}
+
+/** „30" i „30,5" → číslo; prázdné nebo nesmysl → null. */
+function toPercent(value: string): number | null {
+  const parsed = Number(value.replace(',', '.').trim())
+  return value.trim() !== '' && Number.isFinite(parsed) ? parsed : null
 }
 
 /** Z pole se čte číslo, ale píše se do něj text — prázdné pole není nula. */
@@ -80,6 +107,7 @@ export function IssueInvoiceForm({
   vatPayer,
   draftId = null,
   draftsEnabled = false,
+  kindsEnabled = false,
   initial,
 }: {
   draft: IssueDraft
@@ -92,7 +120,9 @@ export function IssueInvoiceForm({
   draftId?: string | null
   /** Je migrace 117 v databázi — jde ukládat koncepty? */
   draftsEnabled?: boolean
-  initial?: { currency: string; note: string }
+  /** Je migrace 132 v databázi — jde vystavit zálohovou, částečnou a finální? */
+  kindsEnabled?: boolean
+  initial?: { currency: string; note: string; kind?: InvoiceKind | null; percent?: number | null }
 }) {
   const router = useRouter()
   const editingDraft = draftId !== null
@@ -122,6 +152,62 @@ export function IssueInvoiceForm({
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const [aresPending, startAres] = useTransition()
+
+  // ─── Druh faktury (R-143) ───
+  const [billing, setBilling] = useState<ProjectBilling | null>(draft.billing)
+  const [billingPending, startBilling] = useTransition()
+  const availability = useMemo(() => kindAvailability(billing), [billing])
+  const [kind, setKind] = useState<InvoiceKind | null>(() => {
+    if (!kindsEnabled) return 'single'
+    const wanted = initial?.kind ?? null
+    return wanted && kindAvailability(draft.billing)[wanted] === null ? wanted : null
+  })
+  const [percentText, setPercentText] = useState(() =>
+    initial?.percent != null ? String(initial.percent).replace('.', ',') : String(DEFAULT_DEPOSIT_PERCENT),
+  )
+  const percent = toPercent(percentText)
+  const byPercent = kind !== null && kind !== 'single'
+  const overview = billing ? billingOverview(billing) : null
+  const plan = kind && byPercent ? resolveKindPlan(kind, percent, billing) : null
+  const planAmount = plan?.ok ? plan.plan.amount ?? 0 : 0
+  const planPercent = plan?.ok ? plan.plan.percent : null
+  // Popis položky se u druhu s procentem skládá sám („Web — záloha 30 %"),
+  // dokud ho nepřepíšete.
+  const [kindDescription, setKindDescription] = useState<string | null>(() =>
+    byPercent && draft.items[0]?.description ? draft.items[0].description : null,
+  )
+  const baseDescription = billing?.description || draft.items[0]?.description || ''
+  const autoDescription = kind ? kindItemDescription(kind, baseDescription, planPercent) : ''
+  const description = kindDescription ?? autoDescription
+
+  const chooseKind = (next: InvoiceKind) => {
+    setError(null)
+    setKind(next)
+    setKindDescription(null)
+    if (next !== 'single') setCurrency('CZK')
+    if (next === 'deposit' && toPercent(percentText) === null) setPercentText(String(DEFAULT_DEPOSIT_PERCENT))
+  }
+
+  const changeProject = (id: string) => {
+    setProjectId(id)
+    setError(null)
+    if (id === '') {
+      setBilling(null)
+      if (kind && kind !== 'single') setKind(kindsEnabled ? null : 'single')
+      return
+    }
+    startBilling(async () => {
+      const next = await getProjectBilling(id)
+      setBilling(next)
+      if (kindsEnabled && kind && kindAvailability(next)[kind] !== null) setKind(null)
+    })
+  }
+
+  /** Položky, jak půjdou na server: u druhu s procentem jediná, s částkou z procenta. */
+  const outgoingItems = (): InvoiceIssueItem[] =>
+    byPercent
+      ? [{ description, quantity: 1, unitPrice: planAmount, vatRate: vatPayer ? 21 : 0 }]
+      : items.map(toItem)
 
   const total = useMemo(() => {
     try {
@@ -154,17 +240,23 @@ export function IssueInvoiceForm({
 
   const saveDraft = () => {
     setError(null)
+    if (plan && !plan.ok) {
+      setError(plan.error)
+      return
+    }
     start(async () => {
       const result = await saveInvoiceDraft(draftId, {
         projectId: projectId === '' ? null : projectId,
         counterparty,
         email: email.trim(),
-        items: items.map(toItem),
+        items: outgoingItems(),
         currency,
         dueDays: Math.min(90, Math.max(0, daysBetween(issuedOn, dueOn))),
         // Plnění v den vystavení se neukládá — u konceptu je to den schválení.
         suppliedOn: suppliedOn === issuedOn ? '' : suppliedOn,
         note,
+        kind,
+        percent: kind === 'deposit' || kind === 'partial' ? percent : null,
       })
       if (result.error) {
         setError(result.error)
@@ -176,6 +268,14 @@ export function IssueInvoiceForm({
   }
 
   const submit = () => {
+    if (!kind) {
+      setError('Nahoře vyberte, o jakou fakturu jde.')
+      return
+    }
+    if (plan && !plan.ok) {
+      setError(plan.error)
+      return
+    }
     if (editingDraft) {
       saveDraft()
       return
@@ -190,8 +290,10 @@ export function IssueInvoiceForm({
           suppliedOn,
           dueOn,
           currency,
-          items: items.map(toItem),
+          items: outgoingItems(),
           note,
+          kind,
+          percent: kind === 'deposit' || kind === 'partial' ? percent : null,
         },
         email.trim(),
       )
@@ -199,10 +301,28 @@ export function IssueInvoiceForm({
         setError(result.error ?? 'Fakturu se nepodařilo vystavit.')
         return
       }
-      toast.success(`Faktura ${result.number} vystavená`)
+      toast.success(`${kind === 'single' ? 'Faktura' : `${KIND_LABELS[kind]} faktura`} ${result.number} vystavená`)
       router.push(`/dashboard/faktury/${result.id}`)
     })
   }
+
+  const projectSelect = (
+    <Field label="Zakázka" hint={kindsEnabled ? 'Procento se počítá z ceny zakázky. Faktura se objeví v jejím detailu.' : 'Faktura se tím objeví v detailu zakázky.'}>
+      <select
+        value={projectId}
+        onChange={e => changeProject(e.target.value)}
+        className="h-11 w-full rounded-chip border border-input bg-surface px-3.5 text-[15px] text-ink transition-colors focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+      >
+        <option value="">Bez zakázky</option>
+        {projects.map(project => (
+          <option key={project.id} value={project.id}>
+            {project.client_name}
+            {project.description ? ` — ${project.description}` : ''}
+          </option>
+        ))}
+      </select>
+    </Field>
+  )
 
   return (
     <form
@@ -212,6 +332,104 @@ export function IssueInvoiceForm({
         submit()
       }}
     >
+      {kindsEnabled && (
+        <section className="flex flex-col gap-4 rounded-box border border-navy-100 bg-surface p-4 sm:p-5">
+          {projectSelect}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="mb-1 text-sm font-semibold text-ink">Jaká je to faktura?</legend>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {INVOICE_KINDS.map((k) => {
+                const why = availability[k]
+                const isOn = kind === k
+                return (
+                  <label
+                    key={k}
+                    className={cn(
+                      'relative flex min-h-[72px] flex-col gap-1 rounded-box border p-3.5 pr-10 transition-colors duration-200 ease-zq has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy-500 has-[:focus-visible]:ring-offset-2',
+                      isOn ? 'border-navy-700 bg-navy-50' : 'border-navy-100 bg-surface',
+                      why ? 'cursor-not-allowed' : 'cursor-pointer hover:border-navy-300',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="invoice-kind"
+                      value={k}
+                      checked={isOn}
+                      disabled={why !== null}
+                      onChange={() => chooseKind(k)}
+                      className="sr-only"
+                    />
+                    <span className={cn('text-[15px] font-semibold leading-snug', why ? 'text-quiet' : 'text-ink')}>{KIND_LABELS[k]}</span>
+                    <span className="text-xs leading-snug text-quiet">{why ?? KIND_HINTS[k]}</span>
+                    {isOn && <Check aria-hidden size={18} strokeWidth={1.75} className="absolute right-3 top-3.5 text-navy-700" />}
+                  </label>
+                )
+              })}
+            </div>
+          </fieldset>
+
+          {overview && overview.price > 0 && (
+            <div className="flex flex-col gap-4 border-t border-navy-100 pt-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p className="text-sm text-ink">
+                  Cena zakázky <span className="font-num font-semibold tabular-nums">{money(overview.price, 'CZK')}</span>
+                </p>
+                <p className="text-sm text-quiet">
+                  Zbývá doplatit <span className="font-num tabular-nums text-ink">{money(overview.toPay, 'CZK')}</span>
+                </p>
+              </div>
+              <BillingBar overview={overview} thisAmount={byPercent ? planAmount : 0} />
+
+              {(kind === 'deposit' || kind === 'partial') && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <Field label="Kolik procent z ceny">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={percentText}
+                          inputMode="decimal"
+                          className="w-24"
+                          aria-label="Procento z ceny zakázky"
+                          onChange={e => setPercentText(e.target.value)}
+                        />
+                        <span className="text-sm text-quiet">%</span>
+                      </div>
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      {[30, 50].filter(p => p <= overview.freePct).map(p => (
+                        <Button key={p} type="button" variant="outline" onClick={() => setPercentText(String(p))}>
+                          {p} %
+                        </Button>
+                      ))}
+                      {overview.freePct > 0 && (
+                        <Button type="button" variant="outline" onClick={() => setPercentText(formatPercent(overview.freePct))}>
+                          Zbytek {formatPercent(overview.freePct)} %
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {plan && !plan.ok ? (
+                    <p className="text-sm text-danger">{plan.error}</p>
+                  ) : (
+                    <p className="text-sm text-ink">
+                      Faktura na <span className="font-num font-semibold tabular-nums">{money(planAmount, 'CZK')}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+              {kind === 'final' && plan?.ok && (
+                <p className="text-sm text-ink">
+                  Finální faktura na všechno, co zbývá:{' '}
+                  <span className="font-num font-semibold tabular-nums">{money(planAmount, 'CZK')}</span>
+                  {planPercent !== null && <span className="text-quiet"> · {formatPercent(planPercent)} % ceny</span>}
+                </p>
+              )}
+            </div>
+          )}
+          {billingPending && <p className="text-xs text-quiet">Načítám platby zakázky…</p>}
+        </section>
+      )}
+
       <section className="flex flex-col gap-4 rounded-box border border-navy-100 bg-surface p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-ink">Odběratel</h2>
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
@@ -246,6 +464,18 @@ export function IssueInvoiceForm({
         </Field>
       </section>
 
+      {byPercent ? (
+        <section className="flex flex-col gap-4 rounded-box border border-navy-100 bg-surface p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-ink">Co fakturujete</h2>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <Field label="Popis" hint="Tohle bude na faktuře jako položka. Částka se počítá z procenta.">
+              <Input value={description} onChange={e => setKindDescription(e.target.value)} required={!editingDraft} />
+            </Field>
+            <p className="pb-3 font-num text-[17px] font-semibold tabular-nums text-ink">{money(planAmount, 'CZK')}</p>
+          </div>
+          {!vatPayer && <p className="text-xs text-quiet">Nejste plátce DPH, takže se na faktuře neúčtuje.</p>}
+        </section>
+      ) : (
       <section className="flex flex-col gap-4 rounded-box border border-navy-100 bg-surface p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-ink">Co fakturujete</h2>
         <div className="flex flex-col gap-3">
@@ -303,6 +533,7 @@ export function IssueInvoiceForm({
         </div>
         {!vatPayer && <p className="text-xs text-quiet">Nejste plátce DPH, takže se na faktuře neúčtuje.</p>}
       </section>
+      )}
 
       <section className="flex flex-col gap-4 rounded-box border border-navy-100 bg-surface p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-ink">Podrobnosti</h2>
@@ -313,14 +544,15 @@ export function IssueInvoiceForm({
           <Field label="Splatnost">
             <Input type="date" value={dueOn} onChange={e => setDueOn(e.target.value)} required />
           </Field>
-          <Field label="Datum plnění">
+          <Field label="Datum plnění" hint={kind === 'deposit' ? 'Na zálohové faktuře se netiskne.' : undefined}>
             <Input type="date" value={suppliedOn} onChange={e => setSuppliedOn(e.target.value)} required />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Měna">
+          <Field label="Měna" hint={byPercent ? 'Cena zakázky je v korunách.' : undefined}>
             <select
               value={currency}
+              disabled={byPercent}
               onChange={e => setCurrency(e.target.value)}
               className="h-11 w-full rounded-chip border border-input bg-surface px-3.5 text-[15px] text-ink transition-colors focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
             >
@@ -331,21 +563,7 @@ export function IssueInvoiceForm({
               ))}
             </select>
           </Field>
-          <Field label="Zakázka" hint="Faktura se tím objeví v detailu zakázky.">
-            <select
-              value={projectId}
-              onChange={e => setProjectId(e.target.value)}
-              className="h-11 w-full rounded-chip border border-input bg-surface px-3.5 text-[15px] text-ink transition-colors focus-visible:border-navy-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            >
-              <option value="">Bez zakázky</option>
-              {projects.map(project => (
-                <option key={project.id} value={project.id}>
-                  {project.client_name}
-                  {project.description ? ` — ${project.description}` : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {!kindsEnabled && projectSelect}
         </div>
         <Field label="Poznámka" hint="Napíše se dolů na fakturu.">
           <Input value={note} onChange={e => setNote(e.target.value)} />

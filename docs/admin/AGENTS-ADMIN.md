@@ -749,6 +749,55 @@ Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a ad
 - Záloha vyšší než zbývá se neuloží (`INSERT … SELECT … WHERE`); smazat jde jen ruční příjem,
   který si nepřevzala faktura. Test `lib/__tests__/admin-zalohy.test.ts`.
 
+### Vzhled a povinné údaje faktury (R-142)
+
+- **Jeden renderer** `lib/invoice-pdf/render.ts` pro admin, Workspace i klientský prostor. Doklad obsahuje: druh
+  a číslo (u plátce „Faktura – daňový doklad"), dodavatele (právní jméno, obchodní značka, adresa, IČO, DIČ,
+  **údaj o zápisu** podle § 435 OZ, kontakt), odběratele, datum vystavení, **datum uskutečnění plnění vždy**,
+  splatnost, variabilní symbol, položky (u neplátce „Cena za kus", u plátce „Cena za kus bez DPH" a sazba),
+  u plátce rekapitulaci DPH po sazbách (`vatRecap`), u neplátce větu „Dodavatel není plátcem DPH."
+- **Platební údaje** jen u faktury, která se platí: účet v tuzemském tvaru z českého IBANu (`czechAccountFromIban`),
+  IBAN po čtveřicích, VS, částka, splatnost a QR (jen CZK). Zaplacená má štítek a „Uhrazeno …", stornovaná
+  červený pruh, přeškrtnutou částku a žádné platební údaje; storno nedostane QR ani při `payable: true`.
+- **Patička na každé stránce** přes `@page` okraje (`@bottom-left`/`@bottom-right`, Chromium ≥ 131, Vercel má 149):
+  „Vystaveno v systému ZakazIQ · zakaziq.cz" se znakem dílků a „Faktura <číslo> · strana X z Y". Barvy v okraji
+  stránky jsou číslem, okraj nedědí proměnné z `:root`.
+- **Profil dodavatele** (`issuerProfileSchema`) má navíc `tradeName`, `registry`, `phone`, `web` s `.default('')`, aby
+  starý profil prošel čtením. **Uložení** jde přes `issuerProfileSaveSchema`, které bez `registry` neprojde.
+  Snímek na faktuře nese všechna pole; starší snímky je nemají a PDF je prostě nevytiskne.
+- Do klientského prostoru jdou z dodavatele navíc jen `tradeName`, `registry`, `web` (migrace 131), ne e-mail
+  a telefon (DECISIONS #042).
+
+### Druh faktury a rozpis ceny zakázky (R-143)
+
+- **Čtyři druhy** (`lib/admin/invoice-kinds.ts`, čisté, čte i formulář): `single` Za celé dílo, `deposit` Zálohová
+  (výchozí 30 %), `partial` Částečná, `final` Finální. Formulář `/dashboard/faktury/nova` druh **nepředvyplní**,
+  `issueNewInvoice` bez něj vrátí „Vyberte, o jakou fakturu jde." (`issueKindSchema`). `?druh=` předvybere druh
+  z tlačítek v detailu zakázky (Fakturace › Platby za zakázku).
+- **Rozpis zakázky** `loadProjectBilling` (`lib/admin/project-billing.ts`): cena, zaplaceno (stejně jako
+  `remainingSql`: vlastní záloha, ruční zálohy, příjmy založené fakturou; `projects.paid` = celé) a platné
+  korunové faktury zakázky. `billingOverview` z toho dělá zaplaceno / čeká na zaplacení / zbývá vyfakturovat;
+  pruh `components/admin/invoices/billing-bar.tsx` je ve formuláři i v detailu zakázky.
+- **Pravidla** (`kindAvailability`, `resolveKindPlan`): bez zakázky nebo bez ceny jen za celé dílo; po záloze či
+  faktuře už ne za celé dílo; finální až když je co odečíst; nikdy víc, než zbývá vyfakturovat. Procento je
+  z ceny zakázky, na celé koruny; rozdíl pod 1 Kč proti zbytku se dorovná na zbytek. Faktura s procentem je
+  **v korunách a má jednu položku**; její cenu **počítá server** (`prepareKindIssue` v `lib/admin/invoice-issue.ts`)
+  z databáze, z prohlížeče bere jen popis. U plátce se základ dopočítá zpátky z částky s DPH.
+- **Na dokladu (migrace 132):** `invoices.invoice_kind`, `share_percent`, `settlement` (snímek: cena, předchozí
+  faktury s druhem a zaplacením, zálohy bez faktury, tahle faktura, co zbývá). `admin_invoice_issue` je bere
+  z payloadu (`issuePayload(..., plan)`), `admin_invoice_locked` je hlídá. NULL = faktura před R-143 nebo archiv.
+- **PDF:** nadpis podle druhu (`KIND_TITLES`; plátce „– daňový doklad" kromě zálohové), u zálohové místo data
+  plnění „Záloha 30 % ceny" a věta „Zálohová faktura není daňový doklad.", u druhu s rozpisem blok „Rozpis ceny
+  zakázky" s pruhem a tečkami (jen CZK). Workspace `document` neposílá, tiskne se dál „Faktura".
+- **Koncepty:** `invoice_drafts.invoice_kind`, `share_percent` (132). `issueDraft` u konceptu s druhem částku
+  přepočítá podle zakázky v okamžiku schválení; koncept bez druhu se vystaví jako dřív. Hotová zakázka připraví
+  **finální** koncept (je-li záloha nebo faktura), jinak za celé dílo; bez 132 platí staré „s fakturou nic".
+- **Klientský prostor (migrace 133):** `portal.invoices.document` = {kind, percent, settlement}; čte se přes
+  `to_jsonb(i)`, takže prostor funguje i bez 133.
+- **Bez migrace 132** jde vystavit jen faktura za celé dílo (druh se neuloží), volba druhu se ve formuláři neukáže.
+- Testy `lib/__tests__/admin-faktury-druhy.test.ts` (záloha → částečná → finální, přefakturování, zámek, PDF,
+  storno, koncepty), `kp13-penize-faktury` (projekce 133), `invoice-pdf` (nadpisy, rozpis jen v CZK).
+
 ### Koncepty faktur a pravidelné faktury (R-117)
 
 - **Tabulky (migrace 117):** `invoice_drafts` (koncept: `source` `project_done`/`manual`/`assistant`/`recurring`, odběratel a položky v jsonb, `client_email`, `due_days`, `supplied_on` NULL = den schválení, `status` `draft` → `sending` → `issued` | `dismissed`, `invoice_id`), `invoice_recurring` (šablona, `day_of_month` 1–28, `active`) a sloupec `invoices.client_email` (kam faktura šla; trigger neměnnosti ho nehlídá). Unikátní indexy: jeden koncept `project_done` na zakázku (i zahozený), jeden koncept na šablonu a měsíc.

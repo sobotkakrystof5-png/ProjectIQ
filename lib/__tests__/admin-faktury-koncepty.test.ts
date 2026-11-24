@@ -58,6 +58,10 @@ const ISSUER: IssuerProfile = {
   bank: 'CZ6508000000192000145399',
   email: 'info@example.cz',
   vatPayer: false,
+  tradeName: 'VIZEON',
+  registry: 'Fyzická osoba zapsaná v živnostenském rejstříku',
+  phone: '',
+  web: '',
 }
 
 const fields = (over: Partial<DraftFields> = {}): DraftFields => ({

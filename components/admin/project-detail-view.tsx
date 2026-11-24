@@ -36,6 +36,10 @@ import { loadProjectPortalAccess } from '@/lib/portal/project-access'
 import { ProjectPhasesCard } from '@/components/admin/phases/project-phases-card'
 import { loadProjectPhases, loadServices } from '@/lib/admin/phases'
 import { getProjectInvoices } from '@/app/dashboard/finance/invoice-actions'
+import { BillingBar } from '@/components/admin/invoices/billing-bar'
+import { Button } from '@/components/ui/button'
+import { isKindsReady, loadProjectBilling } from '@/lib/admin/project-billing'
+import { billingOverview, kindAvailability, type InvoiceKind } from '@/lib/admin/invoice-kinds'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { getProjectCosts } from '@/app/costs-actions'
 import { getActiveAgentKey, isAgentKeyConfigured, maskAgentKey } from '@/lib/agent-keys'
@@ -609,10 +613,56 @@ function portalMessages(rows: AdminRow[]): PortalThreadMessage[] | null {
     }))
 }
 
+/** Tlačítka v kartě Platby za zakázku — jen druhy, které teď dávají smysl. */
+const KIND_BUTTONS: Record<InvoiceKind, string> = {
+  deposit: 'Vystavit zálohovou',
+  partial: 'Vystavit částečnou',
+  final: 'Vystavit finální',
+  single: 'Vystavit za celé dílo',
+}
+
+/**
+ * Platby za zakázku (R-143): kolik je zaplaceno, kolik čeká na platbu
+ * a kolik zbývá vyfakturovat, a odkud vystavit další fakturu.
+ */
+async function BillingPlanCard({ project }: { project: Project }) {
+  if (!(Number(project.price) > 0)) return null
+  const [billing, kindsReady] = await Promise.all([loadProjectBilling(project.id), isKindsReady()])
+  if (!billing) return null
+  const overview = billingOverview(billing)
+  const availability = kindAvailability(billing)
+  // Pořadí podle toho, co obvykle přijde na řadu: nejdřív záloha, pak části a doplatek.
+  const order: InvoiceKind[] = ['deposit', 'partial', 'final', 'single']
+  const kinds = kindsReady ? order.filter((k) => availability[k] === null) : []
+  return (
+    <Card>
+      <CardHead
+        title="Platby za zakázku"
+        hint={
+          overview.free > 0
+            ? 'Faktury se počítají z ceny zakázky. Vystavit jde jen to, co ještě nikdo nevyfakturoval.'
+            : 'Celá cena zakázky je vyfakturovaná.'
+        }
+      />
+      <BillingBar overview={overview} />
+      {kinds.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {kinds.map((k) => (
+            <Button key={k} asChild variant="outline">
+              <Link href={`/dashboard/faktury/nova?zakazka=${project.id}&druh=${k}`}>{KIND_BUTTONS[k]}</Link>
+            </Button>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 async function BillingTab({ project }: { project: Project }) {
   const [invoices, costs] = await Promise.all([getProjectInvoices(project.id), getProjectCosts(project.id)])
   return (
     <>
+      <BillingPlanCard project={project} />
       <Card>
         <InvoiceArchive
           data={invoices}

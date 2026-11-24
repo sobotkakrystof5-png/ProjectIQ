@@ -19,6 +19,7 @@ import { Card as AdminCard, SECTION_LABEL } from '@/components/admin/card'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { isInvoiceOverdue } from '@/lib/invoice-status'
 import { loadHandover } from '@/lib/admin/handover'
+import { KIND_TITLES, formatPercent } from '@/lib/admin/invoice-kinds'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -122,8 +123,8 @@ export default async function InvoiceDetailPage(props: PageProps) {
 
         <PageHeader
           className="mt-4"
-          title={`Faktura ${invoice.invoice_number}`}
-          subtitle={`${formatAmount(invoice.amount, invoice.currency)} · vystaveno ${formatDate(invoice.issued_on)}`}
+          title={`${invoice.issued?.kind ? KIND_TITLES[invoice.issued.kind] : 'Faktura'} ${invoice.invoice_number}`}
+          subtitle={`${formatAmount(invoice.amount, invoice.currency)}${invoice.issued?.percent ? ` · ${formatPercent(invoice.issued.percent)} % ceny zakázky` : ''} · vystaveno ${formatDate(invoice.issued_on)}`}
           action={
             <>
               <Badge variant={toneVariant(invoiceTone(Boolean(invoice.paid_on), overdue))}>

@@ -176,8 +176,8 @@ describe('PDF a síť',()=>{
    amount:1250.5,currency:'CZK',items:[],status:'issued',note:'',hasPdf:false}
   expect(spaydPaymentString(invoice)).toBe('SPD*1.0*ACC:CZ6508000000192000145399*AM:1250.50*CC:CZK*X-VS:2026000042')
   const html=await invoiceHtml(invoice,{name:'Test',logo:null})
-  expect(html).toContain('Zaplatit QR kódem');expect(html).toContain('<svg')
-  expect(await invoiceHtml({...invoice,status:'paid',paidOn:'2026-10-10'},{name:'Test',logo:null})).not.toContain('Zaplatit QR kódem')
+  expect(html).toContain('QR platba');expect(html).toContain('<svg')
+  expect(await invoiceHtml({...invoice,status:'paid',paidOn:'2026-10-10'},{name:'Test',logo:null})).not.toContain('QR platba')
   expect(spaydPaymentString({...invoice,issuer:{...invoice.issuer,bank:'19-2000145399/0800'}})).toBeNull()
   expect(spaydPaymentString({...invoice,currency:'EUR'})).toBeNull()
  })

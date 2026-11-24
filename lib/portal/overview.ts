@@ -107,8 +107,8 @@ export async function loadClientOverview(
          WHERE client_id = ${clientId} ORDER BY project_id, phase_id, position`,
       pq`SELECT project_id, price, paid, remaining FROM portal.project_money WHERE client_id = ${clientId}`,
       {
-        text: `SELECT project_id, ${INVOICE_COLUMNS} FROM portal.invoices
-               WHERE client_id = $1 ORDER BY issued_on DESC, number DESC`,
+        text: `SELECT i.project_id, ${INVOICE_COLUMNS} FROM portal.invoices i
+               WHERE i.client_id = $1 ORDER BY i.issued_on DESC, i.number DESC`,
         params: [clientId],
       },
       pq`SELECT id::text, project_id, starts_at, ends_at, topic, channel, meet_url, meet_pending

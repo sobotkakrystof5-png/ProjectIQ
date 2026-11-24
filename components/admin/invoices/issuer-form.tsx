@@ -50,8 +50,11 @@ export function IssuerForm({ initial }: { initial: IssuerProfile }) {
         save()
       }}
     >
-      <Field label="Jméno nebo firma">
+      <Field label="Jméno nebo firma" hint="Právní jméno podle rejstříku. U živnosti vaše jméno a příjmení.">
         <Input value={form.name} onChange={e => set({ name: e.target.value })} required />
+      </Field>
+      <Field label="Obchodní značka" hint="Nepovinné. Na faktuře bude velká v hlavičce, třeba VIZEON.">
+        <Input value={form.tradeName} onChange={e => set({ tradeName: e.target.value })} maxLength={80} />
       </Field>
       <Field label="Adresa" hint="Tak, jak má být na faktuře — ulice, město, PSČ.">
         <Input value={form.address} onChange={e => set({ address: e.target.value })} required />
@@ -66,16 +69,36 @@ export function IssuerForm({ initial }: { initial: IssuerProfile }) {
             required
           />
         </Field>
-        <Field label="DIČ" hint="Jen když jste plátce DPH.">
+        <Field label="DIČ" hint="Plátce DPH ho mít musí, neplátce jen pokud ho má.">
           <Input value={form.dic} onChange={e => set({ dic: e.target.value })} />
         </Field>
       </div>
-      <Field label="Účet (IBAN)" hint="Z IBANu se na faktuře vykreslí QR kód k zaplacení.">
+      <Field
+        label="Kde jste zapsaní"
+        hint="Na faktuře být musí. U živnosti: Fyzická osoba zapsaná v živnostenském rejstříku a název úřadu. U firmy: obchodní rejstřík, soud, oddíl a vložka."
+      >
+        <Input
+          value={form.registry}
+          onChange={e => set({ registry: e.target.value })}
+          maxLength={300}
+          placeholder="Fyzická osoba zapsaná v živnostenském rejstříku, Magistrát města …"
+          required
+        />
+      </Field>
+      <Field label="Účet (IBAN)" hint="Z IBANu se na faktuře vykreslí číslo účtu i QR kód k zaplacení.">
         <Input value={form.bank} onChange={e => set({ bank: e.target.value })} placeholder="CZ65 0800 0000 1920 0014 5399" />
       </Field>
-      <Field label="E-mail" hint="Nepovinné, tiskne se na fakturu.">
-        <Input value={form.email} onChange={e => set({ email: e.target.value })} type="email" />
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="E-mail" hint="Nepovinné, tiskne se na fakturu.">
+          <Input value={form.email} onChange={e => set({ email: e.target.value })} type="email" />
+        </Field>
+        <Field label="Telefon" hint="Nepovinné.">
+          <Input value={form.phone} onChange={e => set({ phone: e.target.value })} type="tel" maxLength={30} />
+        </Field>
+        <Field label="Web" hint="Nepovinné, třeba vizeon.cz.">
+          <Input value={form.web} onChange={e => set({ web: e.target.value })} maxLength={120} />
+        </Field>
+      </div>
       <label className="flex items-center gap-3 rounded-chip border border-input bg-surface px-3.5 py-3">
         <input
           type="checkbox"
@@ -85,7 +108,7 @@ export function IssuerForm({ initial }: { initial: IssuerProfile }) {
         />
         <span className="text-sm text-ink">
           Jsem plátce DPH
-          <span className="block text-xs text-quiet">Nezaškrtnuté: faktury se vystavují bez DPH a s větou „Dodavatel není plátce DPH“.</span>
+          <span className="block text-xs text-quiet">Nezaškrtnuté: faktury se vystavují bez DPH a s větou „Dodavatel není plátcem DPH.“</span>
         </span>
       </label>
 

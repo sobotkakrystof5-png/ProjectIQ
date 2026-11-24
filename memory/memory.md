@@ -1574,10 +1574,65 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
 
 - [ ] **Jeden klient, jedny údaje (R-141) — projít naživo:** kód i migrace 130 jsou na produkci od 2026-11-24.
   Projít: firma od asistenta se souhlasem má v detailu
+
+### R-142 · Faktura splňuje povinné náležitosti, nese značku VIZEON a vždy „Vystaveno v systému ZakazIQ" (2026-11-24)
+**Rozhodnutí:** (1) Každá faktura z ZakazIQ (admin, Workspace, klientský prostor) obsahuje všechny povinné
+údaje dokladu: číslo a druh, dodavatele s právním jménem, adresou, IČO (DIČ, má-li) a **údajem o zápisu do
+rejstříku nebo jiné evidence** (§ 435 OZ), odběratele, datum vystavení, **datum uskutečnění plnění vždy**,
+předmět, množství, cenu za kus a částku; u plátce DPH „daňový doklad", sazbu a rekapitulaci po sazbách,
+u neplátce „Dodavatel není plátcem DPH." (2) Dodavatel má **obchodní značku** (VIZEON) velkou v hlavičce,
+právní jméno (Kryštof Sobotka) zůstává u dodavatele. (3) Na **každé stránce** je patička „Vystaveno
+v systému ZakazIQ · zakaziq.cz" a „Faktura <číslo> · strana X z Y". (4) Zaplacená a stornovaná faktura to
+mají napsané nahoře i v souhrnu a nenabízejí platbu. (5) Profil dodavatele bez údaje o zápisu nejde uložit.
+**Proč:** Kryštof 2026-11-24: „chci, aby moje faktury splňovaly všechny body, co každá faktura v Česku povinně
+musí splňovat… doplň moji firmu VIZEON… profesionální, důvěryhodné… vydáno systémem ZakazIQ vždy uváděj".
+Údaj o zápisu u podnikatele zapsaného v jiné evidenci (živnostenský rejstřík) vyžaduje § 435 odst. 1 OZ.
+**Důsledek:** `lib/invoice-pdf/render.ts`, nová pole profilu `tradeName`, `registry`, `phone`, `web`
+(`lib/admin/invoice-issue-schema.ts`, `.default('')` kvůli starým profilům), migrace 131 (do klientského
+prostoru jde značka, zápis a web, ne e-mail a telefon — DECISIONS #042). Technika `docs/admin/AGENTS-ADMIN.md`
+→ „Vzhled a povinné údaje faktury (R-142)". Workspace profil pole `registry` zatím nemá (Otevřené problémy).
+
+### R-143 · Před fakturou se vybírá druh, faktury jdou po procentech z ceny zakázky (2026-11-24)
+**Rozhodnutí:** (1) Před každou fakturou v adminu se vybere druh: **Za celé dílo**, **Zálohová** (výchozí 30 %),
+**Částečná** (další část, třeba 30 / 30 / 40) nebo **Finální** (doplatek všeho, co zbývá). Nic se nepředvyplní,
+bez volby faktura nevznikne. (2) Procento je z ceny zakázky, částku počítá server z databáze a nikdy nepustí víc,
+než zbývá vyfakturovat; po záloze už nejde „za celé dílo", finální až když je co odečíst. (3) Pruh „zaplaceno /
+čeká na zaplacení / zbývá vyfakturovat" je ve formuláři i v detailu zakázky (Fakturace › Platby za zakázku,
+tlačítka pro každý druh). (4) Na PDF nadpis podle druhu (Zálohová / Částečná / Konečná faktura), u zálohové bez
+data plnění a s větou, že není daňový doklad, a „Rozpis ceny zakázky" s předchozími fakturami. (5) Jedna číselná
+řada pro všechny druhy (VS = číslo). (6) Hotová zakázka se zálohou připraví koncept **finální** faktury na zbytek.
+**Proč:** Kryštof 2026-11-24: „chci vždy rozhodnout, zda se jedná o zálohovou, finální, nebo fakturu za dílo…
+systém zbývá doplatit… přímka… vystav mi fakturu na zbývajících 30 %… 30, 30, 40". Vlastní řada pro zálohy by
+rozbila VS (jen číslice) a pro neplátce nemá oporu v zákoně. Zbytek pod 1 Kč se dorovná, ať 30/30/40 z lichých
+korun sedí na cenu.
+**Důsledek:** migrace 132 (`invoices.invoice_kind`, `share_percent`, `settlement` + koncepty, nová těla
+`admin_invoice_issue` a `admin_invoice_locked`) a 133 (`portal.invoices.document`). `lib/admin/invoice-kinds.ts`
+(čisté výpočty), `project-billing.ts`, `prepareKindIssue`. **Mění R-117** v části „k zakázce s fakturou se koncept
+nepřipravuje" — s migrací 132 vznikne finální koncept na zbytek. Nová cesta k vystavení faktury musí projít
+`prepareKindIssue`, jinak se druh neuloží. Technika `docs/admin/AGENTS-ADMIN.md` → „Druh faktury a rozpis ceny
+zakázky (R-143)", DECISIONS #042 doplnění.
+
   „Upravit telefon a e-mail", oprava e-mailu v Kontaktech se objeví v Hovorech, v okně schůzky a u budoucí
   schůzky; okno události v kalendáři našeptá kontakt a vyplní telefon i e-mail (390 a 1280 px, Escape zavře
   jen našeptávač). Ověřeno jen testy nad PGlite, `tsc` a buildem · od 2026-11-24
 - [ ] **Growth OS neposílá e-mail nadiktovaný v hovoru:** `email_jiny` jde do e-mailu s ukázkou, ale ne do
+- [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
+  skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
+  Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
+  dodavatele · Kryštof · od 2026-11-24
+- [ ] **Faktury R-142 a R-143 — ověřit po nasazení:** migrace 131–133 jsou na produkci od 2026-11-24, kód jde
+  na `main`. Po deployi zkontrolovat build a běhové chyby a projít Faktury › Nová faktura za přihlášením
+  · od 2026-11-24
+- [ ] **Druh faktury (R-143) — projít naživo:** formulář a pruh ověřené jen na dočasné stránce s vymyšlenými
+  daty (1280 a 390 px), logika testy nad PGlite. Projít za přihlášením: zakázka s cenou → Zálohová 30 % →
+  zaplatit → Částečná → Finální, PDF všech tří, koncept po přepnutí zakázky na Hotovo · od 2026-11-24
+- [ ] **Workspace: údaj o zápisu na faktuře chybí:** profil Workspace (`ws.accounts.invoice_profile`, Nastavení ›
+  Firma a fakturace) pole `registry` nemá, faktury firem z Workspace proto § 435 OZ nesplní. Doplnit pole
+  a povinnost jako v adminu · `lib/ws/money/{schema,data}.ts` · od 2026-11-24
+- [ ] **Plátce DPH a faktura v eurech:** zákon o DPH chce daň na dokladu v Kč; renderer ji u EUR faktury tiskne
+  v eurech a kurz neukládáme. Admin (Kryštof je neplátce) se netýká, Workspace ano — zakázat EUR plátci, nebo
+  ukládat kurz ČNB · od 2026-11-24
+
   `leads.email`, a v datech z hovoru je zakrytý. Zadání pro autopilota
   `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md` · od 2026-11-24
 - [ ] **Kontakty z Growth OS bez retence:** firma, která řekla ano, má od R-141 kontakt (`source = 'growth-os'`);
@@ -1972,6 +2027,46 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
   (nadcházející událost s kontaktem nebo Meetem bez odeslané pozvánky). Nad kalendářem souhrn
   za nadcházející schůzky zobrazeného období, v detailu kdy a kam pozvánka odešla a u „Bez
   pozvánky" tlačítko „Poslat pozvánku" (úprava s předvoleným Meetem). Stejně v Dnes a Hovorech
+### 2026-11-24 (druh faktury a zbývá doplatit — R-143)
+- **feat** Před vystavením se vybírá druh faktury: za celé dílo, zálohová (30 %), částečná (procento z ceny),
+  finální (všechno, co zbývá). Pruh zaplaceno / čeká na zaplacení / zbývá vyfakturovat ve formuláři a nová karta
+  „Platby za zakázku" v detailu zakázky s tlačítky pro každý druh. Server částku počítá z databáze a nepustí víc,
+  než je cena. PDF: nadpis podle druhu, zálohová bez data plnění, „Rozpis ceny zakázky" s předchozími fakturami.
+  Koncepty si pamatují druh a částku přepočítají při schválení; hotová zakázka se zálohou připraví finální koncept.
+  Detail faktury a panel Ke schválení ukazují druh. Soubory: `lib/admin/{invoice-kinds,project-billing,invoice-issue,
+  invoice-drafts,invoice-draft-schema}.ts`, `lib/invoice-pdf/render.ts`, `lib/portal/{money,overview}.ts`,
+  `components/admin/invoices/{issue-form,billing-bar,drafts-panel}.tsx`, `components/admin/project-detail-view.tsx`,
+  `app/dashboard/faktury/{nova,[id]}/page.tsx`, `app/dashboard/finance/invoice-actions.ts`.
+- **db** Migrace 132 `faktura_druh` a 133 `portal_druh_faktury` — spolu se 131 **aplikované na produkci**
+  2026-11-24 (Neon MCP po transakcích na souhlas Kryštofa, zapsané v `public.schema_migrations` s otiskem souboru;
+  md5 těl `admin_invoice_issue`, `admin_invoice_locked` a `portal.put_invoice` sedí na soubory, `portal_app` čte
+  `document`, `put_invoice` ani `public.invoices` ne). Testovací Neon ne.
+- **chore** Produkční profil dodavatele přepsaný SQL na souhlas Kryštofa (bez IBANu a DIČ). Ověřeno: `tsc`, nový
+  `admin-faktury-druhy.test.ts` (23 testů), testy faktur, prostoru a hlídání XSS/tříd 37 souborů / 494 testů,
+  tři PDF prohlédnuté okem, formulář na dočasné stránce 1280 a 390 px (stránka smazaná). Celá sada 1797 prošlo /
+  4 selhaly: `ws-email` (pevné datum, známé) a tři časové limity či limit požadavků pod zátěží, samostatně 60/60.
+  `npm run build` prošel.
+- **decision** **R-143**, DECISIONS #042 doplnění.
+
+### 2026-11-24 (faktura s povinnými údaji a značkou VIZEON — R-142)
+- **feat** Nový vzhled PDF faktury (`lib/invoice-pdf/render.ts`, sdílí admin, Workspace i klientský prostor):
+  značka dodavatele v hlavičce, „Faktura – daňový doklad" u plátce, dodavatel s údajem o zápisu a kontaktem,
+  řádek dat (vystavení, DUZP vždy, splatnost, VS), položky s čísly vpravo, rekapitulace DPH po sazbách, tmavé
+  pole „Celkem k úhradě", platební údaje s tuzemským číslem účtu z IBANu a QR, patička „Vystaveno v systému
+  ZakazIQ" a „Faktura X · strana N z M" na každé stránce. Opraveno: storno ukazovalo k úhradě i účet,
+  zaplacená faktura „Celkem k úhradě", neplátce nadpis „Cena bez DPH", nadpis „Celkem" nebyl zarovnaný
+  a e-mail dodavatele z profilu se na fakturu netiskl. Workspace posílá do PDF i storno.
+- **feat** Profil dodavatele v adminu: obchodní značka, kde jste zapsaní (povinné při uložení), telefon, web
+  (`lib/admin/invoice-issue-schema.ts`, `components/admin/invoices/issuer-form.tsx`, `invoice-actions.ts`,
+  `lib/admin/invoice-issue.ts`); do klientského prostoru jde značka, zápis a web (`lib/portal/money.ts`).
+- **db** Migrace 131 `faktura_udaje_dodavatele` — `portal.put_invoice` s novými klíči dodavatele a přepočet
+  projekce (aplikována na produkci 2026-11-24, viz R-143 výš).
+- **chore** Ověřeno: `tsc`, 19 souborů testů faktur (272 testů) včetně vykreslení v Chromu (`PDF_SMOKE`,
+  `WS_PDF_SMOKE`), nové testy povinných údajů, patičky, storna, zaplacené faktury, účtu z IBANu, DPH po sazbách,
+  starého profilu a escapování. Šest variant PDF prohlédnuto okem (neplátce s QR, zaplacená, storno, EUR,
+  plátce se dvěma sazbami, 34 položek na 3 stránkách). Za přihlášením v adminu neověřeno, necommitnuto.
+- **decision** **R-142**, doplnění DECISIONS #042.
+
   (tentýž `SmartCalendar`). Bez migrace, čte `invite_status` z 115. „Odešla" = převzal Resend,
   doručení do schránky se nesleduje. Soubory: `lib/admin/invite-mark.ts`,
   `components/SmartCalendar.tsx`, `components/AdminEventModal.tsx`, `docs/admin/AGENTS-ADMIN.md`,

@@ -15,10 +15,12 @@ import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/
 import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
 import { isInvoiceOutstanding, isInvoiceOverdue, invoiceSql } from '@/lib/invoice-status'
 import {
-  cancelInvoiceQuery, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, saveIssuerProfile,
+  cancelInvoiceQuery, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, prepareKindIssue, saveIssuerProfile,
   type IssuerSettings,
 } from '@/lib/admin/invoice-issue'
-import { issueInvoiceSchema, issuerProfileSchema } from '@/lib/admin/invoice-issue-schema'
+import { issueInvoiceSchema, issuerProfileSaveSchema } from '@/lib/admin/invoice-issue-schema'
+import { isInvoiceKind, issueKindSchema, type InvoiceKind, type ProjectBilling } from '@/lib/admin/invoice-kinds'
+import { loadProjectBilling } from '@/lib/admin/project-billing'
 import { invoiceEmailTemplateSchema } from '@/lib/admin/invoice-email-template'
 import { loadInvoiceEmailTemplate, saveInvoiceEmailTemplate } from '@/lib/admin/invoice-email-settings'
 import { lookupIco } from '@/lib/ares'
@@ -374,6 +376,9 @@ export interface IssuedInvoiceDetail {
   vat_total: number | null
   cancelled_at: string | null
   sent_at: string | null
+  /** Druh dokladu (R-143); null u faktur před R-143. */
+  kind: InvoiceKind | null
+  percent: number | null
 }
 
 /** Faktura se vším, co je o ní uloženo — včetně surového AI přepisu a vazby na ledger. */
@@ -484,8 +489,9 @@ function issuedQuery(id: string): AdminQuery {
   return {
     text: `
       SELECT items, issuer, client_address, supplied_on::text,
-             vat_total::float AS vat_total, cancelled_at::text, sent_at::text
-      FROM invoices
+             vat_total::float AS vat_total, cancelled_at::text, sent_at::text,
+             to_jsonb(i)->>'invoice_kind' AS invoice_kind, (to_jsonb(i)->>'share_percent')::float AS share_percent
+      FROM invoices i
       WHERE id = $1 AND number_seq IS NOT NULL
       LIMIT 1
     `,
@@ -495,8 +501,10 @@ function issuedQuery(id: string): AdminQuery {
 
 function toIssuedPart(row: unknown): IssuedInvoiceDetail | null {
   if (!row) return null
-  const r = row as IssuedInvoiceDetail & { items: unknown; issuer: unknown }
+  const r = row as IssuedInvoiceDetail & { items: unknown; issuer: unknown; invoice_kind: unknown; share_percent: number | null }
   return {
+    kind: isInvoiceKind(r.invoice_kind) ? r.invoice_kind : null,
+    percent: r.share_percent ?? null,
     items: (r.items as IssuedInvoiceDetail['items']) ?? [],
     issuer: r.issuer as IssuedInvoiceDetail['issuer'],
     client_address: r.client_address,
@@ -672,7 +680,7 @@ export async function getIssuerSettings(): Promise<IssuerSettings> {
 
 export async function saveIssuer(raw: unknown): Promise<{ error?: string }> {
   await requireAuth()
-  const parsed = issuerProfileSchema.safeParse(raw)
+  const parsed = issuerProfileSaveSchema.safeParse(raw)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Údaje dodavatele nejsou úplné.' }
   try {
     await saveIssuerProfile(parsed.data)
@@ -706,6 +714,10 @@ export async function issueNewInvoice(
 ): Promise<{ error?: string; id?: string; number?: string }> {
   await requireAuth()
 
+  // Druh faktury je povinný (R-143): před každou fakturou se rozhoduje,
+  // jestli je za celé dílo, zálohová, částečná, nebo finální.
+  const kind = issueKindSchema.safeParse(raw)
+  if (!kind.success) return { error: kind.error.issues[0]?.message ?? 'Vyberte, o jakou fakturu jde.' }
   const parsed = issueInvoiceSchema.safeParse(raw)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Něco ve faktuře nesedí.' }
 
@@ -716,7 +728,9 @@ export async function issueNewInvoice(
   }
 
   try {
-    const { id, number } = await issueInvoice(parsed.data, profile)
+    const prepared = await prepareKindIssue(parsed.data, kind.data, profile)
+    if (!prepared.ok) return { error: prepared.error }
+    const { id, number } = await issueInvoice(prepared.input, profile, prepared.plan)
     const email = z.string().trim().max(254).email().safeParse(clientEmail ?? '')
     if (email.success) await rememberClientEmail(id, email.data)
     revalidateInvoicePaths(parsed.data.projectId)
@@ -738,6 +752,16 @@ async function rememberClientEmail(id: string, email: string): Promise<void> {
       console.error('[Faktury] E-mail odběratele se nepodařilo uložit.', err instanceof Error ? err.message : String(err))
     }
   }
+}
+
+/**
+ * Rozpis ceny zakázky pro formulář faktury (R-143) — když se ve formuláři
+ * vybere jiná zakázka, než se kterou se otevřel.
+ */
+export async function getProjectBilling(projectId: string): Promise<ProjectBilling | null> {
+  await requireAuth()
+  if (!UUID_RE.test(projectId)) return null
+  return loadProjectBilling(projectId)
 }
 
 /** Storno: vystavený doklad se nepřepisuje, opravuje se novou fakturou. */

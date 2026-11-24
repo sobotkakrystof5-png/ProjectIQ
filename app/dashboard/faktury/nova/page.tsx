@@ -6,6 +6,8 @@ import { loadIssueDraft, type IssueDraft } from '@/lib/admin/invoice-issue'
 import { getDraft, isDraftsReady } from '@/lib/admin/invoice-drafts'
 import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
 import { requireAuth } from '@/lib/auth'
+import { isInvoiceKind, type InvoiceKind } from '@/lib/admin/invoice-kinds'
+import { isKindsReady, loadProjectBilling } from '@/lib/admin/project-billing'
 
 /**
  * Vystavení faktury (AD12). Dřív fakturu vyrobil jiný nástroj a sem se jen
@@ -17,23 +19,28 @@ import { requireAuth } from '@/lib/auth'
  *
  * `?koncept=<id>` otevře koncept faktury (R-117) k úpravě. Formulář ho pak
  * jen ukládá; vystavuje se ve Fakturách › Ke schválení.
+ *
+ * `?druh=deposit|partial|final|single` předvybere druh faktury (R-143) —
+ * tlačítka v detailu zakázky. Bez něj se druh vybírá ve formuláři, vždy.
  */
 
 export const metadata = { title: 'Nová faktura' }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export default async function NewInvoicePage(props: { searchParams: Promise<{ zakazka?: string; koncept?: string }> }) {
+export default async function NewInvoicePage(props: { searchParams: Promise<{ zakazka?: string; koncept?: string; druh?: string }> }) {
   await requireAuth()
   const searchParams = await props.searchParams
   const projectId = typeof searchParams.zakazka === 'string' && UUID.test(searchParams.zakazka) ? searchParams.zakazka : null
   const conceptId = typeof searchParams.koncept === 'string' && UUID.test(searchParams.koncept) ? searchParams.koncept : null
+  const wantedKind: InvoiceKind | null = isInvoiceKind(searchParams.druh) ? searchParams.druh : null
 
-  const [{ profile, configured }, prefill, projects, draftsEnabled, concept] = await Promise.all([
+  const [{ profile, configured }, prefill, projects, draftsEnabled, kindsEnabled, concept] = await Promise.all([
     getIssuerSettings(),
     loadIssueDraft(projectId),
     getInvoiceProjectOptions(),
     isDraftsReady(),
+    isKindsReady(),
     conceptId ? getDraft(conceptId) : Promise.resolve(null),
   ])
   // Koncept, který mezitím někdo vystavil nebo zahodil, se už neupravuje.
@@ -49,7 +56,9 @@ export default async function NewInvoicePage(props: { searchParams: Promise<{ za
     )
   }
 
-  const draft: IssueDraft = editable ? fromConcept(editable) : prefill
+  const draft: IssueDraft = editable
+    ? fromConcept(editable, editable.projectId ? await loadProjectBilling(editable.projectId) : null)
+    : prefill
 
   if (!configured) {
     return (
@@ -94,14 +103,19 @@ export default async function NewInvoicePage(props: { searchParams: Promise<{ za
         vatPayer={profile.vatPayer}
         draftId={editable?.id ?? null}
         draftsEnabled={draftsEnabled}
-        initial={editable ? { currency: editable.currency, note: editable.note } : undefined}
+        kindsEnabled={kindsEnabled}
+        initial={
+          editable
+            ? { currency: editable.currency, note: editable.note, kind: editable.kind ?? null, percent: editable.percent ?? null }
+            : { currency: 'CZK', note: '', kind: wantedKind }
+        }
       />
     </PageShell>
   )
 }
 
 /** Koncept ve tvaru, kterým se plní formulář: dnešek, splatnost za N dní. */
-function fromConcept(concept: NonNullable<Awaited<ReturnType<typeof getDraft>>>): IssueDraft {
+function fromConcept(concept: NonNullable<Awaited<ReturnType<typeof getDraft>>>, billing: IssueDraft['billing']): IssueDraft {
   const today = getPragueTodayISO()
   return {
     issuedOn: today,
@@ -113,5 +127,6 @@ function fromConcept(concept: NonNullable<Awaited<ReturnType<typeof getDraft>>>)
     projectId: concept.projectId,
     projectLabel: concept.projectLabel,
     items: concept.items,
+    billing,
   }
 }

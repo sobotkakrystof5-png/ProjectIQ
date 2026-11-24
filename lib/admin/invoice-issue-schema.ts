@@ -32,9 +32,26 @@ export const issuerProfileSchema = z.object({
   bank: text(40),
   email: text(254),
   vatPayer: z.boolean(),
+  // R-142. `.default('')`, aby profil uložený před R-142 dál prošel čtením —
+  // jinak by admin přestal umět vystavit fakturu, dokud někdo profil neuloží.
+  /** Obchodní značka (VIZEON). Právní jméno dodavatele zůstává v `name`. */
+  tradeName: text(80).default(''),
+  /** Údaj o zápisu do rejstříku nebo jiné evidence — povinný na obchodní listině (§ 435 OZ). */
+  registry: text(300).default(''),
+  phone: text(30).default(''),
+  web: text(120).default(''),
 }).refine(v => !v.vatPayer || v.dic.length > 0, { message: 'Plátce DPH musí mít DIČ.', path: ['dic'] })
 
 export type IssuerProfile = z.infer<typeof issuerProfileSchema>
+
+/**
+ * Ukládání profilu je přísnější než čtení: bez údaje o zápisu by faktura
+ * nesplnila § 435 občanského zákoníku, takže se profil bez něj neuloží.
+ */
+export const issuerProfileSaveSchema = issuerProfileSchema.refine(v => v.registry.length > 0, {
+  message: 'Doplňte, kde jste zapsaní — u živnosti živnostenský rejstřík a úřad, u firmy obchodní rejstřík s oddílem a vložkou.',
+  path: ['registry'],
+})
 
 export const invoiceItemSchema = z.object({
   description: text(200).min(1, 'Napište, co fakturujete.'),
@@ -60,6 +77,7 @@ export type IssueInvoiceInput = z.infer<typeof issueInvoiceSchema>
 
 export const EMPTY_ISSUER: IssuerProfile = {
   name: '', address: '', ico: '', dic: '', bank: '', email: '', vatPayer: false,
+  tradeName: '', registry: '', phone: '', web: '',
 }
 
 /** Výchozí splatnost: čtrnáct dní. */

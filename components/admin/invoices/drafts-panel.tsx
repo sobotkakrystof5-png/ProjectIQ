@@ -12,6 +12,7 @@ import { Card, CardHead } from '@/components/admin/card'
 import { dismissInvoiceDraft, restoreInvoiceDraft, saveDraftEmail } from '@/app/dashboard/faktury/koncepty-actions'
 import { DRAFT_SOURCE_LABELS, draftGaps, gapsSentence, periodLabel } from '@/lib/admin/invoice-draft-schema'
 import type { InvoiceDraft } from '@/lib/admin/invoice-drafts'
+import { KIND_LABELS, formatPercent } from '@/lib/admin/invoice-kinds'
 
 /**
  * Faktury › Ke schválení (R-117). Koncepty, které se připravily samy
@@ -167,6 +168,12 @@ function DraftRow({ draft }: { draft: InvoiceDraft }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-[15px] font-semibold text-ink">{who}</span>
           <Badge variant="neutral">{DRAFT_SOURCE_LABELS[draft.source]}</Badge>
+          {draft.kind && draft.kind !== 'single' && (
+            <Badge variant="neutral">
+              {KIND_LABELS[draft.kind]}
+              {draft.percent ? ` ${formatPercent(draft.percent)} %` : ''}
+            </Badge>
+          )}
         </div>
         <p className="mt-0.5 truncate text-sm text-quiet">
           {[what, context].filter(Boolean).join(' · ') || 'Bez položek'}

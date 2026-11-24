@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { createHash } from 'crypto'
 import { invoiceState, type InvoiceState } from '@/lib/invoice-status'
 import { getPragueTodayISO } from '@/lib/prague-time'
-import { spaydPaymentString, variableSymbol, type PdfInvoice } from '@/lib/invoice-pdf/render'
+import { spaydPaymentString, variableSymbol, type PdfDocument, type PdfInvoice } from '@/lib/invoice-pdf/render'
+import { INVOICE_KINDS } from '@/lib/admin/invoice-kinds'
 import { portalDb, pq, type PortalRow } from './db'
 
 // Peníze a faktury zakázky v klientském prostoru (KP13, migrace 122, R-125).
@@ -68,6 +69,11 @@ const issuerSchema = z.object({
   dic: z.string().max(20).nullish(),
   bank: z.string().max(40).nullish(),
   vatPayer: z.boolean().nullish(),
+  // R-142, migrace 131. Starší projekce je nemají. E-mail a telefon dodavatele
+  // do prostoru nejdou (DECISIONS #042).
+  tradeName: z.string().max(80).nullish(),
+  registry: z.string().max(300).nullish(),
+  web: z.string().max(120).nullish(),
 })
 const customerSchema = z.object({
   name: z.string().max(300).nullish(),
@@ -76,8 +82,30 @@ const customerSchema = z.object({
   dic: z.string().max(20).nullish(),
 })
 
-export const INVOICE_COLUMNS = `id, number, kind, issued_on, supplied_on, due_on, paid_on, cancelled_at, amount, vat_total,
-  currency, items, issuer, customer, printed_note, has_pdf, pdf_md5`
+/**
+ * Druh dokladu a rozpis ceny zakázky (R-143, migrace 133). Čte se přes
+ * `to_jsonb(i)`, aby dotaz fungoval i na databázi bez migrace 133.
+ */
+const documentSchema = z.object({
+  kind: z.enum(INVOICE_KINDS),
+  percent: z.coerce.number().finite().nullish(),
+  settlement: z.object({
+    price: z.coerce.number().finite(),
+    paidOutside: z.coerce.number().finite().default(0),
+    thisAmount: z.coerce.number().finite(),
+    thisPercent: z.coerce.number().finite(),
+    remainingAfter: z.coerce.number().finite(),
+    invoices: z.array(z.object({
+      number: z.string().max(40),
+      kind: z.enum(INVOICE_KINDS).nullish(),
+      amount: z.coerce.number().finite(),
+      paid: z.boolean(),
+    })).max(50).default([]),
+  }).nullish(),
+})
+
+export const INVOICE_COLUMNS = `i.id, i.number, i.kind, i.issued_on, i.supplied_on, i.due_on, i.paid_on, i.cancelled_at, i.amount, i.vat_total,
+  i.currency, i.items, i.issuer, i.customer, i.printed_note, i.has_pdf, i.pdf_md5, to_jsonb(i)->'document' AS document`
 
 /**
  * Projekce vystavené faktury ve tvaru sdíleného rendereru. `null`, když snímek
@@ -101,6 +129,9 @@ export function pdfInvoiceFromRow(row: PortalRow): PdfInvoice | null {
       dic: issuer.data.dic ?? null,
       bank: issuer.data.bank ?? null,
       vatPayer: issuer.data.vatPayer === true,
+      tradeName: issuer.data.tradeName ?? null,
+      registry: issuer.data.registry ?? null,
+      web: issuer.data.web ?? null,
     },
     counterparty: {
       name: customer.data.name ?? '',
@@ -118,6 +149,20 @@ export function pdfInvoiceFromRow(row: PortalRow): PdfInvoice | null {
     note: row.printed_note == null ? '' : String(row.printed_note),
     payable: row.paid_on == null && row.cancelled_at == null,
     cancelled: row.cancelled_at != null,
+    document: pdfDocument(row.document),
+  }
+}
+
+function pdfDocument(raw: unknown): PdfDocument | null {
+  const parsed = documentSchema.safeParse(raw)
+  if (!parsed.success) return null
+  const st = parsed.data.settlement
+  return {
+    kind: parsed.data.kind,
+    percent: parsed.data.percent ?? null,
+    settlement: st
+      ? { ...st, invoices: st.invoices.map(i => ({ number: i.number, kind: i.kind ?? null, amount: i.amount, paid: i.paid })) }
+      : null,
   }
 }
 
@@ -157,8 +202,8 @@ export async function loadClientMoney(
       pq`SELECT price, paid, remaining FROM portal.project_money
          WHERE client_id = ${clientId} AND project_id = ${projectId}`,
       {
-        text: `SELECT ${INVOICE_COLUMNS} FROM portal.invoices
-               WHERE client_id = $1 AND project_id = $2 ORDER BY issued_on DESC, number DESC`,
+        text: `SELECT ${INVOICE_COLUMNS} FROM portal.invoices i
+               WHERE i.client_id = $1 AND i.project_id = $2 ORDER BY i.issued_on DESC, i.number DESC`,
         params: [clientId, projectId],
       },
     ])
@@ -192,9 +237,10 @@ export async function loadClientInvoiceDoc(clientId: string, invoiceId: string):
   let rows: PortalRow[]
   try {
     rows = await portalDb({ clientId })<PortalRow>`
-      SELECT id, number, kind, issued_on, supplied_on, due_on, paid_on, cancelled_at, amount, vat_total,
-             currency, items, issuer, customer, printed_note, has_pdf, pdf_md5
-      FROM portal.invoices WHERE client_id = ${clientId} AND id = ${invoiceId}
+      SELECT i.id, i.number, i.kind, i.issued_on, i.supplied_on, i.due_on, i.paid_on, i.cancelled_at, i.amount, i.vat_total,
+             i.currency, i.items, i.issuer, i.customer, i.printed_note, i.has_pdf, i.pdf_md5,
+             to_jsonb(i)->'document' AS document
+      FROM portal.invoices i WHERE i.client_id = ${clientId} AND i.id = ${invoiceId}
     `
   } catch (err) {
     if (TOLERATED.has(pgCode(err) ?? '')) return null

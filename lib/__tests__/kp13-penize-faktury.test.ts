@@ -58,6 +58,10 @@ const ISSUER: IssuerProfile = {
   bank: IBAN,
   email: 'tajny-dodavatel@example.cz',
   vatPayer: false,
+  tradeName: 'VIZEON',
+  registry: 'Fyzická osoba zapsaná v živnostenském rejstříku',
+  phone: '',
+  web: '',
 }
 
 async function asClient<T = Record<string, unknown>>(clientId: string | null, sqlText: string, params: unknown[] = []) {
@@ -153,6 +157,7 @@ beforeAll(async () => {
   await db.exec(read('migrations', '093_project_activity.sql'))
   await db.exec(read('migrations', '107_fakturace_vystavovani.sql'))
   await db.exec(read('migrations', '117_faktury_koncepty.sql'))
+  await db.exec(read('migrations', '132_faktura_druh.sql'))
   await prepareConsultationTables(db)
   for (let i = 0; i < 2; i++) {
     await db.exec(read('migrations', '095_portal_schema.sql'))
@@ -164,6 +169,8 @@ beforeAll(async () => {
     await db.exec(read('migrations', '124_chat_s_klientem.sql'))
     await db.exec(read('migrations', '125_prehled_klienta.sql'))
     await db.exec(read('migrations', '126_poptavky_z_webu.sql'))
+    await db.exec(read('migrations', '131_faktura_udaje_dodavatele.sql'))
+    await db.exec(read('migrations', '133_portal_druh_faktury.sql'))
   }
   await db.exec('CREATE ROLE portal_app NOLOGIN')
   for (const stmt of read('scripts', 'portal-grants.sql')
@@ -322,6 +329,12 @@ describe('co do portal nikdy nesmí', () => {
     // Poznámka *na faktuře* je vytištěná na dokladu, takže u vystavené faktury je.
     const printed = await db.query<{ printed_note: string | null }>('SELECT printed_note FROM portal.invoices WHERE id = $1', [issuedId])
     expect(printed.rows[0].printed_note).toBe('Děkuji za spolupráci.')
+    // Údaj o zápisu a značka na dokladu být musí (R-142, migrace 131), e-mail dodavatele ne.
+    const issuer = await db.query<{ registry: string | null; trade: string | null; email: string | null }>(
+      `SELECT issuer->>'registry' AS registry, issuer->>'tradeName' AS trade, issuer->>'email' AS email FROM portal.invoices WHERE id = $1`,
+      [issuedId],
+    )
+    expect(issuer.rows[0]).toEqual({ registry: 'Fyzická osoba zapsaná v živnostenském rejstříku', trade: 'VIZEON', email: null })
   })
 
   it('divný obsah položek neshodí zápis v adminu', async () => {
@@ -398,6 +411,29 @@ describe('oddělení klientů (role portal_app)', () => {
     const after = await loadClientInvoiceDoc(A, eurId)
     expect(before?.etag).not.toBe(after?.etag)
     expect(after?.etag.startsWith('i-')).toBe(true)
+  })
+})
+
+describe('druh faktury v prostoru (R-143, migrace 133)', () => {
+  it('zálohová faktura přijde klientovi s druhem a rozpisem', async () => {
+    const PC = 'aaaaaaaa-0000-4000-8000-0000000000a2'
+    await db.query(
+      `INSERT INTO projects (id, client_name, description, status, price, invoiced_on_ico) VALUES ($1, 'Firma A', 'E-shop', 'new', 50000, true)`,
+      [PC],
+    )
+    await db.query('SELECT portal.link_project($1, $2)', [A, PC])
+    const settlement = { price: 50000, invoices: [], paidOutside: 0, thisAmount: 15000, thisPercent: 30, remainingAfter: 35000 }
+    const id = (await issueInvoice(
+      issueInput({ projectId: PC, items: [{ description: 'E-shop — záloha 30 %', quantity: 1, unitPrice: 15000, vatRate: 0 }] }),
+      ISSUER,
+      { kind: 'deposit', percent: 30, amount: 15000, settlement },
+    )).id
+
+    const doc = await loadClientInvoiceDoc(A, id)
+    expect(doc?.kind).toBe('issued')
+    if (doc?.kind !== 'issued') return
+    expect(doc.invoice.document).toEqual({ kind: 'deposit', percent: 30, settlement })
+    expect(await loadClientInvoiceDoc(B, id)).toBeNull()
   })
 })
 

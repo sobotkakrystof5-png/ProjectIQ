@@ -46,7 +46,7 @@ import {
   saveIssuerProfile,
 } from '@/lib/admin/invoice-issue'
 import type { IssuerProfile } from '@/lib/admin/invoice-issue-schema'
-import { cancelIssuedInvoice, issueNewInvoice } from '@/app/dashboard/finance/invoice-actions'
+import { cancelIssuedInvoice, issueNewInvoice, saveIssuer } from '@/app/dashboard/finance/invoice-actions'
 import { invoiceHtml } from '@/lib/invoice-pdf/render'
 import { invoiceTotal } from '@/lib/invoice-pdf/totals'
 import { syncInvoiceTransaction } from '@/lib/invoices'
@@ -60,6 +60,10 @@ const ISSUER: IssuerProfile = {
   bank: 'CZ6508000000192000145399',
   email: 'info@example.cz',
   vatPayer: false,
+  tradeName: 'VIZEON',
+  registry: 'Fyzická osoba zapsaná v živnostenském rejstříku, Magistrát města Mladá Boleslav',
+  phone: '',
+  web: 'vizeon.cz',
 }
 
 const input = (over: Partial<Parameters<typeof issueInvoice>[0]> = {}) => ({
@@ -448,6 +452,7 @@ describe('celá cesta vystavení: akce → doklad → PDF', () => {
   it('server action uloží doklad a z uloženého řádku vznikne hotové PDF', async () => {
     await saveIssuerProfile(ISSUER)
     const result = await issueNewInvoice({
+      kind: 'single',
       projectId: null,
       counterparty: { name: 'Konec s.r.o.', address: 'Krátká 2, Brno', ico: '27074358', dic: '' },
       issuedOn: '2026-12-01',
@@ -471,13 +476,35 @@ describe('celá cesta vystavení: akce → doklad → PDF', () => {
     const html = await invoiceHtml(loaded!.invoice, { name: 'VIZEON', logo: null })
     expect(html).toContain(result.number!)
     expect(html).toContain('Školení')
-    expect(html).toContain('Zaplatit QR kódem')
-    expect(html).toContain('Dodavatel není plátce DPH.')
+    expect(html).toContain('QR platba')
+    expect(html).toContain('Dodavatel není plátcem DPH.')
+    expect(html).toContain('Vystaveno v systému ZakazIQ')
+    // Snímek dodavatele z profilu se dostane až do PDF (R-142).
+    expect(html).toContain('Fyzická osoba zapsaná v živnostenském rejstříku')
+    expect(html).toContain('<p class="trade">VIZEON</p>')
+    expect(html).toContain('19-2000145399/0800')
+  })
+
+  it('profil uložený před R-142 se dál načte a faktura jde vystavit (R-142)', async () => {
+    const { tradeName: _t, registry: _r, phone: _p, web: _w, ...stary } = ISSUER
+    await db.query(`UPDATE admin_settings SET issuer_profile = $1::jsonb WHERE id = true`, [JSON.stringify(stary)])
+    const settings = await loadIssuerProfile()
+    expect(settings.configured).toBe(true)
+    expect(settings.profile.registry).toBe('')
+    await saveIssuerProfile(ISSUER)
+  })
+
+  it('bez údaje o zápisu do rejstříku se profil neuloží (R-142)', async () => {
+    const result = await saveIssuer({ ...ISSUER, registry: '' })
+    expect(result.error).toContain('kde jste zapsaní')
+    const ok = await saveIssuer(ISSUER)
+    expect(ok.error).toBeUndefined()
   })
 
   it('bez vyplněného dodavatele se faktura nevystaví', async () => {
     await db.query(`UPDATE admin_settings SET issuer_profile = NULL WHERE id = true`)
     const result = await issueNewInvoice({
+      kind: 'single',
       projectId: null,
       counterparty: { name: 'Nikdo', address: '', ico: '', dic: '' },
       issuedOn: '2026-12-01',
@@ -494,6 +521,7 @@ describe('celá cesta vystavení: akce → doklad → PDF', () => {
 
   it('neplátce DPH nevystaví fakturu s DPH', async () => {
     const result = await issueNewInvoice({
+      kind: 'single',
       projectId: null,
       counterparty: { name: 'Plátce', address: '', ico: '', dic: '' },
       issuedOn: '2026-12-01',
@@ -508,6 +536,7 @@ describe('celá cesta vystavení: akce → doklad → PDF', () => {
 
   it('storno přes akci doklad zruší a příjem po něm nezůstane', async () => {
     const issued = await issueNewInvoice({
+      kind: 'single',
       projectId: null,
       counterparty: { name: 'Storno s.r.o.', address: '', ico: '', dic: '' },
       issuedOn: '2026-12-02',
@@ -542,6 +571,7 @@ describe('celá cesta vystavení: akce → doklad → PDF', () => {
   it.runIf(process.env.PDF_SMOKE === '1')('a vykreslí se do skutečného PDF', async () => {
     const { renderInvoicePdf } = await import('@/lib/invoice-pdf/render')
     const issued = await issueNewInvoice({
+      kind: 'single',
       projectId: null,
       counterparty: { name: 'Žluťoučký kůň, s.r.o.', address: 'Dlouhá 1, Praha', ico: '27074358', dic: '' },
       issuedOn: '2026-12-04',

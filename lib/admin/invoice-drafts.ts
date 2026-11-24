@@ -5,7 +5,10 @@ import {
   issuePayload,
   loadIssueDraft,
   loadIssuerProfile,
+  prepareKindIssue,
 } from './invoice-issue'
+import { isKindsReady } from './project-billing'
+import { billingOverview, isInvoiceKind, kindItemDescription, type InvoiceKind, type KindPlan } from './invoice-kinds'
 import { issueInvoiceSchema } from './invoice-issue-schema'
 import {
   draftGaps,
@@ -79,6 +82,8 @@ type DraftRow = {
   supplied_on: string | null
   note: string
   created_at: string
+  invoice_kind?: string | null
+  share_percent?: number | null
 }
 
 const DRAFT_SELECT = `
@@ -88,7 +93,8 @@ const DRAFT_SELECT = `
               ELSE p.client_name || ' — ' || p.description END AS project_label,
          r.label AS recurring_label,
          d.counterparty, d.client_email, d.items, d.currency, d.due_days,
-         d.supplied_on::text AS supplied_on, d.note, d.created_at::text AS created_at
+         d.supplied_on::text AS supplied_on, d.note, d.created_at::text AS created_at,
+         to_jsonb(d)->>'invoice_kind' AS invoice_kind, (to_jsonb(d)->>'share_percent')::float AS share_percent
   FROM invoice_drafts d
   LEFT JOIN projects p ON p.id = d.project_id
   LEFT JOIN invoice_recurring r ON r.id = d.recurring_id
@@ -112,6 +118,8 @@ function toDraft(row: DraftRow): InvoiceDraft {
     dueDays: Number(row.due_days ?? 14),
     suppliedOn: row.supplied_on ?? '',
     note: row.note ?? '',
+    kind: isInvoiceKind(row.invoice_kind) ? row.invoice_kind : null,
+    percent: row.share_percent == null ? null : Number(row.share_percent),
   }
   let total = 0
   try {
@@ -180,7 +188,20 @@ export async function createDraft(source: 'manual' | 'assistant', fields: DraftF
   ])
   const id = (rows[0] as { id: string } | undefined)?.id
   if (!id) throw new Error('invoice_draft_missing')
+  await saveDraftKind(id, fields)
   return id
+}
+
+/**
+ * Druh a procento konceptu (migrace 132). Zvlášť, ať ukládání konceptu
+ * funguje i na databázi, kde 132 ještě není.
+ */
+async function saveDraftKind(id: string, fields: Pick<DraftFields, 'kind' | 'percent'>): Promise<void> {
+  if (!(await isKindsReady())) return
+  await adminDb`
+    UPDATE invoice_drafts SET invoice_kind = ${fields.kind ?? null}, share_percent = ${fields.kind && fields.kind !== 'single' && fields.kind !== 'final' ? fields.percent ?? null : null}
+    WHERE id = ${id}
+  `
 }
 
 /** Úprava konceptu. Vystavený nebo zahozený koncept se nemění. */
@@ -197,6 +218,7 @@ export async function updateDraft(id: string, fields: DraftFields): Promise<bool
       params: [id, ...fieldsParams(fields)],
     },
   ])
+  if (rows.length > 0) await saveDraftKind(id, fields)
   return rows.length > 0
 }
 
@@ -236,12 +258,14 @@ export async function deleteAssistantDraft(id: string): Promise<boolean> {
 // ─── Automatika: hotová zakázka ──────────────────────────────────────────────
 
 /**
- * Zakázka je hotová → koncept faktury na doplatek. Připraví se jen jednou
- * (ani zahozený se nevrátí) a jen tehdy, když dává smysl:
+ * Zakázka je hotová → koncept faktury na to, co zbývá. Připraví se jen
+ * jednou (ani zahozený se nevrátí) a jen tehdy, když dává smysl:
  * - zakázka je pro klienta a pořád ve stavu „hotovo" (Zpět ji mohl vrátit),
- * - zbývá něco doplatit (cena − zálohy, R-110),
- * - k zakázce ještě neexistuje žádná platná faktura — kdo už fakturuje
- *   ručně nebo po etapách, tomu se do toho nemluví.
+ * - zbývá něco vyfakturovat (cena − zálohy − platné faktury, R-110, R-143).
+ *
+ * Od R-143 je to **finální faktura**, když už byla záloha nebo předchozí
+ * faktura (odečte je), jinak faktura za celé dílo. Bez migrace 132 platí
+ * původní pravidlo: k zakázce s fakturou se koncept nepřipravuje.
  *
  * Vrací id nového konceptu, nebo null.
  */
@@ -250,27 +274,36 @@ export async function prepareProjectDoneDraft(projectId: string): Promise<string
   const rows = await adminDb<{ ok: boolean }>`
     SELECT (p.status = 'done'
             AND coalesce(p.project_type, 'client') = 'client'
-            AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.project_id = p.id AND i.cancelled_at IS NULL)
             AND NOT EXISTS (SELECT 1 FROM invoice_drafts d WHERE d.project_id = p.id AND d.source = 'project_done')
            ) AS ok
     FROM projects p WHERE p.id = ${projectId} LIMIT 1
   `
   if (rows[0]?.ok !== true) return null
 
-  const [draft, issuer] = await Promise.all([loadIssueDraft(projectId), loadIssuerProfile()])
-  if (draft.amount <= 0) return null
+  const [draft, issuer, kindsReady] = await Promise.all([loadIssueDraft(projectId), loadIssuerProfile(), isKindsReady()])
+  const billing = draft.billing
+  if (!billing) return null
+  if (!kindsReady && billing.invoices.length > 0) return null
 
+  const overview = billingOverview(billing)
+  const amount = billing.price > 0 ? overview.free : 0
+  if (amount <= 0) return null
+
+  const kind: InvoiceKind | null = !kindsReady ? null : billing.paid > 0 || billing.invoices.length > 0 ? 'final' : 'single'
   const vatRate = issuer.profile.vatPayer ? 21 : 0
-  const description = draft.items[0]?.description || projectDescription(draft.projectLabel)
+  const base = draft.items[0]?.description || projectDescription(draft.projectLabel)
+  const description = kind === 'final' ? kindItemDescription('final', billing.description || base, overview.freePct) : base
   const fields: DraftFields = {
     projectId,
     counterparty: draft.counterparty,
     email: draft.email,
-    items: [{ description, quantity: 1, unitPrice: draft.amount, vatRate }],
+    items: [{ description, quantity: 1, unitPrice: amount, vatRate }],
     currency: 'CZK',
     dueDays: 14,
     suppliedOn: '',
     note: '',
+    kind,
+    percent: null,
   }
 
   // ON CONFLICT: dvě rychlé změny stavu za sebou nezaloží dva koncepty.
@@ -286,7 +319,9 @@ export async function prepareProjectDoneDraft(projectId: string): Promise<string
       params: fieldsParams(fields),
     },
   ])
-  return (inserted[0] as { id: string } | undefined)?.id ?? null
+  const id = (inserted[0] as { id: string } | undefined)?.id ?? null
+  if (id) await saveDraftKind(id, fields)
+  return id
 }
 
 /**
@@ -302,7 +337,7 @@ export async function prepareProjectDoneDraftLater(projectId: string, delayMs: n
       await createNotification({
         type: 'invoice_draft',
         title: 'Faktura ke schválení',
-        body: 'Zakázka je hotová, koncept faktury na doplatek čeká ve Fakturách.',
+        body: 'Zakázka je hotová, koncept faktury na to, co zbývá, čeká ve Fakturách.',
         link: '/dashboard/faktury',
       })
     }
@@ -485,7 +520,8 @@ export async function issueDraft(id: string, to?: string): Promise<IssueDraftRes
         RETURNING d.id::text, d.source, d.status, d.project_id::text, d.period,
                   NULL::text AS project_label, NULL::text AS recurring_label,
                   d.counterparty, d.client_email, d.items, d.currency, d.due_days,
-                  d.supplied_on::text AS supplied_on, d.note, d.created_at::text AS created_at
+                  d.supplied_on::text AS supplied_on, d.note, d.created_at::text AS created_at,
+                  to_jsonb(d)->>'invoice_kind' AS invoice_kind, (to_jsonb(d)->>'share_percent')::float AS share_percent
       `,
       params: [id],
     },
@@ -521,11 +557,30 @@ export async function issueDraft(id: string, to?: string): Promise<IssueDraftRes
     return { ok: false, error: 'Nejste plátce DPH, takže položky musí mít sazbu 0 %.', status: 400, editHref }
   }
 
+  // Druh faktury (R-143): částka zálohové, částečné a finální se přepočítá
+  // podle stavu zakázky teď, ne podle toho, kdy koncept vznikl. Koncept bez
+  // druhu (z doby před R-143) se vystaví jako dřív.
+  let toIssue = parsed.data
+  let plan: KindPlan | null = null
+  if (draft.kind) {
+    if (draft.kind !== 'single' && parsed.data.items.length !== 1) {
+      await release()
+      return { ok: false, error: 'Zálohová, částečná i finální faktura má jednu položku.', status: 400, editHref }
+    }
+    const prepared = await prepareKindIssue(parsed.data, { kind: draft.kind, percent: draft.percent ?? null }, profile)
+    if (!prepared.ok) {
+      await release()
+      return { ok: false, error: prepared.error, status: 400, editHref }
+    }
+    toIssue = prepared.input
+    plan = prepared.plan
+  }
+
   let invoiceId: string | undefined
   try {
     const issued = await adminDb<{ invoice_id: string }>`
       UPDATE invoice_drafts SET
-        invoice_id = admin_invoice_issue(${JSON.stringify(issuePayload(parsed.data, profile))}::jsonb),
+        invoice_id = admin_invoice_issue(${JSON.stringify(issuePayload(toIssue, profile, plan))}::jsonb),
         status = 'issued', issued_at = now(), updated_at = now()
       WHERE id = ${id} AND status = 'sending'
       RETURNING invoice_id::text

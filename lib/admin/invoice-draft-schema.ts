@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { isIsoDate } from '@/lib/prague-time'
 import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
+import { INVOICE_KINDS } from './invoice-kinds'
 
 /**
  * Koncept faktury (R-117) — co jde uložit rozepsané a co musí být hotové,
@@ -35,6 +36,13 @@ export const draftFieldsSchema = z.object({
   /** Datum plnění; prázdné = den, kdy fakturu schválíte. */
   suppliedOn: z.string().max(10).refine(v => v === '' || isIsoDate(v), 'Vyberte platné datum.'),
   note: text(2000),
+  /**
+   * Druh faktury (R-143). Prázdný = koncept z doby před R-143, vystaví se
+   * jako dřív. Částku zálohové, částečné a finální faktury přepočítá
+   * schválení podle stavu zakázky v tu chvíli.
+   */
+  kind: z.enum(INVOICE_KINDS).nullish(),
+  percent: z.number().finite().positive().max(100).nullish(),
 })
 
 export type DraftFields = z.infer<typeof draftFieldsSchema>

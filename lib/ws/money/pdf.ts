@@ -19,7 +19,9 @@ function toPdfInvoice(invoice:Invoice):PdfInvoice {
  return {number:invoice.number,issuer:invoice.issuer,counterparty:invoice.counterparty,
   issuedOn:invoice.issuedOn,suppliedOn:invoice.suppliedOn,dueOn:invoice.dueOn,paidOn:invoice.paidOn,
   amount:invoice.amount,currency:invoice.currency,items:invoice.items,note:invoice.note,
-  payable:invoice.direction==='issued'&&invoice.status==='issued'}
+  payable:invoice.direction==='issued'&&invoice.status==='issued',
+  // Stornovaná faktura musí mít storno napsané i na PDF (R-142).
+  cancelled:invoice.status==='cancelled'}
 }
 
 export function spaydPaymentString(invoice:Invoice):string|null { return spayd(toPdfInvoice(invoice)) }

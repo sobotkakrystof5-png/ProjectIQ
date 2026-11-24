@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-24 — review: faktura s povinnými údaji (R-142) a druh faktury (R-143)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: necommitnutý diff nad `7c2e2f1` — renderer PDF (`lib/invoice-pdf/render.ts`), profil dodavatele (`issuerProfileSaveSchema`, `saveIssuer`), vystavení s druhem (`issueNewInvoice`, `prepareKindIssue`, `issueDraft`), nová akce `getProjectBilling`, koncepty (`saveInvoiceDraft`), projekce do klientského prostoru (`lib/portal/{money,overview}.ts`, migrace 131 a 133), migrace 132, tajemství v diffu.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Akce mají `requireAuth` a Zod s mezemi (druh jen ze čtyř hodnot, procento 0–100, `getProjectBilling` uuid). (2) Částku zálohové, částečné a finální faktury počítá server z databáze (`loadProjectBilling` → `resolveKindPlan`); z prohlížeče se bere jen popis položky, přefakturování nad cenu zakázky server odmítne (test). (3) PDF: všechny hodnoty z dokladu přes `escapeHtml`, šířky pruhu se počítají z čísel, číslo faktury v CSS patičce omezené na `[0-9A-Za-z/-]`. (4) `portal.put_invoice` (SECURITY DEFINER, pevný `search_path`) bere z `settlement` jen vyjmenované klíče; prostor čte `document` přes Zod. E-mail a telefon dodavatele do `portal` nejdou (test kp13). (5) `admin_invoice_issue` a `admin_invoice_locked` zůstávají SECURITY INVOKER s `REVOKE … FROM PUBLIC`; druh a rozpis hlídá trigger neměnnosti.
+Opraveno: nic nebylo potřeba. V diffu žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění (PDF má vlastní CSP v dokumentu jako dřív).
+Zůstává: v prohlížeči za přihlášením neověřeno.
+
 ## 2026-11-24 — review: jeden klient, jedny údaje (R-141), fialová schůzka (R-140), telefon podle e-mailu
 Spouštěč: před commitem (`web-security-review`)
 Rozsah: necommitnutý diff nad `e01bb11` — `lib/admin/contact-sync.ts` (propis kontakt → Hovory, zakázky, budoucí schůzky), `ensureContact`, `saveContactFields`, `suggestContacts`, příjem snímků z Growth OS (`ingestOutreachLeads` → kontakty), akce `findContacts`, `openOutreachContact`, `findClientPhone` (druhé sezení), `createLead`/`updateLead`, `lead-mail-target`, schůzka od asistenta, migrace 130, našeptávač v okně události, tajemství v diffu.

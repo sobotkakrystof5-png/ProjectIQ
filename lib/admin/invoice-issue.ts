@@ -4,7 +4,18 @@ import { contactOfProject, loadFacts, type AdminFacts } from '@/lib/admin/memory
 import { adminDb, type AdminQuery } from './db'
 import { extraDepositsSql, invoicePaymentsSql, remainingToPay } from './project-payments'
 import { invoiceTotal } from '@/lib/invoice-pdf/totals'
-import type { PdfInvoice } from '@/lib/invoice-pdf/render'
+import type { PdfDocument, PdfInvoice } from '@/lib/invoice-pdf/render'
+import { isKindsReady, loadProjectBilling } from './project-billing'
+import {
+  isInvoiceKind,
+  kindItemDescription,
+  resolveKindPlan,
+  round2,
+  type IssueKindInput,
+  type KindPlan,
+  type ProjectBilling,
+  type Settlement,
+} from './invoice-kinds'
 import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
 import {
   DEFAULT_DUE_DAYS,
@@ -102,8 +113,8 @@ export type IssueResult = { id: string; number: string }
  * Vystaví fakturu a vrátí její číslo. Profil dodavatele se na doklad uloží
  * jako **snímek** — pozdější změna profilu starší faktury nepřepíše.
  */
-export async function issueInvoice(input: IssueInvoiceInput, issuer: IssuerProfile): Promise<IssueResult> {
-  const payload = issuePayload(input, issuer)
+export async function issueInvoice(input: IssueInvoiceInput, issuer: IssuerProfile, plan: KindPlan | null = null): Promise<IssueResult> {
+  const payload = issuePayload(input, issuer, plan)
 
   // Dva příkazy schválně: řádek vložený funkcí ještě není vidět ve snímku
   // téhož dotazu, takže `JOIN invoices` by vrátil prázdno.
@@ -122,8 +133,13 @@ export async function issueInvoice(input: IssueInvoiceInput, issuer: IssuerProfi
  * že koncept faktury (R-117) vystavuje uvnitř jiného příkazu — koncept se
  * označí jako vystavený **v téže transakci**, ve které doklad vznikne.
  */
-export function issuePayload(input: IssueInvoiceInput, issuer: IssuerProfile): Record<string, unknown> {
+export function issuePayload(input: IssueInvoiceInput, issuer: IssuerProfile, plan: KindPlan | null = null): Record<string, unknown> {
   return {
+    // Druh, procento a rozpis (R-143, migrace 132). Bez plánu se nic nepošle
+    // a databáze bez migrace 132 nové klíče stejně ignoruje.
+    ...(plan
+      ? { invoice_kind: plan.kind, share_percent: plan.percent, settlement: plan.settlement }
+      : {}),
     project_id: input.projectId,
     client_name: input.counterparty.name,
     client_ico: input.counterparty.ico,
@@ -138,6 +154,58 @@ export function issuePayload(input: IssueInvoiceInput, issuer: IssuerProfile): R
     items: input.items,
     issuer,
   }
+}
+
+export type PreparedIssue = { ok: true; input: IssueInvoiceInput; plan: KindPlan | null } | { ok: false; error: string }
+
+/**
+ * Druh faktury → co se opravdu vystaví (R-143). Částku zálohové, částečné
+ * a finální faktury počítá server z ceny zakázky a z toho, co je už
+ * vyfakturované — položku z formuláře si nechá jen kvůli popisu.
+ *
+ * Bez migrace 132 jde vystavit jen faktura za celé dílo, a to jako dřív
+ * (druh se neuloží). Jinak by zálohová faktura vyšla jako obyčejná.
+ */
+export async function prepareKindIssue(
+  input: IssueInvoiceInput,
+  kind: IssueKindInput,
+  issuer: IssuerProfile,
+): Promise<PreparedIssue> {
+  const ready = await isKindsReady()
+  if (!ready && kind.kind !== 'single') {
+    return { ok: false, error: 'Zálohové, částečné a finální faktury se zapnou po spuštění migrace 132.' }
+  }
+
+  const billing = input.projectId ? await loadProjectBilling(input.projectId) : null
+  if (input.projectId && !billing) return { ok: false, error: 'Zakázka nenalezena.' }
+
+  const resolved = resolveKindPlan(kind.kind, kind.percent, billing)
+  if (!resolved.ok) return resolved
+  const plan = resolved.plan
+  if (plan.kind === 'single' || plan.amount === null || !billing) {
+    return { ok: true, input, plan: ready ? plan : null }
+  }
+
+  if (input.currency !== 'CZK') {
+    return { ok: false, error: 'Zálohová, částečná i finální faktura je v korunách, stejně jako cena zakázky.' }
+  }
+
+  const first = input.items[0]
+  const vatRate = issuer.vatPayer ? (first?.vatRate ?? 21) : 0
+  // U plátce je částka z procenta i s DPH — základ se dopočítá zpátky.
+  const unitPrice = vatRate > 0 ? round2(plan.amount / (1 + vatRate / 100)) : plan.amount
+  const items = [{
+    description: first?.description.trim() || kindItemDescription(plan.kind, billing.description, plan.percent),
+    quantity: 1,
+    unitPrice,
+    vatRate,
+  }]
+  const total = invoiceTotal(items)
+  const settlement: Settlement | null = plan.settlement
+    ? { ...plan.settlement, thisAmount: total, remainingAfter: round2(Math.max(0, plan.settlement.remainingAfter + plan.amount - total)) }
+    : null
+
+  return { ok: true, input: { ...input, items }, plan: { ...plan, amount: total, settlement } }
 }
 
 /**
@@ -184,6 +252,8 @@ export type IssueDraft = {
    * modelem (R-085). Prázdné pole = fakturuje se mu poprvé.
    */
   items: { description: string; quantity: number; unitPrice: number; vatRate?: 0 | 12 | 21 }[]
+  /** Cena zakázky, co je zaplacené a vyfakturované (R-143). Bez zakázky null. */
+  billing: ProjectBilling | null
 }
 
 /**
@@ -217,6 +287,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     projectId,
     projectLabel: null,
     items: [],
+    billing: null,
   }
   if (!projectId) return draft
 
@@ -294,7 +365,12 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
   // Popis položky dřív nikdo nepředvyplňoval, takže se u stálého klienta
   // opisoval pokaždé znovu (zjištěno při průchodu AD12). Fakta vědí, co se
   // mu fakturovalo naposledy.
-  draft.items = suggestItems(await loadFacts(await contactOfProject(projectId)), draft.amount)
+  const [facts, billing] = await Promise.all([
+    contactOfProject(projectId).then(loadFacts),
+    loadProjectBilling(projectId),
+  ])
+  draft.items = suggestItems(facts, draft.amount)
+  draft.billing = billing
   return draft
 }
 
@@ -313,8 +389,11 @@ export async function loadIssuedInvoiceForPdf(id: string): Promise<IssuedInvoice
       text: `
         SELECT invoice_number, client_name, client_ico, client_dic, client_address,
                issued_on::text, supplied_on::text, due_on::text, paid_on::text,
-               cancelled_at, amount::float AS amount, currency, items, issuer, note
-        FROM invoices
+               cancelled_at, amount::float AS amount, currency, items, issuer, note,
+               to_jsonb(i)->>'invoice_kind' AS invoice_kind,
+               (to_jsonb(i)->>'share_percent')::float AS share_percent,
+               to_jsonb(i)->'settlement' AS settlement
+        FROM invoices i
         WHERE id = $1 AND number_seq IS NOT NULL
         LIMIT 1
       `,
@@ -339,9 +418,16 @@ export async function loadIssuedInvoiceForPdf(id: string): Promise<IssuedInvoice
         items: PdfInvoice['items']
         issuer: IssuerProfile
         note: string | null
+        invoice_kind: string | null
+        share_percent: number | null
+        settlement: Settlement | null
       }
     | undefined
   if (!row) return null
+
+  const document: PdfDocument | null = isInvoiceKind(row.invoice_kind)
+    ? { kind: row.invoice_kind, percent: row.share_percent, settlement: row.settlement ?? null }
+    : null
 
   const invoice: PdfInvoice = {
     number: row.invoice_number,
@@ -352,6 +438,12 @@ export async function loadIssuedInvoiceForPdf(id: string): Promise<IssuedInvoice
       dic: row.issuer.dic,
       bank: row.issuer.bank,
       vatPayer: row.issuer.vatPayer,
+      // Snímky před R-142 tyhle údaje nemají — pak se na faktuře netisknou.
+      tradeName: row.issuer.tradeName ?? null,
+      registry: row.issuer.registry ?? null,
+      email: row.issuer.email ?? null,
+      phone: row.issuer.phone ?? null,
+      web: row.issuer.web ?? null,
     },
     counterparty: {
       name: row.client_name ?? '',
@@ -369,6 +461,7 @@ export async function loadIssuedInvoiceForPdf(id: string): Promise<IssuedInvoice
     note: row.note ?? '',
     payable: row.paid_on === null && row.cancelled_at === null,
     cancelled: row.cancelled_at !== null,
+    document,
   }
 
   return { invoice, filename: `faktura-${row.invoice_number}.pdf` }
