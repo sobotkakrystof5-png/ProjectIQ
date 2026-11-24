@@ -1521,6 +1521,16 @@ Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
   proto je podpis v textu. Text bez diakritiky a jen ze základní sady GSM (`toSmsText`), aby se
   vešel do jedné SMS (160 znaků); `reminderSms` vybere variantu, která odkaz na Meet neusekne.
   Odložené odeslání Odoriku se nepoužívá (nejde zrušit).
+- **Značka pozvánky v kalendáři** (`lib/admin/invite-mark.ts` → `inviteMarkOf`): v Měsíci, Týdnu
+  i Dni je u události fajfka „Pozvánka odešla", hodiny „se odesílá", červená obálka „neodešla",
+  nebo oranžová „Bez pozvánky". Bez pozvánky = nadcházející `manual` událost s klientem (Meet,
+  nebo e-mail či telefon kontaktu v Hovorech), které `invite_status` neříká `sent`/`pending`/
+  `sending`/`failed`; soukromá událost bez kontaktu a blokace značku nemají, u proběhlé zůstane
+  jen „odešla". Nad kalendářem je souhrn za nadcházející schůzky zobrazeného období. Detail
+  ukáže, kdy a kam pozvánka odešla, a u „Bez pozvánky" tlačítko **Poslat pozvánku** (otevře
+  úpravu s předvolenou volbou Meet, `EditableEvent.startAsMeeting`). „Odešla" = e-mail převzal
+  Resend; doručení do schránky ZakazIQ nesleduje (webhook Resendu pro vizeon.cz není).
+  Konzultace z volna značku nemají (rezervuje si je klient sám). Test `admin-pozvanka-znacka.test.ts`.
 - **Detail události** v kalendáři ukazuje stav připomínek (`getMeetingStatus`, načítá se až při
   otevření) a varuje, když spouštěč neběží. Smazání schůzky ji smaže i v Google Kalendáři, ale
   až po 10 s a jen když ji „Zpět" neobnovilo (obnova vrací stejné id i s připomínkami).

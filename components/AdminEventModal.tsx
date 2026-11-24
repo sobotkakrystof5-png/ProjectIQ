@@ -58,6 +58,8 @@ export type EditableEvent = {
     phone: string | null
     remindersOn: boolean
   } | null
+  /** Otevřít rovnou s „Schůzka přes Google Meet? Ano" (tlačítko Poslat pozvánku). */
+  startAsMeeting?: boolean
 }
 
 /** ISO okamžik → hodnota pro `datetime-local` v pražském čase. */
@@ -182,7 +184,7 @@ export function AdminEventModal({ onClose, onReload, defaultDate, defaultHour, e
   // ─── Schůzka přes Google Meet (R-137) ───
   const existingMeeting = editing?.meeting ?? null
   const [readiness, setReadiness] = useState<MeetingReadiness | null>(null)
-  const [meetingOn, setMeetingOn] = useState(false)
+  const [meetingOn, setMeetingOn] = useState(editing?.startAsMeeting === true && !existingMeeting)
   const [subjectEdited, setSubjectEdited] = useState<string | null>(null)
   const [introEdited, setIntroEdited] = useState<string | null>(null)
   const [demoUrl, setDemoUrl] = useState('')

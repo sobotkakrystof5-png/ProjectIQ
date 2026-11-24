@@ -7,13 +7,16 @@ import {
   ChevronLeft, ChevronRight, Plus, ExternalLink,
   CalendarDays, Phone, Monitor, Video, MessageSquare,
   CalendarPlus, Lock, Trash2, Clock, Flag, Pencil,
-  Building2, User, Mail, MessageCircle, Coins, CalendarClock, Repeat,
+  Building2, User, Mail, MessageCircle, Coins, CalendarClock, Repeat, Check, MailX,
 } from 'lucide-react'
 import {
   deleteCalendarEvent, restoreCalendarEvent, deleteClientAvailability, restoreClientAvailability,
 } from '@/app/calendar-actions'
 import { getMeetingStatus, resendMeetingInvite } from '@/app/meeting-actions'
 import type { MeetingStatus, ReminderRow } from '@/lib/admin/meeting-reminders'
+import {
+  INVITE_MARK_LABELS, inviteMarkOf, summarizeInviteMarks, type InviteMark, type InviteSummary,
+} from '@/lib/admin/invite-mark'
 import { toast } from '@/components/ui/toast'
 import {
   CHANNEL_LABELS, LEAD_ACTION_TYPE_LABELS, LEAD_STATUS_LABELS,
@@ -78,6 +81,8 @@ interface UnifiedEvent {
     /** Stav e-mailu s odkazem na schůzku (R-112). */
     inviteNote?: string | null
     inviteFailed?: boolean
+    /** Značka pozvánky v mřížce: dostal klient pozvánku? */
+    invite?: InviteMark | null
     clientWish?: string
     clientEmail?: string | null
     description?: string | null
@@ -205,7 +210,7 @@ function moment(start: Date, end: Date): Pick<UnifiedEvent, 'day' | 'startMin' |
   return { day, startMin, endMin: Math.max(endMin, startMin) }
 }
 
-function buildUnified({ consultations, deadlines, events, leads }: CalendarData): UnifiedEvent[] {
+function buildUnified({ consultations, deadlines, events, leads }: CalendarData, now: Date = new Date()): UnifiedEvent[] {
   const result: UnifiedEvent[] = []
 
   for (const c of consultations) {
@@ -281,7 +286,15 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData)
         contactDraft: { name: e.contact_person ?? null, phone: e.contact_phone, email: e.contact_email },
         // Schůzka s Google Meet (R-112): tlačítko „Připojit se" a stav e-mailu klientovi.
         meetingLink: e.meet_url ?? null,
-        inviteNote: inviteNote(e.invite_status ?? null),
+        invite: inviteMarkOf({
+          eventType: e.event_type,
+          meetUrl: e.meet_url ?? null,
+          inviteStatus: e.invite_status ?? null,
+          contactEmail: e.contact_email,
+          contactPhone: e.contact_phone,
+          endsAt: e.ends_at,
+        }, now),
+        inviteNote: inviteNote(e.invite_status ?? null, e.invite_sent_at ?? null, e.invite_to ?? null),
         inviteFailed: e.invite_status === 'failed',
         meeting: e.meet_url
           ? {
@@ -486,18 +499,96 @@ function ResendInviteButton({ eventId }: { eventId: string }) {
   )
 }
 
-function inviteNote(status: string | null): string | null {
+function inviteNote(status: string | null, sentAt: string | null, to: string | null): string | null {
   switch (status) {
-    case 'sent':
-      return 'Klient dostal e-mail s odkazem na schůzku.'
+    case 'sent': {
+      // „Odešla", ne „dostal": víme jen, že e-mail převzal Resend.
+      const when = sentAt ? ` ${shortDateTime(sentAt)}` : ''
+      const where = to ? ` na ${to}` : ''
+      return `Pozvánka s odkazem na schůzku odešla${when}${where}.`
+    }
     case 'pending':
     case 'sending':
-      return 'E-mail s odkazem na schůzku se odesílá.'
+      return 'Pozvánka s odkazem na schůzku se odesílá.'
     case 'failed':
-      return 'E-mail s odkazem klientovi neodešel.'
+      return 'Pozvánka s odkazem klientovi neodešla.'
     default:
       return null
   }
+}
+
+/**
+ * Značka pozvánky v bloku kalendáře. „Bez pozvánky" je jediná věc, která po
+ * vás něco chce, proto má plochu `signal` (R-091); chyba je `danger`, zbytek
+ * nese barvu události.
+ */
+function InviteIcon({ mark, withLabel = false }: { mark: InviteMark; withLabel?: boolean }) {
+  const label = INVITE_MARK_LABELS[mark]
+  const icon = { size: 12, strokeWidth: 1.75, 'aria-hidden': true as const }
+  return (
+    <span
+      title={label}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1',
+        mark === 'failed' && 'text-danger',
+        mark === 'missing' && 'rounded-full bg-signal text-signal-ink',
+        mark === 'missing' && (withLabel ? 'px-1.5 py-px' : 'p-px'),
+      )}
+    >
+      {/* Samotná fajfka: fajfka v rohu obálky je v 12px nečitelná. */}
+      {mark === 'sent' && <Check {...icon} strokeWidth={2.5} />}
+      {mark === 'sending' && <Clock {...icon} />}
+      {mark === 'failed' && <MailX {...icon} />}
+      {mark === 'missing' && <Mail {...icon} />}
+      {withLabel
+        ? <span className="text-[11px] font-semibold">{label}</span>
+        : <span className="sr-only">, {label.toLowerCase()}</span>}
+    </span>
+  )
+}
+
+/** Czech: 1 pozvánka, 2–4 pozvánky, 5+ pozvánek. */
+function plural(n: number, forms: [string, string, string]): string {
+  if (n === 1) return forms[0]
+  if (n >= 2 && n <= 4) return forms[1]
+  return forms[2]
+}
+
+/** Souhrn nad kalendářem: komu pozvánka odešla a komu ne, za zobrazené období. */
+function InviteSummaryLine({ summary }: { summary: InviteSummary }) {
+  const parts: { mark: InviteMark; text: string }[] = []
+  if (summary.sent > 0) parts.push({ mark: 'sent', text: `${summary.sent} s pozvánkou` })
+  if (summary.sending > 0) parts.push({ mark: 'sending', text: `${summary.sending} čeká na odeslání` })
+  if (summary.failed > 0) {
+    parts.push({
+      mark: 'failed',
+      text: `${summary.failed} ${plural(summary.failed, ['pozvánka neodešla', 'pozvánky neodešly', 'pozvánek neodešlo'])}`,
+    })
+  }
+  if (summary.missing > 0) parts.push({ mark: 'missing', text: `${summary.missing} bez pozvánky` })
+  if (parts.length === 0) return null
+
+  return (
+    <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-quiet" role="status">
+      <span className="font-medium text-ink">Nadcházející schůzky:</span>
+      {parts.map(({ mark, text }) => (
+        <span
+          key={mark}
+          className={cn(
+            'inline-flex items-center gap-1.5',
+            mark === 'failed' && 'text-danger',
+            mark === 'missing' && 'rounded-full bg-signal px-2 py-0.5 font-semibold text-signal-ink',
+          )}
+        >
+          {mark === 'sent' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}
+          {mark === 'sending' && <Clock size={14} strokeWidth={1.5} aria-hidden="true" />}
+          {mark === 'failed' && <MailX size={14} strokeWidth={1.5} aria-hidden="true" />}
+          {mark === 'missing' && <Mail size={14} strokeWidth={1.5} aria-hidden="true" />}
+          {text}
+        </span>
+      ))}
+    </p>
+  )
 }
 
 const REMINDER_KIND: Record<ReminderRow['kind'], string> = {
@@ -590,7 +681,7 @@ function EventDetailModal({
   event: UnifiedEvent
   onClose: () => void
   onDeleted: () => void
-  onEdit: (event: UnifiedEvent) => void
+  onEdit: (event: UnifiedEvent, options?: { startAsMeeting?: boolean }) => void
 }) {
   const [deleting, setDeleting] = useState(false)
   const style = getEventStyle(event)
@@ -757,6 +848,19 @@ function EventDetailModal({
               </div>
             )}
 
+            {/* Událost s klientem, kterému zatím nic nepřišlo: pozvánka jedním klikem do úpravy. */}
+            {event.meta.invite === 'missing' && (
+              <div className="flex flex-wrap items-center gap-3 rounded-chip border border-signal-line bg-signal-bg p-3">
+                <p className="flex-1 text-xs text-signal-ink">Klient zatím pozvánku na schůzku nedostal.</p>
+                {!event.meta.meetingLink && (
+                  <Button variant="outline" onClick={() => onEdit(event, { startAsMeeting: true })}>
+                    <Mail size={14} strokeWidth={1.5} aria-hidden="true" />
+                    Poslat pozvánku
+                  </Button>
+                )}
+              </div>
+            )}
+
             {event.meta.meeting && <MeetingReminders eventId={event.id} />}
 
             {/* Description */}
@@ -920,10 +1024,11 @@ function MonthView({
                       title={ev.label}
                     >
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={style.dot} />
-                      <span className="truncate">
+                      <span className="min-w-0 flex-1 truncate">
                         {!ev.allDay && `${ev.startsAt.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' })} `}
                         {ev.label}
                       </span>
+                      {ev.meta.invite && <InviteIcon mark={ev.meta.invite} />}
                     </button>
                   )
                 })}
@@ -1169,7 +1274,10 @@ function WeekView({
                         style={{ ...style.pill, top: `${topPx + 1}px`, height: `${heightPx}px` }}
                       >
                         <div className="px-1.5 py-1 flex flex-col h-full">
-                          <span className="text-[10px] font-bold truncate leading-tight">{ev.label}</span>
+                          <span className="flex items-center gap-1 text-[10px] font-bold leading-tight">
+                            <span className="min-w-0 flex-1 truncate">{ev.label}</span>
+                            {ev.meta.invite && <InviteIcon mark={ev.meta.invite} />}
+                          </span>
                           {heightPx > 30 && (
                             <span className="text-[9px] opacity-70 truncate">
                               {formatTime(ev.startsAt)}
@@ -1283,7 +1391,10 @@ function DayView({
                   style={{ ...style.pill, top: `${topPx + 1}px`, height: `${heightPx}px` }}
                 >
                   <div className="px-3 py-1.5 flex flex-col h-full justify-center">
-                    <span className="text-xs font-bold leading-tight">{ev.label}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="min-w-0 truncate text-xs font-bold leading-tight">{ev.label}</span>
+                      {ev.meta.invite && <InviteIcon mark={ev.meta.invite} withLabel />}
+                    </span>
                     <span className="text-[11px] opacity-70 mt-0.5">
                       {formatTime(ev.startsAt)} – {formatTime(ev.endsAt)}
                       {ev.channel && ` · ${CHANNEL_LABELS[ev.channel]}`}
@@ -1317,6 +1428,11 @@ function DayView({
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold truncate">{ev.label}</p>
                     <p className="text-[11px] opacity-70">{formatTime(ev.startsAt)}</p>
+                    {ev.meta.invite && (
+                      <span className="mt-1 flex">
+                        <InviteIcon mark={ev.meta.invite} withLabel />
+                      </span>
+                    )}
                   </div>
                 </button>
               )
@@ -1363,6 +1479,21 @@ function Legend() {
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: staffAccent(null, KIND_TONE.call ?? 0) }} />
         <span>Plánovaná akce (Hovory)</span>
       </div>
+      {/* Značky pozvánek: co klient od vás dostal (u nadcházejících schůzek). */}
+      <div className="flex items-center gap-1.5">
+        <Check size={12} strokeWidth={2.5} aria-hidden="true" />
+        <span>Pozvánka odešla</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <MailX size={12} strokeWidth={1.75} aria-hidden="true" className="text-danger" />
+        <span>Pozvánka neodešla</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="inline-flex rounded-full bg-signal p-px text-signal-ink">
+          <Mail size={12} strokeWidth={1.75} aria-hidden="true" />
+        </span>
+        <span>Bez pozvánky</span>
+      </div>
     </div>
   )
 }
@@ -1406,6 +1537,18 @@ export function SmartCalendar({
   const [isLoading, startLoading] = useTransition()
 
   const unified = useMemo(() => buildUnified(data), [data])
+
+  // Souhrn pozvánek jen za nadcházející schůzky v zobrazeném období:
+  // u proběhlých už nic udělat nejde.
+  const inviteSummary = useMemo(() => {
+    const range = viewRange(view, anchor)
+    const now = Date.now()
+    return summarizeInviteMarks(
+      unified
+        .filter((ev) => ev.day >= range.from && ev.day <= range.to && ev.endsAt.getTime() > now)
+        .map((ev) => ev.meta.invite),
+    )
+  }, [unified, view, anchor])
 
   /**
    * Vymění vše, co padá do `range`, za nově stažené. Jednou funkcí se tak
@@ -1566,6 +1709,9 @@ export function SmartCalendar({
         </div>
       </Toolbar>
 
+      {/* Komu pozvánka odešla a komu ne, za zobrazené období */}
+      <InviteSummaryLine summary={inviteSummary} />
+
       {/* Calendar body */}
       <div className="overflow-hidden rounded-box border border-navy-100 bg-surface">
         <div className="p-4 sm:p-5">
@@ -1628,7 +1774,7 @@ export function SmartCalendar({
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
           onDeleted={reloadCurrent}
-          onEdit={ev => {
+          onEdit={(ev, options) => {
             setSelectedEvent(null)
             setCreateModal({
               open: true,
@@ -1643,6 +1789,7 @@ export function SmartCalendar({
                 phone: ev.meta.contactDraft?.phone ?? null,
                 email: ev.meta.contactDraft?.email ?? null,
                 meeting: ev.meta.meeting ?? null,
+                startAsMeeting: options?.startAsMeeting === true,
               },
             })
           }}

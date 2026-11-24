@@ -1966,6 +1966,22 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
+### 2026-11-24 (komu pozvánka na schůzku odešla — značky v kalendáři)
+- **feat** Kalendář adminu u každé události s klientem ukazuje, jestli dostal pozvánku: fajfka
+  „Pozvánka odešla", hodiny „se odesílá", červená obálka „neodešla", oranžová „Bez pozvánky"
+  (nadcházející událost s kontaktem nebo Meetem bez odeslané pozvánky). Nad kalendářem souhrn
+  za nadcházející schůzky zobrazeného období, v detailu kdy a kam pozvánka odešla a u „Bez
+  pozvánky" tlačítko „Poslat pozvánku" (úprava s předvoleným Meetem). Stejně v Dnes a Hovorech
+  (tentýž `SmartCalendar`). Bez migrace, čte `invite_status` z 115. „Odešla" = převzal Resend,
+  doručení do schránky se nesleduje. Soubory: `lib/admin/invite-mark.ts`,
+  `components/SmartCalendar.tsx`, `components/AdminEventModal.tsx`, `docs/admin/AGENTS-ADMIN.md`,
+  test `lib/__tests__/admin-pozvanka-znacka.test.ts` (8).
+- **chore** Ověřeno: `npx tsc --noEmit`, testy kalendáře, připomínek a tříd adminu 56/56, `npm run build`,
+  dočasná stránka s vymyšlenými schůzkami (Playwright CLI) na 1280 px — Měsíc, Týden, Den, oba
+  detaily — a 390 px bez vodorovného přetečení; stránka smazaná. Za přihlášením na skutečných datech
+  neověřeno. Na produkci v tu chvíli 5 nadcházejících schůzek s odeslanou pozvánkou a 9 událostí
+  bez Meetu. Push na `main` schválil Kryštof (s ním odešel i úklidový commit `04941fe`).
+
 ### 2026-11-24 (úklid repa podle ponytail-audit)
 - **chore** Kontrola celého repa postupem `ponytail-audit` (github.com/DietrichGebert/ponytail, jen jako
   návod, nic se neinstalovalo). Graf importů přes všechny sledované soubory: bez odkazu byly jen tři
