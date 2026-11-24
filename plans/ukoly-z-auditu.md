@@ -274,14 +274,14 @@ Podrobnosti v [`README.md`](README.md) → Kam projekt posunout.
 
 | Balík | Úkoly | Stav | Commit | Poznámka |
 |---|---|---|---|---|
-| A | A1–A3 | TODO | | |
-| B | B1 | TODO | | |
-| C | C0–C3 | TODO | | C1 a C2 částečně čekají na R1 |
+| A | A1–A3 | HOTOVO | `9ab4191` | CI na `main` zezelená až po sloučení |
+| B | B1 | HOTOVO | `d7c30ec` | Preview se session `aal1` neověřené |
+| C | C0–C3 | ČÁSTEČNĚ | `18783c1` | hotovo vše kromě částí čekajících na R1 (stav „Zaplaceno" = Peníze dorazily, smazání doplatku při odškrtnutí) |
 | D | D1–D2 | ČEKÁ (R2) | | |
-| E | E1–E7 | TODO | | E2 čeká na R3, E5 na R4 |
-| F | F1–F5 | TODO | | F1: otočení hesel R5 |
-| G | G1–G3 | TODO | | G3 až po C |
-| H | H1–H2 | TODO | | |
-| I | I1–I2 | TODO | | I2 čeká na R6 |
-| J | J1–J4 | TODO | | J4 čeká na R7 |
+| E | E1–E7 | ČÁSTEČNĚ | `11ac89c` | E1, E3, E4, E6, E7 hotové; E2 čeká na R3, E5 na R4 |
+| F | F1–F5 | ČÁSTEČNĚ | `95c0a2a` | F1–F4 hotové (DECISIONS #052), F1: otočit heslo (R5); F5 zatím ne (riziko rozbití nahrání faktury) |
+| G | G1–G3 | ČÁSTEČNĚ | `60b1d78` | G1 hotové; G2, G3 TODO |
+| H | H1–H2 | ČÁSTEČNĚ | `60b1d78` | H1 hotové; H2 TODO |
+| I | I1–I2 | ČÁSTEČNĚ | `983100f` | I1 hotové; I2 čeká na R6 |
+| J | J1–J4 | ČÁSTEČNĚ | `da1fe04` | J1 jen připnutí verzí (Chromium 156 chce ověření PDF na Preview); J2, J3 TODO; J4 čeká na R7 |
 | K | K1–K3 | TODO | | |

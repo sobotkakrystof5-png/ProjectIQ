@@ -104,10 +104,11 @@
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
-(34 ověřených nálezů v balících A–K, audit `plans/README.md`). Začít balíkem **A** (CI na `main` je
-červená od 2026-11-17 kvůli testu s pevným datem), pak **B** (TOTP adminu hlídá jen layout) a **C**
-(tři chyby ve výpočtu doplatku a ledgeru). Rozhodnutí R1–R7 v témže souboru čekají na Kryštofa.
-Nic z toho zatím není v kódu.
+(34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Hotovo na větvi `fix/audit-2026-11`**
+(worktree `.claude/worktrees/fix-audit-2026-11`, nenasazeno, nepushnuto): A1–A3, B1, C0–C3 (bez částí
+čekajících na R1), E1, E3, E4, E6, E7, F1–F4, G1, H1, I1, J1. Zbývá: rozhodnutí R1–R7 od Kryštofa
+(D1–D2, E2, E5, I2, J4 a zbytek C1/C2), pak F5, G2, G3, H2, J2, J3, K1–K3. Po sloučení otočit heslo
+databáze waitlistu (R5). Stav po úkolech v tabulce „Stav" na konci seznamu.
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
@@ -1623,6 +1624,14 @@ zakázky (R-143)", DECISIONS #042 doplnění.
 
 ## 3. Otevřené problémy
 
+- [ ] **Opravy z auditu (větev `fix/audit-2026-11`) — sloučit a ověřit:** nepushnuto, nenasazeno.
+  Před nasazením na Preview: po kroku s heslem bez kódu otevřít `/dashboard/kontakty` (má skončit na
+  `/login`), Finance › Podnikání a zakázka se zaplacenou fakturou („Peníze dorazily"), chat v adminu
+  i v `/klient` (v Network žádné obnovení stránky každých 10 s), editor startupu (Waitlist DB URL jen
+  pro zápis). Po nasazení **otočit heslo databáze waitlistu** v Neonu (R5 v `plans/ukoly-z-auditu.md`,
+  dřív leželo nešifrovaně a chodilo do prohlížeče). `memory/memory.md` se při sloučení potká se změnami
+  jiného sezení v hlavní složce (necommitnuté) · od 2026-11-24
+
 - [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
   skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
   Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
@@ -2032,6 +2041,34 @@ zakázky (R-143)", DECISIONS #042 doplnění.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-24 (opravy z auditu, větev `fix/audit-2026-11`)
+- **test** A: `ws-email` počítá termín od dneška (CI na `main` červená od 2026-11-17), CI a security
+  na všech větvích, nový test route „Schválit a poslat". Soubory: `lib/ws/__tests__/ws-email.test.ts`,
+  `.github/workflows/{ci,security}.yml`, `app/api/invoices/drafts/[id]/send/__tests__/`.
+- **fix** B1: druhý faktor adminu vynucený i v `proxy.ts` (`checkAdminSession` u `aal1` zjistí faktory)
+  a na každé stránce `app/dashboard/**` (`requireAdminPage()`, hlídací test `admin-page-guard`); dotaz
+  na faktory při chybě nepouští. Soubory: `lib/auth.ts`, `lib/supabase/proxy.ts`, 34 stránek. DECISIONS #029.
+- **fix** C: `remainingSql`/`remainingToPay` znají `paid` (koncept faktury u zaplacené zakázky nevznikne),
+  „Peníze dorazily" po zaplacené faktuře zapíše doplatek, přepnutí IČO nesahá na příjem z faktury.
+  Soubory: `lib/admin/{project-payments,invoice-drafts,invoice-issue}.ts`, `app/actions.ts`. Bez migrace.
+- **fix** E: rezervace z webu jedním příkazem, smazání kontaktu v Hovorech maže schůzku i v Googlu
+  a nechá konzultaci, převzetí firmy od asistenta bez zdvojení, připomínky po jedné s rozpočtem 40 s,
+  `pragueWallClockToISO` ve dny změny času. Soubory: `lib/web-leads.ts`, `app/{calls,outreach}-actions.ts`,
+  `lib/admin/meeting-reminders.ts`, `lib/prague-time.ts`.
+- **fix** F: připojení k databázi waitlistu šifrovaně (`GOOGLE_TOKEN_KEY`) a jen na serveru, limit
+  `api_requests` po /64, brána na IP i pro `/api/public`, `/api/klient`, `/embed`, logy bez e-mailů
+  a celých chyb. Soubory: `lib/admin/waitlist-secret.ts`, `lib/security/log-safe.ts`, `proxy.ts`,
+  `lib/api-rate-limit.ts`. DECISIONS #052.
+- **fix** G1, H1: otisk chatu bez vlastního „přečteno" (stránka se neobnovuje každých 10 s),
+  `formatDate`/`formatDateTime` v pražské zóně. Soubory: `lib/{admin,portal}/chat.ts`,
+  `components/chat/chat-live.tsx`, `lib/utils.ts`.
+- **docs** I1: NextAuth → Supabase Auth, Gmail → Resend, odkazy na smazané soubory, STATE.md.
+- **chore** J1: `@sparticuz/chromium` 149.0.0 a `puppeteer-core` 25.16.0 přesně (bez `^`).
+- **chore** Ověřeno: `npx tsc --noEmit` čisté, `npm test` 1805 testů, selhal jen známý časový limit
+  (od teď má delší limit, samostatně zelené), `npm run build` prošel, `next start` s regresními adresami
+  (`/` a `/login` 200, `/dashboard` a `/dashboard/finance` 307 na `/login`, `/p/<nesmysl>` 404, booking
+  bez klíče 401). **Za přihlášením ani na Preview neověřeno** (session `aal1`, Finance, chat, startup).
 
 ### 2026-11-24 (druh faktury a zbývá doplatit — R-143)
 - **feat** Před vystavením se vybírá druh faktury: za celé dílo, zálohová (30 %), částečná (procento z ceny),
