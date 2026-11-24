@@ -16,6 +16,18 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-24 — audit: opravy z auditu skillem `improve` (větev `fix/audit-2026-11`)
+Spouštěč: audit celého repa skillem `improve` (`plans/README.md`, commit `04941fe`)
+Rozsah: druhý faktor adminu, limity na IP, brána v `proxy.ts`, tajemství v datech startupových projektů, logy
+Výsledek: 5 nálezů, všechny opravené na větvi `fix/audit-2026-11` (nenasazeno)
+Nálezy:
+1. **Druhý faktor adminu hlídal jen layout** (#2): proxy nekontroloval `aal`, 31 z 36 stránek `app/dashboard` přihlášení samo neověřovalo a layout podle dokumentace Next 16 nebrání vykreslení stránky v RSC payloadu. Kdo znal heslo, ale ne kód, si mohl vyžádat data stránek. Dotaz na faktory při chybě pouštěl (fail-open).
+2. **Connection string databáze waitlistu chodil do prohlížeče a ležel nešifrovaný** (#10). Oprava zápisu z 2026-11-14 níž: tehdy se zavřely akce exportu a rozesílky, ale ne čtení projektu pro klientský editor.
+3. **Databázový limit `api_requests` počítal IPv6 po celé adrese** (#12), předbrána po /64 — střídáním adres v jedné síti šel přesný limit obejít.
+4. **Brána na IP neběžela pro `/api/*` ani `/embed/*`** (#17), přestože STATE.md sliboval strop pro API.
+5. **E-maily příjemců a celé objekty chyb v runtime logách** (#29).
+Opraveno: (1) `checkAdminSession` zjišťuje faktory u `aal1`, `requireAdminPage()` na každé stránce + hlídací test, selhání dotazu nepouští (DECISIONS #029 doplněno). (2)–(5) DECISIONS #052.
+Zůstává: otočit heslo databáze waitlistu (Kryštof, R5); ověřit session `aal1` na Preview; strop těla 5 MB pro veřejné server actions (#28) se zatím nemění.
 ## 2026-11-24 — review: faktura s povinnými údaji (R-142) a druh faktury (R-143)
 Spouštěč: před commitem a deployem (`web-security-review`)
 Rozsah: necommitnutý diff nad `7c2e2f1` — renderer PDF (`lib/invoice-pdf/render.ts`), profil dodavatele (`issuerProfileSaveSchema`, `saveIssuer`), vystavení s druhem (`issueNewInvoice`, `prepareKindIssue`, `issueDraft`), nová akce `getProjectBilling`, koncepty (`saveInvoiceDraft`), projekce do klientského prostoru (`lib/portal/{money,overview}.ts`, migrace 131 a 133), migrace 132, tajemství v diffu.
@@ -300,7 +312,7 @@ Nálezy:
 1. **`getCallsScreen(params, waiting)` brala `TableParams` jako argument server action** — a `TableParams.orderBy` je hotový kus SQL, který se vkládá do textu dotazu. Server action je veřejný endpoint, takže přihlášený admin (jediný účet, ale pravidlo platí) mohl poslat libovolné `ORDER BY`. Porušení B13 „každý vstup validovat na serveru" a vlastního pravidla AD07, že do `ORDER BY` jde jen whitelist.
 2. **`exportWaitlistCsv(dbUrl)` a `sendLaunchEmailBlast(projectId, { dbUrl, appUrl })` braly connection string z prohlížeče** (`exportWaitlistCsv` nová, druhá existovala dřív). Server by se tak připojil na libovolnou adresu, kterou mu klient podstrčí, a poslal e-maily s libovolným odkazem.
 3. **CSV export bez ochrany proti vzorcům** — jméno začínající `=`, `+`, `-` nebo `@` je v Excelu vzorec, ne text (platilo i pro původní export v prohlížeči).
-Opraveno: (1) `getCallsScreen` zrušená, stránka volá `loadCallsScreen` z `lib/admin/leads.ts` (server-only modul, není to endpoint); řazení si každá stránka ověří sama přes `parseTableParams`. (2) obě akce berou **id projektu**, adresu databáze i webu si dohledají v `startup_projects`; `dbUrl` se do prohlížeče vůbec neposílá. (3) hodnota začínající `=+-@` dostane v CSV apostrof.
+Opraveno: (1) `getCallsScreen` zrušená, stránka volá `loadCallsScreen` z `lib/admin/leads.ts` (server-only modul, není to endpoint); řazení si každá stránka ověří sama přes `parseTableParams`. (2) obě akce berou **id projektu**, adresu databáze i webu si dohledají v `startup_projects`; `dbUrl` se do prohlížeče vůbec neposílá. *Oprava 2026-11-24: neplatilo celé — `getStartupProject(s)` vracely `waitlist_db_url` klientskému editoru; zavřeno až DECISIONS #052.* (3) hodnota začínající `=+-@` dostane v CSV apostrof.
 Navíc: zrušeno sedm server actions, které tahaly celé tabulky (`getLeads`, `getAllLeadNotes`, `getCompletedProjects`, `getProjectSurveys`, `getAllInvoices`, `getInvoiceRegistryScreen`, `getWaitlistEntries`) — o tolik méně endpointů, které umí vrátit všechna data najednou.
 Ověřeno: `npx tsc`, 802 testů (nový `lib/__tests__/admin-table.test.ts` zkouší i `sort=x';DROP TABLE costs--` a vlastnosti prototypu), produkční build a smoke test přes HTTP s podepsanou session — 23 adres včetně pokusu o injekci vrací 200 a server nehlásí chybu.
 Zůstává: hledání ve Fakturách neescapuje `%` a `_` v `ILIKE` (jen širší výsledky, ne bezpečnostní problém). Průchod v prohlížeči okem.

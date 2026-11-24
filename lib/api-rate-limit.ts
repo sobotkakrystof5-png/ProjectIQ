@@ -40,11 +40,14 @@ export async function isApiRateLimited(
   windowMinutes: number,
   maxRequests: number,
 ): Promise<boolean> {
-  if (preGateFor(windowMinutes, maxRequests).hit(`${endpoint}|${ipRateKey(ip)}`).limited) return true
+  // IPv6 po celé síti /64 i v databázi, ne jen v předbráně — jinak by šel
+  // přesný limit obejít střídáním adres v jedné síti (audit 2026-11-24, #12).
+  const key = ipRateKey(ip)
+  if (preGateFor(windowMinutes, maxRequests).hit(`${endpoint}|${key}`).limited) return true
 
   const rows = await sql`
     SELECT count(*)::int AS count FROM api_requests
-    WHERE endpoint = ${endpoint} AND ip = ${ip}
+    WHERE endpoint = ${endpoint} AND ip = ${key}
       AND created_at > now() - interval '1 minute' * ${windowMinutes}
   `
   return (rows[0] as { count: number }).count >= maxRequests
@@ -54,7 +57,7 @@ export async function recordApiRequest(endpoint: string, ip: string): Promise<vo
   // Úklid starých řádků jen občas: dřív běžel `DELETE` při každém požadavku,
   // takže zahlcení endpointu znamenalo dva zápisy do Neonu na jeden požadavek.
   // Řádek žije den a limity jsou v minutách, na přesném okamžiku mazání nezáleží.
-  const writes = [sql`INSERT INTO api_requests (endpoint, ip) VALUES (${endpoint}, ${ip})`]
+  const writes = [sql`INSERT INTO api_requests (endpoint, ip) VALUES (${endpoint}, ${ipRateKey(ip)})`]
   if (Math.random() < 0.02) {
     writes.push(sql`DELETE FROM api_requests WHERE created_at < now() - interval '1 day'`)
   }

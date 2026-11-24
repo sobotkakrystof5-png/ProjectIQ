@@ -10,6 +10,7 @@ import {
 } from '../startup-actions'
 import { StartupProjectEditor } from '@/components/StartupProjectEditor'
 import { WaitlistPanel } from '@/components/admin/startup/waitlist-panel'
+import { loadWaitlistDbUrl } from '@/lib/admin/waitlist-secret'
 import { AiAssistantsSection } from '@/components/AiAssistantsSection'
 
 interface Props {
@@ -20,20 +21,22 @@ interface Props {
 export default async function StartupDetailPage(props: Props) {
   await requireAdminPage()
   const [params, searchParams] = await Promise.all([props.params, props.searchParams])
-  const [project, improvements, changelog] = await Promise.all([
+  const [project, improvements, changelog, waitlistDbUrl] = await Promise.all([
     getStartupProject(params.id),
     getStartupImprovements(params.id),
     getStartupChangelog(params.id),
+    loadWaitlistDbUrl(params.id),
   ])
 
   if (!project) notFound()
 
   // Waitlist se vykreslí na serveru a do klientského editoru jde jako hotový
   // kus stránky — jinak by se celá tabulka musela poslat do prohlížeče (AD07).
-  const waitlist = project.waitlist_db_url ? (
+  // Připojení se rozšifruje jen tady na serveru a do prohlížeče nejde (audit #10).
+  const waitlist = waitlistDbUrl ? (
     <WaitlistPanel
       projectId={project.id}
-      dbUrl={project.waitlist_db_url}
+      dbUrl={waitlistDbUrl}
       basePath={`/dashboard/startup/${project.id}`}
       searchParams={searchParams}
     />

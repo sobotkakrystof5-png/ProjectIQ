@@ -154,9 +154,9 @@ Co se opravilo 2026-11-20 (nález = konkrétní díra, ne teoretická): `lib/ema
 |---|---|---|---|
 | 0. Síť (L3/L4) | Vercel, automaticky | objemové útoky na síť | platforma, bez zásahu |
 | 1. Firewall (L7) | **Vercel WAF** (Firewall v dashboardu) | záplavu požadavků **dřív, než se spustí funkce** — jediná vrstva, která šetří i počet spuštění a tím limity Hobby | ❌ **nenastaveno** — viz návrh pravidel níž, čeká na Kryštofa |
-| 2. Brána aplikace | `proxy.ts` → `lib/security/front-gate.ts` | 240 stránek / 120 API požadavků za 10 s z jedné IP (IPv6 po /64), 429 + `Retry-After`; dřív než Clerk, Supabase a databáze. Vypnutí při potížích: `FRONT_GATE=off` | ✅ v kódu, jen v produkci |
+| 2. Brána aplikace | `proxy.ts` → `lib/security/front-gate.ts` | 240 stránek / 120 API požadavků za 10 s z jedné IP (IPv6 po /64), 429 + `Retry-After`; dřív než Clerk, Supabase a databáze. Od 2026-11-24 i `/api/public/*`, `/api/klient/*` a `/embed/*` (dřív je matcher vynechával; webhooky a crony dál mimo, #052). Vypnutí při potížích: `FRONT_GATE=off` | ✅ v kódu, jen v produkci |
 | 3. Předbrána limiterů | `lib/api-rate-limit.ts`, `lib/ws/intake/rate-limit.ts` | klient, který pošle 4× (`hitLimit` 2×) povolený počet za okno, se zahodí **bez dotazu do Neonu** — dřív stál každý zahozený požadavek 3 dotazy | ✅ |
-| 4. Limity vstupů | databáze (`api_requests`, `ws.rate_limits`) | přesné počty na endpoint, IP, účet, odkaz | ✅ beze změny; úklid `api_requests` už ne při každém požadavku (2 %) |
+| 4. Limity vstupů | databáze (`api_requests`, `ws.rate_limits`) | přesné počty na endpoint, IP (IPv6 po /64 i v `api_requests` od 2026-11-24, #052), účet, odkaz | ✅ úklid `api_requests` už ne při každém požadavku (2 %) |
 | 5. Drahé operace | `lib/invoice-pdf/render.ts` → `lib/security/semaphore.ts` | nejvýš 2 Chromia najednou na instanci, čekající po 25 s vzdají; dřív stačilo pár souběžných stažení PDF na vyčerpání paměti | ✅ |
 | 6. Velikost těla | `lib/security/request-body.ts` | `readJsonLimited`, `readFormDataLimited`: strop platí i pro `chunked` tělo bez `content-length`; nově u přepisu hlasu (3 routy) a nahrání PDF faktury | ✅ |
 
