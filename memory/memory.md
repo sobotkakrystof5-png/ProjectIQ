@@ -103,6 +103,12 @@
 
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
 
+**Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
+(34 ověřených nálezů v balících A–K, audit `plans/README.md`). Začít balíkem **A** (CI na `main` je
+červená od 2026-11-17 kvůli testu s pevným datem), pak **B** (TOTP adminu hlídá jen layout) a **C**
+(tři chyby ve výpočtu doplatku a ledgeru). Rozhodnutí R1–R7 v témže souboru čekají na Kryštofa.
+Nic z toho zatím není v kódu.
+
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
 **Přihlášení do adminu (R-105, od 2026-11-15, větev `admin/supabase-auth`):** vede **Supabase
@@ -2087,6 +2093,20 @@ zakázky (R-143)", DECISIONS #042 doplnění.
   bez Meetu. **Na produkci od 2026-11-24 (`22682a0`)**, s ním i úklidový commit `04941fe`; build Ready
   (`dpl_EiVw…`, `fra1`), `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard` 307,
   `/p/<nesmysl>` 404, bez běhových chyb.
+
+### 2026-11-24 (audit skillem improve)
+- **chore** Nainstalovaný skill `improve` (`shadcn/improve`, MIT, commit `cac56e1`) uživatelsky do
+  `~/.claude/skills/improve/` a `~/.agents/skills/improve/` (R-080: řemeslné skilly mimo repo). Jen text,
+  bez skriptů a hooků; sám kód nemění, píše jen do `plans/`.
+- **docs** Audit celého repa (úroveň `standard`, 9 kategorií, commit `04941fe`): 34 ověřených nálezů,
+  3 návrhy směru a zamítnuté body v `plans/README.md`. Nejvážnější: CI na `main` červená od 2026-11-17
+  (`ws-email` s pevným datem), TOTP adminu hlídá jen layout, „Peníze dorazily" po zaplacené faktuře
+  nezapíše doplatek, koncept faktury u zaplacené zakázky, přepnutí IČO přesune příjem z faktury do
+  nepřiznané linie. Výchozí stav: `tsc` 0 chyb, `npm audit` 0, testy 1753/3 selhaly (známé). Kód se
+  neměnil.
+- **docs** Pracovní seznam oprav `plans/ukoly-z-auditu.md`: všech 34 nálezů v balících A–K s místem
+  v kódu, opravou, testem a podmínkou hotovo, sedm rozhodnutí R1–R7 pro Kryštofa a tabulka stavu.
+  Odkaz v Aktuálním stavu a v `memory/index.md`.
 
 ### 2026-11-24 (úklid repa podle ponytail-audit)
 - **chore** Kontrola celého repa postupem `ponytail-audit` (github.com/DietrichGebert/ponytail, jen jako

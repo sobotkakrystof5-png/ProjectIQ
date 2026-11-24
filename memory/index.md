@@ -48,6 +48,8 @@
 | [`../new - area of zakaziq/prompty/klientsky-prostor/00-README.md`](<../new - area of zakaziq/prompty/klientsky-prostor/00-README.md>) | Prompty sezení KP00–KP16 (jedno sezení = jedna konverzace), pořadí a společná pravidla | Na začátku každého sezení KP | Když se mění rozfázování |
 | [`../docs/REDESIGN-HANDOFF.md`](../docs/REDESIGN-HANDOFF.md) | Schválený směr redesignu Landing + Workspace, hranice zadání a startovací kontext pro další chat (R-057) | Před implementací redesignu | Když se změní vybraný směr nebo rozsah |
 | [`../new - area of zakaziq/prompty/redesign/00-README.md`](<../new - area of zakaziq/prompty/redesign/00-README.md>) | Prompty sezení RD00–RD16 pro redesign aplikace (jedno sezení = jedna konverzace), pořadí, společná pravidla | Na začátku každého sezení redesignu | Když se mění rozfázování |
+| [`../plans/README.md`](../plans/README.md) | Audit skillem `improve` (2026-11-24, commit `04941fe`): nálezy podle priority, směr, zamítnuté body; plány pro jiné agenty jako `plans/NNN-*.md` | Před opravou nálezu z auditu, `/improve reconcile` | Po každém běhu `/improve` a dokončeném plánu |
+| [`../plans/ukoly-z-auditu.md`](../plans/ukoly-z-auditu.md) | Pracovní seznam oprav z auditu: balíky A–K (CI, TOTP, peníze, asistent, kalendář, bezpečnost, výkon, čas, dokumentace, závislosti, dluh), rozhodnutí R1–R7 pro Kryštofa, tabulka stavu | Každé sezení, které opravuje nález z auditu | Po každém dokončeném balíku (sloupec Stav) |
 | `../graphify-out/` | Znalostní graf kódu (gitignored, lokální) — `/graphify` | Při orientaci v architektuře | Přegenerováním |
 
 ## Kde co najít podle úlohy
