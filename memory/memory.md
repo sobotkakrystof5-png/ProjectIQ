@@ -172,8 +172,8 @@ migrace, pak dá vědět a agent udělá merge + push. Proběhlo takhle:
    `SELECT … WHERE lead_pending` z hlavičky 102, `WARNING` o nevytvořeném indexu u 109
    a `node scripts/admin-contacts-backfill.mjs` po 104.
 
-Migrace 100 a 101 (`DROP TABLE`, R-089) v tomhle pořadí **nebyly** — nejsou potřeba k funkci
-a před nimi musí proběhnout `node scripts/export-before-drop.mjs --ano`.
+Migrace 100 a 101 (`DROP TABLE`, R-089) v tomhle pořadí **nebyly**; později 100 doložily chyby
+v runtime logu a 101 potvrdil Kryštof (Otevřené problémy). Skript na export odešel 2026-11-24.
 
 **Nasazení AD14–AD18 na produkci — hotovo 2026-11-14.** Stejné pořadí jako předtím:
 1. **Migrace 110, 111 a 112 pustil Kryštof** (všechny aditivní, takže směly jít před deployem).
@@ -1854,7 +1854,6 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
 - [ ] **`PRVOTKA_LEAD_WEBHOOK_SECRET` do Vercelu (AD02):** endpoint `/api/public/prvotka-leads` bez klíče odmítá vše (fail-closed). Vygenerovat, nastavit v Production i Preview a tutéž hodnotu dát do repozitáře webu Prvotky · Kryštof · od 2026-11-11
 - [ ] **Napojení webu prvotka.cz:** formulář musí posílat `POST /api/public/prvotka-leads` s `section: 'prvotka'`, `source: 'web_contact_form'` a hlavičkou `x-prvotka-lead-signature`. **Je to práce v repozitáři Prvotky, ne tady.** Prvotka je zatím SaaS ve vývoji, proto má výchozí typ služby obecné „Poptávka z webu" — až bude nabídka hotová, změnit jeden řádek v `lib/lead-origins.ts` · od 2026-11-11
 - [ ] **Kalendář a Hovory po AD02 ukazují i historická ALTENO data:** dřív je filtrovala podmínka `business = 'vizeon'`, teď tam jsou. Je to záměr (jeden byznys, jeden diář), ale při prvním otevření to bude vypadat, že přibyly záznamy · od 2026-11-11
-- [ ] **Migrace 100 a 101 na produkci (AD01):** připravené a vyzkoušené jen na testovacím Neonu. Před spuštěním na produkci **musí** proběhnout `node scripts/export-before-drop.mjs --ano` proti produkční DB (`DROP TABLE` je nevratný, R-089) — na testu byly tabulky prázdné, kolik řádků je na produkci, nikdo neví. Aplikuje Kryštof · od 2026-11-11
 - [ ] **Admin v prohlížeči okem neověřený (AD00, AD02, AD03):** stránky vracejí 200 s ukázkovými daty, ale jen přes HTTP (session podepsaná klíčem z `.env.local`, heslo adminu agent nemá; Chrome není připojený). Projít `/dashboard` (**nový pravý sloupec s měsíčními čísly**), `/dashboard/poptavky` s filtrem zdroje a potvrzením poptávky, detail zakázky (včetně Fakturace u staré ALTENO zakázky), kalendář, Hovory, faktury a **přesunuté obrazovky `/dashboard/{finance,projekty,startup}`** (graf TradingView, kalkulačka Výkonnost podnikání) v prohlížeči na 390 / 768 / 1280 / 1440 px — stačí `npm run dev` a přihlášení · od 2026-11-11
 - [ ] **AD07 v prohlížeči neověřený:** 23 adres vrací přes podepsanou session 200 a server nehlásí chybu, ale okem je nikdo neviděl. Projít na 390 / 768 / 1280 / 1440 px: řazení kliknutím do hlavičky (šipka, aria-sort), stránkování, **karty místo tabulky pod 640 px**, nové dialogy u Dokončených a Nákladů (dřív se upravovalo v řádku), hledání ve Fakturách (Enter odešle formulář), waitlist u startupového projektu a Hovory — hlavně rozbalení kontaktu, kde se poznámky teprve dotahují. Drobnost k ověření: na `?page=2` bez řádků se ukáže prázdný stav obrazovky, ne „na téhle stránce nic není" · od 2026-11-11
 - [ ] **AD05 v prohlížeči neověřený:** stránky vracejí 200 přes podepsanou session, ale okem je nikdo neviděl. Projít na 390 / 768 / 1280 / 1440 px: nové šířky (Dokončené a Hovory bez vodorovného posuvníku, Dnes a Kalendář na 1440), hlavičku `PageHeader` (28 px na telefonu, 36 px výš) a nové odznaky — hlavně jestli „Hotovo" a „V řešení" ve stejném tónu `info` nejsou v seznamu zakázek matoucí a jestli `signal` (amber) u „Nová" a „Čeká na schválení" neruší · od 2026-11-11
@@ -1928,7 +1927,6 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
 - [ ] **Výmaz a odeslané e-maily majiteli:** přehledy dne/týdne v `ws.outbound_messages.payload` můžou nést jméno vymazaného zákazníka (výmaz maže jen zprávy s jeho id nebo klíčem). Zvážit čištění payloadu odeslaných zpráv po 90 dnech · od 2026-10-17
 - [ ] **Tmavý režim — nové třídy:** přemapování v `app/ws-tokens.css` pokrývá třídy použité k 2026-10-17; nová světlá třída (např. `bg-navy-200/50`) potřebuje vlastní `dark:` nebo řádek v tokenech. `/r`, `/z` a landing zůstávají světlé (rozhodnout, jestli i ony) · od 2026-10-17
 - [ ] **Upgrade Next 16 — admin s přihlášením:** Workspace (Clerk) a PDF ověřeny na Preview 2026-10-31; zbývá admin NextAuth na datech (Preview má testovací DB bez admin tabulek) · od 2026-10-17
-- [ ] **`Dockerfile` nesedí s konfigurací:** kopíruje `.next/standalone`, ale `next.config.mjs` nemá `output: 'standalone'`. Produkce běží na Vercelu; rozhodnout, jestli Dockerfile smazat nebo opravit · od 2026-10-17
 - [ ] **Připomínky 2 h před konzultací:** po R-006 není jasné, jestli běží externí hodinový cron (commit 2026-06-20 zmiňuje „externí hodinový cron"). Ověřit u uživatele · od 2026-06-25
 - [ ] **Workspace — env ve Vercelu:** Production i Preview mají `DATABASE_URL_WS`, klíče Clerku, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (2026-10-10). Zbývá: `STRIPE_WEBHOOK_SECRET` v Production je od Kryštofa a nemusí patřit produkčnímu endpointu (ten ještě neexistuje) — přepsat podpisovým klíčem endpointu `https://www.zakaziq.cz/api/stripe/webhook` při nasazení `/w`; `NEXT_PUBLIC_APP_URL` v Preview míří na produkční adresu (pro větev `ws/redesign-app` přepsáno 2026-10-31, ostatní větve dál vrací Checkout na produkci) · od 2026-10-08
 - [ ] **Clerk — webhook:** v Clerk dashboardu založit endpoint `https://<doména>/api/clerk/webhook` (události `organization.updated`, `organizationMembership.*`) a jeho podpisový klíč dát do `CLERK_WEBHOOK_SECRET` (`.env.local` i Vercel). Do té doby route vrací 503 a členové se nesynchronizují (vlastníka zapíše průvodce) · od 2026-10-09
@@ -1967,6 +1965,26 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-24 (úklid repa podle ponytail-audit)
+- **chore** Kontrola celého repa postupem `ponytail-audit` (github.com/DietrichGebert/ponytail, jen jako
+  návod, nic se neinstalovalo). Graf importů přes všechny sledované soubory: bez odkazu byly jen tři
+  komponenty, všechny závislosti v `package.json` se používají. Smazáno (Kryštof vybral všechny skupiny):
+  `components/ProjectCardSkeleton.tsx`, `components/portal/{message-thread,portal-frame}.tsx` (po KP15),
+  jednorázové `scripts/{apply-034-waitlist,apply-042-plans-archive,apply-migrations}.js`,
+  `scripts/{admin-106-zpet.sql,export-before-drop.mjs,admin-income-check.mjs}` (migrace 100, 101 a 106 jsou za námi),
+  `Dockerfile` (zavírá otevřený problém), zastaralé `.env.local.example`, `clerk-zakaziq.cz.zone`,
+  `docs/{CLAUDE_BOOKING_PROMPT,POZNAMKY_NAKLADY_SABLONY_PLAN}.md`, stará kopie Impeccable 0.1.18 pro Copilot
+  (`.github/{skills,agents,hooks}`, 19 MB), staré kopie `new - area of zakaziq/{README.md,docs/workspace/plan.md}`
+  a 70 promptů hotových sezení (zůstaly S19, RD15, KP08, KP10, zadání pro Growth OS a rozcestníky s poznámkou,
+  jak smazaný prompt vrátit: `git show fdb8a63:'<cesta>'`). Mimo git: worktree `xss-ddos-protection` (1,1 GB,
+  bez změn, celé v `main`) a `../ZakazIQ-dotaznik` s lokální větví `admin/dotaznik-bez-google`; větev na GitHubu
+  zůstala. Odkazy opravené v `CLAUDE.md`, `docs/AGENTS-REFERENCE.md`, `docs/workspace/LAUNCH-PLAN.md`,
+  `memory/index.md`, testu `portal-supabase-auth` (hlídá teď `client-shell.tsx`) a `.gitignore`.
+  Otevřený problém „Migrace 100 a 101 na produkci“ smazaný (100 doložená z logů, 101 potvrdil Kryštof).
+- **chore** Ověřeno: `npx tsc --noEmit` bez chyby, `sync-agent-context --check` shodné, plná sada 1753 prošlo /
+  3 selhaly: `ws-email` (pevné datum, známé) a dva soubory na časový limit pod zátěží (`admin-ai-asistent-crm`,
+  `ws-intake`), samostatně 51/51. Build se nespouštěl.
 
 ### 2026-11-24 (jeden klient, jedny údaje — R-141)
 - **feat** Kontakt je jediný zdroj e-mailu a telefonu klienta. `lib/admin/contact-sync.ts`: `propagateContact`

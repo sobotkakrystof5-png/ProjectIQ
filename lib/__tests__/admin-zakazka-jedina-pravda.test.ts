@@ -18,7 +18,7 @@ let db: PGlite
 /** Součty příjmů po letech před migrací — proti nim se po migraci porovnává. */
 let prijmyPred: { rok: string; castka: string; pocet: number }[]
 
-/** Tentýž dotaz, jaký počítá `scripts/admin-income-check.mjs`. */
+/** Součty příjmů po letech (dřív i `scripts/admin-income-check.mjs`, smazaný 2026-11-24). */
 async function prijmyPoLetech() {
   const res = await db.query<{ rok: string; castka: string; pocet: number }>(`
     SELECT to_char(date_trunc('year', date), 'YYYY') AS rok,

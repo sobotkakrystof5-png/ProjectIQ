@@ -208,7 +208,7 @@ Postup: **[C]** sestaví přesnou tabulku, jakmile **[K]** založí doménu v Re
 | CSP blokuje Clerk/Turnstile na produkční doméně | nejde se přihlásit | D7; měnit jen to, co ukáže konzole, nikdy `unsafe-*` |
 | Zrušení účtu bez vrácení poměrné části | spor se zákazníkem | D5, text v podmínkách |
 
-**Neřešit před spuštěním:** Tailwind 4 / `npm audit` Tailwind řetězec, oborové podstránky landing, Stripe Connect zálohy, cena za druhý byznys, SMS, `Dockerfile`, legacy `/dashboard/projekty`.
+**Neřešit před spuštěním:** Tailwind 4 / `npm audit` Tailwind řetězec, oborové podstránky landing, Stripe Connect zálohy, cena za druhý byznys, SMS, legacy `/dashboard/projekty`.
 
 ## 10. Pravidla provádění (pro agenty)
 

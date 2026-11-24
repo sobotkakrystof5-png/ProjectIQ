@@ -60,7 +60,7 @@ Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-se
 - `memory/` — stav, rozhodnutí, otevřené problémy, changelog (mapa v `memory/index.md`)
 - `docs/workspace/PLAN.md` — produktový plán Workspace (zdroj pravdy pro rozsah; export z Claude Docs — při rozporu s Rozhodnutími v `memory/memory.md` platí Rozhodnutí)
 - `.claude/security/` — bezpečnostní stav: `STATE.md`, `DECISIONS.md`, `CSP-LOG.md`, `AUDIT-LOG.md` (S02)
-- `new - area of zakaziq/prompty/` — připravené prompty pro jednotlivá sezení S00–S19 (rozcestník `new - area of zakaziq/prompty/00-README.md`)
+- `new - area of zakaziq/prompty/` — prompty sezení, která ještě čekají; hotové jsou jen v historii gitu (rozcestník `new - area of zakaziq/prompty/00-README.md`)
 
 ## Git
 

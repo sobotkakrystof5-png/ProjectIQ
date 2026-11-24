@@ -1,5 +1,7 @@
 # Prompty pro Claude Code — klientský prostor, hlášení práce a nový admin
 
+> **Úklid 2026-11-24:** prompty hotových sezení jsou z repa smazané, zůstaly jen KP08 (odloženo) a KP10 (zbývá pilot). Smazaný prompt najdeš v gitu: `git show fdb8a63:'<cesta k souboru>'`.
+
 Sezení KP00–KP17 (KP17 poptávky z webu klienta: D-K16 i D-K20 = jen počet rozhodnuto 2026-11-20, kód hotov na větvi `klient/kp17-poptavky-webu`). Druhá vlna KP11–KP16 (R-121, R-122) je popsaná níž v oddílu „Druhá vlna". **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa `ZakazIQ`.
 Každé sezení začíná přečtením paměti a končí jejím zápisem, takže na sebe navazují i bez kontextu z minula.
 Zdroj pravdy je plán `docs/klientsky-prostor/PLAN.md` (architektura, bezpečnostní model, rozhodnutí D-K1–D-K11, tabulka sezení).

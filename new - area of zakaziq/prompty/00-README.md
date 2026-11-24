@@ -1,5 +1,7 @@
 # Prompty pro Claude Code — ZakazIQ Workspace
 
+> **Úklid 2026-11-24:** prompty hotových sezení jsou z repa smazané, zůstal jen S19 (audit a spuštění). Smazaný prompt najdeš v gitu: `git show fdb8a63:'<cesta k souboru>'`.
+
 Dvacet sezení (S00–S19). **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa
 `ZakazIQ` na větvi `workspace`. Každé sezení začíná přečtením paměti a končí jejím zápisem,
 takže na sebe navazují i bez kontextu z minula.

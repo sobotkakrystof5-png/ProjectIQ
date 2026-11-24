@@ -1,5 +1,7 @@
 # Prompty pro Claude Code — redesign aplikace Workspace
 
+> **Úklid 2026-11-24:** prompty hotových sezení jsou z repa smazané, zůstal jen RD15 (rozpracovaný vizuální audit). Smazaný prompt najdeš v gitu: `git show fdb8a63:'<cesta k souboru>'`.
+
 Sedmnáct sezení (RD00–RD16). **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa
 `ZakazIQ`, na větvi `ws/redesign-app` (vznikne v RD00). Každé sezení začíná přečtením paměti
 a končí jejím zápisem, takže na sebe navazují i bez kontextu z minula.

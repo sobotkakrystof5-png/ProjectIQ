@@ -122,7 +122,6 @@ node scripts/apply-migration.js 063_project_notes_meeting_log.sql   # aplikace m
 node scripts/apply-migration.js scripts/admin-base-schema.sql   # čistá DB: projects, client_messages, progress_updates (migrace 001+ je nezakládají)
 node scripts/apply-migration.js --env .env.production.local 100_uklid_skola_sport_plany.sql   # proti produkci
                                  # produkční připojení: vercel env pull .env.production.local --environment=production
-node scripts/export-before-drop.mjs --env .env.production.local --ano   # záloha tabulek do CSV před DROP (AD01, R-089)
 node scripts/admin-seed.mjs --ano   # admin: ukázková data (--smazat --ano je smaže, bez --ano jen vypíše)
                                  # zastaví se, když v DB leží skutečné řádky (přebití --i-s-daty)
 node scripts/bundle-stats.mjs --server http://localhost:3000 --cookie "<session>"   # kolik JS stáhne prohlížeč na trase

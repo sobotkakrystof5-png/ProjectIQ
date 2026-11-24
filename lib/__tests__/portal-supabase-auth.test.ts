@@ -88,7 +88,7 @@ describe('Clerk v klientském prostoru', () => {
     'app/klient/prihlaseni/page.tsx',
     'app/klient/pozvanka/[kod]/page.tsx',
     'app/klient/bez-pristupu/page.tsx',
-    'components/portal/portal-frame.tsx',
+    'components/portal/client-shell.tsx',
     'lib/portal/context.ts',
   ]
 

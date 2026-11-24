@@ -1,5 +1,7 @@
 # Prompty pro Claude Code — modernizace admin konzole
 
+> **Úklid 2026-11-24:** prompty hotových sezení jsou z repa smazané, zůstala jen zadání pro Growth OS (`growth-os-*.md`); AD00–AD18 jsou hotové. Smazaný prompt najdeš v gitu: `git show fdb8a63:'<cesta k souboru>'`.
+
 Čtrnáct sezení (AD00–AD18). **Jedno sezení = jedna nová konverzace v Claude Code** v kořeni repa
 `ZakazIQ`, na větvi `admin/modernizace` (vznikne v AD00 z `main`, až se tam fast-forwardem dostane `ws/redesign-app`). Každé sezení začíná přečtením paměti
 a končí jejím zápisem, takže na sebe navazují i bez kontextu z minula.
