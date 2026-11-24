@@ -5,8 +5,8 @@
 > **Poslední aktualizace:** 2026-11-24 · **Jeden klient, jedny údaje** (R-141): kontakt je jediný
 > zdroj e-mailu a telefonu klienta. Firma od AI asistenta, která řekla ano, dostane kontakt; oprava
 > v Kontaktech nebo v Hovorech se propíše do Hovorů, zakázek a budoucích schůzek (i SMS připomínky)
-> a okno události má našeptávač z Kontaktů. Migrace 130. **Nenasazeno, necommitnuto, v prohlížeči
-> neověřeno.** E-mail nadiktovaný v hovoru do ZakazIQ nedojde, dokud se nesplní zadání pro Growth OS
+> a okno události má našeptávač z Kontaktů. **Na produkci od 2026-11-24 (`44aa2e4`)**; migrace 130
+> zatím neaplikovaná (kód bez ní běží, vazbu firmy na kontakt bere přes Hovory). V prohlížeči neověřeno. E-mail nadiktovaný v hovoru do ZakazIQ nedojde, dokud se nesplní zadání pro Growth OS
 > `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md`.
 >
 > Předchozí: 2026-11-23 · **Ochrana proti XSS a DDoS v `main`** (R-138): audit
@@ -1572,9 +1572,10 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
 
 ## 3. Otevřené problémy
 
-- [ ] **Jeden klient, jedny údaje (R-141) — nasadit a projít:** (1) migrace 130 na produkci (aditivní,
-  smí před nasazením; vytvoří kontakty firmám se souhlasem a doplní prázdná místa v Hovorech a zakázkách —
-  aplikována: ne, nikde), (2) commit a nasazení, (3) projít naživo: firma od asistenta se souhlasem má v detailu
+- [ ] **Jeden klient, jedny údaje (R-141) — migrace a průchod:** kód je na produkci od 2026-11-24 (`44aa2e4`).
+  (1) migrace 130 na produkci (aditivní; vytvoří kontakty firmám se souhlasem a doplní prázdná místa v Hovorech
+  a zakázkách — aplikována: ne, nikde; agent nemá k produkční DB přístup, Neon CLI s uloženým přihlášením zamítla
+  kontrola oprávnění), (2) projít naživo: firma od asistenta se souhlasem má v detailu
   „Upravit telefon a e-mail", oprava e-mailu v Kontaktech se objeví v Hovorech, v okně schůzky a u budoucí
   schůzky; okno události v kalendáři našeptá kontakt a vyplní telefon i e-mail (390 a 1280 px, Escape zavře
   jen našeptávač). Ověřeno jen testy nad PGlite, `tsc` a buildem · od 2026-11-24
@@ -1997,6 +1998,11 @@ nedostane — zadání `new - area of zakaziq/prompty/admin/growth-os-email-z-ho
   Plná sada 1753 prošlo / 3 selhaly: `ws-email` (pevné datum, známé) a dva časové limity pod zátěží
   (`admin-ai-asistent-crm`, `admin-hovory-asistent` — samostatně 22/22). **V prohlížeči neověřeno.**
 - **decision** **R-141**, DECISIONS #051.
+- **chore** **Na produkci** (2026-11-24): commit `44aa2e4` (všechny tři změny, commitnulo a pushnulo souběžné
+  sezení), build `project-q9qla1at8` Ready. Ověřeno veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`
+  200; `/dashboard`, `/dashboard/kontakty`, `/dashboard/ai-asistent` 307; `/p/<nesmysl>` 404; `/api/public/outreach`
+  405 na GET a 401 bez klíče; v logu nasazení žádná chyba. Migrace 130 zatím neběžela. Bezpečnostní review
+  a riziko #051 (d) v `bdfd99d`. **Za přihlášením nikdo nic neviděl.**
 
 ### 2026-11-24 (proč nechodí SMS připomínky)
 - **chore** Kontrola fronty na produkci: e-mailové připomínky odcházejí (hodinová ke schůzce
