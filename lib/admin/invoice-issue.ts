@@ -295,7 +295,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     {
       text: `
         SELECT p.client_name, p.client_email, p.description, p.price::float AS price,
-               p.deposit_amount::float AS deposit_amount, p.deposit_paid,
+               p.deposit_amount::float AS deposit_amount, p.deposit_paid, p.paid,
                ${extraDepositsSql('p')}::float AS extra_deposits,
                ${invoicePaymentsSql('p')}::float AS invoice_payments,
                c.ico AS contact_ico, c.dic AS contact_dic, c.company AS contact_company
@@ -331,6 +331,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
         price: number | null
         deposit_amount: number | null
         deposit_paid: boolean
+        paid: boolean | null
         extra_deposits: number | null
         invoice_payments: number | null
         contact_ico: string | null
@@ -352,6 +353,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     depositPaid: project.deposit_paid,
     extraDeposits: Number(project.extra_deposits ?? 0),
     invoicePayments: Number(project.invoice_payments ?? 0),
+    paid: project.paid === true,
   })
   draft.email = project.client_email?.trim() ?? ''
   draft.projectLabel = project.description ? `${project.client_name} — ${project.description}` : project.client_name

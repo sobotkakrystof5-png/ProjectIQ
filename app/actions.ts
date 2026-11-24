@@ -391,10 +391,15 @@ export async function updateProject(
   await saveProjectPaymentDates(id, payload.paid_on, payload.deposit_paid_on)
 
   if (wasInvoicedOnIco !== payload.invoiced_on_ico) {
+    // Příjem z vystavené faktury (vlastní i převzatý) drží synchronizace
+    // faktury na `declared = true` — daňový doklad do nepřiznané linie
+    // nepatří (audit 2026-11-24, #5).
     await sql`
       UPDATE finance_transactions
       SET declared = ${payload.invoiced_on_ico}
       WHERE source_project_id = ${id} AND type = 'income'
+        AND source_invoice_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.finance_transaction_id = finance_transactions.id)
     `
     revalidatePath('/dashboard/finance')
   }
@@ -448,9 +453,15 @@ export async function updateProject(
       ...(await projectPaymentsFor(id)),
     })
     if (remaining > 0) {
+      // Jen vlastní doplatek zakázky. Příjem, který si založila zaplacená
+      // faktura (`source_invoice_id`), je jiné peníze, už odečtené ve
+      // `remaining` výš — dřív se za doplatek považoval a zbytek chyběl
+      // v ledgeru i v daňovém základu (audit 2026-11-24, #3).
       const existingFinal = await sql`
         SELECT id FROM finance_transactions
-        WHERE source_project_id = ${id} AND (deposit_transaction = false OR deposit_transaction IS NULL) LIMIT 1
+        WHERE source_project_id = ${id} AND (deposit_transaction = false OR deposit_transaction IS NULL)
+          AND category = 'zakázka' AND source_invoice_id IS NULL
+        LIMIT 1
       `
       if ((existingFinal as unknown[]).length === 0) {
         const note = payload.client_name + (payload.description ? ' — ' + payload.description : '')

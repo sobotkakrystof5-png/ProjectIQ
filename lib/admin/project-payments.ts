@@ -71,14 +71,18 @@ export function invoicePaymentsSql(ref = 'p'): string {
   ), 0)`
 }
 
-/** SQL výraz: co ze zakázky ještě zbývá zaplatit (nikdy pod nulu). */
+/**
+ * SQL výraz: co ze zakázky ještě zbývá zaplatit (nikdy pod nulu). Zaplacená
+ * zakázka („Peníze dorazily") nezbývá nic — stejně jako SQL kopie
+ * `portal.refresh_project_money` v migraci 122 (R-125, audit 2026-11-24 #4).
+ */
 export function remainingSql(ref = 'p'): string {
-  return `GREATEST(
+  return `CASE WHEN COALESCE(${ref}.paid, false) THEN 0 ELSE GREATEST(
     COALESCE(${ref}.price, 0)
     - CASE WHEN ${ref}.deposit_paid THEN COALESCE(${ref}.deposit_amount, 0) ELSE 0 END
     - ${extraDepositsSql(ref)}
     - ${invoicePaymentsSql(ref)},
-    0)`
+    0) END`
 }
 
 export type ProjectPayments = { extraDeposits: number; invoicePayments: number }
@@ -185,7 +189,10 @@ export function remainingToPay(input: {
   extraDeposits: number
   /** Zaplacené korunové faktury zakázky (R-125). */
   invoicePayments?: number
+  /** „Peníze dorazily" — zaplacená zakázka nezbývá nic. */
+  paid?: boolean
 }): number {
+  if (input.paid) return 0
   const price = Number(input.price ?? 0)
   const own = input.depositPaid ? Number(input.depositAmount ?? 0) : 0
   const paid = own + input.extraDeposits + (input.invoicePayments ?? 0)
