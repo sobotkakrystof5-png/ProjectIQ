@@ -17,7 +17,7 @@ Jedna Next.js aplikace se třemi částmi:
 
 | Část | Cesty | Přihlášení | Stav |
 |---|---|---|---|
-| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/login`, `/p/[token]`, `/h/[token]` | NextAuth (jeden admin) | mění se jen v sezeních AD00–AD18 (R-082), dokumentace v `docs/admin/AGENTS-ADMIN.md` |
+| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/login`, `/p/[token]`, `/h/[token]` | Supabase Auth + TOTP (jeden admin) | mění se jen v sezeních AD00–AD18 (R-082), dokumentace v `docs/admin/AGENTS-ADMIN.md` |
 | **ZakazIQ Workspace** (SaaS pro firmy) | `/w/*`, `/api/ws/*`, `/api/public/v1/*` | Clerk | ve výstavbě |
 | **Landing page** | `/` a marketingové stránky v `app/(marketing)/` | žádné | ve výstavbě |
 

@@ -193,7 +193,8 @@ describe('fronta „Komu zavolat"', () => {
       setAdminDbForTests(pgliteAdminDriver(db))
       await empty.close()
     }
-  })
+    // Zakládá vlastní PGlite: start databáze ve WASM pod zátěží přetáhne výchozích 5 s.
+  }, 60_000)
 })
 
 describe('akce Kryštofa', () => {

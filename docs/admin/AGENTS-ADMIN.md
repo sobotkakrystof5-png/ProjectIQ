@@ -26,8 +26,8 @@
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
 | Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL`. Čtení obrazovek jde od AD06 přes `lib/admin/db.ts` (dávky), starší volání přes `lib/db.ts` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
-| Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session s platností 12 h (`lib/auth.ts`, od 2026-11-03), zámek 5 chybných pokusů za 15 min na IP, chráněno i přes `proxy.ts` |
-| Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
+| Auth | Supabase Auth (e-mail, heslo, TOTP; R-105) | Jediný admin podle `ADMIN_EMAIL`, session 12 h od přihlášení (R-106, `lib/supabase/session-age.ts`), bez zámku na IP (DECISIONS #030), chráněno přes `proxy.ts` a `requireAdminPage()` (`lib/auth.ts`) |
+| Email | Resend z vizeon.cz (R-116) | `lib/email.ts` — `deliver()` přes `sendVizeonMail` (`lib/admin/vizeon-mail.ts`), záložně Nodemailer + Gmail SMTP, když chybí `VIZEON_RESEND_API_KEY`; branded HTML layout |
 | Deployment | Vercel | Zero-ops, napojení na GitHub, Hobby plán (crony max 1× denně) |
 | AI | `@anthropic-ai/sdk` | AI asistenti (Startup) + AI přepis PDF faktur (`lib/invoice-ai.ts`) |
 | PDF | `puppeteer-core` + `@sparticuz/chromium` | Vykreslení PDF (faktury Workspace; admin faktury AD12) |
@@ -342,14 +342,14 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 ```
 app/
 ├── (auth)/
-│   └── login/page.tsx           ← Přihlášení (NextAuth credentials)
-├── api/auth/[...nextauth]/
-│   └── route.ts                 ← NextAuth handler
+│   └── login/page.tsx           ← Přihlášení (Supabase Auth: e-mail, heslo, TOTP; R-105)
+├── api/auth/supabase-hook/
+│   └── route.ts                 ← Hook Before User Created (registrace jen s pozvánkou, R-107)
 ├── actions.ts                   ← Server Actions: createProject, updateProject, deleteProject, client messages
 ├── portal-actions.ts            ← Public Server Actions: submitFeedback, submitConsultation (token-only auth, rate-limited)
 ├── calendar-actions.ts          ← Server Actions: createCalendarEvent, deleteCalendarEvent
 ├── dashboard/
-│   ├── layout.tsx               ← Ochrana routy (getServerSession) + kostra; počty posílá jako příslib (AD06)
+│   ├── layout.tsx               ← Ochrana routy (`getAdminSession`) + kostra; počty posílá jako příslib (AD06)
 │   ├── loading.tsx              ← Kostlivec Dnes (další u calls, calendar, faktury, zakazky, klienti…)
 │   ├── page.tsx                 ← Přehled zakázek
 │   ├── new/page.tsx             ← Nová zakázka
@@ -386,15 +386,14 @@ lib/
 ├── lead-origins.ts              ← Zdroje poptávek: název, doména, `source`, klíče API, okno rate limitu (dřív business.ts)
 ├── legacy-redirects.mjs         ← Staré adresy adminu → nové (čte next.config.mjs i test)
 ├── web-leads.ts                 ← Příjem poptávek z webů: booking i kontaktní formulář, jeden inbox (dřív web-booking.ts)
-├── web-booking.ts               ← Sdílená implementace veřejného booking endpointu (obě domény)
-├── auth.ts                      ← NextAuth authOptions
-├── email.ts                     ← Sdílený nodemailer transporter + branded HTML layout (sendBrandedEmail)
+├── auth.ts                      ← Supabase Auth: `getAdminSession`, `requireAdminPage`, TOTP (R-105)
+├── email.ts                     ← Pošta přes Resend (`sendVizeonMail`, R-116), záložně nodemailer; branded HTML layout (sendBrandedEmail)
 ├── feedback-schema.ts           ← Zod schémata: feedbackSchema, bookingSchema
 ├── prague-time.ts               ← Timezone helpery (Europe/Prague), generování slotů, kalendářní utility
 ├── utils.ts
 └── types.ts
 
-proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard (`/alteno` a `/hub` zůstaly jako pojistka před přesměrováním), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
+proxy.ts                         ← jediný proxy (dřív middleware.ts): Supabase Auth pro /dashboard (`/alteno` a `/hub` zůstaly jako pojistka před přesměrováním), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -413,7 +412,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `app/calendar-actions.ts` | Kalendářní události (+ párový lead v Hovorech) |
 | `app/calls-actions.ts` | Hovory: leady, poznámky, waiting stav, převod na zakázku, portfolio email, vlastní email |
 | `app/contacts-actions.ts` | Kontakty (AD09): úprava údajů, sloučení duplicity a jeho „Zpět" |
-| `app/completed-actions.ts` | Dokončené zakázky + dotazníky |
+| `app/closed-actions.ts` | Dokončené zakázky + dotazníky |
 | `app/costs-actions.ts` | Náklady — jediný zdroj pravdy pro firemní i osobní náklady |
 | `app/notification-actions.ts` | Notifikace (přečteno) |
 | `app/project-notes-actions.ts` | Log schůzek u zakázky |
@@ -444,7 +443,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Endpoint | Auth | Účel |
 |----------|------|------|
-| `POST /api/public/booking` | `x-api-key` = `VIZEON_API_KEY` | Rezervace z vizeon.cz (`lib/web-booking.ts`) |
+| `POST /api/public/booking` | `x-api-key` = `VIZEON_API_KEY` | Rezervace z vizeon.cz (`lib/web-leads.ts`) |
 | `POST /api/public/booking/alteno` | `x-api-key` = `ALTENO_API_KEY` | Rezervace z alteno.cz |
 | `POST /api/public/alteno-leads` | `x-alteno-lead-signature` = `ALTENO_LEAD_WEBHOOK_SECRET` | Kontaktní formulář alteno.cz → nepotvrzená poptávka |
 | `POST /api/public/prvotka-leads` | `x-prvotka-lead-signature` = `PRVOTKA_LEAD_WEBHOOK_SECRET` | Kontaktní formulář prvotka.cz → nepotvrzená poptávka (AD02; web ještě napojený není) |
@@ -484,7 +483,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 ## Stránky — co každá dělá
 
 ### `/login`
-- Email + heslo přes NextAuth Credentials
+- Email + heslo přes Supabase Auth, pak TOTP (R-105)
 - Po přihlášení redirect na `/dashboard`
 - Čistý minimalistický design
 
@@ -498,7 +497,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - **Šířka a hlavička patří stránce (AD05).** `<main>` v `AdminShell` nemá šířku ani okraje, jen místo pro spodní lištu telefonu. Každá obrazovka `/dashboard` se obaluje `<PageShell>` z `components/ws/app/page-header.tsx` a volí si šířku: `narrow` 960 · `default` 1280 · `wide` 1440 · `table` 1600 (jedenáctisloupcové tabulky Dokončených a Hovorů). Nadpis dělá `<PageHeader>` (admin posílá `subtitleFont="sans"`, protože podnadpis je věta, ne čísla), řádek filtrů `<Toolbar>` / `<PillNav>`, prázdný stav `<EmptyState>`. Jsou to komponenty Workspace, ale závisí jen na `AccentHeading` a `cn` — žádná data `ws`. **Nová obrazovka adminu začíná `<PageShell>`, ne vlastním `max-w-*`.**
 - **Kostlivci obrazovek (AD06).** `components/admin/page-skeleton.tsx` (`TodaySkeleton`, `TableSkeleton`, `CalendarSkeleton`) a `loading.tsx` u `/dashboard` a devíti podstránek. Kostlivec má **stejnou šířku a rozvržení** jako hotová obrazovka, aby se po načtení nic nepřeskládalo, a nekreslí žádné číslo ani text, co by se dal splést se skutečným údajem. `loading.tsx` u `/dashboard` platí i pro podstránky, které si vlastní nezaložily.
 - **`experimental.staleTimes: { dynamic: 30, static: 180 }`** (`next.config.mjs`, AD06): Zpět a Vpřed po dobu 30 s nesahají do databáze. Data po vlastní akci se obnovují cíleně přes `revalidatePath`, takže se stará data ukážou jen při prostém listování tam a zpět.
-- **Kořenový layout nemá `SessionProvider` (AD06).** `useSession()` v repu nikdo nepoužívá; admin si session čte na serveru (`getServerSession`) a hlavička landing page dostává `signedIn` jako prop z `Hero` / `LegalPage`. Dřív provider obaloval celou aplikaci, takže NextAuth načítal i Workspace a landing a každý návštěvník po načtení volal `/api/auth/session`. `signIn()` a `signOut()` z `next-auth/react` provider nepotřebují.
+- **Kořenový layout nemá `SessionProvider` (AD06).** `useSession()` v repu nikdo nepoužívá; admin si session čte na serveru (`getAdminSession`) a hlavička landing page dostává `signedIn` jako prop z `Hero` / `LegalPage`. Dřív provider obaloval celou aplikaci, takže NextAuth načítal i Workspace a landing a každý návštěvník po načtení volal `/api/auth/session`. `signIn()` a `signOut()` z `next-auth/react` provider nepotřebují.
 - **Odznaky mají jeden systém (AD05, R-091).** `lib/admin-status.ts` má pět tónů `neutral | info | signal | success | danger` a mapy pro stav zakázky, hovoru, typ akce, druh změny, vylepšení, fázi projektu, předplatné klienta a stav faktury. Vykresluje se přes `components/ui/badge.tsx` (`toneVariant(tón)`). **Obrazovka si vlastní barvu odznaku nedefinuje**; nový stav = nový řádek v `lib/admin-status.ts`. Kategorie (typ akce, druh změny, oblast, kategorie nákladu) jsou vždy `neutral`.
 
 ### `/dashboard` — Dnes (KP02, AD03)
@@ -1337,25 +1336,25 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 - Cíl admin oznámení ber vždy z `adminEmail()` v `lib/lead-origins.ts` (`VIZEON_ADMIN_EMAIL`, záloha `ADMIN_EMAIL`) — nikdy nečti `process.env.ADMIN_EMAIL` přímo.
 - Selhání odeslání emailu **nikdy** nesmí shodit DB mutaci — `sendBrandedEmail`/`sendPlainEmail` interně chytají chyby a vrací `false`, voláno bez `await` na výsledek pokud na něm nic nezávisí.
-- **Oznámení posílej z `after()`, ne uprostřed akce (AD08).** Gmail SMTP trvá stovky
+- **Oznámení posílej z `after()`, ne uprostřed akce (AD08).** Odeslání e-mailu (Resend) trvá stovky
   milisekund až sekundy a uložení na něj nemá čekat: `import { after } from 'next/server'`
   a odeslání dovnitř. Platí to i pro `createNotification` — plovoucí `void promise` může
   skončit s odpovědí dřív, než se zápis dokončí. Výjimka jsou akce, **jejichž smyslem je
   ten e-mail** (`sendLeadEmail` v `app/lead-mail-actions.ts`): tam UI hlásí, jestli odešel,
   a po odpovědi už by se to uživatel nedozvěděl. Strop drží
   `lib/__tests__/admin-after-emails.test.ts`.
-- Emaily se neodešlou, pokud chybí odpovídající dvojice `*_USER`/`*_APP_PASSWORD` — v dev prostředí appka funguje i bez nich, jen nechodí maily.
+- Emaily se neodešlou, pokud chybí `VIZEON_RESEND_API_KEY` a zároveň odpovídající dvojice `*_USER`/`*_APP_PASSWORD` (záloha) — v dev prostředí appka funguje i bez nich, jen nechodí maily.
 - Trigger body: `notifyClientOfProjectChange` v `app/actions.ts` (vytvoření/update projektu → klient), `submitConsultation` v `app/portal-actions.ts` (rezervace → admin i klient).
 
 ---
 
 ## Bezpečnost
 
-- **NextAuth JWT session** — admin chráněn `proxy.ts` (matcher `/dashboard`, plus `/alteno` a `/hub` jako pojistka, vč. podcest) + `getServerSession` v layoutu. `/api/*` proxy **nehlídá** — každá neveřejná API routa si session kontroluje sama
+- **Supabase Auth session** (e-mail, heslo, TOTP; R-105) — admin chráněn `proxy.ts` (matcher `/dashboard`, plus `/alteno` a `/hub` jako pojistka, vč. podcest) + `requireAdminPage()` na každé stránce `/dashboard/**`. `/api/*` proxy **nehlídá** přihlášení (na `/api/public`, `/api/klient` a `/embed` dělá jen bránu na IP, DECISIONS #052) — každá neveřejná API routa si session kontroluje sama
 - **Security hlavičky** v `next.config.mjs`, CSP s nonce v `proxy.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
-- **Heslo uloženo jako bcrypt hash** v env proměnné `ADMIN_PASSWORD_HASH`
+- **Heslo drží Supabase Auth** (ne repo ani env; `ADMIN_PASSWORD_HASH` a bcrypt se od R-105 nepoužívají), druhý faktor TOTP
 - **Veřejné server actions** (`submitFeedback`, `submitConsultation`) jsou chráněné jen tokenem (bez auth) — mají DB-backed rate limit (`isRateLimited` v `app/portal-actions.ts`: max 3 hodnocení / 10 min, max 3 rezervace / 30 min per projekt), aby nešlo endpoint zaspamovat
 - **Race condition na rezervacích** řešená přes DB `UNIQUE` constraint na `scheduled_at` + catch na Postgres chybový kód `23505` — nikdy přes "zkontroluj a pak vlož"
 
@@ -1382,7 +1381,7 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - Nová emailová šablona → rozšiř `lib/email.ts`, nepiš HTML inline v actions
 - `notes` je výhradně pro admina — **nikdy ho neposílej na `/p/[token]`**
 - `public_token` se generuje v databázi — **nikdy ho negeneruj na frontendu**
-- Auth check v server komponentě: `getServerSession(authOptions)` z `next-auth`
+- Auth check v server komponentě: `getAdminSession()` / `requireAdminPage()` z `lib/auth.ts`
 - Výchozí chování na portálu: cena je **skrytá** (volitelné zapnutí)
 - Nová DB změna → nová idempotentní migrace v `migrations/`, ne přímá úprava základního schématu výše
 - Časové sloty/kalendářní logika → vždy přes `lib/prague-time.ts`, nepřepočítávej timezony znovu v komponentě

@@ -129,7 +129,7 @@ export function bookingPostHandler(origin: LeadOrigin) {
       `
       const { id: eventId, project_id: projectId } = rows[0] as { id: string; project_id: string }
 
-      // Web klienta na nic z toho nečeká (AD08): Gmail SMTP trvá stovky
+      // Web klienta na nic z toho nečeká (AD08): odeslání e-mailu trvá stovky
       // milisekund až sekundy a poptávka je přitom už uložená. `after()`
       // pustí e-mail i oznámení až po odeslání odpovědi — a na rozdíl od
       // plovoucí `void` promise je zaručeně dokončí.

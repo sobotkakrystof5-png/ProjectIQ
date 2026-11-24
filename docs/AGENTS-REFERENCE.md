@@ -85,7 +85,7 @@ Soubor má dvě části: **[A — Admin konzole](#část-a--admin-konzole)** (b�
 
 ## Hranice v repu
 
-Jedna Next.js aplikace, tři části: **admin konzole** (NextAuth, jeden admin), **ZakazIQ Workspace** (Clerk, firmy) a **landing page** (veřejná).
+Jedna Next.js aplikace, tři části: **admin konzole** (Supabase Auth + TOTP, jeden admin, R-105), **ZakazIQ Workspace** (Clerk, firmy) a **landing page** (veřejná).
 
 | Oblast | Složky | Pravidlo |
 |---|---|---|
@@ -106,7 +106,7 @@ Co se z adminu přebírá (příjem poptávek, časové helpery, faktury, daně,
 
 > Kryštofův osobní produkční systém (VIZEON, ALTENO, Hub, klientský portál). **Úplný popis kódu adminu je v [`docs/admin/AGENTS-ADMIN.md`](../docs/admin/AGENTS-ADMIN.md)** — tech stack, databázový model a katalog tabulek, struktura aplikace, server actions, routy, API, crony, stránky, stavy zakázky, e-maily, bezpečnost, UX pravidla a poznámky pro AI. Přečti ho před jakoukoli změnou adminu (R-042). Tady zůstávají jen příkazy a env proměnné, které platí pro celé repo.
 
-Admin v kostce: Next.js 16 App Router, Neon přes `sql` tag z `lib/db.ts` (bez ORM), NextAuth s jedním adminem, e-maily přes Gmail SMTP v `lib/email.ts`, Vercel Hobby (crony max 1× denně). Neon vrací `date`/`timestamptz` jako `Date`, ne string. Částky v CZK a EUR se nikdy nesčítají.
+Admin v kostce: Next.js 16 App Router, Neon přes `sql` tag z `lib/db.ts` (bez ORM), Supabase Auth (e-mail, heslo, TOTP; R-105) s jedním adminem, e-maily přes Resend z vizeon.cz (`sendVizeonMail` z `lib/admin/vizeon-mail.ts`, volá ho `lib/email.ts`; R-116; Gmail SMTP jen záloha), Vercel Hobby (crony max 1× denně). Neon vrací `date`/`timestamptz` jako `Date`, ne string. Částky v CZK a EUR se nikdy nesčítají.
 
 ### Příkazy
 
@@ -141,7 +141,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | Workspace klíče webů | `WS_KEY_PEPPER` (min. 32 znaků, jen server) — pepř pro HMAC tajných klíčů napojení, hash klíčů rate limitu a (odvozeným klíčem) podpis odkazů v e-mailech. Bez něj tajné klíče nejde vytvořit ani ověřit (API 503) a e-maily s odkazy nevzniknou. Změna zneplatní klíče i odeslané odkazy |
 | Workspace e-maily | `WS_EMAIL_FROM` (adresa na doméně ověřené v Resendu, např. `rezervace@zakaziq.cz`; bez ní fronta nic neodešle), `RESEND_API_KEY` (sdílený s adminem), `RESEND_WEBHOOK_SECRET` (`/api/resend/webhook`, bez něj 503), `CRON_SECRET` (`/api/cron/ws-email`, `/api/cron/ws-gdpr`) |
 | Workspace platby | `STRIPE_SECRET_KEY` (omezený `rk_…`, jen server), `STRIPE_WEBHOOK_SECRET` (`/api/stripe/webhook`, bez něj 503), `STRIPE_PRICE_MONTHLY` (cena 249 Kč), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (zatím nepoužitý). Postup `docs/workspace/SETUP.md` → Stripe |
-| Emaily | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD`, `VIZEON_ADMIN_EMAIL`, `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
+| Emaily | `VIZEON_RESEND_API_KEY` (pošta adminu přes Resend, R-116), `VIZEON_ADMIN_EMAIL`; záloha `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `VIZEON_GMAIL_USER`, `VIZEON_GMAIL_APP_PASSWORD` (jen když chybí klíč Resendu); `RESEND_API_KEY` (jen waitlist launch emaily ve Startupu) |
 | Konzultace | `ADMIN_PHONE`, `GOOGLE_MEET_LINK`, `TEAMS_MEETING_LINK` |
 | Veřejná API | `VIZEON_API_KEY`, `ALTENO_API_KEY`, `ALTENO_LEAD_WEBHOOK_SECRET`, `N8N_API_KEY`, `VIZEON_AGENT_API_KEY`, `GROWTH_OS_API_KEY`, `INVOICES_API_KEY`; schůzky s Meet (R-112): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`, `VIZEON_RESEND_API_KEY`, `VIZEON_EMAIL_FROM`; připomínky schůzek (R-137): `ODORIK_API_USER`, `ODORIK_API_PASSWORD`, `ODORIK_SMS_SENDER` (SMS, bez nich jen e-mail), `MEETING_REMINDERS_SECRET` (`/api/cron/meeting-reminders`, volá ho každou minutu pg_cron v Supabase, klíč i ve Vault) |
 | Crony | `CRON_SECRET` |
@@ -154,15 +154,20 @@ Nejdůležitější s popisem:
 
 ```env
 DATABASE_URL=             # Neon connection string (pooled)
-NEXTAUTH_SECRET=          # openssl rand -base64 32
+NEXTAUTH_SECRET=          # nepoužívá se od R-105 (přihlášení drží Supabase Auth); z Vercelu jde odebrat
 NEXTAUTH_URL=             # http://localhost:3000 (dev) / https://... (prod)
 ADMIN_EMAIL=              # e-mail pro přihlášení i pro notifikace o nových rezervacích
-ADMIN_PASSWORD_HASH=      # bcrypt hash hesla (generuj: node -e "require('bcryptjs').hash('heslo',12).then(console.log)")
+SUPABASE_URL=             # projekt zakaziq (přihlášení adminu, klientský prostor; R-105, R-107)
+SUPABASE_PUBLISHABLE_KEY= # veřejný klíč (sb_publishable_…); service_role se do env nedává
 
-GMAIL_USER=               # Výchozí odesílací účet — přihlášení, ALTENO, Hub (vše, co není VIZEON)
+# ADMIN_PASSWORD_HASH (bcrypt) se od R-105 nepoužívá; heslo drží Supabase Auth.
+
+VIZEON_RESEND_API_KEY=    # pošta adminu přes Resend z vizeon.cz (`sendVizeonMail`, R-116)
+
+GMAIL_USER=               # Záložní odesílací účet (R-116), jen když chybí VIZEON_RESEND_API_KEY
 GMAIL_APP_PASSWORD=       # App password (Google Account → Security → App passwords)
 
-VIZEON_GMAIL_USER=        # info@vizeon.cz — vlastní odesílací schránka VIZEONu (klientské i admin emaily)
+VIZEON_GMAIL_USER=        # info@vizeon.cz — záložní odesílací schránka VIZEONu (R-116; hlavní je Resend)
 VIZEON_GMAIL_APP_PASSWORD= # App password pro VIZEON_GMAIL_USER. Chybí-li, VIZEON emaily spadnou zpět na GMAIL_USER
 VIZEON_ADMIN_EMAIL=       # info@vizeon.cz — cíl admin notifikací pro VIZEON (nezávislé na přihlašovacím ADMIN_EMAIL)
 
@@ -193,11 +198,11 @@ ZakazIQ Workspace je SaaS pro malé firmy, které dostávají poptávky (kadeřn
 
 ## B2. Tech stack
 
-Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Neon Postgres (`@neondatabase/serverless`) · Clerk (klienti) · NextAuth (jen admin) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
+Next.js 16 App Router (Turbopack) · React 19 · TypeScript strict · Tailwind CSS + shadcn/ui (`components/ui/`) · Neon Postgres (`@neondatabase/serverless`) · Clerk (Workspace) · Supabase Auth (admin a klientský prostor, R-105/R-107) · Stripe Billing · Resend + React Email · Zod + react-hook-form · Framer Motion · Lucide (`strokeWidth={1.5}`) · Vitest · Vercel (+ Cron).
 
 - Nové závislosti jen s důvodem zapsaným do `memory/memory.md` → Rozhodnutí.
 - UI kit stojí na Radix UI (`@radix-ui/react-*`), `class-variance-authority`, `cmdk` (⌘K) a `react-day-picker` (kalendář) — R-028.
-- E-maily Workspace jdou přes Resend (B7). Admin zůstává na Gmail SMTP (R-004) — `lib/email.ts` Workspace nepoužívá.
+- E-maily Workspace jdou přes Resend (B7). Admin posílá přes Resend z vizeon.cz (R-116, nahrazuje R-004; Gmail SMTP jen záloha) — `lib/email.ts` Workspace nepoužívá.
 - Upgrade Next.js na 15 není součást výstavby, je to samostatný krok po spuštění.
 - Env proměnné Workspace jsou předem (prázdné) v `.env.example` v bloku `# --- ZakazIQ Workspace ---` (S00). Do tabulky env v části A se zapisují až s kódem, který je čte; další nové proměnné do obou míst zároveň.
 
@@ -288,9 +293,9 @@ Pravidla schématu:
 
 | Co | Kde |
 |---|---|
-| Stránky (vzhled adminu, NextAuth) | `/dashboard/klienti` (přehled účtů: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, napojený web), `/dashboard/klienti/[id]` (detail účtu, klíče a prompt, pozvánka znovu, omezená historie auditu), `/dashboard/novinky` (editor s náhledem v aplikaci a e-mailu, seznam). Vykreslení v `clients-view.tsx`, `[id]/detail-view.tsx`, akce `actions.ts` |
+| Stránky (vzhled adminu, Supabase Auth) | `/dashboard/klienti` (přehled účtů: obor, byznysy, stav předplatného, poslední aktivita, poptávky 30 dní, napojený web), `/dashboard/klienti/[id]` (detail účtu, klíče a prompt, pozvánka znovu, omezená historie auditu), `/dashboard/novinky` (editor s náhledem v aplikaci a e-mailu, seznam). Vykreslení v `clients-view.tsx`, `[id]/detail-view.tsx`, akce `actions.ts` |
 | Přístup do DB | `lib/ws/admin/db.ts`: `adminDb` přes `DATABASE_URL` (vlastník tabulek, mimo RLS), `server-only`, v testech `setAdminDriverForTests`. Jen z `lib/ws/admin/*` |
-| Kdo smí | `lib/ws/admin/auth.ts`: `getAdmin()` = NextAuth session; každá server action ho volá první (testy `setAdminAuthForTests`). Audit `actor = 'admin'` |
+| Kdo smí | `lib/ws/admin/auth.ts`: `getAdmin()` = admin session ze Supabase Auth (`getAdminSession` z `lib/auth.ts`, R-105); každá server action ho volá první (testy `setAdminAuthForTests`). Audit `actor = 'admin'` |
 | Přehled a detail | `lib/ws/admin/clients.ts`: `listClients`, `getClientDetail`, `getClientBusiness`, `auditAdmin`. Poslední aktivita = nejnovější změna poptávek, termínů, zakázek, zákazníků a faktur; jejich osobní/finanční obsah ani poznámky a podrobnosti auditu admin nečte. Zůstávají souhrny účtu, byznysů, předplatného a členů týmu. |
 | Pozvat klienta | `lib/ws/admin/invite.ts`: Clerk organizace (bez vlastníka) → `createAccountWithBusiness({ owner: null })` → pozvánka `org:admin` s návratem na `/w/registrace`. Člen se zapíše až v průvodci `/w/novy` (`ensureMember` v `lib/ws/onboarding.ts`, bez webhooku Clerku). Klient pak projde Checkoutem (R-038) |
 | Klíče a prompt pro web | `lib/ws/admin/web-keys.ts`: `ensureIntegration` + `rotateSecretKey` + `buildClaudePrompt` jako Nastavení › Napojený web (S11), zápis rolí `ws_app` pod RLS účtu |
@@ -316,7 +321,7 @@ Plán a rozhodnutí: `docs/klientsky-prostor/PLAN.md` (R-070 a dál v `memory/me
 - Clerk: Organization = účet (firma, jedno IČO, předplatné). Role `owner`, `staff`.
 - Přihlášení bez hesla: e-mailový kód nebo Google.
 - Jedna doména: landing na `/`, aplikace na `/w/*`, jedna Clerk instance (R-017). Cesty veřejných částí viz Hranice v repu (R-016).
-- Jeden `proxy.ts` (dřív `proxy.ts`, Next 16, Node runtime): veřejné cesty; Workspace přes Clerk; admin cesty přes NextAuth token jako dnes. Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
+- Jeden `proxy.ts` (dřív `middleware.ts`, Next 16, Node runtime): veřejné cesty; Workspace přes Clerk; admin cesty přes Supabase Auth session (`checkAdminSession`, R-105). Admin přihlášení zůstává na `/login`, odkaz „Admin" ve footeru landing page.
 - Webhook Clerk (`/api/clerk/webhook`, ověření podpisu) synchronizuje účty a členy do `ws`.
 
 
@@ -661,7 +666,7 @@ Stav zabezpečení je v `.claude/security/`:
 |---|---|
 | Statické hlavičky (HSTS, nosniff, X-Frame-Options, CORP, COOP, Permissions-Policy…) pro všechny odpovědi | `next.config.mjs` |
 | CSP s nonce per request (`strict-dynamic`), výběr profilu podle cesty | `proxy.ts` + `lib/security/csp.ts` |
-| Admin přihlášení (NextAuth), Workspace (Clerk jen `/w`, `/api/ws`) | `proxy.ts` — Clerk větev (`/w`, `/api/ws`) → admin NextAuth → CSP |
+| Admin přihlášení (Supabase Auth), Workspace (Clerk jen `/w`, `/api/ws`) | `proxy.ts` — Clerk větev (`/w`, `/api/ws`) → admin Supabase Auth (`checkAdminSession`) → CSP |
 | `frame-ancestors` pro `/r/[slug]`, CORS pro `/api/public/v1/*` | `lib/security/embed.ts` (`frameAncestorsFor`, `corsHeaders`, `preflightResponse`); domény z `web_integrations.allowed_origins` — `/r` přes `lib/ws/intake/embed-origins.ts` v proxy, API přes `lib/ws/intake/http.ts` |
 | Hlášení zranitelností | `public/.well-known/security.txt` (`Expires` obnovit) |
 | CI: audit závislostí, gitleaks, kontrola hlaviček živého webu | `.github/workflows/security.yml`, skript `.claude/security/security-check.sh` |

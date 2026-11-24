@@ -388,5 +388,6 @@ describe('bez migrace 119', () => {
       setAdminDbForTests(pgliteAdminDriver(db))
       await old.close()
     }
-  })
+    // Zakládá vlastní PGlite: start databáze ve WASM pod zátěží přetáhne výchozích 5 s.
+  }, 60_000)
 })

@@ -60,7 +60,7 @@
 | Pochopit, proč je něco udělané „divně" | `memory.md` → Rozhodnutí; pak komentář v kódu / migraci |
 | Modální okno, panel zprava, viditelný focus, vypnutý pohyb | `components/ui/{dialog,sheet}.tsx`, `components/ui/portal.tsx`, `app/globals.css` (`:focus-visible`, `prefers-reduced-motion`), `docs/admin/AGENTS-ADMIN.md` → Dokončení sjednocení (AD18), R-104 |
 | Vzhled denních obrazovek adminu (panel, štítek sekce, tóny, plochy 44 px) | `components/admin/card.tsx`, `lib/admin-status.ts`, `components/ui/{badge,button}.tsx`, barvy kalendáře `components/SmartCalendar.tsx` (`CHANNEL_TONE`, `KIND_TONE`) + `lib/ws/staff-colors.ts`, `docs/admin/AGENTS-ADMIN.md` → Denní obrazovky v Dílkách, R-103 (AD17) |
-| Výpis v adminu (řazení, stránkování, filtry) | `lib/admin-table.ts`, `components/admin/{data-table,pagination,table-search}.tsx`, dotazy `lib/admin/{completed,invoices,costs,leads,projects,waitlist}.ts` (AD07) |
+| Výpis v adminu (řazení, stránkování, filtry) | `lib/admin-table.ts`, `components/admin/{data-table,pagination,table-search}.tsx`, dotazy `lib/admin/{invoices,costs,leads,projects,waitlist}.ts` (AD07) |
 | Kontakty (jeden člověk, jeden řádek; sloučení duplicit) | `lib/contacts/{normalize,group}.ts`, `lib/admin/contacts.ts`, `app/contacts-actions.ts`, `app/dashboard/kontakty/`, `components/admin/contacts/`, `scripts/admin-contacts-backfill.mjs`, migrace 104, R-095 (AD09) |
 | Údaje klienta všude stejné (e-mail a telefon z kontaktu do Hovorů, zakázek, schůzek; firmy od AI asistenta v Kontaktech; našeptávač v kalendáři) | `lib/admin/contact-sync.ts`, `components/admin/contact-picker.tsx`, `lib/admin/contacts.ts` (`ensureContact`, `suggestContacts`), migrace 130, R-141; zadání pro Growth OS `new - area of zakaziq/prompty/admin/growth-os-email-z-hovoru.md` |
 | Dotazník spokojenosti, reference na web, předávací dokument | `lib/admin/{surveys,survey-model,survey-answers,survey-email,survey-notify,reference,handover,handover-schema}.ts`, `components/SurveyForm.tsx`, `components/admin/google-review-card.tsx`, migrace 118 (R-119, NPS a recenze na Googlu), `lib/invoice-pdf/handover.ts`, `app/handover-actions.ts`, `app/api/projects/[id]/predani/`, `components/admin/handover-card.tsx`, `components/HodnoceniDashboard.tsx`, migrace 112, R-102 (AD16) |
@@ -86,8 +86,7 @@
 | Koncepty faktur ke schválení, „Schválit a poslat", pravidelné faktury | `migrations/117_faktury_koncepty.sql`, `lib/admin/{invoice-drafts,invoice-draft-schema,invoice-send}.ts`, `app/api/invoices/drafts/[id]/send/`, `app/dashboard/faktury/{koncepty-actions.ts,pravidelne/}`, `components/admin/invoices/{drafts-panel,recurring-manager}.tsx`, R-117 |
 | Text e-mailu, kterým faktura odchází klientovi (šablona, proměnné, náhled) | `migrations/129_faktury_sablona_emailu.sql`, `lib/admin/{invoice-email-template,invoice-email-settings,invoice-send}.ts`, `components/admin/invoices/email-template-form.tsx`, `app/dashboard/faktury/dodavatel/page.tsx`, R-139 |
 | Daně | `lib/tax.ts`, `lib/tax-constants.ts`, `lib/tax-deadlines.ts`, `lib/tax-news.ts`, `components/Tax*` |
-| Náklady | `app/costs-actions.ts`, `components/CostsManager.tsx` |
-| Šablony webu | `app/block-templates-actions.ts`, `app/project-blocks-actions.ts`, `components/Block*`, `ProjectBlockList.tsx` |
+| Náklady | `app/costs-actions.ts` |
 | Emaily | `lib/email.ts` (+ `adminEmail()` v `lib/lead-origins.ts`) |
 | Veřejná API — auth, rate limit | `lib/api-auth.ts`, `lib/api-rate-limit.ts` |
 | Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `proxy.ts`, `lib/security/`, `.claude/security/` |
