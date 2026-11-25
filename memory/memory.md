@@ -112,11 +112,11 @@
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
-(34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Hotovo na větvi `fix/audit-2026-11`**
-(worktree `.claude/worktrees/fix-audit-2026-11`, nenasazeno, nepushnuto): A1–A3, B1, C0–C3 (bez částí
-čekajících na R1), E1, E3, E4, E6, E7, F1–F4, G1, H1, I1, J1. Zbývá: rozhodnutí R1–R7 od Kryštofa
-(D1–D2, E2, E5, I2, J4 a zbytek C1/C2), pak F5, G2, G3, H2, J2, J3, K1–K3. Po sloučení otočit heslo
-databáze waitlistu (R5). Stav po úkolech v tabulce „Stav" na konci seznamu.
+(34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
+A1–A3, B1, C0–C3 (bez částí čekajících na R1), E1, E3, E4, E6, E7, F1–F4, G1, H1, I1, J1. CI na `main`
+je zase zelená. Zbývá: rozhodnutí R1–R7 od Kryštofa (D1–D2, E2, E5, I2, J4 a zbytek C1/C2), pak F5, G2,
+G3, H2, J2, J3, K1–K3; otočit heslo databáze waitlistu (R5). Stav po úkolech v tabulce „Stav" na konci
+seznamu.
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
@@ -1667,13 +1667,12 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
   přesná kopie je ruční „Vložit přepis" (Copy as Markdown). Kdyby Wispr Flow vydal API, přejít na něj
   · DECISIONS #052 · od 2026-11-24
 
-- [ ] **Opravy z auditu (větev `fix/audit-2026-11`) — sloučit a ověřit:** nepushnuto, nenasazeno.
-  Před nasazením na Preview: po kroku s heslem bez kódu otevřít `/dashboard/kontakty` (má skončit na
-  `/login`), Finance › Podnikání a zakázka se zaplacenou fakturou („Peníze dorazily"), chat v adminu
-  i v `/klient` (v Network žádné obnovení stránky každých 10 s), editor startupu (Waitlist DB URL jen
-  pro zápis). Po nasazení **otočit heslo databáze waitlistu** v Neonu (R5 v `plans/ukoly-z-auditu.md`,
-  dřív leželo nešifrovaně a chodilo do prohlížeče). `memory/memory.md` se při sloučení potká se změnami
-  jiného sezení v hlavní složce (necommitnuté) · od 2026-11-24
+- [ ] **Opravy z auditu — projít naživo za přihlášením:** na produkci od 2026-11-25 (`718e985`), ověřené
+  jen zvenku. Projít: po kroku s heslem bez kódu otevřít `/dashboard/kontakty` (má skončit na `/login`),
+  Finance › Podnikání a zakázka se zaplacenou fakturou („Peníze dorazily"), chat v adminu i v `/klient`
+  (v Network žádné obnovení stránky každých 10 s), editor startupu (Waitlist DB URL jen pro zápis —
+  uložení projektu stávající připojení zašifruje). **Otočit heslo databáze waitlistu** v Neonu (R5 v
+  `plans/ukoly-z-auditu.md`, dřív leželo nešifrovaně a chodilo do prohlížeče) · Kryštof · od 2026-11-24
 - [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
   skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
   Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
@@ -2108,6 +2107,19 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
   psala body interně („Horák připraví…", „přepis končí…"), proto přibyly `internalNotes` a body
   ve tvaru do e-mailu. **V prohlížeči neověřeno, Gmail naostro neověřen.**
 - **decision** **R-144**, DECISIONS #052.
+
+### 2026-11-25 (opravy z auditu na produkci)
+- **chore** Větev `fix/audit-2026-11` přeskládaná na `main` (faktury R-142/R-143), pak do ní sloučený
+  `main` se schůzkami z Wispr Flow (R-144). Rozhodnutí o waitlistu a bráně přečíslované na DECISIONS #053
+  (#052 má Wispr Flow). Hlídací test `admin-page-guard` zachytil tři nové stránky Schůzek bez
+  `requireAdminPage()` — doplněno. Ověřeno: `tsc`, celá sada 1878 testů **bez jediného selhání**,
+  `npm run build`, CI `ci` i `security` zelené na větvi, Preview zvenku.
+- **chore** **Na produkci** 2026-11-25: fast-forward `main` `2bb6e34` → `718e985`, nasazení Ready
+  (`project-q4j1wu9t9`, alias `www.zakaziq.cz`). Ověřeno veřejně: `/`, `/login`, `/podminky`,
+  `/w/prihlaseni`, `/klient/prihlaseni`, `/robots.txt` 200; `/dashboard`, `/dashboard/finance`,
+  `/dashboard/kontakty`, `/dashboard/schuzky` 307 na `/login`; `/p/<nesmysl>` a `/embed/<neexistuje>.js`
+  404; booking, `/api/public/schuzky` a cron bez klíče 401; CSP a HSTS na `/`. Spouštěč připomínek vrací
+  každou minutu 200, 8 min bez chyby v logu. **Za přihlášením neověřeno.**
 
 ### 2026-11-24 (opravy z auditu, větev `fix/audit-2026-11`)
 - **test** A: `ws-email` počítá termín od dneška (CI na `main` červená od 2026-11-17), CI a security
