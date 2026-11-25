@@ -5,7 +5,8 @@
 > **Poslední aktualizace:** 2026-11-25 · **Doručení pozvánek** (R-146): kalendář ukazuje, jestli pozvánka
 > na schůzku klientovi dorazila, nebo se vrátila, podle webhooku Resendu `/api/resend/vizeon` (migrace 135).
 > Nedoručená pozvánka na nadcházející schůzku založí upozornění a nabídne „Poslat e-mail znovu".
-> **Nenasazeno**; čeká na migraci 135, endpoint v Resendu a `VIZEON_RESEND_WEBHOOK_SECRET` ve Vercelu.
+> **Na produkci od 2026-11-25 i s migrací 135**; dokud v Resendu není webhook a ve Vercelu
+> `VIZEON_RESEND_WEBHOOK_SECRET`, vstup vrací 503 a kalendář ukazuje jen „odešla“.
 >
 > Předchozí: 2026-11-25 · **Schůzky z Wispr Flow zrušené** (R-145): na přání Kryštofa
 > zmizela obrazovka Schůzky, vstup `/api/public/schuzky`, AI shrnutí, koncepty v Gmailu i most na Macu.
@@ -1699,7 +1700,7 @@ v Resendu a pořadí nasazení: `docs/admin/AGENTS-ADMIN.md` → „Doručení p
 
 ## 3. Otevřené problémy
 
-- [ ] **Doručení pozvánek (R-146) — nastavit a projít:** (1) migrace 135 na produkci, (2) v Resendu (účet
+- [ ] **Doručení pozvánek (R-146) — nastavit a projít:** ~~(1) migrace 135 na produkci~~ (2026-11-25), (2) v Resendu (účet
   s doménou vizeon.cz) Webhooks → Add endpoint `https://www.zakaziq.cz/api/resend/vizeon` s událostmi
   `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.failed`,
   `email.suppressed`, (3) podpisový klíč `whsec_…` do Vercel Production jako `VIZEON_RESEND_WEBHOOK_SECRET`,
@@ -2134,7 +2135,8 @@ v Resendu a pořadí nasazení: `docs/admin/AGENTS-ADMIN.md` → „Doručení p
   e-mail ze `sendVizeonMail` nese štítek `zakaziq=admin`, ostatní (Growth OS) se zahodí. Soubory:
   `lib/admin/{email-delivery,email-deliveries,invite-mark,calendar,meetings,vizeon-mail}.ts`,
   `app/api/resend/vizeon/route.ts`, `components/{SmartCalendar,NotificationList}.tsx`, `lib/notifications.ts`.
-- **db** Migrace 135 `doruceni_emailu` — tabulka `email_deliveries` (aplikována: ne).
+- **db** Migrace 135 `doruceni_emailu` — tabulka `email_deliveries` (aplikována na produkci 2026-11-25 přes Neon MCP
+  v jedné transakci na pokyn Kryštofa, zapsaná v `public.schema_migrations` s otiskem souboru; testovací Neon ne).
 - **chore** Ověřeno: `tsc`, nový `admin-doruceni-emailu.test.ts` (rozbor události, pořadí stavů, upozornění
   jen jednou, poslat znovu s novým klíčem, webhook s podpisem a stropem těla, načtení do kalendáře, štítek)
   a související testy kalendáře, schůzek, připomínek, e-mailů a bezpečnosti; padá jen `ws-schema` kvůli
