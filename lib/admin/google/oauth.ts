@@ -8,7 +8,8 @@ import { decryptSecret, encryptSecret } from '@/lib/admin/google/crypto'
  * Propojení Google účtu Kryštofa (Workspace vizeon.cz) s adminem (R-112).
  *
  * Jen to nejmenší oprávnění: `calendar.events` (založit a smazat událost
- * s Meetem) a `email` (ukázat, který účet je propojený). Klient OAuth je
+ * s Meetem), `gmail.compose` (koncept e-mailu po schůzce, R-144) a `email`
+ * (ukázat, který účet je propojený). Klient OAuth je
  * v Google Cloud typu „Internal" — jen účty z Workspace, obnovovací token
  * nevyprší po 7 dnech jako u aplikace v režimu „Testing".
  *
@@ -16,7 +17,14 @@ import { decryptSecret, encryptSecret } from '@/lib/admin/google/crypto'
  * a drží server, takže CSP se nemění.
  */
 
-export const GOOGLE_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events'] as const
+export const GOOGLE_SCOPES = [
+  'openid',
+  'email',
+  'https://www.googleapis.com/auth/calendar.events',
+  // Koncept e-mailu klientovi po schůzce (R-144). Kód volá jen `drafts`, nic
+  // neodesílá; propojení bez tohoto oprávnění funguje dál, jen bez konceptů.
+  'https://www.googleapis.com/auth/gmail.compose',
+] as const
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -176,6 +184,12 @@ export async function googleStatus(): Promise<GoogleStatus> {
   return stored
     ? { configured: true, connected: true, email: stored.email, connectedAt: stored.connected_at }
     : { configured: true, connected: false }
+}
+
+/** Oprávnění, která Google při propojení skutečně udělil (mezerou oddělená), nebo null bez propojení. */
+export async function googleGrantedScopes(): Promise<string | null> {
+  const stored = await loadStored()
+  return stored?.scope ?? null
 }
 
 /** Přístupový token platí hodinu — v paměti procesu, ať se neobnovuje u každé schůzky. */

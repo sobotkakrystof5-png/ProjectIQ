@@ -2,7 +2,15 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
+> **Poslední aktualizace:** 2026-11-24 · **Schůzky z Wispr Flow** (R-144): nová sekce Schůzky v adminu.
+> Schůzka nahraná ve Wispr Flow přijde i s doslovným přepisem, AI udělá shrnutí, body dohody, kdo co
+> udělá a pozná klienta; po potvrzení klienta se doplní prázdné údaje v kontaktu a v Gmailu
+> krystof@vizeon.cz čeká koncept e-mailu se shrnutím (přepis zůstává jen v ZakazIQ). Most je
+> naplánovaná úloha Clauda s konektorem Wispr Flow (Wispr nemá API). **Jen ve větvi
+> `admin/schuzky-prepisy`, nenasazeno;** migrace 134, klíč, Gmail API a úloha čekají
+> (`docs/admin/SCHUZKY-WISPR.md`). AI ověřená naostro na výňatku skutečné schůzky, v prohlížeči nic.
+>
+> Předchozí: 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
 > náležitosti českého dokladu (údaj o zápisu, datum plnění, značka VIZEON, „Vystaveno v systému ZakazIQ" na
 > každé stránce) a před vystavením se vybírá druh — za celé dílo, zálohová, částečná, finální — s procentem
 > z ceny zakázky a pruhem zaplaceno / čeká / zbývá. **Na produkci od 2026-11-24 (`aaa3215`) i s migracemi
@@ -1613,10 +1621,44 @@ nepřipravuje" — s migrací 132 vznikne finální koncept na zbytek. Nová ces
 `prepareKindIssue`, jinak se druh neuloží. Technika `docs/admin/AGENTS-ADMIN.md` → „Druh faktury a rozpis ceny
 zakázky (R-143)", DECISIONS #042 doplnění.
 
+### R-144 · Schůzky z Wispr Flow: přepis v ZakazIQ, shrnutí jako koncept v Gmailu (2026-11-24)
+**Rozhodnutí:** (1) Nová sekce **Schůzky** v adminu (`/dashboard/schuzky`): každá schůzka nahraná ve
+Wispr Flow („všechny, kde ho použiju") s doslovným přepisem, shrnutím od AI, body „na čem jsme se
+domluvili", kroky obou stran a otevřenými body. (2) **Přepis zůstává jen v ZakazIQ**, nijak se
+neupravuje. (3) Klientovi jde **jen koncept e-mailu v Gmailu** krystof@vizeon.cz se shrnutím,
+dohodami a kroky; odešle ho Kryštof sám. (4) AI pozná klienta, ale **sám se přiřadí jen jistý
+klient bez AI** (e-mail účastníka s kontaktem, jediná událost v kalendáři ve stejný čas s kontaktem);
+návrh AI potvrzuje Kryštof jedním kliknutím, potvrzení doplní do kontaktu jen prázdná pole a založí
+koncept. (5) Most z Wispr Flow je **naplánovaná úloha Clauda** (každou hodinu, konektor Wispr Flow,
+klíč `MEETING_NOTES_API_KEY` jako network secret) → `POST /api/public/schuzky`; náhradou ruční
+„Vložit přepis". (6) Retence 3 roky po schůzce, skrytá po roce, výmaz kontaktu bere přepisy s sebou.
+**Proč:** zadání Kryštofa 2026-11-24 („přepis hovoru, poslat klientovi sumarizaci, nová sekce, kde AI
+pozná o koho jde a doplní údaje"; odpovědi: „jenom v konceptech v emailu", „celý přepis jde do ZakazIQ,
+sekce schůzky/přepisy", „všechny, kde ho použiju"). Wispr Flow nemá API ani webhook a konektor se
+přihlašuje jen v prohlížeči, server ZakazIQ si data stáhnout neumí. Přepis mluvil klient, takže podle
+R-111 se z něj nic nevykoná bez kliknutí; podvržené jméno v hovoru by jinak poslalo shrnutí cizímu.
+**Důsledek:** migrace 134 (`meeting_notes`), Google propojení s novým oprávněním `gmail.compose`
+(jen koncepty) — po nasazení propojit Google znovu a zapnout Gmail API. Body pro klienta píše AI
+rovnou ve tvaru do e-mailu (já / vy), poznámky jen pro Kryštofa jdou do `internalNotes` a do e-mailu
+nikdy. Mění R-114/R-116 v tom, že e-mail po schůzce nejde přes Resend, ale jako koncept do Gmailu.
+Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", nastavení a text úlohy
+`docs/admin/SCHUZKY-WISPR.md`, bezpečnost `.claude/security/DECISIONS.md` #052.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Schůzky z Wispr Flow (R-144) — nasadit a spustit:** (1) migrace 134 na produkci, (2)
+  `MEETING_NOTES_API_KEY` do Vercelu, (3) Gmail API v Google Cloud `zakaziq-admin` a v Profilu
+  propojit Google znovu (nové oprávnění `gmail.compose`), (4) merge větve `admin/schuzky-prepisy`
+  a deploy, (5) naplánovaná úloha na claude.ai/code podle `docs/admin/SCHUZKY-WISPR.md` (network
+  secret pro `www.zakaziq.cz`, jen konektor Wispr Flow), (6) projít na 390 a 1280 px: seznam,
+  potvrzení klienta, koncept v Gmailu, Přepis. Ověřeno testy nad PGlite, `tsc` a AI naostro na
+  výňatku jedné schůzky · od 2026-11-24
+- [ ] **Přepis kopíruje model v naplánované úloze (R-144):** konektor Wispr Flow vydává přepis jen
+  do kontextu modelu, do souboru ho model opisuje. Odchylku pozná jen kontrola délky (`complete`);
+  přesná kopie je ruční „Vložit přepis" (Copy as Markdown). Kdyby Wispr Flow vydal API, přejít na něj
+  · DECISIONS #052 · od 2026-11-24
 - [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
   skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
   Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
@@ -2026,6 +2068,31 @@ zakázky (R-143)", DECISIONS #042 doplnění.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-24 (schůzky z Wispr Flow — R-144)
+- **feat** Sekce Schůzky v adminu: seznam (Všechny, Ke kontrole, Skryté), detail se Shrnutím
+  (klient, shrnutí, dohody, kroky, otevřené body, „Jen pro vás", e-mail klientovi) a Přepisem
+  (doslovně, kopírování, kontrola úplnosti), ruční „Vložit přepis", schůzky na kartě kontaktu,
+  položka v menu a typ upozornění `meeting_note`. Soubory: `app/dashboard/schuzky/`,
+  `components/admin/meeting-notes/`, `app/meeting-notes-actions.ts`,
+  `app/dashboard/kontakty/[id]/page.tsx`, `lib/admin-nav.ts`, `components/admin/admin-icons.tsx`,
+  `components/NotificationList.tsx`, `lib/notifications.ts`.
+- **feat** Tok schůzky: příjem `POST`/`GET /api/public/schuzky` (klíč `MEETING_NOTES_API_KEY`),
+  jistá shoda klienta (e-mail účastníka, kalendář ±20 min), AI (role `smart`, kandidát jen ze
+  seznamu), potvrzení klienta s doplněním prázdných polí a propisem (R-141), koncept v Gmailu
+  přes Gmail API `drafts`, pojistky v cronech `send-reminders` a `client-retention`. Soubory:
+  `lib/admin/meeting-notes/{store,match,ai,email,process}.ts`, `lib/admin/google/{gmail,oauth}.ts`,
+  `types/meeting-notes.ts`, `scripts/wispr-most.mjs`, `docs/admin/SCHUZKY-WISPR.md`.
+- **db** Migrace 134 `schuzky_prepisy` — tabulka `meeting_notes` (aplikována: ne, nikde).
+- **chore** Ověřeno: `npx tsc --noEmit` bez chyby, nový `lib/__tests__/admin-schuzky-prepisy.test.ts`
+  (28 testů nad PGlite s migracemi 114, 115, 128, 130, 134 dvakrát po sobě: příjem a idempotence,
+  doslovné uložení, značky konektoru, jistá shoda, kandidáti, souběh, tři pokusy, potvrzení klienta
+  a doplnění jen prázdných polí, nový kontakt, koncept bez e-mailu a bez oprávnění, escapování
+  e-mailu, retence a kaskáda s kontaktem, vstup 401/400/201/200). AI naostro (Sonnet, ~20 s) na
+  výňatku skutečné schůzky: klienta poznala z kandidátů s jistotou, nic si nevymyslela; první verze
+  psala body interně („Horák připraví…", „přepis končí…"), proto přibyly `internalNotes` a body
+  ve tvaru do e-mailu. **V prohlížeči neověřeno, Gmail naostro neověřen.**
+- **decision** **R-144**, DECISIONS #052.
 
 ### 2026-11-24 (druh faktury a zbývá doplatit — R-143)
 - **feat** Před vystavením se vybírá druh faktury: za celé dílo, zálohová (30 %), částečná (procento z ceny),

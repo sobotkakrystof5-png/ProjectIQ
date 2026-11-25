@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-25 — review: schůzky z Wispr Flow (R-144)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: větev `admin/schuzky-prepisy` proti `ab6ffc3` — veřejný vstup `app/api/public/schuzky/route.ts`, server actions `app/meeting-notes-actions.ts`, čtení a zápis `lib/admin/meeting-notes/store.ts`, AI nad přepisem (`ai.ts`), e-mail a Gmail (`email.ts`, `lib/admin/google/gmail.ts`, `oauth.ts`), obrazovky `app/dashboard/schuzky/` a `components/admin/meeting-notes/`, skript mostu, migrace 134, tajemství v diffu i v historii větve.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Vstup: `verifyBearerApiKey`/`verifyApiKey` v konstantním čase, bez `MEETING_NOTES_API_KEY` odmítá vše, limit 30/min na IP před ověřením klíče, tělo 3 MB přes `readJsonLimited`, Zod se stropy. (2) Všech sedm akcí volá `requireAuth`, id přes uuid, zdroj přiřazení jen z výčtu. (3) SQL parametrizované; jediné skládání (`WHERE` výpisu) je ze tří pevných řetězců podle výčtu filtru. (4) Žádný `dangerouslySetInnerHTML`/`innerHTML`; přepis i výstup AI se kreslí jako text, odkaz na Wispr Flow jen `https://notes.wisprflow.ai`, odkaz do Gmailu s `encodeURIComponent`. (5) MIME konceptu odmítá CR/LF v předmětu a `\r\n,;<>` v adresátovi, předmět v RFC 2047, cizí text v HTML přes `escapeHtml`. (6) Kandidát od AI jen z nabídnutých id, bez kliknutí se nic nepřiřadí (R-111). `maxDuration = 120` ověřené proti projektu (Fluid compute, strop 300 s).
+Opraveno: nic nebylo potřeba. Žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění (Gmail i Anthropic volá server).
+Zůstává: přijatá rizika v DECISIONS #052 (`gmail.compose` dovoluje i odeslání, přepis opisuje model v úloze, uniklý klíč podstrčí schůzku). V prohlížeči za přihlášením neověřeno.
+
 ## 2026-11-24 — review: faktura s povinnými údaji (R-142) a druh faktury (R-143)
 Spouštěč: před commitem a deployem (`web-security-review`)
 Rozsah: necommitnutý diff nad `7c2e2f1` — renderer PDF (`lib/invoice-pdf/render.ts`), profil dodavatele (`issuerProfileSaveSchema`, `saveIssuer`), vystavení s druhem (`issueNewInvoice`, `prepareKindIssue`, `issueDraft`), nová akce `getProjectBilling`, koncepty (`saveInvoiceDraft`), projekce do klientského prostoru (`lib/portal/{money,overview}.ts`, migrace 131 a 133), migrace 132, tajemství v diffu.

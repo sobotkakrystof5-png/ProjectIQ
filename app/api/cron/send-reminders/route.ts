@@ -14,6 +14,7 @@ import { finishUnfinishedConsultations } from '@/lib/admin/consultations'
 import { processDueReminders, warnIfTriggerStopped } from '@/lib/admin/meeting-reminders'
 import { prepareRecurringDrafts } from '@/lib/admin/invoice-drafts'
 import { flushPhaseEmails } from '@/lib/admin/phase-email'
+import { finishPendingMeetingNotes } from '@/lib/admin/meeting-notes/process'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -241,6 +242,12 @@ export async function GET(req: NextRequest) {
         console.error('[cron] Pojistka připomínek schůzek selhala:', (err as Error).message)
         return false
       }),
+    // Přepisy schůzek (R-144), kterým nedoběhlo shrnutí přes `after()`
+    // (výpadek AI, timeout). Nejvýš tři za běh; bez migrace 134 nic.
+    finishPendingMeetingNotes(3).catch((err) => {
+      console.error('[cron] Pojistka přepisů schůzek selhala:', (err as Error).message)
+      return 0
+    }),
     // Pravidelné faktury (R-117): jednou za měsíc koncept ke schválení.
     // Nic neodchází — koncept čeká ve Fakturách, odesílá se až kliknutím.
     prepareRecurringDrafts()
