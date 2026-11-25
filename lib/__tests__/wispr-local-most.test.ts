@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   buildPayload,
   buildTranscript,
+  INTERVAL_SECONDS,
   isEligible,
   parseNdjson,
+  parseState,
   participantsFrom,
+  payloadHash,
+  planSends,
+  skipReason,
   speakerLabel,
   sqliteDateToIso,
 } from '../../scripts/wispr-local-most.mjs'
@@ -97,6 +102,52 @@ describe('most Wispr Flow z Macu', () => {
     expect(isEligible({ ...row, isDeleted: 1 })).toBe(false)
     expect(isEligible({ ...row, transcriptReady: 0 })).toBe(false)
     expect(isEligible({ ...row, transcriptDeletedAt: '2026-11-10' })).toBe(false)
+  })
+
+  it('důvod vynechání: rozpracovaná schůzka čeká na další běh, ne na příští hodinu', () => {
+    expect(INTERVAL_SECONDS).toBeLessThanOrEqual(300)
+    expect(skipReason(row)).toBeNull()
+    expect(skipReason({ ...row, finalized: 0 })).toBe('probiha')
+    expect(skipReason({ ...row, transcriptReady: 0 })).toBe('probiha')
+    expect(skipReason({ ...row, recordedMs: 34905 })).toBe('kratka')
+    expect(skipReason({ ...row, recordedMs: null })).toBe('kratka')
+    expect(skipReason({ ...row, isDeleted: 1 })).toBe('smazana')
+    expect(skipReason({ ...row, contentWithheld: 1 })).toBe('skryta')
+  })
+
+  it('otisk se změní s přepisem, názvem i jmény mluvčích, jinak ne', () => {
+    const transcript = buildTranscript(parseNdjson(ndjson), speakerMap)
+    const base = buildPayload(row, transcript)
+    expect(payloadHash(buildPayload(row, transcript))).toBe(payloadHash(base))
+    expect(payloadHash(buildPayload(row, `${transcript}\nKryštof: Ještě jedna věta.`))).not.toBe(payloadHash(base))
+    expect(payloadHash(buildPayload({ ...row, title: 'Jiný název' }, transcript))).not.toBe(payloadHash(base))
+    const renamed = JSON.stringify({ ...speakerMap, people: { ...speakerMap.people, 'voice-2-llm': { name: 'Jan Novák' } } })
+    expect(payloadHash(buildPayload({ ...row, speakerMap: renamed }, transcript))).not.toBe(payloadHash(base))
+  })
+
+  it('stav: poškozený nebo cizí obsah se bere jako prázdný', () => {
+    expect(parseState('')).toEqual({ sent: {}, heartbeatAt: 0 })
+    expect(parseState('{nesmysl')).toEqual({ sent: {}, heartbeatAt: 0 })
+    const good = 'a'.repeat(64)
+    expect(parseState(JSON.stringify({ sent: { x: good, y: 'kratky', z: 5 }, heartbeatAt: 12 }))).toEqual({
+      sent: { x: good },
+      heartbeatAt: 12,
+    })
+  })
+
+  it('plán: posílá jen nové a přepočítané, nezměněné jen na vyžádání', () => {
+    const state = { sent: { a: 'h1', b: 'h2' }, heartbeatAt: 0 }
+    const items = [
+      { id: 'a', hash: 'h1' },
+      { id: 'b', hash: 'h2-novy' },
+      { id: 'c', hash: 'h3' },
+    ]
+    expect(planSends(items, state).map((i: { id: string; kind: string }) => `${i.id}:${i.kind}`)).toEqual(['b:changed', 'c:new'])
+    expect(planSends(items, state, true).map((i: { id: string; kind: string }) => `${i.id}:${i.kind}`)).toEqual([
+      'a:forced',
+      'b:changed',
+      'c:new',
+    ])
   })
 
   it('účastníci jen se jménem, bez duplicit', () => {

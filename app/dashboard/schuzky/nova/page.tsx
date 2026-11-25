@@ -7,6 +7,8 @@ import { ManualNoteForm } from '@/components/admin/meeting-notes/manual-note-for
 import { getPragueTodayISO } from '@/lib/prague-time'
 
 export const dynamic = 'force-dynamic'
+// Shrnutí od AI běží po uložení v `after()` téže server action; dlouhá schůzka trvá desítky sekund.
+export const maxDuration = 120
 
 function pragueNowHm(): string {
   return new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false })

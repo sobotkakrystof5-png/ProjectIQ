@@ -12,9 +12,9 @@ Wispr Flow (aplikace na Macu)
   ~/Library/Application Support/Wispr Flow/flow.sqlite          tabulka Meetings
   ~/Library/Application Support/Wispr Flow/meetings/<id>/refined.ndjson   přepis po segmentech
         │
-        ▼  scripts/wispr-local-most.mjs (LaunchAgent každou hodinu, bez modelu)
-           GET  /api/public/schuzky?ids=…   které už ZakazIQ má
-           POST /api/public/schuzky         nová schůzka + přepis slovo od slova
+        ▼  scripts/wispr-local-most.mjs (LaunchAgent každých 5 minut, bez modelu)
+           stav ~/Library/Application Support/ZakazIQ/wispr-most-stav.json   co už odešlo (otisk)
+           POST /api/public/schuzky         nová nebo přepočítaná schůzka + přepis slovo od slova
         ▼
 ZakazIQ: meeting_notes ─after()─▶ jistá shoda klienta (e-mail účastníka, kalendář)
                                 ─▶ AI (smart): shrnutí, dohody, kroky, kandidát
@@ -24,7 +24,11 @@ ZakazIQ: meeting_notes ─after()─▶ jistá shoda klienta (e-mail účastník
 
 Wispr Flow nemá API ani webhook. Desktopová aplikace si ale drží celé přepisy na Macu, takže je
 skript čte přímo ze souborů a posílá je bez modelu — přepis dorazí přesně, jak ho Wispr Flow má.
-Most běží, jen když je Mac zapnutý; zmeškané schůzky dobere při dalším běhu (okno 30 dní).
+Most běží každých 5 minut, jen když je Mac zapnutý; schůzka je v ZakazIQ nejpozději 5 minut po skončení,
+zmeškané dobere při dalším běhu (okno 30 dní). Rozpracovanou schůzku (Wispr Flow ještě nahrává nebo dopočítává
+přepis) vynechá a vezme ji hned při prvním běhu po dokončení. Co odeslal, si pamatuje otiskem obsahu, takže na
+server jde jen nová schůzka, nebo ta, kterou Wispr Flow po skončení přepočítal (přepis, název, jména mluvčích) —
+server ji podle id aktualizuje a změněný přepis shrne znovu.
 Kdyby neběžel, přepis jde vložit ručně: Schůzky › Vložit přepis (ve Wispr Flow „Copy as Markdown").
 
 **Proč ne naplánovaná úloha Clauda:** první verze mostu (2026-11-25) byla cloudová úloha s konektorem
@@ -63,9 +67,12 @@ aplikace. Pak skript schůzky vynechá nebo nahlásí chybu do záznamu — zkon
    neodesílá). Bez toho schůzky fungují, jen koncept nevznikne a detail řekne proč.
 4. **Most na Macu:** `node scripts/wispr-local-most.mjs --install` zkopíruje skript do
    `~/Library/Application Support/ZakazIQ/` (mimo repo, ať nezáleží na větvi a na ochraně Plochy)
-   a zapne LaunchAgent `cz.zakaziq.wispr-most` (každou hodinu a po přihlášení). Záznam
-   `~/Library/Logs/zakaziq-wispr-most.log`. Vypnutí `--uninstall`. Po změně skriptu v repu znovu `--install`.
-   Ručně: `--dry-run` (co by poslal, bez obsahu), `--days 90`, `--only <id>,<id>`.
+   a zapne LaunchAgent `cz.zakaziq.wispr-most` (každých 5 minut a po přihlášení). Záznam
+   `~/Library/Logs/zakaziq-wispr-most.log` (řádek při odeslání nebo chybě, jinak „běží, nic nového" jednou za
+   hodinu). Vypnutí `--uninstall`. Po změně skriptu v repu znovu `--install`.
+   Ručně: `--dry-run` (co by poslal a proč co vynechal, bez obsahu), `--days 90`, `--only <id>,<id>` (pošle znovu,
+   i když se nezměnily). Smazáním `wispr-most-stav.json` se při dalším běhu pošle všech 30 dní znovu (server nic
+   nezdvojí, nezměněné nepřepočítá).
 
 ## Co kde je
 

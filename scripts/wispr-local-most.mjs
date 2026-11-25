@@ -7,20 +7,26 @@
  *   ~/Library/Application Support/Wispr Flow/meetings/<id>/refined.ndjson  (přepis po segmentech)
  * Tenhle skript je čte přímo — bez modelu, takže přepis dorazí slovo od slova
  * (dřívější cesta přes naplánovanou úlohu Clauda selhala: model nesmí dlouhý
- * text doslova opsat). Pošle jen schůzky, které ZakazIQ ještě nemá.
+ * text doslova opsat).
  *
- *   node scripts/wispr-local-most.mjs --dry-run     ukáže, co by poslal (bez obsahu)
- *   node scripts/wispr-local-most.mjs               pošle nové schůzky (posledních 30 dní)
+ * Běží každých 5 minut. Co už odeslal, si pamatuje v souboru stavu (otisk
+ * obsahu), takže na server jde jen nová schůzka nebo schůzka, kterou Wispr Flow
+ * po skončení ještě přepočítal (jiný přepis, název, jména mluvčích). Server
+ * stejnou schůzku podle id nezdvojí.
+ *
+ *   node scripts/wispr-local-most.mjs --dry-run     ukáže, co by poslal a co vynechal (bez obsahu)
+ *   node scripts/wispr-local-most.mjs               pošle nové a změněné schůzky (posledních 30 dní)
  *   node scripts/wispr-local-most.mjs --days 90     delší okno
- *   node scripts/wispr-local-most.mjs --only <id>,<id>
- *   node scripts/wispr-local-most.mjs --install     zkopíruje se mimo repo a zapne LaunchAgent (každou hodinu)
+ *   node scripts/wispr-local-most.mjs --only <id>,<id>   pošle tyhle znovu, i když se nezměnily
+ *   node scripts/wispr-local-most.mjs --install     zkopíruje se mimo repo a zapne LaunchAgent (každých 5 minut)
  *   node scripts/wispr-local-most.mjs --uninstall   LaunchAgent vypne a smaže
  *
  * Klíč `MEETING_NOTES_API_KEY` čte z Klíčenky (služba `zakaziq-meeting-notes`),
  * nikdy ze souboru ani z argumentů. Bez závislostí, jen Node a systémové
- * `sqlite3` a `security`. Obsah schůzek do výstupu nepíše.
+ * `sqlite3` a `security`. Obsah schůzek do výstupu ani do souboru stavu nepíše.
  */
 
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -31,7 +37,12 @@ export const WISPR_DIR = path.join(os.homedir(), 'Library', 'Application Support
 export const API_URL = 'https://www.zakaziq.cz/api/public/schuzky'
 export const KEYCHAIN_SERVICE = 'zakaziq-meeting-notes'
 export const LABEL = 'cz.zakaziq.wispr-most'
+/** Jak často LaunchAgent most pouští. Schůzka je v ZakazIQ nejpozději 5 minut po skončení. */
+export const INTERVAL_SECONDS = 300
+/** Řádek „běží, nic nového" do záznamu nejvýš jednou za hodinu, ať záznam nebobtná. */
+const HEARTBEAT_MS = 55 * 60_000
 const INSTALL_DIR = path.join(os.homedir(), 'Library', 'Application Support', 'ZakazIQ')
+const STATE_FILE = path.join(INSTALL_DIR, 'wispr-most-stav.json')
 const PLIST = path.join(os.homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`)
 const LOG = path.join(os.homedir(), 'Library', 'Logs', 'zakaziq-wispr-most.log')
 
@@ -137,16 +148,78 @@ export function buildPayload(row, transcript) {
   }
 }
 
+/**
+ * Proč se schůzka neposílá, nebo `null`, když je hotová a stojí za poslání.
+ * „probiha" = Wispr Flow ji ještě nahrává nebo dopočítává přepis; pošle se
+ * při dalším běhu po dokončení.
+ */
+export function skipReason(row) {
+  if (Number(row.isDeleted) === 1 || row.transcriptDeletedAt) return 'smazana'
+  if (Number(row.contentWithheld) === 1) return 'skryta'
+  if (Number(row.finalized) !== 1 || Number(row.transcriptReady) !== 1) return 'probiha'
+  if (!(Number(row.recordedMs) >= MIN_RECORDED_MS)) return 'kratka'
+  return null
+}
+
 /** Je schůzka hotová a stojí za poslání? */
 export function isEligible(row) {
-  return (
-    Number(row.finalized) === 1 &&
-    Number(row.isDeleted) !== 1 &&
-    Number(row.transcriptReady) === 1 &&
-    Number(row.contentWithheld) !== 1 &&
-    !row.transcriptDeletedAt &&
-    Number(row.recordedMs) >= MIN_RECORDED_MS
-  )
+  return skipReason(row) === null
+}
+
+/**
+ * Otisk toho, co se posílá. Změní se, když Wispr Flow po schůzce přepočítá
+ * přepis, doplní název, shrnutí nebo jména mluvčích — pak se schůzka pošle znovu.
+ */
+export function payloadHash(payload) {
+  const { title, start, end, share_link, participants, summary, transcript } = payload
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify({ title, start, end, share_link, participants, summary, transcript }))
+    .digest('hex')
+}
+
+/** Soubor stavu: `{ sent: { <id>: <otisk> }, heartbeatAt }`. Poškozený nebo chybějící = prázdný. */
+export function parseState(raw) {
+  const empty = { sent: {}, heartbeatAt: 0 }
+  if (typeof raw !== 'string' || !raw.trim()) return empty
+  try {
+    const value = JSON.parse(raw)
+    const sent = value && typeof value.sent === 'object' && value.sent !== null ? value.sent : {}
+    const clean = {}
+    for (const [id, hash] of Object.entries(sent)) {
+      if (typeof hash === 'string' && /^[0-9a-f]{64}$/.test(hash)) clean[id] = hash
+    }
+    return { sent: clean, heartbeatAt: Number(value?.heartbeatAt) || 0 }
+  } catch {
+    return empty
+  }
+}
+
+/** Co poslat: nové (`new`) a změněné (`changed`); `force` pošle i nezměněné. */
+export function planSends(items, state, force = false) {
+  const out = []
+  for (const item of items) {
+    const known = state.sent[item.id]
+    if (known === undefined) out.push({ ...item, kind: 'new' })
+    else if (known !== item.hash) out.push({ ...item, kind: 'changed' })
+    else if (force) out.push({ ...item, kind: 'forced' })
+  }
+  return out
+}
+
+function readState() {
+  try {
+    return parseState(fs.readFileSync(STATE_FILE, 'utf8'))
+  } catch {
+    return parseState('')
+  }
+}
+
+function writeState(state) {
+  fs.mkdirSync(INSTALL_DIR, { recursive: true })
+  const tmp = `${STATE_FILE}.${process.pid}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(state), { mode: 0o600 })
+  fs.renameSync(tmp, STATE_FILE)
 }
 
 function readMeetingRows(days, only) {
@@ -182,21 +255,6 @@ function readKey() {
   }
 }
 
-async function knownIds(ids, key) {
-  const known = new Set()
-  for (let i = 0; i < ids.length; i += 100) {
-    const batch = ids.slice(i, i + 100)
-    const res = await fetch(`${API_URL}?ids=${batch.map(encodeURIComponent).join(',')}`, {
-      headers: { Authorization: `Bearer ${key}` },
-      redirect: 'error',
-    })
-    const body = await res.json().catch(() => null)
-    if (!res.ok || !body?.success) throw new Error(`ZakazIQ GET ${res.status}: ${body?.error ?? 'neznámá chyba'}`)
-    for (const id of body.known ?? []) known.add(id)
-  }
-  return known
-}
-
 async function send(payload, key) {
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -223,51 +281,70 @@ export async function run(argv = process.argv.slice(2)) {
   const only = (arg(argv, 'only', '') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
 
   const rows = readMeetingRows(days, only)
-  const candidates = []
-  let skipped = 0
+  const items = []
+  const skipped = { probiha: 0, kratka: 0, smazana: 0, skryta: 0, prazdna: 0 }
+  const skippedRows = []
   for (const row of rows) {
-    if (!isEligible(row)) {
-      skipped++
+    let reason = skipReason(row)
+    let transcript = null
+    if (reason === null) {
+      transcript = readTranscript(row)
+      if (!transcript || transcript.length < MIN_TRANSCRIPT_CHARS || transcript.length > MAX_TRANSCRIPT_CHARS) reason = 'prazdna'
+    }
+    if (reason !== null) {
+      skipped[reason]++
+      skippedRows.push({ id: row.id, reason })
       continue
     }
-    const transcript = readTranscript(row)
-    if (!transcript || transcript.length < MIN_TRANSCRIPT_CHARS || transcript.length > MAX_TRANSCRIPT_CHARS) {
-      skipped++
-      continue
-    }
-    candidates.push({ row, transcript })
+    const payload = buildPayload(row, transcript)
+    items.push({ id: String(row.id), payload, hash: payloadHash(payload) })
   }
 
+  const state = readState()
+  const plan = planSends(items, state, only.length > 0)
+  const skippedText = Object.entries(skipped)
+    .filter(([, n]) => n > 0)
+    .map(([why, n]) => `${{ probiha: 'probíhá', kratka: 'krátká', smazana: 'smazaná', skryta: 'skrytá', prazdna: 'bez přepisu' }[why]} ${n}`)
+    .join(', ')
+
   if (dryRun) {
-    console.log(`[${stamp()}] suchý běh: ${candidates.length} k odeslání, ${skipped} vynecháno (posledních ${days} dní)`)
-    for (const { row, transcript } of candidates) {
-      const p = buildPayload(row, transcript)
-      console.log(`  ${row.id}  ${p.start ?? '?'}  znaků ${transcript.length}  mluvčích ${new Set(transcript.split('\n').map((l) => l.split(':')[0])).size}  odkaz ${p.share_link ? 'ano' : 'ne'}  shrnutí ${p.summary ? 'ano' : 'ne'}`)
+    console.log(`[${stamp()}] suchý běh (posledních ${days} dní): k odeslání ${plan.length}, beze změny ${items.length - plan.length}, vynecháno ${skippedRows.length}${skippedText ? ` (${skippedText})` : ''}`)
+    for (const { id, payload, kind } of plan) {
+      const t = payload.transcript
+      console.log(`  ${kind === 'new' ? 'nová   ' : kind === 'changed' ? 'změněná' : 'znovu  '}  ${id}  ${payload.start ?? '?'}  znaků ${t.length}  mluvčích ${new Set(t.split('\n').map((l) => l.split(':')[0])).size}  odkaz ${payload.share_link ? 'ano' : 'ne'}  shrnutí ${payload.summary ? 'ano' : 'ne'}`)
     }
+    for (const { id, reason } of skippedRows) console.log(`  vynechá  ${id}  ${reason}`)
     return 0
   }
 
-  if (candidates.length === 0) {
-    console.log(`[${stamp()}] nové schůzky: 0 (vynecháno ${skipped})`)
+  const now = Date.now()
+  if (plan.length === 0) {
+    // Nic nového: do záznamu jen jednou za hodinu, ať je vidět, že most žije.
+    if (now - state.heartbeatAt >= HEARTBEAT_MS) {
+      console.log(`[${stamp()}] běží, nic nového (v ZakazIQ ${items.length}${skippedText ? `, vynecháno: ${skippedText}` : ''})`)
+      writeState({ ...state, heartbeatAt: now })
+    }
     return 0
   }
 
   const key = readKey()
-  const known = await knownIds(candidates.map((c) => c.row.id), key)
-  const fresh = candidates.filter((c) => !known.has(c.row.id))
   let sent = 0
   let failed = 0
-  for (const { row, transcript } of fresh) {
-    const { status, body } = await send(buildPayload(row, transcript), key)
+  for (const { id, payload, hash, kind } of plan) {
+    const { status, body } = await send(payload, key)
     if (status === 200 || status === 201) {
       sent++
-      console.log(`[${stamp()}] odesláno ${row.id} (${status}, znaků ${body?.chars ?? '?'}, complete ${body?.complete})`)
+      state.sent[id] = hash
+      writeState(state)
+      const what = status === 201 ? 'nová' : body?.changed ? 'aktualizovaná' : 'beze změny'
+      console.log(`[${stamp()}] odesláno ${id} (${what}${kind === 'changed' ? ', Wispr ji přepočítal' : ''}, znaků ${body?.chars ?? '?'}, celé ${body?.complete ? 'ano' : 'NE'})`)
     } else {
       failed++
-      console.log(`[${stamp()}] CHYBA ${row.id}: ${status} ${body?.error ?? ''}`)
+      console.log(`[${stamp()}] CHYBA ${id}: ${status} ${body?.error ?? ''}`)
     }
   }
-  console.log(`[${stamp()}] nové schůzky: ${fresh.length}, odesláno ${sent}, chyby ${failed}, už v ZakazIQ ${known.size}, vynecháno ${skipped}`)
+  writeState({ ...state, heartbeatAt: now })
+  console.log(`[${stamp()}] odesláno ${sent}, chyby ${failed}${skippedText ? `, vynecháno: ${skippedText}` : ''}`)
   return failed > 0 ? 1 : 0
 }
 
@@ -292,7 +369,7 @@ function install() {
     <string>${xml(process.execPath)}</string>
     <string>${xml(target)}</string>
   </array>
-  <key>StartInterval</key><integer>3600</integer>
+  <key>StartInterval</key><integer>${INTERVAL_SECONDS}</integer>
   <key>RunAtLoad</key><true/>
   <key>ProcessType</key><string>Background</string>
   <key>StandardOutPath</key><string>${xml(LOG)}</string>
@@ -308,7 +385,7 @@ function install() {
     // nebyl zapnutý
   }
   execFileSync('/bin/launchctl', ['bootstrap', domain, PLIST])
-  console.log(`Zapnuto: ${LABEL} každou hodinu (skript ${target}, záznam ${LOG}).`)
+  console.log(`Zapnuto: ${LABEL} každých ${INTERVAL_SECONDS / 60} minut (skript ${target}, záznam ${LOG}).`)
 }
 
 function uninstall() {

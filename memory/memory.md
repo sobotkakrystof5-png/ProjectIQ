@@ -8,7 +8,8 @@
 > krystof@vizeon.cz čeká koncept e-mailu se shrnutím (přepis zůstává jen v ZakazIQ). Most je
 > skript na Macu, který čte lokální data aplikace Wispr Flow bez modelu (cloudovou úlohu zastavil
 > bezpečnostní filtr při opisování přepisu). **Na produkci od 2026-11-25 (`f024737`) i s migrací 134**,
-> LaunchAgent každou hodinu, 4 starší schůzky naimportované a shrnuté (`docs/admin/SCHUZKY-WISPR.md`).
+> LaunchAgent **každých 5 minut** (od 2026-11-25 večer, dřív hodinu), 5 schůzek naimportovaných a shrnutých
+> (`docs/admin/SCHUZKY-WISPR.md`). Ruční „Vložit přepis“ na produkci zatím nikdo neuložil (v DB žádný řádek `manual`).
 > **Zbývá v Profilu znovu propojit Google** (bez toho nevznikne koncept v Gmailu), potvrdit klienta
 > u dvou schůzek s Horákem a projít Schůzky za přihlášením.
 >
@@ -1668,8 +1669,8 @@ každou hodinu, klíč v Klíčence. Běží jen při zapnutém Macu; formát lo
   seznam, potvrzení klienta, koncept v Gmailu, Přepis, (3) po pár dnech zkontrolovat běhy úlohy
   (`complete: false`, chyby) · Kryštof · od 2026-11-24
 - [ ] **Most z Wispr Flow běží na Macu (R-144):** skript `scripts/wispr-local-most.mjs` čte lokální data
-  aplikace Wispr Flow (LaunchAgent `cz.zakaziq.wispr-most`, záznam `~/Library/Logs/zakaziq-wispr-most.log`).
-  Běží jen při zapnutém Macu a stojí na neveřejném formátu `flow.sqlite` a `refined.ndjson` — po aktualizaci
+  aplikace Wispr Flow (LaunchAgent `cz.zakaziq.wispr-most` každých 5 minut, stav `~/Library/Application Support/ZakazIQ/wispr-most-stav.json`,
+  záznam `~/Library/Logs/zakaziq-wispr-most.log`). Běží jen při zapnutém Macu a stojí na neveřejném formátu `flow.sqlite` a `refined.ndjson` — po aktualizaci
   Wispr Flow ověřit `--dry-run`. Cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` nefungovala (opsání přepisu
   modelem zastavil bezpečnostní filtr) a je vypnutá; smazat ji jde jen na claude.ai/code/routines
   · DECISIONS #052 · od 2026-11-24
@@ -2089,6 +2090,22 @@ každou hodinu, klíč v Klíčence. Běží jen při zapnutém Macu; formát lo
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-25 (schůzky: most každých 5 minut, ruční vložení — R-144)
+- **fix** Dnešní schůzka (17:15–17:57) v ZakazIQ nebyla: most běžel jednou za hodinu, v 17:46 byla schůzka
+  ještě rozpracovaná a další běh by byl až v 18:46. Most teď běží každých 5 minut a pamatuje si otisk odeslaného
+  (`wispr-most-stav.json`), takže na server jde jen nová schůzka nebo ta, kterou Wispr Flow po skončení přepočítal
+  (přepis, název, jména mluvčích) — dřív se přepočítaný přepis už nikdy neposlal. Dotaz `GET ?ids=` skript
+  nepoužívá. Záznam: řádek při odeslání nebo chybě, jinak jednou za hodinu „běží, nic nového“; `--dry-run`
+  vypíše i důvod vynechání (probíhá, krátká, bez přepisu…). Soubory: `scripts/wispr-local-most.mjs`, test
+  `lib/__tests__/wispr-local-most.test.ts` (11), `docs/admin/SCHUZKY-WISPR.md`, `docs/admin/AGENTS-ADMIN.md`.
+- **fix** Ruční „Vložit přepis“: když server action selže (nejčastěji vypršelé přihlášení, strop 12 h), formulář
+  dřív nereagoval; teď ukáže hlášku a vložený text nechá ve formuláři. Stránky `/dashboard/schuzky/nova` a detail
+  mají `maxDuration = 120` (AI v `after()` server action). Prázdný stav Schůzek: „do 5 minut po skončení“.
+  Soubory: `components/admin/meeting-notes/manual-note-form.tsx`, `app/dashboard/schuzky/{page,nova/page,[id]/page}.tsx`.
+- **chore** Dnešní schůzka odeslaná ručním během mostu (201, 40 776 znaků, `complete: true`), AI hotová za 18 s.
+  LaunchAgent přeinstalovaný (`StartInterval 300`), první běh: 5 schůzek „beze změny“, stav uložen.
+  Ověřeno: `tsc`, testy Schůzek a mostu 58/58. Formulář v prohlížeči neověřený (MCP prohlížeč nepřihlášený).
 
 ### 2026-11-25 (most z Wispr Flow přes Mac — R-144)
 - **fix** Cloudová úloha s konektorem Wispr Flow nepřenesla nic: jednorázový import čtyř schůzek

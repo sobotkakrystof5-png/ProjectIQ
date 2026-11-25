@@ -26,13 +26,20 @@ export function ManualNoteForm({ today, now }: { today: string; now: string }) {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     start(async () => {
-      const result = await addManualMeetingNote({
-        title,
-        date,
-        time,
-        minutes: minutes ? Number(minutes) : undefined,
-        transcript,
-      })
+      let result: Awaited<ReturnType<typeof addManualMeetingNote>>
+      try {
+        result = await addManualMeetingNote({
+          title,
+          date,
+          time,
+          minutes: minutes ? Number(minutes) : undefined,
+          transcript,
+        })
+      } catch {
+        // Nejčastěji vypršelé přihlášení (strop 12 h). Text zůstává ve formuláři.
+        toast.error('Přepis se neuložil. Možná vypršelo přihlášení: přihlaste se v nové kartě a zkuste to znovu. Text tu zůstal.')
+        return
+      }
       if (!result.ok) {
         toast.error(result.error)
         return

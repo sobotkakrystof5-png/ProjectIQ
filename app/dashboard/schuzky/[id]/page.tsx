@@ -8,6 +8,8 @@ import { gmailDraftsUrl } from '@/lib/admin/google/gmail'
 // Detail schůzky (R-144). Vykreslení je v `MeetingDetailView`.
 
 export const dynamic = 'force-dynamic'
+// „Shrnout znovu" pouští AI v `after()` server action z téhle stránky.
+export const maxDuration = 120
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
