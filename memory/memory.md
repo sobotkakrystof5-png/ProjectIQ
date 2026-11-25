@@ -6,10 +6,11 @@
 > Schůzka nahraná ve Wispr Flow přijde i s doslovným přepisem, AI udělá shrnutí, body dohody, kdo co
 > udělá a pozná klienta; po potvrzení klienta se doplní prázdné údaje v kontaktu a v Gmailu
 > krystof@vizeon.cz čeká koncept e-mailu se shrnutím (přepis zůstává jen v ZakazIQ). Most je
-> naplánovaná úloha Clauda s konektorem Wispr Flow (Wispr nemá API). **Na produkci od 2026-11-25
-> (`2bb6e34`) i s migrací 134**, klíč mostu ve Vercelu, Gmail API zapnuté, úloha běží každou hodinu
-> (`docs/admin/SCHUZKY-WISPR.md`). **Zbývá v Profilu znovu propojit Google** (bez toho nevznikne
-> koncept v Gmailu) a projít Schůzky za přihlášením.
+> skript na Macu, který čte lokální data aplikace Wispr Flow bez modelu (cloudovou úlohu zastavil
+> bezpečnostní filtr při opisování přepisu). **Na produkci od 2026-11-25 (`f024737`) i s migrací 134**,
+> LaunchAgent každou hodinu, 4 starší schůzky naimportované a shrnuté (`docs/admin/SCHUZKY-WISPR.md`).
+> **Zbývá v Profilu znovu propojit Google** (bez toho nevznikne koncept v Gmailu), potvrdit klienta
+> u dvou schůzek s Horákem a projít Schůzky za přihlášením.
 >
 > Předchozí: 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
 > náležitosti českého dokladu (údaj o zápisu, datum plnění, značka VIZEON, „Vystaveno v systému ZakazIQ" na
@@ -2099,6 +2100,11 @@ každou hodinu, klíč v Klíčence. Běží jen při zapnutém Macu; formát lo
   Starý `scripts/wispr-most.mjs` odstraněn. Test `lib/__tests__/wispr-local-most.test.ts` (7).
 - **chore** Klíč `MEETING_NOTES_API_KEY` vyměněný: nový ve Vercelu Production (sensitive) a v Klíčence
   (služba `zakaziq-meeting-notes`), vygenerovaný a předaný bez vypsání. Doplnění DECISIONS #052.
+- **chore** Na produkci (`f024737`). Import z Macu: 4 schůzky (31. 10.–4. 11.) odeslané 201, délky přesně
+  podle lokálních dat (18 890–38 083 znaků, `complete: true`); AI je zpracovala napoprvé, obě schůzky
+  s Horákem jako klientské bez kandidáta v Kontaktech (čekají v „Ke kontrole"), pohovor a mentoring
+  „netýká se klienta". LaunchAgent `cz.zakaziq.wispr-most` zapnutý, první běh na pozadí: kód 0, klíč
+  z Klíčenky přečtený, „už v ZakazIQ 4". Cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` vypnutá.
 
 ### 2026-11-25 (schůzky z Wispr Flow na produkci — R-144)
 - **chore** Větev `admin/schuzky-prepisy` přesazená na `main` s fakturami: migrace přečíslovaná
