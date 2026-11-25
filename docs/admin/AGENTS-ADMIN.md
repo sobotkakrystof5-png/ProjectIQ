@@ -310,6 +310,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | Tabulka | Migrace | K čemu |
 |---------|---------|--------|
 | `login_attempts` | 006 | Brute-force lockout přihlášení |
+| `meeting_notes` | 134 | Schůzky z Wispr Flow nebo vložené ručně: doslovný přepis, výsledek AI, klient, koncept v Gmailu (R-144) |
 | `api_requests` | 007 | Rate limit veřejných API (`lib/api-rate-limit.ts`) |
 | `client_leads` | 010, 017, 024, 049, 051 | **Hovory** — kontakty/leady, další akce, telefonát zvednut, portfolio odesláno, vazba na kalendář |
 | `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
@@ -455,6 +456,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `GET /api/public/outreach/handled` | Bearer `GROWTH_OS_API_KEY` | Zpětný kanál pro Growth OS (R-120): koho Kryštof převzal nebo odložil od `?since=` (podle `outreach_leads.admin_changed_at`, trigger z 119), nejvýš 500 vzestupně, bez jmen a kontaktů. 30/min, bez migrace 119 vrací 503 |
 | `GET /api/outreach/leads/[id]/nahled` | session | Náhled ukázky přes náš server: jen https z `navrhy.vizeon.cz` (`lib/admin/outreach-demo.ts`), bez přesměrování, jen PNG/JPEG/WebP do 2 MB |
 | `POST /api/public/outreach/reports` | Bearer `GROWTH_OS_API_KEY` | Denní reporty hovorů z Growth OS (R-118): čísla dne + řádek za hovor, přepis jen u spojených → `outreach_reports`, `outreach_calls` (migrace 116). Tělo 2 MB, 30 požadavků/min, upsert podle dne a kola / `external_id`, starší report novější nepřepíše, bez migrace 116 vrací 503. Kontrakt `types/outreach-report.ts` |
+| `POST /api/public/schuzky`, `GET ?ids=` | Bearer nebo `x-api-key` = `MEETING_NOTES_API_KEY` | Schůzky z Wispr Flow (R-144): most je naplánovaná úloha Clauda s konektorem Wispr Flow. POST uloží schůzku s doslovným přepisem do `meeting_notes` (upsert podle id z Wispr Flow, značky konektoru `<<<…>>>` vynechá) a přes `after()` pustí zpracování; GET vrátí, která id už ZakazIQ má. Tělo 3 MB, přepis do 1 milionu znaků, 30/min, bez migrace 134 vrací 503. Odpověď nese `complete` (sedí délka s tím, co hlásil Wispr Flow). Detail `docs/admin/SCHUZKY-WISPR.md` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
@@ -1350,7 +1352,7 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 ## Bezpečnost
 
-- **Supabase Auth session** (e-mail, heslo, TOTP; R-105) — admin chráněn `proxy.ts` (matcher `/dashboard`, plus `/alteno` a `/hub` jako pojistka, vč. podcest) + `requireAdminPage()` na každé stránce `/dashboard/**`. `/api/*` proxy **nehlídá** přihlášení (na `/api/public`, `/api/klient` a `/embed` dělá jen bránu na IP, DECISIONS #052) — každá neveřejná API routa si session kontroluje sama
+- **Supabase Auth session** (e-mail, heslo, TOTP; R-105) — admin chráněn `proxy.ts` (matcher `/dashboard`, plus `/alteno` a `/hub` jako pojistka, vč. podcest) + `requireAdminPage()` na každé stránce `/dashboard/**`. `/api/*` proxy **nehlídá** přihlášení (na `/api/public`, `/api/klient` a `/embed` dělá jen bránu na IP, DECISIONS #053) — každá neveřejná API routa si session kontroluje sama
 - **Security hlavičky** v `next.config.mjs`, CSP s nonce v `proxy.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
@@ -1583,3 +1585,37 @@ Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
   otevření) a varuje, když spouštěč neběží. Smazání schůzky ji smaže i v Google Kalendáři, ale
   až po 10 s a jen když ji „Zpět" neobnovilo (obnova vrací stejné id i s připomínkami).
 - Testy: `lib/__tests__/admin-pripominky.test.ts` (PGlite se SQL 114, 115, 128).
+
+
+## Schůzky a přepisy z Wispr Flow (R-144)
+
+Obrazovka **Schůzky** (`/dashboard/schuzky`, v menu Práce pod Kalendářem): každá schůzka nahraná
+ve Wispr Flow s doslovným přepisem, shrnutím od AI a klientem. Záložky Všechny / Ke kontrole
+(bez klienta, týká se klienta) / Skryté. Detail `/dashboard/schuzky/[id]` má Shrnutí (klient,
+shrnutí, Na čem jsme se domluvili, Co udělám já, Co udělá klient, Co zůstalo otevřené, „Jen pro
+vás", E-mail klientovi) a Přepis (`?pohled=prepis`, doslovně, kopírování, kontrola úplnosti).
+Ruční vložení `/dashboard/schuzky/nova`. Karta kontaktu ukazuje jeho schůzky.
+
+- **Data:** `meeting_notes` (migrace 134). `transcript` přesně, jak přišel; `ai` jsonb (tvar
+  `storedMeetingAiSchema` v `types/meeting-notes.ts`, poškozený záznam se nevykreslí);
+  `contact_id` maže kaskádou s kontaktem; `contact_source` = `email` | `kalendar` | `potvrzeno`
+  (`telefon` připravený, zatím ho nic nenastavuje). Upsert podle `(source, source_id)`.
+- **Tok:** `processMeetingNote` (`lib/admin/meeting-notes/process.ts`) — zámek na 5 minut a nejvýš
+  tři pokusy, jistá shoda bez AI (`match.ts`: e-mail účastníka s kontaktem, jediná událost
+  v kalendáři ±20 minut s kontaktem přes `lead_id`, `project_id` nebo `invite_to`), kandidáti
+  pro AI podle jmen účastníků, AI (`ai.ts`, role `smart`, strukturovaný výstup, kandidát jen ze
+  seznamu, e-mail a telefon normalizované), pak dohledání klienta, kterého AI poznala jménem,
+  uložení, koncept v Gmailu u jistého klienta a zvonek `meeting_note`.
+- **Potvrzení klienta** (`confirmMeetingClient`): přiřadí vybraný kontakt, nebo založí nový
+  z údajů v přepisu (`source = 'schuzka'`), doplní **jen prázdná** pole (firma, e-mail, telefon,
+  IČO; e-mail a telefon jen když je nemá jiný kontakt), propíše změnu (`propagateContact`, R-141)
+  a založí koncept. „Není to on" odpojí klienta, Zpět ho vrátí.
+- **E-mail** (`email.ts`): kód skládá text ze struktury od AI — oslovení, úvod, sekce s body,
+  podpis z `SIGNATURE`. Přepis ani „Jen pro vás" do něj nejdou. Koncept zakládá
+  `lib/admin/google/gmail.ts` (Gmail API `drafts`, MIME s base64, hlavičky bez konců řádků),
+  adresát je vždy e-mail přiřazeného kontaktu. Bez oprávnění `gmail.compose` v uloženém
+  propojení se koncept nezakládá a detail řekne, ať se Google propojí znovu.
+- **Pojistky:** `send-reminders` dokončí nejvýš tři nezpracované schůzky (`finishPendingMeetingNotes`),
+  `client-retention` maže schůzky 3 roky po konání a skryté po roce (`purgeMeetingNotes`).
+- **Most z Wispr Flow** a nastavení: `docs/admin/SCHUZKY-WISPR.md`; skript `scripts/wispr-most.mjs`
+  poskládá tělo z kusů přepisu.

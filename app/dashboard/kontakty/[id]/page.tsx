@@ -11,6 +11,8 @@ import { ContactForm } from '@/components/admin/contacts/contact-form'
 import { MergeButton, UnmergeButton } from '@/components/admin/contacts/merge-actions'
 import { MemoryCard } from '@/components/admin/memory/memory-card'
 import { loadContactDetail, type ContactOccurrence } from '@/lib/admin/contacts'
+import { loadContactMeetingNotes } from '@/lib/admin/meeting-notes/store'
+import { formatPragueShortDateTime } from '@/lib/prague-time'
 import { formatDate } from '@/lib/utils'
 import { nameKey } from '@/lib/contacts/normalize'
 
@@ -55,7 +57,7 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
   const { id } = await props.params
   if (!UUID.test(id)) notFound()
 
-  const [detail, readiness] = await Promise.all([loadContactDetail(id), loadMailReadiness()])
+  const [detail, readiness, meetings] = await Promise.all([loadContactDetail(id), loadMailReadiness(), loadContactMeetingNotes(id)])
   if (detail === null) notFound()
 
   const { contact, merged, occurrences, candidates } = detail
@@ -200,6 +202,29 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
               </div>
             )}
           </Section>
+
+          {/* Přepisy schůzek s tímhle člověkem (R-144). */}
+          {meetings.length > 0 && (
+            <Section title="Schůzky" hint="Shrnutí a doslovný přepis z Wispr Flow.">
+              <ul className="overflow-hidden rounded-box border border-navy-100 bg-surface">
+                {meetings.map((m) => (
+                  <li key={m.id} className="border-b border-navy-100 last:border-b-0">
+                    <Link
+                      href={`/dashboard/schuzky/${m.id}`}
+                      className="flex min-h-11 flex-col gap-0.5 px-4 py-3 transition-colors hover:bg-navy-50"
+                    >
+                      <span className="font-medium text-ink">{m.title}</span>
+                      <span className="text-sm text-quiet">
+                        {[m.startedAt ? formatPragueShortDateTime(m.startedAt) : null, m.minutes ? `${m.minutes} min` : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           {merged.length > 0 && (
             <Section title="Sloučené kontakty" hint="Zápisy téhož člověka, které už vedou sem.">

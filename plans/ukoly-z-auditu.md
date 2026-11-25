@@ -279,7 +279,7 @@ Podrobnosti v [`README.md`](README.md) → Kam projekt posunout.
 | C | C0–C3 | ČÁSTEČNĚ | `18783c1` | hotovo vše kromě částí čekajících na R1 (stav „Zaplaceno" = Peníze dorazily, smazání doplatku při odškrtnutí) |
 | D | D1–D2 | ČEKÁ (R2) | | |
 | E | E1–E7 | ČÁSTEČNĚ | `11ac89c` | E1, E3, E4, E6, E7 hotové; E2 čeká na R3, E5 na R4 |
-| F | F1–F5 | ČÁSTEČNĚ | `95c0a2a` | F1–F4 hotové (DECISIONS #052), F1: otočit heslo (R5); F5 zatím ne (riziko rozbití nahrání faktury) |
+| F | F1–F5 | ČÁSTEČNĚ | `95c0a2a` | F1–F4 hotové (DECISIONS #053), F1: otočit heslo (R5); F5 zatím ne (riziko rozbití nahrání faktury) |
 | G | G1–G3 | ČÁSTEČNĚ | `60b1d78` | G1 hotové; G2, G3 TODO |
 | H | H1–H2 | ČÁSTEČNĚ | `60b1d78` | H1 hotové; H2 TODO |
 | I | I1–I2 | ČÁSTEČNĚ | `983100f` | I1 hotové; I2 čeká na R6 |
