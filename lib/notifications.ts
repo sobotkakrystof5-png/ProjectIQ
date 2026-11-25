@@ -37,6 +37,8 @@ export type NotificationType =
   | 'client_message'
   /** Připomínka schůzky klientovi neodešla, nebo neběží spouštěč (R-137). */
   | 'meeting_reminder_failed'
+  /** Pozvánka na schůzku se klientovi vrátila nebo nedorazila (R-146). */
+  | 'meeting_invite_undelivered'
 
 export async function createNotification(params: {
   type: NotificationType

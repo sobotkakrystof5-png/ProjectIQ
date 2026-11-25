@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-25 — review: doručení e-mailů z adminu přes webhook Resendu (R-146)
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: necommitnutý diff nad `ab6ffc3` — `app/api/resend/vizeon/route.ts`, `lib/admin/email-delivery{,ies}.ts`, štítek v `sendVizeonMail`, `retryInvite`, dotaz kalendáře, migrace 135, tajemství v diffu.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Podpis se ověří dřív, než se tělo parsuje; strop těla platí před ověřením; bez tajemství 503, cizí podpis a starý čas 400 (test). (2) Z payloadu se bere jen id (regex), stav (pevný seznam) a druh vrácení (regex); čas se jen parsuje. SQL parametrizované. (3) Text upozornění skládá server z `calendar_events` (název, adresa z naší DB), ne z payloadu; zvonek ho vykresluje jako text. (4) `retryInvite` pošle znovu jen pozvánku, která neodešla nebo nedorazila, na adresu z DB; akce `resendMeetingInvite` zůstává za `requireAuth` s ověřeným uuid. (5) Endpoint není v matcheru `proxy.ts`, takže na něj nepůsobí brána ani CSP — stejně jako na ostatní webhooky.
+Opraveno: nic nebylo potřeba. V diffu žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění.
+Zůstává: naživo s Resendem neověřeno; endpoint v Resendu a tajemství ve Vercelu nastaví Kryštof.
+
 ## 2026-11-25 — review: zrušení Schůzek z Wispr Flow (R-145)
 Spouštěč: odstranění funkce na přání Kryštofa
 Rozsah: smazaný veřejný vstup `/api/public/schuzky`, server actions, stránky, Gmail, most na Macu; klíč `MEETING_NOTES_API_KEY`

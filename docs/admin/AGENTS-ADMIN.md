@@ -1578,8 +1578,25 @@ Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
   jen „odešla". Nad kalendářem je souhrn za nadcházející schůzky zobrazeného období. Detail
   ukáže, kdy a kam pozvánka odešla, a u „Bez pozvánky" tlačítko **Poslat pozvánku** (otevře
   úpravu s předvolenou volbou Meet, `EditableEvent.startAsMeeting`). „Odešla" = e-mail převzal
-  Resend; doručení do schránky ZakazIQ nesleduje (webhook Resendu pro vizeon.cz není).
-  Konzultace z volna značku nemají (rezervuje si je klient sám). Test `admin-pozvanka-znacka.test.ts`.
+  Resend a zprávu o doručení zatím nemáme. Konzultace z volna značku nemají (rezervuje si je
+  klient sám). Test `admin-pozvanka-znacka.test.ts`.
+- **Doručení pozvánek (R-146, migrace 135):** každý e-mail ze `sendVizeonMail` nese štítek
+  `zakaziq=admin`. Webhook Resendu `POST /api/resend/vizeon` (podpis Svix, tajemství
+  `VIZEON_RESEND_WEBHOOK_SECRET`, bez něj 503, tělo do 64 kB) zahodí všechno bez štítku (Growth OS
+  posílá ze stejného účtu) a do `email_deliveries` zapíše jen id e-mailu, stav (`delivered`,
+  `delayed`, `complained`, `bounced`, `failed`, `suppressed`), čas události a u vrácení druh
+  (`Permanent`/`Transient`) — adresu ani text odpovědi serveru ne. Novější událost přepíše starší
+  podle času od Resendu, „zdržuje se" nikdy nepřepíše konečný stav (`lib/admin/email-deliveries.ts`).
+  Kalendář čte doručení samostatným dotazem v okně (bez migrace prázdno), značky přibyly dvě:
+  dvojitá fajfka **Pozvánka dorazila** (i u proběhlé schůzky) a červená obálka **Pozvánka
+  nedorazila** (jen nadcházející). Detail vysvětlí proč (adresa neexistuje, plná schránka, adresa
+  na seznamu blokovaných) a nabídne **Poslat e-mail znovu** — `retryInvite` pošle na adresu, která
+  je u schůzky teď (oprava kontaktu se propíše, R-141), s novým klíčem idempotence; doručenou
+  pozvánku znovu neposílá. Změna na „nedorazila" u nadcházející schůzky založí upozornění
+  `meeting_invite_undelivered` (jednou, opakovaný webhook ho nezdvojí). Nastavení v Resendu:
+  Webhooks → Add endpoint, URL výš, události `email.delivered`, `email.delivery_delayed`,
+  `email.bounced`, `email.complained`, `email.failed`, `email.suppressed`; podpisový klíč do Vercelu.
+  Test `admin-doruceni-emailu.test.ts`.
 - **Detail události** v kalendáři ukazuje stav připomínek (`getMeetingStatus`, načítá se až při
   otevření) a varuje, když spouštěč neběží. Smazání schůzky ji smaže i v Google Kalendáři, ale
   až po 10 s a jen když ji „Zpět" neobnovilo (obnova vrací stejné id i s připomínkami).

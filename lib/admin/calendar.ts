@@ -68,6 +68,10 @@ export type RawCalendarEvent = {
   invite_to?: string | null
   meeting_phone?: string | null
   reminders_on?: string | null
+  /** Co se s pozvánkou stalo podle webhooku Resendu (R-146, migrace 135). Bez migrace null. */
+  invite_delivery?: string | null
+  invite_delivery_at?: string | null
+  invite_bounce_type?: string | null
 }
 
 export type RawLead = {
@@ -123,7 +127,7 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
   const fromInstant = pragueWallClockToISO(...dayParts(from), 0, 0)
   const toInstant = pragueWallClockToISO(...dayParts(toExclusive), 0, 0)
 
-  const [consultationRows, deadlineRows, eventRows, leadRows, availabilityRows] = await batchTolerant([
+  const [consultationRows, deadlineRows, eventRows, leadRows, availabilityRows, deliveryRows] = await batchTolerant([
     q`
       SELECT
         cs.id,
@@ -189,7 +193,22 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
       ORDER BY next_action_date, next_action_time
     `,
     availabilityQuery(from, range.to),
+    // Doručení pozvánek zvlášť: bez migrace 135 tabulka chybí a tenhle dotaz
+    // vrátí prázdno, zbytek kalendáře se načte normálně. Id e-mailu přes
+    // to_jsonb, ať to nespadne ani bez migrace 115.
+    q`
+      SELECT e.id::text AS event_id, d.status, d.event_at, d.bounce_type
+      FROM calendar_events e
+      JOIN email_deliveries d ON d.provider_id = to_jsonb(e) ->> 'invite_provider_id'
+      WHERE e.starts_at >= ${fromInstant} AND e.starts_at < ${toInstant}
+    `,
   ], notMissingSchema)
+
+  const deliveries = new Map(
+    (deliveryRows as { event_id: string; status: string; event_at: Date | string; bounce_type: string | null }[]).map(
+      (d) => [d.event_id, d],
+    ),
+  )
 
   const consultations = (consultationRows as unknown as RawConsultation[]).map((r) => ({
     ...r,
@@ -213,11 +232,17 @@ export async function loadCalendarWindow(range: DayRange): Promise<CalendarData>
       deadline: dayOnly(r.deadline),
     })),
     events: (eventRows as unknown as RawCalendarEvent[])
-      .map((r) => ({
-        ...r,
-        starts_at: iso(r.starts_at),
-        ends_at: iso(r.ends_at),
-      }))
+      .map((r) => {
+        const delivery = deliveries.get(String(r.id))
+        return {
+          ...r,
+          starts_at: iso(r.starts_at),
+          ends_at: iso(r.ends_at),
+          invite_delivery: delivery?.status ?? null,
+          invite_delivery_at: delivery ? iso(delivery.event_at) : null,
+          invite_bounce_type: delivery?.bounce_type ?? null,
+        }
+      })
       .filter((r) => !slotKeys.has(`${r.project_id}@${new Date(r.starts_at).getTime()}`)),
     leads: (leadRows as unknown as (Omit<RawLead, 'estimated_value'> & { estimated_value: string | number | null })[]).map((r) => ({
       ...r,

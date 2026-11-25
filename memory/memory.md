@@ -2,10 +2,15 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-25 · **Schůzky z Wispr Flow zrušené** (R-145): na přání Kryštofa
+> **Poslední aktualizace:** 2026-11-25 · **Doručení pozvánek** (R-146): kalendář ukazuje, jestli pozvánka
+> na schůzku klientovi dorazila, nebo se vrátila, podle webhooku Resendu `/api/resend/vizeon` (migrace 135).
+> Nedoručená pozvánka na nadcházející schůzku založí upozornění a nabídne „Poslat e-mail znovu".
+> **Nenasazeno**; čeká na migraci 135, endpoint v Resendu a `VIZEON_RESEND_WEBHOOK_SECRET` ve Vercelu.
+>
+> Předchozí: 2026-11-25 · **Schůzky z Wispr Flow zrušené** (R-145): na přání Kryštofa
 > zmizela obrazovka Schůzky, vstup `/api/public/schuzky`, AI shrnutí, koncepty v Gmailu i most na Macu.
 > LaunchAgent je vypnutý a klíč `MEETING_NOTES_API_KEY` smazaný z Klíčenky i z Vercelu. **Uložené
-> přepisy (5 schůzek) zůstaly v `meeting_notes`** s retencí 3 roky. Kód na větvi `admin/zruseni-schuzek`.
+> přepisy (5 schůzek) zůstaly v `meeting_notes`** s retencí 3 roky. **Na produkci od 2026-11-25 (`ccb1823`).**
 >
 > Předchozí: 2026-11-25 · **Schůzky z Wispr Flow** (R-144): nová sekce Schůzky v adminu.
 > Schůzka nahraná ve Wispr Flow přijde i s doslovným přepisem, AI udělá shrnutí, body dohody, kdo co
@@ -1674,10 +1679,33 @@ Tabulka `meeting_notes` (migrace 134) **zůstává i s daty**; denní úklid ji 
 `client-retention`). Funkci jde vrátit z historie gitu (`ddba729`) bez migrace. Migrace 134 se neupravuje
 ani nemaže (B3); kdyby se měla smazat i data, je to nová migrace s `DROP TABLE`. Bezpečnost DECISIONS #052 (zrušeno).
 
+### R-146 · Doručení pozvánek podle webhooku Resendu (2026-11-25)
+**Rozhodnutí:** (1) U pozvánky na schůzku kalendář ukazuje i doručení: „dorazila" (poštovní server klienta
+e-mail přijal; otevření se nesleduje), „nedorazila" (vrátila se, adresa je u Resendu zablokovaná, nebo se
+nedoručila) a „odešla", dokud zpráva o doručení nepřišla. (2) Zdrojem je webhook Resendu `/api/resend/vizeon`
+s vlastním tajemstvím. Každý e-mail ze `sendVizeonMail` nese štítek `zakaziq=admin` a nic bez něj se neukládá.
+(3) Ukládá se jen id e-mailu, stav, čas a druh vrácení (`email_deliveries`), a to u všech e-mailů z adminu;
+zobrazuje se zatím jen u pozvánek. (4) Pozvánka na nadcházející schůzku, která nedorazila, založí upozornění
+do zvonku a nabídne „Poslat e-mail znovu" na adresu, která je u schůzky teď. (5) Otevření e-mailu (sledovací
+pixel) se nesleduje.
+**Proč:** Kryštof 2026-11-25 vybral „Sledovat doručení", protože „Odešla" říkalo jen, že e-mail převzal Resend.
+`VIZEON_RESEND_API_KEY` umí jen odesílat, takže stav nejde zjistit dotazem; webhook je jediná cesta bez
+plného klíče v aplikaci. Štítek je nutný, protože webhook platí pro celý účet Resendu a posílá z něj i Growth OS.
+**Důsledek:** migrace 135. Nový e-mail z adminu musí jít přes `sendVizeonMail` (kvůli štítku), jinak jeho
+doručení neuvidíme. U faktur, připomínek a dotazníků se doručení už ukládá, chybí jen zobrazení. Nastavení
+v Resendu a pořadí nasazení: `docs/admin/AGENTS-ADMIN.md` → „Doručení pozvánek", DECISIONS #054.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Doručení pozvánek (R-146) — nastavit a projít:** (1) migrace 135 na produkci, (2) v Resendu (účet
+  s doménou vizeon.cz) Webhooks → Add endpoint `https://www.zakaziq.cz/api/resend/vizeon` s událostmi
+  `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.failed`,
+  `email.suppressed`, (3) podpisový klíč `whsec_…` do Vercel Production jako `VIZEON_RESEND_WEBHOOK_SECRET`,
+  pak nasazení, (4) zkušební schůzka na vlastní e-mail → do minuty „Pozvánka dorazila"; na `bounced@resend.dev`
+  → „nedorazila" a upozornění ve zvonku. Pozvánky odeslané před nasazením štítek nemají a zůstanou „odešla".
+  Ověřeno jen testy nad PGlite a dočasnou stránkou s vymyšlenými daty · Kryštof · od 2026-11-25
 - [ ] **Zbytky Schůzek z Wispr Flow (R-145):** vypnutá cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` a prostředí „ZakazIQ most Wispr" (Network
   secret se starým, už neplatným klíčem) smazat na claude.ai/code/routines · od 2026-11-25
 
@@ -2096,6 +2124,26 @@ ani nemaže (B3); kdyby se měla smazat i data, je to nová migrace s `DROP TABL
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-25 (doručení pozvánek — R-146)
+- **feat** Kalendář ukazuje, jestli pozvánka na schůzku opravdu dorazila: dvojitá fajfka „Pozvánka dorazila",
+  červená obálka „Pozvánka nedorazila" s důvodem (adresa neexistuje, plná schránka, zablokovaná adresa)
+  a „Poslat e-mail znovu" na aktuální adresu, s novým klíčem idempotence. Rozšířený souhrn nad kalendářem
+  i legenda; nedoručená pozvánka na nadcházející schůzku založí upozornění `meeting_invite_undelivered`.
+  Zdroj: webhook Resendu `POST /api/resend/vizeon` (podpis Svix, `VIZEON_RESEND_WEBHOOK_SECRET`). Každý
+  e-mail ze `sendVizeonMail` nese štítek `zakaziq=admin`, ostatní (Growth OS) se zahodí. Soubory:
+  `lib/admin/{email-delivery,email-deliveries,invite-mark,calendar,meetings,vizeon-mail}.ts`,
+  `app/api/resend/vizeon/route.ts`, `components/{SmartCalendar,NotificationList}.tsx`, `lib/notifications.ts`.
+- **db** Migrace 135 `doruceni_emailu` — tabulka `email_deliveries` (aplikována: ne).
+- **chore** Ověřeno: `tsc`, nový `admin-doruceni-emailu.test.ts` (rozbor události, pořadí stavů, upozornění
+  jen jednou, poslat znovu s novým klíčem, webhook s podpisem a stropem těla, načtení do kalendáře, štítek)
+  a související testy kalendáře, schůzek, připomínek, e-mailů a bezpečnosti; padá jen `ws-schema` kvůli
+  mezeře 134. Dočasná stránka s vymyšlenými schůzkami na 1280 a 390 px (Měsíc, detail vrácené a doručené
+  pozvánky), stránka smazaná. Za přihlášením a s Resendem naživo neověřeno.
+- **decision** **R-146**, DECISIONS #054.
+- **chore** Rozpracovaná práce z hlavní složky (nad `ab6ffc3`) přenesená na aktuální `main` do větve
+  `admin/doruceni-pozvanek` a přečíslovaná R-144 → **R-146**, DECISIONS #052 → **#054** (obě čísla mezitím
+  dostaly Schůzky z Wispr Flow). Kopie v hlavní složce zůstala necommitnutá, jde zahodit.
 
 ### 2026-11-25 (zrušení Schůzek z Wispr Flow — R-145)
 - **refactor** Funkce Schůzky odstraněná: `app/dashboard/schuzky/`, `app/api/public/schuzky/`,
