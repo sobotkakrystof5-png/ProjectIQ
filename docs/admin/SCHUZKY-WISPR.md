@@ -31,42 +31,48 @@ přepis jde vložit ručně: Schůzky › Vložit přepis (ve Wispr Flow „Copy
    Gmail API). Pak v adminu **Profil → Google → Propojit znovu**: přibylo oprávnění
    `gmail.compose` (jen koncepty, kód nic neodesílá). Bez toho schůzky fungují, jen koncept
    nevznikne a detail řekne proč.
-4. **Naplánovaná úloha** na claude.ai/code (Scheduled tasks), každou hodinu:
-   - prostředí: v *Allowed domains* přidat `www.zakaziq.cz`; v *Network secrets* klíč z bodu 2
-     pro hostitele `www.zakaziq.cz` jako hlavičku `Authorization: Bearer <klíč>`
-     (vstup bere i `x-api-key`). Do textu úlohy ani do proměnných prostředí klíč nepatří.
-   - konektory: nechat jen **Wispr Flow** (ostatní vypnout).
-   - repozitář: ZakazIQ (kvůli `scripts/wispr-most.mjs`).
-   - text úlohy: níže.
+4. **Naplánovaná úloha** na claude.ai/code (Routines) — **založená 2026-11-25:**
+   „Most Wispr Flow → ZakazIQ (schůzky)", `trig_013Y7qZxCW55vP1K6THsPR55`, každou hodinu v :17 UTC
+   (`17 * * * *`), model Sonnet 5.5, jen konektor **Wispr Flow**, repozitář ProjectIQ (kvůli
+   `scripts/wispr-most.mjs`), nástroje Bash, Read, Write, Glob, Grep a `mcp__Wispr-Flow`.
+   Správa: https://claude.ai/code/routines/trig_013Y7qZxCW55vP1K6THsPR55
+   - prostředí **„ZakazIQ most Wispr"** (`env_015BA5v9MaLnGvERWcuTKist`, cloud): síť *Limited*,
+     jediná povolená doména `www.zakaziq.cz`, správci balíčků vypnutí; *Network secret* pro
+     hostitele `www.zakaziq.cz`, hlavička `Authorization`, prefix `Bearer`, token = klíč z bodu 2.
+     Úloha klíč nevidí, proxy ho přidá sama. Do textu úlohy ani do proměnných prostředí nepatří.
+   - výměna klíče: nová hodnota ve Vercelu (`vercel env rm` + `vercel env add … --sensitive`),
+     redeploy a tatáž hodnota v Network secrets prostředí.
 
 ## Text úlohy
 
 ```
-Jsi most mezi Wispr Flow a ZakazIQ. Nic jiného nedělej, nic neměň v repozitáři.
+Jsi most mezi Wispr Flow a ZakazIQ. Nic jiného nedělej, nic neměň v repozitáři (žádné úpravy souborů repa, žádný commit ani push). Pracuješ v kořeni repozitáře ProjectIQ. Klíč k ZakazIQ přidává k požadavkům na https://www.zakaziq.cz proxy prostředí sama — žádnou hlavičku Authorization ani klíč nepřidávej a nehledej.
 
-1. Přes konektor Wispr Flow zavolej search_meetings se sort "start" a since = před 3 dny.
+1. Spočítej datum před 3 dny: date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ
+   Přes konektor Wispr Flow zavolej search_meetings se sort "start" a since = to datum.
    Ber jen schůzky, které jsou finalized, mají has_transcript a trvaly aspoň 1 minutu.
-2. Zjisti, které už ZakazIQ má:
+   Když žádná taková není, napiš „Nové schůzky: 0“ a skonči.
+2. Zjisti, které už ZakazIQ má (nejvýš 100 id najednou, oddělená čárkou):
    curl -sS "https://www.zakaziq.cz/api/public/schuzky?ids=<id1>,<id2>,…"
-   Pokračuj jen se schůzkami, které nejsou v poli "known".
+   Pokračuj jen se schůzkami, které nejsou v poli "known". Když odpověď není success:true, napiš kód a text chyby a skonči.
 3. Pro každou novou schůzku:
    a) get_meeting s view_transcript {start_char: 0, char_limit: 40000}. Dokud přepis končí
       řádkem "(...truncated, N chars remaining; continue with view_transcript.start_char=X...)",
       volej znovu se start_char = X.
-   b) Každý kus ulož do /tmp/schuzky/<id>/casti/cast-<pořadí>.txt PŘESNĚ tak, jak přišel,
+   b) Každý kus ulož nástrojem Write do /tmp/schuzky/<id>/casti/cast-<pořadí>.txt (1, 2, 3…) PŘESNĚ tak, jak přišel,
       jen bez řádků <<<…>>> a bez řádku "(...truncated…)". Nic neopravuj, nezkracuj,
       nepřekládej a neshrnuj, ani překlepy a vata. Na konec souboru nepřidávej prázdný řádek.
    c) get_meeting_participants_enriched → účastníci.
    d) Ulož /tmp/schuzky/<id>/meta.json: {"id", "title", "start", "end", "share_link",
       "summary" (pole summary z get_meeting), "participants": [{"name","emails","spoke","role",
       "self"}], "transcript_chars"}. transcript_chars = délka prvního kusu + N z jeho řádku
-      "chars remaining" (když první kus zkrácený nebyl, je to jeho délka).
+      "chars remaining" (když první kus zkrácený nebyl, je to jeho délka). start a end jako ISO 8601 s časovou zónou (např. 2026-11-24T14:00:00Z).
    e) node scripts/wispr-most.mjs --meta /tmp/schuzky/<id>/meta.json \
         --parts /tmp/schuzky/<id>/casti --out /tmp/schuzky/<id>/telo.json
    f) curl -sS -X POST https://www.zakaziq.cz/api/public/schuzky \
         -H 'Content-Type: application/json' --data-binary @/tmp/schuzky/<id>/telo.json
 4. Na konci napiš jen: kolik schůzek bylo nových, kolik se odeslalo, u kterých odpověď
-   hlásila "complete": false, a chyby. Obsah schůzek do výstupu nepiš.
+   hlásila "complete": false, a chyby. Obsah schůzek (přepis, shrnutí, jména, e-maily) do výstupu nepiš.
 ```
 
 ## Co kde je

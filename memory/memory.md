@@ -2,13 +2,14 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-24 · **Schůzky z Wispr Flow** (R-144): nová sekce Schůzky v adminu.
+> **Poslední aktualizace:** 2026-11-25 · **Schůzky z Wispr Flow** (R-144): nová sekce Schůzky v adminu.
 > Schůzka nahraná ve Wispr Flow přijde i s doslovným přepisem, AI udělá shrnutí, body dohody, kdo co
 > udělá a pozná klienta; po potvrzení klienta se doplní prázdné údaje v kontaktu a v Gmailu
 > krystof@vizeon.cz čeká koncept e-mailu se shrnutím (přepis zůstává jen v ZakazIQ). Most je
-> naplánovaná úloha Clauda s konektorem Wispr Flow (Wispr nemá API). **Jen ve větvi
-> `admin/schuzky-prepisy`, nenasazeno;** migrace 134, klíč, Gmail API a úloha čekají
-> (`docs/admin/SCHUZKY-WISPR.md`). AI ověřená naostro na výňatku skutečné schůzky, v prohlížeči nic.
+> naplánovaná úloha Clauda s konektorem Wispr Flow (Wispr nemá API). **Na produkci od 2026-11-25
+> (`2bb6e34`) i s migrací 134**, klíč mostu ve Vercelu, Gmail API zapnuté, úloha běží každou hodinu
+> (`docs/admin/SCHUZKY-WISPR.md`). **Zbývá v Profilu znovu propojit Google** (bez toho nevznikne
+> koncept v Gmailu) a projít Schůzky za přihlášením.
 >
 > Předchozí: 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
 > náležitosti českého dokladu (údaj o zápisu, datum plnění, značka VIZEON, „Vystaveno v systému ZakazIQ" na
@@ -1655,13 +1656,12 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
 
 ## 3. Otevřené problémy
 
-- [ ] **Schůzky z Wispr Flow (R-144) — nasadit a spustit:** (1) migrace 134 na produkci, (2)
-  `MEETING_NOTES_API_KEY` do Vercelu, (3) Gmail API v Google Cloud `zakaziq-admin` a v Profilu
-  propojit Google znovu (nové oprávnění `gmail.compose`), (4) merge větve `admin/schuzky-prepisy`
-  a deploy, (5) naplánovaná úloha na claude.ai/code podle `docs/admin/SCHUZKY-WISPR.md` (network
-  secret pro `www.zakaziq.cz`, jen konektor Wispr Flow), (6) projít na 390 a 1280 px: seznam,
-  potvrzení klienta, koncept v Gmailu, Přepis. Ověřeno testy nad PGlite, `tsc` a AI naostro na
-  výňatku jedné schůzky · od 2026-11-24
+- [ ] **Schůzky z Wispr Flow (R-144) — dokončit naživo:** ~~migrace 134~~, ~~klíč ve Vercelu~~,
+  ~~Gmail API~~, ~~nasazení~~, ~~naplánovaná úloha~~ (vše 2026-11-25). Zbývá: (1) **Profil → Google →
+  Propojit znovu** (nové oprávnění `gmail.compose`; do té doby schůzky přijdou a AI je zpracuje,
+  jen koncept nevznikne a detail ukáže proč — pak „Založit znovu"), (2) projít na 390 a 1280 px:
+  seznam, potvrzení klienta, koncept v Gmailu, Přepis, (3) po pár dnech zkontrolovat běhy úlohy
+  (`complete: false`, chyby) · Kryštof · od 2026-11-24
 - [ ] **Přepis kopíruje model v naplánované úloze (R-144):** konektor Wispr Flow vydává přepis jen
   do kontextu modelu, do souboru ho model opisuje. Odchylku pozná jen kontrola délky (`complete`);
   přesná kopie je ruční „Vložit přepis" (Copy as Markdown). Kdyby Wispr Flow vydal API, přejít na něj
@@ -2083,6 +2083,31 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
+### 2026-11-25 (schůzky z Wispr Flow na produkci — R-144)
+- **chore** Větev `admin/schuzky-prepisy` přesazená na `main` s fakturami: migrace přečíslovaná
+  131 → **134**, rozhodnutí R-142 → **R-144** (131–133 a R-142/R-143 mezitím dostaly faktury),
+  DECISIONS #052 zůstalo. Po rebase `tsc` bez chyby, 201 testů (schůzky, Google, číslování migrací,
+  faktury, třídy adminu, XSS) prošlo, `npm run build` prošel. Bezpečnostní review bez nálezu (AUDIT-LOG).
+- **db** Migrace 134 na produkčním Neonu (Neon MCP v jedné transakci na pokyn Kryštofa, zapsaná
+  v `public.schema_migrations` s otiskem souboru): 29 sloupců, 5 indexů, kontakt `ON DELETE CASCADE`,
+  událost `SET NULL`, 0 řádků.
+- **chore** `MEETING_NOTES_API_KEY` ve Vercelu Production (sensitive; vygenerovaný `openssl rand`,
+  do Vercelu i do Network secrets šel ze souboru, nikde nevypsaný). Gmail API zapnuté v Google Cloud
+  projektu „ZakazIQ admin" (Chrome, po ověření Kryštofa přístupovým klíčem). Fluid compute projektu
+  ověřený (strop 300 s, `maxDuration = 120` routy projde).
+- **chore** **Na produkci** 2026-11-25: fast-forward `main` `ab6ffc3` → `2bb6e34`, nasazení Ready.
+  Ověřeno veřejně: `/api/public/schuzky` bez klíče i se špatným klíčem 401, se správným
+  `{"success":true,"known":[]}`; `/`, `/login`, `/w/prihlaseni` 200, `/dashboard/schuzky` 307.
+- **chore** Naplánovaná úloha „Most Wispr Flow → ZakazIQ (schůzky)" (`trig_013Y7qZxCW55vP1K6THsPR55`,
+  každou hodinu v :17 UTC, Sonnet 5.5, jen konektor Wispr Flow) v novém cloudovém prostředí
+  „ZakazIQ most Wispr" (jen `www.zakaziq.cz`, bez správců balíčků, Network secret `Authorization: Bearer`).
+  Text úlohy a nastavení v `docs/admin/SCHUZKY-WISPR.md`. Do 14:17 UTC proběhla 9×, každý běh ~10 s:
+  konektor Wispr Flow v cloudu funguje, od 2026-11-22 ve Wispr Flow žádná schůzka (`count: 0`), takže
+  zatím nic neposlala. Klíč přes proxy ověřený jednorázovou úlohou ve stejném prostředí
+  (`trig_01HQAQeJCH5pEnJRHmYaUEt1`, 14:47 UTC): `GET /api/public/schuzky` bez hlavičky →
+  `{"success":true,"known":[]}` 200. Google v Profilu znovu propojený **není** (uložené oprávnění
+  bez `gmail.compose`).
+
 ### 2026-11-24 (schůzky z Wispr Flow — R-144)
 - **feat** Sekce Schůzky v adminu: seznam (Všechny, Ke kontrole, Skryté), detail se Shrnutím
   (klient, shrnutí, dohody, kroky, otevřené body, „Jen pro vás", e-mail klientovi) a Přepisem
@@ -2097,7 +2122,7 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
   přes Gmail API `drafts`, pojistky v cronech `send-reminders` a `client-retention`. Soubory:
   `lib/admin/meeting-notes/{store,match,ai,email,process}.ts`, `lib/admin/google/{gmail,oauth}.ts`,
   `types/meeting-notes.ts`, `scripts/wispr-most.mjs`, `docs/admin/SCHUZKY-WISPR.md`.
-- **db** Migrace 134 `schuzky_prepisy` — tabulka `meeting_notes` (aplikována: ne, nikde).
+- **db** Migrace 134 `schuzky_prepisy` — tabulka `meeting_notes` (aplikována na produkci 2026-11-25, testovací Neon ne).
 - **chore** Ověřeno: `npx tsc --noEmit` bez chyby, nový `lib/__tests__/admin-schuzky-prepisy.test.ts`
   (28 testů nad PGlite s migracemi 114, 115, 128, 130, 134 dvakrát po sobě: příjem a idempotence,
   doslovné uložení, značky konektoru, jistá shoda, kandidáti, souběh, tři pokusy, potvrzení klienta
