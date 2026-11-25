@@ -1,0 +1,138 @@
+import type { SttSegment } from './guards'
+
+/**
+ * ZakazIQ Voice (R-148): přepis řeči na text.
+ *
+ * Dva poskytovatelé, volí `VOICE_STT_PROVIDER` (`groq` | `openai`); bez něj
+ * Groq, když je `GROQ_API_KEY`, jinak OpenAI (klíč už v projektu je kvůli
+ * přepisu z portálu). Groq vrací segmenty s jistotou, takže na něm fungují
+ * všechny pojistky proti halucinacím; OpenAI vrací jen text.
+ *
+ * Audio se nikam neukládá: jde přes server k poskytovateli a zahodí se.
+ * Tělo chyby poskytovatele se neloguje (může nést kus nahrávky nebo klíč).
+ */
+
+export type SttProvider = 'groq' | 'openai'
+
+export interface SttOk {
+  ok: true
+  provider: SttProvider
+  model: string
+  text: string
+  /** Jen Groq (verbose_json). */
+  segments: SttSegment[] | null
+  ms: number
+}
+export interface SttFail {
+  ok: false
+  provider: SttProvider
+  model: string
+  status: number
+  ms: number
+}
+export type SttResult = SttOk | SttFail
+
+const GROQ_URL = 'https://api.groq.com/openai/v1/audio/transcriptions'
+const OPENAI_URL = 'https://api.openai.com/v1/audio/transcriptions'
+const GROQ_DEFAULT_MODEL = 'whisper-large-v3-turbo'
+const OPENAI_DEFAULT_MODEL = 'gpt-4o-mini-transcribe'
+
+/**
+ * Ceny v USD za hodinu zvuku (ověřeno 2026-11-25: console.groq.com/docs/speech-to-text,
+ * přehled cen OpenAI). Slouží jen k odhadu nákladů ve statistikách.
+ * Groq účtuje nejméně 10 s za požadavek.
+ */
+export const STT_PRICE_PER_HOUR: Record<string, number> = {
+  'whisper-large-v3-turbo': 0.04,
+  'whisper-large-v3': 0.111,
+  'gpt-4o-mini-transcribe': 0.18,
+  'gpt-4o-transcribe': 0.36,
+  'gpt-transcribe': 0.27,
+}
+
+export function sttProvider(): SttProvider | null {
+  const forced = process.env.VOICE_STT_PROVIDER?.trim()
+  if (forced === 'groq') return process.env.GROQ_API_KEY ? 'groq' : null
+  if (forced === 'openai') return process.env.OPENAI_API_KEY ? 'openai' : null
+  if (process.env.GROQ_API_KEY) return 'groq'
+  if (process.env.OPENAI_API_KEY) return 'openai'
+  return null
+}
+
+export function sttModel(provider: SttProvider): string {
+  return provider === 'groq'
+    ? process.env.GROQ_STT_MODEL?.trim() || GROQ_DEFAULT_MODEL
+    : process.env.VOICE_OPENAI_STT_MODEL?.trim() || OPENAI_DEFAULT_MODEL
+}
+
+/** Odhad ceny přepisu v USD. Neznámý model = 0 (raději nic než vymyšlené číslo). */
+export function sttCostUsd(provider: SttProvider, model: string, audioSeconds: number): number {
+  const perHour = STT_PRICE_PER_HOUR[model] ?? 0
+  const billed = provider === 'groq' ? Math.max(10, audioSeconds) : audioSeconds
+  return (billed / 3600) * perHour
+}
+
+function extensionFor(type: string): string {
+  const base = type.split(';')[0]?.trim().toLowerCase()
+  if (base === 'audio/wav' || base === 'audio/x-wav') return 'wav'
+  if (base === 'audio/webm') return 'webm'
+  if (base === 'audio/mpeg') return 'mp3'
+  return 'm4a'
+}
+
+interface GroqVerbose {
+  text?: unknown
+  segments?: { text?: unknown; no_speech_prob?: unknown; avg_logprob?: unknown; compression_ratio?: unknown }[]
+}
+
+const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+
+export async function transcribeVoice(
+  audio: Blob,
+  prompt: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SttResult> {
+  const provider = sttProvider()
+  if (!provider) return { ok: false, provider: 'openai', model: '', status: 503, ms: 0 }
+  const model = sttModel(provider)
+  const started = Date.now()
+
+  const form = new FormData()
+  form.append('file', audio, `diktat.${extensionFor(audio.type)}`)
+  form.append('model', model)
+  form.append('language', 'cs')
+  form.append('temperature', '0')
+  form.append('response_format', provider === 'groq' ? 'verbose_json' : 'json')
+  if (prompt) form.append('prompt', prompt)
+
+  const key = provider === 'groq' ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY
+  try {
+    const res = await fetchImpl(provider === 'groq' ? GROQ_URL : OPENAI_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+      cache: 'no-store',
+    })
+    const ms = Date.now() - started
+    if (!res.ok) {
+      console.error('[voice/stt]', provider, 'vrátil', res.status)
+      return { ok: false, provider, model, status: res.status, ms }
+    }
+    const data = (await res.json()) as GroqVerbose
+    const text = typeof data.text === 'string' ? data.text.trim() : ''
+    const segments =
+      provider === 'groq' && Array.isArray(data.segments)
+        ? data.segments.map((s) => ({
+            text: typeof s.text === 'string' ? s.text : '',
+            noSpeechProb: num(s.no_speech_prob),
+            avgLogprob: num(s.avg_logprob),
+            compressionRatio: num(s.compression_ratio),
+          }))
+        : null
+    return { ok: true, provider, model, text, segments, ms }
+  } catch (err) {
+    console.error('[voice/stt]', provider, 'selhal:', err instanceof Error ? err.name : 'unknown')
+    return { ok: false, provider, model, status: 0, ms: Date.now() - started }
+  }
+}

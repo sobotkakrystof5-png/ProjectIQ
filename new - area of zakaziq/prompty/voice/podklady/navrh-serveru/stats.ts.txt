@@ -1,0 +1,116 @@
+/**
+ * ZakazIQ Voice (R-148): statistiky diktování — čisté výpočty bez DB.
+ * Definice odpovídají záložce Insights ve Wispr Flow (rychlost z času řeči,
+ * série dní v místním čase, pásma heatmapy), aby šla čísla porovnat.
+ */
+
+export interface DayRow {
+  /** 'YYYY-MM-DD' v pražském čase */
+  day: string
+  words: number
+  /** čas řeči v ms (bez ticha, jinak délka nahrávky) */
+  ms: number
+  dictations: number
+  userEdits: number
+  fixes: number
+  costUsd: number
+}
+
+const DAY_MS = 86_400_000
+
+export function addDays(isoDay: string, delta: number): string {
+  const t = Date.parse(`${isoDay}T00:00:00Z`) + delta * DAY_MS
+  return new Date(t).toISOString().slice(0, 10)
+}
+
+/** Řada dnů od `from` do `to` včetně, chybějící dny s nulou. */
+export function fillDays(rows: DayRow[], from: string, to: string): DayRow[] {
+  const byDay = new Map(rows.map((r) => [r.day, r]))
+  const out: DayRow[] = []
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    out.push(byDay.get(d) ?? { day: d, words: 0, ms: 0, dictations: 0, userEdits: 0, fixes: 0, costUsd: 0 })
+  }
+  return out
+}
+
+/**
+ * Série: po sobě jdoucí dny se slovy. Aktuální série končí dnes, nebo včera
+ * (dnešek ještě neskončil — dokud se nediktovalo, série trvá). Nejdelší
+ * přes celou historii.
+ */
+export function streaks(activeDays: string[], today: string): { current: number; longest: number } {
+  const days = [...new Set(activeDays)].sort()
+  let longest = 0
+  let run = 0
+  let prev: string | null = null
+  for (const d of days) {
+    run = prev !== null && addDays(prev, 1) === d ? run + 1 : 1
+    longest = Math.max(longest, run)
+    prev = d
+  }
+  const set = new Set(days)
+  let current = 0
+  let cursor = set.has(today) ? today : addDays(today, -1)
+  while (set.has(cursor)) {
+    current++
+    cursor = addDays(cursor, -1)
+  }
+  return { current, longest }
+}
+
+/** Pásmo heatmapy jako ve Wispr Flow: 0, 1–249, 250–499, 500–749, 750+. */
+export function band(words: number): 0 | 1 | 2 | 3 | 4 {
+  if (words <= 0) return 0
+  if (words < 250) return 1
+  if (words < 500) return 2
+  if (words < 750) return 3
+  return 4
+}
+
+/** Slova za minutu řeči. Bez času = null (raději nic než nesmysl). */
+export function wpm(words: number, ms: number): number | null {
+  if (ms <= 0 || words <= 0) return null
+  return Math.round(words / (ms / 60_000))
+}
+
+/** Ušetřený čas v minutách: kolik by to trvalo napsat minus kolik trvalo říct. */
+export function savedMinutes(words: number, ms: number, typingWpm: number): number {
+  if (words <= 0 || typingWpm <= 0) return 0
+  return Math.max(0, Math.round(words / typingWpm - ms / 60_000))
+}
+
+/** Podíl opravených slov v procentech (s jedním desetinným místem). Měřítko, jestli se systém učí. */
+export function editRate(userEdits: number, words: number): number | null {
+  if (words <= 0) return null
+  return Math.round((userEdits / words) * 1000) / 10
+}
+
+/** Mřížka heatmapy: sloupec = týden (od pondělí), řádek = den v týdnu. */
+export function heatmapWeeks(days: DayRow[]): { weekStart: string; cells: (DayRow | null)[] }[] {
+  if (!days.length) return []
+  const weekday = (d: string) => (new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7 // pondělí = 0
+  const weeks: { weekStart: string; cells: (DayRow | null)[] }[] = []
+  for (const d of days) {
+    const wd = weekday(d.day)
+    const start = addDays(d.day, -wd)
+    let week = weeks[weeks.length - 1]
+    if (!week || week.weekStart !== start) {
+      week = { weekStart: start, cells: [null, null, null, null, null, null, null] }
+      weeks.push(week)
+    }
+    week.cells[wd] = d
+  }
+  return weeks
+}
+
+export const formatWords = (n: number): string =>
+  n === 1 ? '1 slovo' : n >= 2 && n <= 4 ? `${n} slova` : `${n.toLocaleString('cs-CZ')} slov`
+
+export const formatDays = (n: number): string => (n === 1 ? '1 den' : n >= 2 && n <= 4 ? `${n} dny` : `${n} dní`)
+
+export function formatMinutes(min: number): string {
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m ? `${h} h ${m} min` : `${h} h`
+}

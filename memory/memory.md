@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
+> **Poslední aktualizace:** 2026-11-25 · **ZakazIQ Voice — VO00** (R-148): vlastní diktování jako
+> Wispr Flow (Fn na Macu, přepis a učení v adminu). Plán `docs/admin/VOICE-PLAN.md` a prompty VO00–VO12
+> jsou na větvi `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`). Text diktátů zůstává
+> natrvalo, dokud ho Kryštof nesmaže. Chybí klíč Groq a test skutečného hlasu; kód zatím žádný.
+>
+> Předchozí: 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
 > náležitosti českého dokladu (údaj o zápisu, datum plnění, značka VIZEON, „Vystaveno v systému ZakazIQ" na
 > každé stránce) a před vystavením se vybírá druh — za celé dílo, zálohová, částečná, finální — s procentem
 > z ceny zakázky a pruhem zaplaceno / čeká / zbývá. **Na produkci od 2026-11-24 (`aaa3215`) i s migracemi
@@ -102,6 +107,13 @@
 ## 1. Aktuální stav
 
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
+
+**ZakazIQ Voice (R-148, od 2026-11-25, větev `admin/zakaziq-voice`):** diktování na Macu přes Fn,
+zpracování a statistiky v adminu `/dashboard/voice`. Třináct sezení VO00–VO12, plán
+`docs/admin/VOICE-PLAN.md` (stav v oddílu 14), prompty `new - area of zakaziq/prompty/voice/`.
+VO00 rozpracované: plán v repu, rozhodnutí, ceny ověřené, `scripts/voice-stt-test.mjs` běží. Další krok:
+Kryštof vloží `GROQ_API_KEY`, nahraje ~10 vět do `~/ZakazIQ-voice-test/`, vytvoří certifikát pro podpis;
+pak dokončit test přepisu a VO01 (migrace 136, klíč zařízení).
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
@@ -1613,10 +1625,39 @@ nepřipravuje" — s migrací 132 vznikne finální koncept na zbytek. Nová ces
 `prepareKindIssue`, jinak se druh neuloží. Technika `docs/admin/AGENTS-ADMIN.md` → „Druh faktury a rozpis ceny
 zakázky (R-143)", DECISIONS #042 doplnění.
 
+### R-148 · ZakazIQ Voice: diktování z Macu, zpracování v adminu, text natrvalo (2026-11-25)
+**Rozhodnutí:** vlastní diktování jako Wispr Flow podle `docs/admin/VOICE-PLAN.md` (oddíl 2, D-V1–D-V13).
+Kryštof potvrdil: (1) zpracování na **serveru ZakazIQ** (admin), Mac jen nahrává, ukazuje lištu a vkládá
+(D-V2); (2) aplikace pro Mac ve **Swiftu bez cizích balíčků ve složce `voice-mac/` v repu** (D-V5);
+(3) **text diktátů na serveru natrvalo, dokud ho sám nesmaže** — jeden diktát, období, vše; automatická
+lhůta jen volitelná, výchozí vypnutá; zvuk se neukládá nikdy (D-V7, změna proti doporučeným 90 dnům);
+(4) slovo se naučí **samo** po 3 stejných opravách, pravidla stylu a blokované fráze **jen po schválení**
+(D-V8). Ostatní body oddílu 2 podle doporučení (Groq `whisper-large-v3-turbo`, čištění rolí `fast`,
+Fn ≥ 0,3 s, offline fronta bez pozdního vkládání, limity, Dílky). Je to **výslovné zadání změny adminu**
+v rozsahu, který jmenují sezení VO01–VO12.
+**Proč:** Kryštof 2026-11-25 („vlastní Wispr Flow v barvách ZakazIQ, učí se z logů, statistiky v adminu");
+u textu chce celou historii k dohledání. Klíče poskytovatelů jen na serveru a jedno místo pro logy,
+učení a statistiky. Čísla R-144–R-147 mají rozdělané větve (doručení pozvánek, Wispr Flow, navrhovač
+nabídek).
+**Důsledek:** migrace 136 (VO01) bude mít `text_retention_days` výchozí NULL a `voice_corrections`
+navázané na diktát kaskádou, bez vlastní lhůty. Admin musí umět diktáty mazat a hledat v nich (VO10),
+jinak žádost GDPR o výmaz zmínky o klientovi nejde splnit. Nová pojistka **G12** (ozvěna nápovědy):
+test VO00 ukázal, že přepis s nápovědou slovníku na tichu vrátí celou nápovědu. Názvy modelů Claude jen
+v `lib/ai/models.ts`, ceny v `lib/admin/voice/costs.ts`. Zpracovatel Groq do `.claude/security/DECISIONS.md`
+ve VO02. Žádný nový npm balíček.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **ZakazIQ Voice — dokončit VO00:** (1) `GROQ_API_KEY` z console.groq.com vložit do `.env.local`
+  hlavní složky (worktree na něj odkazuje) a v Groq Data Controls zapnout Zero Data Retention,
+  (2) nahrát ~10 vět vlastním hlasem jako `*.m4a` + `*.txt` s přesným textem do `~/ZakazIQ-voice-test/`
+  (e-mail klientovi, Slack, zadání pro Claude s anglickými slovy, čísla a data, „ZakazIQ", „Prvotka",
+  „VIZEON") a pustit `node scripts/voice-stt-test.mjs ~/ZakazIQ-voice-test` bez nápovědy i s `--napoveda`,
+  (3) před VO03 certifikát pro podpis: Přístup ke klíčence → Asistent certifikátů → Vytvořit certifikát,
+  název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu **Code Signing**
+  (dnes 0 identit pro podpis). Zatím otestováno jen OpenAI na syntetickém hlasu (plán 12a) · Kryštof · od 2026-11-25
 - [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
   skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
   Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
@@ -2026,6 +2067,27 @@ zakázky (R-143)", DECISIONS #042 doplnění.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-25 (ZakazIQ Voice — VO00, R-148)
+- **docs** Plán `docs/admin/VOICE-PLAN.md` a prompty `new - area of zakaziq/prompty/voice/` (VO00–VO12,
+  podklady s neověřeným návrhem serveru) z `~/Desktop/zakaziq-voice-plan` na novou větev
+  `admin/zakaziq-voice` z `main` (`ab6ffc3`), ve vlastním worktree `.claude/worktrees/zakaziq-voice`
+  (`node_modules` a `.env.local` jsou odkazy na hlavní složku). Číslo rozhodnutí R-147 → R-148 všude.
+- **decision** **R-148**: D-V2, D-V5, D-V8 podle doporučení, D-V7 text natrvalo (plán oddíl 2 a 6,
+  prompty VO01, VO08, VO10 a návrh migrace upravené).
+- **docs** Ceník ověřený 2026-11-25 (plán oddíl 12): Groq turbo $0,04/h, v3 $0,111/h, nejkratší účtovaná
+  délka 10 s, nápověda do 224 tokenů, `verbose_json` se segmenty, data se ve výchozím stavu neuchovávají
+  (přepis až 30 dní kvůli zneužití, ZDR jde zapnout), DPA s SCC, servery v USA; OpenAI `gpt-4o-transcribe`
+  $0,006/min, mini $0,003/min; Haiku 5.5 $0,10/$0,50, Sonnet 5.5 $2/$10 za 1M tokenů. Odhad pro 3 000 slov
+  denně ~$1,5 měsíčně.
+- **feat** `scripts/voice-stt-test.mjs`: Groq turbo, Groq v3 a OpenAI na složce nahrávek, WER, ticho,
+  výsledek po G2, p50/p95, odhad ceny, `--napoveda`, `--jen`, `--podrobne`, `--selftest`; bez balíčků,
+  klíče nevypisuje, nahrávky nikam neukládá.
+- **docs** Test přepisu (plán 12a), jen OpenAI `gpt-4o-mini-transcribe` na syntetickém hlasu: bez nápovědy
+  WER 11,6 %, s nápovědou 5,5 %, ale na 5 s ticha s nápovědou **opsal celou nápovědu** → nová pojistka G12.
+  Groq neměřený (chybí klíč). Mac: macOS 15.7.4, Swift 6.1.2, jen Command Line Tools, 0 identit pro podpis.
+- **chore** Nové env `GROQ_API_KEY`, `VOICE_STT_PROVIDER`, `VOICE_GROQ_STT_MODEL`, `VOICE_OPENAI_STT_MODEL`
+  v `.env.example` a `docs/AGENTS-REFERENCE.md` → Env proměnné.
 
 ### 2026-11-24 (druh faktury a zbývá doplatit — R-143)
 - **feat** Před vystavením se vybírá druh faktury: za celé dílo, zálohová (30 %), částečná (procento z ceny),

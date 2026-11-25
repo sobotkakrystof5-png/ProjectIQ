@@ -1,0 +1,142 @@
+import { foldText, fold, similarity, words } from './text'
+
+/**
+ * ZakazIQ Voice (R-148): učení z logů — čisté funkce.
+ *
+ * Systém se neučí přetrénováním modelu, ale tím, co mu dáváme do ruky:
+ * slovník (nápověda pro přepis a náhrady), blokované fráze a pravidla stylu
+ * pro čištění. Všechno se bere z toho, co Kryštof po vložení opravil:
+ *
+ * - **Slovo:** stejná oprava (slyšeno → správně) aspoň dvakrát = návrh do
+ *   slovníku. Aspoň třikrát a vypadá jako jméno nebo překlep (velké písmeno,
+ *   číslice, podobnost) = naučí se samo, jde vrátit.
+ * - **Blokovaná fráze:** stejný krátký text u krátkých nahrávek aspoň třikrát,
+ *   nebo vložený text, který Kryštof celý smazal, aspoň dvakrát = návrh.
+ * - **Pravidlo stylu** navrhuje jen AI rozbor a vždy ho potvrzuje člověk.
+ *
+ * Nic, co model vymyslí, se nepoužije bez potvrzení.
+ */
+
+export interface CorrectionPair {
+  heard: string
+  fixed: string
+  count: number
+  examples: string[]
+}
+
+export interface ExistingTerm {
+  term: string
+  heardAs: string[]
+}
+
+export interface TermSuggestion {
+  term: string
+  heardAs: string[]
+  evidence: number
+  examples: string[]
+  autoAccept: boolean
+  dedupeKey: string
+}
+
+/** Opravu tvoří nejvýš 3 slova na každé straně a výraz má aspoň 2 znaky. */
+const shapeOk = (p: CorrectionPair) =>
+  words(p.heard).length <= 3 && words(p.fixed).length <= 3 && p.fixed.trim().length >= 2 && p.heard.trim() !== p.fixed.trim()
+
+/** Vypadá jako jméno, značka nebo číslo (velké písmeno, číslice). */
+const looksProper = (s: string) => /[\p{Lu}\p{N}]/u.test(s)
+
+/**
+ * Je to oprava přepisu, ne přeformulování? Jméno (velké písmeno) nebo
+ * podobně znějící slovo („vizion“ → „Vizeon“) ano; „rychle“ → „brzy“ ne —
+ * to je styl, ne chyba přepisu.
+ */
+export function isTranscriptionFix(heard: string, fixed: string): boolean {
+  if (fold(heard) === fold(fixed)) return true // jen velká písmena nebo diakritika
+  return looksProper(fixed) || similarity(heard, fixed) >= 0.5
+}
+
+export const termDedupeKey = (heard: string, fixed: string) => `term:${foldText(heard)}→${fixed.trim()}`.slice(0, 300)
+
+export function deriveTermSuggestions(
+  pairs: CorrectionPair[],
+  existing: ExistingTerm[],
+  autoLearn: boolean,
+): TermSuggestion[] {
+  const known = new Map<string, Set<string>>()
+  for (const t of existing) known.set(fold(t.term), new Set(t.heardAs.map((h) => foldText(h))))
+
+  const out: TermSuggestion[] = []
+  for (const p of pairs) {
+    if (p.count < 2 || !shapeOk(p) || !isTranscriptionFix(p.heard, p.fixed)) continue
+    const already = known.get(fold(p.fixed))
+    if (already && (already.has(foldText(p.heard)) || fold(p.heard) === fold(p.fixed))) continue
+    out.push({
+      term: p.fixed.trim(),
+      heardAs: fold(p.heard) === fold(p.fixed) ? [] : [p.heard.trim()],
+      evidence: p.count,
+      examples: p.examples.slice(0, 5),
+      autoAccept: autoLearn && p.count >= 3 && (looksProper(p.fixed) || similarity(p.heard, p.fixed) >= 0.6),
+      dedupeKey: termDedupeKey(p.heard, p.fixed),
+    })
+  }
+  return out.sort((a, b) => b.evidence - a.evidence)
+}
+
+export interface LoggedText {
+  id: string
+  finalText: string | null
+  editedText: string | null
+  speechMs: number | null
+  durationMs: number
+}
+
+export interface BlockSuggestion {
+  phrase: string
+  evidence: number
+  examples: string[]
+  reason: string
+  dedupeKey: string
+}
+
+export const blockDedupeKey = (phrase: string) => `block:${foldText(phrase)}`.slice(0, 300)
+
+/** Krátká nahrávka, ze které vyšel celý text: typická halucinace na tichu. */
+const SHORT_MS = 2000
+
+export function deriveBlockSuggestions(rows: LoggedText[], blocked: string[]): BlockSuggestion[] {
+  const blockedSet = new Set(blocked.map(foldText))
+  const groups = new Map<string, { phrase: string; short: string[]; deleted: string[] }>()
+  for (const r of rows) {
+    if (!r.finalText) continue
+    const key = foldText(r.finalText)
+    const n = key ? key.split(' ').length : 0
+    if (n < 2 || n > 8 || blockedSet.has(key)) continue
+    const g = groups.get(key) ?? { phrase: r.finalText.trim(), short: [], deleted: [] }
+    if ((r.speechMs ?? r.durationMs) < SHORT_MS) g.short.push(r.id)
+    if (r.editedText !== null && !words(r.editedText).length) g.deleted.push(r.id)
+    groups.set(key, g)
+  }
+  const out: BlockSuggestion[] = []
+  for (const [key, g] of groups) {
+    if (g.short.length >= 3) {
+      out.push({
+        phrase: g.phrase,
+        evidence: g.short.length,
+        examples: g.short.slice(0, 5),
+        reason: `Objevilo se ${g.short.length}× u nahrávky kratší než 2 sekundy.`,
+        dedupeKey: blockDedupeKey(key),
+      })
+    } else if (g.deleted.length >= 2) {
+      out.push({
+        phrase: g.phrase,
+        evidence: g.deleted.length,
+        examples: g.deleted.slice(0, 5),
+        reason: `Po vložení jste to ${g.deleted.length}× celé smazal.`,
+        dedupeKey: blockDedupeKey(key),
+      })
+    }
+  }
+  return out.sort((a, b) => b.evidence - a.evidence)
+}
+
+export const ruleDedupeKey = (text: string) => `rule:${foldText(text)}`.slice(0, 300)

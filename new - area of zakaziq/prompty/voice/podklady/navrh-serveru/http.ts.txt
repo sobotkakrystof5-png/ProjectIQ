@@ -1,0 +1,98 @@
+import 'server-only'
+import { NextResponse, type NextRequest } from 'next/server'
+import { z } from 'zod'
+import { bearerFrom } from '@/lib/agent-keys'
+import { getClientIp } from '@/lib/api-auth'
+import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
+import { isVoiceKeyConfigured } from './keys'
+import { resolveDevice, touchDevice } from './store'
+
+/**
+ * ZakazIQ Voice (R-148): společné ověření pro `/api/public/voice/*`.
+ *
+ * Volá je jen aplikace na Macu (ne prohlížeč), proto bez CORS a bez cookie.
+ * Klíč zařízení v `Authorization: Bearer …`. Limit po IP se počítá u každého
+ * volání včetně neúspěšných (hádání klíčů), limit po zařízení až po ověření.
+ * Chyby neprozrazují, jestli zařízení existuje.
+ */
+
+export type VoiceScope = 'dictate' | 'feedback' | 'config' | 'write'
+
+const PER_DEVICE_HOURLY: Record<VoiceScope, number> = {
+  dictate: 400,
+  feedback: 400,
+  config: 240,
+  write: 120,
+}
+const IP_ENDPOINT = 'voice_ip'
+const IP_HOURLY = 1200
+
+export function voiceFail(status: number, code: string, error?: string): NextResponse {
+  return NextResponse.json({ ok: false, code, ...(error ? { error } : {}) }, { status })
+}
+
+export async function authorizeVoiceDevice(
+  req: NextRequest,
+  scope: VoiceScope,
+): Promise<{ ok: true; device: { id: string; name: string } } | { ok: false; res: NextResponse }> {
+  if (!isVoiceKeyConfigured()) return { ok: false, res: voiceFail(503, 'NOT_CONFIGURED') }
+
+  const ip = getClientIp(req)
+  if (await isApiRateLimited(IP_ENDPOINT, ip, 60, IP_HOURLY)) return { ok: false, res: voiceFail(429, 'RATE_LIMITED') }
+  await recordApiRequest(IP_ENDPOINT, ip)
+
+  const key = bearerFrom(req.headers.get('authorization'))
+  let device: { id: string; name: string } | null = null
+  try {
+    device = key ? await resolveDevice(key) : null
+  } catch {
+    // Tabulka zařízení neexistuje (migrace 136 neproběhla).
+    return { ok: false, res: voiceFail(503, 'NOT_CONFIGURED') }
+  }
+  if (!device) return { ok: false, res: voiceFail(401, 'UNAUTHORIZED') }
+
+  const endpoint = `voice_${scope}:${device.id}`
+  if (await isApiRateLimited(endpoint, 'device', 60, PER_DEVICE_HOURLY[scope])) {
+    return { ok: false, res: voiceFail(429, 'RATE_LIMITED') }
+  }
+  await recordApiRequest(endpoint, 'device')
+  await touchDevice(device.id)
+  return { ok: true, device }
+}
+
+/** Údaje o diktátu, které posílá Mac spolu s nahrávkou (pole `meta`). */
+export const dictationMetaSchema = z.object({
+  id: z.string().uuid(),
+  startedAt: z.iso.datetime({ offset: true }),
+  durationMs: z.number().int().min(0).max(600_000),
+  speechMs: z.number().int().min(0).max(600_000).nullable(),
+  mode: z.enum(['hold', 'hands_free']),
+  cancelled: z.boolean().optional(),
+  app: z.object({
+    bundleId: z.string().trim().max(200).nullable(),
+    name: z.string().trim().max(120).nullable(),
+    // Jen nápověda pro kategorii u prohlížeče. Neukládá se (může nést předmět e-mailu).
+    titleHint: z.string().max(200).nullable().optional(),
+  }),
+})
+export type DictationMetaInput = z.infer<typeof dictationMetaSchema>
+
+/** Diktát z budoucnosti nebo starší než 30 dní (fronta offline) se nepřijme. */
+export function startedAtPlausible(iso: string, now = Date.now()): boolean {
+  const t = Date.parse(iso)
+  return Number.isFinite(t) && t <= now + 5 * 60_000 && t >= now - 30 * 86_400_000
+}
+
+export const feedbackSchema = z.object({
+  id: z.string().uuid(),
+  editedText: z.string().max(20_000),
+})
+
+export const termInputSchema = z
+  .object({
+    kind: z.enum(['term', 'snippet']),
+    term: z.string().trim().min(1).max(80),
+    heardAs: z.array(z.string().trim().min(1).max(120)).max(10).default([]),
+    expansion: z.string().trim().max(2000).nullable().optional(),
+  })
+  .refine((v) => v.kind === 'term' || Boolean(v.expansion), { message: 'Zkratka potřebuje text.' })

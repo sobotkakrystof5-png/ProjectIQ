@@ -1,0 +1,199 @@
+import { cleanupCostUsd, type CleanupCaller } from './cleanup'
+import type { VoiceCategory, VoiceStyle } from './categories'
+import { allowedTermsOf, applyDictionary, buildSttPrompt, matchSnippet, type VoiceSnippet, type VoiceTerm } from './dictionary'
+import {
+  MIN_SPEECH_MS,
+  applyBlocklist,
+  checkCleanup,
+  collapseRepeats,
+  filterSegments,
+  isImplausiblyFast,
+  stripWrappingQuotes,
+  type BlockPhrase,
+} from './guards'
+import { sttCostUsd, type SttResult } from './stt'
+import { countWords, stripFillers, tidy, wordDiff } from './text'
+
+/**
+ * ZakazIQ Voice (R-148): cesta jednoho diktátu od nahrávky k textu.
+ *
+ *   řeč? → přepis → pojistky přepisu → zkratka? → slovník → vycpávky
+ *        → čištění modelem → kontrola výstupu → text
+ *
+ * Každý krok, který něco zahodil nebo odmítl, přidá kód do `guards`. Výsledek
+ * jde do `voice_dictations` a vrací se Macu. Závislosti (přepis, model) se
+ * předávají zvenku, takže celá cesta jde otestovat bez sítě.
+ */
+
+export interface PipelineConfig {
+  terms: VoiceTerm[]
+  snippets: VoiceSnippet[]
+  blocklist: BlockPhrase[]
+  rules: string[]
+  examples: { heard: string; fixed: string }[]
+  style: VoiceStyle
+  cleanupEnabled: boolean
+}
+
+export interface PipelineInput {
+  audio: Blob
+  durationMs: number
+  speechMs: number | null
+  category: VoiceCategory
+  appName: string | null
+}
+
+export interface PipelineDeps {
+  transcribe: (audio: Blob, prompt: string) => Promise<SttResult>
+  cleanup: CleanupCaller
+}
+
+export type PipelineStatus = 'ok' | 'raw' | 'snippet' | 'empty' | 'blocked' | 'error'
+
+export interface PipelineOutcome {
+  status: PipelineStatus
+  guards: string[]
+  rawText: string | null
+  finalText: string
+  words: number
+  wordsCorrected: number
+  dictionaryFixes: number
+  usedTermIds: string[]
+  snippetId: string | null
+  sttProvider: string | null
+  sttModel: string | null
+  llmModel: string | null
+  sttMs: number | null
+  llmMs: number | null
+  audioSeconds: number
+  tokensIn: number
+  tokensOut: number
+  costUsd: number
+}
+
+/** Pod tolik slov se model nevolá — „Ano.“ nebo „Díky“ učeše `tidy` sám. */
+export const CLEANUP_MIN_WORDS = 3
+
+export async function runPipeline(input: PipelineInput, config: PipelineConfig, deps: PipelineDeps): Promise<PipelineOutcome> {
+  const audioSeconds = Math.round(input.durationMs / 10) / 100
+  const out: PipelineOutcome = {
+    status: 'empty',
+    guards: [],
+    rawText: null,
+    finalText: '',
+    words: 0,
+    wordsCorrected: 0,
+    dictionaryFixes: 0,
+    usedTermIds: [],
+    snippetId: null,
+    sttProvider: null,
+    sttModel: null,
+    llmModel: null,
+    sttMs: null,
+    llmMs: null,
+    audioSeconds,
+    tokensIn: 0,
+    tokensOut: 0,
+    costUsd: 0,
+  }
+
+  // 1. Bez řeči se nic nepřepisuje: na tichu si Whisper vymýšlí.
+  if (input.speechMs !== null && input.speechMs < MIN_SPEECH_MS) {
+    out.guards.push('no_speech')
+    return out
+  }
+
+  // 2. Přepis s nápovědou ze slovníku.
+  const stt = await deps.transcribe(input.audio, buildSttPrompt(config.terms))
+  out.sttProvider = stt.provider
+  out.sttModel = stt.model || null
+  out.sttMs = stt.ms
+  if (!stt.ok) {
+    out.status = 'error'
+    out.guards.push(stt.status === 503 ? 'stt_not_configured' : 'stt_failed')
+    return out
+  }
+  out.costUsd += sttCostUsd(stt.provider, stt.model, audioSeconds)
+  out.rawText = stt.text
+
+  // 3. Pojistky přepisu.
+  let text = stt.text
+  if (stt.segments) {
+    const filtered = filterSegments(stt.segments)
+    if (filtered.dropped > 0) {
+      out.guards.push('segments')
+      text = filtered.text
+    }
+  }
+  const repeats = collapseRepeats(text)
+  if (repeats.collapsed) out.guards.push('repeat')
+  text = repeats.text
+  const blocked = applyBlocklist(text, config.blocklist, input.speechMs ?? input.durationMs)
+  if (blocked.hits.length) out.guards.push('blocklist')
+  text = blocked.text
+  if (isImplausiblyFast(countWords(text), input.durationMs)) {
+    out.guards.push('too_fast')
+    text = ''
+  }
+  if (!countWords(text)) {
+    out.status = out.guards.length ? 'blocked' : 'empty'
+    return out
+  }
+
+  // 4. Zkratka: celý diktát je spouštěcí fráze.
+  const snippet = matchSnippet(text, config.snippets)
+  if (snippet) {
+    out.status = 'snippet'
+    out.snippetId = snippet.id
+    out.finalText = snippet.expansion
+    out.words = countWords(snippet.expansion)
+    return out
+  }
+
+  // 5. Slovník a vycpávky — bez modelu, vždy.
+  const dict = applyDictionary(text, config.terms)
+  out.dictionaryFixes = dict.fixes
+  out.usedTermIds = dict.usedIds
+  const base = stripFillers(dict.text).text
+
+  // 6. Čištění modelem a kontrola výstupu.
+  let final = base
+  out.status = 'ok'
+  if (config.cleanupEnabled && countWords(base) >= CLEANUP_MIN_WORDS) {
+    const res = await deps.cleanup({
+      text: base,
+      style: config.style,
+      category: input.category,
+      appName: input.appName,
+      terms: config.terms.map((t) => t.term),
+      rules: config.rules,
+      examples: config.examples,
+    })
+    out.llmModel = res.model
+    out.llmMs = res.ms
+    out.tokensIn = res.tokensIn
+    out.tokensOut = res.tokensOut
+    out.costUsd += cleanupCostUsd(res.tokensIn, res.tokensOut)
+    if (!res.ok) {
+      out.guards.push(`cleanup_${res.reason}`)
+      out.status = 'raw'
+    } else {
+      const candidate = stripWrappingQuotes(res.text, base)
+      const verdict = checkCleanup({
+        source: base,
+        output: candidate,
+        allowedTerms: allowedTermsOf(config.terms, config.snippets),
+      })
+      if (verdict.ok) final = candidate
+      else {
+        out.guards.push(`cleanup_${verdict.reason}`)
+        out.status = 'raw'
+      }
+    }
+  }
+
+  out.finalText = tidy(final)
+  out.words = countWords(out.finalText)
+  out.wordsCorrected = wordDiff(stt.text, out.finalText).changed
+  return out
+}

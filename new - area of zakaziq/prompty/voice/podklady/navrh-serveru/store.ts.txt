@@ -1,0 +1,384 @@
+import 'server-only'
+import { adminDb, q } from '@/lib/admin/db'
+import { DEFAULT_STYLES, STYLE_KEYS, VOICE_CATEGORIES, type VoiceCategory, type VoiceStyle } from './categories'
+import type { VoiceSnippet, VoiceTerm } from './dictionary'
+import type { BlockPhrase } from './guards'
+import { generateVoiceKey, voiceKeyMatches, voiceKeyPrefixOf } from './keys'
+import type { PipelineConfig, PipelineOutcome } from './pipeline'
+import { wordDiff } from './text'
+
+/**
+ * ZakazIQ Voice (R-148): databáze. Čtení jde v dávkách přes `adminDb` (R-092).
+ */
+
+// --- Nastavení ---------------------------------------------------------------
+
+export interface VoiceSettings {
+  styles: Record<VoiceCategory, VoiceStyle>
+  typingWpm: number
+  textRetentionDays: number
+  cleanupEnabled: boolean
+  autoLearnTerms: boolean
+}
+
+export const DEFAULT_SETTINGS: VoiceSettings = {
+  styles: DEFAULT_STYLES,
+  typingWpm: 40,
+  textRetentionDays: 90,
+  cleanupEnabled: true,
+  autoLearnTerms: true,
+}
+
+const clampInt = (v: unknown, min: number, max: number, fallback: number): number => {
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback
+}
+
+/** Řádky `voice_settings` → nastavení. Neznámé nebo poškozené hodnoty = výchozí. */
+export function parseSettings(rows: { key: string; value: unknown }[]): VoiceSettings {
+  const map = new Map(rows.map((r) => [r.key, r.value]))
+  const stylesRaw = map.get('styles')
+  const styles = { ...DEFAULT_STYLES }
+  if (stylesRaw && typeof stylesRaw === 'object') {
+    for (const cat of VOICE_CATEGORIES) {
+      const v = (stylesRaw as Record<string, unknown>)[cat]
+      if (typeof v === 'string' && (STYLE_KEYS as readonly string[]).includes(v)) styles[cat] = v as VoiceStyle
+    }
+  }
+  return {
+    styles,
+    typingWpm: clampInt(map.get('typing_wpm'), 10, 200, DEFAULT_SETTINGS.typingWpm),
+    textRetentionDays: clampInt(map.get('text_retention_days'), 1, 3650, DEFAULT_SETTINGS.textRetentionDays),
+    cleanupEnabled: map.has('cleanup_enabled') ? map.get('cleanup_enabled') === true : true,
+    autoLearnTerms: map.has('auto_learn_terms') ? map.get('auto_learn_terms') === true : true,
+  }
+}
+
+const SETTINGS_SQL = q`SELECT key, value FROM voice_settings`
+
+export async function loadSettings(): Promise<VoiceSettings> {
+  const [rows] = await adminDb.batch([SETTINGS_SQL])
+  return parseSettings(rows as { key: string; value: unknown }[])
+}
+
+export async function saveSettings(patch: Partial<VoiceSettings>): Promise<void> {
+  const pairs: [string, unknown][] = []
+  if (patch.styles) pairs.push(['styles', patch.styles])
+  if (patch.typingWpm !== undefined) pairs.push(['typing_wpm', patch.typingWpm])
+  if (patch.textRetentionDays !== undefined) pairs.push(['text_retention_days', patch.textRetentionDays])
+  if (patch.cleanupEnabled !== undefined) pairs.push(['cleanup_enabled', patch.cleanupEnabled])
+  if (patch.autoLearnTerms !== undefined) pairs.push(['auto_learn_terms', patch.autoLearnTerms])
+  if (!pairs.length) return
+  await adminDb.batch(
+    pairs.map(
+      ([key, value]) => q`
+        INSERT INTO voice_settings (key, value, updated_at) VALUES (${key}, ${JSON.stringify(value)}::jsonb, now())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+      `,
+    ),
+  )
+}
+
+// --- Kontext pro jeden diktát -------------------------------------------------
+
+type TermRow = { id: string; kind: 'term' | 'snippet'; term: string; heard_as: string[] | null; expansion: string | null }
+type RuleRow = { kind: 'rule' | 'blocklist'; text: string; mode: 'always' | 'alone' }
+type PairRow = { heard: string; fixed: string; n: number }
+
+/** Kolik naučených oprav jde do promptu jako příklady. */
+export const EXAMPLE_LIMIT = 12
+
+/** Všechno, co potřebuje cesta diktátu, jedním požadavkem. */
+export async function loadPipelineContext(category: VoiceCategory): Promise<{ config: PipelineConfig; settings: VoiceSettings }> {
+  const [settingsRows, termRows, ruleRows, pairRows] = await adminDb.batch([
+    SETTINGS_SQL,
+    q`SELECT id, kind, term, heard_as, expansion FROM voice_terms ORDER BY uses DESC, created_at ASC LIMIT 400`,
+    q`SELECT kind, text, mode FROM voice_rules WHERE active ORDER BY created_at ASC LIMIT 200`,
+    q`
+      SELECT heard, fixed, count(*)::int AS n FROM voice_corrections
+      WHERE created_at > now() - interval '90 days'
+      GROUP BY heard, fixed HAVING count(*) >= 2
+      ORDER BY n DESC LIMIT ${EXAMPLE_LIMIT}
+    `,
+  ])
+  const settings = parseSettings(settingsRows as { key: string; value: unknown }[])
+  const terms = termRows as TermRow[]
+  const rules = ruleRows as RuleRow[]
+  const config: PipelineConfig = {
+    terms: terms
+      .filter((t) => t.kind === 'term')
+      .map((t): VoiceTerm => ({ id: t.id, term: t.term, heardAs: t.heard_as ?? [] })),
+    snippets: terms
+      .filter((t) => t.kind === 'snippet' && t.expansion)
+      .map((t): VoiceSnippet => ({ id: t.id, trigger: t.term, expansion: t.expansion as string })),
+    blocklist: rules.filter((r) => r.kind === 'blocklist').map((r): BlockPhrase => ({ text: r.text, mode: r.mode })),
+    rules: rules.filter((r) => r.kind === 'rule').map((r) => r.text),
+    examples: (pairRows as PairRow[]).map((p) => ({ heard: p.heard, fixed: p.fixed })),
+    style: settings.styles[category],
+    cleanupEnabled: settings.cleanupEnabled,
+  }
+  return { config, settings }
+}
+
+// --- Zápis diktátu ------------------------------------------------------------
+
+/** Už zpracovaný diktát (opakované odeslání z fronty) — vrátí se uložený výsledek, přepis se neplatí znovu. */
+export async function findDictation(
+  id: string,
+  deviceId: string,
+): Promise<{ status: string; finalText: string | null; words: number; guards: string[] } | null> {
+  const rows = await adminDb<{ status: string; final_text: string | null; words: number; guards: string[] | null }>`
+    SELECT status, final_text, words, guards FROM voice_dictations WHERE id = ${id} AND device_id = ${deviceId}
+  `
+  const r = rows[0]
+  return r ? { status: r.status, finalText: r.final_text, words: Number(r.words), guards: r.guards ?? [] } : null
+}
+
+export interface DictationMeta {
+  id: string
+  deviceId: string
+  startedAt: string
+  durationMs: number
+  speechMs: number | null
+  mode: 'hold' | 'hands_free'
+  appBundleId: string | null
+  appName: string | null
+  category: VoiceCategory
+}
+
+/** Zapíše diktát. Stejné `id` podruhé nic nezmění (opakované odeslání z Macu). */
+export async function saveDictation(meta: DictationMeta, out: PipelineOutcome, totalMs: number): Promise<boolean> {
+  const queries = [
+    q`
+      INSERT INTO voice_dictations (
+        id, device_id, started_at, duration_ms, speech_ms, mode, app_bundle_id, app_name, category,
+        status, guards, raw_text, final_text, words, words_corrected, dictionary_fixes,
+        stt_provider, stt_model, llm_model, stt_ms, llm_ms, total_ms, audio_seconds,
+        tokens_in, tokens_out, cost_usd
+      ) VALUES (
+        ${meta.id}, ${meta.deviceId}, ${meta.startedAt}, ${meta.durationMs}, ${meta.speechMs}, ${meta.mode},
+        ${meta.appBundleId}, ${meta.appName}, ${meta.category},
+        ${out.status}, ${out.guards}, ${out.rawText}, ${out.finalText || null}, ${out.words},
+        ${out.wordsCorrected}, ${out.dictionaryFixes},
+        ${out.sttProvider}, ${out.sttModel}, ${out.llmModel}, ${out.sttMs}, ${out.llmMs}, ${totalMs},
+        ${out.audioSeconds}, ${out.tokensIn}, ${out.tokensOut}, ${Number(out.costUsd.toFixed(6))}
+      )
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id
+    `,
+  ]
+  const used = [...out.usedTermIds, ...(out.snippetId ? [out.snippetId] : [])]
+  if (used.length) {
+    queries.push(q`UPDATE voice_terms SET uses = uses + 1 WHERE id = ANY(${used}::uuid[])`)
+  }
+  const [inserted] = await adminDb.batch(queries)
+  return inserted.length > 0
+}
+
+/** Diktát zrušený klávesou Esc: jen čísla, žádný text. */
+export async function saveCancelled(meta: DictationMeta): Promise<void> {
+  await adminDb`
+    INSERT INTO voice_dictations (id, device_id, started_at, duration_ms, speech_ms, mode, app_bundle_id, app_name, category, status)
+    VALUES (${meta.id}, ${meta.deviceId}, ${meta.startedAt}, ${meta.durationMs}, ${meta.speechMs}, ${meta.mode},
+            ${meta.appBundleId}, ${meta.appName}, ${meta.category}, 'cancelled')
+    ON CONFLICT (id) DO NOTHING
+  `
+}
+
+/**
+ * Oprava po vložení: Mac poslal, jak vložený úsek vypadá teď. Spočítá se rozdíl
+ * po slovech, náhrady 1–3 slov se uloží jako opravy (z nich se učí slovník).
+ * Jen jednou na diktát a jen pro diktát téhož zařízení.
+ */
+export async function recordFeedback(
+  id: string,
+  deviceId: string,
+  editedText: string,
+): Promise<{ ok: boolean; changed: number; pairs: number }> {
+  const rows = await adminDb<{ final_text: string | null; edited_text: string | null }>`
+    SELECT final_text, edited_text FROM voice_dictations
+    WHERE id = ${id} AND device_id = ${deviceId} AND status IN ('ok', 'raw')
+  `
+  const row = rows[0]
+  if (!row || row.final_text === null || row.edited_text !== null) return { ok: false, changed: 0, pairs: 0 }
+
+  const diff = wordDiff(row.final_text, editedText)
+  const pairs = diff.replacements.filter((p) => p.heard.length <= 120 && p.fixed.length <= 120).slice(0, 20)
+  const queries = [
+    q`UPDATE voice_dictations SET edited_text = ${editedText}, user_edits = ${diff.changed} WHERE id = ${id}`,
+    ...pairs.map((p) => q`INSERT INTO voice_corrections (dictation_id, heard, fixed) VALUES (${id}, ${p.heard}, ${p.fixed})`),
+  ]
+  await adminDb.batch(queries)
+  return { ok: true, changed: diff.changed, pairs: pairs.length }
+}
+
+// --- Zařízení -----------------------------------------------------------------
+
+export interface VoiceDevice {
+  id: string
+  name: string
+  prefix: string
+  createdAt: string
+  lastUsedAt: string | null
+  revokedAt: string | null
+}
+
+const iso = (v: Date | string | null): string | null => (v ? new Date(v).toISOString() : null)
+
+export async function listDevices(): Promise<VoiceDevice[]> {
+  const rows = await adminDb<{
+    id: string
+    name: string
+    prefix: string
+    created_at: Date | string
+    last_used_at: Date | string | null
+    revoked_at: Date | string | null
+  }>`SELECT id, name, prefix, created_at, last_used_at, revoked_at FROM voice_devices ORDER BY revoked_at NULLS FIRST, created_at DESC`
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    prefix: r.prefix,
+    createdAt: iso(r.created_at) ?? '',
+    lastUsedAt: iso(r.last_used_at),
+    revokedAt: iso(r.revoked_at),
+  }))
+}
+
+/** Nové zařízení. Klíč se vrací jedinkrát a nikam se neukládá ani neloguje. */
+export async function createDevice(name: string, by: string): Promise<string> {
+  const { key, prefix, hash } = generateVoiceKey()
+  await adminDb`INSERT INTO voice_devices (name, prefix, key_hash, created_by) VALUES (${name}, ${prefix}, ${hash}, ${by})`
+  return key
+}
+
+export async function revokeDevice(id: string): Promise<boolean> {
+  const rows = await adminDb`UPDATE voice_devices SET revoked_at = now() WHERE id = ${id} AND revoked_at IS NULL RETURNING id`
+  return rows.length > 0
+}
+
+/** Klíč → zařízení. Špatný tvar, neznámý prefix, neshoda i zneplatněný klíč = null. */
+export async function resolveDevice(key: string): Promise<{ id: string; name: string } | null> {
+  const prefix = voiceKeyPrefixOf(key)
+  if (!prefix) return null
+  const rows = await adminDb<{ id: string; name: string; key_hash: string; revoked_at: unknown }>`
+    SELECT id, name, key_hash, revoked_at FROM voice_devices WHERE prefix = ${prefix} LIMIT 1
+  `
+  const row = rows[0]
+  if (!row || row.revoked_at || !voiceKeyMatches(key, row.key_hash)) return null
+  return { id: row.id, name: row.name }
+}
+
+export async function touchDevice(id: string): Promise<void> {
+  try {
+    await adminDb`UPDATE voice_devices SET last_used_at = now() WHERE id = ${id}`
+  } catch (err) {
+    console.error('[voice] last_used_at se nezapsal:', err instanceof Error ? err.name : 'unknown')
+  }
+}
+
+// --- Slovník, zkratky a pravidla ---------------------------------------------
+
+export interface TermItem {
+  id: string
+  kind: 'term' | 'snippet'
+  term: string
+  heardAs: string[]
+  expansion: string | null
+  source: 'manual' | 'learned'
+  uses: number
+}
+
+export interface RuleItem {
+  id: string
+  kind: 'rule' | 'blocklist'
+  text: string
+  mode: 'always' | 'alone'
+  active: boolean
+  source: 'manual' | 'learned' | 'builtin'
+}
+
+export async function listTerms(): Promise<TermItem[]> {
+  const rows = await adminDb<{
+    id: string
+    kind: 'term' | 'snippet'
+    term: string
+    heard_as: string[] | null
+    expansion: string | null
+    source: 'manual' | 'learned'
+    uses: number
+  }>`SELECT id, kind, term, heard_as, expansion, source, uses FROM voice_terms ORDER BY kind, lower(term)`
+  return rows.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    term: r.term,
+    heardAs: r.heard_as ?? [],
+    expansion: r.expansion,
+    source: r.source,
+    uses: r.uses,
+  }))
+}
+
+export async function listRules(): Promise<RuleItem[]> {
+  return adminDb<RuleItem & Record<string, unknown>>`
+    SELECT id, kind, text, mode, active, source FROM voice_rules ORDER BY kind, source DESC, created_at
+  `
+}
+
+/** Přidá výraz nebo zkratku; existující výraz dostane nové „jak to slyší“. */
+export async function upsertTerm(input: {
+  kind: 'term' | 'snippet'
+  term: string
+  heardAs: string[]
+  expansion: string | null
+  source: 'manual' | 'learned'
+}): Promise<void> {
+  await adminDb`
+    INSERT INTO voice_terms (kind, term, heard_as, expansion, source)
+    VALUES (${input.kind}, ${input.term}, ${input.heardAs}::text[], ${input.expansion}, ${input.source})
+    ON CONFLICT (kind, lower(term)) DO UPDATE SET
+      term = EXCLUDED.term,
+      heard_as = (SELECT coalesce(array_agg(DISTINCT x), '{}') FROM unnest(voice_terms.heard_as || EXCLUDED.heard_as) AS x),
+      expansion = coalesce(EXCLUDED.expansion, voice_terms.expansion),
+      updated_at = now()
+  `
+}
+
+export async function deleteTerm(id: string): Promise<void> {
+  await adminDb`DELETE FROM voice_terms WHERE id = ${id}`
+}
+
+export async function addRule(kind: 'rule' | 'blocklist', text: string, mode: 'always' | 'alone', source: 'manual' | 'learned'): Promise<void> {
+  await adminDb`
+    INSERT INTO voice_rules (kind, text, mode, source) VALUES (${kind}, ${text}, ${mode}, ${source})
+    ON CONFLICT (kind, lower(text)) DO UPDATE SET active = true
+  `
+}
+
+export async function setRuleActive(id: string, active: boolean): Promise<void> {
+  await adminDb`UPDATE voice_rules SET active = ${active} WHERE id = ${id}`
+}
+
+export async function deleteRule(id: string): Promise<void> {
+  // Vestavěné fráze se nemažou, jen vypínají — jinak by je další migrace nevrátila.
+  await adminDb`DELETE FROM voice_rules WHERE id = ${id} AND source <> 'builtin'`
+}
+
+// --- Úklid --------------------------------------------------------------------
+
+/**
+ * Text diktátů starších než retence se smaže, čísla zůstanou. Opravy (dvojice
+ * slov) žijí rok — z nich se učí slovník. Vrací počet vyčištěných diktátů.
+ */
+export async function purgeVoiceText(retentionDays: number): Promise<number> {
+  const [purged] = await adminDb.batch([
+    q`
+      UPDATE voice_dictations
+      SET raw_text = NULL, final_text = NULL, edited_text = NULL, text_purged_at = now()
+      WHERE text_purged_at IS NULL AND created_at < now() - make_interval(days => ${retentionDays})
+      RETURNING id
+    `,
+    q`DELETE FROM voice_corrections WHERE created_at < now() - interval '365 days'`,
+    q`DELETE FROM voice_suggestions WHERE status <> 'pending' AND decided_at < now() - interval '365 days'`,
+  ])
+  return purged.length
+}

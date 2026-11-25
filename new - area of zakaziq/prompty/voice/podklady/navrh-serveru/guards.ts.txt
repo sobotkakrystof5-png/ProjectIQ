@@ -1,0 +1,186 @@
+import { countWords, fold, foldText, isNumberToken, words } from './text'
+
+/**
+ * ZakazIQ Voice (R-148): pojistky proti halucinacím.
+ *
+ * Halucinace přicházejí ze dvou míst a každé má jinou pojistku:
+ *
+ * 1. **Přepis řeči (Whisper)** si na tichu, šumu nebo dozvuku vymýšlí věty,
+ *    které se naučil z titulků („Titulky vytvořil JohnyX“, „Děkuji za
+ *    pozornost“), nebo se zacyklí a opakuje jednu frázi. Proti tomu:
+ *    Mac nepošle nahrávku bez řeči, segmenty s nízkou jistotou se zahodí,
+ *    opakování se sloučí a známé fráze se vyškrtnou.
+ * 2. **Čištění jazykovým modelem** může místo učesání odpovědět, doplnit
+ *    údaj, který nikdo neřekl, nebo text zkrátit. Proti tomu: výstup se
+ *    porovná s přepisem (délka, nová slova, čísla, „odpověď asistenta“)
+ *    a když neprojde, vloží se přepis bez čištění.
+ *
+ * Všechno tady jsou čisté funkce; co zasáhlo, se ukládá jako kód do
+ * `voice_dictations.guards`, ne jako text.
+ */
+
+/** Kratší řeč než tohle se nepřepisuje — Whisper by si na tichu vymýšlel. */
+export const MIN_SPEECH_MS = 300
+
+/** Víc slov za sekundu nahrávky člověk nevysloví (8 slov/s = 480 slov/min). */
+export const MAX_WORDS_PER_SECOND = 8
+
+export interface SttSegment {
+  text: string
+  noSpeechProb?: number
+  avgLogprob?: number
+  compressionRatio?: number
+}
+
+/**
+ * Segment, který Whisper sám považuje za ticho (vysoká pravděpodobnost „bez
+ * řeči“ a zároveň nízká jistota), nebo se v něm točí dokola (vysoký poměr
+ * komprese), se zahodí. Prahy jsou ty, které používá referenční implementace
+ * Whisperu pro opakování dekódování.
+ */
+export function filterSegments(segments: SttSegment[]): { text: string; dropped: number } {
+  let dropped = 0
+  const kept: string[] = []
+  for (const s of segments) {
+    const silent = (s.noSpeechProb ?? 0) > 0.6 && (s.avgLogprob ?? 0) < -1
+    const looping = (s.compressionRatio ?? 0) > 2.4
+    if (silent || looping) dropped++
+    else kept.push(s.text.trim())
+  }
+  return { text: kept.filter(Boolean).join(' '), dropped }
+}
+
+/**
+ * Sloučí frázi opakovanou třikrát a víckrát za sebou („děkuji děkuji děkuji
+ * děkuji“, „a pak a pak a pak“). Dvakrát se v řeči opakuje běžně, to zůstane.
+ */
+export function collapseRepeats(text: string): { text: string; collapsed: boolean } {
+  let collapsed = false
+  // Mezera na konci, aby i poslední opakování mělo za sebou oddělovač jako ostatní.
+  let out = `${text.trim()} `
+  for (let n = 6; n >= 1; n--) {
+    // n celých slov (s interpunkcí a mezerami mezi nimi), pak totéž ještě aspoň
+    // dvakrát. Hranice slov jsou nutné: bez nich by se „1000“ slilo na „10“.
+    const unit = `((?:[\\p{L}\\p{N}'’-]+(?![\\p{L}\\p{N}])[\\s,.;:!?…]*){${n}})`
+    const re = new RegExp(`(?<![\\p{L}\\p{N}'’-])${unit}(?:\\1){2,}`, 'giu')
+    out = out.replace(re, (_m, g1: string) => {
+      collapsed = true
+      return g1
+    })
+  }
+  return { text: out.replace(/\s+/g, ' ').trim(), collapsed }
+}
+
+export interface BlockPhrase {
+  text: string
+  /** always = vždy pryč · alone = jen když je to celý přepis krátké nahrávky */
+  mode: 'always' | 'alone'
+}
+
+/** Krátká nahrávka pro pravidlo „alone“: delší diktát, který končí „děkuji“, je skutečný. */
+export const ALONE_MAX_SPEECH_MS = 4000
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Fráze jako regulární výraz: mezi slovy libovolná mezera a interpunkce. */
+function phrasePattern(phrase: string): string {
+  return words(phrase).map(escapeRe).join('[\\s,.;:!?…-]+')
+}
+
+export function applyBlocklist(
+  text: string,
+  phrases: BlockPhrase[],
+  speechMs: number,
+): { text: string; hits: string[] } {
+  const hits: string[] = []
+  let out = text
+  for (const p of phrases) {
+    if (!words(p.text).length) continue
+    if (p.mode === 'always') {
+      // Fráze a zbytek její věty („Titulky vytvořil JohnyX.“).
+      const re = new RegExp(`(?<![\\p{L}\\p{N}])${phrasePattern(p.text)}[^.!?\\n]*[.!?]?`, 'giu')
+      const next = out.replace(re, '')
+      if (next !== out) {
+        hits.push(p.text)
+        out = next
+      }
+    } else if (speechMs < ALONE_MAX_SPEECH_MS && foldText(out) === foldText(p.text)) {
+      hits.push(p.text)
+      out = ''
+    }
+  }
+  return { text: out.replace(/\s+/g, ' ').trim(), hits }
+}
+
+/** Halucinace podle rychlosti: víc slov, než se dá za dobu nahrávky vyslovit. */
+export function isImplausiblyFast(wordCount: number, durationMs: number): boolean {
+  if (durationMs <= 0) return wordCount > 0
+  return wordCount / (durationMs / 1000) > MAX_WORDS_PER_SECOND && wordCount > 6
+}
+
+// --- Kontrola výstupu čištění -------------------------------------------------
+
+/** Začátky typické pro asistenta, který odpovídá, místo aby upravil text. */
+const ASSISTANT_OPENERS =
+  /^(?:jistě|samozřejmě|rozumím|zde je|tady je|tady máte|zde máte|upravený text|opravený text|text po úpravě|ráda?\s|mohu|můžu vám|bohužel|omlouvám se|here is|sure|certainly|i can|i'm sorry)\b/iu
+
+export type CleanupVerdict =
+  | { ok: true }
+  | { ok: false; reason: 'empty' | 'assistant' | 'too_short' | 'too_long' | 'novel_words' | 'numbers' }
+
+export interface CleanupCheckInput {
+  /** Text, který šel do čištění (po slovníku a vycpávkách). */
+  source: string
+  /** Výstup modelu (bez značek). */
+  output: string
+  /** Slova ze slovníku a zkratek: smí se objevit, i když v přepisu nejsou. */
+  allowedTerms: string[]
+}
+
+/**
+ * Prošel by výstup čištění jako „tentýž text, jen učesaný“? Odmítá:
+ * - prázdný výstup u neprázdného přepisu,
+ * - začátek odpovědi asistenta, který v přepisu nebyl,
+ * - výrazně kratší nebo delší text (krátké diktáty mají volnější mez —
+ *   oprava „ve středu, vlastně ne, ve čtvrtek“ zkrátí větu na polovinu),
+ * - víc nových slov, než unese oprava gramatiky a slovníku,
+ * - číslo z přepisu, které ve výstupu chybí.
+ */
+export function checkCleanup({ source, output, allowedTerms }: CleanupCheckInput): CleanupVerdict {
+  const srcWords = words(source)
+  const outWords = words(output)
+  if (!outWords.length) return srcWords.length ? { ok: false, reason: 'empty' } : { ok: true }
+
+  if (ASSISTANT_OPENERS.test(output.trim()) && !ASSISTANT_OPENERS.test(source.trim())) {
+    return { ok: false, reason: 'assistant' }
+  }
+
+  const ratio = outWords.length / Math.max(1, srcWords.length)
+  const minRatio = srcWords.length <= 12 ? 0.3 : 0.5
+  if (ratio < minRatio) return { ok: false, reason: 'too_short' }
+  if (outWords.length > srcWords.length * 1.35 + 4) return { ok: false, reason: 'too_long' }
+
+  const known = new Set(srcWords.map(fold))
+  for (const term of allowedTerms) for (const w of words(term)) known.add(fold(w))
+  const novel = outWords.filter((w) => !isNumberToken(w) && !known.has(fold(w)))
+  const allowance = Math.max(3, Math.ceil(outWords.length * 0.2))
+  if (novel.length > allowance) return { ok: false, reason: 'novel_words' }
+
+  // Čísla napsaná číslicemi v přepisu musí přežít (výstup smí slovní číslo převést na číslice).
+  const outNumbers = new Set(outWords.filter(isNumberToken))
+  const outDigits = output.replace(/\s+/g, '')
+  for (const n of srcWords.filter(isNumberToken)) {
+    if (!outNumbers.has(n) && !outDigits.includes(n)) return { ok: false, reason: 'numbers' }
+  }
+  return { ok: true }
+}
+
+/** Uvozovky kolem celého výstupu, které v přepisu nebyly, pryč. */
+export function stripWrappingQuotes(output: string, source: string): string {
+  const t = output.trim()
+  const quoted = /^["„“'»«][\s\S]*["“”'»«]$/u.test(t)
+  const srcQuoted = /^["„“'»«]/u.test(source.trim())
+  return quoted && !srcQuoted ? t.slice(1, -1).trim() : t
+}
+
+export { countWords }

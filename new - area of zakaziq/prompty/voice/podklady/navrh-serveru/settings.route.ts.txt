@@ -1,0 +1,38 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { readJsonLimited } from '@/lib/security/request-body'
+import { STYLE_KEYS } from '@/lib/admin/voice/categories'
+import { authorizeVoiceDevice, voiceFail } from '@/lib/admin/voice/http'
+import { loadSettings, saveSettings } from '@/lib/admin/voice/store'
+
+// ZakazIQ Voice (R-148): styl podle kategorie z okna aplikace na Macu
+// (záložka Styl, jako ve Wispr Flow). Ostatní nastavení jen v adminu.
+
+export const dynamic = 'force-dynamic'
+
+const style = z.enum(STYLE_KEYS)
+const patchSchema = z.object({
+  styles: z
+    .object({
+      email: style,
+      work_msg: style,
+      personal_msg: style,
+      ai_prompt: style,
+      document: style,
+      other: style,
+    })
+    .partial(),
+})
+
+export async function PATCH(req: NextRequest): Promise<NextResponse> {
+  const auth = await authorizeVoiceDevice(req, 'write')
+  if (!auth.ok) return auth.res
+  const body = await readJsonLimited(req, 4 * 1024)
+  if (!body.ok) return voiceFail(400, 'INVALID_BODY')
+  const parsed = patchSchema.safeParse(body.value)
+  if (!parsed.success) return voiceFail(400, 'INVALID_BODY')
+  const current = await loadSettings()
+  const styles = { ...current.styles, ...parsed.data.styles }
+  await saveSettings({ styles })
+  return NextResponse.json({ ok: true, styles })
+}

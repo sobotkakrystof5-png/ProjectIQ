@@ -1,0 +1,143 @@
+/**
+ * ZakazIQ Voice (R-148): práce s textem diktátu — slova, porovnání, rozdíl.
+ * Čisté funkce bez DB a bez sítě, testované v `lib/__tests__/voice-text.test.ts`.
+ */
+
+/** Slovo = písmena a číslice včetně diakritiky, uvnitř smí být apostrof nebo spojovník. */
+const WORD_RE = /[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu
+
+export function words(text: string): string[] {
+  return text.match(WORD_RE) ?? []
+}
+
+export function countWords(text: string | null | undefined): number {
+  return text ? words(text).length : 0
+}
+
+/** Malá písmena bez diakritiky — na porovnání „je to totéž slovo?“. */
+export function fold(word: string): string {
+  return word
+    .toLocaleLowerCase('cs')
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+}
+
+/** Celý text na porovnání: bez interpunkce, malými písmeny, jedna mezera. */
+export function foldText(text: string): string {
+  return words(text).map(fold).join(' ')
+}
+
+export const isNumberToken = (w: string): boolean => /^\p{N}+$/u.test(w)
+
+/** Levenshteinova podobnost 0–1 (1 = stejné). Na krátká slova, ne na odstavce. */
+export function similarity(a: string, b: string): number {
+  const x = fold(a)
+  const y = fold(b)
+  if (x === y) return 1
+  if (!x.length || !y.length) return 0
+  const prev = Array.from({ length: y.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= x.length; i++) {
+    let diag = prev[0]
+    prev[0] = i
+    for (let j = 1; j <= y.length; j++) {
+      const tmp = prev[j]
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (x[i - 1] === y[j - 1] ? 0 : 1))
+      diag = tmp
+    }
+  }
+  return 1 - prev[y.length] / Math.max(x.length, y.length)
+}
+
+export interface WordDiff {
+  /** Kolik slov se změnilo (náhrada, vypuštění nebo vložení, počítá se větší strana). */
+  changed: number
+  /** Náhrady 1–3 slov za 1–3 slova: z nich se učí slovník. */
+  replacements: { heard: string; fixed: string }[]
+}
+
+/** Nad tímhle počtem slov se rozdíl nepočítá (kvadratická paměť). */
+export const DIFF_MAX_WORDS = 600
+
+/**
+ * Rozdíl po slovech (nejdelší společná podposloupnost). Slova se porovnávají
+ * přesně včetně velkých písmen — oprava „zakaziq“ → „ZakazIQ“ je oprava.
+ * Interpunkce se nepočítá.
+ */
+export function wordDiff(before: string, after: string): WordDiff {
+  const a = words(before)
+  const b = words(after)
+  if (a.length > DIFF_MAX_WORDS || b.length > DIFF_MAX_WORDS) {
+    return { changed: Math.abs(a.length - b.length), replacements: [] }
+  }
+  const n = a.length
+  const m = b.length
+  // dp[i][j] = délka LCS a[i..] a b[j..]
+  const dp: Uint16Array[] = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1))
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
+    }
+  }
+
+  let changed = 0
+  const replacements: WordDiff['replacements'] = []
+  let i = 0
+  let j = 0
+  let del: string[] = []
+  let ins: string[] = []
+  const flush = () => {
+    if (del.length || ins.length) {
+      changed += Math.max(del.length, ins.length)
+      if (del.length >= 1 && del.length <= 3 && ins.length >= 1 && ins.length <= 3) {
+        replacements.push({ heard: del.join(' '), fixed: ins.join(' ') })
+      }
+    }
+    del = []
+    ins = []
+  }
+  while (i < n || j < m) {
+    if (i < n && j < m && a[i] === b[j]) {
+      flush()
+      i++
+      j++
+    } else if (j < m && (i >= n || dp[i][j + 1] >= dp[i + 1][j])) {
+      ins.push(b[j++])
+    } else {
+      del.push(a[i++])
+    }
+  }
+  flush()
+  return { changed, replacements }
+}
+
+/** Velké písmeno na začátku, jedna mezera, žádná mezera před interpunkcí. */
+export function tidy(text: string): string {
+  const t = text
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ +([,.;:!?…])/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  if (!t) return t
+  return t.charAt(0).toLocaleUpperCase('cs') + t.slice(1)
+}
+
+/** Čistá vycpávková slova. „jako“, „prostě“ nebo „no“ sem nepatří — mívají význam. */
+const FILLERS = new Set(['ehm', 'ehmm', 'eh', 'ehh', 'ee', 'eee', 'eeee', 'éé', 'ééé', 'hm', 'hmm', 'hmmm', 'mhm', 'mmm', 'uhm', 'um', 'uh'])
+
+export function isFiller(word: string): boolean {
+  return FILLERS.has(word.toLocaleLowerCase('cs'))
+}
+
+/** Odstraní vycpávková slova (i s čárkou za nimi) a srovná mezery. */
+export function stripFillers(text: string): { text: string; removed: number } {
+  let removed = 0
+  const out = text.replace(/[\p{L}]+(?:[,]?)(?=\s|$)/gu, (match) => {
+    const bare = match.replace(/,$/, '')
+    if (isFiller(bare)) {
+      removed++
+      return ''
+    }
+    return match
+  })
+  return { text: tidy(out), removed }
+}

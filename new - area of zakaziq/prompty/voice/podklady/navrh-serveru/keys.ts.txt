@@ -1,0 +1,52 @@
+import 'server-only'
+import { createHmac, timingSafeEqual } from 'crypto'
+import { randomToken } from '@/lib/agent-keys'
+
+/**
+ * ZakazIQ Voice (R-148): klíč zařízení (Macu).
+ *
+ * `zk_voice_<prefix>_<tajemství>` umí jen poslat diktát, zpětnou vazbu a číst
+ * slovník a statistiky diktování — nic jiného v adminu. Ukáže se jednou při
+ * vytvoření, na Macu leží v Klíčence. V DB je jen prefix a HMAC-SHA256 s pepřem
+ * `AGENT_KEY_PEPPER`; podpis má vlastní doménu `voice:`, takže klíč projektu
+ * a klíč zařízení nikdy nedají stejný otisk. Bez pepře nejde klíč vytvořit
+ * ani ověřit (selže zavřeně).
+ */
+
+const KEY_PREFIX = 'zk_voice_'
+const KEY_RE = /^zk_voice_([A-Za-z0-9]{10})_([A-Za-z0-9]{32})$/
+
+export class VoiceKeyConfigError extends Error {
+  constructor() {
+    super('Chybí AGENT_KEY_PEPPER (min. 32 znaků) — klíč zařízení nejde vytvořit ani ověřit.')
+  }
+}
+
+function pepper(): string {
+  const value = process.env.AGENT_KEY_PEPPER ?? ''
+  if (value.length < 32) throw new VoiceKeyConfigError()
+  return value
+}
+
+export const isVoiceKeyConfigured = (): boolean => (process.env.AGENT_KEY_PEPPER ?? '').length >= 32
+
+export function hashVoiceKey(key: string): string {
+  return createHmac('sha256', pepper()).update(`voice:${key}`).digest('hex')
+}
+
+export function generateVoiceKey(): { key: string; prefix: string; hash: string } {
+  const prefix = randomToken(10)
+  const key = `${KEY_PREFIX}${prefix}_${randomToken(32)}`
+  return { key, prefix, hash: hashVoiceKey(key) }
+}
+
+export const voiceKeyPrefixOf = (key: string): string | null => KEY_RE.exec(key)?.[1] ?? null
+
+export function voiceKeyMatches(key: string, storedHash: string): boolean {
+  if (!/^[0-9a-f]{64}$/.test(storedHash)) return false
+  const a = Buffer.from(hashVoiceKey(key), 'hex')
+  const b = Buffer.from(storedHash, 'hex')
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+export const maskVoiceKey = (prefix: string): string => `${KEY_PREFIX}${prefix.slice(0, 4)}…`

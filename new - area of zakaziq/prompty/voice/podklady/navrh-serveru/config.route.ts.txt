@@ -1,0 +1,33 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authorizeVoiceDevice } from '@/lib/admin/voice/http'
+import { loadVoiceSummaryForMac } from '@/lib/admin/voice/queries'
+import { listTerms, loadSettings } from '@/lib/admin/voice/store'
+
+// ZakazIQ Voice (R-148): co potřebuje okno aplikace na Macu — slovník,
+// zkratky, styl podle kategorie a krátký přehled (dnes, týden, série).
+// Slouží i jako „Vyzkoušet připojení“.
+
+export const dynamic = 'force-dynamic'
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const auth = await authorizeVoiceDevice(req, 'config')
+  if (!auth.ok) return auth.res
+
+  const [terms, settings, summary] = await Promise.all([listTerms(), loadSettings(), loadVoiceSummaryForMac()])
+  return NextResponse.json(
+    {
+      ok: true,
+      device: { name: auth.device.name },
+      terms: terms
+        .filter((t) => t.kind === 'term')
+        .map((t) => ({ id: t.id, term: t.term, heardAs: t.heardAs, source: t.source, uses: t.uses })),
+      snippets: terms
+        .filter((t) => t.kind === 'snippet')
+        .map((t) => ({ id: t.id, trigger: t.term, expansion: t.expansion ?? '', uses: t.uses })),
+      styles: settings.styles,
+      cleanupEnabled: settings.cleanupEnabled,
+      summary,
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
+}

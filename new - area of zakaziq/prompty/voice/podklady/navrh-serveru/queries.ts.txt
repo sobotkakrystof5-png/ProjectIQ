@@ -1,0 +1,281 @@
+import 'server-only'
+import { adminDb, q } from '@/lib/admin/db'
+import { getPragueTodayISO } from '@/lib/prague-time'
+import { VOICE_CATEGORIES, type VoiceCategory } from './categories'
+import { addDays, editRate, fillDays, savedMinutes, streaks, wpm, type DayRow } from './stats'
+import { parseSettings, type VoiceSettings } from './store'
+
+/**
+ * ZakazIQ Voice (R-148): dotazy pro stránku v adminu, kartu na Dnes a přehled
+ * v aplikaci na Macu. Celá obrazovka je jedna dávka (R-092). Podmínky jsou nad
+ * okamžikem (`started_at >= …`), pražský den se počítá až v SELECTu (R-093).
+ */
+
+// Do slov se počítají jen diktáty se stavem ok, raw a snippet (zrušené, prázdné a chybové ne).
+
+type DayDb = { day: string; words: number; ms: string | number; n: number; edits: number; fixes: number; cost: number | string }
+
+const toDayRow = (r: DayDb): DayRow => ({
+  day: r.day,
+  words: Number(r.words),
+  ms: Number(r.ms),
+  dictations: Number(r.n),
+  userEdits: Number(r.edits),
+  fixes: Number(r.fixes),
+  costUsd: Number(r.cost),
+})
+
+const dailySql = (since: string) =>
+  q`
+    SELECT to_char((started_at AT TIME ZONE 'Europe/Prague')::date, 'YYYY-MM-DD') AS day,
+           sum(words)::int AS words,
+           sum(coalesce(speech_ms, duration_ms))::bigint AS ms,
+           count(*)::int AS n,
+           sum(user_edits)::int AS edits,
+           sum(words_corrected + dictionary_fixes)::int AS fixes,
+           coalesce(sum(cost_usd), 0)::float8 AS cost
+    FROM voice_dictations
+    WHERE started_at >= (${since}::date::timestamp AT TIME ZONE 'Europe/Prague') AND status IN ('ok', 'raw', 'snippet')
+    GROUP BY 1 ORDER BY 1
+  `
+
+export interface VoiceToday {
+  today: number
+  yesterday: number
+  streak: number
+}
+
+/** Karta na Dnes: dnešní a včerejší slova a série. Bez tabulky (migrace 136) = null. */
+export async function loadVoiceToday(): Promise<VoiceToday | null> {
+  const today = getPragueTodayISO()
+  try {
+    const [dayRows, activeRows] = await adminDb.batch([
+      dailySql(addDays(today, -1)),
+      q`
+        SELECT DISTINCT to_char((started_at AT TIME ZONE 'Europe/Prague')::date, 'YYYY-MM-DD') AS day
+        FROM voice_dictations
+        WHERE started_at >= now() - interval '400 days' AND words > 0 AND status IN ('ok', 'raw', 'snippet')
+      `,
+    ])
+    const days = (dayRows as DayDb[]).map(toDayRow)
+    const active = (activeRows as { day: string }[]).map((r) => r.day)
+    if (!active.length) return null
+    return {
+      today: days.find((d) => d.day === today)?.words ?? 0,
+      yesterday: days.find((d) => d.day === addDays(today, -1))?.words ?? 0,
+      streak: streaks(active, today).current,
+    }
+  } catch {
+    // Migrace 136 ještě neproběhla — Dnes se kvůli tomu nesmí rozbít.
+    return null
+  }
+}
+
+export interface VoiceOverview {
+  today: string
+  settings: VoiceSettings
+  /** Posledních 30 dní pro graf slov po dnech. */
+  last30: DayRow[]
+  /** 26 týdnů pro heatmapu. */
+  heatmap: DayRow[]
+  totals: { words: number; ms: number; dictations: number }
+  month: { words: number; ms: number; saved: number; costUsd: number; wpm: number | null }
+  week: { words: number }
+  streak: { current: number; longest: number }
+  categories: { category: VoiceCategory; words: number }[]
+  apps: { name: string; words: number; dictations: number }[]
+  hours: number[]
+  statuses: Record<string, number>
+  guards: { code: string; count: number }[]
+  latency: { p50: number | null; p95: number | null }
+  editRates: { week: string; rate: number | null; words: number }[]
+}
+
+export const HEATMAP_DAYS = 26 * 7
+
+export async function loadVoiceOverview(): Promise<VoiceOverview> {
+  const today = getPragueTodayISO()
+  const from30 = addDays(today, -29)
+  const fromHeat = addDays(today, -(HEATMAP_DAYS - 1))
+
+  const [settingsRows, dayRows, activeRows, totalRows, catRows, appRows, hourRows, statusRows, guardRows, latRows, weekRows] =
+    await adminDb.batch([
+      q`SELECT key, value FROM voice_settings`,
+      dailySql(fromHeat),
+      q`
+        SELECT DISTINCT to_char((started_at AT TIME ZONE 'Europe/Prague')::date, 'YYYY-MM-DD') AS day
+        FROM voice_dictations WHERE words > 0 AND status IN ('ok', 'raw', 'snippet')
+      `,
+      q`
+        SELECT coalesce(sum(words), 0)::int AS words, coalesce(sum(coalesce(speech_ms, duration_ms)), 0)::bigint AS ms,
+               count(*)::int AS n
+        FROM voice_dictations WHERE status IN ('ok', 'raw', 'snippet')
+      `,
+      q`
+        SELECT category, sum(words)::int AS words FROM voice_dictations
+        WHERE started_at >= (${from30}::date::timestamp AT TIME ZONE 'Europe/Prague') AND status IN ('ok', 'raw', 'snippet')
+        GROUP BY category ORDER BY words DESC
+      `,
+      q`
+        SELECT coalesce(app_name, app_bundle_id, 'Neznámá aplikace') AS name, sum(words)::int AS words, count(*)::int AS n
+        FROM voice_dictations
+        WHERE started_at >= (${from30}::date::timestamp AT TIME ZONE 'Europe/Prague') AND status IN ('ok', 'raw', 'snippet')
+        GROUP BY 1 ORDER BY words DESC LIMIT 8
+      `,
+      q`
+        SELECT extract(hour FROM started_at AT TIME ZONE 'Europe/Prague')::int AS h, sum(words)::int AS words
+        FROM voice_dictations
+        WHERE started_at >= (${from30}::date::timestamp AT TIME ZONE 'Europe/Prague') AND status IN ('ok', 'raw', 'snippet')
+        GROUP BY 1
+      `,
+      q`
+        SELECT status, count(*)::int AS n FROM voice_dictations
+        WHERE started_at >= (${from30}::date::timestamp AT TIME ZONE 'Europe/Prague')
+        GROUP BY status
+      `,
+      q`
+        SELECT g AS code, count(*)::int AS n
+        FROM voice_dictations, unnest(guards) AS g
+        WHERE started_at >= (${from30}::date::timestamp AT TIME ZONE 'Europe/Prague')
+        GROUP BY g ORDER BY n DESC
+      `,
+      q`
+        SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY total_ms)::float8 AS p50,
+               percentile_cont(0.95) WITHIN GROUP (ORDER BY total_ms)::float8 AS p95
+        FROM voice_dictations
+        WHERE started_at >= (${from30}::date::timestamp AT TIME ZONE 'Europe/Prague') AND total_ms IS NOT NULL
+          AND status IN ('ok', 'raw', 'snippet')
+      `,
+      q`
+        SELECT to_char(date_trunc('week', started_at AT TIME ZONE 'Europe/Prague'), 'YYYY-MM-DD') AS week,
+               sum(user_edits)::int AS edits, sum(words)::int AS words
+        FROM voice_dictations
+        WHERE started_at >= now() - interval '84 days' AND status IN ('ok', 'raw')
+        GROUP BY 1 ORDER BY 1
+      `,
+    ])
+
+  const settings = parseSettings(settingsRows as { key: string; value: unknown }[])
+  const heatmap = fillDays((dayRows as DayDb[]).map(toDayRow), fromHeat, today)
+  const last30 = heatmap.filter((d) => d.day >= from30)
+  const monthWords = last30.reduce((s, d) => s + d.words, 0)
+  const monthMs = last30.reduce((s, d) => s + d.ms, 0)
+  const total = (totalRows as { words: number; ms: string | number; n: number }[])[0]
+  const hours = Array.from({ length: 24 }, () => 0)
+  for (const r of hourRows as { h: number; words: number }[]) hours[Number(r.h)] = Number(r.words)
+  const lat = (latRows as { p50: number | null; p95: number | null }[])[0]
+
+  return {
+    today,
+    settings,
+    last30,
+    heatmap,
+    totals: { words: Number(total?.words ?? 0), ms: Number(total?.ms ?? 0), dictations: Number(total?.n ?? 0) },
+    month: {
+      words: monthWords,
+      ms: monthMs,
+      saved: savedMinutes(monthWords, monthMs, settings.typingWpm),
+      costUsd: last30.reduce((s, d) => s + d.costUsd, 0),
+      wpm: wpm(monthWords, monthMs),
+    },
+    week: { words: heatmap.filter((d) => d.day > addDays(today, -7)).reduce((s, d) => s + d.words, 0) },
+    streak: streaks((activeRows as { day: string }[]).map((r) => r.day), today),
+    categories: (catRows as { category: string; words: number }[])
+      .filter((r) => (VOICE_CATEGORIES as readonly string[]).includes(r.category))
+      .map((r) => ({ category: r.category as VoiceCategory, words: Number(r.words) })),
+    apps: (appRows as { name: string; words: number; n: number }[]).map((r) => ({
+      name: r.name,
+      words: Number(r.words),
+      dictations: Number(r.n),
+    })),
+    hours,
+    statuses: Object.fromEntries((statusRows as { status: string; n: number }[]).map((r) => [r.status, Number(r.n)])),
+    guards: (guardRows as { code: string; n: number }[]).map((r) => ({ code: r.code, count: Number(r.n) })),
+    latency: {
+      p50: lat?.p50 === null || lat?.p50 === undefined ? null : Math.round(Number(lat.p50)),
+      p95: lat?.p95 === null || lat?.p95 === undefined ? null : Math.round(Number(lat.p95)),
+    },
+    editRates: (weekRows as { week: string; edits: number; words: number }[]).map((r) => ({
+      week: r.week,
+      rate: editRate(Number(r.edits), Number(r.words)),
+      words: Number(r.words),
+    })),
+  }
+}
+
+export interface RecentDictation {
+  id: string
+  startedAt: string
+  appName: string | null
+  category: VoiceCategory
+  status: string
+  guards: string[]
+  words: number
+  rawText: string | null
+  finalText: string | null
+  editedText: string | null
+  userEdits: number
+  totalMs: number | null
+}
+
+export async function loadRecentDictations(limit = 40): Promise<RecentDictation[]> {
+  const rows = await adminDb<{
+    id: string
+    started_at: Date | string
+    app_name: string | null
+    app_bundle_id: string | null
+    category: VoiceCategory
+    status: string
+    guards: string[] | null
+    words: number
+    raw_text: string | null
+    final_text: string | null
+    edited_text: string | null
+    user_edits: number
+    total_ms: number | null
+  }>`
+    SELECT id, started_at, app_name, app_bundle_id, category, status, guards, words, raw_text, final_text,
+           edited_text, user_edits, total_ms
+    FROM voice_dictations
+    WHERE status <> 'cancelled'
+    ORDER BY started_at DESC LIMIT ${limit}
+  `
+  return rows.map((r) => ({
+    id: r.id,
+    startedAt: new Date(r.started_at).toISOString(),
+    appName: r.app_name ?? r.app_bundle_id,
+    category: r.category,
+    status: r.status,
+    guards: r.guards ?? [],
+    words: Number(r.words),
+    rawText: r.raw_text,
+    finalText: r.final_text,
+    editedText: r.edited_text,
+    userEdits: Number(r.user_edits),
+    totalMs: r.total_ms === null ? null : Number(r.total_ms),
+  }))
+}
+
+/** Krátký přehled pro aplikaci na Macu (okno Domů). */
+export async function loadVoiceSummaryForMac(): Promise<{
+  today: number
+  week: number
+  month: number
+  wpm: number | null
+  streak: number
+  longestStreak: number
+  savedMinutesMonth: number
+  last7: { day: string; words: number }[]
+}> {
+  const o = await loadVoiceOverview()
+  return {
+    today: o.last30.find((d) => d.day === o.today)?.words ?? 0,
+    week: o.week.words,
+    month: o.month.words,
+    wpm: o.month.wpm,
+    streak: o.streak.current,
+    longestStreak: o.streak.longest,
+    savedMinutesMonth: o.month.saved,
+    last7: o.last30.slice(-7).map((d) => ({ day: d.day, words: d.words })),
+  }
+}

@@ -1,0 +1,26 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { readJsonLimited } from '@/lib/security/request-body'
+import { authorizeVoiceDevice, feedbackSchema, voiceFail } from '@/lib/admin/voice/http'
+import { recordFeedback } from '@/lib/admin/voice/store'
+
+// ZakazIQ Voice (R-148): oprava po vložení. Mac pošle, jak vložený úsek
+// vypadá chvíli po vložení; server spočítá rozdíl po slovech a uloží opravy,
+// ze kterých se učí slovník. Jen jednou na diktát a jen pro vlastní diktát.
+
+export const dynamic = 'force-dynamic'
+
+const MAX_BODY_BYTES = 96 * 1024
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const auth = await authorizeVoiceDevice(req, 'feedback')
+  if (!auth.ok) return auth.res
+
+  const body = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!body.ok) return body.reason === 'too-large' ? voiceFail(413, 'TOO_LARGE') : voiceFail(400, 'INVALID_BODY')
+  const parsed = feedbackSchema.safeParse(body.value)
+  if (!parsed.success) return voiceFail(400, 'INVALID_BODY')
+
+  const res = await recordFeedback(parsed.data.id, auth.device.id, parsed.data.editedText)
+  if (!res.ok) return voiceFail(404, 'NOT_FOUND')
+  return NextResponse.json({ ok: true, changed: res.changed, learned: res.pairs })
+}

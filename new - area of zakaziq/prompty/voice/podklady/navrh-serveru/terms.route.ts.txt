@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { readJsonLimited } from '@/lib/security/request-body'
+import { authorizeVoiceDevice, termInputSchema, voiceFail } from '@/lib/admin/voice/http'
+import { deleteTerm, upsertTerm } from '@/lib/admin/voice/store'
+
+// ZakazIQ Voice (R-148): slovník a zkratky z okna aplikace na Macu.
+// Totéž jde v adminu na /dashboard/voice?tab=slovnik.
+
+export const dynamic = 'force-dynamic'
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const auth = await authorizeVoiceDevice(req, 'write')
+  if (!auth.ok) return auth.res
+  const body = await readJsonLimited(req, 8 * 1024)
+  if (!body.ok) return voiceFail(400, 'INVALID_BODY')
+  const parsed = termInputSchema.safeParse(body.value)
+  if (!parsed.success) return voiceFail(400, 'INVALID_BODY')
+  const t = parsed.data
+  await upsertTerm({
+    kind: t.kind,
+    term: t.term,
+    heardAs: t.heardAs,
+    expansion: t.kind === 'snippet' ? (t.expansion ?? null) : null,
+    source: 'manual',
+  })
+  return NextResponse.json({ ok: true })
+}
+
+export async function DELETE(req: NextRequest): Promise<NextResponse> {
+  const auth = await authorizeVoiceDevice(req, 'write')
+  if (!auth.ok) return auth.res
+  const id = z.string().uuid().safeParse(req.nextUrl.searchParams.get('id'))
+  if (!id.success) return voiceFail(400, 'INVALID_ID')
+  await deleteTerm(id.data)
+  return NextResponse.json({ ok: true })
+}

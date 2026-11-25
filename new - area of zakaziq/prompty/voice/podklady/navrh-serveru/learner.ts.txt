@@ -1,0 +1,373 @@
+import 'server-only'
+import Anthropic from '@anthropic-ai/sdk'
+import { z } from 'zod'
+import { adminDb, q } from '@/lib/admin/db'
+import { aiModel, isAiConfigured } from '@/lib/ai/models'
+import { redactSensitive } from '@/lib/project-activity'
+import {
+  blockDedupeKey,
+  deriveBlockSuggestions,
+  deriveTermSuggestions,
+  ruleDedupeKey,
+  termDedupeKey,
+  type CorrectionPair,
+} from './learn'
+import { addRule, loadSettings, purgeVoiceText, upsertTerm } from './store'
+
+/**
+ * ZakazIQ Voice (R-148): běh učení nad logy.
+ *
+ * Volá se jednou denně z cronu `send-reminders` (R-006: jeden běh denně)
+ * a tlačítkem „Projít logy teď“ v adminu. Pravidlová část je levná a běží
+ * vždy; AI rozbor (role `smart`) jen na tlačítko nebo jednou týdně a jen
+ * když je z čeho se učit.
+ */
+
+export interface LearningResult {
+  termSuggestions: number
+  termsLearned: number
+  blockSuggestions: number
+  aiSuggestions: number
+  aiSkipped: string | null
+  purged: number
+}
+
+type PairDb = { heard: string; fixed: string; n: number; examples: string[] }
+
+async function insertSuggestion(input: {
+  kind: 'term' | 'blocklist' | 'rule'
+  payload: unknown
+  evidence: number
+  examples: string[]
+  reason: string | null
+  source: 'rules' | 'ai'
+  dedupeKey: string
+  status?: 'pending' | 'accepted'
+}): Promise<boolean> {
+  // Zamítnutý návrh se nevrací: dedupe_key je unikátní a konflikt nic nezmění,
+  // jen u čekajícího návrhu aktualizuje počet výskytů.
+  const rows = await adminDb`
+    INSERT INTO voice_suggestions (kind, payload, evidence, examples, reason, source, dedupe_key, status, decided_at)
+    VALUES (${input.kind}, ${JSON.stringify(input.payload)}::jsonb, ${input.evidence}, ${input.examples}::uuid[],
+            ${input.reason}, ${input.source}, ${input.dedupeKey}, ${input.status ?? 'pending'},
+            ${input.status === 'accepted' ? new Date().toISOString() : null})
+    ON CONFLICT (dedupe_key) DO UPDATE SET
+      evidence = GREATEST(voice_suggestions.evidence, EXCLUDED.evidence),
+      examples = EXCLUDED.examples
+    WHERE voice_suggestions.status = 'pending'
+    RETURNING (xmax = 0) AS inserted
+  `
+  return Boolean((rows[0] as { inserted?: boolean } | undefined)?.inserted)
+}
+
+/** Pravidlová část: opravy → slovník, opakované krátké texty → blokované fráze. */
+export async function learnFromRules(): Promise<Pick<LearningResult, 'termSuggestions' | 'termsLearned' | 'blockSuggestions'>> {
+  const settings = await loadSettings()
+  const [pairRows, termRows, ruleRows, textRows, decidedRows] = await adminDb.batch([
+    q`
+      SELECT c.heard, c.fixed, count(*)::int AS n, (array_agg(c.dictation_id ORDER BY c.created_at DESC))[1:5]::text[] AS examples
+      FROM voice_corrections c
+      WHERE c.created_at > now() - interval '90 days'
+      GROUP BY c.heard, c.fixed HAVING count(*) >= 2
+      ORDER BY n DESC LIMIT 200
+    `,
+    q`SELECT term, heard_as FROM voice_terms WHERE kind = 'term'`,
+    q`SELECT text FROM voice_rules WHERE kind = 'blocklist'`,
+    q`
+      SELECT id, final_text, edited_text, speech_ms, duration_ms FROM voice_dictations
+      WHERE created_at > now() - interval '30 days' AND final_text IS NOT NULL AND words BETWEEN 2 AND 8
+      ORDER BY created_at DESC LIMIT 1000
+    `,
+    q`SELECT dedupe_key FROM voice_suggestions WHERE status <> 'pending'`,
+  ])
+  const decided = new Set((decidedRows as { dedupe_key: string }[]).map((r) => r.dedupe_key))
+
+  const pairs: CorrectionPair[] = (pairRows as PairDb[]).map((r) => ({
+    heard: r.heard,
+    fixed: r.fixed,
+    count: Number(r.n),
+    examples: r.examples ?? [],
+  }))
+  const terms = deriveTermSuggestions(
+    pairs,
+    (termRows as { term: string; heard_as: string[] | null }[]).map((t) => ({ term: t.term, heardAs: t.heard_as ?? [] })),
+    settings.autoLearnTerms,
+  ).filter((s) => !decided.has(s.dedupeKey))
+
+  let termSuggestions = 0
+  let termsLearned = 0
+  for (const s of terms) {
+    if (s.autoAccept) {
+      await upsertTerm({ kind: 'term', term: s.term, heardAs: s.heardAs, expansion: null, source: 'learned' })
+      await insertSuggestion({
+        kind: 'term',
+        payload: { term: s.term, heardAs: s.heardAs },
+        evidence: s.evidence,
+        examples: s.examples,
+        reason: `Opravil jste to ${s.evidence}×, naučeno samo.`,
+        source: 'rules',
+        dedupeKey: s.dedupeKey,
+        status: 'accepted',
+      })
+      termsLearned++
+    } else if (
+      await insertSuggestion({
+        kind: 'term',
+        payload: { term: s.term, heardAs: s.heardAs },
+        evidence: s.evidence,
+        examples: s.examples,
+        reason: `Opravil jste to ${s.evidence}×.`,
+        source: 'rules',
+        dedupeKey: s.dedupeKey,
+      })
+    ) {
+      termSuggestions++
+    }
+  }
+
+  const blocks = deriveBlockSuggestions(
+    (textRows as { id: string; final_text: string | null; edited_text: string | null; speech_ms: number | null; duration_ms: number }[]).map(
+      (r) => ({
+        id: r.id,
+        finalText: r.final_text,
+        editedText: r.edited_text,
+        speechMs: r.speech_ms === null ? null : Number(r.speech_ms),
+        durationMs: Number(r.duration_ms),
+      }),
+    ),
+    (ruleRows as { text: string }[]).map((r) => r.text),
+  ).filter((b) => !decided.has(b.dedupeKey))
+
+  let blockSuggestions = 0
+  for (const b of blocks) {
+    if (
+      await insertSuggestion({
+        kind: 'blocklist',
+        payload: { phrase: b.phrase, mode: 'alone' },
+        evidence: b.evidence,
+        examples: b.examples,
+        reason: b.reason,
+        source: 'rules',
+        dedupeKey: b.dedupeKey,
+      })
+    ) {
+      blockSuggestions++
+    }
+  }
+  return { termSuggestions, termsLearned, blockSuggestions }
+}
+
+// --- AI rozbor ----------------------------------------------------------------
+
+/** Kolik diktátů s opravou musí přibýt, aby měl AI rozbor smysl. */
+export const AI_MIN_SAMPLES = 8
+
+const aiOutputSchema = z.object({
+  rules: z
+    .array(z.object({ text: z.string().trim().min(4).max(200), reason: z.string().trim().max(240), examples: z.array(z.string()).max(5) }))
+    .max(5)
+    .default([]),
+  terms: z
+    .array(
+      z.object({
+        term: z.string().trim().min(2).max(60),
+        heard_as: z.array(z.string().trim().min(1).max(60)).max(5),
+        reason: z.string().trim().max(240),
+        examples: z.array(z.string()).max(5),
+      }),
+    )
+    .max(10)
+    .default([]),
+})
+
+const AI_SYSTEM = [
+  'Analyzuješ log diktování jednoho uživatele (čeština). Každý záznam má id, přepis řeči (prepis),',
+  'text po automatickém učesání (vlozeno) a text po ruční opravě uživatelem (opraveno).',
+  'Najdi OPAKOVANÉ vzorce v tom, co uživatel opravuje, a navrhni:',
+  '- terms: slova nebo jména, která přepis opakovaně píše špatně (term = správný tvar, heard_as = jak ho přepis píše),',
+  '- rules: krátká pravidla stylu pro učesání textu, která by opravám předešla (např. „Částky piš jako 25 000 Kč.“).',
+  'Navrhuj jen to, co je doložené aspoň dvěma záznamy; examples = id těch záznamů. Nic nevymýšlej.',
+  'Pravidlo nesmí měnit význam textu, přidávat obsah ani žádat odpovědi na otázky.',
+  'Odpověz jen JSON mezi <json> a </json> ve tvaru {"rules":[{"text","reason","examples"}],"terms":[{"term","heard_as","reason","examples"}]}.',
+].join('\n')
+
+export async function learnWithAi(): Promise<{ added: number; skipped: string | null }> {
+  if (!isAiConfigured()) return { added: 0, skipped: 'AI není nastavená.' }
+  const rows = await adminDb<{ id: string; raw_text: string | null; final_text: string | null; edited_text: string | null }>`
+    SELECT id, raw_text, final_text, edited_text FROM voice_dictations
+    WHERE created_at > now() - interval '30 days' AND edited_text IS NOT NULL AND user_edits > 0
+      AND final_text IS NOT NULL
+    ORDER BY created_at DESC LIMIT 40
+  `
+  if (rows.length < AI_MIN_SAMPLES) {
+    return { added: 0, skipped: `Málo oprav k rozboru (${rows.length} z potřebných ${AI_MIN_SAMPLES}).` }
+  }
+  const ids = new Set(rows.map((r) => r.id))
+  const clip = (s: string | null) => redactSensitive((s ?? '').slice(0, 1200)).text
+  const log = rows
+    .map((r) => JSON.stringify({ id: r.id, prepis: clip(r.raw_text), vlozeno: clip(r.final_text), opraveno: clip(r.edited_text) }))
+    .join('\n')
+
+  let parsed: z.infer<typeof aiOutputSchema>
+  try {
+    const client = new Anthropic({ timeout: 45_000, maxRetries: 1 })
+    const res = await client.messages.create({
+      model: aiModel('smart'),
+      max_tokens: 2000,
+      temperature: 0,
+      system: AI_SYSTEM,
+      messages: [{ role: 'user', content: `<log>\n${log}\n</log>` }],
+    })
+    const raw = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
+    const m = /<json>([\s\S]*?)<\/json>/i.exec(raw)
+    const json: unknown = m ? JSON.parse(m[1]) : null
+    const out = aiOutputSchema.safeParse(json)
+    if (!out.success) return { added: 0, skipped: 'Odpověď AI neměla správný tvar.' }
+    parsed = out.data
+  } catch (err) {
+    console.error('[voice/learn] AI rozbor selhal:', err instanceof Error ? err.name : 'unknown')
+    return { added: 0, skipped: 'AI rozbor se nepovedl.' }
+  }
+
+  // Jen doložené návrhy: příklady musí být skutečná id z logu, aspoň dvě.
+  const proven = (examples: string[]) => {
+    const real = [...new Set(examples)].filter((id) => ids.has(id))
+    return real.length >= 2 ? real : null
+  }
+  let added = 0
+  for (const r of parsed.rules) {
+    const examples = proven(r.examples)
+    if (!examples) continue
+    const text = redactSensitive(r.text).text
+    if (
+      await insertSuggestion({
+        kind: 'rule',
+        payload: { text },
+        evidence: examples.length,
+        examples,
+        reason: r.reason.slice(0, 300) || null,
+        source: 'ai',
+        dedupeKey: ruleDedupeKey(text),
+      })
+    ) {
+      added++
+    }
+  }
+  for (const t of parsed.terms) {
+    const examples = proven(t.examples)
+    if (!examples) continue
+    const heard = t.heard_as[0] ?? t.term
+    if (
+      await insertSuggestion({
+        kind: 'term',
+        payload: { term: t.term, heardAs: t.heard_as },
+        evidence: examples.length,
+        examples,
+        reason: t.reason.slice(0, 300) || null,
+        source: 'ai',
+        dedupeKey: termDedupeKey(heard, t.term),
+      })
+    ) {
+      added++
+    }
+  }
+  return { added, skipped: null }
+}
+
+/** Denní údržba z cronu: úklid textu podle retence, učení z pravidel, v pondělí AI rozbor. */
+export async function runDailyVoiceMaintenance(now = new Date()): Promise<LearningResult | null> {
+  try {
+    const settings = await loadSettings()
+    const purged = await purgeVoiceText(settings.textRetentionDays)
+    const rules = await learnFromRules()
+    const monday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Europe/Prague' }).format(now) === 'Mon'
+    const ai = monday ? await learnWithAi() : { added: 0, skipped: 'AI rozbor běží v pondělí.' }
+    return { ...rules, aiSuggestions: ai.added, aiSkipped: ai.skipped, purged }
+  } catch (err) {
+    // Migrace 136 ještě neproběhla nebo DB nejede — ostatní úlohy cronu musí doběhnout.
+    console.error('[voice] denní údržba selhala:', err instanceof Error ? err.name : 'unknown')
+    return null
+  }
+}
+
+/** Tlačítko „Projít logy teď“: pravidla i AI hned. */
+export async function runLearningNow(): Promise<LearningResult> {
+  const rules = await learnFromRules()
+  const ai = await learnWithAi()
+  return { ...rules, aiSuggestions: ai.added, aiSkipped: ai.skipped, purged: 0 }
+}
+
+// --- Rozhodnutí o návrhu ------------------------------------------------------
+
+const termPayload = z.object({ term: z.string().min(1).max(80), heardAs: z.array(z.string().max(120)).max(10) })
+const blockPayload = z.object({ phrase: z.string().min(2).max(300), mode: z.enum(['always', 'alone']).default('alone') })
+const rulePayload = z.object({ text: z.string().min(2).max(300) })
+
+/** Přijmout = zapsat do slovníku / pravidel; zamítnout = už se nevrátí. */
+export async function decideSuggestion(id: string, accept: boolean): Promise<boolean> {
+  const rows = await adminDb<{ kind: 'term' | 'blocklist' | 'rule'; payload: unknown }>`
+    SELECT kind, payload FROM voice_suggestions WHERE id = ${id} AND status = 'pending'
+  `
+  const row = rows[0]
+  if (!row) return false
+  if (accept) {
+    if (row.kind === 'term') {
+      const p = termPayload.parse(row.payload)
+      await upsertTerm({ kind: 'term', term: p.term, heardAs: p.heardAs, expansion: null, source: 'learned' })
+    } else if (row.kind === 'blocklist') {
+      const p = blockPayload.parse(row.payload)
+      await addRule('blocklist', p.phrase, p.mode, 'learned')
+    } else {
+      const p = rulePayload.parse(row.payload)
+      await addRule('rule', p.text, 'alone', 'learned')
+    }
+  }
+  await adminDb`
+    UPDATE voice_suggestions SET status = ${accept ? 'accepted' : 'rejected'}, decided_at = now() WHERE id = ${id}
+  `
+  return true
+}
+
+export interface PendingSuggestion {
+  id: string
+  kind: 'term' | 'blocklist' | 'rule'
+  title: string
+  detail: string | null
+  evidence: number
+  reason: string | null
+  source: 'rules' | 'ai'
+  createdAt: string
+}
+
+export async function listPendingSuggestions(): Promise<PendingSuggestion[]> {
+  const rows = await adminDb<{
+    id: string
+    kind: 'term' | 'blocklist' | 'rule'
+    payload: Record<string, unknown>
+    evidence: number
+    reason: string | null
+    source: 'rules' | 'ai'
+    created_at: Date | string
+  }>`
+    SELECT id, kind, payload, evidence, reason, source, created_at FROM voice_suggestions
+    WHERE status = 'pending' ORDER BY evidence DESC, created_at DESC LIMIT 50
+  `
+  return rows.map((r) => {
+    const p = r.payload ?? {}
+    const heard = Array.isArray(p.heardAs) ? (p.heardAs as unknown[]).filter((x): x is string => typeof x === 'string') : []
+    const title =
+      r.kind === 'term' ? String(p.term ?? '') : r.kind === 'blocklist' ? String(p.phrase ?? '') : String(p.text ?? '')
+    return {
+      id: r.id,
+      kind: r.kind,
+      title,
+      detail: r.kind === 'term' && heard.length ? `přepis píše: ${heard.join(', ')}` : null,
+      evidence: Number(r.evidence),
+      reason: r.reason,
+      source: r.source,
+      createdAt: new Date(r.created_at).toISOString(),
+    }
+  })
+}
+
+export { blockDedupeKey }
