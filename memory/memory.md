@@ -5,7 +5,7 @@
 > **Poslední aktualizace:** 2026-11-25 · **Doručení pozvánek** (R-146): kalendář ukazuje, jestli pozvánka
 > na schůzku klientovi dorazila, nebo se vrátila, podle webhooku Resendu `/api/resend/vizeon` (migrace 135).
 > Nedoručená pozvánka na nadcházející schůzku založí upozornění a nabídne „Poslat e-mail znovu".
-> **Na produkci od 2026-11-25 i s migrací 135**; dokud v Resendu není webhook a ve Vercelu
+> **Na produkci od 2026-11-25 (`40fff72`) i s migrací 135**; dokud v Resendu není webhook a ve Vercelu
 > `VIZEON_RESEND_WEBHOOK_SECRET`, vstup vrací 503 a kalendář ukazuje jen „odešla“.
 >
 > Předchozí: 2026-11-25 · **Schůzky z Wispr Flow zrušené** (R-145): na přání Kryštofa
@@ -2146,6 +2146,9 @@ v Resendu a pořadí nasazení: `docs/admin/AGENTS-ADMIN.md` → „Doručení p
 - **chore** Rozpracovaná práce z hlavní složky (nad `ab6ffc3`) přenesená na aktuální `main` do větve
   `admin/doruceni-pozvanek` a přečíslovaná R-144 → **R-146**, DECISIONS #052 → **#054** (obě čísla mezitím
   dostaly Schůzky z Wispr Flow). Kopie v hlavní složce zůstala necommitnutá, jde zahodit.
+- **chore** **Na produkci** 2026-11-25: fast-forward `main` `ccb1823` → `40fff72`. Ověřeno veřejně: `POST /api/resend/vizeon`
+  503 (tajemství zatím chybí), GET 405, `/api/public/schuzky` 404, `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200,
+  `/dashboard` a `/dashboard/calendar` 307; hodinu bez běhových chyb. Za přihlášením neověřeno.
 
 ### 2026-11-25 (zrušení Schůzek z Wispr Flow — R-145)
 - **refactor** Funkce Schůzky odstraněná: `app/dashboard/schuzky/`, `app/api/public/schuzky/`,
