@@ -8,72 +8,64 @@ se shrnutím. Přepis zůstává jen v ZakazIQ (`/dashboard/schuzky`).
 ## Jak data tečou
 
 ```
-Wispr Flow ──(konektor MCP)──▶ naplánovaná úloha Clauda (každou hodinu)
-                                  │  GET  /api/public/schuzky?ids=…   které už ZakazIQ má
-                                  │  POST /api/public/schuzky         nová schůzka + přepis
-                                  ▼
+Wispr Flow (aplikace na Macu)
+  ~/Library/Application Support/Wispr Flow/flow.sqlite          tabulka Meetings
+  ~/Library/Application Support/Wispr Flow/meetings/<id>/refined.ndjson   přepis po segmentech
+        │
+        ▼  scripts/wispr-local-most.mjs (LaunchAgent každou hodinu, bez modelu)
+           GET  /api/public/schuzky?ids=…   které už ZakazIQ má
+           POST /api/public/schuzky         nová schůzka + přepis slovo od slova
+        ▼
 ZakazIQ: meeting_notes ─after()─▶ jistá shoda klienta (e-mail účastníka, kalendář)
                                 ─▶ AI (smart): shrnutí, dohody, kroky, kandidát
                                 ─▶ koncept v Gmailu, když je klient jistý a má e-mail
                                 ─▶ zvonek „Přepis schůzky: …"
 ```
 
-Wispr Flow nemá API ani webhook a jeho konektor se přihlašuje jen v prohlížeči, takže ZakazIQ
-si data stáhnout neumí. Most je proto Claude s konektorem Wispr Flow. Kdyby úloha neběžela,
-přepis jde vložit ručně: Schůzky › Vložit přepis (ve Wispr Flow „Copy as Markdown").
+Wispr Flow nemá API ani webhook. Desktopová aplikace si ale drží celé přepisy na Macu, takže je
+skript čte přímo ze souborů a posílá je bez modelu — přepis dorazí přesně, jak ho Wispr Flow má.
+Most běží, jen když je Mac zapnutý; zmeškané schůzky dobere při dalším běhu (okno 30 dní).
+Kdyby neběžel, přepis jde vložit ručně: Schůzky › Vložit přepis (ve Wispr Flow „Copy as Markdown").
+
+**Proč ne naplánovaná úloha Clauda:** první verze mostu (2026-11-25) byla cloudová úloha s konektorem
+Wispr Flow, která měla přepis opsat do souboru. Opsání dlouhého textu zastavil bezpečnostní filtr
+modelu (blokuje dlouhé doslovné kopie), nedorazilo nic. Filtr se neobchází; úloha
+`trig_013Y7qZxCW55vP1K6THsPR55` a prostředí „ZakazIQ most Wispr" jsou vypnuté/nepoužívané.
+
+Co skript čte a posílá:
+- jen schůzky `finalized`, `transcriptReady`, nesmazané, nahrávka aspoň 1 minuta a přepis aspoň
+  300 znaků (prázdné záznamy a „pokus o spojení" vynechá);
+- přepis = řádky `refined.ndjson` jako „Mluvčí: text"; jméno mluvčího ze `speakerMap` (přiřazení
+  uživatelem › mikrofon › kalendář › odhad AI), jinak „Speaker N" jako konektor; text se nemění;
+- začátek z `calendarOccurrenceStartAtUtc` nebo `createdAt`, konec z `endedAt`, odkaz
+  `https://notes.wisprflow.ai/shared/<shareSlug>`, shrnutí Wispr Flow, účastníci = pojmenovaní mluvčí
+  (e-maily lokálně nejsou, takže jistá shoda podle e-mailu z mostu nenastane — klienta pozná kalendář
+  nebo ho potvrdí Kryštof);
+- databázi otevírá jen pro čtení (`sqlite3 -readonly`), nic v datech Wispr Flow nemění.
+
+Pozor: formát lokálních dat Wispr Flow není veřejné rozhraní a může se změnit s aktualizací
+aplikace. Pak skript schůzky vynechá nebo nahlásí chybu do záznamu — zkontrolovat
+`~/Library/Logs/zakaziq-wispr-most.log` a `node scripts/wispr-local-most.mjs --dry-run`.
 
 ## Nastavení (jednou)
 
-1. **Migrace 134** na produkčním Neonu (`migrations/134_schuzky_prepisy.sql`, aditivní).
-2. **Klíč mostu:** vygenerovat dlouhý náhodný řetězec (např. `openssl rand -hex 32`) a uložit do
-   Vercelu jako `MEETING_NOTES_API_KEY` (Production). Bez něj vstup odmítá všechno (401).
-3. **Gmail API** zapnout v Google Cloud projektu `zakaziq-admin` (APIs & Services → Enable APIs →
-   Gmail API). Pak v adminu **Profil → Google → Propojit znovu**: přibylo oprávnění
-   `gmail.compose` (jen koncepty, kód nic neodesílá). Bez toho schůzky fungují, jen koncept
-   nevznikne a detail řekne proč.
-4. **Naplánovaná úloha** na claude.ai/code (Routines) — **založená 2026-11-25:**
-   „Most Wispr Flow → ZakazIQ (schůzky)", `trig_013Y7qZxCW55vP1K6THsPR55`, každou hodinu v :17 UTC
-   (`17 * * * *`), model Sonnet 5.5, jen konektor **Wispr Flow**, repozitář ProjectIQ (kvůli
-   `scripts/wispr-most.mjs`), nástroje Bash, Read, Write, Glob, Grep a `mcp__Wispr-Flow`.
-   Správa: https://claude.ai/code/routines/trig_013Y7qZxCW55vP1K6THsPR55
-   - prostředí **„ZakazIQ most Wispr"** (`env_015BA5v9MaLnGvERWcuTKist`, cloud): síť *Limited*,
-     jediná povolená doména `www.zakaziq.cz`, správci balíčků vypnutí; *Network secret* pro
-     hostitele `www.zakaziq.cz`, hlavička `Authorization`, prefix `Bearer`, token = klíč z bodu 2.
-     Úloha klíč nevidí, proxy ho přidá sama. Do textu úlohy ani do proměnných prostředí nepatří.
-   - výměna klíče: nová hodnota ve Vercelu (`vercel env rm` + `vercel env add … --sensitive`),
-     redeploy a tatáž hodnota v Network secrets prostředí.
-
-## Text úlohy
-
-```
-Jsi most mezi Wispr Flow a ZakazIQ. Nic jiného nedělej, nic neměň v repozitáři (žádné úpravy souborů repa, žádný commit ani push). Pracuješ v kořeni repozitáře ProjectIQ. Klíč k ZakazIQ přidává k požadavkům na https://www.zakaziq.cz proxy prostředí sama — žádnou hlavičku Authorization ani klíč nepřidávej a nehledej.
-
-1. Spočítej datum před 3 dny: date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ
-   Přes konektor Wispr Flow zavolej search_meetings se sort "start" a since = to datum.
-   Ber jen schůzky, které jsou finalized, mají has_transcript a trvaly aspoň 1 minutu.
-   Když žádná taková není, napiš „Nové schůzky: 0“ a skonči.
-2. Zjisti, které už ZakazIQ má (nejvýš 100 id najednou, oddělená čárkou):
-   curl -sS "https://www.zakaziq.cz/api/public/schuzky?ids=<id1>,<id2>,…"
-   Pokračuj jen se schůzkami, které nejsou v poli "known". Když odpověď není success:true, napiš kód a text chyby a skonči.
-3. Pro každou novou schůzku:
-   a) get_meeting s view_transcript {start_char: 0, char_limit: 40000}. Dokud přepis končí
-      řádkem "(...truncated, N chars remaining; continue with view_transcript.start_char=X...)",
-      volej znovu se start_char = X.
-   b) Každý kus ulož nástrojem Write do /tmp/schuzky/<id>/casti/cast-<pořadí>.txt (1, 2, 3…) PŘESNĚ tak, jak přišel,
-      jen bez řádků <<<…>>> a bez řádku "(...truncated…)". Nic neopravuj, nezkracuj,
-      nepřekládej a neshrnuj, ani překlepy a vata. Na konec souboru nepřidávej prázdný řádek.
-   c) get_meeting_participants_enriched → účastníci.
-   d) Ulož /tmp/schuzky/<id>/meta.json: {"id", "title", "start", "end", "share_link",
-      "summary" (pole summary z get_meeting), "participants": [{"name","emails","spoke","role",
-      "self"}], "transcript_chars"}. transcript_chars = délka prvního kusu + N z jeho řádku
-      "chars remaining" (když první kus zkrácený nebyl, je to jeho délka). start a end jako ISO 8601 s časovou zónou (např. 2026-11-24T14:00:00Z).
-   e) node scripts/wispr-most.mjs --meta /tmp/schuzky/<id>/meta.json \
-        --parts /tmp/schuzky/<id>/casti --out /tmp/schuzky/<id>/telo.json
-   f) curl -sS -X POST https://www.zakaziq.cz/api/public/schuzky \
-        -H 'Content-Type: application/json' --data-binary @/tmp/schuzky/<id>/telo.json
-4. Na konci napiš jen: kolik schůzek bylo nových, kolik se odeslalo, u kterých odpověď
-   hlásila "complete": false, a chyby. Obsah schůzek (přepis, shrnutí, jména, e-maily) do výstupu nepiš.
-```
+1. **Migrace 134** na produkčním Neonu (`migrations/134_schuzky_prepisy.sql`, aditivní) — hotovo 2026-11-25.
+2. **Klíč mostu** `MEETING_NOTES_API_KEY`: stejná hodnota ve Vercelu (Production, sensitive) a v Klíčence
+   Macu (služba `zakaziq-meeting-notes`, účet `zakaziq`). Výměna jedním příkazem, hodnota se nikde nevypíše:
+   ```
+   KEY=$(openssl rand -hex 32) && security add-generic-password -U -a zakaziq -s zakaziq-meeting-notes -w "$KEY" \
+     && vercel env rm MEETING_NOTES_API_KEY production -y \
+     && printf '%s' "$KEY" | vercel env add MEETING_NOTES_API_KEY production --sensitive; unset KEY
+   ```
+   Pak nasadit znovu (nová hodnota platí až v dalším nasazení).
+3. **Gmail API** zapnuté v Google Cloud projektu „ZakazIQ admin" (2026-11-25). V adminu
+   **Profil → Google → Propojit znovu**: přibylo oprávnění `gmail.compose` (jen koncepty, kód nic
+   neodesílá). Bez toho schůzky fungují, jen koncept nevznikne a detail řekne proč.
+4. **Most na Macu:** `node scripts/wispr-local-most.mjs --install` zkopíruje skript do
+   `~/Library/Application Support/ZakazIQ/` (mimo repo, ať nezáleží na větvi a na ochraně Plochy)
+   a zapne LaunchAgent `cz.zakaziq.wispr-most` (každou hodinu a po přihlášení). Záznam
+   `~/Library/Logs/zakaziq-wispr-most.log`. Vypnutí `--uninstall`. Po změně skriptu v repu znovu `--install`.
+   Ručně: `--dry-run` (co by poslal, bez obsahu), `--days 90`, `--only <id>,<id>`.
 
 ## Co kde je
 
@@ -89,11 +81,12 @@ Jsi most mezi Wispr Flow a ZakazIQ. Nic jiného nedělej, nic neměň v repozit�
 | Obrazovky | `app/dashboard/schuzky/`, `components/admin/meeting-notes/`, blok Schůzky na kartě kontaktu |
 | Akce | `app/meeting-notes-actions.ts` |
 | Pojistky | `send-reminders` (dokončí nezpracované), `client-retention` (retence) |
-| Testy | `lib/__tests__/admin-schuzky-prepisy.test.ts` |
+| Most z Macu | `scripts/wispr-local-most.mjs` |
+| Testy | `lib/__tests__/admin-schuzky-prepisy.test.ts`, `lib/__tests__/wispr-local-most.test.ts` |
 
 ## Pravidla, která drží kód
 
-- **Přepis se nemění.** Uloží se, jak přišel (jen bez značek konektoru `<<<…>>>`), AI ho nepřepisuje.
+- **Přepis se nemění.** Uloží se, jak přišel (vstup jen odstraní případné značky konektoru `<<<…>>>`), AI ho nepřepisuje.
 - **Klienta z návrhu AI potvrzuje Kryštof.** Přepis je text, který mluvil klient (R-111). Sám se
   přiřadí jen jistý klient: e-mail účastníka z Wispr Flow, který má kontakt, nebo jediná událost
   v kalendáři ve stejný čas s kontaktem.

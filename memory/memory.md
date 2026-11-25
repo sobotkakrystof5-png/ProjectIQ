@@ -1651,6 +1651,10 @@ rovnou ve tvaru do e-mailu (já / vy), poznámky jen pro Kryštofa jdou do `inte
 nikdy. Mění R-114/R-116 v tom, že e-mail po schůzce nejde přes Resend, ale jako koncept do Gmailu.
 Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", nastavení a text úlohy
 `docs/admin/SCHUZKY-WISPR.md`, bezpečnost `.claude/security/DECISIONS.md` #052.
+**Upřesněno 2026-11-25:** bod (5) neplatí — naplánovaná úloha přepis nepřenesla (opsání dlouhého textu
+modelem zastavil bezpečnostní filtr). Most je skript na Macu `scripts/wispr-local-most.mjs`: čte lokální
+data aplikace Wispr Flow (`flow.sqlite`, `meetings/<id>/refined.ndjson`) a posílá bez modelu, LaunchAgent
+každou hodinu, klíč v Klíčence. Běží jen při zapnutém Macu; formát lokálních dat není veřejné rozhraní.
 
 ---
 
@@ -1662,9 +1666,11 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
   jen koncept nevznikne a detail ukáže proč — pak „Založit znovu"), (2) projít na 390 a 1280 px:
   seznam, potvrzení klienta, koncept v Gmailu, Přepis, (3) po pár dnech zkontrolovat běhy úlohy
   (`complete: false`, chyby) · Kryštof · od 2026-11-24
-- [ ] **Přepis kopíruje model v naplánované úloze (R-144):** konektor Wispr Flow vydává přepis jen
-  do kontextu modelu, do souboru ho model opisuje. Odchylku pozná jen kontrola délky (`complete`);
-  přesná kopie je ruční „Vložit přepis" (Copy as Markdown). Kdyby Wispr Flow vydal API, přejít na něj
+- [ ] **Most z Wispr Flow běží na Macu (R-144):** skript `scripts/wispr-local-most.mjs` čte lokální data
+  aplikace Wispr Flow (LaunchAgent `cz.zakaziq.wispr-most`, záznam `~/Library/Logs/zakaziq-wispr-most.log`).
+  Běží jen při zapnutém Macu a stojí na neveřejném formátu `flow.sqlite` a `refined.ndjson` — po aktualizaci
+  Wispr Flow ověřit `--dry-run`. Cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` nefungovala (opsání přepisu
+  modelem zastavil bezpečnostní filtr) a je vypnutá; smazat ji jde jen na claude.ai/code/routines
   · DECISIONS #052 · od 2026-11-24
 
 - [ ] **Opravy z auditu — projít naživo za přihlášením:** na produkci od 2026-11-25 (`718e985`), ověřené
@@ -2082,6 +2088,17 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-25 (most z Wispr Flow přes Mac — R-144)
+- **fix** Cloudová úloha s konektorem Wispr Flow nepřenesla nic: jednorázový import čtyř schůzek
+  (`trig_01QEnFUUsL3LcbfESnzjRabK`) zastavil při opisování přepisu bezpečnostní filtr modelu. Nový most
+  `scripts/wispr-local-most.mjs` čte na Macu `flow.sqlite` (jen pro čtení) a `meetings/<id>/refined.ndjson`
+  aplikace Wispr Flow a posílá bez modelu: mluvčí ze `speakerMap`, odkaz ze `shareSlug`, shrnutí Wispr Flow,
+  vynechá záznamy pod minutu a přepisy pod 300 znaků. `--dry-run`, `--days`, `--only`, `--install`
+  (kopie do `~/Library/Application Support/ZakazIQ/`, LaunchAgent každou hodinu), `--uninstall`.
+  Starý `scripts/wispr-most.mjs` odstraněn. Test `lib/__tests__/wispr-local-most.test.ts` (7).
+- **chore** Klíč `MEETING_NOTES_API_KEY` vyměněný: nový ve Vercelu Production (sensitive) a v Klíčence
+  (služba `zakaziq-meeting-notes`), vygenerovaný a předaný bez vypsání. Doplnění DECISIONS #052.
 
 ### 2026-11-25 (schůzky z Wispr Flow na produkci — R-144)
 - **chore** Větev `admin/schuzky-prepisy` přesazená na `main` s fakturami: migrace přečíslovaná

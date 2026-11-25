@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-25 — review: most z Wispr Flow přes Mac (R-144)
+Spouštěč: před commitem (`web-security-review`), výměna mostu po zablokované cloudové úloze
+Rozsah: `scripts/wispr-local-most.mjs` (čtení lokálních dat Wispr Flow, Klíčenka, odeslání, LaunchAgent), výměna `MEETING_NOTES_API_KEY`.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Databáze Wispr Flow jen pro čtení (`sqlite3 -readonly`, `mode=ro`), id z `--only` projdou jen jako UUID, jinak se do SQL nic zvenku nedostane. (2) Klíč jen z Klíčenky přes `/usr/bin/security`, ne z argumentu, souboru ani proměnné; do výstupu nejde. (3) Cíl je pevná `https://www.zakaziq.cz/api/public/schuzky`, `redirect: 'error'` (klíč neodejde po přesměrování jinam). (4) Do záznamu jde jen id, stav a délka, žádný obsah schůzky. (5) LaunchAgent spouští kopii mimo repo s absolutní cestou k Node; XML plistu escapované.
+Opraveno: nic. Starý klíč vyměněný, protože jeho hodnota se nedala přečíst a zůstala v nepoužívaném cloudovém prostředí.
+Zůstává: DECISIONS #052 doplnění (rizika e, f).
+
 ## 2026-11-25 — review: schůzky z Wispr Flow (R-144)
 Spouštěč: před commitem a deployem (`web-security-review`)
 Rozsah: větev `admin/schuzky-prepisy` proti `ab6ffc3` — veřejný vstup `app/api/public/schuzky/route.ts`, server actions `app/meeting-notes-actions.ts`, čtení a zápis `lib/admin/meeting-notes/store.ts`, AI nad přepisem (`ai.ts`), e-mail a Gmail (`email.ts`, `lib/admin/google/gmail.ts`, `oauth.ts`), obrazovky `app/dashboard/schuzky/` a `components/admin/meeting-notes/`, skript mostu, migrace 134, tajemství v diffu i v historii větve.

@@ -9,15 +9,15 @@ import { meetingIngestSchema, meetingKnownQuerySchema } from '@/types/meeting-no
 /**
  * Příjem schůzek z Wispr Flow (R-144).
  *
- * Wispr Flow nemá API ani webhook, jen konektor pro Clauda. Most je
- * naplánovaná úloha Clauda (docs/admin/SCHUZKY-WISPR.md): přes konektor najde
- * nové schůzky, zeptá se `GET ?ids=…`, které tu ještě nejsou, a pošle je sem
- * i s doslovným přepisem. Zpracování (AI, klient, koncept v Gmailu) běží po
+ * Wispr Flow nemá API ani webhook. Most je skript na Macu
+ * (`scripts/wispr-local-most.mjs`, docs/admin/SCHUZKY-WISPR.md): čte lokální data
+ * aplikace Wispr Flow, zeptá se `GET ?ids=…`, které schůzky tu ještě nejsou, a pošle
+ * je sem i s doslovným přepisem. Zpracování (AI, klient, koncept v Gmailu) běží po
  * odpovědi přes `after()`, ať most nečeká.
  *
  * Klíč `MEETING_NOTES_API_KEY` v `Authorization: Bearer …` nebo `x-api-key`
- * (proxy naplánované úlohy umí přidat hlavičku podle hostitele). Bez nastavené
- * proměnné se odmítá všechno. Prohlížeč sem nechodí, CORS žádné.
+ * (skript ho bere z Klíčenky). Bez nastavené proměnné se odmítá všechno.
+ * Prohlížeč sem nechodí, CORS žádné.
  */
 
 export const dynamic = 'force-dynamic'

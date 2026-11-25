@@ -124,7 +124,7 @@ export default async function SchuzkyPage(props: { searchParams: Promise<{ filtr
             </p>
             {filter === 'vse' && (
               <p className="text-sm text-quiet">
-                Schůzky nahrané ve Wispr Flow sem chodí samy, jakmile poběží naplánovaná úloha. Přepis můžete vložit i ručně přes
+                Schůzky nahrané ve Wispr Flow sem chodí samy každou hodinu, když je Mac zapnutý. Přepis můžete vložit i ručně přes
                 „Vložit přepis".
               </p>
             )}
