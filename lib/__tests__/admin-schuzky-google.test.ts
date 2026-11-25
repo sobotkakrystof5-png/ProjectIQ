@@ -96,12 +96,10 @@ describe('šifrování obnovovacího tokenu', () => {
 })
 
 describe('Google OAuth', () => {
-  it('žádá jen kalendář, koncepty v Gmailu a e-mail, s PKCE a offline přístupem', () => {
+  it('žádá jen kalendář a e-mail, s PKCE a offline přístupem', () => {
     const { url, state, verifier } = newAuthRequest('https://www.zakaziq.cz')
     const params = new URL(url).searchParams
-    expect(params.get('scope')).toBe(
-      'openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.compose',
-    )
+    expect(params.get('scope')).toBe('openid email https://www.googleapis.com/auth/calendar.events')
     expect(params.get('redirect_uri')).toBe('https://www.zakaziq.cz/api/google/callback')
     expect(params.get('access_type')).toBe('offline')
     expect(params.get('code_challenge_method')).toBe('S256')

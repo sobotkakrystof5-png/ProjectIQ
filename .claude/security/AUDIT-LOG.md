@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-25 — review: zrušení Schůzek z Wispr Flow (R-145)
+Spouštěč: odstranění funkce na přání Kryštofa
+Rozsah: smazaný veřejný vstup `/api/public/schuzky`, server actions, stránky, Gmail, most na Macu; klíč `MEETING_NOTES_API_KEY`
+Výsledek: 0 chyb
+Nálezy: žádný zbylý kód, který by četl `MEETING_NOTES_API_KEY` nebo přijímal schůzky zvenku (`git grep`). Oprávnění `gmail.compose` z Google OAuth pryč; už uložený token ho nese, dokud se Google nepropojí znovu.
+Opraveno: LaunchAgent `cz.zakaziq.wispr-most` vypnutý a smazaný i s kopií skriptu, souborem stavu a záznamem; klíč smazaný z Klíčenky a z Vercelu Production.
+Zůstává: tabulka `meeting_notes` s uloženými přepisy (rozhodl Kryštof), retence 3 roky běží dál. Vypnutá cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` a prostředí „ZakazIQ most Wispr" se starým (už neplatným) klíčem v Network secrets existují dál.
+
 ## 2026-11-25 — review: most z Wispr Flow přes Mac (R-144)
 Spouštěč: před commitem (`web-security-review`), výměna mostu po zablokované cloudové úloze
 Rozsah: `scripts/wispr-local-most.mjs` (čtení lokálních dat Wispr Flow, Klíčenka, odeslání, LaunchAgent), výměna `MEETING_NOTES_API_KEY`.

@@ -5,7 +5,7 @@ import { purgeMemoryRetention } from '@/lib/admin/memory/store'
 import { purgeOutreachRetention } from '@/lib/admin/outreach-reports'
 import { purgeOutreachEmails } from '@/lib/admin/outreach-calls'
 import { purgeDeletedAttachments } from '@/lib/admin/chat'
-import { purgeMeetingNotes } from '@/lib/admin/meeting-notes/store'
+import { purgeMeetingNotes } from '@/lib/admin/meeting-notes-retention'
 import { chatStorageConfigured, deleteStoredFiles } from '@/lib/chat/storage'
 
 // Denní úklid dat klientů po dokončených zakázkách (D-K10, R-076, vercel.json).
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       console.error('[cron] mazání příloh selhalo:', err instanceof Error ? err.message : 'unknown')
       return null
     })
-    // Přepisy schůzek 3 roky po konání, skryté po roce (R-144, migrace 134).
+    // Uložené přepisy schůzek 3 roky po konání, skryté po roce (R-144, R-145; funkce zrušená, data zůstala).
     const meetingNotes = await purgeMeetingNotes().catch(() => null)
     return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails, attachments, meetingNotes })
   } catch (e) {

@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-25 · **Schůzky z Wispr Flow** (R-144): nová sekce Schůzky v adminu.
+> **Poslední aktualizace:** 2026-11-25 · **Schůzky z Wispr Flow zrušené** (R-145): na přání Kryštofa
+> zmizela obrazovka Schůzky, vstup `/api/public/schuzky`, AI shrnutí, koncepty v Gmailu i most na Macu.
+> LaunchAgent je vypnutý a klíč `MEETING_NOTES_API_KEY` smazaný z Klíčenky i z Vercelu. **Uložené
+> přepisy (5 schůzek) zůstaly v `meeting_notes`** s retencí 3 roky. Kód na větvi `admin/zruseni-schuzek`.
+>
+> Předchozí: 2026-11-25 · **Schůzky z Wispr Flow** (R-144): nová sekce Schůzky v adminu.
 > Schůzka nahraná ve Wispr Flow přijde i s doslovným přepisem, AI udělá shrnutí, body dohody, kdo co
 > udělá a pozná klienta; po potvrzení klienta se doplní prázdné údaje v kontaktu a v Gmailu
 > krystof@vizeon.cz čeká koncept e-mailu se shrnutím (přepis zůstává jen v ZakazIQ). Most je
@@ -1657,23 +1662,24 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", 
 modelem zastavil bezpečnostní filtr). Most je skript na Macu `scripts/wispr-local-most.mjs`: čte lokální
 data aplikace Wispr Flow (`flow.sqlite`, `meetings/<id>/refined.ndjson`) a posílá bez modelu, LaunchAgent
 každou hodinu, klíč v Klíčence. Běží jen při zapnutém Macu; formát lokálních dat není veřejné rozhraní.
+**Nahrazeno:** R-145 (2026-11-25) — funkce zrušená.
+
+### R-145 · Schůzky z Wispr Flow zrušené, uložené přepisy zůstávají (2026-11-25)
+**Rozhodnutí:** funkce Schůzky z Wispr Flow (R-144) se z aplikace odstraňuje celá: obrazovka
+`/dashboard/schuzky`, vstup `/api/public/schuzky`, AI shrnutí, koncepty v Gmailu, karta schůzek
+u kontaktu, typ upozornění `meeting_note` a most na Macu. Google propojení žádá zase jen kalendář.
+Tabulka `meeting_notes` (migrace 134) **zůstává i s daty**; denní úklid ji dál maže 3 roky po schůzce.
+**Proč:** Kryštof 2026-11-25: „zruš ten kód z aplikace", vybral „celé Schůzky" a „nechat v databázi".
+**Důsledek:** jediný kód nad `meeting_notes` je `lib/admin/meeting-notes-retention.ts` (cron
+`client-retention`). Funkci jde vrátit z historie gitu (`ddba729`) bez migrace. Migrace 134 se neupravuje
+ani nemaže (B3); kdyby se měla smazat i data, je to nová migrace s `DROP TABLE`. Bezpečnost DECISIONS #052 (zrušeno).
 
 ---
 
 ## 3. Otevřené problémy
 
-- [ ] **Schůzky z Wispr Flow (R-144) — dokončit naživo:** ~~migrace 134~~, ~~klíč ve Vercelu~~,
-  ~~Gmail API~~, ~~nasazení~~, ~~naplánovaná úloha~~ (vše 2026-11-25). Zbývá: (1) **Profil → Google →
-  Propojit znovu** (nové oprávnění `gmail.compose`; do té doby schůzky přijdou a AI je zpracuje,
-  jen koncept nevznikne a detail ukáže proč — pak „Založit znovu"), (2) projít na 390 a 1280 px:
-  seznam, potvrzení klienta, koncept v Gmailu, Přepis, (3) po pár dnech zkontrolovat běhy úlohy
-  (`complete: false`, chyby) · Kryštof · od 2026-11-24
-- [ ] **Most z Wispr Flow běží na Macu (R-144):** skript `scripts/wispr-local-most.mjs` čte lokální data
-  aplikace Wispr Flow (LaunchAgent `cz.zakaziq.wispr-most` každých 5 minut, stav `~/Library/Application Support/ZakazIQ/wispr-most-stav.json`,
-  záznam `~/Library/Logs/zakaziq-wispr-most.log`). Běží jen při zapnutém Macu a stojí na neveřejném formátu `flow.sqlite` a `refined.ndjson` — po aktualizaci
-  Wispr Flow ověřit `--dry-run`. Cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` nefungovala (opsání přepisu
-  modelem zastavil bezpečnostní filtr) a je vypnutá; smazat ji jde jen na claude.ai/code/routines
-  · DECISIONS #052 · od 2026-11-24
+- [ ] **Zbytky Schůzek z Wispr Flow (R-145):** vypnutá cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` a prostředí „ZakazIQ most Wispr" (Network
+  secret se starým, už neplatným klíčem) smazat na claude.ai/code/routines · od 2026-11-25
 
 - [ ] **Opravy z auditu — projít naživo za přihlášením:** na produkci od 2026-11-25 (`718e985`), ověřené
   jen zvenku. Projít: po kroku s heslem bez kódu otevřít `/dashboard/kontakty` (má skončit na `/login`),
@@ -2090,6 +2096,17 @@ každou hodinu, klíč v Klíčence. Běží jen při zapnutém Macu; formát lo
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-25 (zrušení Schůzek z Wispr Flow — R-145)
+- **refactor** Funkce Schůzky odstraněná: `app/dashboard/schuzky/`, `app/api/public/schuzky/`,
+  `app/meeting-notes-actions.ts`, `components/admin/meeting-notes/`, `lib/admin/meeting-notes/`,
+  `lib/admin/google/gmail.ts`, `types/meeting-notes.ts`, `scripts/wispr-local-most.mjs`, oba testy
+  a `docs/admin/SCHUZKY-WISPR.md`. Z karty kontaktu zmizel blok Schůzky, z menu položka, z cronu
+  `send-reminders` pojistka zpracování, z Google OAuth oprávnění `gmail.compose`, z `.env.example`
+  a reference `MEETING_NOTES_API_KEY`. Úklid uložených přepisů zůstal v `lib/admin/meeting-notes-retention.ts`.
+- **chore** LaunchAgent `cz.zakaziq.wispr-most` vypnutý a smazaný (`--uninstall`), smazaná i kopie skriptu,
+  soubor stavu a záznam; klíč smazaný z Klíčenky a `MEETING_NOTES_API_KEY` z Vercelu Production.
+  V produkční DB zůstalo 5 schůzek; 5 upozornění `meeting_note` smazaných (na pokyn Kryštofa).
 
 ### 2026-11-25 (schůzky: most každých 5 minut, ruční vložení — R-144)
 - **fix** Dnešní schůzka (17:15–17:57) v ZakazIQ nebyla: most běžel jednou za hodinu, v 17:46 byla schůzka

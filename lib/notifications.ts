@@ -37,8 +37,6 @@ export type NotificationType =
   | 'client_message'
   /** Připomínka schůzky klientovi neodešla, nebo neběží spouštěč (R-137). */
   | 'meeting_reminder_failed'
-  /** Přepis schůzky z Wispr Flow je zpracovaný (R-144). */
-  | 'meeting_note'
 
 export async function createNotification(params: {
   type: NotificationType

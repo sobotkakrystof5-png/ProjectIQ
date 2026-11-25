@@ -9,7 +9,7 @@
 export type NavIcon =
   | 'today' | 'projects' | 'done' | 'requests' | 'inbox'
   | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
-  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services' | 'messages' | 'meetings'
+  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services' | 'messages'
 
 export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts' | 'messages'
 
@@ -53,8 +53,6 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: '/dashboard/ai-asistent', label: 'AI asistent', icon: 'assistant' },
       { href: '/dashboard/kontakty', label: 'Kontakty', icon: 'contacts' },
       { href: '/dashboard/calendar', label: 'Kalendář', icon: 'calendar' },
-      // Přepisy schůzek z Wispr Flow, shrnutí a koncept e-mailu klientovi (R-144).
-      { href: '/dashboard/schuzky', label: 'Schůzky', icon: 'meetings' },
       // Hodnocení v menu není (AD11, R-090): je na zakázce, souhrn na Profilu.
     ],
   },

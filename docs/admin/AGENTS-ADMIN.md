@@ -310,7 +310,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | Tabulka | Migrace | K čemu |
 |---------|---------|--------|
 | `login_attempts` | 006 | Brute-force lockout přihlášení |
-| `meeting_notes` | 134 | Schůzky z Wispr Flow nebo vložené ručně: doslovný přepis, výsledek AI, klient, koncept v Gmailu (R-144) |
+| `meeting_notes` | 134 | Uložené schůzky z Wispr Flow (R-144). **Funkce je od 2026-11-25 zrušená (R-145)**, tabulka i data zůstaly; kód ji jen maže po retenci (`lib/admin/meeting-notes-retention.ts`) |
 | `api_requests` | 007 | Rate limit veřejných API (`lib/api-rate-limit.ts`) |
 | `client_leads` | 010, 017, 024, 049, 051 | **Hovory** — kontakty/leady, další akce, telefonát zvednut, portfolio odesláno, vazba na kalendář |
 | `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
@@ -456,7 +456,6 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `GET /api/public/outreach/handled` | Bearer `GROWTH_OS_API_KEY` | Zpětný kanál pro Growth OS (R-120): koho Kryštof převzal nebo odložil od `?since=` (podle `outreach_leads.admin_changed_at`, trigger z 119), nejvýš 500 vzestupně, bez jmen a kontaktů. 30/min, bez migrace 119 vrací 503 |
 | `GET /api/outreach/leads/[id]/nahled` | session | Náhled ukázky přes náš server: jen https z `navrhy.vizeon.cz` (`lib/admin/outreach-demo.ts`), bez přesměrování, jen PNG/JPEG/WebP do 2 MB |
 | `POST /api/public/outreach/reports` | Bearer `GROWTH_OS_API_KEY` | Denní reporty hovorů z Growth OS (R-118): čísla dne + řádek za hovor, přepis jen u spojených → `outreach_reports`, `outreach_calls` (migrace 116). Tělo 2 MB, 30 požadavků/min, upsert podle dne a kola / `external_id`, starší report novější nepřepíše, bez migrace 116 vrací 503. Kontrakt `types/outreach-report.ts` |
-| `POST /api/public/schuzky`, `GET ?ids=` | Bearer nebo `x-api-key` = `MEETING_NOTES_API_KEY` | Schůzky z Wispr Flow (R-144): most je skript na Macu `scripts/wispr-local-most.mjs` (LaunchAgent každých 5 minut, čte lokální data aplikace Wispr Flow, bez modelu; co odeslal, si pamatuje otiskem, posílá jen nové a přepočítané). POST uloží schůzku s doslovným přepisem do `meeting_notes` (upsert podle id z Wispr Flow, značky konektoru `<<<…>>>` vynechá) a přes `after()` pustí zpracování; GET vrátí, která id už ZakazIQ má (skript ho od 2026-11-25 nepoužívá). Tělo 3 MB, přepis do 1 milionu znaků, 30/min, bez migrace 134 vrací 503. Odpověď nese `complete` (sedí délka s tím, co hlásil Wispr Flow). Detail `docs/admin/SCHUZKY-WISPR.md` |
 | `POST /api/public/invoices` | Bearer `INVOICES_API_KEY` | Zakládání faktur zvenčí (n8n) |
 | `POST /api/invoices/parse` | session | AI přepis PDF faktury (nic neukládá) |
 | `POST /api/public/portal/[token]/transcribe` | token projektu + limit IP/projekt | Přepis hlasu klienta (OpenAI), nic neukládá, vrací jen text (`lib/transcribe.ts`) |
@@ -1587,37 +1586,11 @@ Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
 - Testy: `lib/__tests__/admin-pripominky.test.ts` (PGlite se SQL 114, 115, 128).
 
 
-## Schůzky a přepisy z Wispr Flow (R-144)
+## Schůzky z Wispr Flow — zrušené (R-144, R-145)
 
-Obrazovka **Schůzky** (`/dashboard/schuzky`, v menu Práce pod Kalendářem): každá schůzka nahraná
-ve Wispr Flow s doslovným přepisem, shrnutím od AI a klientem. Záložky Všechny / Ke kontrole
-(bez klienta, týká se klienta) / Skryté. Detail `/dashboard/schuzky/[id]` má Shrnutí (klient,
-shrnutí, Na čem jsme se domluvili, Co udělám já, Co udělá klient, Co zůstalo otevřené, „Jen pro
-vás", E-mail klientovi) a Přepis (`?pohled=prepis`, doslovně, kopírování, kontrola úplnosti).
-Ruční vložení `/dashboard/schuzky/nova`. Karta kontaktu ukazuje jeho schůzky.
-
-- **Data:** `meeting_notes` (migrace 134). `transcript` přesně, jak přišel; `ai` jsonb (tvar
-  `storedMeetingAiSchema` v `types/meeting-notes.ts`, poškozený záznam se nevykreslí);
-  `contact_id` maže kaskádou s kontaktem; `contact_source` = `email` | `kalendar` | `potvrzeno`
-  (`telefon` připravený, zatím ho nic nenastavuje). Upsert podle `(source, source_id)`.
-- **Tok:** `processMeetingNote` (`lib/admin/meeting-notes/process.ts`) — zámek na 5 minut a nejvýš
-  tři pokusy, jistá shoda bez AI (`match.ts`: e-mail účastníka s kontaktem, jediná událost
-  v kalendáři ±20 minut s kontaktem přes `lead_id`, `project_id` nebo `invite_to`), kandidáti
-  pro AI podle jmen účastníků, AI (`ai.ts`, role `smart`, strukturovaný výstup, kandidát jen ze
-  seznamu, e-mail a telefon normalizované), pak dohledání klienta, kterého AI poznala jménem,
-  uložení, koncept v Gmailu u jistého klienta a zvonek `meeting_note`.
-- **Potvrzení klienta** (`confirmMeetingClient`): přiřadí vybraný kontakt, nebo založí nový
-  z údajů v přepisu (`source = 'schuzka'`), doplní **jen prázdná** pole (firma, e-mail, telefon,
-  IČO; e-mail a telefon jen když je nemá jiný kontakt), propíše změnu (`propagateContact`, R-141)
-  a založí koncept. „Není to on" odpojí klienta, Zpět ho vrátí.
-- **E-mail** (`email.ts`): kód skládá text ze struktury od AI — oslovení, úvod, sekce s body,
-  podpis z `SIGNATURE`. Přepis ani „Jen pro vás" do něj nejdou. Koncept zakládá
-  `lib/admin/google/gmail.ts` (Gmail API `drafts`, MIME s base64, hlavičky bez konců řádků),
-  adresát je vždy e-mail přiřazeného kontaktu. Bez oprávnění `gmail.compose` v uloženém
-  propojení se koncept nezakládá a detail řekne, ať se Google propojí znovu.
-- **Pojistky:** `send-reminders` dokončí nejvýš tři nezpracované schůzky (`finishPendingMeetingNotes`),
-  `client-retention` maže schůzky 3 roky po konání a skryté po roce (`purgeMeetingNotes`).
-- **Most z Wispr Flow** a nastavení: `docs/admin/SCHUZKY-WISPR.md`; skript `scripts/wispr-local-most.mjs`
-  čte na Macu `flow.sqlite` a `meetings/<id>/refined.ndjson` aplikace Wispr Flow a posílá nové schůzky
-  (LaunchAgent `cz.zakaziq.wispr-most`, klíč v Klíčence). Cloudová úloha s konektorem nefungovala:
-  opsání přepisu modelem zastavil bezpečnostní filtr.
+Obrazovka Schůzky (`/dashboard/schuzky`), vstup `POST`/`GET /api/public/schuzky`, AI shrnutí,
+koncepty v Gmailu a most na Macu (`scripts/wispr-local-most.mjs`, LaunchAgent `cz.zakaziq.wispr-most`)
+byly 2026-11-25 odstraněné na přání Kryštofa (R-145). Google propojení žádá zase jen kalendář.
+**Zůstala tabulka `meeting_notes`** (migrace 134) s uloženými přepisy; čte ji jen denní úklid
+`client-retention` (`purgeMeetingNotes` v `lib/admin/meeting-notes-retention.ts`: 3 roky po schůzce,
+skryté po roce). Kód funkce je v historii gitu (`git show ddba729 -- <cesta>`), kdyby se měla vrátit.
