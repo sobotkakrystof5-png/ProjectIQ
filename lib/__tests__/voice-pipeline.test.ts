@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CleanupCaller } from '@/lib/admin/voice/cleanup'
 import { runPipeline, type PipelineConfig } from '@/lib/admin/voice/pipeline'
 import { transcribeVoice, type SttResult } from '@/lib/admin/voice/stt'
 
@@ -19,7 +20,18 @@ const CONFIG: PipelineConfig = {
     { text: 'Titulky vytvořil', mode: 'always' },
     { text: 'Děkuji za pozornost', mode: 'alone' },
   ],
+  cleanup: { enabled: true, dailyCapUsd: 1, spentTodayUsd: 0, rules: [], examples: [] },
 }
+
+/** Čištění, které text vrátí beze změny (pojistky čištění testuje zlatá sada). */
+const echoCleanup: CleanupCaller = async (req) => ({
+  ok: true,
+  text: req.text,
+  model: 'test-model',
+  ms: 5,
+  tokensIn: 100,
+  tokensOut: 20,
+})
 
 const AUDIO = new Blob([new Uint8Array(32)], { type: 'audio/mp4' })
 
@@ -36,19 +48,19 @@ const sttOk = (text: string, extra: Partial<Extract<SttResult, { ok: true }>> = 
   ...extra,
 })
 
-const input = (durationMs: number, speechMs: number | null = durationMs) => ({ audio: AUDIO, durationMs, speechMs })
+const input = (durationMs: number, speechMs: number | null = durationMs) => ({ audio: AUDIO, durationMs, speechMs, style: 'neutral' as const })
 
 describe('cesta diktátu', () => {
   it('G1: bez řeči je prázdný výsledek a přepis se nevolá', async () => {
     const transcribe = vi.fn()
-    const out = await runPipeline(input(5000, 120), CONFIG, { transcribe })
+    const out = await runPipeline(input(5000, 120), CONFIG, { cleanup: echoCleanup, transcribe })
     expect(out).toMatchObject({ status: 'empty', guards: ['no_speech'], finalText: '', words: 0, costUsd: 0 })
     expect(transcribe).not.toHaveBeenCalled()
   })
 
   it('běžná věta projde, slovník opraví jméno a spočítá se cena', async () => {
     const transcribe = vi.fn(async (_audio: Blob, _prompt: string) => sttOk(' posílám nabídku pro prvotko a zákaz IQ'))
-    const out = await runPipeline(input(4000), CONFIG, { transcribe })
+    const out = await runPipeline(input(4000), CONFIG, { cleanup: echoCleanup, transcribe })
     expect(out).toMatchObject({
       status: 'ok',
       finalText: 'Posílám nabídku pro Prvotka a ZakazIQ',
@@ -64,13 +76,14 @@ describe('cesta diktátu', () => {
   })
 
   it('G4: jen halucinace z titulků → blocked', async () => {
-    const out = await runPipeline(input(3000), CONFIG, { transcribe: async () => sttOk('Titulky vytvořil JohnyX') })
+    const out = await runPipeline(input(3000), CONFIG, { cleanup: echoCleanup, transcribe: async () => sttOk('Titulky vytvořil JohnyX') })
     expect(out).toMatchObject({ status: 'blocked', guards: ['blocklist'], finalText: '', words: 0 })
     expect(out.rawText).toBe('Titulky vytvořil JohnyX')
   })
 
   it('G12: ozvěna nápovědy → blocked', async () => {
     const out = await runPipeline(input(5000), { ...CONFIG, terms: [...CONFIG.terms, { id: 't3', term: 'VIZEON', heardAs: [] }] }, {
+      cleanup: echoCleanup,
       transcribe: async () => sttOk('Prvotka, ZakazIQ, VIZEON'),
     })
     expect(out).toMatchObject({ status: 'blocked', guards: ['prompt_echo'] })
@@ -78,32 +91,35 @@ describe('cesta diktátu', () => {
 
   it('G5: víc slov, než se dá vyslovit → blocked', async () => {
     const text = Array.from({ length: 40 }, (_, i) => `slovo${i}`).join(' ')
-    const out = await runPipeline(input(2000), CONFIG, { transcribe: async () => sttOk(text) })
+    const out = await runPipeline(input(2000), CONFIG, { cleanup: echoCleanup, transcribe: async () => sttOk(text) })
     expect(out).toMatchObject({ status: 'blocked', guards: ['too_fast'] })
   })
 
   it('prázdný přepis bez zásahu pojistky → empty', async () => {
-    const out = await runPipeline(input(2000), CONFIG, { transcribe: async () => sttOk('  ') })
+    const out = await runPipeline(input(2000), CONFIG, { cleanup: echoCleanup, transcribe: async () => sttOk('  ') })
     expect(out).toMatchObject({ status: 'empty', guards: [] })
   })
 
   it('zkratka nahradí celý diktát', async () => {
-    const out = await runPipeline(input(1500), CONFIG, { transcribe: async () => sttOk('Můj podpis.') })
+    const out = await runPipeline(input(1500), CONFIG, { cleanup: echoCleanup, transcribe: async () => sttOk('Můj podpis.') })
     expect(out).toMatchObject({ status: 'snippet', snippetId: 's1', finalText: 'S pozdravem\nKryštof Sobotka', words: 4 })
   })
 
   it('záloha přepisu se pozná v pojistkách, selhání obou → error', async () => {
     const fallback = await runPipeline(input(3000), CONFIG, {
+      cleanup: echoCleanup,
       transcribe: async () => sttOk('Dobrý den.', { provider: 'openai', model: 'gpt-4o-transcribe', fallback: true }),
     })
     expect(fallback).toMatchObject({ status: 'ok', guards: ['stt_fallback'], sttProvider: 'openai' })
 
     const failed = await runPipeline(input(3000), CONFIG, {
+      cleanup: echoCleanup,
       transcribe: async () => ({ ok: false, notConfigured: false, ms: 900, attempts: [] }),
     })
     expect(failed).toMatchObject({ status: 'error', guards: ['stt_failed'], notConfigured: false, rawText: null })
 
     const missing = await runPipeline(input(3000), CONFIG, {
+      cleanup: echoCleanup,
       transcribe: async () => ({ ok: false, notConfigured: true, ms: 0, attempts: [] }),
     })
     expect(missing).toMatchObject({ status: 'error', guards: ['stt_not_configured'], notConfigured: true })
@@ -175,7 +191,7 @@ describe('přepis', () => {
 
   it('celá cesta s ukázkovou odpovědí Groq: G2 zahodí titulky, slovník opraví jméno', async () => {
     const { impl } = fakeFetch([json(GROQ_VERBOSE)])
-    const out = await runPipeline(input(6500), CONFIG, { transcribe: (a, p) => transcribeVoice(a, p, impl) })
+    const out = await runPipeline(input(6500), CONFIG, { cleanup: echoCleanup, transcribe: (a, p) => transcribeVoice(a, p, impl) })
     expect(out).toMatchObject({
       status: 'ok',
       finalText: 'Dobrý den, posílám nabídku na nový web pro Prvotka.',

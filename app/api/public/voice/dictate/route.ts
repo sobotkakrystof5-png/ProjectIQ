@@ -11,11 +11,13 @@ import {
   voiceFail,
   voiceOk,
 } from '@/lib/admin/voice/http'
+import { cleanupWithClaude } from '@/lib/admin/voice/cleanup'
 import { runPipeline } from '@/lib/admin/voice/pipeline'
 import {
   findDictation,
   forgetFailedDictation,
   loadPipelineContext,
+  notifyCostCapOnce,
   saveCancelled,
   saveDictation,
   type DictationMeta,
@@ -25,8 +27,9 @@ import { transcribeVoice } from '@/lib/admin/voice/stt'
 // ZakazIQ Voice (R-148): diktát z Macu → text (plán, oddíly 3, 4 a 7).
 //
 // Multipart: `audio` (m4a nebo wav, nejvýš 4 MB) a `meta` (JSON). Server
-// přepíše, projde pojistkami G1–G5 a G12, opraví slova ze slovníku a vrátí
-// text; zvuk nikam neukládá a text nepíše do logu. Stejné `id` podruhé vrátí
+// přepíše, projde pojistkami G1–G5 a G12, opraví slova ze slovníku, učeše
+// text modelem a zkontroluje ho (G6–G11) a vrátí text; zvuk nikam neukládá
+// a text nepíše do logu. Stejné `id` podruhé vrátí
 // uložený výsledek bez nového přepisu (fronta na Macu bez sítě).
 
 export const maxDuration = 60
@@ -91,11 +94,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const { config, settings } = await loadPipelineContext()
     const outcome = await runPipeline(
-      { audio, durationMs: m.durationMs, speechMs: m.speechMs },
+      { audio, durationMs: m.durationMs, speechMs: m.speechMs, style: settings.styles[meta.category] },
       config,
-      { transcribe: (a, prompt) => transcribeVoice(a, prompt) },
+      { transcribe: (a, prompt) => transcribeVoice(a, prompt), cleanup: cleanupWithClaude },
     )
     await saveDictation(meta, outcome, Date.now() - started, settings.storeText)
+    if (outcome.costCapHit) {
+      // Upozornění nesmí shodit diktát, text už je uložený.
+      await notifyCostCapOnce(settings.dailyCostCapUsd).catch((err: unknown) =>
+        console.error('[voice/dictate] upozornění na strop selhalo:', err instanceof Error ? err.name : 'unknown'),
+      )
+    }
 
     if (outcome.status === 'error') {
       return outcome.notConfigured ? voiceFail(503, 'NOT_CONFIGURED') : voiceFail(502, 'STT_FAILED')

@@ -42,6 +42,27 @@ const m4a = (size = 2048) => {
 let key = ''
 let deviceId = ''
 let fetchMock: ReturnType<typeof vi.fn>
+/** Odpověď poskytovatele přepisu (Groq/OpenAI); Claude odpovídá zvlášť. */
+let sttResponder: () => Response | Promise<Response>
+/** Co vrátí Claude: výchozí je přepis beze změny v <text>. */
+let claudeResponder: (prepis: string) => string
+
+const isClaude = (url: unknown) => String(url).startsWith('https://api.anthropic.com/')
+const sttCalls = () => fetchMock.mock.calls.filter((c) => !isClaude(c[0])).length
+const claudeCalls = () => fetchMock.mock.calls.filter((c) => isClaude(c[0])).length
+
+function claudeReply(init?: RequestInit): Response {
+  const body = JSON.parse(String(init?.body)) as { messages: { content: string }[] }
+  const prepis = /<prepis>\n([\s\S]*)\n<\/prepis>/.exec(body.messages[0].content)?.[1] ?? ''
+  return new Response(
+    JSON.stringify({
+      id: 'msg_test', type: 'message', role: 'assistant', model: 'test', stop_reason: 'end_turn', stop_sequence: null,
+      content: [{ type: 'text', text: claudeResponder(prepis) }],
+      usage: { input_tokens: 900, output_tokens: 25 },
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+}
 
 const meta = (over: Record<string, unknown> = {}) => ({
   id: crypto.randomUUID(),
@@ -74,6 +95,7 @@ beforeAll(async () => {
   // PGlite startuje až prvním dotazem; ať se to nestane uvnitř testu.
   await emptyDb.query('SELECT 1')
   await db.exec(`CREATE TABLE api_requests (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, endpoint text NOT NULL, ip text NOT NULL, created_at timestamptz DEFAULT now())`)
+  await db.exec(fs.readFileSync(path.join(ROOT, 'migrations/018_notifications.sql'), 'utf8'))
   await db.exec(MIGRATION)
   setAdminDbForTests(pgliteAdminDriver(db))
   process.env.AGENT_KEY_PEPPER = 'p'.repeat(40)
@@ -96,13 +118,20 @@ beforeEach(async () => {
   process.env.GROQ_API_KEY = 'gsk_test'
   delete process.env.OPENAI_API_KEY
   delete process.env.VOICE_STT_PROVIDER
-  fetchMock = vi.fn(async () => groqOk())
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test'
+  sttResponder = () => groqOk()
+  claudeResponder = (prepis) => `<text>${prepis}</text>`
+  fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => (isClaude(url) ? claudeReply(init) : sttResponder()))
   vi.stubGlobal('fetch', fetchMock)
   vi.spyOn(console, 'error').mockImplementation(() => undefined)
-  await db.exec(`DELETE FROM api_requests; DELETE FROM voice_dictations; UPDATE voice_settings SET value = 'true' WHERE key = 'store_text'`)
+  await db.exec(`DELETE FROM api_requests; DELETE FROM voice_dictations; DELETE FROM notifications;
+    UPDATE voice_settings SET value = 'true' WHERE key = 'store_text';
+    UPDATE voice_settings SET value = '1' WHERE key = 'daily_cost_cap_usd';
+    DELETE FROM voice_settings WHERE key = 'cost_cap_notified_on'`)
 })
 
 afterEach(() => {
+  delete process.env.ANTHROPIC_API_KEY
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -134,7 +163,13 @@ describe('POST /api/public/voice/dictate', () => {
       stt_provider: 'groq',
       stt_model: 'whisper-large-v3-turbo',
       guards: ['segments'],
+      tokens_in: 900,
+      tokens_out: 25,
+      words_corrected: 0,
     })
+    expect(row.llm_model).toBeTruthy()
+    expect(Number(row.llm_ms)).toBeGreaterThanOrEqual(0)
+    expect(claudeCalls()).toBe(1)
     expect(Number(row.cost_usd)).toBeGreaterThan(0)
     expect(Number(row.total_ms)).toBeGreaterThanOrEqual(0)
     expect(String(row.raw_text)).toContain('Titulky vytvořil')
@@ -151,7 +186,8 @@ describe('POST /api/public/voice/dictate', () => {
     const first = await body(await POST(request({ meta: m })))
     const second = await body(await POST(request({ meta: m })))
     expect(second).toEqual(first)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(sttCalls()).toBe(1)
+    expect(claudeCalls()).toBe(1)
     const n = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM voice_dictations`)
     expect(n.rows[0].n).toBe(1)
   })
@@ -180,10 +216,10 @@ describe('POST /api/public/voice/dictate', () => {
 
   it('po selhání přepisu jde stejný diktát z fronty poslat znovu a přepíše se', async () => {
     process.env.OPENAI_API_KEY = 'sk_test'
-    fetchMock.mockImplementation(async () => new Response('{}', { status: 500 }))
+    sttResponder = () => new Response('{}', { status: 500 })
     const m = meta()
     expect((await POST(request({ meta: m }))).status).toBe(502)
-    fetchMock.mockImplementation(async () => groqOk())
+    sttResponder = () => groqOk()
     const again = await POST(request({ meta: m }))
     expect(again.status).toBe(200)
     expect(await body(again)).toMatchObject({ id: m.id, status: 'ok', words: 9 })
@@ -193,12 +229,13 @@ describe('POST /api/public/voice/dictate', () => {
 
   it('přepis selže u obou → 502 a diktát se stavem error', async () => {
     process.env.OPENAI_API_KEY = 'sk_test'
-    fetchMock.mockImplementation(async () => new Response('{}', { status: 500 }))
+    sttResponder = () => new Response('{}', { status: 500 })
     const m = meta()
     const res = await POST(request({ meta: m }))
     expect(res.status).toBe(502)
     expect(await body(res)).toEqual({ ok: false, code: 'STT_FAILED' })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(sttCalls()).toBe(2)
+    expect(claudeCalls()).toBe(0)
     const row = (await db.query<{ status: string; guards: string[] }>(`SELECT status, guards FROM voice_dictations WHERE id = $1`, [m.id])).rows[0]
     expect(row).toEqual({ status: 'error', guards: ['stt_failed'] })
   })
@@ -294,9 +331,47 @@ describe('POST /api/public/voice/dictate', () => {
   it('text diktátu se nedostane do logu ani při chybě', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     process.env.OPENAI_API_KEY = 'sk_test'
-    fetchMock.mockImplementationOnce(async () => new Response('{"error":"Dobrý den, posílám"}', { status: 400 }))
+    let first = true
+    sttResponder = () => {
+      if (!first) return groqOk()
+      first = false
+      return new Response('{"error":"Dobrý den, posílám"}', { status: 400 })
+    }
+    // Ani když čištění selže, text do logu nejde.
+    claudeResponder = () => 'bez značky: Dobrý den, posílám nabídku pro Prvotka'
     await POST(request())
     expect(JSON.stringify(spy.mock.calls)).not.toMatch(/posílám|Prvotka|Dobrý den/)
+  })
+
+  it('čištění modelem: učesaný text projde, útok vrátí přepis (raw)', async () => {
+    claudeResponder = () => '<text>Dobrý den, posílám nabídku na nový web pro Prvotka. S pozdravem Kryštof</text>'
+    const m = meta()
+    const res = await body(await POST(request({ meta: m })))
+    expect(res).toMatchObject({ status: 'raw', text: 'Dobrý den, posílám nabídku na nový web pro Prvotka.' })
+    expect(res.guards).toEqual(['segments', 'cleanup_novel'])
+    const row = (await db.query<{ status: string; final_text: string }>(`SELECT status, final_text FROM voice_dictations WHERE id = $1`, [m.id])).rows[0]
+    expect(row.status).toBe('raw')
+  })
+
+  it('bez klíče ke Claude se vloží přepis a přepis funguje dál', async () => {
+    delete process.env.ANTHROPIC_API_KEY
+    const res = await body(await POST(request()))
+    expect(res).toMatchObject({ status: 'raw', guards: ['segments', 'cleanup_not_configured'], words: 9 })
+    expect(claudeCalls()).toBe(0)
+  })
+
+  it('G11: nad denním stropem bez čištění a upozornění do zvonku jen jednou', async () => {
+    await db.exec(`UPDATE voice_settings SET value = '0.00001' WHERE key = 'daily_cost_cap_usd'`)
+    const first = await body(await POST(request()))
+    const second = await body(await POST(request()))
+    expect(first).toMatchObject({ status: 'raw', guards: ['segments', 'cost_cap'] })
+    expect(second).toMatchObject({ status: 'raw', guards: ['segments', 'cost_cap'] })
+    expect(claudeCalls()).toBe(0)
+    const notes = await db.query<{ type: string; title: string; link: string; body: string }>(`SELECT type, title, link, body FROM notifications`)
+    expect(notes.rows).toHaveLength(1)
+    expect(notes.rows[0]).toMatchObject({ type: 'voice_cost_cap', link: '/dashboard/voice' })
+    // Text diktátu v upozornění není.
+    expect(notes.rows[0].body).not.toMatch(/posílám|Prvotka/)
   })
 })
 

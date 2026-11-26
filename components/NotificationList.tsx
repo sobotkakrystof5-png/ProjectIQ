@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Calendar, Star, ClipboardList, Inbox, ArrowRightLeft, Bell,
-  CheckCheck, ExternalLink, Sparkles, FileText, MessageSquarePlus, PhoneCall, MailWarning, ListChecks,
+  CheckCheck, ExternalLink, Sparkles, FileText, MessageSquarePlus, PhoneCall, MailWarning, ListChecks, Mic,
 } from 'lucide-react'
 import { markNotificationRead, markAllNotificationsRead } from '@/app/notification-actions'
 import { cn } from '@/lib/utils'
@@ -37,6 +37,7 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   consultation_meet_failed: { icon: MailWarning,    color: ICON, label: 'Chybí odkaz na Meet' },
   client_message:        { icon: MessageSquarePlus, color: ICON, label: 'Zpráva od klienta' },
   meeting_reminder_failed: { icon: Calendar,       color: ICON, label: 'Připomínka schůzky' },
+  voice_cost_cap:        { icon: Mic,               color: ICON, label: 'Diktování' },
 }
 
 function timeAgo(iso: string): string {

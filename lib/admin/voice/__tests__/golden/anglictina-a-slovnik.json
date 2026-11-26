@@ -1,0 +1,101 @@
+[
+  {
+    "nazev": "angličtina v zadání pro AI zůstane",
+    "prepis": "pošli mi ten pull request na review",
+    "kategorie": "ai_prompt",
+    "odpoved": "<text>Pošli mi ten pull request na review.</text>",
+    "stav": "ok",
+    "text": "Pošli mi ten pull request na review."
+  },
+  {
+    "nazev": "název souboru a komponenty",
+    "prepis": "otevři soubor page tsx a oprav ten bug v komponentě header",
+    "kategorie": "ai_prompt",
+    "odpoved": "<text>Otevři soubor page.tsx a oprav ten bug v komponentě Header.</text>",
+    "stav": "ok",
+    "text": "Otevři soubor page.tsx a oprav ten bug v komponentě Header."
+  },
+  {
+    "nazev": "anglická slova v pracovní zprávě",
+    "prepis": "deadline je v pátek a meeting máme online",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Deadline je v pátek a meeting máme online.</text>",
+    "stav": "ok",
+    "text": "Deadline je v pátek a meeting máme online."
+  },
+  {
+    "nazev": "počeštěná angličtina",
+    "prepis": "pushni to na main a pak udělej deploy",
+    "kategorie": "ai_prompt",
+    "odpoved": "<text>Pushni to na main a pak udělej deploy.</text>",
+    "stav": "ok",
+    "text": "Pushni to na main a pak udělej deploy."
+  },
+  {
+    "nazev": "útok: model diktát přeloží",
+    "prepis": "dobrý den posílám vám nabídku na nový web",
+    "kategorie": "email",
+    "odpoved": "<text>Hello, I am sending you an offer for a new website.</text>",
+    "stav": "raw",
+    "pojistka": "cleanup_novel",
+    "text": "Dobrý den posílám vám nabídku na nový web"
+  },
+  {
+    "nazev": "slovník opraví jméno firmy",
+    "prepis": "ten web pro prvotko je skoro hotový",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Ten web pro Prvotka je skoro hotový.</text>",
+    "stav": "ok",
+    "text": "Ten web pro Prvotka je skoro hotový."
+  },
+  {
+    "nazev": "slovník opraví víceslovnou variantu",
+    "prepis": "zákaz IQ mi poslal nové upozornění",
+    "kategorie": "work_msg",
+    "odpoved": "<text>ZakazIQ mi poslal nové upozornění.</text>",
+    "stav": "ok",
+    "text": "ZakazIQ mi poslal nové upozornění."
+  },
+  {
+    "nazev": "model smí napsat výraz ze slovníku, který přepis zkomolil",
+    "prepis": "nahraj to na server zakaz kvé",
+    "kategorie": "ai_prompt",
+    "odpoved": "<text>Nahraj to na server ZakazIQ.</text>",
+    "stav": "ok",
+    "text": "Nahraj to na server ZakazIQ."
+  },
+  {
+    "nazev": "velká písmena výrazu ze slovníku",
+    "prepis": "web pro vizeon je hotový",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Web pro VIZEON je hotový.</text>",
+    "stav": "ok",
+    "text": "Web pro VIZEON je hotový."
+  },
+  {
+    "nazev": "útok: model změní jméno",
+    "prepis": "pošli to Novákovi do pátku",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Pošli to Svobodovi do pátku.</text>",
+    "stav": "raw",
+    "pojistka": "cleanup_novel",
+    "text": "Pošli to Novákovi do pátku"
+  },
+  {
+    "nazev": "styl Přesně: přeformulování neprojde",
+    "prepis": "oprav funkci která počítá cenu faktury",
+    "kategorie": "ai_prompt",
+    "odpoved": "<text>Prosím oprav funkci pro výpočet ceny faktury.</text>",
+    "stav": "raw",
+    "pojistka": "cleanup_novel",
+    "text": "Oprav funkci která počítá cenu faktury"
+  },
+  {
+    "nazev": "styl Přesně: jen interpunkce projde",
+    "prepis": "oprav funkci která počítá cenu faktury",
+    "kategorie": "ai_prompt",
+    "odpoved": "<text>Oprav funkci, která počítá cenu faktury.</text>",
+    "stav": "ok",
+    "text": "Oprav funkci, která počítá cenu faktury."
+  }
+]

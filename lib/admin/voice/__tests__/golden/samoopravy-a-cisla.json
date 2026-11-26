@@ -1,0 +1,134 @@
+[
+  {
+    "nazev": "samooprava dne",
+    "prepis": "sejdeme se v pondělí teda v úterý",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Sejdeme se v úterý.</text>",
+    "stav": "ok",
+    "text": "Sejdeme se v úterý."
+  },
+  {
+    "nazev": "samooprava jména",
+    "prepis": "pošli to Pavlovi vlastně ne Martinovi",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Pošli to Martinovi.</text>",
+    "stav": "ok",
+    "text": "Pošli to Martinovi."
+  },
+  {
+    "nazev": "samooprava čísla slovy",
+    "prepis": "objednej deset teda dvanáct kusů",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Objednej 12 kusů.</text>",
+    "stav": "ok",
+    "text": "Objednej 12 kusů."
+  },
+  {
+    "nazev": "samooprava čísla číslicemi z přepisu",
+    "prepis": "sraz v 10 teda v 11",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Sraz v 11.</text>",
+    "stav": "ok",
+    "text": "Sraz v 11."
+  },
+  {
+    "nazev": "samooprava s „pardon“",
+    "prepis": "napiš to Novákovi pardon Novotnému",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Napiš to Novotnému.</text>",
+    "stav": "ok",
+    "text": "Napiš to Novotnému."
+  },
+  {
+    "nazev": "částka slovy na číslice",
+    "prepis": "faktura na dvacet pět tisíc korun",
+    "kategorie": "email",
+    "odpoved": "<text>Faktura na 25 000 Kč.</text>",
+    "stav": "ok",
+    "text": "Faktura na 25 000 Kč."
+  },
+  {
+    "nazev": "datum a čas odpoledne",
+    "prepis": "schůzka bude dvacátého pátého listopadu ve tři odpoledne",
+    "kategorie": "email",
+    "odpoved": "<text>Schůzka bude 25. 11. v 15:00.</text>",
+    "stav": "ok",
+    "text": "Schůzka bude 25. 11. v 15:00."
+  },
+  {
+    "nazev": "telefonní číslo po číslicích",
+    "prepis": "zavolej mi na sedm sedm sedm jedna dva tři čtyři pět šest",
+    "kategorie": "personal_msg",
+    "odpoved": "<text>Zavolej mi na 777 123 456</text>",
+    "stav": "ok",
+    "text": "Zavolej mi na 777 123 456"
+  },
+  {
+    "nazev": "procenta",
+    "prepis": "sleva bude třicet procent",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Sleva bude 30 %.</text>",
+    "stav": "ok",
+    "text": "Sleva bude 30 %."
+  },
+  {
+    "nazev": "rok slovy",
+    "prepis": "v roce dva tisíce dvacet šest spustíme novou verzi",
+    "kategorie": "document",
+    "odpoved": "<text>V roce 2026 spustíme novou verzi.</text>",
+    "stav": "ok",
+    "text": "V roce 2026 spustíme novou verzi."
+  },
+  {
+    "nazev": "„a půl“ zůstane slovy",
+    "prepis": "potřebuju to za hodinu a půl",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Potřebuju to za hodinu a půl.</text>",
+    "stav": "ok",
+    "text": "Potřebuju to za hodinu a půl."
+  },
+  {
+    "nazev": "číslice z přepisu zůstanou",
+    "prepis": "pošli 3 kusy a 2 krabice",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Pošli 3 kusy a 2 krabice.</text>",
+    "stav": "ok",
+    "text": "Pošli 3 kusy a 2 krabice."
+  },
+  {
+    "nazev": "útok: model změní částku",
+    "prepis": "faktura na dvacet pět tisíc korun",
+    "kategorie": "email",
+    "odpoved": "<text>Faktura na 26 000 Kč.</text>",
+    "stav": "raw",
+    "pojistka": "cleanup_numbers",
+    "text": "Faktura na dvacet pět tisíc korun"
+  },
+  {
+    "nazev": "útok: model vynechá čísla",
+    "prepis": "pošli 3 kusy do pondělí a 2 krabice do středy",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Pošli kusy do pondělí a krabice do středy.</text>",
+    "stav": "raw",
+    "pojistka": "cleanup_numbers",
+    "text": "Pošli 3 kusy do pondělí a 2 krabice do středy"
+  },
+  {
+    "nazev": "útok: model si vymyslí čas",
+    "prepis": "zavolej mi zítra ráno",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Zavolej mi zítra v 8:00.</text>",
+    "stav": "raw",
+    "pojistka": "cleanup_numbers",
+    "text": "Zavolej mi zítra ráno"
+  },
+  {
+    "nazev": "útok: model posune hodinu",
+    "prepis": "přijdu ve čtyři odpoledne",
+    "kategorie": "personal_msg",
+    "odpoved": "<text>Přijdu v 17:00</text>",
+    "stav": "raw",
+    "pojistka": "cleanup_numbers",
+    "text": "Přijdu ve čtyři odpoledne"
+  }
+]

@@ -1626,9 +1626,10 @@ Tady jen to, co je v kódu.
   bez přepisu → přepis (`stt.ts`: Groq `verbose_json`, záloha OpenAI, limit 20 s, model z env, pokus bez klíče
   se přeskočí) → G12 ozvěna nápovědy → G2 segmenty (`no_speech_prob > 0,6` a `avg_logprob < −1`, nebo
   `compression_ratio > 2,4`) → G3 opakování → G4 blokované fráze (`always`/`alone` pod 4 s) → G5 víc než 8 slov
-  za sekundu nahrávky (od 7 slov) → zkratka (celý diktát) → slovník → `tidy`. Prázdný výsledek po zásahu pojistky
-  = `blocked`, bez zásahu `empty`. Kódy pojistek `GUARD` v `guards.ts`, čísla jako konstanty tamtéž. Místo pro
-  čištění modelem (VO07) je vyznačené.
+  za sekundu nahrávky (od 7 slov) → zkratka (celý diktát) → slovník → „nový řádek"/„nový odstavec" a výplňová
+  slova (`text.ts`, bez modelu, vždy) → čištění (VO07, níž) → `tidy`. Prázdný výsledek po zásahu pojistky
+  = `blocked`, bez zásahu `empty`. Kódy pojistek `GUARD` a `CLEANUP_GUARD` v `guards.ts`, čísla jako konstanty
+  tamtéž. G3 nikdy neslučuje čísla („sedm sedm sedm" je telefon).
 - **Slovník** (`dictionary.ts`): náhrady `heard_as → term` po celých slovech bez ohledu na velikost písmen
   a diakritiku, srovnání velkých písmen u výrazu, který je má; nápověda pro přepis „Diktát v češtině. Výrazy: …“
   do 450 znaků (strop Groq 224 tokenů), nejpoužívanější slova první (`uses += 1` při použití). Skloňované tvary
@@ -1640,3 +1641,32 @@ Tady jen to, co je v kódu.
   ukázková odpověď `fixtures/voice-groq-verbose.json`), `app/api/public/voice/dictate/__tests__/dictate.test.ts`
   (route nad PGlite s migrací 136).
 - **Vývojový skript:** `scripts/voice-stt-test.mjs` — porovnání přepisu češtiny (Groq, OpenAI), nahrávky mimo repo.
+- **Čištění modelem (VO07, `cleanup.ts`):** role `fast` (`aiModel`), `thinking: disabled`, `output_config.effort: low`,
+  **bez `temperature`** (Haiku 5.5 jinou než výchozí odmítne 400), limit 6 s (`CLEANUP_TIMEOUT_MS`, G10) bez
+  opakování, `max_tokens` = 0,7 × znaky + 150 (nejvýš 4096). Přepis jde v `<prepis>` jako data, výstup se bere jen
+  z `<text>`; `stop_reason` `refusal`/`max_tokens` = selhání. Prompt: styl podle `voice_settings.styles`
+  (`formal|neutral|casual|exact`, „Přesně" nic nepřeformulovává), slovník do 30 výrazů, aktivní `voice_rules`
+  kind `rule` (do 20) a 5 posledních různých dvojic z `voice_corrections`. Diktát do 3 slov se nečistí
+  (`finishShort`: velké písmeno, tečka jen u `formal`/`neutral` od 2 slov).
+- **Kontrola výstupu (`checkCleanup` v `guards.ts`):** formát (zbytky značek, Markdown navíc) → G7 délka (počítá
+  číslo jako jedno slovo; do 12 slov ≥ 0,25×, jinak ≥ 0,5×, nejvýš 1,35× + 4) → G6 začátek nebo věta asistenta
+  (porovnává se s přepisem, „Jasně…" z diktátu projde) → G8 pozdrav/podpis navíc, nová slova (každé slovo přepisu
+  platí jednou, jiný tvar téhož slova a výrazy ze slovníku smí; 3 nová za sebou = vložená věta; tolerance
+  max(3, 20 %), u „Přesně" max(1, 10 %); **nové jméno s velkým písmenem uprostřed věty vždy odmítne**), otočený
+  zápor („nechci" → „chci", „není" → „je") → G9 čísla (`numbers.ts`: číslo ve výstupu musí v přepisu zaznít
+  číslicemi nebo slovy včetně pořadových čísel, měsíců, „odpoledne" + 12 a telefonů po číslicích; číslo z přepisu
+  nesmí zmizet, leda po samoopravě „teda/vlastně/pardon"). Neprojde-li, vloží se přepis po slovníku, `status = raw`
+  a kód do `guards` (`cleanup_assistant|length|novel|negation|numbers|format|timeout|error|refusal|truncated|
+  not_configured|off`, `cost_cap`).
+- **Denní strop (G11):** `loadPipelineContext` načte v téže dávce útratu za pražský den (`created_at`, ne čas
+  z Macu); `spentTodayUsd + cena přepisu ≥ daily_cost_cap_usd` → bez čištění (`cost_cap`) a `notifyCostCapOnce`
+  (zámek `voice_settings.cost_cap_notified_on` = den, upozornění `voice_cost_cap` nejvýš jednou denně). Strop 0 =
+  čištění nikdy.
+- **Ceny (`costs.ts`):** `LLM_PRICE_PER_MTOK` klíčované výchozími modely rolí (Haiku 5.5 $0,10 / $0,50, Sonnet 5.5
+  $2 / $10 za milion), neznámý model nejdražší známou cenou (kvůli stropu). Zápis diktátu má nově `words_corrected`
+  (`changedWords`: kolik slov změnilo čištění včetně výplňových, bez náhrad slovníku), `llm_model`, `llm_ms`,
+  `tokens_in`, `tokens_out` a `cost_usd` přepisu i čištění.
+- **Zlatá sada:** `lib/admin/voice/__tests__/golden/*.json` (69 případů: běžné věty, samoopravy, čísla, angličtina,
+  slovník, útoky), test `voice-golden.test.ts` v `npm test` s podvrženou odpovědí modelu. Se skutečným modelem jen
+  `node scripts/voice-eval.mjs --ano` (pouští `voice-eval.live.test.ts` s `VOICE_EVAL=1`, stojí pod 1 Kč). Další
+  testy `lib/__tests__/voice-cleanup.test.ts` (prompt, skutečné SDK s podvrženým `fetch`, časový limit, čísla, strop).

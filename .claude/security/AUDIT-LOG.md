@@ -1038,6 +1038,25 @@ Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
 - Left open: přijatá rizika v DECISIONS #055 (klíč v Klíčence Macu, text diktátů bez lhůty, společný
   `AGENT_KEY_PEPPER`). Migrace 136 na testovacím Neonu ano, na produkci ne.
 
+## 2026-11-26 — review ZakazIQ Voice VO07 (čištění modelem, útok pokynem v diktátu)
+
+- Scope: `lib/admin/voice/{cleanup,guards,numbers,text,pipeline,store,costs}.ts`, `app/api/public/voice/dictate/route.ts`,
+  `lib/notifications.ts`, `components/NotificationList.tsx`, `scripts/voice-eval.mjs` (web-security-review, pět oblastí:
+  tajné údaje jen na serveru a v `.env.local`, validace beze změny z VO02, žádné HTML, parametrizované dotazy, limity).
+- Prošlo: diktát jde modelu jako data v `<prepis>` (značky odstraněné), bez nástrojů, výstup se jen vrací Macu
+  jako text (JSON, nikdy HTML); G6–G9 vracejí přepis při odpovědi asistenta, větě/pozdravu/podpisu/jménu navíc,
+  vynechání, změně čísla a otočení záporu (69 případů zlaté sady, z toho útoky). Klient Anthropic bez opakování
+  s limitem 6 s; chyby se logují jen druhem (`API 529`, časový limit), text diktátu ani odpověď modelu ne (test).
+  Strop nákladů počítá útratu podle `created_at` (čas z Macu by šel posunout), upozornění atomicky jednou denně
+  a bez textu diktátu. Žádná nová env, CSP beze změny (prohlížeč na Anthropic nesahá), dotazy parametrizované.
+- Fixed během sezení: otočený zápor a změna jména by se vešly do tolerance nových slov (doplněné kontroly);
+  G3 slučovala telefonní číslo diktované po číslicích; slovník a příklady oprav (zčásti z Macu) šly do systémového
+  promptu bez úpravy — teď bez `<>` a s větou, že nejsou pokyny.
+- Fix before launch (VO12): denní strop nezastaví přepis, jen čištění; ukradený klíč do zneplatnění platí přepis
+  až do limitu po zařízení (DECISIONS #055 (g)). Návrh: nad násobkem stropu odmítnout i přepis.
+- Left open: běh `scripts/voice-eval.mjs --ano` se skutečným modelem (Kryštof); posun významu jedním obyčejným
+  slovem kontrola nepozná (DECISIONS #055 (e)).
+
 ## 2026-11-26 — review ZakazIQ Voice VO02 (veřejný vstup diktátu)
 
 - Scope: `app/api/public/voice/{dictate,config}/route.ts`, `lib/admin/voice/{http,stt,pipeline,store,guards,dictionary,categories,text,costs}.ts` (web-security-review).

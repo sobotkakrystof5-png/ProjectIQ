@@ -113,13 +113,13 @@ pozornost") a model na čištění by mohl odpovídat místo opisování. Proto 
 |---|---|---|---|
 | G1 | Mac + server | Řeč kratší než 300 ms | Přepis se nevolá, `status = empty` |
 | G2 | Server | Segment s `no_speech_prob > 0,6` a `avg_logprob < −1`, nebo `compression_ratio > 2,4` | Segment se zahodí (jen u Groq, OpenAI segmenty nemá) |
-| G3 | Server | Opakování („a a a a", stejná věta třikrát) | Sloučí se, čísla zůstanou (hranice slov) |
+| G3 | Server | Opakování („a a a a", stejná věta třikrát) | Sloučí se; čísla se neslučují nikdy („sedm sedm sedm" je telefon, VO07) |
 | G4 | Server | Blokované fráze: `always` = vždy pryč, `alone` = jen když je to celý přepis krátké nahrávky (< 4 s) | Zahodí se; zbude-li nic, `status = blocked` |
 | G5 | Server | Víc než 8 slov za sekundu řeči | `status = blocked` (přepis nemůže odpovídat nahrávce) |
 | G6 | Server | Čištění: výstup začíná jako odpověď asistenta („Jasně", „Zde je", „Sure") | Vrátí se přepis, `status = raw` |
-| G7 | Server | Čištění: délka mimo meze (méně než 0,5× slov, u krátkých 0,3×; víc než 1,35× + 4) | `raw` |
-| G8 | Server | Čištění: nová slova, která v přepisu ani ve slovníku nejsou, víc než max(3, 20 %) | `raw` |
-| G9 | Server | Čištění: číslo ve výstupu, které v přepisu není | `raw` |
+| G7 | Server | Čištění: délka mimo meze (méně než 0,5× slov, u krátkých do 12 slov 0,25×; víc než 1,35× + 4; číslo = jedno slovo) | `raw` |
+| G8 | Server | Čištění: nová slova, která v přepisu ani ve slovníku nejsou, víc než max(3, 20 %) (styl Přesně max(1, 10 %)); tři nová za sebou; pozdrav nebo podpis navíc; **nové jméno** s velkým písmenem uprostřed věty; **otočený zápor** („nechci" → „chci") | `raw` |
+| G9 | Server | Čištění: číslo ve výstupu, které v přepisu nezaznělo (číslicemi ani slovy), nebo číslo z přepisu zmizelo (kromě samooprav „teda", „vlastně") | `raw` |
 | G10 | Server | Časový limit čištění 6 s, přepisu 20 s (pak záloha) | `raw` / záloha / `error` |
 | G11 | Server | Denní strop nákladů | Bez čištění, `raw` + upozornění |
 | G12 | Server | **Ozvěna nápovědy:** přepis tvoří jen slova z nápovědy slovníku (`prompt`), ve stejném pořadí, nebo je s ní shodný po normalizaci | Zahodí se, `status = blocked`. Přidáno ve VO00: OpenAI s nápovědou na 5 s ticha vrátilo celou nápovědu jako přepis (oddíl 12a) |
@@ -412,7 +412,7 @@ v `cost_usd`. Strop D-V11.
 | Groq limity | 20 požadavků/min, 2 000/den, 7 200 s zvuku/h, 28 800 s/den | stránka uvádí základ pro Developer plan, hodnoty free plánu nepotvrzené (vidět jsou jen v console.groq.com/settings/limits) | console.groq.com/docs/rate-limits |
 | OpenAI `gpt-4o-transcribe` | $0,006 / min (odhad OpenAI) | $2,50 / $10 za 1M tokenů | developers.openai.com/api/docs/pricing |
 | OpenAI `gpt-4o-mini-transcribe` | $0,003 / min (odhad OpenAI) | $1,25 / $5 za 1M tokenů; tenhle model je dnes v `.env.local` | tamtéž |
-| Claude Haiku 5.5 (role `fast`) | $0,10 vstup / $0,50 výstup za 1M tokenů | do 100K tokenů promptu; přemýšlení se platí jako výstup | ceník Claude API (stav 2026-11-03) |
+| Claude Haiku 5.5 (role `fast`) | $0,10 vstup / $0,50 výstup za 1M tokenů | do 100K tokenů promptu; přemýšlení se platí jako výstup (čištění ho vypíná); `temperature` jiná než výchozí = 400 | ceník Claude API (stav 2026-11-03), znovu ověřeno 2026-11-26 v referenci Claude API |
 | Claude Sonnet 5.5 (role `smart`, týdenní rozbor) | $2 / $10 za 1M tokenů | | tamtéž |
 
 Groq parametry (tamtéž): `verbose_json` vrací segmenty s `avg_logprob`, `compression_ratio`
@@ -514,7 +514,7 @@ nápovědu** a G12 ji zahodilo (`blocked`). Čísla dál slovy („čtyřicet os
 | VO04 | čeká | | |
 | VO05 | čeká | | |
 | VO06 | čeká | | |
-| VO07 | čeká | | |
+| VO07 | hotovo | 2026-11-26 | Čištění Claude `fast` (bez přemýšlení a bez `temperature`), G6–G11 + otočený zápor, strop s upozorněním jednou denně, zlatá sada 69 případů v `npm test`, `scripts/voice-eval.mjs`. Odchylky: G7 u krátkých 0,25× (samoopravy), G3 neslučuje čísla, výplňová slova a „nový řádek" bez modelu. **Se skutečným modelem ani na Macu zatím neověřeno** (`voice-eval.mjs --ano` čeká na Kryštofa) |
 | VO08 | čeká | | |
 | VO09 | čeká | | |
 | VO10 | čeká | | |

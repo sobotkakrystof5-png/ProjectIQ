@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO01 a VO02** (R-148): migrace 136, zařízení
+> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO07, milník 2** (R-148): diktát se učeše modelem
+> Claude `fast` podle stylu aplikace a kontrola G6–G9 (+ otočený zápor) vrátí přepis, kdykoli model odpoví,
+> přidá, vynechá, změní číslo nebo jméno. Denní strop nákladů s jedním upozorněním do zvonku, zlatá sada
+> 69 případů v `npm test`. **Se skutečným modelem zatím neověřeno** (`node scripts/voice-eval.mjs --ano`).
+>
+> Předchozí: 2026-11-26 · **ZakazIQ Voice — VO01 a VO02** (R-148): migrace 136, zařízení
 > s klíčem v `/dashboard/voice` a příjem diktátu `POST /api/public/voice/dictate` (přepis Groq se zálohou
 > OpenAI, pojistky G1–G5 a G12, slovník). Naostro ověřené přes OpenAI a testovací Neon, ne na produkci.
 > Větev `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`). VO00 čeká na klíč Groq.
@@ -114,9 +119,11 @@
 **ZakazIQ Voice (R-148, od 2026-11-25, větev `admin/zakaziq-voice`):** diktování na Macu přes Fn,
 zpracování a statistiky v adminu `/dashboard/voice`. Třináct sezení VO00–VO12, plán
 `docs/admin/VOICE-PLAN.md` (stav v oddílu 14), prompty `new - area of zakaziq/prompty/voice/`.
-VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01 a VO02 hotové 2026-11-26**: migrace 136 v repu a na
-testovacím Neonu, `/dashboard/voice` se zařízeními, `POST /api/public/voice/dictate` a `GET …/config`.
-Další krok: **VO07** (čištění textu, jde hned) nebo **VO03** (kostra aplikace na Macu, potřebuje certifikát).
+VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01, VO02 a VO07 hotové 2026-11-26**: migrace 136 v repu a na
+testovacím Neonu, `/dashboard/voice` se zařízeními, `POST /api/public/voice/dictate` a `GET …/config`, čištění
+Claude s kontrolou výstupu a denním stropem (milník 2, bez skutečného modelu neověřené).
+Další krok: **VO10** (admin stránka a karta na Dnes, jde hned), **VO08** (učení z logů, po VO07) nebo **VO03**
+(kostra aplikace na Macu, potřebuje certifikát).
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
@@ -1662,6 +1669,12 @@ ve VO02. Žádný nový npm balíček.
   (3) před VO03 certifikát pro podpis: Přístup ke klíčence → Asistent certifikátů → Vytvořit certifikát,
   název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu **Code Signing**
   (dnes 0 identit pro podpis). Zatím otestováno jen OpenAI na syntetickém hlasu (plán 12a) · Kryštof · od 2026-11-25
+- [ ] **ZakazIQ Voice — čištění se skutečným modelem neověřené (VO07):** zlatá sada běží s podvrženými odpověďmi.
+  Pustit `node scripts/voice-eval.mjs --ano` (volá Claude, stojí pod 1 Kč) a výsledek zapsat do plánu oddíl 14;
+  po VO06 navíc 10 skutečných diktátů v Mailu, Slacku a Claude (kolik skončilo `raw` a proč) · Kryštof · od 2026-11-26
+- [ ] **ZakazIQ Voice — denní strop nezastaví přepis:** nad `daily_cost_cap_usd` se jen přeskočí čištění (D-V11),
+  přepis běží dál až do limitu 400 diktátů za hodinu na zařízení; ukradený klíč tak do zneplatnění stojí jednotky USD
+  za hodinu. Návrh pro VO12: nad násobkem stropu odmítnout i přepis (429) — rozhodne Kryštof · DECISIONS #055 (g) · od 2026-11-26
 - [ ] **ZakazIQ Voice — `AGENT_KEY_PEPPER` chybí v lokálním `.env.local`:** bez něj lokálně nejde přidat zařízení
   a `/api/public/voice/*` vrací 503. Doplnit libovolný náhodný řetězec aspoň 32 znaků, jen pro vývoj;
   produkce má vlastní ve Vercelu · Kryštof · od 2026-11-26
@@ -2081,6 +2094,25 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice — VO07, milník 2, R-148)
+- **feat** Čištění diktátu modelem role `fast` (`lib/admin/voice/cleanup.ts`): prompt podle stylu kategorie
+  (Spisovně, Přirozeně, Volně, Přesně), slovník do 30 výrazů, schválená pravidla a 5 posledních oprav; přepis jako data
+  v `<prepis>`, výstup jen z `<text>`; bez přemýšlení, `effort: low`, **bez `temperature`** (Haiku 5.5 jinou než
+  výchozí odmítne 400 — odchylka od promptu VO07), limit 6 s bez opakování. Diktát do 3 slov se nečistí.
+- **feat** Kontrola výstupu `checkCleanup` (G6 odpověď asistenta, G7 délka, G8 nová slova, pozdrav/podpis, nové jméno,
+  otočený zápor, G9 čísla přes `lib/admin/voice/numbers.ts` — česká čísla slovy, pořadová čísla, měsíce, odpoledne,
+  telefony po číslicích, samoopravy). Neprojde-li, vloží se přepis po slovníku se stavem `raw` a kódem pojistky.
+- **feat** Denní strop nákladů (G11): útrata za pražský den v téže dávce jako nastavení, nad stropem bez čištění
+  a upozornění `voice_cost_cap` nejvýš jednou denně (zámek v `voice_settings`). Ceny čištění v `costs.ts`
+  (Haiku 5.5 $0,10 / $0,50, ověřeno v referenci Claude API). Zápis diktátu nově plní `words_corrected`, `llm_*`,
+  `tokens_*`. „Nový řádek", „nový odstavec" a výplňová slova (ehm, eee, hm) bez modelu, vždy.
+- **fix** G3 slučovala čísla („sedm sedm sedm" → „sedm", rozbité telefonní číslo); čísla se už neslučují.
+- **chore** Zlatá sada `lib/admin/voice/__tests__/golden/` (69 případů včetně útoků) v `npm test`, testy
+  `voice-cleanup.test.ts` (skutečné SDK s podvrženým `fetch`, časový limit, strop), route test se stropem
+  a upozorněním. `scripts/voice-eval.mjs` se skutečným modelem jen na vyžádání. Ověřeno: `tsc`, `npm test` (jen 4
+  známá selhání), `build:check`. Se skutečným modelem ani na Macu neověřeno. Bez migrace. Bezpečnost DECISIONS #055
+  doplnění (zpracovatel Anthropic, útok pokynem v diktátu, strop nezastaví přepis), STATE, AUDIT-LOG.
 
 ### 2026-11-26 (ZakazIQ Voice — VO02, R-148)
 - **feat** Příjem diktátu `POST /api/public/voice/dictate` a `GET /api/public/voice/config`: ověření klíče zařízení,

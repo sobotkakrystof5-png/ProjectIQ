@@ -1,0 +1,122 @@
+[
+  {
+    "nazev": "pracovní zpráva s výplňovým slovem a jménem ze slovníku",
+    "prepis": "ehm posílám ti tu nabídku pro prvotko zítra ráno",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Posílám ti tu nabídku pro Prvotka zítra ráno.</text>",
+    "stav": "ok",
+    "text": "Posílám ti tu nabídku pro Prvotka zítra ráno."
+  },
+  {
+    "nazev": "e-mail s pozdravem, který v diktátu zazněl",
+    "prepis": "dobrý den posílám vám fakturu za říjen",
+    "kategorie": "email",
+    "odpoved": "<text>Dobrý den, posílám vám fakturu za říjen.</text>",
+    "stav": "ok",
+    "text": "Dobrý den, posílám vám fakturu za říjen."
+  },
+  {
+    "nazev": "spisovný styl převede hovorový tvar",
+    "prepis": "mám tady velkej problém s tím webem",
+    "kategorie": "email",
+    "odpoved": "<text>Mám tady velký problém s tím webem.</text>",
+    "stav": "ok",
+    "text": "Mám tady velký problém s tím webem."
+  },
+  {
+    "nazev": "osobní zpráva bez tečky na konci",
+    "prepis": "jo jasně dorazím kolem osmé",
+    "kategorie": "personal_msg",
+    "odpoved": "<text>Jo, jasně, dorazím kolem osmé</text>",
+    "stav": "ok",
+    "text": "Jo, jasně, dorazím kolem osmé"
+  },
+  {
+    "nazev": "otázka dostane otazník",
+    "prepis": "můžeš mi poslat ten odkaz na schůzku",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Můžeš mi poslat ten odkaz na schůzku?</text>",
+    "stav": "ok",
+    "text": "Můžeš mi poslat ten odkaz na schůzku?"
+  },
+  {
+    "nazev": "dlouhá věta do dokumentu",
+    "prepis": "v příštím týdnu dokončíme úvodní stránku a pak se pustíme do kontaktního formuláře který bude posílat poptávky rovnou do systému",
+    "kategorie": "document",
+    "odpoved": "<text>V příštím týdnu dokončíme úvodní stránku a pak se pustíme do kontaktního formuláře, který bude posílat poptávky rovnou do systému.</text>",
+    "stav": "ok",
+    "text": "V příštím týdnu dokončíme úvodní stránku a pak se pustíme do kontaktního formuláře, který bude posílat poptávky rovnou do systému."
+  },
+  {
+    "nazev": "„nový řádek“ se převede na zalomení ještě před modelem",
+    "prepis": "ahoj Petře nový řádek posílám podklady k webu",
+    "kategorie": "personal_msg",
+    "odpoved": "<text>Ahoj Petře,\nposílám podklady k webu</text>",
+    "stav": "ok",
+    "text": "Ahoj Petře,\nposílám podklady k webu"
+  },
+  {
+    "nazev": "„nový odstavec“ dá prázdný řádek",
+    "prepis": "díky za schůzku nový odstavec v příloze je zápis",
+    "kategorie": "document",
+    "odpoved": "<text>Díky za schůzku.\n\nV příloze je zápis.</text>",
+    "stav": "ok",
+    "text": "Díky za schůzku.\n\nV příloze je zápis."
+  },
+  {
+    "nazev": "výplňová slova uprostřed věty",
+    "prepis": "takže ehm zítra ehm pošlu tu fakturu",
+    "kategorie": "work_msg",
+    "odpoved": "<text>Takže zítra pošlu tu fakturu.</text>",
+    "stav": "ok",
+    "text": "Takže zítra pošlu tu fakturu."
+  },
+  {
+    "nazev": "krátký diktát bez modelu, tečka v pracovní zprávě",
+    "prepis": "pošli to",
+    "kategorie": "work_msg",
+    "odpoved": null,
+    "stav": "ok",
+    "text": "Pošli to."
+  },
+  {
+    "nazev": "krátká osobní zpráva bez tečky",
+    "prepis": "jo díky",
+    "kategorie": "personal_msg",
+    "odpoved": null,
+    "stav": "ok",
+    "text": "Jo díky"
+  },
+  {
+    "nazev": "krátké zadání pro AI bez tečky",
+    "prepis": "spusť testy",
+    "kategorie": "ai_prompt",
+    "odpoved": null,
+    "stav": "ok",
+    "text": "Spusť testy"
+  },
+  {
+    "nazev": "jedno slovo bez tečky",
+    "prepis": "ano",
+    "kategorie": "email",
+    "odpoved": null,
+    "stav": "ok",
+    "text": "Ano"
+  },
+  {
+    "nazev": "krátký pozdrav v e-mailu dostane tečku",
+    "prepis": "dobrý den",
+    "kategorie": "email",
+    "odpoved": null,
+    "stav": "ok",
+    "text": "Dobrý den."
+  },
+  {
+    "nazev": "jen výplňová slova = nic se neřeklo",
+    "prepis": "ehm eee",
+    "kategorie": "other",
+    "odpoved": null,
+    "stav": "empty",
+    "text": ""
+  }
+]

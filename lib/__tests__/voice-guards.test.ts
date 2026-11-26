@@ -56,7 +56,10 @@ describe('pojistky', () => {
     expect(collapseRepeats('a pak a pak a pak jsem šel').text).toBe('a pak jsem šel')
     expect(collapseRepeats('ano ano, dobře')).toEqual({ text: 'ano ano, dobře', collapsed: false })
     expect(collapseRepeats('stojí 1000 korun').text).toBe('stojí 1000 korun')
-    expect(collapseRepeats('10 10 10 kusů').text).toBe('10 kusů')
+    // Čísla se neslučují (VO07): „sedm sedm sedm" je začátek telefonního čísla.
+    expect(collapseRepeats('10 10 10 kusů')).toEqual({ text: '10 10 10 kusů', collapsed: false })
+    expect(collapseRepeats('volej na sedm sedm sedm jedna dva').collapsed).toBe(false)
+    expect(collapseRepeats('7 7 7 1 2 3').text).toBe('7 7 7 1 2 3')
   })
 
   it('G4 always vezme frázi i se zbytkem věty, alone jen u krátké nahrávky', () => {

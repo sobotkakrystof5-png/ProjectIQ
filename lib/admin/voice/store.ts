@@ -1,5 +1,7 @@
 import 'server-only'
 import { adminDb, q } from '@/lib/admin/db'
+import { createNotification } from '@/lib/notifications'
+import { getPragueTodayISO } from '@/lib/prague-time'
 import { DEFAULT_STYLES, STYLE_KEYS, VOICE_CATEGORIES, type VoiceCategory, type VoiceStyle } from './categories'
 import type { VoiceSnippet, VoiceTerm } from './dictionary'
 import type { BlockPhrase } from './guards'
@@ -71,6 +73,22 @@ const SETTINGS_SQL = q`SELECT key, value FROM voice_settings`
 const TERMS_SQL = q`SELECT id::text, kind, term, heard_as, expansion, source, uses
                      FROM voice_terms ORDER BY uses DESC, created_at ASC LIMIT 400`
 const BLOCKLIST_SQL = q`SELECT text, mode FROM voice_rules WHERE kind = 'blocklist' AND active ORDER BY created_at ASC LIMIT 200`
+// Schválená pravidla stylu pro čištění (plní VO08 po schválení v adminu).
+const RULES_SQL = q`SELECT text FROM voice_rules WHERE kind = 'rule' AND active ORDER BY created_at ASC LIMIT 20`
+// Pět posledních různých oprav, které Kryštof udělal po vložení (plní VO08/VO09).
+const EXAMPLES_SQL = q`
+  SELECT heard, fixed FROM (
+    SELECT DISTINCT ON (lower(heard), fixed) heard, fixed, created_at
+      FROM voice_corrections
+     ORDER BY lower(heard), fixed, created_at DESC
+  ) latest
+  ORDER BY created_at DESC LIMIT 5
+`
+// Útrata za dnešní pražský den (G11). Podle okamžiku zpracování, ne času z Macu.
+const SPENT_TODAY_SQL = q`
+  SELECT coalesce(sum(cost_usd), 0)::float8 AS usd FROM voice_dictations
+   WHERE created_at >= (date_trunc('day', now() AT TIME ZONE 'Europe/Prague') AT TIME ZONE 'Europe/Prague')
+`
 
 type TermRow = {
   id: string
@@ -95,16 +113,55 @@ function splitTerms(rows: TermRow[]): { terms: VoiceTerm[]; snippets: VoiceSnipp
 
 /** Všechno, co potřebuje cesta diktátu, jedním požadavkem. */
 export async function loadPipelineContext(): Promise<{ config: PipelineConfig; settings: VoiceSettings }> {
-  const [settingsRows, termRows, ruleRows] = await adminDb.batch([SETTINGS_SQL, TERMS_SQL, BLOCKLIST_SQL])
+  const [settingsRows, termRows, blockRows, ruleRows, exampleRows, spentRows] = await adminDb.batch([
+    SETTINGS_SQL,
+    TERMS_SQL,
+    BLOCKLIST_SQL,
+    RULES_SQL,
+    EXAMPLES_SQL,
+    SPENT_TODAY_SQL,
+  ])
   const { terms, snippets } = splitTerms(termRows as TermRow[])
+  const settings = parseSettings(settingsRows as { key: string; value: unknown }[])
   return {
-    settings: parseSettings(settingsRows as { key: string; value: unknown }[]),
+    settings,
     config: {
       terms,
       snippets,
-      blocklist: (ruleRows as { text: string; mode: 'always' | 'alone' }[]).map((r): BlockPhrase => ({ text: r.text, mode: r.mode })),
+      blocklist: (blockRows as { text: string; mode: 'always' | 'alone' }[]).map((r): BlockPhrase => ({ text: r.text, mode: r.mode })),
+      cleanup: {
+        enabled: settings.cleanupEnabled,
+        dailyCapUsd: settings.dailyCostCapUsd,
+        spentTodayUsd: Number((spentRows as { usd: number | string }[])[0]?.usd ?? 0),
+        rules: (ruleRows as { text: string }[]).map((r) => r.text),
+        examples: (exampleRows as { heard: string; fixed: string }[]).map((r) => ({ heard: r.heard, fixed: r.fixed })),
+      },
     },
   }
+}
+
+/**
+ * G11: denní strop nákladů je vyčerpaný → upozornění do zvonku, nejvýš jednou
+ * za pražský den. Zámek je zápis dne do `voice_settings` (`cost_cap_notified_on`):
+ * kdo ho změní, ten upozorní, takže ani dva souběžné diktáty nepošlou dvě.
+ * Vrací, jestli upozornil.
+ */
+export async function notifyCostCapOnce(capUsd: number, notify: typeof createNotification = createNotification): Promise<boolean> {
+  const day = getPragueTodayISO()
+  const claimed = await adminDb<{ key: string }>`
+    INSERT INTO voice_settings (key, value) VALUES ('cost_cap_notified_on', to_jsonb(${day}::text))
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+     WHERE voice_settings.value IS DISTINCT FROM EXCLUDED.value
+    RETURNING key
+  `
+  if (!claimed.length) return false
+  await notify({
+    type: 'voice_cost_cap',
+    title: 'Diktování dnes běží bez čištění',
+    body: `Diktáty dnes stály ${capUsd.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} USD a víc, takže se vkládá jen přepis. Zítra se čištění vrátí samo.`,
+    link: '/dashboard/voice',
+  })
+  return true
 }
 
 /** Pro `/config`: slovník, zkratky a nastavení jedním požadavkem. */
@@ -173,14 +230,14 @@ export async function saveDictation(
     q`
       INSERT INTO voice_dictations (
         id, device_id, started_at, duration_ms, speech_ms, mode, app_bundle_id, app_name, category,
-        status, guards, raw_text, final_text, words, dictionary_fixes,
-        stt_provider, stt_model, stt_ms, total_ms, audio_seconds, cost_usd
+        status, guards, raw_text, final_text, words, words_corrected, dictionary_fixes,
+        stt_provider, stt_model, llm_model, stt_ms, llm_ms, total_ms, audio_seconds, tokens_in, tokens_out, cost_usd
       ) VALUES (
         ${meta.id}, ${meta.deviceId}, ${meta.startedAt}, ${meta.durationMs}, ${meta.speechMs}, ${meta.mode},
         ${meta.appBundleId}, ${meta.appName}, ${meta.category},
-        ${out.status}, ${out.guards}, ${rawText}, ${finalText}, ${out.words}, ${out.dictionaryFixes},
-        ${out.sttProvider}, ${out.sttModel}, ${out.sttMs}, ${totalMs}, ${out.audioSeconds},
-        ${Number(out.costUsd.toFixed(6))}
+        ${out.status}, ${out.guards}, ${rawText}, ${finalText}, ${out.words}, ${out.wordsCorrected}, ${out.dictionaryFixes},
+        ${out.sttProvider}, ${out.sttModel}, ${out.llmModel}, ${out.sttMs}, ${out.llmMs}, ${totalMs}, ${out.audioSeconds},
+        ${out.tokensIn}, ${out.tokensOut}, ${Number(out.costUsd.toFixed(6))}
       )
       ON CONFLICT (id) DO NOTHING
       RETURNING id
