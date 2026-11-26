@@ -1738,3 +1738,42 @@ Tady jen to, co je v kódu.
   blokovaná fráze, rozbor AI s podvrženou odpovědí, pondělí, „jen čísla", úklid; naučené slovo v nápovědě přepisu
   i v promptu čištění), route testy v `dictate.test.ts` (`/feedback`, `/terms`, `/settings`: 404, 409, 400, 413,
   401, 403, limit 429).
+- **Aplikace na Macu (VO03, `voice-mac/`, postup v `voice-mac/README.md`):** Swift balíček bez cizích závislostí
+  (nástroje Swift 6, jazykový režim 5, macOS 14), dva cíle: **`ZakazIQVoiceCore`** (logika bez rozhraní, kterou
+  pokrývají testy) a **`ZakazIQVoice`** (aplikace, AppKit + SwiftUI). Sestavení `make -C voice-mac test app install`
+  (`run`, `icon`, `clean`); výstup `voice-mac/build/ZakazIQ Voice.app`, mezivýsledky `voice-mac/.build/` (obojí
+  v `.gitignore`). Testy jsou **Swift Testing** (`import Testing`), protože Command Line Tools XCTest nemají.
+  - **Podpis:** `make app` podepíše identitou `SIGN_ID` (výchozí „ZakazIQ Voice vývoj", vlastní certifikát
+    z Asistenta certifikátů, typ Podepisování kódu; důvěra nastavovat nemusí). Makefile najde otisk SHA-1
+    v `security find-identity -p codesigning`, podepisuje s hardened runtime, `--identifier cz.zakaziq.voice`
+    a jediným oprávněním `com.apple.security.device.audio-input`; bez identity skončí s návodem.
+    `SIGN_ID=-` = ad hoc na zkoušku (oprávnění se pak po každém sestavení ztratí). Poznávací znak pro macOS je
+    `certificate leaf = H"…"`, takže oprávnění i přístup ke Klíčence přežijí nové sestavení.
+  - **Lišta menu** (`App/AppDelegate.swift`, `NSStatusItem`, `LSUIElement`): ikona 2×2 dílky jako šablonový
+    obrázek (`Brand/TileMark.swift`), menu: stav připojení · Diktovat (vypnuté do VO04) · Otevřít ZakazIQ Voice
+    (⌘,) · Vyzkoušet připojení (otevře okno, ať je výsledek vidět) · Ukončit (⌘Q). Bez klíče se po spuštění
+    otevře okno, s klíčem se připojení ověří potichu na pozadí.
+  - **Okno Nastavení** (`Settings/SettingsView.swift`, SwiftUI v `NSWindow`, jen světlé): adresa serveru,
+    klíč zařízení (vložit, zakrytý, Smazat se Zpět 8 s), **Vyzkoušet připojení** (jediná hlavní akce),
+    oprávnění Mikrofon / Sledování vstupu / Zpřístupnění se stavem a tlačítkem Povolit nebo Otevřít Nastavení
+    (`Permissions/Permissions.swift`; systémový dotaz jen poprvé, pak rovnou Nastavení systému; stav se při
+    otevřeném okně obnovuje po 1,5 s). Barvy a písma jen z `Brand/Dilky.swift` (hex z plánu, oddíl 9),
+    Instrument Sans a JetBrains Mono přibalené v `Resources/Fonts` (OFL), registrované jen pro proces.
+    Ikony žádné (Lucide v Swiftu není), stav nese tečka a text. Stav okna i menu drží `App/AppModel.swift`.
+  - **Adresa** (`ServerAddress`): jen `https://`, výjimka `localhost`/`127.0.0.1`/`::1`; bez schématu localhost
+    → `http`, jinak `https`; apex `zakaziq.cz` → `www.zakaziq.cz`; cesta, dotaz a přihlašovací údaje se odmítnou.
+    Ukládá se do `UserDefaults` (`serverAddress`) a při čtení se znovu kontroluje.
+  - **Klíč** (`DeviceKey`, `SecretStore`): tvar jako `lib/admin/voice/keys.ts`, jen v Klíčence (obecné heslo,
+    služba `cz.zakaziq.voice`, účet `device-key`, `AfterFirstUnlockThisDeviceOnly`, klasická klíčenka — „data
+    protection" chce tým Apple). Do paměti se načte až při požadavku.
+  - **Klient** (`VoiceClient`): `Authorization: Bearer`, `.ephemeral` relace bez cookie a cache, bez `Origin`,
+    limit 10 s, **přesměrování se nesleduje** (3xx = chyba `redirected`). Odpověď 2xx → model (`ConfigResponse`
+    ignoruje neznámá pole), `{ ok:false, code }` → `.server`, cokoli jiného → „Na téhle adrese ZakazIQ neodpovídá".
+    České hlášky a `isRetryable` (jen síť, 502, 429) ve `VoiceError.swift`; hláška nikdy neukáže kód chyby.
+  - **Ikona aplikace** `Resources/AppIcon.icns` kreslí `Scripts/AppIcon.swift` ze stejné geometrie jako
+    `public/ikony/ikona.svg`, v mřížce ikon macOS (824/1024, stín); `make icon` ji přegeneruje.
+  - **Testy** `voice-mac/Tests/ZakazIQVoiceTests/` (24): adresa (apex → www, http mimo localhost, cesty),
+    `Preferences`, klíč a jeho zakrytí, rozbor odpovědí (`Fixtures/config-ok.json` ve tvaru ze serveru, 401, 404,
+    308, HTML), tvar požadavku (klíč jen v hlavičce, bez `Origin`), síťové chyby a české hlášky.
+  - **Ladicí snímek:** jen sestavení `CONFIG=debug` — `ZAKAZIQ_VOICE_SNAPSHOT=/cesta.png` vykreslí obsah okna
+    do PNG (bez oprávnění Nahrávání obrazovky).

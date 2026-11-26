@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>cz.zakaziq.voice</string>
+  <key>CFBundleName</key>
+  <string>ZakazIQ Voice</string>
+  <key>CFBundleDisplayName</key>
+  <string>ZakazIQ Voice</string>
+  <key>CFBundleExecutable</key>
+  <string>ZakazIQVoice</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>cs</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>14.0</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.productivity</string>
+  <!-- Jen v liště menu, bez ikony v Docku. -->
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSHumanReadableCopyright</key>
+  <string>ZakazIQ · Kryštof Sobotka</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>ZakazIQ Voice nahrává váš hlas jen během diktování, aby ho přepsal na text.</string>
+  <!-- Vývoj proti http://localhost:3000. Jinam aplikace nešifrovaně nepustí (ServerAddress). -->
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key>
+    <true/>
+  </dict>
+</dict>
+</plist>

@@ -513,7 +513,7 @@ nápovědu** a G12 ji zahodilo (`blocked`). Čísla dál slovy („čtyřicet os
 | VO00 | rozpracováno | 2026-11-25 | Plán na větvi `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`), R-148, ceny ověřené, skript testu přepisu hotový. Chybí: klíč Groq, test Groq a skutečného hlasu, certifikát pro podpis |
 | VO01 | hotovo | 2026-11-26 | Migrace 136 v repu a na testovacím Neonu (produkce ne), `/dashboard/voice` se zařízeními, klíč `zk_voice_…`, DECISIONS #055. Za přihlášením neověřené |
 | VO02 | hotovo | 2026-11-26 | `POST /dictate`, `GET /config`, G1–G5 a G12, slovník bez diakritiky, záloha OpenAI. Naostro jen přes OpenAI (Groq bez klíče): odpověď 0,9–1,9 s, G1 i G12 zasáhly. S Groq a za přihlášením neověřené |
-| VO03 | čeká | | |
+| VO03 | rozpracováno | 2026-11-26 | `voice-mac/`: lišta menu s dílky, okno Nastavení (adresa, klíč v Klíčence, Vyzkoušet připojení, tři oprávnění), `make test app install`, 24 testů. Odchylky: Swift Testing místo XCTest (Command Line Tools XCTest nemají), logika v knihovně `ZakazIQVoiceCore`, ikona kreslená skriptem `Scripts/AppIcon.swift` místo `sips` z PNG, bez ikon v okně. Ověřeno: testy, sestavení bez varování, vzhled okna (ladicí snímek), klient naživo (apex 308 → zastaveno, 404, nedostupný localhost). **Chybí certifikát „ZakazIQ Voice vývoj"** — bez něj neprošel `make app` se stálým podpisem, instalace ani připojení s klíčem proti `npm run dev` |
 | VO04 | čeká | | |
 | VO05 | čeká | | |
 | VO06 | čeká | | |

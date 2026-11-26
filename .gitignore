@@ -48,3 +48,7 @@ route-bundle-stats.json
 
 # Snímky a logy Playwright CLI (R-115)
 .playwright-cli/
+
+# ZakazIQ Voice — sestavení aplikace na Macu (voice-mac/Makefile)
+voice-mac/.build/
+voice-mac/build/

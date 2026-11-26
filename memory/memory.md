@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO08, učení z oprav** (R-148): Mac pošle, jak vložený
+> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO03, aplikace na Macu** (R-148): `voice-mac/` se
+> sestaví `make`, běží v liště menu s ikonou dílků a má okno Nastavení (adresa serveru, klíč zařízení jen v Klíčence,
+> Vyzkoušet připojení, tři oprávnění). 24 testů, vzhled ověřený snímkem okna, klient naživo proti produkci.
+> **Čeká na certifikát „ZakazIQ Voice vývoj"** — bez něj neprošel stálý podpis, instalace ani připojení s klíčem.
+>
+> Předchozí: 2026-11-26 · **ZakazIQ Voice — VO08, učení z oprav** (R-148): Mac pošle, jak vložený
 > text vypadá po úpravě (`POST /api/public/voice/feedback`); stejná oprava ve 3 diktátech za 60 dní naučí slovo
 > do slovníku, celý stejný text smazaný 2× dá návrh blokované fráze, v pondělí rozbor AI navrhne pravidla stylu
 > (jen návrhy). Slovník a nastavení jdou měnit z Macu, úklid maže text i dvojice oprav po lhůtě. Ověřeno testy
@@ -136,7 +141,10 @@ a na testovacím Neonu, `POST /api/public/voice/dictate`, `GET …/config` a `GE
 výstupu a denním stropem (milník 2, bez skutečného modelu neověřené), admin s pěti záložkami a karta na Dnes
 (milník 3, za přihlášením neověřené), učení z oprav, slovník a nastavení z Macu (VO08, rozbor AI jen s podvrženou
 odpovědí).
-Další krok: **VO03** (kostra aplikace na Macu, potřebuje certifikát), pak VO09 (zachycení oprav na Macu).
+**VO03 rozpracované 2026-11-26:** kostra aplikace `voice-mac/` (lišta menu, okno Nastavení, Klíčenka, oprávnění,
+`make test app install`) je v kódu a testy prochází; chybí certifikát pro podpis, pak `make -C voice-mac run`
+a Vyzkoušet připojení s klíčem z adminu proti `npm run dev` (Otevřené problémy). Pak VO04 (Fn a nahrávání),
+VO09 (zachycení oprav) navazuje na VO06.
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
@@ -1679,9 +1687,14 @@ ve VO02. Žádný nový npm balíček.
   (2) nahrát ~10 vět vlastním hlasem jako `*.m4a` + `*.txt` s přesným textem do `~/ZakazIQ-voice-test/`
   (e-mail klientovi, Slack, zadání pro Claude s anglickými slovy, čísla a data, „ZakazIQ", „Prvotka",
   „VIZEON") a pustit `node scripts/voice-stt-test.mjs ~/ZakazIQ-voice-test` bez nápovědy i s `--napoveda`,
-  (3) před VO03 certifikát pro podpis: Přístup ke klíčence → Asistent certifikátů → Vytvořit certifikát,
-  název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu **Code Signing**
-  (dnes 0 identit pro podpis). Zatím otestováno jen OpenAI na syntetickém hlasu (plán 12a) · Kryštof · od 2026-11-25
+  (3) certifikát pro podpis — přesunuto do bodu VO03 níž. Zatím otestováno jen OpenAI na syntetickém hlasu
+  (plán 12a) · Kryštof · od 2026-11-25
+- [ ] **ZakazIQ Voice — dokončit VO03 (certifikát a ověření naostro):** (1) Kryštof: Přístup ke klíčenkám → Asistent
+  certifikátů → Vytvořit certifikát, název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu
+  **Code Signing** (důvěru nastavovat netřeba, ověřeno na dočasné klíčence), (2) `make -C voice-mac run` (při prvním
+  podpisu heslo k Macu a „Vždy povolit"), (3) `npm run dev` ve worktree, v adminu Voice › Zařízení nový klíč,
+  vložit do okna, adresa localhost:3000, Vyzkoušet připojení → „Připojeno k zařízení …", (4) povolit mikrofon
+  a zpřístupnění, `make -C voice-mac install` znovu a zkontrolovat, že se na povolení neptá znovu · od 2026-11-26
 - [ ] **ZakazIQ Voice — čištění se skutečným modelem neověřené (VO07):** zlatá sada běží s podvrženými odpověďmi.
   Pustit `node scripts/voice-eval.mjs --ano` (volá Claude, stojí pod 1 Kč) a výsledek zapsat do plánu oddíl 14;
   po VO06 navíc 10 skutečných diktátů v Mailu, Slacku a Claude (kolik skončilo `raw` a proč) · Kryštof · od 2026-11-26
@@ -2110,6 +2123,22 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice — VO03, aplikace na Macu, R-148)
+- **feat** `voice-mac/`: Swift balíček bez cizích závislostí (knihovna `ZakazIQVoiceCore` + aplikace `ZakazIQVoice`),
+  lišta menu s mřížkou 2×2 (Diktovat zatím vypnuté, Otevřít, Vyzkoušet připojení, Ukončit), okno Nastavení v Dílkách
+  (adresa serveru, klíč zařízení v Klíčence se Zpět, `GET /config`, oprávnění Mikrofon / Sledování vstupu /
+  Zpřístupnění), přibalená písma Instrument Sans a JetBrains Mono (OFL), ikona aplikace ze `Scripts/AppIcon.swift`,
+  `Makefile` (test, app s podpisem `SIGN_ID`, install, run, icon), `README.md`. Klient nesleduje přesměrování, apex
+  se přepíše na www, `http` jen localhost. Soubory: `voice-mac/**`, `.gitignore`, `docs/admin/AGENTS-ADMIN.md`,
+  `docs/admin/VOICE-PLAN.md` (stav VO03), `.claude/security/DECISIONS.md` #055 (20)–(23). Bez migrace.
+- **chore** Ověřeno: `swift test` 24 testů (Swift Testing; XCTest v Command Line Tools není), sestavení release
+  i debug bez varování, `make app SIGN_ID=-` složí a podepíše balíček (ad hoc), snímek okna z ladicího sestavení
+  (písma, barvy, oprava odkazu, který SwiftUI obarvil systémovou modrou), klient naživo s vymyšleným klíčem:
+  apex → zastavené přesměrování, `www` → 404 „ZakazIQ neodpovídá", localhost bez serveru → „neodpovídá".
+  Samopodepsaný certifikát bez důvěry `codesign` přijme a poznávací znak je `certificate leaf` (dočasná klíčenka
+  ve scratchpadu, smazaná). **Neověřeno:** stálý podpis (certifikát chybí), instalace, oprávnění přes `open`,
+  Klíčenka a připojení s klíčem proti `npm run dev`, menu v liště okem.
 
 ### 2026-11-26 (ZakazIQ Voice — VO08, učení z oprav, R-148)
 - **feat** `POST /api/public/voice/feedback`: oprava po vložení jen pro diktát téhož zařízení do 24 h, rozdíl po
