@@ -5,6 +5,7 @@ import { purgeMemoryRetention } from '@/lib/admin/memory/store'
 import { purgeOutreachRetention } from '@/lib/admin/outreach-reports'
 import { purgeOutreachEmails } from '@/lib/admin/outreach-calls'
 import { purgeDeletedAttachments } from '@/lib/admin/chat'
+import { purgeVoiceText } from '@/lib/admin/voice/retention'
 import { chatStorageConfigured, deleteStoredFiles } from '@/lib/chat/storage'
 
 // Denní úklid dat klientů po dokončených zakázkách (D-K10, R-076, vercel.json).
@@ -32,7 +33,12 @@ export async function GET(req: NextRequest) {
       console.error('[cron] mazání příloh selhalo:', err instanceof Error ? err.message : 'unknown')
       return null
     })
-    return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails, attachments })
+    // Text diktátů ZakazIQ Voice po nastavené lhůtě (VO08); výchozí bez lhůty = nic.
+    const voice = await purgeVoiceText().catch((err: unknown) => {
+      console.error('[cron] úklid textu ZakazIQ Voice selhal:', err instanceof Error ? err.name : 'unknown')
+      return null
+    })
+    return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails, attachments, voice })
   } catch (e) {
     console.error('cron.client-retention: úklid selhal', { error: e instanceof Error ? e.message : 'unknown' })
     return NextResponse.json({ success: false, error: 'Retention failed' }, { status: 500 })

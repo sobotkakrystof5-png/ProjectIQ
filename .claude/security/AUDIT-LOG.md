@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-26 — review: ZakazIQ Voice VO08, učení z oprav a zápis z Macu
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: necommitnutý diff nad `e54865c` na větvi `admin/zakaziq-voice` — `app/api/public/voice/{feedback,terms,settings}/route.ts`, `lib/admin/voice/{learn,learner,retention,http}.ts`, cron `send-reminders` a `client-retention`, akce `runVoiceLearning`, tajemství v diffu.
+Výsledek: 0 zneužitelných nálezů, 3 opravy před commitem, 2 přijatá rizika.
+Nálezy: (1) Routy mají společné ověření z VO02 (`Origin` 403, klíč v `Authorization`, limit po IP i zařízení), tělo přes `readJsonLimited` se stropem a Zod `.strict()`; oprava je vázaná na `device_id` a 24 h. (2) SQL celé parametrizované, pole přes `unnest(…::text[])`. (3) Rozbor AI: vstup přes `redactSensitive` a oříznutý, výstup přes Zod a kontrolu id, vznikne jen čekající návrh; do logu jen druh chyby. (4) Server action `runVoiceLearning` jde přes `guarded` s `requireAuth`. (5) **Opraveno:** oprava po vložení ukládala opravený text a dvojice i při vypnutém „ukládat text" (porušení „jen čísla", D-V7) — teď jen počet slov. (6) **Opraveno:** úklid textu po lhůtě nechával dvojice oprav z téhož textu. (7) **Opraveno:** tichý `catch` u úklidu v cronu `client-retention` — teď loguje druh chyby a chybějící migraci 136 řeší sám úklid.
+Opraveno: viz (5)–(7), testy doplněné. V diffu žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění (Mac není prohlížeč, cesty bez CORS).
+Zůstává: přijatá rizika DECISIONS #055 (h), (i); rozbor se skutečným modelem neověřený. `curl` proti lokálnímu serveru prošel (oprava 200, cizí `Origin` 403).
+
 ## 2026-11-24 — review: faktura s povinnými údaji (R-142) a druh faktury (R-143)
 Spouštěč: před commitem a deployem (`web-security-review`)
 Rozsah: necommitnutý diff nad `7c2e2f1` — renderer PDF (`lib/invoice-pdf/render.ts`), profil dodavatele (`issuerProfileSaveSchema`, `saveIssuer`), vystavení s druhem (`issueNewInvoice`, `prepareKindIssue`, `issueDraft`), nová akce `getProjectBilling`, koncepty (`saveInvoiceDraft`), projekce do klientského prostoru (`lib/portal/{money,overview}.ts`, migrace 131 a 133), migrace 132, tajemství v diffu.

@@ -38,6 +38,7 @@ import {
   type TermSnapshot,
 } from '@/lib/admin/voice/manage'
 import { SEARCH_MAX } from '@/lib/admin/voice/queries'
+import { runVoiceLearningNow } from '@/lib/admin/voice/learner'
 import { isIsoDate } from '@/lib/prague-time'
 
 // ZakazIQ Voice (R-148): zařízení s klíčem v adminu (VO01). Klíč se vrací jen
@@ -330,5 +331,30 @@ export async function deleteVoiceDictations(raw: unknown): Promise<VoiceResult<{
     const deleted = await deleteDictations(parsed.scope)
     refresh()
     return { ok: true, deleted }
+  })
+}
+
+// --- VO08: učení na tlačítko -----------------------------------------------------
+
+const AI_SKIP: Record<'not_configured' | 'few' | 'failed', string> = {
+  not_configured: 'Rozbor AI neběžel, chybí klíč k modelu.',
+  few: 'Rozbor AI neběžel, za 30 dní je méně než 8 opravených diktátů.',
+  failed: 'Rozbor AI se nepovedl, zkuste to později.',
+}
+
+/** „Spustit učení teď": pravidla i rozbor AI hned, souhrn jednou větou. */
+export async function runVoiceLearning(): Promise<VoiceResult<{ summary: string; note: string | null }>> {
+  return guarded<{ summary: string; note: string | null }>('učení', async () => {
+    const run = await runVoiceLearningNow()
+    const parts: string[] = []
+    if (run.termsLearned) parts.push(`naučená slova: ${run.termsLearned}`)
+    const proposals = run.termSuggestions + run.blockSuggestions + (run.ai?.added ?? 0)
+    if (proposals) parts.push(`nové návrhy: ${proposals}`)
+    refresh()
+    return {
+      ok: true,
+      summary: parts.length ? `Hotovo, ${parts.join(', ')}.` : 'Hotovo, nic nového k naučení.',
+      note: run.ai?.skipped ? AI_SKIP[run.ai.skipped] : null,
+    }
   })
 }

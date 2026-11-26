@@ -8,6 +8,7 @@ import { VoiceDevicesPanel } from '@/components/admin/voice/devices-panel'
 import { VoiceDictionaryPanel } from '@/components/admin/voice/dictionary-panel'
 import { VoiceHistoryView } from '@/components/admin/voice/history'
 import { VoiceLearningPanel } from '@/components/admin/voice/learning-panel'
+import { RunLearningButton } from '@/components/admin/voice/run-learning'
 import { VoiceOverviewView } from '@/components/admin/voice/overview'
 import { VoiceDeleteCard, VoiceSettingsForm } from '@/components/admin/voice/settings-panel'
 import { isVoiceKeyConfigured } from '@/lib/admin/voice/keys'
@@ -66,7 +67,7 @@ async function tabContent(tab: Tab, filter: HistoryFilter): Promise<{ body: Reac
     case 'uceni': {
       const res = await loadVoiceLearning()
       if (!res.ok) return { body: <MissingTables />, pending: null }
-      return { pending: res.pending, body: <VoiceLearningPanel data={res.data} /> }
+      return { pending: res.pending, body: <VoiceLearningPanel data={res.data} runNow={<RunLearningButton />} /> }
     }
     case 'slovnik': {
       const res = await loadVoiceDictionary()

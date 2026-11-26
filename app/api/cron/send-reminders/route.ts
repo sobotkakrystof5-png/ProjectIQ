@@ -14,6 +14,7 @@ import { finishUnfinishedConsultations } from '@/lib/admin/consultations'
 import { processDueReminders, warnIfTriggerStopped } from '@/lib/admin/meeting-reminders'
 import { prepareRecurringDrafts } from '@/lib/admin/invoice-drafts'
 import { flushPhaseEmails } from '@/lib/admin/phase-email'
+import { runDailyVoiceLearning } from '@/lib/admin/voice/learner'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
@@ -259,6 +260,12 @@ export async function GET(req: NextRequest) {
         console.error('[cron] Pravidelné faktury selhaly:', (err as Error).message)
         return 0
       }),
+    // ZakazIQ Voice (R-148, VO08): učení z oprav denně, v pondělí i rozbor AI.
+    // Jen navrhuje; bez migrace 136 nic. Chyba nesmí zastavit zbytek cronu.
+    runDailyVoiceLearning().catch((err) => {
+      console.error('[cron] Učení ZakazIQ Voice selhalo:', err instanceof Error ? err.name : 'unknown')
+      return null
+    }),
   ])
 
   const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, surveys: surveys.sent, errors: surveys.failed }

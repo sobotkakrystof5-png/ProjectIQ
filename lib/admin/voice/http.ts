@@ -15,10 +15,11 @@ import { isVoiceKeyConfigured, voiceBearerFrom } from './keys'
  * limit po zařízení až po ověření. Chyba neprozradí, jestli zařízení existuje.
  */
 
-export type VoiceScope = 'dictate' | 'config' | 'stats'
+export type VoiceScope = 'dictate' | 'config' | 'stats' | 'feedback' | 'write'
 
 /** D-V11: 400 diktátů za hodinu na zařízení. */
-export const PER_DEVICE_HOURLY: Record<VoiceScope, number> = { dictate: 400, config: 240, stats: 240 }
+/** `feedback` = oprava po vložení (nejvýš jedna na diktát), `write` = slovník a nastavení z okna na Macu (VO08). */
+export const PER_DEVICE_HOURLY: Record<VoiceScope, number> = { dictate: 400, config: 240, stats: 240, feedback: 400, write: 120 }
 const IP_ENDPOINT = 'voice_ip'
 export const IP_HOURLY = 1200
 
@@ -107,3 +108,16 @@ export function audioBytesMatch(type: string, head: Uint8Array): boolean {
   }
   return head.length >= 8 && ascii(4, 8) === 'ftyp'
 }
+
+/** Oprava po vložení (VO08): id diktátu a jak vložený úsek vypadá teď. */
+export const feedbackSchema = z
+  .object({
+    id: z.string().uuid(),
+    editedText: z.string().max(20_000),
+  })
+  .strict()
+
+/** Strop těla `/feedback`: 20 000 znaků textu (až 4 bajty na znak) a obálka JSON. */
+export const FEEDBACK_MAX_BYTES = 84 * 1024
+/** Strop těla `/terms` a `/settings`. */
+export const WRITE_MAX_BYTES = 16 * 1024

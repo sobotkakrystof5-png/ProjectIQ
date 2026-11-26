@@ -162,9 +162,12 @@ Pravidla:
   vypadá jako jméno nebo pojem (velké písmeno, číslice uvnitř slova, podobnost ≥ 0,6).
   V adminu je v „Naučené samo" s tlačítkem Vrátit.
 - **Blokovaná fráze a pravidlo stylu** se nikdy nepřidají samy.
-- **Týdenní rozbor AI** (pondělí, z denního cronu `send-reminders`): dostane opravy z týdne
-  po `redactSensitive()`, vrátí nejvýš 5 návrhů pravidel, každý s aspoň 2 příklady. Zod ověří
-  tvar, návrh bez příkladů se zahodí.
+- **Týdenní rozbor AI** (pondělí, z denního cronu `send-reminders`): dostane opravené diktáty od
+  minulého rozboru (nejvýš 30 dní zpět, nejvýš 40, každý text do 1 000 znaků) po
+  `redactSensitive()`, vrátí nejvýš 5 návrhů pravidel, každý s aspoň 2 příklady. Zod ověří
+  tvar, návrh bez příkladů nebo s cizím id se zahodí. Běží jen při ≥ 8 opravených diktátech.
+- **Úklid** (cron `client-retention`): s nastavenou lhůtou smaže text diktátu i jeho dvojice
+  oprav, čísla zůstanou. Naučená slova ve slovníku zůstávají.
 - Do čištění jde: aktivní pravidla, nejpoužívanější slova ze slovníku (do 30) a 5 posledních
   schválených příkladů. Do přepisu jde nápověda ze slovníku (do 600 znaků).
 
@@ -515,7 +518,7 @@ nápovědu** a G12 ji zahodilo (`blocked`). Čísla dál slovy („čtyřicet os
 | VO05 | čeká | | |
 | VO06 | čeká | | |
 | VO07 | hotovo | 2026-11-26 | Čištění Claude `fast` (bez přemýšlení a bez `temperature`), G6–G11 + otočený zápor, strop s upozorněním jednou denně, zlatá sada 69 případů v `npm test`, `scripts/voice-eval.mjs`. Odchylky: G7 u krátkých 0,25× (samoopravy), G3 neslučuje čísla, výplňová slova a „nový řádek" bez modelu. **Se skutečným modelem ani na Macu zatím neověřeno** (`voice-eval.mjs --ano` čeká na Kryštofa) |
-| VO08 | čeká | | |
+| VO08 | hotovo | 2026-11-26 | `POST /feedback` (jen diktát téhož zařízení do 24 h), rozdíl LCS po slovech, slovo se naučí samo při ≥ 3 stejných opravách za 60 dní (2× nic), blokovaná fráze jen jako návrh při ≥ 2 celých smazáních, rozbor AI v pondělí (≥ 8 opravených diktátů od minula, jen návrhy pravidel s ≥ 2 příklady), `/terms` a `/settings` z Macu (rozsah `write` 120/h), úklid textu i dvojic po lhůtě, „Spustit učení teď“ v adminu. Odchylky: pravidlo „krátká nahrávka 3×“ z návrhu se nestavělo; při „jen čísla“ oprava uloží jen počet slov; úklid maže i dvojice oprav. Ověřeno nad PGlite (route i učení) a `curl` proti lokálnímu serveru s testovacím Neonem (3 stejné opravy → slovo v `/config` a `/terms`, cizí původ 403; zkušební data smazaná). **Rozbor se skutečným modelem, tlačítko za přihlášením a oprava z Macu (VO09) neověřené** |
 | VO09 | čeká | | |
 | VO10 | hotovo | 2026-11-26 | `/dashboard/voice` s pěti záložkami, karta Diktování na Dnes, `GET /stats`, `summary` v `/config`, `scripts/voice-seed.mjs`. Odchylky: `requireAuth` místo neexistujícího `requireAdminPage`, bez migrace stránka chytá chybu schématu (jedno kolo) místo `batchTolerant`, ukázková data se značkou aplikace „Ukázka …“ a `ukazka.*`. Vzhled ověřený na dočasné stránce se skutečnými ukázkovými daty z testovacího Neonu (390/768/1280/1440 px, bez přetečení a chyb v konzoli). **Za přihlášením ani Přijmout/Zpět v prohlížeči neověřené** (jen PGlite), „Spustit učení teď“ přidá VO08 |
 | VO11 | čeká | | |

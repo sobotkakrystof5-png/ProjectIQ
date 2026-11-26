@@ -1698,3 +1698,43 @@ Tady jen to, co je v kódu.
   slovník, útoky), test `voice-golden.test.ts` v `npm test` s podvrženou odpovědí modelu. Se skutečným modelem jen
   `node scripts/voice-eval.mjs --ano` (pouští `voice-eval.live.test.ts` s `VOICE_EVAL=1`, stojí pod 1 Kč). Další
   testy `lib/__tests__/voice-cleanup.test.ts` (prompt, skutečné SDK s podvrženým `fetch`, časový limit, čísla, strop).
+- **Oprava po vložení (VO08):** `POST /api/public/voice/feedback` `{ id, editedText }` (Zod `.strict()`, text do
+  20 000 znaků, tělo do 84 kB přes `readJsonLimited`, rozsah `feedback` 400/h po zařízení). Jen diktát téhož
+  zařízení (jinak 404 `NOT_FOUND`), do 24 h od `started_at` (409 `TOO_OLD`), jen `ok|raw|snippet` s textem
+  (409 `NO_TEXT`). Odpověď `{ ok, userEdits, pairs, learned }`. Opakovaná oprava téhož diktátu nahradí předchozí
+  (`voice_corrections` se smažou a zapíšou znovu). Při `store_text = false` se uloží jen `user_edits`, opravený
+  text ani dvojice ne. Po uložení se hned pustí pravidlová část učení, takže třetí stejná oprava platí už pro
+  další diktát.
+- **Rozdíl** (`learn.ts`, čisté funkce): slova po odříznutí společného začátku a konce, pak LCS; dvojice
+  „slyšel → opravil" o 1–3 slovech na každé straně. Jen interpunkce se nepočítá, velká písmena ano, kromě
+  velkého písmena na začátku věty. Změněno víc než 50 % slov = `rewrite` (neučí se), prázdný opravený text
+  = `deleted`. `looksLikeTerm`: velké písmeno, číslice uvnitř nebo podobnost bez diakritiky ≥ 0,6 (Levenshtein);
+  styl („rychle" → „brzy") ne. Klíče návrhů `termDedupeKey`, `blockDedupeKey`, `ruleDedupeKey`.
+- **Učení** (`learner.ts`): `learnFromRules` — stejná dvojice ve ≥ 3 různých diktátech za 60 dní, která vypadá
+  jako pojem → při `auto_learn_terms` slovo do `voice_terms` (`source = learned`, `heard_as` doplněné) a návrh
+  rovnou `accepted`, jinak návrh `term`. Dvakrát nic. Celý stejný text smazaný ve ≥ 2 diktátech (do 12 slov)
+  → návrh `blocklist` (`mode: alone`), nikdy sám. Rozhodnutý `dedupe_key` (přijatý i odmítnutý) se znovu
+  nenavrhne; slovo, jehož návrh je `rejected` (i „Vrátit" v adminu), se samo znovu nenaučí. `reviewWithAi`
+  — role `smart`, `max_tokens` 1500, nejvýš 40 opravených diktátů, každý text oříznutý na 1000 znaků a přes
+  `redactSensitive()`; týdenní běh bere diktáty od `voice_settings.last_review_at` (nejvýš 30 dní zpět),
+  tlačítko 30 dní; pod 8 opravenými diktáty neběží. Výstup jen `<json>` přes Zod (`parseAiRules`): nejvýš 5
+  pravidel do 300 znaků, každé s ≥ 2 id z logu, cizí id, tajný údaj nebo `<>` = zahodit. Vznikne jen návrh
+  `rule` (`source = ai`), nic se nepoužije bez přijetí. `last_review_at` se zapíše i bez návrhů.
+- **Spouštění:** denní cron `send-reminders` → `runDailyVoiceLearning` (pravidla denně, rozbor AI v pražské
+  pondělí; bez migrace 136 nic). Admin Učení › „Spustit učení teď" (`runVoiceLearning` v `app/voice-actions.ts`,
+  `RunLearningButton`) pustí obojí hned a vrátí větu se souhrnem.
+- **Úklid** (`retention.ts`): cron `client-retention` → `purgeVoiceText`. Jen s nastavenou
+  `text_retention_days` (výchozí NULL = nic): diktátům starším než lhůta (`created_at`) smaže `raw_text`,
+  `final_text`, `edited_text` a jejich `voice_corrections`, zapíše `text_purged_at`; čísla zůstanou. Bez
+  migrace 136 vrátí `{ days: null }`.
+- **Slovník a nastavení z Macu:** `GET /api/public/voice/terms` (`config`) vrací `{ terms, snippets }`;
+  `POST` `{ kind: 'term', id?, term, heardAs[] }` nebo `{ kind: 'snippet', id?, term, expansion }` přes
+  `termInput`/`snippetInput` z `manage.ts` (409 `DUPLICATE`, 404 `NOT_FOUND`); `DELETE ?id=`.
+  `GET`/`PATCH /api/public/voice/settings` jen `styles` (doplní se k ostatním kategoriím), `storeText`,
+  `autoLearnTerms`, `cleanupEnabled`; strop nákladů, lhůtu textu a rychlost psaní mění jen admin. Zápisy mají
+  rozsah `write` 120/h po zařízení a tělo do 16 kB.
+- **Testy (VO08):** `lib/__tests__/voice-learn.test.ts` (rozdíl, interpunkce, velká písmena, přepsaný a smazaný
+  text, pojem), `voice-learner.test.ts` (PGlite: oprava, 2×/3×, vypnuté učení, odmítnutý se nevrátí, Vrátit,
+  blokovaná fráze, rozbor AI s podvrženou odpovědí, pondělí, „jen čísla", úklid; naučené slovo v nápovědě přepisu
+  i v promptu čištění), route testy v `dictate.test.ts` (`/feedback`, `/terms`, `/settings`: 404, 409, 400, 413,
+  401, 403, limit 429).

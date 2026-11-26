@@ -25,6 +25,9 @@ import { createDevice, revokeDevice } from '@/lib/admin/voice/devices'
 import { POST } from '@/app/api/public/voice/dictate/route'
 import { GET as CONFIG } from '@/app/api/public/voice/config/route'
 import { GET as STATS } from '@/app/api/public/voice/stats/route'
+import { POST as FEEDBACK } from '@/app/api/public/voice/feedback/route'
+import { DELETE as TERMS_DELETE, GET as TERMS_GET, POST as TERMS_POST } from '@/app/api/public/voice/terms/route'
+import { GET as SETTINGS_GET, PATCH as SETTINGS_PATCH } from '@/app/api/public/voice/settings/route'
 
 // ZakazIQ Voice (R-148, VO02): veřejný vstup diktátu přes skutečný route
 // handler, PGlite s migrací 136 a podvržený Groq.
@@ -433,5 +436,90 @@ describe('GET /api/public/voice/stats', () => {
     expect((await get('?range=rok')).status).toBe(400)
     expect((await get('', null)).status).toBe(401)
     expect((await get('', key, 'https://example.com')).status).toBe(403)
+  })
+})
+
+const jsonRequest = (url: string, method: string, data: unknown, opts: { auth?: string | null; origin?: string } = {}) =>
+  new NextRequest(`http://localhost${url}`, {
+    method,
+    body: data === undefined ? undefined : typeof data === 'string' ? data : JSON.stringify(data),
+    headers: {
+      'content-type': 'application/json',
+      ...(opts.auth === null ? {} : { authorization: `Bearer ${opts.auth ?? key}` }),
+      ...(opts.origin ? { origin: opts.origin } : {}),
+    },
+  })
+
+describe('POST /api/public/voice/feedback (VO08)', () => {
+  async function ownDictation(text: string, hoursAgo = 0) {
+    const id = crypto.randomUUID()
+    await db.query(
+      `INSERT INTO voice_dictations (id, device_id, started_at, duration_ms, status, raw_text, final_text, words)
+       VALUES ($1, $2, now() - make_interval(hours => $3), 4000, 'ok', $4, $4, 4)`,
+      [id, deviceId, hoursAgo, text],
+    )
+    return id
+  }
+
+  it('uloží opravu a vrátí počet změněných slov', async () => {
+    const id = await ownDictation('Pošli to pro vizion dnes')
+    const res = await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id, editedText: 'Pošli to pro Vizeon dnes' }))
+    expect(res.status).toBe(200)
+    expect(await body(res)).toMatchObject({ ok: true, userEdits: 1, pairs: 1, learned: 0 })
+  })
+
+  it('cizí diktát 404, starší než 24 h 409, špatné tělo 400, z prohlížeče 403', async () => {
+    const foreign = crypto.randomUUID()
+    expect((await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id: foreign, editedText: 'x' }))).status).toBe(404)
+    const old = await ownDictation('Starý diktát z včera', 30)
+    const tooOld = await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id: old, editedText: 'Starý' }))
+    expect(tooOld.status).toBe(409)
+    expect(await body(tooOld)).toMatchObject({ code: 'TOO_OLD' })
+    expect((await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id: old, editedText: 'x', navic: 1 }))).status).toBe(400)
+    expect((await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', '{nejson'))).status).toBe(400)
+    expect((await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id: old, editedText: 'x' }, { origin: 'https://example.com' }))).status).toBe(403)
+    expect((await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id: old, editedText: 'x' }, { auth: null }))).status).toBe(401)
+  })
+
+  it('příliš dlouhý text 400, příliš velké tělo 413', async () => {
+    const id = await ownDictation('Krátký text tady je')
+    expect((await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id, editedText: 'a'.repeat(20_001) }))).status).toBe(400)
+    expect((await FEEDBACK(jsonRequest('/api/public/voice/feedback', 'POST', { id, editedText: 'ž'.repeat(60_000) }))).status).toBe(413)
+  })
+})
+
+describe('/api/public/voice/terms a /settings (VO08)', () => {
+  it('přidá, upraví a smaže slovo; duplicita 409; zkratka bez textu 400', async () => {
+    const add = await TERMS_POST(jsonRequest('/api/public/voice/terms', 'POST', { kind: 'term', term: 'Dílkovna', heardAs: ['dilkovna'] }))
+    expect(add.status).toBe(200)
+    const dup = await TERMS_POST(jsonRequest('/api/public/voice/terms', 'POST', { kind: 'term', term: 'dílkovna', heardAs: [] }))
+    expect(dup.status).toBe(409)
+    expect((await TERMS_POST(jsonRequest('/api/public/voice/terms', 'POST', { kind: 'snippet', term: 'podpis', expansion: '' }))).status).toBe(400)
+    expect((await TERMS_POST(jsonRequest('/api/public/voice/terms', 'POST', { kind: 'term', term: 'x', heardAs: [], admin: true }))).status).toBe(400)
+    const list = await body(await TERMS_GET(jsonRequest('/api/public/voice/terms', 'GET', undefined)))
+    const term = (list.terms as { id: string; term: string }[]).find((t) => t.term === 'Dílkovna')
+    expect(term).toBeDefined()
+    const del = await TERMS_DELETE(jsonRequest(`/api/public/voice/terms?id=${term!.id}`, 'DELETE', undefined))
+    expect(del.status).toBe(200)
+    expect((await TERMS_DELETE(jsonRequest(`/api/public/voice/terms?id=${term!.id}`, 'DELETE', undefined))).status).toBe(404)
+  })
+
+  it('zápis má vlastní limit za hodinu', async () => {
+    await db.query(
+      `INSERT INTO api_requests (endpoint, ip) SELECT $1, 'device' FROM generate_series(1, 120)`,
+      [`voice_write:${deviceId}`],
+    )
+    expect((await TERMS_POST(jsonRequest('/api/public/voice/terms', 'POST', { kind: 'term', term: 'Limit', heardAs: [] }))).status).toBe(429)
+  })
+
+  it('nastavení: jen povolené klíče, styl se doplní k ostatním', async () => {
+    const res = await SETTINGS_PATCH(jsonRequest('/api/public/voice/settings', 'PATCH', { styles: { email: 'casual' }, storeText: false }))
+    expect(res.status).toBe(200)
+    expect(await body(res)).toMatchObject({ settings: { storeText: false, styles: { email: 'casual', ai_prompt: 'exact' } } })
+    expect((await SETTINGS_PATCH(jsonRequest('/api/public/voice/settings', 'PATCH', { dailyCostCapUsd: 50 }))).status).toBe(400)
+    expect((await SETTINGS_PATCH(jsonRequest('/api/public/voice/settings', 'PATCH', { styles: { email: 'kricet' } }))).status).toBe(400)
+    expect((await SETTINGS_PATCH(jsonRequest('/api/public/voice/settings', 'PATCH', {}))).status).toBe(400)
+    expect((await SETTINGS_GET(jsonRequest('/api/public/voice/settings', 'GET', undefined, { origin: 'https://example.com' }))).status).toBe(403)
+    await SETTINGS_PATCH(jsonRequest('/api/public/voice/settings', 'PATCH', { styles: { email: 'formal' }, storeText: true }))
   })
 })

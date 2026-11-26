@@ -2,7 +2,13 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO10, milník 3** (R-148): admin `/dashboard/voice`
+> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO08, učení z oprav** (R-148): Mac pošle, jak vložený
+> text vypadá po úpravě (`POST /api/public/voice/feedback`); stejná oprava ve 3 diktátech za 60 dní naučí slovo
+> do slovníku, celý stejný text smazaný 2× dá návrh blokované fráze, v pondělí rozbor AI navrhne pravidla stylu
+> (jen návrhy). Slovník a nastavení jdou měnit z Macu, úklid maže text i dvojice oprav po lhůtě. Ověřeno testy
+> a `curl` proti lokálnímu serveru; **rozbor se skutečným modelem a tlačítko za přihlášením neověřené**.
+>
+> Předchozí: 2026-11-26 · **ZakazIQ Voice — VO10, milník 3** (R-148): admin `/dashboard/voice`
 > má Přehled (slova po dnech, série, rychlost, ušetřený čas, heatmapa 26 týdnů, kategorie, aplikace, hodiny,
 > kvalita, náklady), Historii s hledáním a mazáním, Učení (přijmout / odmítnout se Zpět), Slovník a Nastavení;
 > na Dnes karta Diktování. Okno na Macu dostane tatáž čísla z `GET /api/public/voice/stats`. Vzhled ověřený na
@@ -125,12 +131,12 @@
 **ZakazIQ Voice (R-148, od 2026-11-25, větev `admin/zakaziq-voice`):** diktování na Macu přes Fn,
 zpracování a statistiky v adminu `/dashboard/voice`. Třináct sezení VO00–VO12, plán
 `docs/admin/VOICE-PLAN.md` (stav v oddílu 14), prompty `new - area of zakaziq/prompty/voice/`.
-VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01, VO02, VO07 a VO10 hotové 2026-11-26**: migrace 136 v repu
+VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01, VO02, VO07, VO08 a VO10 hotové 2026-11-26**: migrace 136 v repu
 a na testovacím Neonu, `POST /api/public/voice/dictate`, `GET …/config` a `GET …/stats`, čištění Claude s kontrolou
 výstupu a denním stropem (milník 2, bez skutečného modelu neověřené), admin s pěti záložkami a karta na Dnes
-(milník 3, za přihlášením neověřené).
-Další krok: **VO08** (učení z logů, jde hned; přidá „Spustit učení teď“ do záložky Učení) nebo **VO03**
-(kostra aplikace na Macu, potřebuje certifikát).
+(milník 3, za přihlášením neověřené), učení z oprav, slovník a nastavení z Macu (VO08, rozbor AI jen s podvrženou
+odpovědí).
+Další krok: **VO03** (kostra aplikace na Macu, potřebuje certifikát), pak VO09 (zachycení oprav na Macu).
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
@@ -1688,6 +1694,9 @@ ve VO02. Žádný nový npm balíček.
 - [ ] **ZakazIQ Voice — test číslování migrací na větvi `admin/zakaziq-voice` padá:** migrace 136 je za 133,
   čísla 134 (zrušení schůzek) a 135 (doručení pozvánek) jsou na jiných větvích. Spraví se rebasem po jejich
   sloučení do `main`; čísla neměnit · `lib/ws/__tests__/ws-schema.test.ts` · od 2026-11-26
+- [ ] **ZakazIQ Voice — rozbor AI z oprav se skutečným modelem neověřený (VO08):** běží jen s podvrženou odpovědí.
+  Ověřit „Spustit učení teď“ v adminu, až bude ≥ 8 opravených diktátů (role `smart`, do pár korun), a jestli
+  návrhy pravidel dávají smysl · od 2026-11-26
 - [ ] **ZakazIQ Voice — `/dashboard/voice` za přihlášením neověřené:** vzhled ověřen jen na dočasné stránce
   s vymyšlenými zařízeními (1280 a 390 px, bez přetečení, plochy ≥ 44 px, konzole bez chyb). Projít
   s přihlášením: Přidat zařízení → klíč ukázaný jednou, po obnovení stránky už ne → Zneplatnit → Zpět.
@@ -2101,6 +2110,25 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice — VO08, učení z oprav, R-148)
+- **feat** `POST /api/public/voice/feedback`: oprava po vložení jen pro diktát téhož zařízení do 24 h, rozdíl po
+  slovech (LCS, `lib/admin/voice/learn.ts`), dvojice „slyšel → opravil" o 1–3 slovech do `voice_corrections`;
+  opakovaná oprava nahradí předchozí. Při „jen čísla" se uloží jen počet změněných slov.
+- **feat** Učení (`lib/admin/voice/learner.ts`): slovo se naučí samo při ≥ 3 stejných opravách v různých diktátech
+  za 60 dní (2× nic, s vypnutým učením návrh), celý stejný text smazaný ≥ 2× = návrh blokované fráze, rozbor AI
+  (role `smart`) v pondělí z cronu `send-reminders` při ≥ 8 opravených diktátech od minula — jen návrhy pravidel
+  s ≥ 2 příklady. Odmítnutý návrh ani „Vrácené" slovo se nevrátí. Tlačítko „Spustit učení teď" v záložce Učení.
+- **feat** `/api/public/voice/terms` (GET, POST, DELETE) a `/api/public/voice/settings` (GET, PATCH jen styl,
+  `storeText`, `autoLearnTerms`, `cleanupEnabled`) pro okno na Macu, rozsah `write` 120/h. Úklid
+  `lib/admin/voice/retention.ts` z cronu `client-retention`: po nastavené lhůtě text i dvojice oprav, čísla zůstanou.
+- **chore** Ověřeno: `tsc`, `voice-learn` (10), `voice-learner` (15, PGlite; naučené slovo v nápovědě přepisu
+  i v promptu čištění), route testy (29), plná sada 2037 prošlo / 4 selhaly — známé `ws-schema` (na větvi chybí
+  134 a 135), `ws-email` (pevné datum) a dva časové limity pod zátěží (samostatně 22/22); `npm run build:check`
+  prošel. `curl` proti lokálnímu serveru s testovacím Neonem a dočasným pepřem: tři stejné opravy → třetí
+  `learned: 1`, slovo v `/config` i `/terms`, cizí `Origin` 403; zkušební zařízení a data smazaná.
+  `web-security-review`: 3 opravy (viz AUDIT-LOG), DECISIONS #055 doplnění (16)–(19) a rizika (h), (i).
+  **Rozbor se skutečným modelem a tlačítko za přihlášením neověřené.**
 
 ### 2026-11-26 (ZakazIQ Voice — VO10, milník 3, R-148)
 - **feat** Admin `/dashboard/voice` se záložkami Přehled · Historie · Učení · Slovník · Nastavení (`?tab=`),

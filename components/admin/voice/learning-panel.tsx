@@ -132,7 +132,7 @@ export function VoiceLearningPanel({ data, runNow }: { data: VoiceLearning; runN
         <p className="mt-4 text-xs text-quiet">
           {data.lastReviewAt
             ? `Rozbor AI proběhl naposledy ${dateTime(data.lastReviewAt)}.`
-            : 'Rozbor AI zatím neproběhl. Pouští se v pondělí, když je za týden aspoň 8 oprav.'}
+            : 'Rozbor AI zatím neproběhl. Pouští se v pondělí, když od minula přibylo aspoň 8 opravených diktátů.'}
         </p>
       </Card>
 
