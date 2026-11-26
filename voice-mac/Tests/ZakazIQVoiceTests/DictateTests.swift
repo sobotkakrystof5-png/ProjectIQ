@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import ZakazIQVoiceCore
 
@@ -295,6 +296,41 @@ struct LocalDBTests {
     try db.removeFromQueue(id: c.id)
     #expect(try db.queueCount() == 2)
     #expect(Set(try db.allQueue().map(\.audioPath)) == ["/tmp/a.m4a", "/tmp/b.m4a"])
+  }
+
+  @Test("oprava po vložení, smazání celé historie (frontu nechá), starší soubor dostane sloupec")
+  func editsAndMigration() throws {
+    let (db, dir) = try makeDB()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let edited = entry(3)
+    let queued = entry(2, status: .pending, text: "")
+    try db.save(edited)
+    try db.save(queued)
+    try db.save(entry(1))
+    try db.enqueue(QueueItem(id: queued.id, audioPath: "/tmp/q.m4a", meta: DictateTests.meta(), nextAttempt: Date(), createdAt: Date()))
+    #expect(try db.entry(id: edited.id)?.userEdited == false)
+    try db.markEdited(id: edited.id)
+    #expect(try db.entry(id: edited.id)?.userEdited == true)
+    try db.deleteAllHistory()
+    #expect(try db.recent(limit: 10).map(\.id) == [queued.id])
+
+    // Soubor z verze 1 (bez user_edited) se při otevření doplní a data zůstanou.
+    let oldPath = dir.appendingPathComponent("v1.sqlite").path
+    var raw: OpaquePointer?
+    #expect(sqlite3_open(oldPath, &raw) == SQLITE_OK)
+    sqlite3_exec(raw, """
+      CREATE TABLE history (id TEXT PRIMARY KEY, started_at REAL NOT NULL, app_name TEXT, app_bundle_id TEXT, mode TEXT NOT NULL,
+        status TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', words INTEGER NOT NULL DEFAULT 0, error TEXT, total_ms INTEGER,
+        synced INTEGER NOT NULL DEFAULT 0);
+      INSERT INTO history (id, started_at, mode, status, text, words) VALUES ('7e1b7d2c-0a4b-4c1e-9d55-2f0c3a8b9e10', 1, 'hold', 'ok', 'starý', 1);
+      PRAGMA user_version = 1;
+      """, nil, nil, nil)
+    sqlite3_close(raw)
+    let migrated = try LocalDB(path: oldPath)
+    let old = try #require(try migrated.entry(id: DictateTests.id))
+    #expect(old.text == "starý" && !old.userEdited)
+    try migrated.markEdited(id: DictateTests.id)
+    #expect(try migrated.entry(id: DictateTests.id)?.userEdited == true)
   }
 
   @Test("stav ze serveru: error je neúspěch, text mají jen ok/raw/snippet")

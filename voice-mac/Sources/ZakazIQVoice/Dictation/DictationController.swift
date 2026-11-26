@@ -76,6 +76,25 @@ final class DictationController: ObservableObject {
     bar.onClick = { [weak self] in self?.toggleFromMenu() }
     bar.onCancel = { [weak self] in self?.send(.barCancel) }
     bar.onCopy = { [weak self] text in self?.copy(text) }
+
+    // Okno (VO11) zapisuje volby rovnou do Preferences; lišta a zkratka je převezmou tady.
+    defaultsObserver = NotificationCenter.default.addObserver(
+      forName: UserDefaults.didChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.applyPreferences() }
+    }
+  }
+
+  private var defaultsObserver: NSObjectProtocol?
+
+  private func applyPreferences() {
+    let shortcut = prefs.shortcut
+    if monitor.shortcut != shortcut { monitor.shortcut = shortcut }
+    if bar.shortcut != shortcut { bar.shortcut = shortcut }
+    let showIdle = prefs.showBarWhenIdle
+    if bar.showWhenIdle != showIdle { bar.showWhenIdle = showIdle }
   }
 
   var shortcut: DictationShortcut { prefs.shortcut }

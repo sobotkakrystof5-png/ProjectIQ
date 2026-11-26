@@ -39,6 +39,8 @@ public struct HistoryEntry: Identifiable, Equatable, Sendable {
   public var totalMs: Int?
   /// Server o diktátu ví (přepsáno nebo zrušeno se zápisem).
   public var synced: Bool
+  /// Kryštof vložený text potom upravil (VO09, měřítko učení).
+  public var userEdited: Bool
 
   public init(
     id: UUID,
@@ -51,7 +53,8 @@ public struct HistoryEntry: Identifiable, Equatable, Sendable {
     words: Int = 0,
     error: String? = nil,
     totalMs: Int? = nil,
-    synced: Bool = false
+    synced: Bool = false,
+    userEdited: Bool = false
   ) {
     self.id = id
     self.startedAt = startedAt
@@ -64,6 +67,7 @@ public struct HistoryEntry: Identifiable, Equatable, Sendable {
     self.error = error
     self.totalMs = totalMs
     self.synced = synced
+    self.userEdited = userEdited
   }
 }
 
@@ -134,7 +138,8 @@ public final class LocalDB: @unchecked Sendable {
         words INTEGER NOT NULL DEFAULT 0,
         error TEXT,
         total_ms INTEGER,
-        synced INTEGER NOT NULL DEFAULT 0
+        synced INTEGER NOT NULL DEFAULT 0,
+        user_edited INTEGER NOT NULL DEFAULT 0
       );
       CREATE INDEX IF NOT EXISTS history_started ON history(started_at DESC);
       CREATE TABLE IF NOT EXISTS queue (
@@ -145,8 +150,13 @@ public final class LocalDB: @unchecked Sendable {
         next_attempt REAL NOT NULL,
         created_at REAL NOT NULL
       );
-      PRAGMA user_version = 1;
       """)
+    // Verze 2 (VO09): příznak opravy po vložení. Starší soubor dostane sloupec dodatečně.
+    let columns = try query("PRAGMA table_info(history)", [], { stmt in Self.string(stmt, 1) ?? "" })
+    if !columns.contains("user_edited") {
+      try exec("ALTER TABLE history ADD COLUMN user_edited INTEGER NOT NULL DEFAULT 0")
+    }
+    try exec("PRAGMA user_version = 2")
   }
 
   // MARK: Historie
@@ -155,12 +165,12 @@ public final class LocalDB: @unchecked Sendable {
   public func save(_ e: HistoryEntry) throws {
     try run(
       """
-      INSERT OR REPLACE INTO history (id, started_at, app_name, app_bundle_id, mode, status, text, words, error, total_ms, synced)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO history (id, started_at, app_name, app_bundle_id, mode, status, text, words, error, total_ms, synced, user_edited)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """,
       [.text(e.id.uuidString.lowercased()), .real(e.startedAt.timeIntervalSince1970), .text(e.appName), .text(e.appBundleId),
        .text(e.mode.rawValue), .text(e.status.rawValue), .text(e.text), .int(e.words), .text(e.error),
-       .int(e.totalMs), .int(e.synced ? 1 : 0)]
+       .int(e.totalMs), .int(e.synced ? 1 : 0), .int(e.userEdited ? 1 : 0)]
     )
   }
 
@@ -198,6 +208,16 @@ public final class LocalDB: @unchecked Sendable {
 
   public func delete(id: UUID) throws {
     try run("DELETE FROM history WHERE id = ?", [.text(id.uuidString.lowercased())])
+  }
+
+  /// Smaže celou místní historii kromě diktátů, které ještě čekají ve frontě.
+  public func deleteAllHistory() throws {
+    try run("DELETE FROM history WHERE id NOT IN (SELECT id FROM queue)", [])
+  }
+
+  /// Označí diktát jako upravený po vložení (VO09).
+  public func markEdited(id: UUID) throws {
+    try run("UPDATE history SET user_edited = 1 WHERE id = ?", [.text(id.uuidString.lowercased())])
   }
 
   /// Smaže historii starší než `date` (kromě diktátů, které ještě čekají ve frontě). Vrátí počet.
@@ -267,7 +287,7 @@ public final class LocalDB: @unchecked Sendable {
     case real(Double)
   }
 
-  private static let columns = "id, started_at, app_name, app_bundle_id, mode, status, text, words, error, total_ms, synced"
+  private static let columns = "id, started_at, app_name, app_bundle_id, mode, status, text, words, error, total_ms, synced, user_edited"
   private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
   private func exec(_ sql: String) throws {
@@ -332,7 +352,8 @@ public final class LocalDB: @unchecked Sendable {
       words: Int(sqlite3_column_int64(stmt, 7)),
       error: string(stmt, 8),
       totalMs: sqlite3_column_type(stmt, 9) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(stmt, 9)),
-      synced: sqlite3_column_int64(stmt, 10) != 0
+      synced: sqlite3_column_int64(stmt, 10) != 0,
+      userEdited: sqlite3_column_int64(stmt, 11) != 0
     )
   }
 

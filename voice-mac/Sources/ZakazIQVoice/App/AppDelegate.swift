@@ -4,7 +4,8 @@ import SwiftUI
 import ZakazIQVoiceCore
 
 /// Aplikace v liště menu (bez ikony v Docku, `LSUIElement`). Menu: stav připojení,
-/// Diktovat, Otevřít ZakazIQ Voice, Vyzkoušet připojení, Ukončit.
+/// Diktovat, Zkopírovat poslední diktát, Otevřít ZakazIQ Voice (okno VO11),
+/// Vyzkoušet připojení, Ukončit. Dole na obrazovce lišta (VO05).
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private let dictation = DictationController()
@@ -14,8 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var noticeLine: NSMenuItem?
   private var dictateItem: NSMenuItem?
   private var queueLine: NSMenuItem?
-  private var window: NSWindow?
-  private var permissionTimer: Timer?
+  /// Místní historie pro okno; okno ji drží slabě, proto tady.
+  private lazy var historySource = LocalHistorySource(dictation: dictation)
+  private lazy var hub = HubWindowController(app: model, history: dictation.history == nil ? nil : historySource)
   private var hotkeyTimer: Timer?
   private var bar: FlowBarPanel?
   private var subscriptions = Set<AnyCancellable>()
@@ -50,13 +52,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       }
       .store(in: &subscriptions)
 
+    // Hláška na liště bez nabídky kopírování (chyba, fronta) otevře Historii.
+    dictation.bar.onOpenHistory = { [weak self] in self?.hub.show(tab: .history) }
+    dictation.$historyRevision
+      .dropFirst()
+      .receive(on: RunLoop.main)
+      .sink { [weak self] _ in
+        guard let self, self.hub.isVisible else { return }
+        self.hub.hub.reloadHistory()
+      }
+      .store(in: &subscriptions)
+
     startHotkey()
     dictation.startBackground()
 
     if model.hasKey {
       Task { await model.testConnection() }
     } else {
-      showWindow()
+      // Bez klíče okno samo ukáže úvod (oprávnění, klíč, zkouška).
+      hub.show()
     }
   }
 
@@ -164,78 +178,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     hotkeyTimer = timer
   }
 
-  @objc private func openWindow() { showWindow() }
+  @objc private func openWindow() { hub.show() }
 
-  /// Otevře okno, ať je výsledek vidět, a ověří připojení.
+  /// Otevře okno na Nastavení, ať je výsledek vidět, a ověří připojení.
   @objc private func testConnection() {
-    showWindow()
+    hub.show(tab: .settings)
     Task { await model.testConnection() }
   }
 
   @objc private func quit() { NSApp.terminate(nil) }
-
-  // MARK: Okno
-
-  private func showWindow() {
-    if window == nil {
-      let hosting = NSHostingView(rootView: SettingsView(model: model))
-      let win = NSWindow(
-        contentRect: NSRect(x: 0, y: 0, width: 520, height: 640),
-        styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
-        backing: .buffered,
-        defer: false
-      )
-      win.title = "ZakazIQ Voice"
-      win.titlebarAppearsTransparent = true
-      win.titleVisibility = .hidden
-      win.isMovableByWindowBackground = true
-      win.backgroundColor = Dilky.groundNS
-      // Dílky v aplikaci zatím jen ve světlé podobě; tmavou dodá VO11 s velkým oknem.
-      win.appearance = NSAppearance(named: .aqua)
-      win.isReleasedWhenClosed = false
-      win.contentView = hosting
-      win.setContentSize(hosting.fittingSize)
-      win.center()
-      win.delegate = self
-      window = win
-    }
-    model.refreshPermissions()
-    startPermissionTimer()
-    NSApp.activate()
-    window?.makeKeyAndOrderFront(nil)
-    #if DEBUG
-    snapshotIfRequested()
-    #endif
-  }
-
-  #if DEBUG
-  /// Jen ladicí sestavení: `ZAKAZIQ_VOICE_SNAPSHOT=/cesta.png` vykreslí obsah okna do PNG
-  /// (kontrola vzhledu bez oprávnění Nahrávání obrazovky).
-  private func snapshotIfRequested() {
-    guard let path = ProcessInfo.processInfo.environment["ZAKAZIQ_VOICE_SNAPSHOT"], !path.isEmpty else { return }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-      guard let view = self?.window?.contentView,
-            let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
-      else { return }
-      view.cacheDisplay(in: view.bounds, to: rep)
-      try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
-    }
-  }
-  #endif
-
-  /// Zpřístupnění se mění v Nastavení systému, aniž by aplikace dostala zprávu —
-  /// dokud je okno otevřené, stav se kontroluje každou vteřinu a půl.
-  private func startPermissionTimer() {
-    permissionTimer?.invalidate()
-    permissionTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-      Task { @MainActor in self?.model.refreshPermissions() }
-    }
-  }
-}
-
-extension AppDelegate: NSWindowDelegate {
-  func windowWillClose(_ notification: Notification) {
-    permissionTimer?.invalidate()
-    permissionTimer = nil
-  }
 }

@@ -20,6 +20,8 @@ final class BarModel: ObservableObject {
   var onClick: (() -> Void)?
   var onCancel: (() -> Void)?
   var onCopy: ((String) -> Void)?
+  /// Klik na hlášku bez nabídky kopírování (plán: „klik otevře Historii").
+  var onOpenHistory: (() -> Void)?
 
   private var messageTask: Task<Void, Never>?
   private var observer: NSObjectProtocol?
@@ -110,8 +112,12 @@ final class BarModel: ObservableObject {
 
   func click() {
     if case .message(let message) = stage {
-      if let text = message.copyText { onCopy?(text) }
-      idle()
+      if let text = message.copyText {
+        onCopy?(text)
+      } else {
+        idle()
+        onOpenHistory?()
+      }
       return
     }
     onClick?()
