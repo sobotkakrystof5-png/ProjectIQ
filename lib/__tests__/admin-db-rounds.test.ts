@@ -3,6 +3,7 @@ import { setAdminDbForTests } from '@/lib/admin/db'
 import { fakeAdminDriver } from './helpers/admin-driver'
 import { loadTodayData, loadMonthMoney, loadTodayScreen } from '@/lib/admin-today-queries'
 import { loadAdminCounts } from '@/lib/admin-counts'
+import { loadVoiceHistory, loadVoiceOverview } from '@/lib/admin/voice/queries'
 
 // Měření rychlosti adminu (AD00, snížené v AD06): kolik požadavků do databáze
 // stojí načtení obrazovky a kolik z nich jde za sebou. Čítač je záměrně jen
@@ -38,11 +39,21 @@ describe('kola do databáze — admin po AD06', () => {
     expect(probe.queries()).toHaveLength(2)
   })
 
-  it('Dnes i s penězi je jeden požadavek — jedna dávka pro celou obrazovku', async () => {
+  it('Dnes i s penězi a diktováním je jeden požadavek — jedna dávka pro celou obrazovku', async () => {
     await loadTodayScreen('2026-11-11')
     expect(probe.rounds()).toBe(1)
     expect(probe.waves()).toBe(1)
-    expect(probe.queries()).toHaveLength(8)
+    // 6 věcí k vyřízení + 2 peníze + 1 karta Diktování (ZakazIQ Voice, VO10).
+    expect(probe.queries()).toHaveLength(9)
+  })
+
+  it('ZakazIQ Voice (/dashboard/voice) stojí jeden požadavek na záložku', async () => {
+    await loadVoiceOverview('2026-11-11')
+    expect(probe.rounds()).toBe(1)
+    expect(probe.waves()).toBe(1)
+    probe.reset()
+    await loadVoiceHistory({ query: 'novák', status: 'ok' })
+    expect(probe.rounds()).toBe(1)
   })
 
   it('odznaky v menu (kostra administrace) stojí jeden požadavek', async () => {

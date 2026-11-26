@@ -145,14 +145,22 @@ describe('kola do databáze — Dnes', () => {
     await loadTodayScreen('2026-11-11')
     expect(probe.rounds()).toBe(1)
     expect(probe.waves()).toBe(1)
-    expect(probe.queries()).toHaveLength(8)
+    // 6 věcí k vyřízení + 2 peníze + 1 karta Diktování (VO10).
+    expect(probe.queries()).toHaveLength(9)
   })
 
   it('chybějící tabulka shodí dávku, ale ne obrazovku — zbytek se dotáhne jednotlivě', async () => {
     missingTable = 'client_requests'
     const { data } = await loadTodayScreen('2026-11-11')
     expect(data.requests).toEqual([])
-    // 1 neúspěšná dávka + 8 jednotlivých pokusů
-    expect(probe.rounds()).toBe(9)
+    // 1 neúspěšná dávka + 9 jednotlivých pokusů
+    expect(probe.rounds()).toBe(10)
+  })
+
+  it('bez tabulek ZakazIQ Voice (migrace 136) se karta Diktování jen neukáže', async () => {
+    missingTable = 'voice_dictations'
+    const { voice, money } = await loadTodayScreen('2026-11-11')
+    expect(voice).toBeNull()
+    expect(money.month).toBe('2026-11')
   })
 })

@@ -517,7 +517,7 @@ nápovědu** a G12 ji zahodilo (`blocked`). Čísla dál slovy („čtyřicet os
 | VO07 | hotovo | 2026-11-26 | Čištění Claude `fast` (bez přemýšlení a bez `temperature`), G6–G11 + otočený zápor, strop s upozorněním jednou denně, zlatá sada 69 případů v `npm test`, `scripts/voice-eval.mjs`. Odchylky: G7 u krátkých 0,25× (samoopravy), G3 neslučuje čísla, výplňová slova a „nový řádek" bez modelu. **Se skutečným modelem ani na Macu zatím neověřeno** (`voice-eval.mjs --ano` čeká na Kryštofa) |
 | VO08 | čeká | | |
 | VO09 | čeká | | |
-| VO10 | čeká | | |
+| VO10 | hotovo | 2026-11-26 | `/dashboard/voice` s pěti záložkami, karta Diktování na Dnes, `GET /stats`, `summary` v `/config`, `scripts/voice-seed.mjs`. Odchylky: `requireAuth` místo neexistujícího `requireAdminPage`, bez migrace stránka chytá chybu schématu (jedno kolo) místo `batchTolerant`, ukázková data se značkou aplikace „Ukázka …“ a `ukazka.*`. Vzhled ověřený na dočasné stránce se skutečnými ukázkovými daty z testovacího Neonu (390/768/1280/1440 px, bez přetečení a chyb v konzoli). **Za přihlášením ani Přijmout/Zpět v prohlížeči neověřené** (jen PGlite), „Spustit učení teď“ přidá VO08 |
 | VO11 | čeká | | |
 | VO12 | čeká | | |
 

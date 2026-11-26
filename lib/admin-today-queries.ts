@@ -5,6 +5,7 @@ import { projectPath } from '@/lib/lead-origins'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { calculateTax } from '@/lib/tax'
 import { STALE_AFTER_DAYS, type MonthMoney, type TodayData, type UnpaidInvoiceLine } from '@/lib/admin-today'
+import { mapVoiceToday, voiceTodayQuery, type VoiceToday } from '@/lib/admin/voice/queries'
 
 const iso = (value: Date | string): string => new Date(value).toISOString()
 
@@ -215,13 +216,18 @@ function mapMoney([incomeRows, invoiceRows]: AdminRow[][], month: string, year: 
 }
 
 /**
- * Celá obrazovka Dnes jedním požadavkem: věci k vyřízení (6 dotazů) i peníze
- * za měsíc (2) jdou v jedné dávce. Odděleně by to byla dvě kola v jedné vlně
- * a navigace na Dnes by stála tři (menu + dvě) místo dvou.
+ * Celá obrazovka Dnes jedním požadavkem: věci k vyřízení (6 dotazů), peníze
+ * za měsíc (2) a karta Diktování (1, ZakazIQ Voice, VO10) jdou v jedné dávce.
+ * Odděleně by to byla víc kol v jedné vlně a navigace na Dnes by stála víc
+ * než dvě (menu + obsah).
+ *
+ * Diktování je na konci dávky: databáze bez migrace 136 shodí transakci,
+ * `batchTolerant` pak zkusí dotazy jednotlivě a karta se jen neukáže. Takových
+ * kol je víc, proto se 136 nasazuje spolu s kódem (VO12).
  */
 export async function loadTodayScreen(
   todayIso: string = getPragueTodayISO(),
-): Promise<{ data: TodayData; money: MonthMoney }> {
+): Promise<{ data: TodayData; money: MonthMoney; voice: VoiceToday | null }> {
   const month = todayIso.slice(0, 7)
   const year = Number(todayIso.slice(0, 4))
   const today = todayQueries()
@@ -229,10 +235,11 @@ export async function loadTodayScreen(
   // „sloupec currency neexistuje" spolknout nesmí — jinak by se peníze
   // tiše nespočítaly (AD13).
   const rows = await withLedger((L) =>
-    batchTolerant([...today, ...moneyQueries(L, month, year)], isMissingLedgerCurrency),
+    batchTolerant([...today, ...moneyQueries(L, month, year), voiceTodayQuery(todayIso)], isMissingLedgerCurrency),
   )
   return {
     data: mapToday(rows.slice(0, today.length)),
-    money: mapMoney(rows.slice(today.length), month, year),
+    money: mapMoney(rows.slice(today.length, -1), month, year),
+    voice: mapVoiceToday(rows[rows.length - 1], todayIso),
   }
 }

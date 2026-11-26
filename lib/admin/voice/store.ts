@@ -6,6 +6,7 @@ import { DEFAULT_STYLES, STYLE_KEYS, VOICE_CATEGORIES, type VoiceCategory, type 
 import type { VoiceSnippet, VoiceTerm } from './dictionary'
 import type { BlockPhrase } from './guards'
 import type { PipelineConfig, PipelineOutcome } from './pipeline'
+import { mapVoiceToday, voiceTodayQuery } from './queries'
 
 /**
  * ZakazIQ Voice (R-148): databáze diktátů, slovníku a nastavení (migrace 136).
@@ -164,15 +165,18 @@ export async function notifyCostCapOnce(capUsd: number, notify: typeof createNot
   return true
 }
 
-/** Pro `/config`: slovník, zkratky a nastavení jedním požadavkem. */
-export async function loadMacConfig(): Promise<{
+/** Pro `/config`: slovník, zkratky, nastavení a krátký přehled (dnešní slova, série) jedním požadavkem. */
+export async function loadMacConfig(today = getPragueTodayISO()): Promise<{
   terms: (VoiceTerm & { source: string; uses: number })[]
   snippets: (VoiceSnippet & { uses: number })[]
   settings: VoiceSettings
+  summary: { today: number; streak: number }
 }> {
-  const [settingsRows, termRows] = await adminDb.batch([SETTINGS_SQL, TERMS_SQL])
+  const [settingsRows, termRows, todayRows] = await adminDb.batch([SETTINGS_SQL, TERMS_SQL, voiceTodayQuery(today)])
   const rows = termRows as TermRow[]
+  const summary = mapVoiceToday(todayRows, today)
   return {
+    summary: { today: summary?.words ?? 0, streak: summary?.streak ?? 0 },
     settings: parseSettings(settingsRows as { key: string; value: unknown }[]),
     terms: rows
       .filter((t) => t.kind === 'term')

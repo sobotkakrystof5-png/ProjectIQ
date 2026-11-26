@@ -15,10 +15,10 @@ import { isVoiceKeyConfigured, voiceBearerFrom } from './keys'
  * limit po zařízení až po ověření. Chyba neprozradí, jestli zařízení existuje.
  */
 
-export type VoiceScope = 'dictate' | 'config'
+export type VoiceScope = 'dictate' | 'config' | 'stats'
 
 /** D-V11: 400 diktátů za hodinu na zařízení. */
-export const PER_DEVICE_HOURLY: Record<VoiceScope, number> = { dictate: 400, config: 240 }
+export const PER_DEVICE_HOURLY: Record<VoiceScope, number> = { dictate: 400, config: 240, stats: 240 }
 const IP_ENDPOINT = 'voice_ip'
 export const IP_HOURLY = 1200
 

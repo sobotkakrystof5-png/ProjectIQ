@@ -24,6 +24,7 @@ import { pgliteAdminDriver } from '@/lib/__tests__/helpers/admin-pglite'
 import { createDevice, revokeDevice } from '@/lib/admin/voice/devices'
 import { POST } from '@/app/api/public/voice/dictate/route'
 import { GET as CONFIG } from '@/app/api/public/voice/config/route'
+import { GET as STATS } from '@/app/api/public/voice/stats/route'
 
 // ZakazIQ Voice (R-148, VO02): veřejný vstup diktátu přes skutečný route
 // handler, PGlite s migrací 136 a podvržený Groq.
@@ -394,6 +395,7 @@ describe('GET /api/public/voice/config', () => {
       storeText: true,
       transcriptionReady: true,
       styles: { email: 'formal', ai_prompt: 'exact' },
+      summary: { today: 0, streak: 0 },
     })
     expect(data.terms).toEqual([expect.objectContaining({ term: 'Prvotka', heardAs: ['prvotko'], source: 'manual' })])
     expect(data.snippets).toEqual([expect.objectContaining({ trigger: 'můj podpis', expansion: 'S pozdravem' })])
@@ -402,5 +404,34 @@ describe('GET /api/public/voice/config', () => {
   it('bez klíče 401, z prohlížeče 403', async () => {
     expect((await get(null)).status).toBe(401)
     expect((await get(key, 'https://example.com')).status).toBe(403)
+  })
+})
+
+describe('GET /api/public/voice/stats', () => {
+  const get = (query: string, auth: string | null = key, origin?: string) =>
+    STATS(
+      new NextRequest(`http://localhost/api/public/voice/stats${query}`, {
+        headers: { ...(auth ? { authorization: `Bearer ${auth}` } : {}), ...(origin ? { origin } : {}) },
+      }),
+    )
+
+  it('vrátí tatáž čísla jako admin: dnešní slova, týden, série, rychlost a dny', async () => {
+    await db.query(
+      `INSERT INTO voice_dictations (id, device_id, started_at, duration_ms, speech_ms, status, words)
+       VALUES ($1, $2, now() - interval '1 minute', 61000, 60000, 'ok', 120)`,
+      [crypto.randomUUID(), deviceId],
+    )
+    const res = await get('?range=30d')
+    expect(res.status).toBe(200)
+    const data = await body(res)
+    expect(data).toMatchObject({ ok: true, range: '30d', today: 120, week: 120, words: 120, streak: 1, wpm: 120 })
+    expect(data.daily).toHaveLength(30)
+    expect(data).not.toHaveProperty('text')
+  })
+
+  it('neznámé období 400, bez klíče 401, z prohlížeče 403', async () => {
+    expect((await get('?range=rok')).status).toBe(400)
+    expect((await get('', null)).status).toBe(401)
+    expect((await get('', key, 'https://example.com')).status).toBe(403)
   })
 })

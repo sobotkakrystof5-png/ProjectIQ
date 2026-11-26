@@ -2,7 +2,13 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO07, milník 2** (R-148): diktát se učeše modelem
+> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO10, milník 3** (R-148): admin `/dashboard/voice`
+> má Přehled (slova po dnech, série, rychlost, ušetřený čas, heatmapa 26 týdnů, kategorie, aplikace, hodiny,
+> kvalita, náklady), Historii s hledáním a mazáním, Učení (přijmout / odmítnout se Zpět), Slovník a Nastavení;
+> na Dnes karta Diktování. Okno na Macu dostane tatáž čísla z `GET /api/public/voice/stats`. Vzhled ověřený na
+> dočasné stránce s ukázkovými daty, **za přihlášením neověřené**.
+>
+> Předchozí: 2026-11-26 · **ZakazIQ Voice — VO07, milník 2** (R-148): diktát se učeše modelem
 > Claude `fast` podle stylu aplikace a kontrola G6–G9 (+ otočený zápor) vrátí přepis, kdykoli model odpoví,
 > přidá, vynechá, změní číslo nebo jméno. Denní strop nákladů s jedním upozorněním do zvonku, zlatá sada
 > 69 případů v `npm test`. **Se skutečným modelem zatím neověřeno** (`node scripts/voice-eval.mjs --ano`).
@@ -119,10 +125,11 @@
 **ZakazIQ Voice (R-148, od 2026-11-25, větev `admin/zakaziq-voice`):** diktování na Macu přes Fn,
 zpracování a statistiky v adminu `/dashboard/voice`. Třináct sezení VO00–VO12, plán
 `docs/admin/VOICE-PLAN.md` (stav v oddílu 14), prompty `new - area of zakaziq/prompty/voice/`.
-VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01, VO02 a VO07 hotové 2026-11-26**: migrace 136 v repu a na
-testovacím Neonu, `/dashboard/voice` se zařízeními, `POST /api/public/voice/dictate` a `GET …/config`, čištění
-Claude s kontrolou výstupu a denním stropem (milník 2, bez skutečného modelu neověřené).
-Další krok: **VO10** (admin stránka a karta na Dnes, jde hned), **VO08** (učení z logů, po VO07) nebo **VO03**
+VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01, VO02, VO07 a VO10 hotové 2026-11-26**: migrace 136 v repu
+a na testovacím Neonu, `POST /api/public/voice/dictate`, `GET …/config` a `GET …/stats`, čištění Claude s kontrolou
+výstupu a denním stropem (milník 2, bez skutečného modelu neověřené), admin s pěti záložkami a karta na Dnes
+(milník 3, za přihlášením neověřené).
+Další krok: **VO08** (učení z logů, jde hned; přidá „Spustit učení teď“ do záložky Učení) nebo **VO03**
 (kostra aplikace na Macu, potřebuje certifikát).
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
 
@@ -2094,6 +2101,24 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice — VO10, milník 3, R-148)
+- **feat** Admin `/dashboard/voice` se záložkami Přehled · Historie · Učení · Slovník · Nastavení (`?tab=`),
+  každá jednou dávkou. Výpočty `lib/admin/voice/stats.ts` (plán oddíl 8), dotazy `queries.ts`, zápisy `manage.ts`,
+  popisky `labels.ts`, komponenty `components/admin/voice/*`. Přijetí návrhu jedním příkazem se zápisem
+  `payload._applied` pro Zpět (2 min), „Vrátit" naučené slovo označí jeho návrhy jako odmítnuté. Mazání diktátů
+  jeden / období / nalezené / vše s počtem v potvrzení. Akce v `app/voice-actions.ts`.
+- **feat** Karta „Diktování dnes" na Dnes (`components/admin/voice/today-card.tsx`): 9. dotaz v dávce
+  `loadTodayScreen`, bez migrace 136 nebo bez diktátu se neukáže. `GET /api/public/voice/stats?range=7d|30d|all`
+  pro okno na Macu a `summary` v `/config`. Tóny `VOICE_DICTATION_TONE`, `VOICE_SUGGESTION_TONE`.
+- **chore** `scripts/voice-seed.mjs` (250 fiktivních diktátů za 60 dní, značka `ukazka.*`). Na testovacím Neonu
+  vložené kvůli ověření vzhledu a hned zase smazané (`--smazat --ano`).
+- **chore** Ověřeno: `tsc`, nové testy `voice-stats` (14) a `voice-queries` (17, PGlite), `/stats` v `dictate.test.ts`,
+  upravený strop `admin-db-rounds` a `admin-today-queries` (Dnes 1 kolo, 9 dotazů). Plná sada 2003 prošlo / 6 selhalo:
+  dva testy Dnes opravené, zbytek známé (`ws-schema` — na větvi chybí 134 a 135, `ws-email` pevné datum, dva časové
+  limity pod zátěží, samostatně prochází). Vzhled na dočasné stránce se skutečnými ukázkovými daty: 390/768/1280/1440 px,
+  bez vodorovného přetečení a chyb v konzoli (opraveno přetečení heatmapy na telefonu). Stránka smazaná.
+  **Za přihlášením a Přijmout/Zpět v prohlížeči neověřené.** DECISIONS #055 doplnění (12)–(15).
 
 ### 2026-11-26 (ZakazIQ Voice — VO07, milník 2, R-148)
 - **feat** Čištění diktátu modelem role `fast` (`lib/admin/voice/cleanup.ts`): prompt podle stylu kategorie

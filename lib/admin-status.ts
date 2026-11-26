@@ -145,3 +145,20 @@ export const VOICE_DEVICE_TONE = {
   active: 'info',
   revoked: 'neutral',
 } as const satisfies Record<'active' | 'revoked', AdminTone>
+
+/**
+ * Stav diktátu ZakazIQ Voice (VO10). Vložený text je konec s výsledkem, zahozený
+ * nebo chybový diktát konec bez výsledku; prázdný a zrušený jsou jen záznam.
+ */
+export const VOICE_DICTATION_TONE = {
+  ok: 'success',
+  raw: 'info',
+  snippet: 'info',
+  empty: 'neutral',
+  blocked: 'danger',
+  error: 'danger',
+  cancelled: 'neutral',
+} as const satisfies Record<'ok' | 'raw' | 'snippet' | 'empty' | 'blocked' | 'error' | 'cancelled', AdminTone>
+
+/** Návrh z učení čeká na vás (R-091: jediná teplá barva). */
+export const VOICE_SUGGESTION_TONE: AdminTone = 'signal'

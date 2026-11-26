@@ -11,6 +11,7 @@ import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import { BASE_CURRENCY, foreignLabel, formatMoney } from '@/lib/money-currency'
 import { Card, SECTION_LABEL } from '@/components/admin/card'
 import { EmptyState } from '@/components/ws/brand'
+import { VoiceTodayCard } from '@/components/admin/voice/today-card'
 
 // Dnes (KP02): co je teď potřeba udělat. Jedna hlavní věc nahoře, zbytek pod ní.
 // Seznam všech zakázek je na /dashboard/zakazky. Vpravo peníze za tenhle měsíc
@@ -41,7 +42,7 @@ const invoicesLabel = (count: number): string =>
 function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
   const monthName = new Intl.DateTimeFormat('cs-CZ', { month: 'long', year: 'numeric' }).format(now)
   return (
-    <Card className="min-w-0 p-5 lg:self-start">
+    <Card className="min-w-0 p-5">
       <h2 className={cn(SECTION_LABEL, 'flex items-center gap-2')}>
         <span className="text-navy-500">
           <Wallet size={16} strokeWidth={1.5} aria-hidden="true" />
@@ -112,7 +113,7 @@ export default async function TodayPage() {
   // dotazy z `lib/admin/calendar.ts` a běží souběžně, ne po nich.
   const today = getPragueTodayISO()
   const calendarRange = windowFor(today)
-  const [{ data, money }, calendar] = await Promise.all([loadTodayScreen(), loadCalendarWindow(calendarRange)])
+  const [{ data, money, voice }, calendar] = await Promise.all([loadTodayScreen(), loadCalendarWindow(calendarRange)])
   const now = new Date()
   const focus = pickFocus(data, now)
   const empty = isTodayEmpty(data)
@@ -248,7 +249,10 @@ export default async function TodayPage() {
           </div>
         )}
 
-        <MonthMoneyPanel money={money} now={now} />
+        <div className="flex min-w-0 flex-col gap-4 lg:self-start">
+          <MonthMoneyPanel money={money} now={now} />
+          {voice && <VoiceTodayCard voice={voice} />}
+        </div>
       </div>
 
       {/* Kalendář na Dnes (R-110): stejný jako v sekci Kalendář, jen začíná týdnem. */}

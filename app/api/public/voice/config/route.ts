@@ -6,7 +6,7 @@ import { isSttConfigured } from '@/lib/admin/voice/stt'
 
 // ZakazIQ Voice (R-148): co potřebuje aplikace na Macu — slovník, zkratky
 // a styl podle kategorie. Slouží i jako „Vyzkoušet připojení" (plán, oddíl 7).
-// Přehled slov a série (`summary`) přidá VO10.
+// `summary` = dnešní slova a série, tatáž čísla jako admin (VO10).
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!auth.ok) return auth.res
 
   try {
-    const { terms, snippets, settings } = await loadMacConfig()
+    const { terms, snippets, settings, summary } = await loadMacConfig()
     return voiceOk({
       device: { name: auth.device.name },
       terms: terms.map((t) => ({ id: t.id, term: t.term, heardAs: t.heardAs, source: t.source, uses: t.uses })),
@@ -24,6 +24,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       cleanupEnabled: settings.cleanupEnabled,
       storeText: settings.storeText,
       transcriptionReady: isSttConfigured(),
+      summary,
     })
   } catch (err) {
     if (isMissingVoiceSchema(err)) return voiceFail(503, 'NOT_CONFIGURED')

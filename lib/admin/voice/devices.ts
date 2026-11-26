@@ -1,5 +1,5 @@
 import 'server-only'
-import { adminDb } from '@/lib/admin/db'
+import { adminDb, q } from '@/lib/admin/db'
 import { generateVoiceKey, maskVoiceKey, voiceKeyMatches, voiceKeyPrefixOf } from '@/lib/admin/voice/keys'
 
 /**
@@ -38,7 +38,7 @@ export function isMissingVoiceSchema(err: unknown): boolean {
   return code === '42P01' || code === '42703'
 }
 
-type DeviceRow = {
+export type DeviceRow = {
   id: string
   name: string
   prefix: string
@@ -47,7 +47,7 @@ type DeviceRow = {
   revoked_at: unknown
 }
 
-const toDevice = (r: DeviceRow): VoiceDevice => ({
+export const toDevice = (r: DeviceRow): VoiceDevice => ({
   id: r.id,
   name: r.name,
   keyMask: maskVoiceKey(r.prefix),
@@ -56,16 +56,19 @@ const toDevice = (r: DeviceRow): VoiceDevice => ({
   revokedAt: iso(r.revoked_at),
 })
 
-/** Seznam pro admin: platná nahoře, nejnovější první. Bez migrace 136 `missing_tables`. */
+/** Seznam pro admin: platná nahoře, nejnovější první. Jako dotaz kvůli dávce stránky (VO10). */
+export const DEVICES_SQL = q`
+  SELECT id::text, name, prefix, created_at, last_used_at, revoked_at
+  FROM voice_devices
+  ORDER BY revoked_at IS NOT NULL, created_at DESC
+  LIMIT 100
+`
+
+/** Seznam pro admin. Bez migrace 136 `missing_tables`. */
 export async function listDevices(): Promise<VoiceDevicesResult> {
   try {
-    const rows = await adminDb<DeviceRow>`
-      SELECT id::text, name, prefix, created_at, last_used_at, revoked_at
-      FROM voice_devices
-      ORDER BY revoked_at IS NOT NULL, created_at DESC
-      LIMIT 100
-    `
-    return { ok: true, devices: rows.map(toDevice) }
+    const [rows] = await adminDb.batch([DEVICES_SQL])
+    return { ok: true, devices: (rows as DeviceRow[]).map(toDevice) }
   } catch (err) {
     if (isMissingVoiceSchema(err)) return { ok: false, reason: 'missing_tables' }
     throw err

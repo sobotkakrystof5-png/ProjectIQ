@@ -1607,13 +1607,41 @@ Tady jen to, co je v kódu.
   `missing_tables`), `createDevice` (klíč jen v návratové hodnotě, strop `MAX_ACTIVE_DEVICES` = 10 hlídá týž
   INSERT), `revokeDevice`, `restoreDevice` (jen do `RESTORE_WINDOW_SECONDS` = 120 po zneplatnění),
   `resolveDevice` (špatný tvar, neznámý prefix, neshoda i zneplatněné = `null`), `touchDevice`.
-- **Admin:** `/dashboard/voice` (menu Osobní › ZakazIQ Voice, ikona `Mic`) má zatím jen kartu Zařízení
-  (`components/admin/voice/devices-panel.tsx`): přidat (název 1–80 znaků), klíč ukázaný jednou se Zkopírovat,
-  Zneplatnit se Zpět v toastu, zneplatněná pod rozbalením. Akce `app/voice-actions.ts` (`requireAuth`, Zod,
-  výsledek `{ ok, error }`). Přehled, Historie, Učení a Slovník přidá VO10. Tón stavu `VOICE_DEVICE_TONE`
-  v `lib/admin-status.ts`.
+- **Admin (VO10):** `/dashboard/voice` (menu Osobní › ZakazIQ Voice, ikona `Mic`), záložky `?tab=` **Přehled ·
+  Historie (`historie`, `hledat`, `stav`) · Učení (`uceni`, odznak s počtem návrhů) · Slovník (`slovnik`) ·
+  Nastavení (`nastaveni`, kotva `#zarizeni`)**. Každá záložka = jedna dávka (`lib/admin/voice/queries.ts`, test
+  `admin-db-rounds`); bez migrace 136 `{ ok: false, reason: 'missing_tables' }` a věta místo chyby.
+  - **Čísla** (`lib/admin/voice/stats.ts`, čisté funkce, plán oddíl 8): slova jen u `ok|raw|snippet`
+    (`COUNTED_STATUSES`), pražský den v SELECTu, podmínky přes okamžik `pragueDayStart(day)` (R-093); rychlost
+    jen z diktátů s řečí ≥ 2 s (`WPM_MIN_SPEECH_MS`), ušetřený čas `max(0, slova/typing_wpm − minuty řeči)`,
+    série končí dneškem nebo včerejškem, heatmapa 26 týdnů od pondělí s pásmy 0/1–249/250–499/500–749/750+,
+    p50/p95 odezvy `percentile` jako `percentile_cont` z posledních 2 000 diktátů za 30 dní, náklady za den
+    a kalendářní měsíc v USD (všechny stavy). Kategorie, aplikace (8), hodiny, stavy a pojistky za 30 dní,
+    podíl opravených diktátů (`user_edits > 0`) po týdnech za 12 týdnů.
+  - **Zápisy** (`lib/admin/voice/manage.ts`, volá jen `app/voice-actions.ts` s `requireAuth` a Zodem): přijetí
+    návrhu je jeden příkaz (CTE: označí `accepted` a zapíše slovo/pravidlo jen když byl návrh `pending`) a do
+    `payload._applied` si uloží, co změnil (`created`, `prevHeardAs`, `prevActive`); `undoSuggestion` to vrátí
+    do `UNDO_WINDOW_SECONDS` = 120. „Vrátit" naučené slovo ho smaže a jeho návrhy označí `rejected`, aby se
+    samo znovu nenaučilo (učení VO08 to musí respektovat). Slovník, zkratky, pravidla (vestavěné jen vypnout),
+    nastavení (`settingsInput`, zapisuje jen poslané klíče) a mazání diktátů `one|range|search|all`
+    (hledání bez textu i stavu odmítne; počet ukáže `countDictations` před potvrzením, smazání nejde vrátit).
+  - **Komponenty** `components/admin/voice/{overview,history,learning-panel,dictionary-panel,settings-panel,
+    delete-dictations,today-card,devices-panel}.tsx`; popisky stavů a pojistek `lib/admin/voice/labels.ts`, tóny
+    `VOICE_DICTATION_TONE`, `VOICE_SUGGESTION_TONE` (signal) a `VOICE_DEVICE_TONE` v `lib/admin-status.ts`.
+    Grafy bez knihovny (hodnota při najetí, `sr-only` tabulka), heatmapa na telefonu posuvná a otevřená u dneška.
+  - **Dnes:** karta „Diktování dnes" (slova, série) — dotaz `voiceTodayQuery` je 9. v dávce `loadTodayScreen`
+    (`batchTolerant`); bez migrace 136 nebo bez diktátu za 400 dní se karta neukáže. Na databázi bez 136 stojí
+    Dnes kvůli tomu víc kol (záloha po jednom dotazu), proto 136 jde na produkci spolu s kódem (VO12).
+  - **Ukázková data:** `node scripts/voice-seed.mjs [--smazat] --ano` (250 diktátů za 60 dní, aplikace
+    „Ukázka …" s bundle id `ukazka.*`, návrhy `ukazka:*`, slova Dílkovna a Dílkovník); se skutečnými diktáty
+    v DB se zastaví (`--i-s-daty`).
+- **Okno na Macu:** `GET /api/public/voice/stats?range=7d|30d|all` (klíč zařízení, rozsah `stats` 240/h) vrací
+  `{ range, today, week, words, dictations, streak, longestStreak, wpm, timeSaved, daily[] }` ze stejných dotazů;
+  `GET /config` nese `summary: { today, streak }`. Žádný text diktátu.
 - **Testy:** `lib/__tests__/voice-schema.test.ts` (migrace dvakrát, CHECK, unikátnost, úklid návrhů),
-  `lib/__tests__/voice-keys.test.ts` (klíč, zařízení a akce nad PGlite).
+  `lib/__tests__/voice-keys.test.ts` (klíč, zařízení a akce nad PGlite), `voice-stats.test.ts` (série přes půlnoc
+  a změnu času, rychlost, ušetřený čas, pásma, p50/p95), `voice-queries.test.ts` (PGlite: pražské dny, kategorie,
+  Historie s `%`, mazání, přijetí a Zpět, bez migrace).
 - **Příjem diktátu (VO02):** `POST /api/public/voice/dictate` (multipart `audio` m4a/wav do 4 MB + `meta` JSON,
   `maxDuration` 60) a `GET /api/public/voice/config` (zařízení, slovník, zkratky, styl, `storeText`,
   `transcriptionReady`; slouží jako „Vyzkoušet připojení“). Společné ověření `lib/admin/voice/http.ts`:
