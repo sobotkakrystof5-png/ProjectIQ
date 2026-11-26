@@ -6,7 +6,7 @@ import { fireRoutine, routineConfigured, type FireRoutine } from './routine'
 import { normalizeResult, readStoredResult, RESULT_JSON_SCHEMA, type OfferResearchResult } from './result'
 
 /**
- * Rozbor firmy pro navrhovač nabídek (R-147, krok N1; běh podle R-148).
+ * Rozbor firmy pro navrhovač nabídek (R-147, krok N1; běh podle R-149).
  *
  * Tok: Kryštof u kontaktu klikne → `startResearch` založí řádek ve frontě
  * (`queued`) a spustí cloudovou úlohu Claude Code (`fireRoutine`) → úloha si

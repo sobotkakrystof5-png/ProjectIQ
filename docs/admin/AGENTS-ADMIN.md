@@ -702,8 +702,10 @@ Nehotové (vystavení faktury, AD12) nic nepředstírá — odkáže na záložk
 - **Přiznaná linie** — jestli faktura v ledgeru příjem založila, nebo jen převzala ten od zakázky (`owned_by_invoice`); bez `paid_on` žádný nemá
 - **Co z PDF přečetla AI** — surový `ai_extracted` pro dohledatelnost; pole, kde se uložená hodnota od přepisu liší, jsou označená jako ručně upravená. Platí vždy uložené údaje, ne přepis
 - Data z `getInvoiceDetail()`; akce v `InvoiceDetailActions.tsx`. **Faktura vystavená v adminu**
-  (AD12) má místo nich `IssuedInvoiceActions` (Poslat e-mailem, Storno) a kartu Položky —
-  neupravuje se ani nemaže
+  (AD12) má místo nich `IssuedInvoiceActions` (Poslat e-mailem, Opravit fakturu, Storno) a kartu
+  Položky. Na místě se neupravuje ani nemaže, opravuje se přes „Opravit fakturu“ (R-148)
+- **Stáhnout PDF** u obou druhů faktur: `/api/invoices/[id]/pdf?stazeni=1` vrací `Content-Disposition: attachment`,
+  bez parametru `inline` (náhled, Otevřít v novém okně)
 
 ### Vystavování faktur (AD12, R-098)
 
@@ -797,6 +799,28 @@ Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a ad
 - **Bez migrace 132** jde vystavit jen faktura za celé dílo (druh se neuloží), volba druhu se ve formuláři neukáže.
 - Testy `lib/__tests__/admin-faktury-druhy.test.ts` (záloha → částečná → finální, přefakturování, zámek, PDF,
   storno, koncepty), `kp13-penize-faktury` (projekce 133), `invoice-pdf` (nadpisy, rozpis jen v CZK).
+
+### Oprava vystavené faktury (R-148)
+
+Vystavená faktura se dál na místě nemění (R-098). „Opravit fakturu“ v detailu vede na
+`/dashboard/faktury/nova?oprava=<id>`: formulář se vyplní údaji původní faktury (odběratel, e-mail,
+položky, měna, druh a procento, datum plnění, splatnost, pokud neuplynula), vystavuje se dnes a do
+poznámky přibude „Nahrazuje fakturu N.“ (`replacementNote`, při opravě opravy jen jeden odkaz).
+
+- **Nabízí se jen u platné nezaplacené faktury.** Zaplacená je v ledgeru jako příjem a storno by ho
+  vrátilo; tu dál opraví ruční storno a nová faktura.
+- **Nová a storno staré jedním příkazem** (`issueCorrection` v `lib/admin/invoice-issue.ts`): datově
+  měnící CTE stornuje starou, jen když je pořád platná a nezaplacená, a teprve pro ten řádek se zavolá
+  `admin_invoice_issue`. Když ji mezitím někdo zaplatil nebo stornoval, nevznikne nic; když neprojde nová,
+  padá celý příkaz a stará zůstane. Bez migrace.
+- **Opravovaná faktura se nepočítá do rozpisu zakázky** (`loadProjectBilling(projectId, excludeInvoiceId)`),
+  takže záloha 30 % jde opravit třeba na 80 %. Totéž `getProjectBilling` při přepnutí zakázky ve formuláři.
+- Popis položky, který si formulář složil sám („Web — záloha 30 %“), se do opravy nepřebírá, ať po změně
+  procenta nezůstane staré číslo. Vlastní popis ano.
+- Formulář v režimu opravy nemá „Uložit jako koncept“ (koncept by starou nestornoval). Novou fakturu klientovi
+  pošle Kryštof z jejího detailu, sama neodchází.
+- Test `lib/__tests__/admin-faktura-oprava.test.ts` (oprava zálohy, bez zakázky, zaplacená, dvakrát, selhání
+  nové, archiv, předvyplnění, poznámka).
 
 ### Koncepty faktur a pravidelné faktury (R-117)
 
@@ -1617,7 +1641,7 @@ skryté po roce). Kód funkce je v historii gitu (`git show ddba729 -- <cesta>`)
 Plán a cenová pravidla: `docs/admin/NABIDKY-PLAN.md`. N1 umí jen **rozbor firmy** u kontaktu, cenu
 ještě nenavrhuje (N2).
 
-**Kde běží (R-148).** Rozbor nedělá server přes placené API. Běží jako **cloudová úloha Claude Code**
+**Kde běží (R-149).** Rozbor nedělá server přes placené API. Běží jako **cloudová úloha Claude Code**
 (claude.ai/code/routines, „Rozbor firem pro nabídky") v předplatném Kryštofa: vedoucí na Opusu, dva
 subagenti na Sonnetu. Postup úlohy je projektový skill `.claude/skills/zakaziq-rozbor-firmy/SKILL.md`
 (úloha ho čte z `main`). Managed Agents z prvního návrhu N1 nikdy nevznikly.

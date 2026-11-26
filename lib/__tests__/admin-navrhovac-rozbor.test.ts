@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { NextRequest } from 'next/server'
 
 /**
- * Navrhovač nabídek, krok N1: rozbor firmy (R-147, běh podle R-148).
+ * Navrhovač nabídek, krok N1: rozbor firmy (R-147, běh podle R-149).
  * Kontrola výsledku (B10: tvrzení bez zdroje se zahodí), spuštění cloudové
  * úlohy Claude Code, fronta, oba veřejné vstupy pro úlohu a údržba — proti
  * skutečnému Postgresu s migracemi 136 a 137. Anthropic se nevolá.

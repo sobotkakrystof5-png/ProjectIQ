@@ -39,7 +39,7 @@ export type NotificationType =
   | 'meeting_reminder_failed'
   /** Pozvánka na schůzku se klientovi vrátila nebo nedorazila (R-146). */
   | 'meeting_invite_undelivered'
-  /** Rozbor firmy pro navrhovač nabídek doběhl v Claude Code (R-148). */
+  /** Rozbor firmy pro navrhovač nabídek doběhl v Claude Code (R-149). */
   | 'offer_research_done'
 
 export async function createNotification(params: {

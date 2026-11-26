@@ -6,7 +6,7 @@ import { readJsonLimited } from '@/lib/security/request-body'
 import { failResearch, submitResult } from '@/lib/admin/offers/research'
 
 /**
- * Odevzdání rozboru firmy (navrhovač nabídek, R-148). Volá ho jen cloudová
+ * Odevzdání rozboru firmy (navrhovač nabídek, R-149). Volá ho jen cloudová
  * úloha Claude Code s klíčem `OFFER_RESEARCH_API_KEY` (přidává ho prostředí).
  *
  * Tělo: `{ "vysledek": { … } }` podle JSON Schema z vyzvednutí, nebo

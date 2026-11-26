@@ -6,7 +6,7 @@ import { readBodyLimited } from '@/lib/security/request-body'
 import { claimResearch } from '@/lib/admin/offers/research'
 
 /**
- * Vyzvednutí rozboru firmy z fronty (navrhovač nabídek, R-148).
+ * Vyzvednutí rozboru firmy z fronty (navrhovač nabídek, R-149).
  *
  * Volá ho jen cloudová úloha Claude Code. Klíč `OFFER_RESEARCH_API_KEY`
  * přidává k požadavku cloudové prostředí (network secret), úloha ho nevidí.

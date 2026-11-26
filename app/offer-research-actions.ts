@@ -13,7 +13,7 @@ import {
 } from '@/lib/admin/offers/research'
 
 /**
- * Navrhovač nabídek, krok N1: rozbor firmy u kontaktu (R-147, R-148).
+ * Navrhovač nabídek, krok N1: rozbor firmy u kontaktu (R-147, R-149).
  *
  * Každá akce stojí za přihlášením adminu. Spuštění stojí limit předplatného
  * Claude, proto jde jen na kliknutí a má strop za den (`DAILY_RUN_LIMIT`).

@@ -1,4 +1,4 @@
--- Migrace 137: navrhovač nabídek — rozbor běží v Claude Code na předplatném (R-148)
+-- Migrace 137: navrhovač nabídek — rozbor běží v Claude Code na předplatném (R-149)
 --
 -- Rozbor už nespouští server přes placené Managed Agents (R-147, migrace 136).
 -- Tlačítko u kontaktu založí řádek ve frontě (`queued`) a spustí cloudovou
@@ -49,4 +49,4 @@ END;
 $$;
 
 COMMENT ON COLUMN admin_settings.offer_agents IS
-  'Nepoužívá se od R-148 (rozbor běží v Claude Code, ne v Managed Agents).';
+  'Nepoužívá se od R-149 (rozbor běží v Claude Code, ne v Managed Agents).';

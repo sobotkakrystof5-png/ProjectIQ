@@ -4,7 +4,7 @@ import { safeHttpUrl, stripControlChars } from '@/lib/security/html'
 /**
  * Výsledek rozboru firmy (navrhovač nabídek, N1, R-147).
  *
- * Úloha Claude Code ho pošle na `POST /api/public/rozbory/[id]` (R-148) — to
+ * Úloha Claude Code ho pošle na `POST /api/public/rozbory/[id]` (R-149) — to
  * je jediný výstup, který admin z rozboru bere. Text pochází od modelu, který
  * četl cizí weby, takže je to **nedůvěryhodný vstup** (R-069): server ho tady
  * ořeže, zahodí, co nesedí, a vykresluje se jen jako text.

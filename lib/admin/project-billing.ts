@@ -15,7 +15,14 @@ import { isInvoiceKind, type ProjectBilling } from './invoice-kinds'
  * Nové sloupce (`paid`, `invoice_kind`) se čtou přes `to_jsonb(řádek)`, ať
  * dotaz funguje i na databázi bez migrace 132.
  */
-export async function loadProjectBilling(projectId: string): Promise<ProjectBilling | null> {
+export async function loadProjectBilling(
+  projectId: string,
+  /**
+   * Faktura, kterou právě opravujete (storno + nová, R-148). Do rozpisu se
+   * nepočítá, jinak by oprava zálohy 30 % narazila na „zbývá jen 70 %".
+   */
+  excludeInvoiceId: string | null = null,
+): Promise<ProjectBilling | null> {
   const [projectRows, invoiceRows] = await adminDb.batch([
     {
       text: `
@@ -36,10 +43,11 @@ export async function loadProjectBilling(projectId: string): Promise<ProjectBill
           AND i.cancelled_at IS NULL
           AND i.direction = 'issued'
           AND i.currency = 'CZK'
+          AND ($2::uuid IS NULL OR i.id <> $2::uuid)
         ORDER BY i.issued_on, i.created_at
         LIMIT 50
       `,
-      params: [projectId],
+      params: [projectId, excludeInvoiceId],
     },
   ])
 

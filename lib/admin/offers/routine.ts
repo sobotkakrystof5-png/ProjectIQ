@@ -2,7 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 
 /**
- * Spuštění cloudové úlohy Claude Code, která rozbor firmy zpracuje (R-148).
+ * Spuštění cloudové úlohy Claude Code, která rozbor firmy zpracuje (R-149).
  *
  * Rozbor neběží na placeném API: běží jako naplánovaná úloha na claude.ai/code
  * v rámci předplatného Kryštofa. Tlačítko u kontaktu ji spustí hned přes

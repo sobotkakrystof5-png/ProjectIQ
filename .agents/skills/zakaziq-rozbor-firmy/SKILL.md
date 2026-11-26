@@ -1,6 +1,6 @@
 ---
 name: zakaziq-rozbor-firmy
-description: Postup cloudové úlohy Claude Code „Rozbor firem pro nabídky" (navrhovač nabídek ZakazIQ, R-148). Vyzvedne rozbor z fronty adminu, pustí dva subagenty (web firmy, veřejná rešerše), složí výsledek podle schématu a odešle ho do ZakazIQ. Použij jen v té úloze, nebo když Kryštof chce rozbor firmy pustit ručně.
+description: Postup cloudové úlohy Claude Code „Rozbor firem pro nabídky" (navrhovač nabídek ZakazIQ, R-149). Vyzvedne rozbor z fronty adminu, pustí dva subagenty (web firmy, veřejná rešerše), složí výsledek podle schématu a odešle ho do ZakazIQ. Použij jen v té úloze, nebo když Kryštof chce rozbor firmy pustit ručně.
 ---
 
 # Rozbor firmy pro navrhovač nabídek

@@ -15,7 +15,7 @@ import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/
 import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
 import { isInvoiceOutstanding, isInvoiceOverdue, invoiceSql } from '@/lib/invoice-status'
 import {
-  cancelInvoiceQuery, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, prepareKindIssue, saveIssuerProfile,
+  cancelInvoiceQuery, issueCorrection, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, prepareKindIssue, saveIssuerProfile,
   type IssuerSettings,
 } from '@/lib/admin/invoice-issue'
 import { issueInvoiceSchema, issuerProfileSaveSchema } from '@/lib/admin/invoice-issue-schema'
@@ -711,8 +711,15 @@ export async function issueNewInvoice(
   raw: unknown,
   /** Kam fakturu později poslat (R-117). Na doklad se netiskne, jen předvyplní odeslání. */
   clientEmail?: string,
+  /**
+   * Oprava (R-148): tahle faktura se v témže příkazu stornuje. Jde jen
+   * u platné nezaplacené faktury vystavené tady.
+   */
+  replacesId?: string | null,
 ): Promise<{ error?: string; id?: string; number?: string }> {
   await requireAuth()
+  const replaces = replacesId ?? null
+  if (replaces !== null && !UUID_RE.test(replaces)) return { error: 'Opravovaná faktura nenalezena.' }
 
   // Druh faktury je povinný (R-143): před každou fakturou se rozhoduje,
   // jestli je za celé dílo, zálohová, částečná, nebo finální.
@@ -728,13 +735,28 @@ export async function issueNewInvoice(
   }
 
   try {
-    const prepared = await prepareKindIssue(parsed.data, kind.data, profile)
+    const prepared = await prepareKindIssue(parsed.data, kind.data, profile, replaces)
     if (!prepared.ok) return { error: prepared.error }
-    const { id, number } = await issueInvoice(prepared.input, profile, prepared.plan)
+    let issued: { id: string; number: string }
+    if (replaces === null) {
+      issued = await issueInvoice(prepared.input, profile, prepared.plan)
+    } else {
+      const oldRows = await sql`SELECT project_id::text FROM invoices WHERE id = ${replaces} LIMIT 1`
+      const corrected = await issueCorrection(replaces, prepared.input, profile, prepared.plan)
+      if (!corrected) {
+        return { error: 'Původní fakturu mezitím někdo zaplatil nebo stornoval. Opravu jsem nevystavil.' }
+      }
+      issued = corrected
+      // Stará faktura nezaplacená nebyla, takže v ledgeru nic nemá. Srovnání
+      // je tu pro jistotu, stejně jako u ručního storna.
+      await adminDb.batch(invoiceSyncQueries(await ledgerSql(), replaces))
+      revalidateInvoicePaths((oldRows[0] as { project_id: string | null } | undefined)?.project_id ?? null)
+      revalidatePath(`/dashboard/faktury/${replaces}`)
+    }
     const email = z.string().trim().max(254).email().safeParse(clientEmail ?? '')
-    if (email.success) await rememberClientEmail(id, email.data)
+    if (email.success) await rememberClientEmail(issued.id, email.data)
     revalidateInvoicePaths(parsed.data.projectId)
-    return { id, number }
+    return issued
   } catch (err) {
     return { error: issueErrorMessage(err) }
   }
@@ -758,10 +780,12 @@ async function rememberClientEmail(id: string, email: string): Promise<void> {
  * Rozpis ceny zakázky pro formulář faktury (R-143) — když se ve formuláři
  * vybere jiná zakázka, než se kterou se otevřel.
  */
-export async function getProjectBilling(projectId: string): Promise<ProjectBilling | null> {
+export async function getProjectBilling(projectId: string, excludeInvoiceId: string | null = null): Promise<ProjectBilling | null> {
   await requireAuth()
   if (!UUID_RE.test(projectId)) return null
-  return loadProjectBilling(projectId)
+  // Při opravě (R-148) se opravovaná faktura do rozpisu nepočítá.
+  const exclude = excludeInvoiceId !== null && UUID_RE.test(excludeInvoiceId) ? excludeInvoiceId : null
+  return loadProjectBilling(projectId, exclude)
 }
 
 /** Storno: vystavený doklad se nepřepisuje, opravuje se novou fakturou. */

@@ -81,7 +81,7 @@ varianty, zdůvodnění, předpoklady odhadu hodnoty, zdroje, „zjistit od klie
 „Použít v nabídce" (otevře e-mail Nabídka s předvyplněnou cenou a odstavcem o tom, co klient
 dostane; text jde přepsat). Rozpad ceny po položkách ani hodiny se neukazují (D-N4).
 
-### Kde to běží (D-N2, od 2026-11-26 R-148: Claude Code na předplatném)
+### Kde to běží (D-N2, od 2026-11-26 R-149: Claude Code na předplatném)
 
 Na Vercel Hobby má funkce časový strop a provoz se má později stěhovat na Cloudflare (R-135), proto
 smyčka neběží v adminu. Původně Managed Agents od Anthropicu (placené API); **Kryštof 2026-11-26 rozhodl
@@ -292,7 +292,7 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | Krok | Co | Hotovo, když | Stav |
 |---|---|---|---|
 | **N0** | Cenová pravidla (oddíl 5); k 14 zakázkám obor, co dostal, proč ta cena | Tabulka v oddílu 5 bez `[DOPLNIT]`, vzory zapsané | hotovo 2026-11-25 (dosavadní zakázky a nabídky jsou úvodní ceny, ne vzor) |
-| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-148), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
+| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
 | **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | čeká |
 | **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | čeká |
 | **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | čeká |
@@ -302,7 +302,7 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | # | Otázka | Rozhodnuto (2026-11-25) |
 |---|---|---|
 | D-N1 | Spouštět ručně, nebo automaticky po souhlasu firmy? | **Ručně tlačítkem** |
-| D-N2 | Managed Agents, nebo vlastní řízení přes Messages API? | ~~Managed Agents~~ → **cloudová úloha Claude Code na předplatném**, spuštění tlačítkem + ranní průchod, vedoucí Opus, subagenti Sonnet (Kryštof 2026-11-26, R-148) |
+| D-N2 | Managed Agents, nebo vlastní řízení přes Messages API? | ~~Managed Agents~~ → **cloudová úloha Claude Code na předplatném**, spuštění tlačítkem + ranní průchod, vedoucí Opus, subagenti Sonnet (Kryštof 2026-11-26, R-149) |
 | D-N3 | Jakou zpětnou vazbu zapisovat? | **Výsledek nabídky a poslaná cena; hodiny ne**, cena se odvozuje z hodnoty pro klienta |
 | D-N4 | Co návrh ukáže? | **Cena a zdůvodnění**, bez rozpadu po položkách a hodin |
 | D-N5 | Retence rozboru bez zakázky | **12 měsíců od posledního pohybu**, se zakázkou podle R-076 |
@@ -314,7 +314,7 @@ Technika v `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: rozbor firmy
 
 - **Rozbor je jen u kontaktu.** Firma od asistenta bez kontaktu (bez souhlasu) tlačítko nemá; firmy se
   souhlasem kontakt mají (R-141). Hovory přijdou s N2.
-- **Běh přestavěný na Claude Code (R-148, 2026-11-26).** První verze N1 stála na Managed Agents (tlačítko
+- **Běh přestavěný na Claude Code (R-149, 2026-11-26).** První verze N1 stála na Managed Agents (tlačítko
   „Nastavit agenty", strop 2 USD na běh); nasadila se, ale nikdy nespustila. Teď tlačítko zařadí rozbor
   do fronty a spustí cloudovou úlohu; úloha výsledek sama odevzdá, karta jen čte databázi. Migrace 137
   přidala stav `queued`, `claimed_at` a odkaz na běh.

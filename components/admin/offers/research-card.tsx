@@ -15,7 +15,7 @@ import {
 import type { ResearchRow, ResearchSetup, StartOutcome } from '@/lib/admin/offers/research'
 
 /**
- * Rozbor firmy u kontaktu (navrhovač nabídek, N1, R-147, R-148).
+ * Rozbor firmy u kontaktu (navrhovač nabídek, N1, R-147, R-149).
  *
  * Jedna hlavní akce: „Připravit rozbor". Rozbor běží v Claude Code na
  * předplatném; karta se jen každých 15 s dívá do databáze, jestli je hotový.

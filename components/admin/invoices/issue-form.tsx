@@ -109,6 +109,7 @@ export function IssueInvoiceForm({
   draftsEnabled = false,
   kindsEnabled = false,
   initial,
+  replaces = null,
 }: {
   draft: IssueDraft
   projects: InvoiceProjectOption[]
@@ -123,6 +124,11 @@ export function IssueInvoiceForm({
   /** Je migrace 132 v databázi — jde vystavit zálohovou, částečnou a finální? */
   kindsEnabled?: boolean
   initial?: { currency: string; note: string; kind?: InvoiceKind | null; percent?: number | null }
+  /**
+   * Oprava vystavené faktury (R-148): po vystavení nové se tahle sama
+   * stornuje, v témže příkazu v databázi.
+   */
+  replaces?: { id: string; number: string } | null
 }) {
   const router = useRouter()
   const editingDraft = draftId !== null
@@ -197,7 +203,7 @@ export function IssueInvoiceForm({
       return
     }
     startBilling(async () => {
-      const next = await getProjectBilling(id)
+      const next = await getProjectBilling(id, replaces?.id ?? null)
       setBilling(next)
       if (kindsEnabled && kind && kindAvailability(next)[kind] !== null) setKind(null)
     })
@@ -296,12 +302,14 @@ export function IssueInvoiceForm({
           percent: kind === 'deposit' || kind === 'partial' ? percent : null,
         },
         email.trim(),
+        replaces?.id ?? null,
       )
       if (result.error || !result.id) {
         setError(result.error ?? 'Fakturu se nepodařilo vystavit.')
         return
       }
-      toast.success(`${kind === 'single' ? 'Faktura' : `${KIND_LABELS[kind]} faktura`} ${result.number} vystavená`)
+      const label = `${kind === 'single' ? 'Faktura' : `${KIND_LABELS[kind]} faktura`} ${result.number} vystavená`
+      toast.success(replaces ? `${label}, ${replaces.number} je stornovaná` : label)
       router.push(`/dashboard/faktury/${result.id}`)
     })
   }
@@ -574,9 +582,11 @@ export function IssueInvoiceForm({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {editingDraft ? (pending ? 'Ukládám…' : 'Uložit koncept') : pending ? 'Vystavuju…' : 'Vystavit fakturu'}
+          {editingDraft
+            ? pending ? 'Ukládám…' : 'Uložit koncept'
+            : pending ? 'Vystavuju…' : replaces ? 'Vystavit opravenou fakturu' : 'Vystavit fakturu'}
         </Button>
-        {!editingDraft && draftsEnabled && (
+        {!editingDraft && !replaces && draftsEnabled && (
           <Button type="button" variant="outline" onClick={saveDraft} disabled={pending}>
             Uložit jako koncept
           </Button>
@@ -587,7 +597,9 @@ export function IssueInvoiceForm({
         <p className="text-xs text-quiet">
           {editingDraft
             ? 'Vystavíte a pošlete ji jedním kliknutím ve Fakturách › Ke schválení.'
-            : 'Číslo přidělím při vystavení. Vystavenou fakturu už nejde měnit, jen stornovat.'}
+            : replaces
+              ? `Nová faktura dostane další číslo a ${replaces.number} se tím stornuje. Klientovi ji pak pošlete z detailu.`
+              : 'Číslo přidělím při vystavení. Vystavenou fakturu už nejde měnit, jen stornovat nebo opravit.'}
         </p>
       </div>
     </form>
