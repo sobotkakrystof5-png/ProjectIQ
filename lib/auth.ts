@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 
 import { sql } from './db'
 import { clientIpFromHeaders } from './security/client-ip'
@@ -65,9 +66,11 @@ export async function loadAdminSession(): Promise<AdminSession | null> {
 
   // Kdo má zapsaný druhý faktor, musí ho projít. Jinak by stačilo heslo
   // a dvoufázové ověření by se dalo obejít tím, že se druhý krok přeskočí.
+  // Když se na faktory nejde zeptat, nepouštět: bez odpovědi nevíme, jestli
+  // druhý faktor chybí, nebo ho jen nevidíme.
   if (aal !== 'aal2') {
-    const { data: factors } = await supabase.auth.mfa.listFactors()
-    if ((factors?.totp?.length ?? 0) > 0) return null
+    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors()
+    if (factorsError || (factors?.totp?.length ?? 0) > 0) return null
   }
 
   return { email, userId: String(claims.sub ?? ''), aal }
@@ -98,4 +101,16 @@ export async function adminActorEmail(): Promise<string> {
 export async function requireAuth(): Promise<void> {
   const session = await getAdminSession()
   if (!session) throw new Error('Neautorizovaný přístup')
+}
+
+/**
+ * Pro každou stránku `app/dashboard/**` (audit 2026-11-24, #2). Layout sám
+ * nestačí: podle dokumentace Next 16 nebrání vykreslení stránky v RSC
+ * payloadu, takže session jen s heslem (`aal1`) by si data stránky vyžádala.
+ * Hlídá to `components/admin/__tests__/admin-page-guard.test.ts`.
+ */
+export async function requireAdminPage(): Promise<AdminSession> {
+  const session = await getAdminSession()
+  if (!session) redirect('/login')
+  return session
 }

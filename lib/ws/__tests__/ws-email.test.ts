@@ -19,6 +19,7 @@ import { queueReminders } from '../email/scheduled'
 import { verifySvix } from '../email/resend-webhook'
 import { createDraft } from '../outreach'
 import { createWsTestDb, ids, pgliteDriver } from './helpers/ws-pglite'
+import { addDays, pragueToday, pragueToUtc } from '../time'
 
 vi.mock('server-only', () => ({}))
 
@@ -374,8 +375,9 @@ describe('celá cesta', () => {
        ON CONFLICT (business_id, module) DO UPDATE SET enabled = true`,
       [A.account, A.business],
     )
-    const today = '2026-11-16'
-    const start = '2026-11-17T09:00:00Z'
+    // Od dneška, ne pevně: pevný termín zestárl a potvrzení zapadlo jako prošlé (CI červená od 2026-11-17).
+    const today = pragueToday()
+    const start = pragueToUtc(addDays(today, 1), 10 * 60).toISOString()
     const req = await newRequest(start)
     // 1. Poptávka: zákazník i majitel dostanou e-mail, majitel s tlačítky.
     await notifyNewRequest(scopeA, A.business, req)

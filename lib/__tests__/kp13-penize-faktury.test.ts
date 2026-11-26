@@ -78,10 +78,13 @@ async function asClient<T = Record<string, unknown>>(clientId: string | null, sq
   }
 }
 
-/** Co admin ukáže jako „zbývá doplatit" — zaplacená zakázka nezbývá nic. */
+/**
+ * Co admin ukáže jako „zbývá doplatit". Bez ruční masky `CASE WHEN p.paid`:
+ * ta dřív zakrývala, že TS kopie `paid` nezná (audit 2026-11-24, #4).
+ */
 async function adminRemaining(projectId: string): Promise<number> {
   const res = await db.query<{ remaining: number }>(
-    `SELECT (CASE WHEN p.paid THEN 0 ELSE ${remainingSql('p')} END)::float AS remaining FROM projects p WHERE p.id = $1`,
+    `SELECT (${remainingSql('p')})::float AS remaining FROM projects p WHERE p.id = $1`,
     [projectId],
   )
   return Number(res.rows[0].remaining)

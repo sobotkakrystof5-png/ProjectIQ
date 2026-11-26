@@ -20,6 +20,7 @@ import { publicToken } from '@/lib/public-token'
 import { summarizeClientRequest } from '@/lib/client-request-ai'
 import { finishConsultationBooking } from '@/lib/admin/consultations'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
+import { errorSummary } from '@/lib/security/log-safe'
 
 type ActionResult = { success: boolean; error?: string }
 
@@ -345,7 +346,7 @@ export async function submitClientRequest(
     `
     requestId = (inserted[0] as { id: string }).id
   } catch (err) {
-    console.error('[ClientRequest] DB chyba při INSERT:', err)
+    console.error('[ClientRequest] DB chyba při INSERT:', errorSummary(err))
     return { success: false, error: 'Chyba serveru. Zkuste to prosím znovu.' }
   }
 
@@ -379,7 +380,7 @@ export async function submitClientRequest(
         await sql`UPDATE client_requests SET ai_status = 'failed' WHERE id = ${requestId}`
       }
     } catch (err) {
-      console.error('[ClientRequest] uložení shrnutí selhalo:', err)
+      console.error('[ClientRequest] uložení shrnutí selhalo:', requestId, errorSummary(err))
     }
 
     const to = adminEmail()

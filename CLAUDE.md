@@ -17,7 +17,7 @@ Jedna Next.js aplikace se třemi částmi:
 
 | Část | Cesty | Přihlášení | Stav |
 |---|---|---|---|
-| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/login`, `/p/[token]`, `/h/[token]` | NextAuth (jeden admin) | mění se jen v sezeních AD00–AD18 (R-082), dokumentace v `docs/admin/AGENTS-ADMIN.md` |
+| **Admin konzole** (Kryštofův osobní systém) | `/dashboard/*`, `/login`, `/p/[token]`, `/h/[token]` | Supabase Auth + TOTP (jeden admin) | mění se jen v sezeních AD00–AD18 (R-082), dokumentace v `docs/admin/AGENTS-ADMIN.md` |
 | **ZakazIQ Workspace** (SaaS pro firmy) | `/w/*`, `/api/ws/*`, `/api/public/v1/*` | Clerk | ve výstavbě |
 | **Landing page** | `/` a marketingové stránky v `app/(marketing)/` | žádné | ve výstavbě |
 
@@ -51,6 +51,7 @@ Projektové skilly (`.claude/skills/`, identická kopie pro Codex v `.agents/ski
 | `zakaziq-workspace-backend` | DB, migrace, server actions, API, Clerk, Stripe, příjem poptávek |
 | `zakaziq-ux-texty-cs` | každý text, který uvidí uživatel nebo zákazník |
 | `zakaziq-memory` | začátek a konec sezení, zápis rozhodnutí — zapisuje do `memory/` podle `memory/pravidla.md` |
+| `zakaziq-rozbor-firmy` | postup cloudové úlohy navrhovače nabídek (rozbor firmy subagenty, R-149); mění se tady, ne v nastavení úlohy |
 
 Uživatelské skilly, které projekt používá: `web-security-setup` (+ `web-security-memory`, `web-security-audit`, `web-security-review`), `web-project-brief`, `humanize-text-cs`, `frontend-design`, `seo` + `seo-quality-principles` (R-022). Řemeslné skilly třetích stran a jejich meze v ZakazIQ: `docs/AGENTS-REFERENCE.md` → Skills (R-080). `design-taste-frontend` (tasteskill 2.5.1) je od 2026-11-10 uživatelský, ne v repu.
 

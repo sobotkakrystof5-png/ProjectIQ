@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default async function PersonalProjectDetailPage(props: Props) {
+  await requireAdminPage()
   const params = await props.params
   const [project, improvements, changelog] = await Promise.all([
     getPersonalProject(params.id),

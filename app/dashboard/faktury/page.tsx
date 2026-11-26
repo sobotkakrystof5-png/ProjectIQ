@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { AlertTriangle, FilePlus2, Paperclip } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
@@ -146,6 +147,7 @@ function columns(today: string): AdminColumn<InvoiceRegistryItem>[] {
 export default async function FakturyPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const status = toInvoiceStatus(searchParams.stav)
   const rawYear = Number.parseInt(Array.isArray(searchParams.rok) ? searchParams.rok[0] : (searchParams.rok ?? ''), 10)

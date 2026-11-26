@@ -32,7 +32,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import { setAdminDbForTests } from '@/lib/admin/db'
-import { resetIssuingReadyForTests, saveIssuerProfile } from '@/lib/admin/invoice-issue'
+import { loadIssueDraft, resetIssuingReadyForTests, saveIssuerProfile } from '@/lib/admin/invoice-issue'
 import type { IssuerProfile } from '@/lib/admin/invoice-issue-schema'
 import {
   createDraft,
@@ -115,6 +115,7 @@ beforeAll(async () => {
       price numeric,
       deposit_amount numeric,
       deposit_paid boolean NOT NULL DEFAULT false,
+      paid boolean NOT NULL DEFAULT false,
       status text NOT NULL DEFAULT 'new',
       project_type text NOT NULL DEFAULT 'client',
       contact_id uuid,
@@ -206,6 +207,13 @@ describe('hotová zakázka připraví koncept', () => {
     expect(await prepareProjectDoneDraft(await project({ status: 'in_progress' }))).toBeNull()
     expect(await prepareProjectDoneDraft(await project({ status: 'paid' }))).toBeNull()
     expect(await prepareProjectDoneDraft(await project({ price: 10000 }))).toBeNull()
+  })
+
+  it('ne u hotové zakázky se zaškrtnutým „Peníze dorazily" bez faktury (audit #4)', async () => {
+    const id = await project({ paid: true })
+    expect(await prepareProjectDoneDraft(id)).toBeNull()
+    // Ani formulář nové faktury nenabídne celou cenu znovu.
+    expect((await loadIssueDraft(id)).amount).toBe(0)
   })
 
   it('ne, když už k zakázce existuje platná faktura', async () => {

@@ -5,7 +5,7 @@ name: security
 
 on:
   push:
-    branches: [main, workspace, 'ws/**']
+    branches: ['**']
   pull_request:
   schedule:
     - cron: '0 6 * * 1' # pondělí ráno — nově zveřejněné CVE

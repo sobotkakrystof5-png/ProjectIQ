@@ -32,6 +32,33 @@
 > Předchozí: 2026-11-25 · **ZakazIQ Voice — VO00** (R-150): plán a prompty VO00–VO12 do repa, rozhodnutí,
 > ceny, skript testu přepisu. Text diktátů zůstává natrvalo, dokud ho Kryštof nesmaže.
 >
+> Předchozí: 2026-11-26 · **Opravit a stáhnout fakturu** (R-148): v detailu vystavené
+> faktury je „Opravit fakturu“ (formulář nové s údaji staré, po vystavení se stará sama stornuje, jedním
+> příkazem v databázi) a „Stáhnout PDF“. Jen u nezaplacené faktury. Bez migrace. **Na produkci od 2026-11-26
+> (`76e9a8d`)**, za přihlášením neověřeno. Faktura 2026001 klientce nedorazila — stav doručení zatím nikdo neviděl.
+>
+> Předchozí: 2026-11-25 · **Doručení pozvánek** (R-146): kalendář ukazuje, jestli pozvánka
+> na schůzku klientovi dorazila, nebo se vrátila, podle webhooku Resendu `/api/resend/vizeon` (migrace 135).
+> Nedoručená pozvánka na nadcházející schůzku založí upozornění a nabídne „Poslat e-mail znovu".
+> **Na produkci od 2026-11-25 (`40fff72`) i s migrací 135**; dokud v Resendu není webhook a ve Vercelu
+> `VIZEON_RESEND_WEBHOOK_SECRET`, vstup vrací 503 a kalendář ukazuje jen „odešla“.
+>
+> Předchozí: 2026-11-25 · **Schůzky z Wispr Flow zrušené** (R-145): na přání Kryštofa
+> zmizela obrazovka Schůzky, vstup `/api/public/schuzky`, AI shrnutí, koncepty v Gmailu i most na Macu.
+> LaunchAgent je vypnutý a klíč `MEETING_NOTES_API_KEY` smazaný z Klíčenky i z Vercelu. **Uložené
+> přepisy (5 schůzek) zůstaly v `meeting_notes`** s retencí 3 roky. **Na produkci od 2026-11-25 (`ccb1823`).**
+>
+> Předchozí: 2026-11-25 · **Schůzky z Wispr Flow** (R-144): nová sekce Schůzky v adminu.
+> Schůzka nahraná ve Wispr Flow přijde i s doslovným přepisem, AI udělá shrnutí, body dohody, kdo co
+> udělá a pozná klienta; po potvrzení klienta se doplní prázdné údaje v kontaktu a v Gmailu
+> krystof@vizeon.cz čeká koncept e-mailu se shrnutím (přepis zůstává jen v ZakazIQ). Most je
+> skript na Macu, který čte lokální data aplikace Wispr Flow bez modelu (cloudovou úlohu zastavil
+> bezpečnostní filtr při opisování přepisu). **Na produkci od 2026-11-25 (`f024737`) i s migrací 134**,
+> LaunchAgent **každých 5 minut** (od 2026-11-25 večer, dřív hodinu), 5 schůzek naimportovaných a shrnutých
+> (`docs/admin/SCHUZKY-WISPR.md`). Ruční „Vložit přepis“ na produkci zatím nikdo neuložil (v DB žádný řádek `manual`).
+> **Zbývá v Profilu znovu propojit Google** (bez toho nevznikne koncept v Gmailu), potvrdit klienta
+> u dvou schůzek s Horákem a projít Schůzky za přihlášením.
+>
 > Předchozí: 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
 > náležitosti českého dokladu (údaj o zápisu, datum plnění, značka VIZEON, „Vystaveno v systému ZakazIQ" na
 > každé stránce) a před vystavením se vybírá druh — za celé dílo, zálohová, částečná, finální — s procentem
@@ -146,6 +173,21 @@ odpovědí).
 a Vyzkoušet připojení s klíčem z adminu proti `npm run dev` (Otevřené problémy). Pak VO04 (Fn a nahrávání),
 VO09 (zachycení oprav) navazuje na VO06.
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
+
+**Rozpracováno — navrhovač nabídek (R-147, od 2026-11-25):** plán `docs/admin/NABIDKY-PLAN.md`, větev
+`admin/navrhovac-nabidek` (worktree `.claude/worktrees/navrhovac-nabidek`). N0 hotové (cenová pravidla
+v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1:** karta „Rozbor firmy" u kontaktu; první verze
+na Managed Agents byla na produkci (`7380078`, migrace 136), nikdy se nespustila. **Přestavěno na cloudovou
+úlohu Claude Code na předplatném (R-149, 2026-11-26):** fronta, API trigger, dva vstupy `/api/public/rozbory`,
+skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Otevřené problémy), zkouška na 5 firmách
+(Kryštof souhlasil 2026-11-26), pak N2 (cena, tři varianty, stránka nabídky).
+
+**Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
+(34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
+A1–A3, B1, C0–C3 (bez částí čekajících na R1), E1, E3, E4, E6, E7, F1–F4, G1, H1, I1, J1. CI na `main`
+je zase zelená. Zbývá: rozhodnutí R1–R7 od Kryštofa (D1–D2, E2, E5, I2, J4 a zbytek C1/C2), pak F5, G2,
+G3, H2, J2, J3, K1–K3; otočit heslo databáze waitlistu (R5). Stav po úkolech v tabulce „Stav" na konci
+seznamu.
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
@@ -1657,6 +1699,108 @@ nepřipravuje" — s migrací 132 vznikne finální koncept na zbytek. Nová ces
 `prepareKindIssue`, jinak se druh neuloží. Technika `docs/admin/AGENTS-ADMIN.md` → „Druh faktury a rozpis ceny
 zakázky (R-143)", DECISIONS #042 doplnění.
 
+### R-144 · Schůzky z Wispr Flow: přepis v ZakazIQ, shrnutí jako koncept v Gmailu (2026-11-24)
+**Rozhodnutí:** (1) Nová sekce **Schůzky** v adminu (`/dashboard/schuzky`): každá schůzka nahraná ve
+Wispr Flow („všechny, kde ho použiju") s doslovným přepisem, shrnutím od AI, body „na čem jsme se
+domluvili", kroky obou stran a otevřenými body. (2) **Přepis zůstává jen v ZakazIQ**, nijak se
+neupravuje. (3) Klientovi jde **jen koncept e-mailu v Gmailu** krystof@vizeon.cz se shrnutím,
+dohodami a kroky; odešle ho Kryštof sám. (4) AI pozná klienta, ale **sám se přiřadí jen jistý
+klient bez AI** (e-mail účastníka s kontaktem, jediná událost v kalendáři ve stejný čas s kontaktem);
+návrh AI potvrzuje Kryštof jedním kliknutím, potvrzení doplní do kontaktu jen prázdná pole a založí
+koncept. (5) Most z Wispr Flow je **naplánovaná úloha Clauda** (každou hodinu, konektor Wispr Flow,
+klíč `MEETING_NOTES_API_KEY` jako network secret) → `POST /api/public/schuzky`; náhradou ruční
+„Vložit přepis". (6) Retence 3 roky po schůzce, skrytá po roce, výmaz kontaktu bere přepisy s sebou.
+**Proč:** zadání Kryštofa 2026-11-24 („přepis hovoru, poslat klientovi sumarizaci, nová sekce, kde AI
+pozná o koho jde a doplní údaje"; odpovědi: „jenom v konceptech v emailu", „celý přepis jde do ZakazIQ,
+sekce schůzky/přepisy", „všechny, kde ho použiju"). Wispr Flow nemá API ani webhook a konektor se
+přihlašuje jen v prohlížeči, server ZakazIQ si data stáhnout neumí. Přepis mluvil klient, takže podle
+R-111 se z něj nic nevykoná bez kliknutí; podvržené jméno v hovoru by jinak poslalo shrnutí cizímu.
+**Důsledek:** migrace 134 (`meeting_notes`), Google propojení s novým oprávněním `gmail.compose`
+(jen koncepty) — po nasazení propojit Google znovu a zapnout Gmail API. Body pro klienta píše AI
+rovnou ve tvaru do e-mailu (já / vy), poznámky jen pro Kryštofa jdou do `internalNotes` a do e-mailu
+nikdy. Mění R-114/R-116 v tom, že e-mail po schůzce nejde přes Resend, ale jako koncept do Gmailu.
+Technika `docs/admin/AGENTS-ADMIN.md` → „Schůzky a přepisy z Wispr Flow", nastavení a text úlohy
+`docs/admin/SCHUZKY-WISPR.md`, bezpečnost `.claude/security/DECISIONS.md` #052.
+**Upřesněno 2026-11-25:** bod (5) neplatí — naplánovaná úloha přepis nepřenesla (opsání dlouhého textu
+modelem zastavil bezpečnostní filtr). Most je skript na Macu `scripts/wispr-local-most.mjs`: čte lokální
+data aplikace Wispr Flow (`flow.sqlite`, `meetings/<id>/refined.ndjson`) a posílá bez modelu, LaunchAgent
+každou hodinu, klíč v Klíčence. Běží jen při zapnutém Macu; formát lokálních dat není veřejné rozhraní.
+**Nahrazeno:** R-145 (2026-11-25) — funkce zrušená.
+
+### R-145 · Schůzky z Wispr Flow zrušené, uložené přepisy zůstávají (2026-11-25)
+**Rozhodnutí:** funkce Schůzky z Wispr Flow (R-144) se z aplikace odstraňuje celá: obrazovka
+`/dashboard/schuzky`, vstup `/api/public/schuzky`, AI shrnutí, koncepty v Gmailu, karta schůzek
+u kontaktu, typ upozornění `meeting_note` a most na Macu. Google propojení žádá zase jen kalendář.
+Tabulka `meeting_notes` (migrace 134) **zůstává i s daty**; denní úklid ji dál maže 3 roky po schůzce.
+**Proč:** Kryštof 2026-11-25: „zruš ten kód z aplikace", vybral „celé Schůzky" a „nechat v databázi".
+**Důsledek:** jediný kód nad `meeting_notes` je `lib/admin/meeting-notes-retention.ts` (cron
+`client-retention`). Funkci jde vrátit z historie gitu (`ddba729`) bez migrace. Migrace 134 se neupravuje
+ani nemaže (B3); kdyby se měla smazat i data, je to nová migrace s `DROP TABLE`. Bezpečnost DECISIONS #052 (zrušeno).
+
+### R-146 · Doručení pozvánek podle webhooku Resendu (2026-11-25)
+**Rozhodnutí:** (1) U pozvánky na schůzku kalendář ukazuje i doručení: „dorazila" (poštovní server klienta
+e-mail přijal; otevření se nesleduje), „nedorazila" (vrátila se, adresa je u Resendu zablokovaná, nebo se
+nedoručila) a „odešla", dokud zpráva o doručení nepřišla. (2) Zdrojem je webhook Resendu `/api/resend/vizeon`
+s vlastním tajemstvím. Každý e-mail ze `sendVizeonMail` nese štítek `zakaziq=admin` a nic bez něj se neukládá.
+(3) Ukládá se jen id e-mailu, stav, čas a druh vrácení (`email_deliveries`), a to u všech e-mailů z adminu;
+zobrazuje se zatím jen u pozvánek. (4) Pozvánka na nadcházející schůzku, která nedorazila, založí upozornění
+do zvonku a nabídne „Poslat e-mail znovu" na adresu, která je u schůzky teď. (5) Otevření e-mailu (sledovací
+pixel) se nesleduje.
+**Proč:** Kryštof 2026-11-25 vybral „Sledovat doručení", protože „Odešla" říkalo jen, že e-mail převzal Resend.
+`VIZEON_RESEND_API_KEY` umí jen odesílat, takže stav nejde zjistit dotazem; webhook je jediná cesta bez
+plného klíče v aplikaci. Štítek je nutný, protože webhook platí pro celý účet Resendu a posílá z něj i Growth OS.
+**Důsledek:** migrace 135. Nový e-mail z adminu musí jít přes `sendVizeonMail` (kvůli štítku), jinak jeho
+doručení neuvidíme. U faktur, připomínek a dotazníků se doručení už ukládá, chybí jen zobrazení. Nastavení
+v Resendu a pořadí nasazení: `docs/admin/AGENTS-ADMIN.md` → „Doručení pozvánek", DECISIONS #054.
+
+### R-147 · Navrhovač nabídek: cena podle hodnoty pro klienta, AI navrhne, Kryštof potvrdí (2026-11-25)
+**Rozhodnutí:** (1) V adminu vznikne navrhovač nabídek: tlačítko „Připravit nabídku" u kontaktu, firmy od
+asistenta a v Hovorech pustí na pozadí rozbor webu firmy, rešerši firmy a trhu z veřejných zdrojů, odhad
+hodnoty pro klienta a návrh ceny ve třech variantách (Základ, Doporučená, Plus). (2) **Cena se odvozuje
+z hodnoty, kterou zakázka klientovi přinese, ne z hodin**; systém hodiny nepočítá ani neukazuje a návrh
+ukazuje jen cenu a zdůvodnění. (3) Spouští se **ručně** (D-N1). (4) Běží na **Managed Agents** od
+Anthropicu (D-N2). (5) Učí se zpětnou vazbou, ne dotrénováním: poslaná cena a odpověď klienta na jedno
+klepnutí, měsíční vyhodnocení, návrhy úprav cenových pravidel, které potvrdí Kryštof. (6) Nic neodejde samo
+(R-084, R-111), každé tvrzení o firmě má zdroj (B10).
+**Proč:** Kryštof 2026-11-25: „navrhli vhodnou cenu na základě různých dat… přesně mi bude říkat ceny na míru…
+trénovat, aby to byl plnohodnotný člen týmu"; „neúčtujeme si dle hodiny, účtujeme si podle toho, co to
+klientovi přinese, jakou hodnotu". Na dotrénování nejsou data: na produkci je 14 klientských zakázek s cenou
+a žádný záznam o poslaných nabídkách. Managed Agents proto, že na Vercel Hobby má funkce časový strop a provoz
+se má stěhovat na Cloudflare (R-135).
+**Důsledek:** plán `docs/admin/NABIDKY-PLAN.md` (kroky N0–N4, otevřené D-N5 retence). Nová cesta k ceně
+nabídky jde přes cenová pravidla v `admin_settings.pricing_rules`, ne natvrdo v kódu. Rozbor osoby (OSVČ) je
+osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
+**Upřesněno:** R-149 (2026-11-26) — rozbor neběží na Managed Agents, ale v Claude Code na předplatném.
+
+### R-148 · Oprava vystavené faktury = nová faktura s údaji staré a automatické storno (2026-11-26)
+**Rozhodnutí:** vystavená faktura se dál na místě nemění (R-098). Tlačítko „Opravit fakturu“ otevře formulář
+nové faktury vyplněný údaji té staré; po vystavení dostane nová další číslo a stará se v témže příkazu stornuje.
+Na nové je poznámka „Nahrazuje fakturu N.“ Jen u platné nezaplacené faktury; zaplacenou opraví ruční storno
+a nová faktura. Klientovi se nová posílá ručně z detailu. K tomu „Stáhnout PDF“ u každé faktury.
+**Proč:** Kryštof 2026-11-26 chtěl fakturu „stáhnout a upravovat“ a vybral variantu „Opravit = předvyplněná
+nová“ před úpravou na místě (stejné číslo, dokud neodešla) i úpravou vždy. Klient má v e-mailu původní verzi,
+takže přepsat doklad pod stejným číslem by znamenalo dvě různé faktury se stejným číslem.
+**Důsledek:** `issueCorrection` (CTE storno + `admin_invoice_issue`), `loadCorrectionSource`,
+`loadProjectBilling(…, excludeInvoiceId)`, `issueNewInvoice(raw, email, replacesId)`, `?oprava=` na
+`/dashboard/faktury/nova`, `?stazeni=1` na PDF. Bez migrace. Upřesňuje R-098 (ruční storno zůstává).
+Technika `docs/admin/AGENTS-ADMIN.md` → „Oprava vystavené faktury (R-148)“.
+
+### R-149 · Rozbor firmy běží v Claude Code na předplatném, ne na placeném API (2026-11-26)
+**Rozhodnutí:** (1) Rozbor firmy pro navrhovač nabídek dělá **cloudová úloha Claude Code** na claude.ai/code
+v předplatném Kryštofa, ne Managed Agents ani jiné placené API. (2) „Připravit rozbor" zařadí rozbor do fronty
+a úlohu **hned spustí** přes její API trigger; **ráno v 7:00** ji spustí rozvrh jako zálohu. (3) Vedoucí běží na
+**Opusu**, dva subagenti (web firmy, veřejná rešerše) na **Sonnetu**. (4) Úloha si zadání vyzvedne a výsledek
+odevzdá přes `/api/public/rozbory` s klíčem, který přidává cloudové prostředí; server výsledek zkontroluje stejně
+jako dřív (B10).
+**Proč:** Kryštof 2026-11-26: „jde mi čistě o subagenty, nepotřebujeme drahé SDK agenty od Anthropicu… klidně
+samostatné subagenty, které se spustí samy, v rámci mého předplatného". Spouštění a modely vybral z nabídnutých
+variant. Managed Agents (první verze N1) se nikdy nezaložily, nic se nezaplatilo.
+**Důsledek:** mění D-N2 v `docs/admin/NABIDKY-PLAN.md`. Migrace 137 (fronta `queued`, `claimed_at`, odkaz na běh),
+`lib/admin/offers/routine.ts`, vstupy `app/api/public/rozbory/`, skill `.claude/skills/zakaziq-rozbor-firmy/`, env
+`OFFER_RESEARCH_API_KEY`, `OFFER_RESEARCH_ROUTINE_ID`, `OFFER_RESEARCH_FIRE_TOKEN`. Rozbory se počítají do limitu
+předplatného (strop 15 denně, 5 za běh). Postup úlohy se mění v repu (skill), ne v nastavení úlohy. Bezpečnost
+`.claude/security/DECISIONS.md` #056.
+
 ### R-150 · ZakazIQ Voice: diktování z Macu, zpracování v adminu, text natrvalo (2026-11-25)
 **Rozhodnutí:** vlastní diktování jako Wispr Flow podle `docs/admin/VOICE-PLAN.md` (oddíl 2, D-V1–D-V13).
 Kryštof potvrdil: (1) zpracování na **serveru ZakazIQ** (admin), Mac jen nahrává, ukazuje lištu a vkládá
@@ -1704,9 +1848,6 @@ ve VO02. Žádný nový npm balíček.
 - [ ] **ZakazIQ Voice — `AGENT_KEY_PEPPER` chybí v lokálním `.env.local`:** bez něj lokálně nejde přidat zařízení
   a `/api/public/voice/*` vrací 503. Doplnit libovolný náhodný řetězec aspoň 32 znaků, jen pro vývoj;
   produkce má vlastní ve Vercelu · Kryštof · od 2026-11-26
-- [ ] **ZakazIQ Voice — test číslování migrací na větvi `admin/zakaziq-voice` padá:** migrace 138 je za 133,
-  čísla 134 (zrušení schůzek) a 135 (doručení pozvánek) jsou na jiných větvích. Spraví se rebasem po jejich
-  sloučení do `main`; čísla neměnit · `lib/ws/__tests__/ws-schema.test.ts` · od 2026-11-26
 - [ ] **ZakazIQ Voice — rozbor AI z oprav se skutečným modelem neověřený (VO08):** běží jen s podvrženou odpovědí.
   Ověřit „Spustit učení teď“ v adminu, až bude ≥ 8 opravených diktátů (role `smart`, do pár korun), a jestli
   návrhy pravidel dávají smysl · od 2026-11-26
@@ -1714,6 +1855,49 @@ ve VO02. Žádný nový npm balíček.
   s vymyšlenými zařízeními (1280 a 390 px, bez přetečení, plochy ≥ 44 px, konzole bez chyb). Projít
   s přihlášením: Přidat zařízení → klíč ukázaný jednou, po obnovení stránky už ne → Zneplatnit → Zpět.
   Blok s klíčem okem nikdo neviděl (stejné třídy jako klíč webu, KP17) · od 2026-11-26
+- [ ] **Navrhovač nabídek N1 (R-149) — zapojit a vyzkoušet:** (1) migrace 137 na produkci a nasazení,
+  (2) v prostředí `env_015BA5…` (dřív most Wispr Flow) vyměnit network secret pro `www.zakaziq.cz` za nový
+  `OFFER_RESEARCH_API_KEY` (typ Bearer) a tentýž klíč dát do Vercelu, (3) cloudová úloha „Rozbor firem pro nabídky"
+  (Opus, rozvrh 7:00, bez konektorů) s API triggerem, jeho klíč do Vercelu jako `OFFER_RESEARCH_FIRE_TOKEN`
+  a id jako `OFFER_RESEARCH_ROUTINE_ID`, (4) zkouška na 5 firmách s webem (Kryštof 2026-11-26 schválil pět firem
+  od asistenta: reality, instalatérství, truhlářství na Webnode, tesařství s webem jen z e-mailu, elektro) po jednom;
+  ověřit, že WebSearch a WebFetch v běhu úlohy fungují (dokumentace to neříká), a zapsat dobu a spotřebu limitu,
+  (5) projít kartu na 390 a 1280 px · od 2026-11-26
+- [ ] **Oprava a stažení faktury (R-148) — nasadit a projít naživo:** ověřeno testy nad PGlite a `tsc`,
+  v prohlížeči ne. Projít za přihlášením: detail 2026001 → Stáhnout PDF (uloží soubor), Opravit fakturu →
+  formulář s údaji a poznámkou „Nahrazuje fakturu 2026001.“ → Vystavit opravenou → nová má další číslo,
+  2026001 je stornovaná, rozpis zakázky ukazuje jen novou → Poslat e-mailem · od 2026-11-26
+- [ ] **Faktura 2026001 klientce nedorazila:** na produkci má `sent_at` 2026-11-26 17:04 a Resend e-mail přijal
+  (je v jeho dashboardu); kód bez PDF neodesílá. Stav doručení (doručeno / vráceno / spam) nikdo neviděl: webhook
+  R-146 v Resendu není nastavený. Zkušební odeslání z repa nešlo — **lokální `VIZEON_RESEND_API_KEY` je neplatný**
+  (Resend 401), produkční je ve Vercelu jako sensitive. Zjistit stav v Resendu (detail e-mailu), nastavit webhook
+  R-146, a hlavně **doplnit IBAN do Údajů dodavatele**: 2026001 nemá účet ani QR, klientka ji nemá jak zaplatit.
+  Pak „Opravit fakturu“ (R-148) a poslat znovu · Kryštof · od 2026-11-26
+- [ ] **Běhoun migrací neumí středník v textu:** `splitStatements` v `scripts/apply-migration.js` dělí podle `;`
+  i uvnitř řetězce (komentář migrace 136 by se rozpadl, testy nad PGlite pouštějí soubor vcelku a nepoznají to).
+  Zvážit test, který rozdělí každou migraci a ověří sudý počet apostrofů · od 2026-11-26
+- [ ] **vizeon.cz odporuje cenovým pravidlům (R-147):** správa 480 Kč místo 999 Kč, kód zůstává VIZEONu,
+  copywriting mimo cenu, „dohodnutý počet kol". Zadání pro repo webu
+  `new - area of zakaziq/prompty/admin/vizeon-web-podminky-a-sprava.md`, spouští Kryštof · od 2026-11-25
+- [ ] **DECISIONS má dvakrát číslo 052** (Wispr Flow a doručení pozvánek); paměť u R-146 odkazuje na #054.
+  Sjednotit číslování v `.claude/security/DECISIONS.md` · od 2026-11-26
+
+- [ ] **Doručení pozvánek (R-146) — nastavit a projít:** ~~(1) migrace 135 na produkci~~ (2026-11-25), (2) v Resendu (účet
+  s doménou vizeon.cz) Webhooks → Add endpoint `https://www.zakaziq.cz/api/resend/vizeon` s událostmi
+  `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.failed`,
+  `email.suppressed`, (3) podpisový klíč `whsec_…` do Vercel Production jako `VIZEON_RESEND_WEBHOOK_SECRET`,
+  pak nasazení, (4) zkušební schůzka na vlastní e-mail → do minuty „Pozvánka dorazila"; na `bounced@resend.dev`
+  → „nedorazila" a upozornění ve zvonku. Pozvánky odeslané před nasazením štítek nemají a zůstanou „odešla".
+  Ověřeno jen testy nad PGlite a dočasnou stránkou s vymyšlenými daty · Kryštof · od 2026-11-25
+- [ ] **Zbytky Schůzek z Wispr Flow (R-145):** vypnutá cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` a prostředí „ZakazIQ most Wispr" (Network
+  secret se starým, už neplatným klíčem) smazat na claude.ai/code/routines · od 2026-11-25
+
+- [ ] **Opravy z auditu — projít naživo za přihlášením:** na produkci od 2026-11-25 (`718e985`), ověřené
+  jen zvenku. Projít: po kroku s heslem bez kódu otevřít `/dashboard/kontakty` (má skončit na `/login`),
+  Finance › Podnikání a zakázka se zaplacenou fakturou („Peníze dorazily"), chat v adminu i v `/klient`
+  (v Network žádné obnovení stránky každých 10 s), editor startupu (Waitlist DB URL jen pro zápis —
+  uložení projektu stávající připojení zašifruje). **Otočit heslo databáze waitlistu** v Neonu (R5 v
+  `plans/ukoly-z-auditu.md`, dřív leželo nešifrovaně a chodilo do prohlížeče) · Kryštof · od 2026-11-24
 - [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
   skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
   Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
@@ -2245,6 +2429,253 @@ ve VO02. Žádný nový npm balíček.
 - **chore** Nové env `GROQ_API_KEY`, `VOICE_STT_PROVIDER`, `VOICE_GROQ_STT_MODEL`, `VOICE_OPENAI_STT_MODEL`
   v `.env.example` a `docs/AGENTS-REFERENCE.md` → Env proměnné.
 
+### 2026-11-26 (navrhovač nabídek — rozbor v Claude Code na předplatném, R-149)
+- **refactor** Rozbor firmy už nespouští Managed Agents: „Připravit rozbor" zařadí rozbor do fronty a spustí cloudovou
+  úlohu Claude Code přes API trigger (posílá jen id rozboru). Úloha si zadání vyzvedne `POST /api/public/rozbory`
+  (atomicky), pustí dva subagenty a výsledek pošle na `POST /api/public/rozbory/[id]` (422 = oprav a pošli znovu,
+  `nepodarilo_se` = konec s kódem `gave_up`). Hotový rozbor dá upozornění do zvonku (`offer_research_done`). Karta
+  ukazuje „čeká / běží", odkaz „Sledovat v Claude" a „Zkusit spustit znovu"; „Nastavit agenty" a strop 2 USD zmizely.
+  Kontakt pojmenovaný e-mailem už úloze neprozradí adresu. Pryč `lib/admin/offers/{api,agent-config}.ts` a role
+  modelu `deep`. Soubory: `lib/admin/offers/{research,routine,result}.ts`, `app/offer-research-actions.ts`,
+  `app/api/public/rozbory/{route.ts,[id]/route.ts}`, `components/admin/offers/{research-card,research-section}.tsx`,
+  `lib/notifications.ts`, `components/NotificationList.tsx`, `.claude/skills/zakaziq-rozbor-firmy/SKILL.md` (+ `.agents/`),
+  `.env.example`.
+- **db** Migrace 137 `navrhovac_fronta`: stav `queued`, `claimed_at`, `session_url`, jeden otevřený rozbor na kontakt,
+  nové tělo `purge_offer_research()` (aplikována: ne, nikde). Regex v kontrole odkazu bez opakování přes 255
+  (Postgres víc nedovolí, test to chytil).
+- **docs** `docs/admin/AGENTS-ADMIN.md` → Navrhovač nabídek, `docs/admin/NABIDKY-PLAN.md` (D-N2, oddíly 4, 8, 9, 11),
+  `docs/AGENTS-REFERENCE.md` (env), DECISIONS #056 (nahrazuje #055), STATE.md.
+- **chore** Ověřeno: `npx tsc --noEmit`, přepsaný `lib/__tests__/admin-navrhovac-rozbor.test.ts` (20 testů: kontrola
+  výsledku, spuštění úlohy s podstrčeným `fetch`, celý tok přes oba vstupy nad PGlite s migracemi 136 a 137 dvakrát,
+  přednost spuštěného rozboru, jeden otevřený na kontakt, denní strop, vzdání, údržba), `ws-schema`, hlídací testy
+  adminu a XSS — 179 prošlo. Cloudová úloha zatím neexistuje, nic se nespouštělo.
+### 2026-11-26 (opravit a stáhnout fakturu — R-148)
+- **feat** Detail vystavené faktury: „Opravit fakturu“ → `/dashboard/faktury/nova?oprava=<id>` s údaji původní
+  faktury a poznámkou „Nahrazuje fakturu N.“; po vystavení se původní stornuje v témže příkazu (CTE se stornem
+  a `admin_invoice_issue`), opravovaná se nepočítá do rozpisu zakázky. Jen u nezaplacené. „Stáhnout PDF“
+  (`?stazeni=1` → `attachment`) u vystavených i archivních faktur. Soubory: `lib/admin/{invoice-issue,
+  project-billing,invoice-issue-schema}.ts`, `app/dashboard/finance/invoice-actions.ts`,
+  `app/dashboard/faktury/{nova,[id]}/page.tsx`, `components/admin/invoices/{issue-form,issued-actions}.tsx`,
+  `app/api/invoices/[id]/pdf/route.ts`. Bez migrace.
+- **chore** Kontrola „faktura se neodeslala“: 2026001 má na produkci `sent_at` 17:04, Resend e-mail přijal,
+  v logu žádná chyba; e-mail se bez PDF poslat nedá (při chybě PDF se neodešle nic). Příloha v náhledu
+  Resendu není vidět; zbývá potvrdit ve schránce (Otevřené problémy).
+- **chore** Ověřeno: `npx tsc --noEmit` bez chyby, nový `lib/__tests__/admin-faktura-oprava.test.ts` (9),
+  `pdf-route.test.ts` (15, nově stažení), na aktuálním `main` i testy faktur (druhy, fakturace, storno,
+  koncepty, KP13). Na produkci `76e9a8d` (Ready): `/`, `/login` 200, `/dashboard/faktury/nova?oprava=` 307,
+  PDF bez přihlášení 401. V prohlížeči neověřeno.
+- **chore** Zkušební odeslání 2026001 na Kryštofův Gmail neproběhlo: lokální klíč Resendu je neplatný (401);
+  PDF se vyrobilo (198 kB). Do Resendu ani adminu agent v Chromu přihlášený není.
+
+### 2026-11-26 (smazání kontaktu v Hovorech)
+- **feat** Rozbalený kontakt v Hovorech má dole tlačítko „Smazat kontakt" s potvrzením přímo v řádku (co se smaže
+  s ním: poznámky, termín v kalendáři; „Nechat", Escape vrátí fokus). Dřív šlo mazat jen ikonou, která se ukáže
+  až při najetí myší, takže na telefonu vůbec. Ikona v řádku zůstala. Soubor: `components/LeadsTable.tsx`.
+- **fix** `deleteLead` maže kontakt i spárovanou událost jedním příkazem (dřív dva `DELETE` za sebou) a schůzku
+  s Meetem smaže i v Google Kalendáři — dřív tam po smazání kontaktu z Hovorů zůstávala. Soubor:
+  `app/calls-actions.ts`, test `lib/__tests__/admin-hovory-smazani.test.ts` (6). Bez migrace.
+- **chore** Ověřeno: `tsc`, nový test a testy kalendáře, asistenta a tříd adminu (67), dočasná stránka s vymyšlenými
+  kontakty na 1280 a 390 px (tlačítko 44 px, potvrzení, Escape, chyba bez přihlášení vrátí řádek a ukáže hlášku);
+  stránka smazaná. Za přihlášením a s Googlem naživo neověřeno, necommitnuto.
+
+### 2026-11-26 (navrhovač nabídek N1 — rozbor firmy, R-147)
+- **feat** Karta „Rozbor firmy" na kartě kontaktu: „Nastavit agenty" založí u Anthropicu prostředí a tým tří
+  agentů (Analytik webů na `fast`, Rešeršista na `smart`, Vedoucí na nové roli `deep` = `claude-opus-5-5`),
+  „Připravit rozbor" pustí běh se stropem 2 USD, karta každých 8 s převezme výsledek, server ho zkontroluje
+  (tvrzení bez zdroje pryč) a běh u Anthropicu smaže. Zobrazení: firma, web a co mu chybí, typická zakázka
+  klienta, recenze, signály možností, konkurence, varování, otázky na klienta, číslované zdroje. Smazání
+  se Zpět. Soubory: `lib/admin/offers/{agent-config,api,result,research}.ts`, `app/offer-research-actions.ts`,
+  `components/admin/offers/{research-section,research-card,research-view}.tsx`, `app/dashboard/kontakty/[id]/page.tsx`,
+  `app/api/cron/client-retention/route.ts`, `lib/ai/models.ts`, `.env.example` (`ADMIN_AI_MODEL_DEEP`).
+- **db** Migrace 136 `navrhovac_rozbor`: `offer_research`, `admin_settings.offer_agents`, `purge_offer_research()`
+  — **aplikovaná na produkci** 2026-11-26 (Neon MCP v jedné transakci na souhlas Kryštofa, zapsaná
+  v `public.schema_migrations` s otiskem souboru; ověřeno: tabulka, 5 indexů, 3 cizí klíče, sloupec, md5 těla
+  funkce sedí na soubor). Testovací Neon ne. Před aplikací opraven středník v komentáři tabulky, na kterém by
+  běhoun migrací spadl (`7380078`).
+- **chore** **Na produkci** 2026-11-26: fast-forward `main` `d871974` → `7380078`, nasazení `dpl_E95Q…` Ready.
+  Veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard` a `/dashboard/kontakty` 307,
+  cron 401. Za přihlášením a se skutečnými agenty zatím neověřeno.
+- **docs** `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: rozbor firmy", plán oddíl 9 a 11, DECISIONS #055,
+  STATE.md (synchronizováno do `.agents/`). Zadání pro vizeon.cz
+  `new - area of zakaziq/prompty/admin/vizeon-web-podminky-a-sprava.md`.
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-navrhovac-rozbor.test.ts` (24 testů: kontrola
+  výsledku, rozhodování o běhu, nastavení a aktualizace agentů, celý tok nad PGlite s migrací 136 dvakrát,
+  denní strop, jeden běh na kontakt, mazání a retence), `ai-models`, `ws-schema`, hlídací testy adminu a XSS
+  (153), `npm run build`. Vzhled karty na dočasné stránce s vymyšlenými daty na 1280 a 390 px (bez přetečení,
+  ovládání ≥ 44 px, konzole bez chyb; stránka smazaná). Anthropic se nevolal. **Za přihlášením a se skutečnými
+  agenty neověřeno.** Bezpečnostní review před commitem bez nálezu k opravě (AUDIT-LOG 2026-11-26).
+
+### 2026-11-25 (navrhovač nabídek — R-147)
+- **docs** Plán navrhovače nabídek `docs/admin/NABIDKY-PLAN.md`: rozbor webu, rešerše firmy, odhad hodnoty
+  pro klienta a tři varianty ceny, Managed Agents, učení ze zpětné vazby, data, rizika, kroky N0–N4.
+  Rozbor před plánem: v historii sezení Claude Code předchozí rozhovor o tomhle není; na produkci 14 klientských
+  zakázek s cenou 4 000–50 000 Kč, odhad hodin jen u jedné, 240 z 372 firem od asistenta má rešerši.
+  Kód zatím žádný, větev `admin/navrhovac-nabidek`.
+- **decision** **R-147** (D-N1–D-N5 rozhodl Kryštof).
+- **docs** Cenotvorba VIZEONu v plánu, oddíl 5: rozhovor s Kryštofem v šesti kolech (Q1–Q39). Pásma podle
+  hodnoty jedné zakázky klienta (prezentace 10–30 tisíc, doporučená až 50 tisíc), e-shop 30–80 tisíc,
+  správa 999 Kč, web patří klientovi, úpravy do spokojenosti, smlouvání jen přes rozsah, nabídka jako stránka
+  ve značce VIZEON. Rozpory s vizeon.cz (správa 480 Kč, vlastnictví kódu, copywriting mimo cenu) zapsané
+  v oddílu 5.2, opravu webu čeká zadání pro repo vizeon.cz.
+
+### 2026-11-25 (doručení pozvánek — R-146)
+- **feat** Kalendář ukazuje, jestli pozvánka na schůzku opravdu dorazila: dvojitá fajfka „Pozvánka dorazila",
+  červená obálka „Pozvánka nedorazila" s důvodem (adresa neexistuje, plná schránka, zablokovaná adresa)
+  a „Poslat e-mail znovu" na aktuální adresu, s novým klíčem idempotence. Rozšířený souhrn nad kalendářem
+  i legenda; nedoručená pozvánka na nadcházející schůzku založí upozornění `meeting_invite_undelivered`.
+  Zdroj: webhook Resendu `POST /api/resend/vizeon` (podpis Svix, `VIZEON_RESEND_WEBHOOK_SECRET`). Každý
+  e-mail ze `sendVizeonMail` nese štítek `zakaziq=admin`, ostatní (Growth OS) se zahodí. Soubory:
+  `lib/admin/{email-delivery,email-deliveries,invite-mark,calendar,meetings,vizeon-mail}.ts`,
+  `app/api/resend/vizeon/route.ts`, `components/{SmartCalendar,NotificationList}.tsx`, `lib/notifications.ts`.
+- **db** Migrace 135 `doruceni_emailu` — tabulka `email_deliveries` (aplikována na produkci 2026-11-25 přes Neon MCP
+  v jedné transakci na pokyn Kryštofa, zapsaná v `public.schema_migrations` s otiskem souboru; testovací Neon ne).
+- **chore** Ověřeno: `tsc`, nový `admin-doruceni-emailu.test.ts` (rozbor události, pořadí stavů, upozornění
+  jen jednou, poslat znovu s novým klíčem, webhook s podpisem a stropem těla, načtení do kalendáře, štítek)
+  a související testy kalendáře, schůzek, připomínek, e-mailů a bezpečnosti; padá jen `ws-schema` kvůli
+  mezeře 134. Dočasná stránka s vymyšlenými schůzkami na 1280 a 390 px (Měsíc, detail vrácené a doručené
+  pozvánky), stránka smazaná. Za přihlášením a s Resendem naživo neověřeno.
+- **decision** **R-146**, DECISIONS #054.
+- **chore** Rozpracovaná práce z hlavní složky (nad `ab6ffc3`) přenesená na aktuální `main` do větve
+  `admin/doruceni-pozvanek` a přečíslovaná R-144 → **R-146**, DECISIONS #052 → **#054** (obě čísla mezitím
+  dostaly Schůzky z Wispr Flow). Kopie v hlavní složce zůstala necommitnutá, jde zahodit.
+- **chore** **Na produkci** 2026-11-25: fast-forward `main` `ccb1823` → `40fff72`. Ověřeno veřejně: `POST /api/resend/vizeon`
+  503 (tajemství zatím chybí), GET 405, `/api/public/schuzky` 404, `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200,
+  `/dashboard` a `/dashboard/calendar` 307; hodinu bez běhových chyb. Za přihlášením neověřeno.
+
+### 2026-11-25 (zrušení Schůzek z Wispr Flow — R-145)
+- **refactor** Funkce Schůzky odstraněná: `app/dashboard/schuzky/`, `app/api/public/schuzky/`,
+  `app/meeting-notes-actions.ts`, `components/admin/meeting-notes/`, `lib/admin/meeting-notes/`,
+  `lib/admin/google/gmail.ts`, `types/meeting-notes.ts`, `scripts/wispr-local-most.mjs`, oba testy
+  a `docs/admin/SCHUZKY-WISPR.md`. Z karty kontaktu zmizel blok Schůzky, z menu položka, z cronu
+  `send-reminders` pojistka zpracování, z Google OAuth oprávnění `gmail.compose`, z `.env.example`
+  a reference `MEETING_NOTES_API_KEY`. Úklid uložených přepisů zůstal v `lib/admin/meeting-notes-retention.ts`.
+- **chore** LaunchAgent `cz.zakaziq.wispr-most` vypnutý a smazaný (`--uninstall`), smazaná i kopie skriptu,
+  soubor stavu a záznam; klíč smazaný z Klíčenky a `MEETING_NOTES_API_KEY` z Vercelu Production.
+  V produkční DB zůstalo 5 schůzek; 5 upozornění `meeting_note` smazaných (na pokyn Kryštofa).
+
+### 2026-11-25 (schůzky: most každých 5 minut, ruční vložení — R-144)
+- **fix** Dnešní schůzka (17:15–17:57) v ZakazIQ nebyla: most běžel jednou za hodinu, v 17:46 byla schůzka
+  ještě rozpracovaná a další běh by byl až v 18:46. Most teď běží každých 5 minut a pamatuje si otisk odeslaného
+  (`wispr-most-stav.json`), takže na server jde jen nová schůzka nebo ta, kterou Wispr Flow po skončení přepočítal
+  (přepis, název, jména mluvčích) — dřív se přepočítaný přepis už nikdy neposlal. Dotaz `GET ?ids=` skript
+  nepoužívá. Záznam: řádek při odeslání nebo chybě, jinak jednou za hodinu „běží, nic nového“; `--dry-run`
+  vypíše i důvod vynechání (probíhá, krátká, bez přepisu…). Soubory: `scripts/wispr-local-most.mjs`, test
+  `lib/__tests__/wispr-local-most.test.ts` (11), `docs/admin/SCHUZKY-WISPR.md`, `docs/admin/AGENTS-ADMIN.md`.
+- **fix** Ruční „Vložit přepis“: když server action selže (nejčastěji vypršelé přihlášení, strop 12 h), formulář
+  dřív nereagoval; teď ukáže hlášku a vložený text nechá ve formuláři. Stránky `/dashboard/schuzky/nova` a detail
+  mají `maxDuration = 120` (AI v `after()` server action). Prázdný stav Schůzek: „do 5 minut po skončení“.
+  Soubory: `components/admin/meeting-notes/manual-note-form.tsx`, `app/dashboard/schuzky/{page,nova/page,[id]/page}.tsx`.
+- **chore** Dnešní schůzka odeslaná ručním během mostu (201, 40 776 znaků, `complete: true`), AI hotová za 18 s.
+  LaunchAgent přeinstalovaný (`StartInterval 300`), první běh: 5 schůzek „beze změny“, stav uložen.
+  Ověřeno: `tsc`, testy Schůzek a mostu 58/58. Formulář v prohlížeči neověřený (MCP prohlížeč nepřihlášený).
+
+### 2026-11-25 (most z Wispr Flow přes Mac — R-144)
+- **fix** Cloudová úloha s konektorem Wispr Flow nepřenesla nic: jednorázový import čtyř schůzek
+  (`trig_01QEnFUUsL3LcbfESnzjRabK`) zastavil při opisování přepisu bezpečnostní filtr modelu. Nový most
+  `scripts/wispr-local-most.mjs` čte na Macu `flow.sqlite` (jen pro čtení) a `meetings/<id>/refined.ndjson`
+  aplikace Wispr Flow a posílá bez modelu: mluvčí ze `speakerMap`, odkaz ze `shareSlug`, shrnutí Wispr Flow,
+  vynechá záznamy pod minutu a přepisy pod 300 znaků. `--dry-run`, `--days`, `--only`, `--install`
+  (kopie do `~/Library/Application Support/ZakazIQ/`, LaunchAgent každou hodinu), `--uninstall`.
+  Starý `scripts/wispr-most.mjs` odstraněn. Test `lib/__tests__/wispr-local-most.test.ts` (7).
+- **chore** Klíč `MEETING_NOTES_API_KEY` vyměněný: nový ve Vercelu Production (sensitive) a v Klíčence
+  (služba `zakaziq-meeting-notes`), vygenerovaný a předaný bez vypsání. Doplnění DECISIONS #052.
+- **chore** Na produkci (`f024737`). Import z Macu: 4 schůzky (31. 10.–4. 11.) odeslané 201, délky přesně
+  podle lokálních dat (18 890–38 083 znaků, `complete: true`); AI je zpracovala napoprvé, obě schůzky
+  s Horákem jako klientské bez kandidáta v Kontaktech (čekají v „Ke kontrole"), pohovor a mentoring
+  „netýká se klienta". LaunchAgent `cz.zakaziq.wispr-most` zapnutý, první běh na pozadí: kód 0, klíč
+  z Klíčenky přečtený, „už v ZakazIQ 4". Cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` vypnutá.
+
+### 2026-11-25 (schůzky z Wispr Flow na produkci — R-144)
+- **chore** Větev `admin/schuzky-prepisy` přesazená na `main` s fakturami: migrace přečíslovaná
+  131 → **134**, rozhodnutí R-142 → **R-144** (131–133 a R-142/R-143 mezitím dostaly faktury),
+  DECISIONS #052 zůstalo. Po rebase `tsc` bez chyby, 201 testů (schůzky, Google, číslování migrací,
+  faktury, třídy adminu, XSS) prošlo, `npm run build` prošel. Bezpečnostní review bez nálezu (AUDIT-LOG).
+- **db** Migrace 134 na produkčním Neonu (Neon MCP v jedné transakci na pokyn Kryštofa, zapsaná
+  v `public.schema_migrations` s otiskem souboru): 29 sloupců, 5 indexů, kontakt `ON DELETE CASCADE`,
+  událost `SET NULL`, 0 řádků.
+- **chore** `MEETING_NOTES_API_KEY` ve Vercelu Production (sensitive; vygenerovaný `openssl rand`,
+  do Vercelu i do Network secrets šel ze souboru, nikde nevypsaný). Gmail API zapnuté v Google Cloud
+  projektu „ZakazIQ admin" (Chrome, po ověření Kryštofa přístupovým klíčem). Fluid compute projektu
+  ověřený (strop 300 s, `maxDuration = 120` routy projde).
+- **chore** **Na produkci** 2026-11-25: fast-forward `main` `ab6ffc3` → `2bb6e34`, nasazení Ready.
+  Ověřeno veřejně: `/api/public/schuzky` bez klíče i se špatným klíčem 401, se správným
+  `{"success":true,"known":[]}`; `/`, `/login`, `/w/prihlaseni` 200, `/dashboard/schuzky` 307.
+- **chore** Naplánovaná úloha „Most Wispr Flow → ZakazIQ (schůzky)" (`trig_013Y7qZxCW55vP1K6THsPR55`,
+  každou hodinu v :17 UTC, Sonnet 5.5, jen konektor Wispr Flow) v novém cloudovém prostředí
+  „ZakazIQ most Wispr" (jen `www.zakaziq.cz`, bez správců balíčků, Network secret `Authorization: Bearer`).
+  Text úlohy a nastavení v `docs/admin/SCHUZKY-WISPR.md`. Do 14:17 UTC proběhla 9×, každý běh ~10 s:
+  konektor Wispr Flow v cloudu funguje, od 2026-11-22 ve Wispr Flow žádná schůzka (`count: 0`), takže
+  zatím nic neposlala. Klíč přes proxy ověřený jednorázovou úlohou ve stejném prostředí
+  (`trig_01HQAQeJCH5pEnJRHmYaUEt1`, 14:47 UTC): `GET /api/public/schuzky` bez hlavičky →
+  `{"success":true,"known":[]}` 200. Google v Profilu znovu propojený **není** (uložené oprávnění
+  bez `gmail.compose`).
+
+### 2026-11-24 (schůzky z Wispr Flow — R-144)
+- **feat** Sekce Schůzky v adminu: seznam (Všechny, Ke kontrole, Skryté), detail se Shrnutím
+  (klient, shrnutí, dohody, kroky, otevřené body, „Jen pro vás", e-mail klientovi) a Přepisem
+  (doslovně, kopírování, kontrola úplnosti), ruční „Vložit přepis", schůzky na kartě kontaktu,
+  položka v menu a typ upozornění `meeting_note`. Soubory: `app/dashboard/schuzky/`,
+  `components/admin/meeting-notes/`, `app/meeting-notes-actions.ts`,
+  `app/dashboard/kontakty/[id]/page.tsx`, `lib/admin-nav.ts`, `components/admin/admin-icons.tsx`,
+  `components/NotificationList.tsx`, `lib/notifications.ts`.
+- **feat** Tok schůzky: příjem `POST`/`GET /api/public/schuzky` (klíč `MEETING_NOTES_API_KEY`),
+  jistá shoda klienta (e-mail účastníka, kalendář ±20 min), AI (role `smart`, kandidát jen ze
+  seznamu), potvrzení klienta s doplněním prázdných polí a propisem (R-141), koncept v Gmailu
+  přes Gmail API `drafts`, pojistky v cronech `send-reminders` a `client-retention`. Soubory:
+  `lib/admin/meeting-notes/{store,match,ai,email,process}.ts`, `lib/admin/google/{gmail,oauth}.ts`,
+  `types/meeting-notes.ts`, `scripts/wispr-most.mjs`, `docs/admin/SCHUZKY-WISPR.md`.
+- **db** Migrace 134 `schuzky_prepisy` — tabulka `meeting_notes` (aplikována na produkci 2026-11-25, testovací Neon ne).
+- **chore** Ověřeno: `npx tsc --noEmit` bez chyby, nový `lib/__tests__/admin-schuzky-prepisy.test.ts`
+  (28 testů nad PGlite s migracemi 114, 115, 128, 130, 134 dvakrát po sobě: příjem a idempotence,
+  doslovné uložení, značky konektoru, jistá shoda, kandidáti, souběh, tři pokusy, potvrzení klienta
+  a doplnění jen prázdných polí, nový kontakt, koncept bez e-mailu a bez oprávnění, escapování
+  e-mailu, retence a kaskáda s kontaktem, vstup 401/400/201/200). AI naostro (Sonnet, ~20 s) na
+  výňatku skutečné schůzky: klienta poznala z kandidátů s jistotou, nic si nevymyslela; první verze
+  psala body interně („Horák připraví…", „přepis končí…"), proto přibyly `internalNotes` a body
+  ve tvaru do e-mailu. **V prohlížeči neověřeno, Gmail naostro neověřen.**
+- **decision** **R-144**, DECISIONS #052.
+
+### 2026-11-25 (opravy z auditu na produkci)
+- **chore** Větev `fix/audit-2026-11` přeskládaná na `main` (faktury R-142/R-143), pak do ní sloučený
+  `main` se schůzkami z Wispr Flow (R-144). Rozhodnutí o waitlistu a bráně přečíslované na DECISIONS #053
+  (#052 má Wispr Flow). Hlídací test `admin-page-guard` zachytil tři nové stránky Schůzek bez
+  `requireAdminPage()` — doplněno. Ověřeno: `tsc`, celá sada 1878 testů **bez jediného selhání**,
+  `npm run build`, CI `ci` i `security` zelené na větvi, Preview zvenku.
+- **chore** **Na produkci** 2026-11-25: fast-forward `main` `2bb6e34` → `718e985`, nasazení Ready
+  (`project-q4j1wu9t9`, alias `www.zakaziq.cz`). Ověřeno veřejně: `/`, `/login`, `/podminky`,
+  `/w/prihlaseni`, `/klient/prihlaseni`, `/robots.txt` 200; `/dashboard`, `/dashboard/finance`,
+  `/dashboard/kontakty`, `/dashboard/schuzky` 307 na `/login`; `/p/<nesmysl>` a `/embed/<neexistuje>.js`
+  404; booking, `/api/public/schuzky` a cron bez klíče 401; CSP a HSTS na `/`. Spouštěč připomínek vrací
+  každou minutu 200, 8 min bez chyby v logu. **Za přihlášením neověřeno.**
+
+### 2026-11-24 (opravy z auditu, větev `fix/audit-2026-11`)
+- **test** A: `ws-email` počítá termín od dneška (CI na `main` červená od 2026-11-17), CI a security
+  na všech větvích, nový test route „Schválit a poslat". Soubory: `lib/ws/__tests__/ws-email.test.ts`,
+  `.github/workflows/{ci,security}.yml`, `app/api/invoices/drafts/[id]/send/__tests__/`.
+- **fix** B1: druhý faktor adminu vynucený i v `proxy.ts` (`checkAdminSession` u `aal1` zjistí faktory)
+  a na každé stránce `app/dashboard/**` (`requireAdminPage()`, hlídací test `admin-page-guard`); dotaz
+  na faktory při chybě nepouští. Soubory: `lib/auth.ts`, `lib/supabase/proxy.ts`, 34 stránek. DECISIONS #029.
+- **fix** C: `remainingSql`/`remainingToPay` znají `paid` (koncept faktury u zaplacené zakázky nevznikne),
+  „Peníze dorazily" po zaplacené faktuře zapíše doplatek, přepnutí IČO nesahá na příjem z faktury.
+  Soubory: `lib/admin/{project-payments,invoice-drafts,invoice-issue}.ts`, `app/actions.ts`. Bez migrace.
+- **fix** E: rezervace z webu jedním příkazem, smazání kontaktu v Hovorech maže schůzku i v Googlu
+  a nechá konzultaci, převzetí firmy od asistenta bez zdvojení, připomínky po jedné s rozpočtem 40 s,
+  `pragueWallClockToISO` ve dny změny času. Soubory: `lib/web-leads.ts`, `app/{calls,outreach}-actions.ts`,
+  `lib/admin/meeting-reminders.ts`, `lib/prague-time.ts`.
+- **fix** F: připojení k databázi waitlistu šifrovaně (`GOOGLE_TOKEN_KEY`) a jen na serveru, limit
+  `api_requests` po /64, brána na IP i pro `/api/public`, `/api/klient`, `/embed`, logy bez e-mailů
+  a celých chyb. Soubory: `lib/admin/waitlist-secret.ts`, `lib/security/log-safe.ts`, `proxy.ts`,
+  `lib/api-rate-limit.ts`. DECISIONS #053.
+- **fix** G1, H1: otisk chatu bez vlastního „přečteno" (stránka se neobnovuje každých 10 s),
+  `formatDate`/`formatDateTime` v pražské zóně. Soubory: `lib/{admin,portal}/chat.ts`,
+  `components/chat/chat-live.tsx`, `lib/utils.ts`.
+- **docs** I1: NextAuth → Supabase Auth, Gmail → Resend, odkazy na smazané soubory, STATE.md.
+- **chore** J1: `@sparticuz/chromium` 149.0.0 a `puppeteer-core` 25.16.0 přesně (bez `^`).
+- **chore** Ověřeno: `npx tsc --noEmit` čisté, `npm test` 1805 testů, selhal jen známý časový limit
+  (od teď má delší limit, samostatně zelené), `npm run build` prošel, `next start` s regresními adresami
+  (`/` a `/login` 200, `/dashboard` a `/dashboard/finance` 307 na `/login`, `/p/<nesmysl>` 404, booking
+  bez klíče 401). **Za přihlášením ani na Preview neověřeno** (session `aal1`, Finance, chat, startup).
+
 ### 2026-11-24 (druh faktury a zbývá doplatit — R-143)
 - **feat** Před vystavením se vybírá druh faktury: za celé dílo, zálohová (30 %), částečná (procento z ceny),
   finální (všechno, co zbývá). Pruh zaplaceno / čeká na zaplacení / zbývá vyfakturovat ve formuláři a nová karta
@@ -2305,6 +2736,20 @@ ve VO02. Žádný nový npm balíček.
   bez Meetu. **Na produkci od 2026-11-24 (`22682a0`)**, s ním i úklidový commit `04941fe`; build Ready
   (`dpl_EiVw…`, `fra1`), `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard` 307,
   `/p/<nesmysl>` 404, bez běhových chyb.
+
+### 2026-11-24 (audit skillem improve)
+- **chore** Nainstalovaný skill `improve` (`shadcn/improve`, MIT, commit `cac56e1`) uživatelsky do
+  `~/.claude/skills/improve/` a `~/.agents/skills/improve/` (R-080: řemeslné skilly mimo repo). Jen text,
+  bez skriptů a hooků; sám kód nemění, píše jen do `plans/`.
+- **docs** Audit celého repa (úroveň `standard`, 9 kategorií, commit `04941fe`): 34 ověřených nálezů,
+  3 návrhy směru a zamítnuté body v `plans/README.md`. Nejvážnější: CI na `main` červená od 2026-11-17
+  (`ws-email` s pevným datem), TOTP adminu hlídá jen layout, „Peníze dorazily" po zaplacené faktuře
+  nezapíše doplatek, koncept faktury u zaplacené zakázky, přepnutí IČO přesune příjem z faktury do
+  nepřiznané linie. Výchozí stav: `tsc` 0 chyb, `npm audit` 0, testy 1753/3 selhaly (známé). Kód se
+  neměnil.
+- **docs** Pracovní seznam oprav `plans/ukoly-z-auditu.md`: všech 34 nálezů v balících A–K s místem
+  v kódu, opravou, testem a podmínkou hotovo, sedm rozhodnutí R1–R7 pro Kryštofa a tabulka stavu.
+  Odkaz v Aktuálním stavu a v `memory/index.md`.
 
 ### 2026-11-24 (úklid repa podle ponytail-audit)
 - **chore** Kontrola celého repa postupem `ponytail-audit` (github.com/DietrichGebert/ponytail, jen jako

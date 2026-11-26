@@ -261,6 +261,7 @@ export async function deleteAssistantDraft(id: string): Promise<boolean> {
  * Zakázka je hotová → koncept faktury na to, co zbývá. Připraví se jen
  * jednou (ani zahozený se nevrátí) a jen tehdy, když dává smysl:
  * - zakázka je pro klienta a pořád ve stavu „hotovo" (Zpět ji mohl vrátit),
+ * - peníze ještě nedorazily (zaplacená zakázka nemá co fakturovat, audit #4),
  * - zbývá něco vyfakturovat (cena − zálohy − platné faktury, R-110, R-143).
  *
  * Od R-143 je to **finální faktura**, když už byla záloha nebo předchozí
@@ -273,6 +274,7 @@ export async function prepareProjectDoneDraft(projectId: string): Promise<string
   if (!(await isDraftsReady())) return null
   const rows = await adminDb<{ ok: boolean }>`
     SELECT (p.status = 'done'
+            AND NOT coalesce(p.paid, false)
             AND coalesce(p.project_type, 'client') = 'client'
             AND NOT EXISTS (SELECT 1 FROM invoice_drafts d WHERE d.project_id = p.id AND d.source = 'project_done')
            ) AS ok

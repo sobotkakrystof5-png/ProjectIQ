@@ -11,6 +11,7 @@ import { ensureContact } from '@/lib/admin/contacts'
 import { absorbIntoContact } from '@/lib/admin/contact-sync'
 import { notifyClientOfProjectChange } from '@/app/actions'
 import { pragueDateTimeToISO } from '@/lib/prague-time'
+import { deleteGoogleEvent } from '@/lib/admin/google/calendar'
 import type { ClientLead, LeadNote, LeadStatus, LeadActionType } from '@/lib/types'
 
 export type LeadPayload = {
@@ -221,14 +222,43 @@ export async function moveLeadFromWaiting(id: string) {
   revalidatePath('/dashboard/calls')
 }
 
+/**
+ * Smaže kontakt z Hovorů i s jeho termínem v kalendáři — stejně jako mazání
+ * v kalendáři (`deleteCalendarEvent`): jeden příkaz a schůzka zmizí i z Google
+ * Kalendáře. Zrcadlová událost konzultace z klientského prostoru se tudy
+ * nemaže, patří rezervaci (`consultation_slots`). Audit 2026-11-24, #9.
+ */
 export async function deleteLead(id: string) {
   await requireAuth()
-  const rows = await sql`SELECT calendar_event_id FROM client_leads WHERE id = ${id}`
-  const calendarEventId = (rows[0] as { calendar_event_id: string | null } | undefined)?.calendar_event_id
-  await sql`DELETE FROM client_leads WHERE id = ${id}`
-  if (calendarEventId) {
-    await sql`DELETE FROM calendar_events WHERE id = ${calendarEventId}`
+  const rows = (await sql`
+    WITH ld AS (
+      DELETE FROM client_leads WHERE id = ${id}
+      RETURNING calendar_event_id
+    ),
+    ev AS (
+      DELETE FROM calendar_events
+      WHERE id IN (SELECT calendar_event_id FROM ld)
+        -- Přes to_jsonb, ať mazání běží i bez migrace 105.
+        AND (to_jsonb(calendar_events) ->> 'consultation_slot_id') IS NULL
+      RETURNING id::text AS id, to_jsonb(calendar_events) ->> 'google_event_id' AS google_event_id
+    )
+    SELECT ev.id, ev.google_event_id FROM ev
+  `) as { id: string; google_event_id: string | null }[]
+  const event = rows[0]
+  if (event) {
     revalidatePath('/dashboard/calendar')
+    // Jako v kalendáři: Google až po chvíli a jen když událost nikdo nevrátil.
+    if (event.google_event_id) {
+      const googleId = event.google_event_id
+      after(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10_000))
+        const back = (await sql`SELECT 1 FROM calendar_events WHERE id = ${event.id}`) as unknown[]
+        if (back.length > 0) return
+        await deleteGoogleEvent(googleId).catch((err) =>
+          console.error('[calls] Smazání schůzky v Googlu selhalo:', (err as Error).message),
+        )
+      })
+    }
   }
   revalidatePath('/dashboard/calls')
 }

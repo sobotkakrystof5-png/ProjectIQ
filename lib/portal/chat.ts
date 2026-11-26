@@ -53,13 +53,19 @@ export async function loadClientThread(clientId: string, projectId: string): Pro
   }
 }
 
-/** Otisk všech vláken klienta pro živé obnovení (nové zprávy, schválení, přečteno). */
+/**
+ * Otisk všech vláken klienta pro živé obnovení: nové zprávy, schválení a kolik
+ * zpráv klienta Kryštof přečetl (dvě fajfky). Ne vlastní „přečteno" ani samotný
+ * čas čtení — ten otevřený chat přepisuje každým tikem (audit 2026-11-24, #11).
+ */
 export async function clientChatStamp(clientId: string): Promise<string> {
   const [messages, reads] = await portalDb({ clientId }).batch([
     pq`SELECT count(*)::int AS n, max(updated_at) AS u FROM portal.messages WHERE client_id = ${clientId}`,
-    pq`SELECT project_id::text, side, last_read_at FROM portal.thread_state WHERE client_id = ${clientId} ORDER BY project_id, side`,
+    pq`SELECT count(*)::int AS r FROM portal.messages m
+       JOIN portal.thread_state ts ON ts.project_id = m.project_id AND ts.side = 'admin'
+       WHERE m.client_id = ${clientId} AND m.author = 'client' AND m.created_at <= ts.last_read_at`,
   ])
-  return chatEtag([clientId, messages[0], reads])
+  return chatEtag([clientId, messages[0], reads[0]])
 }
 
 /** Počet nepřečtených zpráv přes všechna vlákna (titulek karty, odznak). */

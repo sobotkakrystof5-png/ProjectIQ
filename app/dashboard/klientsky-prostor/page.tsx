@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import Link from 'next/link'
 import { listPortalClients } from '@/lib/portal/admin-queries'
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic'
 
 // Klientské prostory (KP05): firmy, které se přihlašují na /klient.
 export default async function PortalClientsPage() {
+  await requireAdminPage()
   const { ready, clients } = await listPortalClients()
   return (
     <PageShell width="narrow">

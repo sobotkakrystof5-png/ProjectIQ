@@ -3,7 +3,7 @@ import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { RecurringManager } from '@/components/admin/invoices/recurring-manager'
 import { getInvoiceProjectOptions, getIssuerSettings } from '@/app/dashboard/finance/invoice-actions'
 import { isDraftsReady, listRecurring } from '@/lib/admin/invoice-drafts'
-import { requireAuth } from '@/lib/auth'
+import { requireAdminPage } from '@/lib/auth'
 
 /**
  * Pravidelné faktury (R-117). Jednou za měsíc z nich denní cron připraví
@@ -13,7 +13,7 @@ import { requireAuth } from '@/lib/auth'
 export const metadata = { title: 'Pravidelné faktury' }
 
 export default async function RecurringInvoicesPage() {
-  await requireAuth()
+  await requireAdminPage()
   const [ready, recurring, projects, { profile }] = await Promise.all([
     isDraftsReady(),
     listRecurring(),

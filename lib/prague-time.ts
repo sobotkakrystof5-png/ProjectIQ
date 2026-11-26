@@ -28,17 +28,32 @@ export function utcToPrague(utcDate: Date): { year: number; month: number; day: 
   return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') }
 }
 
+const OFFSET_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: TZ,
+  year: 'numeric', month: 'numeric', day: 'numeric',
+  hour: 'numeric', minute: 'numeric', hour12: false,
+})
+
+/** O kolik minut je Praha v daný okamžik napřed před UTC (60 v zimě, 120 v létě). */
+function pragueOffsetMinutes(at: number): number {
+  const parts = OFFSET_FORMAT.formatToParts(new Date(at))
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0')
+  const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'))
+  return Math.round((wall - Math.floor(at / 60_000) * 60_000) / 60_000)
+}
+
 // Convert a Prague wall-clock moment to a UTC ISO string.
-// Works correctly across CET (UTC+1) and CEST (UTC+2) transitions.
+// Posun zóny se počítá pro **výsledný** okamžik, ne pro odhad: dřív se 1:00–1:59
+// ve dny změny času uložilo o hodinu vedle (audit 2026-11-24, #27). Čas, který
+// v Praze dvakrát je (podzim 2:00–2:59), dostane druhý výskyt (zimní čas); čas,
+// který neexistuje (jaro 2:00–2:59), se posune o hodinu dopředu.
 export function pragueWallClockToISO(year: number, month: number, day: number, hour: number, minute: number): string {
-  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0))
-  const praHour = parseInt(
-    new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', hour12: false }).format(utcGuess)
-  )
-  let offset = praHour - hour
-  if (offset > 12) offset -= 24
-  if (offset < -12) offset += 24
-  return new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0)).toISOString()
+  const wall = Date.UTC(year, month - 1, day, hour, minute, 0)
+  const first = pragueOffsetMinutes(wall)
+  let utc = wall - first * 60_000
+  const second = pragueOffsetMinutes(utc)
+  if (second !== first) utc = wall - second * 60_000
+  return new Date(utc).toISOString()
 }
 
 // Convert a Prague wall-clock slot (hour on a specific day) to a UTC ISO string.

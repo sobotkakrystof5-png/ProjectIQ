@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
@@ -41,6 +42,7 @@ function href(params: Record<string, string | null>): string {
 }
 
 export default async function AiAssistantPage(props: { searchParams: Promise<Search> }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const view = one(searchParams.pohled) ?? 'prehled'
   if (!['prehled', 'kontakty', 'reporty', 'analyza'].includes(view)) notFound()

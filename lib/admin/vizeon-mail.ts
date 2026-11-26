@@ -1,4 +1,5 @@
 import 'server-only'
+import { ADMIN_MAIL_TAG } from '@/lib/admin/email-delivery'
 
 /**
  * Odesílání e-mailů klientům VIZEONu z krystof@vizeon.cz přes Resend (R-112).
@@ -56,6 +57,8 @@ export async function sendVizeonMail(mail: VizeonMail, fetchImpl: typeof fetch =
         subject: mail.subject,
         text: mail.text,
         html: mail.html,
+        // Podle štítku pozná webhook Resendu naše e-maily od Growth OS (R-146).
+        tags: [ADMIN_MAIL_TAG],
         ...(mail.attachments?.length
           ? {
               attachments: mail.attachments.map(a => ({

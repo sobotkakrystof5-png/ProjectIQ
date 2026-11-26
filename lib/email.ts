@@ -1,6 +1,7 @@
 import type { Transporter } from 'nodemailer'
 import { sendVizeonMail, vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
 import { escapeHtml, linkifyHtml, safeHttpUrl } from '@/lib/security/html'
+import { errorSummary } from '@/lib/security/log-safe'
 
 // Jeden byznys = jedna odesílací schránka (AD02, R-088). Pošta jde z vlastní
 // schránky info@vizeon.cz (VIZEON_GMAIL_USER + VIZEON_GMAIL_APP_PASSWORD);
@@ -86,7 +87,7 @@ async function deliver(mail: {
     })
     return true
   } catch (err) {
-    console.error('[Email] Selhání odesílání:', err)
+    console.error('[Email] Selhání odesílání:', errorSummary(err))
     return false
   }
 }

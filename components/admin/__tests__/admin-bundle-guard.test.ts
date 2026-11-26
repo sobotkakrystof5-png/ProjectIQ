@@ -83,7 +83,8 @@ describe('velikost balíčku adminu', () => {
     // z nich musí být omezený oknem, jinak se vrací stav před AD08.
     const calendar = read('lib/admin/calendar.ts')
     const selects = calendar.split(/\bq`/).slice(1)
-    expect(selects).toHaveLength(4)
+    // Pátý je doručení pozvánek (R-146), taky v okně.
+    expect(selects).toHaveLength(5)
     for (const select of selects) {
       expect(select).toMatch(/WHERE/)
       expect(select, select.slice(0, 120)).toMatch(/fromInstant|\$\{from\}/)

@@ -41,6 +41,21 @@ describe('lib/api-rate-limit — paměťová předbrána', () => {
     expect(sql).not.toHaveBeenCalled()
   })
 
+  it('IPv6 z jedné sítě /64 sdílí i databázový limit (audit #12)', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5) // bez občasného úklidu
+    await recordApiRequest('test-v6-db', '2001:db8:7:8:1::1')
+    await isApiRateLimited('test-v6-db', '2001:db8:7:8:ffff::2', 1, 10)
+    const insertKey = sql.mock.calls[0][2]
+    const queryKey = sql.mock.calls[1][2]
+    expect(insertKey).toBe('2001:0db8:0007:0008::/64')
+    expect(queryKey).toBe(insertKey)
+    // IPv4 se ukládá celá.
+    sql.mockClear()
+    await recordApiRequest('test-v4-db', '203.0.113.9')
+    expect(sql.mock.calls[0][2]).toBe('203.0.113.9')
+    random.mockRestore()
+  })
+
   it('databázový limit dál rozhoduje přesně', async () => {
     sql.mockResolvedValue([{ count: 10 }])
     expect(await isApiRateLimited('test-db', '203.0.113.5', 1, 10)).toBe(true)

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Ban, Mail } from 'lucide-react'
+import { Ban, Mail, PenLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
@@ -12,8 +12,10 @@ import { cancelIssuedInvoice } from '@/app/dashboard/finance/invoice-actions'
 /**
  * Akce u faktury vystavené v adminu (AD12).
  *
- * Co tu schválně **není**: Upravit a Smazat. Vystavený doklad je neměnný
- * (hlídá to trigger v migraci 107) a oprava se dělá stornem a novou fakturou.
+ * Co tu schválně **není**: Upravit na místě a Smazat. Vystavený doklad je
+ * neměnný (trigger v migraci 107). „Opravit" otevře formulář nové faktury
+ * s jejími údaji a po vystavení ji sám stornuje (R-148) — jen dokud není
+ * zaplacená; zaplacenou opraví ruční storno a nová faktura.
  *
  * E-mail odchází jen na kliknutí a přes vlastní route, protože se k němu
  * vyrábí PDF — Chromium patří jen tam, kde pro něj build stopuje binárku.
@@ -24,6 +26,7 @@ export function IssuedInvoiceActions({
   defaultEmail,
   cancelled,
   sentAt,
+  paid = false,
   handoverReady = false,
 }: {
   id: string
@@ -31,6 +34,8 @@ export function IssuedInvoiceActions({
   defaultEmail: string | null
   cancelled: boolean
   sentAt: string | null
+  /** Zaplacenou fakturu „Opravit" nenabízí — storno by vrátilo příjem. */
+  paid?: boolean
   /** Zakázka má vyplněný předávací dokument (AD16) — jde přiložit k faktuře. */
   handoverReady?: boolean
 }) {
@@ -122,6 +127,15 @@ export function IssuedInvoiceActions({
         <Button type="button" variant="outline" onClick={() => setComposing(true)}>
           <Mail size={16} strokeWidth={1.75} />
           {sentAt ? 'Poslat znovu' : 'Poslat e-mailem'}
+        </Button>
+      )}
+
+      {!paid && !composing && !confirming && (
+        <Button asChild variant="outline">
+          <Link href={`/dashboard/faktury/nova?oprava=${id}`}>
+            <PenLine size={16} strokeWidth={1.75} />
+            Opravit fakturu
+          </Link>
         </Button>
       )}
 

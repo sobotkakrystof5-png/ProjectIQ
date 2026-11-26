@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { InvoiceAiExtract } from '@/lib/types'
 import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
 import { aiModel, isAiConfigured } from '@/lib/ai/models'
+import { errorSummary } from '@/lib/security/log-safe'
 
 /**
  * AI přepis PDF faktury.
@@ -119,7 +120,7 @@ export async function extractInvoiceFromPdf(pdfBase64: string): Promise<InvoiceE
     }
   } catch (err) {
     // Detail chyby patří do logu, ne uživateli — může nést kus obsahu faktury.
-    console.error('[invoice-ai] extrakce selhala:', err)
+    console.error('[invoice-ai] extrakce selhala:', errorSummary(err))
     if (err instanceof Anthropic.RateLimitError) {
       return { error: 'AI je momentálně přetížená — zkus to za chvíli, nebo vyplň ručně' }
     }
