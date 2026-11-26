@@ -4,7 +4,8 @@
 >
 > **Poslední aktualizace:** 2026-11-26 · **Opravit a stáhnout fakturu** (R-148): v detailu vystavené
 > faktury je „Opravit fakturu“ (formulář nové s údaji staré, po vystavení se stará sama stornuje, jedním
-> příkazem v databázi) a „Stáhnout PDF“. Jen u nezaplacené faktury. Bez migrace.
+> příkazem v databázi) a „Stáhnout PDF“. Jen u nezaplacené faktury. Bez migrace. **Na produkci od 2026-11-26
+> (`76e9a8d`)**, za přihlášením neověřeno. Faktura 2026001 klientce nedorazila — stav doručení zatím nikdo neviděl.
 >
 > Předchozí: 2026-11-25 · **Doručení pozvánek** (R-146): kalendář ukazuje, jestli pozvánka
 > na schůzku klientovi dorazila, nebo se vrátila, podle webhooku Resendu `/api/resend/vizeon` (migrace 135).
@@ -1745,11 +1746,12 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Oprava vystavené faktury (R-148)�
   v prohlížeči ne. Projít za přihlášením: detail 2026001 → Stáhnout PDF (uloží soubor), Opravit fakturu →
   formulář s údaji a poznámkou „Nahrazuje fakturu 2026001.“ → Vystavit opravenou → nová má další číslo,
   2026001 je stornovaná, rozpis zakázky ukazuje jen novou → Poslat e-mailem · od 2026-11-26
-- [ ] **Faktura 2026001 „neodešla“ — ověřit přílohu:** v produkční DB má `sent_at` 2026-11-26 17:04 a Resend
-  e-mail přijal (kód vždy přikládá PDF, při chybě PDF by e-mail neodešel vůbec); v logu Vercelu žádná chyba.
-  Záložka Preview v Resendu přílohy neukazuje. Ověřit ve schránce příjemce nebo v detailu e-mailu v Resendu,
-  jestli PDF dorazilo · Kryštof · od 2026-11-26
-
+- [ ] **Faktura 2026001 klientce nedorazila:** na produkci má `sent_at` 2026-11-26 17:04 a Resend e-mail přijal
+  (je v jeho dashboardu); kód bez PDF neodesílá. Stav doručení (doručeno / vráceno / spam) nikdo neviděl: webhook
+  R-146 v Resendu není nastavený. Zkušební odeslání z repa nešlo — **lokální `VIZEON_RESEND_API_KEY` je neplatný**
+  (Resend 401), produkční je ve Vercelu jako sensitive. Zjistit stav v Resendu (detail e-mailu), nastavit webhook
+  R-146, a hlavně **doplnit IBAN do Údajů dodavatele**: 2026001 nemá účet ani QR, klientka ji nemá jak zaplatit.
+  Pak „Opravit fakturu“ (R-148) a poslat znovu · Kryštof · od 2026-11-26
 - [ ] **Navrhovač nabídek N1 (R-147) — vyzkoušet:** ~~migrace 136~~ a ~~nasazení~~ hotové 2026-11-26.
   Zbývá: (1) na kartě kontaktu „Nastavit agenty" (založí prostředí a tři agenty v účtu Anthropicu),
   (2) zkouška na 5 firmách s webem (Kryštof 2026-11-26 schválil pět firem od asistenta: reality, instalatérství,
@@ -2203,7 +2205,11 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Oprava vystavené faktury (R-148)�
   v logu žádná chyba; e-mail se bez PDF poslat nedá (při chybě PDF se neodešle nic). Příloha v náhledu
   Resendu není vidět; zbývá potvrdit ve schránce (Otevřené problémy).
 - **chore** Ověřeno: `npx tsc --noEmit` bez chyby, nový `lib/__tests__/admin-faktura-oprava.test.ts` (9),
-  `pdf-route.test.ts` (15, nově stažení). V prohlížeči neověřeno.
+  `pdf-route.test.ts` (15, nově stažení), na aktuálním `main` i testy faktur (druhy, fakturace, storno,
+  koncepty, KP13). Na produkci `76e9a8d` (Ready): `/`, `/login` 200, `/dashboard/faktury/nova?oprava=` 307,
+  PDF bez přihlášení 401. V prohlížeči neověřeno.
+- **chore** Zkušební odeslání 2026001 na Kryštofův Gmail neproběhlo: lokální klíč Resendu je neplatný (401);
+  PDF se vyrobilo (198 kB). Do Resendu ani adminu agent v Chromu přihlášený není.
 
 ### 2026-11-26 (smazání kontaktu v Hovorech)
 - **feat** Rozbalený kontakt v Hovorech má dole tlačítko „Smazat kontakt" s potvrzením přímo v řádku (co se smaže
