@@ -23,7 +23,7 @@ vi.mock('@/lib/client-request-ai', () => ({ summarizeClientRequest: vi.fn(async 
 
 import { makeRequestFromMessages } from '@/app/dashboard/zpravy/actions'
 import { listClientThreads, loadClientThread, clientChatStamp, totalUnread } from '@/lib/portal/chat'
-import { loadAdminThread, notifyNewMessage, purgeDeletedAttachments } from '@/lib/admin/chat'
+import { adminChatStamp, loadAdminThread, notifyNewMessage, purgeDeletedAttachments } from '@/lib/admin/chat'
 import { safeFilename, sniffMime } from '@/lib/chat/storage'
 
 // KP15 (R-122, R-123, D-K17–D-K19): chat s klientem. Migrace 124 dvakrát po
@@ -218,6 +218,23 @@ describe('přečteno a nepřečtené', () => {
     await db.query('SELECT portal_admin_touch($1, true)', [PA])
     const admin = await loadAdminThread(PA)
     expect(admin!.reads.otherReaderName).toBe('Jana')
+  })
+
+  it('otevřený chat bez nové zprávy otisk nemění, přečtení mé zprávy ano (audit #11)', async () => {
+    await post(A, MA, PA, 'Ahoj')
+    const client0 = await clientChatStamp(A)
+    const admin0 = await adminChatStamp()
+    // Dva tiky na obou stranách bez nové zprávy: jen se zapíše „přečteno".
+    await asClient(A, 'SELECT portal.touch_thread($1, $2, true)', [PA, MA])
+    await asClient(A, 'SELECT portal.touch_thread($1, $2, true)', [PA, MA])
+    expect(await clientChatStamp(A)).toBe(client0)
+    expect(await adminChatStamp()).toBe(admin0)
+    // Kryštof zprávu klienta přečte → klient uvidí dvě fajfky.
+    await db.query('SELECT portal_admin_touch($1, true)', [PA])
+    const client1 = await clientChatStamp(A)
+    expect(client1).not.toBe(client0)
+    await db.query('SELECT portal_admin_touch($1, true)', [PA])
+    expect(await clientChatStamp(A)).toBe(client1)
   })
 
   it('otisk se nemění bez změny a změní se novou zprávou', async () => {

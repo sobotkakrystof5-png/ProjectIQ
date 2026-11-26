@@ -34,6 +34,13 @@ const ADMIN_PROTECTED = ['/dashboard', '/alteno', '/hub'] as const
 
 const CLERK_PATHS = ['/w', '/api/ws'] as const
 
+/**
+ * Cesty, kde proxy dělá jen bránu na IP (`frontGate`). Webhooky (`/api/stripe`,
+ * `/api/clerk`, `/api/resend`), hook přihlášení a crony sem záměrně nepatří:
+ * posílá je jedna platforma z mála adres a 429 by je zbytečně opakovalo.
+ */
+const GATE_ONLY = ['/api/public', '/api/klient', '/embed'] as const
+
 /** Stránky /w přístupné bez přihlášení. `/w/_design` je v produkci 404. */
 const WS_PUBLIC = [WS_SIGN_IN_PATH, WS_SIGN_UP_PATH, '/w/_design'] as const
 
@@ -74,6 +81,10 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
   const limited = frontGate(req)
   if (limited) return limited
 
+  // Veřejná API, API klientského prostoru a widget sem chodí jen kvůli bráně
+  // (audit 2026-11-24, #17): přihlášení si ověřují samy a CSP nepotřebují.
+  if (GATE_ONLY.some((p) => hasPrefix(pathname, p))) return NextResponse.next()
+
   if (hasPrefix(pathname, '/klient')) return portal(req)
 
   if (CLERK_PATHS.some((p) => hasPrefix(pathname, p))) return workspace(req, event)
@@ -86,7 +97,7 @@ export default async function proxy(req: NextRequest, event: NextFetchEvent) {
       url.search = ''
       return applyCookies(NextResponse.redirect(url), cookiesToSet)
     }
-    // Druhý faktor a platnost hlídá ještě `getAdminSession()` na stránce samé.
+    // Druhý faktor hlídá proxy i `requireAdminPage()` na každé stránce (audit 2026-11-24, #2).
     return applyCookies(await withCsp(req), cookiesToSet)
   }
 
@@ -137,5 +148,9 @@ export const config = {
     '/((?!api/|embed/|_next/static|_next/image|favicon.ico|\\.well-known/).*)',
     // API Workspace — jen kvůli Clerku (auth() v route handlerech)
     '/api/ws/:path*',
+    // Jen brána na IP (GATE_ONLY): veřejná API, API klientského prostoru a widget.
+    '/api/public/:path*',
+    '/api/klient/:path*',
+    '/embed/:path*',
   ],
 }

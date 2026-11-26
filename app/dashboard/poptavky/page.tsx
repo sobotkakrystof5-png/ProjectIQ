@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { LeadCard } from '@/components/LeadCard'
 import { Pagination } from '@/components/admin/pagination'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
@@ -16,6 +17,7 @@ const PATH = '/dashboard/poptavky'
 export default async function LeadsPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const raw = Array.isArray(searchParams.zdroj) ? searchParams.zdroj[0] : searchParams.zdroj
   const known = WEB_LEAD_ORIGINS.map((o) => o.key)

@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { ProjectsList } from '@/components/admin/projects-list'
 import { SCOPE_STATUSES } from '@/lib/admin/projects'
@@ -15,6 +16,7 @@ const FINISHED_STATUSES = new Set<string>(['uzavrene', ...SCOPE_STATUSES.finishe
 export default async function ProjectsPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const rawStatus = Array.isArray(searchParams.status) ? searchParams.status[0] : searchParams.status
   if (rawStatus && FINISHED_STATUSES.has(rawStatus)) {

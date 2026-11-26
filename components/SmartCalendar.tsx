@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Plus, ExternalLink,
   CalendarDays, Phone, Monitor, Video, MessageSquare,
   CalendarPlus, Lock, Trash2, Clock, Flag, Pencil,
-  Building2, User, Mail, MessageCircle, Coins, CalendarClock, Repeat, Check, MailX,
+  Building2, User, Mail, MessageCircle, Coins, CalendarClock, Repeat, Check, CheckCheck, MailX,
 } from 'lucide-react'
 import {
   deleteCalendarEvent, restoreCalendarEvent, deleteClientAvailability, restoreClientAvailability,
@@ -15,7 +15,7 @@ import {
 import { getMeetingStatus, resendMeetingInvite } from '@/app/meeting-actions'
 import type { MeetingStatus, ReminderRow } from '@/lib/admin/meeting-reminders'
 import {
-  INVITE_MARK_LABELS, inviteMarkOf, summarizeInviteMarks, type InviteMark, type InviteSummary,
+  INVITE_MARK_LABELS, inviteMarkOf, inviteNeedsResend, summarizeInviteMarks, type InviteMark, type InviteSummary,
 } from '@/lib/admin/invite-mark'
 import { toast } from '@/components/ui/toast'
 import {
@@ -80,7 +80,8 @@ interface UnifiedEvent {
     meetingLink?: string | null
     /** Stav e-mailu s odkazem na schůzku (R-112). */
     inviteNote?: string | null
-    inviteFailed?: boolean
+    /** Pozvánka neodešla nebo nedorazila: tlačítko „Poslat znovu" a červený text. */
+    inviteResend?: boolean
     /** Značka pozvánky v mřížce: dostal klient pozvánku? */
     invite?: InviteMark | null
     clientWish?: string
@@ -264,6 +265,15 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData,
   for (const e of events) {
     const start = new Date(e.starts_at)
     const end = new Date(e.ends_at)
+    const invite = inviteMarkOf({
+      eventType: e.event_type,
+      meetUrl: e.meet_url ?? null,
+      inviteStatus: e.invite_status ?? null,
+      delivery: e.invite_delivery ?? null,
+      contactEmail: e.contact_email,
+      contactPhone: e.contact_phone,
+      endsAt: e.ends_at,
+    }, now)
     result.push({
       id: e.id,
       kind: e.event_type as EventKind,
@@ -286,16 +296,13 @@ function buildUnified({ consultations, deadlines, events, leads }: CalendarData,
         contactDraft: { name: e.contact_person ?? null, phone: e.contact_phone, email: e.contact_email },
         // Schůzka s Google Meet (R-112): tlačítko „Připojit se" a stav e-mailu klientovi.
         meetingLink: e.meet_url ?? null,
-        invite: inviteMarkOf({
-          eventType: e.event_type,
-          meetUrl: e.meet_url ?? null,
-          inviteStatus: e.invite_status ?? null,
-          contactEmail: e.contact_email,
-          contactPhone: e.contact_phone,
-          endsAt: e.ends_at,
-        }, now),
-        inviteNote: inviteNote(e.invite_status ?? null, e.invite_sent_at ?? null, e.invite_to ?? null),
-        inviteFailed: e.invite_status === 'failed',
+        invite,
+        inviteNote: inviteNote(e.invite_status ?? null, e.invite_sent_at ?? null, e.invite_to ?? null, {
+          status: e.invite_delivery ?? null,
+          at: e.invite_delivery_at ?? null,
+          bounceType: e.invite_bounce_type ?? null,
+        }),
+        inviteResend: inviteNeedsResend(invite),
         meeting: e.meet_url
           ? {
               inviteStatus: e.invite_status ?? null,
@@ -499,13 +506,39 @@ function ResendInviteButton({ eventId }: { eventId: string }) {
   )
 }
 
-function inviteNote(status: string | null, sentAt: string | null, to: string | null): string | null {
+type InviteDelivery = { status: string | null; at: string | null; bounceType: string | null }
+
+function inviteNote(
+  status: string | null,
+  sentAt: string | null,
+  to: string | null,
+  delivery: InviteDelivery = { status: null, at: null, bounceType: null },
+): string | null {
   switch (status) {
     case 'sent': {
-      // „Odešla", ne „dostal": víme jen, že e-mail převzal Resend.
       const when = sentAt ? ` ${shortDateTime(sentAt)}` : ''
       const where = to ? ` na ${to}` : ''
-      return `Pozvánka s odkazem na schůzku odešla${when}${where}.`
+      const address = to ?? 'klienta'
+      // Co se stalo po odeslání, ví jen webhook Resendu (R-146).
+      switch (delivery.status) {
+        case 'delivered':
+          return `Pozvánka dorazila do schránky${where}${delivery.at ? ` (${shortDateTime(delivery.at)})` : ''}.`
+        case 'complained':
+          return `Pozvánka dorazila${where}, ale klient ji označil jako nevyžádanou.`
+        case 'delayed':
+          return `Pozvánka odešla${when}${where}, doručení se zatím zdržuje. Resend to zkouší dál.`
+        case 'bounced':
+          return delivery.bounceType === 'Transient'
+            ? `Pozvánka se vrátila: schránka ${address} je plná nebo dočasně nedostupná. Zkuste ji poslat znovu později.`
+            : `Pozvánka se vrátila: adresa ${address} asi neexistuje. Opravte e-mail u kontaktu a pošlete pozvánku znovu.`
+        case 'suppressed':
+          return `Pozvánka neodešla: na ${address} se dřív e-maily vracely, Resend na ni nic nepošle. Opravte e-mail u kontaktu.`
+        case 'failed':
+          return `Pozvánku na ${address} se nepodařilo doručit. Zkuste ji poslat znovu.`
+        default:
+          // „Odešla", ne „dostal": víme jen, že e-mail převzal Resend.
+          return `Pozvánka s odkazem na schůzku odešla${when}${where}.`
+      }
     }
     case 'pending':
     case 'sending':
@@ -530,15 +563,16 @@ function InviteIcon({ mark, withLabel = false }: { mark: InviteMark; withLabel?:
       title={label}
       className={cn(
         'inline-flex shrink-0 items-center gap-1',
-        mark === 'failed' && 'text-danger',
+        (mark === 'failed' || mark === 'undelivered') && 'text-danger',
         mark === 'missing' && 'rounded-full bg-signal text-signal-ink',
         mark === 'missing' && (withLabel ? 'px-1.5 py-px' : 'p-px'),
       )}
     >
-      {/* Samotná fajfka: fajfka v rohu obálky je v 12px nečitelná. */}
+      {/* Samotná fajfka: fajfka v rohu obálky je v 12px nečitelná. Dvě = dorazila, jako u zpráv. */}
+      {mark === 'delivered' && <CheckCheck {...icon} strokeWidth={2.5} />}
       {mark === 'sent' && <Check {...icon} strokeWidth={2.5} />}
       {mark === 'sending' && <Clock {...icon} />}
-      {mark === 'failed' && <MailX {...icon} />}
+      {(mark === 'failed' || mark === 'undelivered') && <MailX {...icon} />}
       {mark === 'missing' && <Mail {...icon} />}
       {withLabel
         ? <span className="text-[11px] font-semibold">{label}</span>
@@ -557,13 +591,22 @@ function plural(n: number, forms: [string, string, string]): string {
 /** Souhrn nad kalendářem: komu pozvánka odešla a komu ne, za zobrazené období. */
 function InviteSummaryLine({ summary }: { summary: InviteSummary }) {
   const parts: { mark: InviteMark; text: string }[] = []
-  if (summary.sent > 0) parts.push({ mark: 'sent', text: `${summary.sent} s pozvánkou` })
+  const count = (n: number, forms: [string, string, string]) => `${n} ${plural(n, forms)}`
+  if (summary.delivered > 0) {
+    parts.push({ mark: 'delivered', text: count(summary.delivered, ['pozvánka dorazila', 'pozvánky dorazily', 'pozvánek dorazilo']) })
+  }
+  if (summary.sent > 0) {
+    parts.push({ mark: 'sent', text: count(summary.sent, ['pozvánka odešla', 'pozvánky odešly', 'pozvánek odešlo']) })
+  }
   if (summary.sending > 0) parts.push({ mark: 'sending', text: `${summary.sending} čeká na odeslání` })
-  if (summary.failed > 0) {
+  if (summary.undelivered > 0) {
     parts.push({
-      mark: 'failed',
-      text: `${summary.failed} ${plural(summary.failed, ['pozvánka neodešla', 'pozvánky neodešly', 'pozvánek neodešlo'])}`,
+      mark: 'undelivered',
+      text: count(summary.undelivered, ['pozvánka nedorazila', 'pozvánky nedorazily', 'pozvánek nedorazilo']),
     })
+  }
+  if (summary.failed > 0) {
+    parts.push({ mark: 'failed', text: count(summary.failed, ['pozvánka neodešla', 'pozvánky neodešly', 'pozvánek neodešlo']) })
   }
   if (summary.missing > 0) parts.push({ mark: 'missing', text: `${summary.missing} bez pozvánky` })
   if (parts.length === 0) return null
@@ -576,13 +619,14 @@ function InviteSummaryLine({ summary }: { summary: InviteSummary }) {
           key={mark}
           className={cn(
             'inline-flex items-center gap-1.5',
-            mark === 'failed' && 'text-danger',
+            (mark === 'failed' || mark === 'undelivered') && 'text-danger',
             mark === 'missing' && 'rounded-full bg-signal px-2 py-0.5 font-semibold text-signal-ink',
           )}
         >
+          {mark === 'delivered' && <CheckCheck size={14} strokeWidth={2.5} aria-hidden="true" />}
           {mark === 'sent' && <Check size={14} strokeWidth={2.5} aria-hidden="true" />}
           {mark === 'sending' && <Clock size={14} strokeWidth={1.5} aria-hidden="true" />}
-          {mark === 'failed' && <MailX size={14} strokeWidth={1.5} aria-hidden="true" />}
+          {(mark === 'failed' || mark === 'undelivered') && <MailX size={14} strokeWidth={1.5} aria-hidden="true" />}
           {mark === 'missing' && <Mail size={14} strokeWidth={1.5} aria-hidden="true" />}
           {text}
         </span>
@@ -843,8 +887,10 @@ function EventDetailModal({
 
             {event.meta.inviteNote && (
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-xs text-quiet">{event.meta.inviteNote}</p>
-                {event.meta.inviteFailed && <ResendInviteButton eventId={event.id} />}
+                <p className={cn('text-xs', event.meta.inviteResend ? 'text-danger' : 'text-quiet')}>
+                  {event.meta.inviteNote}
+                </p>
+                {event.meta.inviteResend && <ResendInviteButton eventId={event.id} />}
               </div>
             )}
 
@@ -1481,12 +1527,16 @@ function Legend() {
       </div>
       {/* Značky pozvánek: co klient od vás dostal (u nadcházejících schůzek). */}
       <div className="flex items-center gap-1.5">
+        <CheckCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+        <span>Pozvánka dorazila</span>
+      </div>
+      <div className="flex items-center gap-1.5">
         <Check size={12} strokeWidth={2.5} aria-hidden="true" />
         <span>Pozvánka odešla</span>
       </div>
       <div className="flex items-center gap-1.5">
         <MailX size={12} strokeWidth={1.75} aria-hidden="true" className="text-danger" />
-        <span>Pozvánka neodešla</span>
+        <span>Pozvánka neodešla nebo nedorazila</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="inline-flex rounded-full bg-signal p-px text-signal-ink">

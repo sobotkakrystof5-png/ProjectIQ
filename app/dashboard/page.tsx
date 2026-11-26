@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import Link from 'next/link'
 import { ArrowRight, CalendarClock, CalendarDays, FileWarning, MessageSquarePlus, PauseCircle, ClipboardCheck, Wallet } from 'lucide-react'
@@ -109,6 +110,7 @@ function MonthMoneyPanel({ money, now }: { money: MonthMoney; now: Date }) {
 }
 
 export default async function TodayPage() {
+  await requireAdminPage()
   // Věci k vyřízení i peníze jedou v jedné dávce; kalendář (R-110) má vlastní
   // dotazy z `lib/admin/calendar.ts` a běží souběžně, ne po nich.
   const today = getPragueTodayISO()

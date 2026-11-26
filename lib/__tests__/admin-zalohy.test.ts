@@ -199,6 +199,60 @@ describe('zálohy k zakázce', () => {
   })
 })
 
+describe('faktury a doplatek zakázky (audit 2026-11-24)', () => {
+  const form = (over: { paid: boolean; price: number; invoiced_on_ico: boolean }) => ({
+    client_name: 'Kavárna Ukázková', client_email: null, client_phone: null, service_type: null,
+    description: null, focus: null, project_url: null, status: (over.paid ? 'paid' : 'in_progress') as 'paid' | 'in_progress',
+    progress: over.paid ? 100 : 50, estimated_costs: null, deposit_amount: null, deposit_paid: false,
+    deadline: null, notes: null, ...over,
+  })
+
+  /** Zaplacená faktura zakázky, jak ji zapíše `syncInvoiceTransaction` (krok 7). */
+  async function paidInvoice(projectId: string, amount: number) {
+    const [inv] = await rows<{ id: string }>(
+      `INSERT INTO invoices (invoice_number, project_id, amount, paid_on) VALUES ('2026001', $1, $2, $3) RETURNING id::text AS id`,
+      [projectId, amount, today],
+    )
+    const [t] = await rows<{ id: string }>(
+      `INSERT INTO finance_transactions (amount, type, category, note, date, source_project_id, source_invoice_id, declared, income_origin)
+       VALUES ($1, 'income', 'faktura', 'Faktura 2026001', $3, $2, $4, true, 'invoice') RETURNING id::text AS id`,
+      [amount, projectId, today, inv.id],
+    )
+    await db.query(`UPDATE invoices SET finance_transaction_id = $1 WHERE id = $2`, [t.id, inv.id])
+  }
+
+  it('„Peníze dorazily" po zaplacené zálohové faktuře zapíše zbytek (#3)', async () => {
+    const id = await zakazka({ price: 20000 })
+    await paidInvoice(id, 8000)
+    await updateProject(id, form({ paid: true, price: 20000, invoiced_on_ico: false }))
+
+    const doplatek = await rows<{ amount: number; income_origin: string }>(
+      `SELECT amount::float AS amount, income_origin FROM finance_transactions
+       WHERE source_project_id = $1 AND category = 'zakázka'`,
+      [id],
+    )
+    expect(doplatek).toEqual([{ amount: 12000, income_origin: 'project' }])
+    const [sum] = await rows<{ s: number }>(`SELECT sum(amount)::float AS s FROM finance_transactions WHERE source_project_id = $1`, [id])
+    expect(sum.s).toBe(20000)
+  })
+
+  it('vypnutí „Fakturováno na IČO" nechá příjem z faktury v přiznané linii (#5)', async () => {
+    const id = await zakazka({ price: 20000, declared: true })
+    await paidInvoice(id, 8000)
+    await zaloha(id, 2000)
+    await updateProject(id, form({ paid: false, price: 20000, invoiced_on_ico: false }))
+
+    const linie = await rows<{ category: string; declared: boolean }>(
+      `SELECT category, declared FROM finance_transactions WHERE source_project_id = $1 ORDER BY category`,
+      [id],
+    )
+    expect(linie).toEqual([
+      { category: 'faktura', declared: true },
+      { category: 'záloha', declared: false },
+    ])
+  })
+})
+
 describe('Podnikání počítá se zálohami', () => {
   it('nezaplacené zakázky odečtou zálohy a linie ukáže, kolik byly zálohy', async () => {
     const id = await zakazka({ price: 20000 })

@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
@@ -90,6 +91,7 @@ function Tile({ label, value, hint }: { label: string; value: React.ReactNode; h
 export default async function NakladyPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const kind = toCostKind(searchParams.druh)
   const params = parseTableParams(searchParams, {

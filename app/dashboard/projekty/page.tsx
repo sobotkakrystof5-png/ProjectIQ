@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
@@ -6,6 +7,7 @@ import { getPersonalProjects } from './projekty-actions'
 import { PersonalProjectCard } from '@/components/PersonalProjectCard'
 
 export default async function ProjektyPage() {
+  await requireAdminPage()
   const projects = await getPersonalProjects()
 
   return (

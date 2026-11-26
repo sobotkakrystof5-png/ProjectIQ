@@ -361,7 +361,8 @@ export interface StartupProject {
   onetime_price: number | null
   pricing_tiers: PricingTier[]
   archived: boolean
-  waitlist_db_url: string | null
+  /** Jen jestli je databáze waitlistu nastavená; připojení samo do prohlížeče nejde (audit #10). */
+  has_waitlist_db: boolean
   created_at: string | Date
   updated_at: string | Date | null
 }

@@ -317,6 +317,8 @@ export type SendInviteResult = 'sent' | 'failed' | 'skipped'
 export async function sendDueInvite(
   eventId: string,
   send: typeof sendVizeonMail = sendVizeonMail,
+  /** Ruční „Poslat znovu": jiný klíč, jinak by Resend do 24 h e-mail podruhé neposlal. */
+  keySuffix?: string,
 ): Promise<SendInviteResult> {
   const rows = await adminDb<{
     invite_to: string
@@ -367,7 +369,7 @@ export async function sendDueInvite(
       subject: row.invite_subject,
       text,
       html,
-      idempotencyKey: `meeting-invite:${eventId}`,
+      idempotencyKey: keySuffix ? `meeting-invite:${eventId}:${keySuffix}` : `meeting-invite:${eventId}`,
       attachments: [
         { filename: 'schuzka.ics', contentType: 'text/calendar; charset=utf-8; method=PUBLISH', content: Buffer.from(ics, 'utf8') },
       ],
@@ -411,13 +413,35 @@ export async function sendOverdueInvites(): Promise<number> {
   return sent
 }
 
-/** „Poslat znovu" u e-mailu, který neodešel. */
-export async function retryInvite(eventId: string): Promise<SendInviteResult> {
-  await adminDb`
-    UPDATE calendar_events SET invite_status = 'pending', invite_send_after = now(), invite_error = NULL
-     WHERE id = ${eventId} AND invite_status = 'failed'
-  `
-  return sendDueInvite(eventId)
+/**
+ * „Poslat znovu" u pozvánky, která neodešla, nebo podle webhooku Resendu
+ * nedorazila (R-146) — na adresu, která je u schůzky teď (oprava v Kontaktech
+ * se do budoucích schůzek propisuje, R-141). Doručenou pozvánku znovu neposílá.
+ */
+export async function retryInvite(
+  eventId: string,
+  send: typeof sendVizeonMail = sendVizeonMail,
+): Promise<SendInviteResult> {
+  try {
+    await adminDb`
+      UPDATE calendar_events e
+         SET invite_status = 'pending', invite_send_after = now(), invite_error = NULL
+       WHERE e.id = ${eventId}
+         AND (e.invite_status = 'failed'
+              OR (e.invite_status = 'sent' AND EXISTS (
+                    SELECT 1 FROM email_deliveries d
+                     WHERE d.provider_id = e.invite_provider_id
+                       AND d.status IN ('bounced', 'failed', 'suppressed'))))
+    `
+  } catch (err) {
+    // Bez migrace 135 jde znovu poslat jen pozvánka, která neodešla.
+    if ((err as { code?: string })?.code !== '42P01') throw err
+    await adminDb`
+      UPDATE calendar_events SET invite_status = 'pending', invite_send_after = now(), invite_error = NULL
+       WHERE id = ${eventId} AND invite_status = 'failed'
+    `
+  }
+  return sendDueInvite(eventId, send, `znovu-${Date.now()}`)
 }
 
 export type CancelResult = { ok: true } | { ok: false; error: string }

@@ -95,7 +95,7 @@ beforeAll(async () => {
       description text,
       price numeric,
       deposit_amount numeric,
-      deposit_paid boolean NOT NULL DEFAULT false,
+      deposit_paid boolean NOT NULL DEFAULT false, paid boolean NOT NULL DEFAULT false,
       contact_id uuid,
       created_at timestamptz DEFAULT now()
     );

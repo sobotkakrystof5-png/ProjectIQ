@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
 import { DataTable, type AdminColumn } from '@/components/admin/data-table'
@@ -116,6 +117,7 @@ const EMPTY: Record<ContactView, { title: string; description: string }> = {
 export default async function KontaktyPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const raw = searchParams.pohled
   const view: ContactView = raw === 'duplicity' || raw === 'sloucene' ? raw : 'aktivni'

@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { adminDb } from '@/lib/admin/db'
@@ -58,11 +59,25 @@ export async function takeOverOutreachLead(id: string): Promise<OutreachResult> 
       ? 'Zavolat — zeptat se na ukázku'
       : 'Zavolat'
 
+  // Jeden příkaz: nejdřív firmu „zabrat" (jen dokud nemá kontakt v Hovorech),
+  // teprve ze záboru založit kontakt. Dvojklik nebo dvě karty tak nezaloží
+  // dva řádky — druhý UPDATE počká na zámek řádku a podmínku už nesplní.
+  // Cizí klíč na nový kontakt Postgres kontroluje až na konci příkazu.
+  // Audit 2026-11-24, #23.
+  const newLeadId = randomUUID()
   const rows = await adminDb<{ id: string }>`
+    WITH claim AS (
+      UPDATE outreach_leads
+         SET client_lead_id = ${newLeadId}::uuid, handled_at = now(), handled_reason = 'prevzato', updated_at = now()
+       WHERE id = ${id} AND client_lead_id IS NULL
+      RETURNING id
+    )
     INSERT INTO client_leads (
-      company_name, contact_name, phone, email, lead_status, next_action, next_action_type,
+      id, company_name, contact_name, phone, email, lead_status, next_action, next_action_type,
       next_action_date, next_action_time, notes, contact_id
-    ) VALUES (
+    )
+    SELECT
+      ${newLeadId}::uuid,
       ${source.company_name},
       ${source.contact_name},
       ${source.phone},
@@ -74,13 +89,17 @@ export async function takeOverOutreachLead(id: string): Promise<OutreachResult> 
       ${callback?.time ?? null}::time,
       ${takeoverNote(source) || null},
       ${contactId}
-    )
+    FROM claim
     RETURNING id::text AS id
   `
   const leadId = rows[0]?.id
-  if (!leadId) return { ok: false, error: 'Kontakt se nepodařilo založit.' }
+  if (!leadId) {
+    // Někdo byl rychlejší (druhé kliknutí) — vrátit jeho kontakt, nic nezakládat.
+    const winner = await loadOutreachSource(id)
+    if (winner?.client_lead_id) return { ok: true, leadId: winner.client_lead_id }
+    return { ok: false, error: 'Kontakt se nepodařilo založit.' }
+  }
 
-  await markOutreachHandled(id, 'prevzato', leadId)
   if (contactId) {
     try {
       await propagateContact(contactId)

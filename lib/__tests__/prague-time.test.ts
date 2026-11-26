@@ -6,7 +6,30 @@ import {
   getDaysInMonth,
   isSlotPast,
   isSlotBooked,
+  pragueWallClockToISO,
 } from '../prague-time'
+
+describe('pragueWallClockToISO ve dny změny času (audit 2026-11-24, #27)', () => {
+  it('1:30 před jarní změnou je ještě zimní čas', () => {
+    expect(pragueWallClockToISO(2026, 3, 29, 1, 30)).toBe('2026-03-29T00:30:00.000Z')
+  })
+
+  it('1:30 před podzimní změnou je ještě letní čas', () => {
+    expect(pragueWallClockToISO(2026, 10, 25, 1, 30)).toBe('2026-10-24T23:30:00.000Z')
+  })
+
+  it('běžný den v zimě i v létě, i těsně kolem půlnoci', () => {
+    expect(pragueWallClockToISO(2026, 1, 15, 10, 0)).toBe('2026-01-15T09:00:00.000Z')
+    expect(pragueWallClockToISO(2026, 7, 15, 10, 0)).toBe('2026-07-15T08:00:00.000Z')
+    expect(pragueWallClockToISO(2026, 1, 15, 0, 15)).toBe('2026-01-14T23:15:00.000Z')
+    expect(pragueWallClockToISO(2026, 7, 15, 23, 45)).toBe('2026-07-15T21:45:00.000Z')
+  })
+
+  it('kolem změny času: 3:30 po jarní a 3:30 po podzimní změně', () => {
+    expect(pragueWallClockToISO(2026, 3, 29, 3, 30)).toBe('2026-03-29T01:30:00.000Z')
+    expect(pragueWallClockToISO(2026, 10, 25, 3, 30)).toBe('2026-10-25T02:30:00.000Z')
+  })
+})
 
 describe('pragueSlotToISO', () => {
   it('converts a winter (CET, UTC+1) slot correctly', () => {

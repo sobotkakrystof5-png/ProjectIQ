@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { z } from 'zod'
 import { getNewsItem, listNews } from '@/lib/ws/admin/news'
@@ -12,6 +13,7 @@ import { NewsList } from './news-list'
 export const dynamic = 'force-dynamic'
 
 export default async function NovinkyPage(props: { searchParams: Promise<{ upravit?: string }> }) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   const editId = z.string().uuid().safeParse(searchParams.upravit)
   let failed = false

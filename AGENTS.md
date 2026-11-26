@@ -12,7 +12,7 @@ Platí pro Codex, Claude Code, Cursor, Copilot i lidi. Závaznou součástí je 
 
 ## Kontext a povinné čtení
 
-Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Neon bez ORM, Vercel Hobby): osobní admin VIZEON/ALTENO/Hub (NextAuth), veřejná landing page a SaaS Workspace (Clerk, Stripe, Resend). Workspace: poptávky → kalendář → zákazníci/věrnost, zakázky, faktury, příjmy a daně. 249 Kč konečná cena/měsíc, 14 dní s kartou, 1 byznys a neomezeně pracovníků; další byznys v UI vypnutý.
+Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Neon bez ORM, Vercel Hobby): osobní admin (Supabase Auth + TOTP, R-105), veřejná landing page a SaaS Workspace (Clerk, Stripe, Resend). Workspace: poptávky → kalendář → zákazníci/věrnost, zakázky, faktury, příjmy a daně. 249 Kč konečná cena/měsíc, 14 dní s kartou, 1 byznys a neomezeně pracovníků; další byznys v UI vypnutý.
 
 | Úloha | Před prací čti |
 |---|---|

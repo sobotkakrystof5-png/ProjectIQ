@@ -129,6 +129,140 @@ export async function issueInvoice(input: IssueInvoiceInput, issuer: IssuerProfi
 }
 
 /**
+ * Oprava vystavené faktury (R-148): nová faktura a storno té staré **jedním
+ * příkazem**. Datově měnící CTE stornuje starou, jen když je pořád platná
+ * a nezaplacená; teprve pro ten jeden řádek se zavolá `admin_invoice_issue`.
+ * Když starou mezitím někdo zaplatil nebo stornoval, nevznikne nic — žádná
+ * nová faktura vedle platné staré, ani storno bez náhrady. Když neprojde
+ * nová (částka, položky), padá celý příkaz a stará zůstane, jak byla.
+ *
+ * Zaplacení se neopravuje: zaplacená faktura je v ledgeru jako příjem a ten
+ * by storno vrátilo. Tu opraví storno a nová faktura ručně, jako dřív.
+ */
+export async function issueCorrection(
+  replacesId: string,
+  input: IssueInvoiceInput,
+  issuer: IssuerProfile,
+  plan: KindPlan | null = null,
+): Promise<IssueResult | null> {
+  const payload = issuePayload(input, issuer, plan)
+  const issued = await sql`
+    WITH old AS (
+      UPDATE invoices SET cancelled_at = now()
+      WHERE id = ${replacesId}
+        AND number_seq IS NOT NULL
+        AND cancelled_at IS NULL
+        AND paid_on IS NULL
+      RETURNING id
+    )
+    SELECT admin_invoice_issue(${JSON.stringify(payload)}::jsonb)::text AS id FROM old
+  `
+  const id = (issued[0] as { id: string } | undefined)?.id
+  if (!id) return null
+
+  const rows = await sql`SELECT invoice_number FROM invoices WHERE id = ${id} LIMIT 1`
+  const number = (rows[0] as { invoice_number: string } | undefined)?.invoice_number
+  if (!number) throw new Error('admin_invoice_missing')
+  return { id, number }
+}
+
+/** Co z opravované faktury jde do formuláře (R-148). */
+export type CorrectionSource = {
+  id: string
+  number: string
+  projectId: string | null
+  counterparty: IssueDraft['counterparty']
+  email: string
+  suppliedOn: string | null
+  dueOn: string | null
+  currency: string
+  note: string
+  items: { description: string; quantity: number; unitPrice: number; vatRate?: 0 | 12 | 21 }[]
+  kind: string | null
+  percent: number | null
+}
+
+export type CorrectionLookup =
+  | { ok: true; source: CorrectionSource }
+  | { ok: false; reason: 'missing' | 'cancelled' | 'paid' }
+
+/**
+ * Opravit jde jen fakturu vystavenou tady, platnou a nezaplacenou — stejná
+ * podmínka, jakou pak hlídá `issueCorrection` v databázi.
+ */
+export async function loadCorrectionSource(id: string): Promise<CorrectionLookup> {
+  if (!(await isIssuingReady())) return { ok: false, reason: 'missing' }
+  const [rows] = await adminDb.batch([
+    {
+      text: `
+        SELECT i.id::text, i.invoice_number, i.project_id::text AS project_id,
+               i.client_name, i.client_ico, i.client_dic, i.client_address,
+               to_jsonb(i)->>'client_email' AS client_email,
+               i.supplied_on::text, i.due_on::text, i.currency, i.note, i.items,
+               i.paid_on IS NOT NULL AS paid, i.cancelled_at IS NOT NULL AS cancelled,
+               to_jsonb(i)->>'invoice_kind' AS invoice_kind,
+               (to_jsonb(i)->>'share_percent')::float AS share_percent
+        FROM invoices i
+        WHERE i.id = $1 AND i.number_seq IS NOT NULL
+        LIMIT 1
+      `,
+      params: [id],
+    },
+  ])
+  const row = rows[0] as
+    | {
+        id: string
+        invoice_number: string
+        project_id: string | null
+        client_name: string | null
+        client_ico: string | null
+        client_dic: string | null
+        client_address: string | null
+        client_email: string | null
+        supplied_on: string | null
+        due_on: string | null
+        currency: string
+        note: string | null
+        items: CorrectionSource['items'] | null
+        paid: boolean
+        cancelled: boolean
+        invoice_kind: string | null
+        share_percent: number | null
+      }
+    | undefined
+  if (!row) return { ok: false, reason: 'missing' }
+  if (row.cancelled) return { ok: false, reason: 'cancelled' }
+  if (row.paid) return { ok: false, reason: 'paid' }
+  return {
+    ok: true,
+    source: {
+      id: row.id,
+      number: row.invoice_number,
+      projectId: row.project_id,
+      counterparty: {
+        name: row.client_name ?? '',
+        address: row.client_address ?? '',
+        ico: row.client_ico ?? '',
+        dic: row.client_dic ?? '',
+      },
+      email: row.client_email?.trim() ?? '',
+      suppliedOn: row.supplied_on,
+      dueOn: row.due_on,
+      currency: row.currency,
+      note: row.note ?? '',
+      items: (row.items ?? []).map(item => ({
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        ...(item.vatRate === 0 || item.vatRate === 12 || item.vatRate === 21 ? { vatRate: item.vatRate } : {}),
+      })),
+      kind: row.invoice_kind,
+      percent: row.share_percent,
+    },
+  }
+}
+
+/**
  * Tvar, kterému rozumí `admin_invoice_issue` (migrace 107). Samostatně proto,
  * že koncept faktury (R-117) vystavuje uvnitř jiného příkazu — koncept se
  * označí jako vystavený **v téže transakci**, ve které doklad vznikne.
@@ -170,13 +304,15 @@ export async function prepareKindIssue(
   input: IssueInvoiceInput,
   kind: IssueKindInput,
   issuer: IssuerProfile,
+  /** Opravovaná faktura (R-148): do rozpisu zakázky se už nepočítá. */
+  replacesId: string | null = null,
 ): Promise<PreparedIssue> {
   const ready = await isKindsReady()
   if (!ready && kind.kind !== 'single') {
     return { ok: false, error: 'Zálohové, částečné a finální faktury se zapnou po spuštění migrace 132.' }
   }
 
-  const billing = input.projectId ? await loadProjectBilling(input.projectId) : null
+  const billing = input.projectId ? await loadProjectBilling(input.projectId, replacesId) : null
   if (input.projectId && !billing) return { ok: false, error: 'Zakázka nenalezena.' }
 
   const resolved = resolveKindPlan(kind.kind, kind.percent, billing)
@@ -295,7 +431,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     {
       text: `
         SELECT p.client_name, p.client_email, p.description, p.price::float AS price,
-               p.deposit_amount::float AS deposit_amount, p.deposit_paid,
+               p.deposit_amount::float AS deposit_amount, p.deposit_paid, p.paid,
                ${extraDepositsSql('p')}::float AS extra_deposits,
                ${invoicePaymentsSql('p')}::float AS invoice_payments,
                c.ico AS contact_ico, c.dic AS contact_dic, c.company AS contact_company
@@ -331,6 +467,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
         price: number | null
         deposit_amount: number | null
         deposit_paid: boolean
+        paid: boolean | null
         extra_deposits: number | null
         invoice_payments: number | null
         contact_ico: string | null
@@ -352,6 +489,7 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     depositPaid: project.deposit_paid,
     extraDeposits: Number(project.extra_deposits ?? 0),
     invoicePayments: Number(project.invoice_payments ?? 0),
+    paid: project.paid === true,
   })
   draft.email = project.client_email?.trim() ?? ''
   draft.projectLabel = project.description ? `${project.client_name} — ${project.description}` : project.client_name

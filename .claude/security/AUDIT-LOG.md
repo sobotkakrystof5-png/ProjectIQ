@@ -24,6 +24,73 @@ Nálezy: (1) Routy mají společné ověření z VO02 (`Origin` 403, klíč v `A
 Opraveno: viz (5)–(7), testy doplněné. V diffu žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění (Mac není prohlížeč, cesty bez CORS).
 Zůstává: přijatá rizika DECISIONS #057 (h), (i); rozbor se skutečným modelem neověřený. `curl` proti lokálnímu serveru prošel (oprava 200, cizí `Origin` 403).
 
+## 2026-11-26 — review: rozbor firmy přes cloudovou úlohu Claude Code (R-149)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: přestavba N1 z Managed Agents na úlohu Claude Code — nové veřejné vstupy `app/api/public/rozbory/{route.ts,[id]/route.ts}`, `lib/admin/offers/{research,routine}.ts`, karta, migrace 137, skill `.claude/skills/zakaziq-rozbor-firmy/`, tajemství v diffu.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Oba vstupy: limit 30/min na IP před vším, pak Bearer `OFFER_RESEARCH_API_KEY` v konstantním čase (bez proměnné odmítá vše), až potom čtení těla se stropem (2 kB / 256 kB) a Zod `strict`; id jen uuid, SQL parametrizované, vyzvednutí atomické. (2) Vyzvednutí vrací jen veřejné firemní údaje ze zadání (test hlídá, že v odpovědi není telefon ani e-mail); jméno ve tvaru e-mailu se nově vynechá. (3) Výsledek dál prochází `normalizeResult`, text důvodu neúspěchu se neukládá. (4) Spuštění úlohy posílá jen id rozboru, klíč jen v hlavičce, `redirect: 'error'`, časový limit 10 s, do logu jen stav; odkaz na běh se uloží jen pro `https://claude.ai/` (kontrola v kódu i v databázi) a vykresluje se jako `href` jen po té kontrole. (5) Žádné cookies, tedy ani CSRF; CORS se nepřidává (volá server úlohy). (6) Skill zakazuje úloze měnit repo a přidávat klíč; klíč má prostředí jako network secret, do běhu nevstoupí.
+Opraveno: nic nebylo potřeba. V diffu žádné tajemství ani `NEXT_PUBLIC_`, CSP se nemění.
+Zůstává: chování cloudové úlohy (WebSearch/WebFetch v běhu, network secret) ověří až první skutečný běh; rizika DECISIONS #056.
+## 2026-11-26 — review: oprava a stažení faktury (R-148)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: `issueNewInvoice(…, replacesId)` a `getProjectBilling(…, exclude)` v `app/dashboard/finance/invoice-actions.ts`, `issueCorrection` a `loadCorrectionSource` v `lib/admin/invoice-issue.ts`, `loadProjectBilling` s vyloučením, stránka `/dashboard/faktury/nova?oprava=`, tlačítka v detailu, `?stazeni=1` v `/api/invoices/[id]/pdf`.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Obě akce za `requireAuth`, id opravované faktury i vyloučené faktury ověřené jako UUID, server actions mají vestavěnou kontrolu původu. (2) SQL parametrizované; storno staré a vystavení nové jedním příkazem (CTE), stará se stornuje jen platná a nezaplacená — souběh nevyrobí dvě platné faktury ani storno bez náhrady (test). (3) Stránka `?oprava=` za přihlášením, údaje z DB vykresluje React jako text. (4) `stazeni` jen přepíná `inline`/`attachment` z pevné dvojice, název souboru dál přes `encodeURIComponent`; přihlášení a ETag beze změny.
+Opraveno: nic nebylo potřeba. Žádné tajemství, `NEXT_PUBLIC_` ani změna CSP.
+Zůstává: v prohlížeči neověřeno.
+
+## 2026-11-26 — review: navrhovač nabídek, rozbor firmy (R-147, krok N1)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: necommitnutý diff na větvi `admin/navrhovac-nabidek` nad `d871974` — `app/offer-research-actions.ts`, `lib/admin/offers/{agent-config,api,result,research}.ts`, `components/admin/offers/*`, migrace 136, cron `client-retention`, karta kontaktu, tajemství v diffu.
+Výsledek: 0 nálezů k opravě, 1 nejistota k ověření prvním během.
+Nálezy: (1) Všechny čtyři akce stojí za `requireAuth`, id jsou uuid přes Zod, web od Kryštofa má strop 300 znaků a prochází `safeHttpUrl`; web stahuje sandbox Anthropicu, ne náš server, takže SSRF u nás nevzniká. (2) Výsledek od agentů prochází `normalizeResult`: odkazy jen http(s), texty se stropem délky a bez řídicích znaků, vykreslení jen jako text, odkazy s `rel="noopener noreferrer nofollow"`. (3) SQL parametrizované, sloupce `session_id` a `error` mají kontrolu tvaru v databázi. (4) Do agentů nejdou telefony, e-maily, poznámky ani částky (DECISIONS #055). (5) Denní strop 15 běhů se počítá dotazem před vložením, dvě souběžná kliknutí ho můžou o jeden přetáhnout; jeden běžící rozbor na kontakt hlídá unikátní index. U jednoho admina přijatelné.
+Opraveno: nic nebylo potřeba. V diffu žádné tajemství ani `NEXT_PUBLIC_`, CSP se nemění.
+Zůstává: strop ceny 2 USD se předává mimo typy SDK 0.105 (#055 d). Kdyby ho API tiše ignorovalo, chybou se to neprojeví; zkušební rozbory proto jdou po jednom a po prvním se kontroluje cena běhu.
+
+## 2026-11-25 — review: doručení e-mailů z adminu přes webhook Resendu (R-146)
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: necommitnutý diff nad `ab6ffc3` — `app/api/resend/vizeon/route.ts`, `lib/admin/email-delivery{,ies}.ts`, štítek v `sendVizeonMail`, `retryInvite`, dotaz kalendáře, migrace 135, tajemství v diffu.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Podpis se ověří dřív, než se tělo parsuje; strop těla platí před ověřením; bez tajemství 503, cizí podpis a starý čas 400 (test). (2) Z payloadu se bere jen id (regex), stav (pevný seznam) a druh vrácení (regex); čas se jen parsuje. SQL parametrizované. (3) Text upozornění skládá server z `calendar_events` (název, adresa z naší DB), ne z payloadu; zvonek ho vykresluje jako text. (4) `retryInvite` pošle znovu jen pozvánku, která neodešla nebo nedorazila, na adresu z DB; akce `resendMeetingInvite` zůstává za `requireAuth` s ověřeným uuid. (5) Endpoint není v matcheru `proxy.ts`, takže na něj nepůsobí brána ani CSP — stejně jako na ostatní webhooky.
+Opraveno: nic nebylo potřeba. V diffu žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění.
+Zůstává: naživo s Resendem neověřeno; endpoint v Resendu a tajemství ve Vercelu nastaví Kryštof.
+
+## 2026-11-25 — review: zrušení Schůzek z Wispr Flow (R-145)
+Spouštěč: odstranění funkce na přání Kryštofa
+Rozsah: smazaný veřejný vstup `/api/public/schuzky`, server actions, stránky, Gmail, most na Macu; klíč `MEETING_NOTES_API_KEY`
+Výsledek: 0 chyb
+Nálezy: žádný zbylý kód, který by četl `MEETING_NOTES_API_KEY` nebo přijímal schůzky zvenku (`git grep`). Oprávnění `gmail.compose` z Google OAuth pryč; už uložený token ho nese, dokud se Google nepropojí znovu.
+Opraveno: LaunchAgent `cz.zakaziq.wispr-most` vypnutý a smazaný i s kopií skriptu, souborem stavu a záznamem; klíč smazaný z Klíčenky a z Vercelu Production.
+Zůstává: tabulka `meeting_notes` s uloženými přepisy (rozhodl Kryštof), retence 3 roky běží dál. Vypnutá cloudová úloha `trig_013Y7qZxCW55vP1K6THsPR55` a prostředí „ZakazIQ most Wispr" se starým (už neplatným) klíčem v Network secrets existují dál.
+
+## 2026-11-25 — review: most z Wispr Flow přes Mac (R-144)
+Spouštěč: před commitem (`web-security-review`), výměna mostu po zablokované cloudové úloze
+Rozsah: `scripts/wispr-local-most.mjs` (čtení lokálních dat Wispr Flow, Klíčenka, odeslání, LaunchAgent), výměna `MEETING_NOTES_API_KEY`.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Databáze Wispr Flow jen pro čtení (`sqlite3 -readonly`, `mode=ro`), id z `--only` projdou jen jako UUID, jinak se do SQL nic zvenku nedostane. (2) Klíč jen z Klíčenky přes `/usr/bin/security`, ne z argumentu, souboru ani proměnné; do výstupu nejde. (3) Cíl je pevná `https://www.zakaziq.cz/api/public/schuzky`, `redirect: 'error'` (klíč neodejde po přesměrování jinam). (4) Do záznamu jde jen id, stav a délka, žádný obsah schůzky. (5) LaunchAgent spouští kopii mimo repo s absolutní cestou k Node; XML plistu escapované.
+Opraveno: nic. Starý klíč vyměněný, protože jeho hodnota se nedala přečíst a zůstala v nepoužívaném cloudovém prostředí.
+Zůstává: DECISIONS #052 doplnění (rizika e, f).
+
+## 2026-11-25 — review: schůzky z Wispr Flow (R-144)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: větev `admin/schuzky-prepisy` proti `ab6ffc3` — veřejný vstup `app/api/public/schuzky/route.ts`, server actions `app/meeting-notes-actions.ts`, čtení a zápis `lib/admin/meeting-notes/store.ts`, AI nad přepisem (`ai.ts`), e-mail a Gmail (`email.ts`, `lib/admin/google/gmail.ts`, `oauth.ts`), obrazovky `app/dashboard/schuzky/` a `components/admin/meeting-notes/`, skript mostu, migrace 134, tajemství v diffu i v historii větve.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Vstup: `verifyBearerApiKey`/`verifyApiKey` v konstantním čase, bez `MEETING_NOTES_API_KEY` odmítá vše, limit 30/min na IP před ověřením klíče, tělo 3 MB přes `readJsonLimited`, Zod se stropy. (2) Všech sedm akcí volá `requireAuth`, id přes uuid, zdroj přiřazení jen z výčtu. (3) SQL parametrizované; jediné skládání (`WHERE` výpisu) je ze tří pevných řetězců podle výčtu filtru. (4) Žádný `dangerouslySetInnerHTML`/`innerHTML`; přepis i výstup AI se kreslí jako text, odkaz na Wispr Flow jen `https://notes.wisprflow.ai`, odkaz do Gmailu s `encodeURIComponent`. (5) MIME konceptu odmítá CR/LF v předmětu a `\r\n,;<>` v adresátovi, předmět v RFC 2047, cizí text v HTML přes `escapeHtml`. (6) Kandidát od AI jen z nabídnutých id, bez kliknutí se nic nepřiřadí (R-111). `maxDuration = 120` ověřené proti projektu (Fluid compute, strop 300 s).
+Opraveno: nic nebylo potřeba. Žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění (Gmail i Anthropic volá server).
+Zůstává: přijatá rizika v DECISIONS #052 (`gmail.compose` dovoluje i odeslání, přepis opisuje model v úloze, uniklý klíč podstrčí schůzku). V prohlížeči za přihlášením neověřeno.
+
+## 2026-11-24 — audit: opravy z auditu skillem `improve` (větev `fix/audit-2026-11`)
+Spouštěč: audit celého repa skillem `improve` (`plans/README.md`, commit `04941fe`)
+Rozsah: druhý faktor adminu, limity na IP, brána v `proxy.ts`, tajemství v datech startupových projektů, logy
+Výsledek: 5 nálezů, všechny opravené na větvi `fix/audit-2026-11` (nenasazeno)
+Nálezy:
+1. **Druhý faktor adminu hlídal jen layout** (#2): proxy nekontroloval `aal`, 31 z 36 stránek `app/dashboard` přihlášení samo neověřovalo a layout podle dokumentace Next 16 nebrání vykreslení stránky v RSC payloadu. Kdo znal heslo, ale ne kód, si mohl vyžádat data stránek. Dotaz na faktory při chybě pouštěl (fail-open).
+2. **Connection string databáze waitlistu chodil do prohlížeče a ležel nešifrovaný** (#10). Oprava zápisu z 2026-11-14 níž: tehdy se zavřely akce exportu a rozesílky, ale ne čtení projektu pro klientský editor.
+3. **Databázový limit `api_requests` počítal IPv6 po celé adrese** (#12), předbrána po /64 — střídáním adres v jedné síti šel přesný limit obejít.
+4. **Brána na IP neběžela pro `/api/*` ani `/embed/*`** (#17), přestože STATE.md sliboval strop pro API.
+5. **E-maily příjemců a celé objekty chyb v runtime logách** (#29).
+Opraveno: (1) `checkAdminSession` zjišťuje faktory u `aal1`, `requireAdminPage()` na každé stránce + hlídací test, selhání dotazu nepouští (DECISIONS #029 doplněno). (2)–(5) DECISIONS #053.
+Zůstává: otočit heslo databáze waitlistu (Kryštof, R5); ověřit session `aal1` na Preview; strop těla 5 MB pro veřejné server actions (#28) se zatím nemění.
 ## 2026-11-24 — review: faktura s povinnými údaji (R-142) a druh faktury (R-143)
 Spouštěč: před commitem a deployem (`web-security-review`)
 Rozsah: necommitnutý diff nad `7c2e2f1` — renderer PDF (`lib/invoice-pdf/render.ts`), profil dodavatele (`issuerProfileSaveSchema`, `saveIssuer`), vystavení s druhem (`issueNewInvoice`, `prepareKindIssue`, `issueDraft`), nová akce `getProjectBilling`, koncepty (`saveInvoiceDraft`), projekce do klientského prostoru (`lib/portal/{money,overview}.ts`, migrace 131 a 133), migrace 132, tajemství v diffu.
@@ -308,7 +375,7 @@ Nálezy:
 1. **`getCallsScreen(params, waiting)` brala `TableParams` jako argument server action** — a `TableParams.orderBy` je hotový kus SQL, který se vkládá do textu dotazu. Server action je veřejný endpoint, takže přihlášený admin (jediný účet, ale pravidlo platí) mohl poslat libovolné `ORDER BY`. Porušení B13 „každý vstup validovat na serveru" a vlastního pravidla AD07, že do `ORDER BY` jde jen whitelist.
 2. **`exportWaitlistCsv(dbUrl)` a `sendLaunchEmailBlast(projectId, { dbUrl, appUrl })` braly connection string z prohlížeče** (`exportWaitlistCsv` nová, druhá existovala dřív). Server by se tak připojil na libovolnou adresu, kterou mu klient podstrčí, a poslal e-maily s libovolným odkazem.
 3. **CSV export bez ochrany proti vzorcům** — jméno začínající `=`, `+`, `-` nebo `@` je v Excelu vzorec, ne text (platilo i pro původní export v prohlížeči).
-Opraveno: (1) `getCallsScreen` zrušená, stránka volá `loadCallsScreen` z `lib/admin/leads.ts` (server-only modul, není to endpoint); řazení si každá stránka ověří sama přes `parseTableParams`. (2) obě akce berou **id projektu**, adresu databáze i webu si dohledají v `startup_projects`; `dbUrl` se do prohlížeče vůbec neposílá. (3) hodnota začínající `=+-@` dostane v CSV apostrof.
+Opraveno: (1) `getCallsScreen` zrušená, stránka volá `loadCallsScreen` z `lib/admin/leads.ts` (server-only modul, není to endpoint); řazení si každá stránka ověří sama přes `parseTableParams`. (2) obě akce berou **id projektu**, adresu databáze i webu si dohledají v `startup_projects`; `dbUrl` se do prohlížeče vůbec neposílá. *Oprava 2026-11-24: neplatilo celé — `getStartupProject(s)` vracely `waitlist_db_url` klientskému editoru; zavřeno až DECISIONS #053.* (3) hodnota začínající `=+-@` dostane v CSV apostrof.
 Navíc: zrušeno sedm server actions, které tahaly celé tabulky (`getLeads`, `getAllLeadNotes`, `getCompletedProjects`, `getProjectSurveys`, `getAllInvoices`, `getInvoiceRegistryScreen`, `getWaitlistEntries`) — o tolik méně endpointů, které umí vrátit všechna data najednou.
 Ověřeno: `npx tsc`, 802 testů (nový `lib/__tests__/admin-table.test.ts` zkouší i `sort=x';DROP TABLE costs--` a vlastnosti prototypu), produkční build a smoke test přes HTTP s podepsanou session — 23 adres včetně pokusu o injekci vrací 200 a server nehlásí chybu.
 Zůstává: hledání ve Fakturách neescapuje `%` a `_` v `ILIKE` (jen širší výsledky, ne bezpečnostní problém). Průchod v prohlížeči okem.

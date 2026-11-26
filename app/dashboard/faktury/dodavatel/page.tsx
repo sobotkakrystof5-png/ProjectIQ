@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { IssuerForm } from '@/components/admin/invoices/issuer-form'
@@ -11,6 +12,7 @@ import { getInvoiceEmailTemplate, getIssuerSettings } from '@/app/dashboard/fina
 export const metadata = { title: 'Údaje dodavatele' }
 
 export default async function IssuerSettingsPage() {
+  await requireAdminPage()
   const [{ profile, configured }, { template }] = await Promise.all([getIssuerSettings(), getInvoiceEmailTemplate()])
 
   return (

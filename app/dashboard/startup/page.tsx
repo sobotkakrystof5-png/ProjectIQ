@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
@@ -6,6 +7,7 @@ import { getStartupProjects } from './startup-actions'
 import { StartupProjectCard } from '@/components/StartupProjectCard'
 
 export default async function StartupPage() {
+  await requireAdminPage()
   const projects = await getStartupProjects()
 
   const launched = projects.filter(p =>

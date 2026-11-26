@@ -6,7 +6,7 @@ name: ci
 
 on:
   push:
-    branches: [main, workspace, 'ws/**']
+    branches: ['**']
   pull_request:
 
 permissions:

@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -14,6 +15,7 @@ export const metadata: Metadata = { title: 'Zprávy' }
 // Konverzace s klientem u jedné zakázky (KP15). Odpověď textem, hlasem,
 // s přílohou nebo ke schválení; z vybraných zpráv klienta zadání pro Claude Code.
 export default async function ZpravyThreadPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminPage()
   const { id } = await params
   if (!z.string().uuid().safeParse(id).success) notFound()
   const [threads, thread] = await Promise.all([listAdminThreads(), loadAdminThread(id)])

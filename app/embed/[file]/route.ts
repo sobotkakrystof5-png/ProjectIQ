@@ -5,7 +5,7 @@ import { widgetScript } from '@/lib/ws/intake/widget-script'
 
 // GET /embed/<slug>.js — veřejný launcher widgetu (S11, RD07). Vkládá stejnou
 // objednávku jako /r; stránku v iframe omezí frame-ancestors na domény byznysu.
-// Samotný skript neobsahuje API klíč. Cache 5 minut.
+// Samotný skript neobsahuje API klíč. Cache 5 minut (prohlížeč i CDN).
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +42,9 @@ export async function GET(req: Request, props: { params: Promise<{ file: string 
         accent: usableAccent(config.business.color),
       }),
       200,
-      'public, max-age=300',
+      // `s-maxage`: cache i na CDN Vercelu, ne jen v prohlížeči — opakované
+      // načtení widgetu pak nestojí dva dotazy do databáze (audit 2026-11-24, #17).
+      'public, max-age=300, s-maxage=300',
     )
   } catch (e) {
     console.error('embed.widget', { error: e instanceof Error ? e.message : 'unknown' })

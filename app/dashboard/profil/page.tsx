@@ -1,11 +1,10 @@
 import { PageShell } from '@/components/ws/app/page-header'
-import { redirect } from 'next/navigation'
 import {
   Briefcase, CheckCircle2, Clock, TrendingUp, Wallet,
   AlertCircle, Users, Inbox, PhoneCall, Star, BarChart3,
   Receipt, CalendarCheck, CircleDot, ArrowRight,
 } from 'lucide-react'
-import { getAdminSession } from '@/lib/auth'
+import { requireAdminPage } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
 import { STATUS_LABELS } from '@/lib/types'
@@ -173,8 +172,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 export default async function ProfilPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const session = await getAdminSession()
-  if (!session) redirect('/login')
+  const session = await requireAdminPage()
 
   const searchParams = await props.searchParams
   const googleResult = typeof searchParams.google === 'string' ? searchParams.google : null

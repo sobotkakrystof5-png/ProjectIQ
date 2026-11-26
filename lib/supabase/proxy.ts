@@ -41,8 +41,10 @@ function sessionClient(request: NextRequest, cookiesToSet: SetCookie[]) {
   })
 }
 
-async function readClaims(request: NextRequest, cookiesToSet: SetCookie[]) {
-  const { data, error } = await sessionClient(request, cookiesToSet).auth.getClaims()
+type SessionClient = ReturnType<typeof sessionClient>
+
+async function readClaims(client: SessionClient) {
+  const { data, error } = await client.auth.getClaims()
   return error ? null : (data?.claims ?? null)
 }
 
@@ -50,7 +52,8 @@ export async function checkAdminSession(request: NextRequest): Promise<AdminSess
   if (!supabaseConfigured()) return { admin: null, cookiesToSet: [] }
 
   const cookiesToSet: SetCookie[] = []
-  const claims = await readClaims(request, cookiesToSet)
+  const client = sessionClient(request, cookiesToSet)
+  const claims = await readClaims(client)
 
   const email = typeof claims?.email === 'string' ? claims.email : null
   if (!claims || !email || !isAdminUser(email, typeof claims.sub === 'string' ? claims.sub : null)) {
@@ -58,10 +61,18 @@ export async function checkAdminSession(request: NextRequest): Promise<AdminSess
   }
   if (sessionTooOld(claims)) return { admin: null, cookiesToSet }
 
-  return {
-    admin: { email, userId: String(claims.sub ?? ''), aal: typeof claims.aal === 'string' ? claims.aal : null },
-    cookiesToSet,
+  const aal = typeof claims.aal === 'string' ? claims.aal : null
+
+  // Stejné pravidlo jako `loadAdminSession()` v `lib/auth.ts`: kdo má zapsaný
+  // druhý faktor, s heslem samotným do adminu nesmí (audit 2026-11-24, #2).
+  // Supabase se ptáme jen u session `aal1`, ta existuje jen mezi heslem
+  // a kódem. Bez odpovědi nepouštět.
+  if (aal !== 'aal2') {
+    const { data: factors, error } = await client.auth.mfa.listFactors()
+    if (error || (factors?.totp?.length ?? 0) > 0) return { admin: null, cookiesToSet }
   }
+
+  return { admin: { email, userId: String(claims.sub ?? ''), aal }, cookiesToSet }
 }
 
 export type UserSessionCheck = {
@@ -77,7 +88,7 @@ export type UserSessionCheck = {
 export async function checkUserSession(request: NextRequest): Promise<UserSessionCheck> {
   if (!supabaseConfigured()) return { userId: null, cookiesToSet: [] }
   const cookiesToSet: SetCookie[] = []
-  const claims = await readClaims(request, cookiesToSet)
+  const claims = await readClaims(sessionClient(request, cookiesToSet))
   const userId = typeof claims?.sub === 'string' && claims.sub.length > 0 ? claims.sub : null
   return { userId, cookiesToSet }
 }

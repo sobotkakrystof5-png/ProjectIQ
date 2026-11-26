@@ -22,7 +22,7 @@ import {
   loadVoiceSettingsTab,
   type HistoryFilter,
 } from '@/lib/admin/voice/queries'
-import { requireAuth } from '@/lib/auth'
+import { requireAdminPage } from '@/lib/auth'
 
 export const metadata: Metadata = { title: 'ZakazIQ Voice' }
 export const dynamic = 'force-dynamic'
@@ -123,7 +123,7 @@ async function tabContent(tab: Tab, filter: HistoryFilter): Promise<{ body: Reac
 }
 
 export default async function VoicePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAuth()
+  await requireAdminPage()
   const params = await searchParams
   const rawTab = one(params.tab)
   const tab: Tab = TABS.some((t) => t.key === rawTab) ? (rawTab as Tab) : 'prehled'

@@ -1,7 +1,6 @@
 # Z klientského prostoru k platícímu zákazníkovi ZakazIQ — analýza a plán
 
-> **Stav:** 2026-11-21 rozhodnuto D-KV1–D-KV9 (oddíl 9, `memory/memory.md` R-134 a R-135), nic z toho
-> není v kódu. Sezení KV00 je tím hotové. Admin se v dalších sezeních mění jen s výslovným zadáním
+> **Stav:** 2026-11-21 rozhodnuto D-KV1–D-KV9 (oddíl 9, `memory/memory.md` R-134 a R-135). V kódu je jen KV01a (landing s formulářem „Chci to vyzkoušet“, na produkci od 2026-11-21, `1e3c993`); zbytek v kódu není. Sezení KV00 je tím hotové. Admin se v dalších sezeních mění jen s výslovným zadáním
 > (AGENTS.md → Hranice v repu).
 >
 > **Otázka:** jak z klienta, kterému Kryštof staví web a který má klientský prostor `/klient`, udělat
@@ -48,7 +47,7 @@ nejde použít naostro.
 | Oblast | Funkce | Stav | Poznámka |
 |---|---|---|---|
 | Landing | stránka, ceník, dotazy, kontaktní formulář do Hovorů | naživo (stránka), testy (formulář) | text pravdivý, bez vymyšlených čísel |
-| Landing | „Vyzkoušet 14 dní zdarma" | **blokuje** | vede do registrace vývojové instance Clerku |
+| Landing | „Vyzkoušet 14 dní zdarma" | **naživo** | do 2026-11-21 vedlo do registrace vývojové instance Clerku; od KV01a (`1e3c993`) vede na formulář „Chci to vyzkoušet" |
 | Workspace | registrace, průvodce Nový byznys, šablony 8 oborů | testy + Preview 2026-10-31 | krok 2 je Stripe Checkout s kartou (R-038) |
 | Workspace | předplatné, zkušební doba, jen čtení po zrušení | testy | Stripe live chybí, webhook na produkci není |
 | Workspace | Dnes, Poptávky, Kalendář, Zákazníci, věrnost, Zakázky | Preview 2026-10-31 | s přihlášením na skutečných datech jen částečně |
@@ -385,7 +384,7 @@ Jedno sezení = jedna konverzace v Claude Code. S ≈ půl dne, M ≈ den, L ≈
 | Sezení | Co | Velikost | Závisí na | Oblast |
 |---|---|---|---|---|
 | **KV00** | ~~Rozhodnutí D-KV1–D-KV9 a zápis do paměti~~ hotovo 2026-11-21 (R-134, R-135) | S | — | `memory/` |
-| **KV01a** | Landing do spuštění: hlavní akce „Vyzkoušet" → formulář „Chci to vyzkoušet" (do Hovorů, R-065); ověřit klíč Stripe ve Vercel Production | S | — | landing — **kód hotov 2026-11-21** (přepínač `SIGNUP_OPEN`), na produkci není; klíč Stripe neověřen |
+| **KV01a** | Landing do spuštění: hlavní akce „Vyzkoušet" → formulář „Chci to vyzkoušet" (do Hovorů, R-065); ověřit klíč Stripe ve Vercel Production | S | — | landing — **na produkci od 2026-11-21** (`1e3c993`, přepínač `SIGNUP_OPEN`); klíč Stripe neověřen |
 | **KV01** | Odblokovat placení: Workspace na Supabase (R-107, F2), Stripe live, po spuštění vrátit akci landing page na registraci | L | KV01a, `docs/AUTH-SUPABASE-PLAN.md`, `docs/workspace/LAUNCH-PLAN.md` | přihlášení, externí služby |
 | **KV01b** | Přesun z Vercelu na Cloudflare (R-135) — až s prvním platícím klientem; PDF přes Chromium, crony, `after()`, DPA | L | první platba | provoz |
 | **KV02** | Fáze 1: zdroj účtu (W4), delší zkušební doba pro pozvané klienty, „Pozvat klienta" předvyplněné ze zakázky (A2), dotaz na kandidáty jako skript | M | KV01, D-KV3 | Workspace, admin (výjimka) |

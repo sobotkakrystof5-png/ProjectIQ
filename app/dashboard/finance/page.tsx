@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import { Calculator } from 'lucide-react'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
@@ -31,6 +32,7 @@ export default async function FinancePage(
     searchParams: Promise<{ month?: string; tab?: string; year?: string }>
   }
 ) {
+  await requireAdminPage()
   const searchParams = await props.searchParams
   // Záložka žije v URL, ne ve state — odkaz na Podnikání se dá poslat
   // i uložit a přežije reload.

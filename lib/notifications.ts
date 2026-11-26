@@ -39,6 +39,10 @@ export type NotificationType =
   | 'meeting_reminder_failed'
   /** ZakazIQ Voice: denní strop nákladů je vyčerpaný, diktáty jdou bez čištění (VO07, R-150). */
   | 'voice_cost_cap'
+  /** Pozvánka na schůzku se klientovi vrátila nebo nedorazila (R-146). */
+  | 'meeting_invite_undelivered'
+  /** Rozbor firmy pro navrhovač nabídek doběhl v Claude Code (R-149). */
+  | 'offer_research_done'
 
 export async function createNotification(params: {
   type: NotificationType

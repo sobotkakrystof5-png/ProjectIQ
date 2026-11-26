@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import type { Metadata } from 'next'
 import { listAdminThreads } from '@/lib/admin/chat'
 import { AdminInbox } from '@/components/admin/chat/inbox'
@@ -6,6 +7,7 @@ export const metadata: Metadata = { title: 'Zprávy' }
 
 // Schránka Zprávy (KP15, R-122): konverzace všech klientů, nejnovější nahoře.
 export default async function ZpravyPage() {
+  await requireAdminPage()
   const threads = await listAdminThreads()
   return (
     <AdminInbox threads={threads} activeId={null}>

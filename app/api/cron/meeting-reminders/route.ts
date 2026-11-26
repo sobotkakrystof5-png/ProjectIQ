@@ -24,8 +24,8 @@ async function run(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    // Nejvýš 10 zpráv na běh: každé odeslání může čekat až 10 s a běh smí
-    // trvat 60 s. Zbytek pošle další běh za minutu.
+    // Nejvýš 10 zpráv na běh, zabírané po jedné a jen do 40 s (každé odeslání
+    // může čekat až 10 s, běh smí trvat 60 s). Zbytek pošle další běh za minutu.
     const reminders = await processDueReminders({ limit: 10 })
     // Pozvánky, které po 15 s odkladu neodešly (spadlá funkce): každou minutu
     // místo jednou denně.

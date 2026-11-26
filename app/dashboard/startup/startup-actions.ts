@@ -17,6 +17,8 @@ import type {
   PricingTier,
   WaitlistEntry,
 } from '@/lib/types'
+import { errorSummary, maskEmail } from '@/lib/security/log-safe'
+import { loadWaitlistDbUrl, nextStoredWaitlistUrl, openWaitlistUrl, validWaitlistUrl, type WaitlistDbInput } from '@/lib/admin/waitlist-secret'
 
 async function requireAuth() {
   const session = await getAdminSession()
@@ -39,7 +41,7 @@ export async function getStartupProjects(): Promise<StartupProject[]> {
       monthly_price::float, annual_price::float,
       annual_discount_pct::float, onetime_price::float,
       COALESCE(pricing_tiers, '[]'::jsonb) AS pricing_tiers,
-      archived, waitlist_db_url, created_at::text, updated_at::text
+      archived, (waitlist_db_url IS NOT NULL) AS has_waitlist_db, created_at::text, updated_at::text
     FROM startup_projects
     WHERE archived = false
     ORDER BY created_at DESC
@@ -61,7 +63,7 @@ export async function getStartupProject(id: string): Promise<StartupProject | nu
       monthly_price::float, annual_price::float,
       annual_discount_pct::float, onetime_price::float,
       COALESCE(pricing_tiers, '[]'::jsonb) AS pricing_tiers,
-      archived, waitlist_db_url, created_at::text, updated_at::text
+      archived, (waitlist_db_url IS NOT NULL) AS has_waitlist_db, created_at::text, updated_at::text
     FROM startup_projects
     WHERE id = ${id}
     LIMIT 1
@@ -116,7 +118,8 @@ export async function updateStartupProject(
     annual_discount_pct: number | null
     onetime_price: number | null
     pricing_tiers: PricingTier[]
-    waitlist_db_url: string | null
+    /** Připojení k databázi waitlistu jde jen na server, zpátky nikdy (audit #10). */
+    waitlist_db: WaitlistDbInput
   }
 ): Promise<{ error?: string }> {
   try {
@@ -124,6 +127,20 @@ export async function updateStartupProject(
     if (!data.name?.trim()) return { error: 'Název projektu je povinný' }
     if (!data.segment?.trim()) return { error: 'Segment je povinný' }
     if (!data.problem?.trim()) return { error: 'Popis problému je povinný' }
+    if (data.waitlist_db?.action === 'set' && !validWaitlistUrl(data.waitlist_db.url.trim())) {
+      return { error: 'Připojení k databázi musí začínat postgresql:// a nesmí mít mezery.' }
+    }
+    const waitlist: WaitlistDbInput =
+      data.waitlist_db?.action === 'set' ? { action: 'set', url: data.waitlist_db.url.trim() }
+        : data.waitlist_db?.action === 'clear' ? { action: 'clear' }
+          : { action: 'keep' }
+    let storedWaitlist: string | null | undefined
+    try {
+      storedWaitlist = await nextStoredWaitlistUrl(id, waitlist)
+    } catch {
+      // Bez GOOGLE_TOKEN_KEY se připojení nešifrovaně neuloží.
+      return { error: 'Připojení k databázi teď nejde bezpečně uložit. Zkuste to později.' }
+    }
 
     await sql`
       UPDATE startup_projects SET
@@ -147,7 +164,7 @@ export async function updateStartupProject(
         annual_discount_pct = ${data.annual_discount_pct},
         onetime_price = ${data.onetime_price},
         pricing_tiers = ${JSON.stringify(data.pricing_tiers)}::jsonb,
-        waitlist_db_url = ${data.waitlist_db_url},
+        waitlist_db_url = CASE WHEN ${storedWaitlist !== undefined} THEN ${storedWaitlist ?? null} ELSE waitlist_db_url END,
         updated_at = now()
       WHERE id = ${id}
     `
@@ -309,8 +326,7 @@ export async function exportWaitlistCsv(projectId: string): Promise<string> {
   await requireAuth()
   // Adresa databáze waitlistu se dohledá na serveru — z prohlížeče chodí
   // jen id projektu, ne connection string.
-  const project = await sql`SELECT waitlist_db_url FROM startup_projects WHERE id = ${projectId}`
-  const dbUrl = (project[0] as { waitlist_db_url: string | null } | undefined)?.waitlist_db_url
+  const dbUrl = await loadWaitlistDbUrl(projectId)
   if (!dbUrl) return ''
   const entries = await loadWaitlistForExport(dbUrl)
   const rows: string[][] = [
@@ -344,8 +360,8 @@ export async function sendLaunchEmailBlast(
   // chodí jen id projektu, ne connection string (AD07).
   const project = await sql`SELECT waitlist_db_url, live_url FROM startup_projects WHERE id = ${projectId}`
   const row = project[0] as { waitlist_db_url: string | null; live_url: string | null } | undefined
-  if (!row?.waitlist_db_url) return { sent: 0, failed: 0, total: 0, error: 'Projekt nemá nastavenou databázi waitlistu' }
-  const dbUrl = row.waitlist_db_url
+  const dbUrl = openWaitlistUrl(row?.waitlist_db_url)
+  if (!row || !dbUrl) return { sent: 0, failed: 0, total: 0, error: 'Projekt nemá nastavenou databázi waitlistu' }
   // Adresa jde do `href` hromadného e-mailu: jen http(s), jinak výchozí (nikdy `javascript:` z databáze).
   const appUrl = safeHttpUrl(row.live_url) ?? 'https://estatiq.cz'
 
@@ -379,14 +395,14 @@ export async function sendLaunchEmailBlast(
             html: launchEmailHtml(appUrl, name),
           })
           if (result.error) {
-            console.error(`Resend error for ${email}:`, result.error)
+            console.error(`Resend error for ${maskEmail(email)}:`, result.error.name ?? 'error')
             failed++
           } else {
             notifiedIds.push(id)
             sent++
           }
         } catch (err) {
-          console.error(`Failed to send to ${email}:`, err)
+          console.error(`Failed to send to ${maskEmail(email)}:`, errorSummary(err))
           failed++
         }
       }))

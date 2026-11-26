@@ -167,7 +167,9 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
   const [knowHow, setKnowHow] = useState(project.know_how ?? '')
   const [notes, setNotes] = useState(project.notes ?? '')
   const [liveUrl, setLiveUrl] = useState(project.live_url ?? '')
-  const [waitlistDbUrl, setWaitlistDbUrl] = useState(project.waitlist_db_url ?? '')
+  // Připojení k databázi waitlistu se jen zapisuje, zpátky ze serveru nechodí (audit #10).
+  const [waitlistDbUrl, setWaitlistDbUrl] = useState('')
+  const [waitlistClear, setWaitlistClear] = useState(false)
   const [phase, setPhase] = useState<StartupPhase>(project.phase)
   const [progress, setProgress] = useState(project.progress)
   const [currency, setCurrency] = useState(project.currency)
@@ -297,11 +299,18 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
       annual_discount_pct: numOrNull(annualDiscountPct),
       onetime_price: numOrNull(onetimePrice),
       pricing_tiers: pricingTiers,
-      waitlist_db_url: waitlistDbUrl.trim() || null,
+      waitlist_db: waitlistClear
+        ? { action: 'clear' }
+        : waitlistDbUrl.trim()
+          ? { action: 'set', url: waitlistDbUrl.trim() }
+          : { action: 'keep' },
     })
     setSaving(false)
     if (result.error) toast.error(result.error)
-    else toast.success('Projekt uložen')
+    else {
+      setWaitlistDbUrl('')
+      toast.success('Projekt uložen')
+    }
   }
 
   const handleArchive = async () => {
@@ -907,17 +916,38 @@ export function StartupProjectEditor({ project, improvements, changelog, waitlis
           )}
         </div>
         <div>
-          <label className={labelCls}>Waitlist DB URL</label>
+          <label htmlFor="waitlist-db" className={labelCls}>Waitlist DB URL</label>
           <input
+            id="waitlist-db"
             type="text"
+            autoComplete="off"
+            spellCheck={false}
             value={waitlistDbUrl}
-            onChange={e => setWaitlistDbUrl(e.target.value)}
-            placeholder="postgresql://…@….neon.tech/neondb?sslmode=require"
+            onChange={e => {
+              setWaitlistDbUrl(e.target.value)
+              if (e.target.value) setWaitlistClear(false)
+            }}
+            placeholder={project.has_waitlist_db ? 'Nastaveno — nové zadejte jen při změně' : 'postgresql://…@….neon.tech/neondb?sslmode=require'}
             className={inputCls}
           />
           <p className="mt-1 text-xs text-quiet">
-            Neon DB connection string pro waitlist prelaunch stránky. Po uložení se zobrazí záložka Waitlist.
+            {project.has_waitlist_db
+              ? 'Připojení je uložené šifrovaně a z bezpečnostních důvodů se tu nezobrazuje.'
+              : 'Neon DB connection string pro waitlist prelaunch stránky. Po uložení se zobrazí záložka Waitlist.'}
           </p>
+          {project.has_waitlist_db && (
+            <label className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={waitlistClear}
+                onChange={e => {
+                  setWaitlistClear(e.target.checked)
+                  if (e.target.checked) setWaitlistDbUrl('')
+                }}
+              />
+              Odebrat databázi waitlistu
+            </label>
+          )}
         </div>
       </Section>
 

@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -21,6 +22,7 @@ const STATE_LABELS = { open: 'Čeká', used: 'Použitá', revoked: 'Zrušená', 
 const card = 'rounded-box border border-navy-100 bg-surface p-5'
 
 export default async function PortalClientPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminPage()
   const { id } = await params
   if (!z.string().uuid().safeParse(id).success) notFound()
   const detail = await loadPortalClient(id).catch(() => null)

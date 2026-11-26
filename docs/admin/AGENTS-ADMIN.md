@@ -26,8 +26,8 @@
 | Ikony | Lucide React | Konzistentní `strokeWidth={1.5}` napříč celou app |
 | Databáze | Neon (serverless PostgreSQL) | `@neondatabase/serverless`, připojení přes `DATABASE_URL`. Čtení obrazovek jde od AD06 přes `lib/admin/db.ts` (dávky), starší volání přes `lib/db.ts` |
 | Validace | Zod + react-hook-form | `lib/feedback-schema.ts` |
-| Auth | NextAuth.js v4 + Credentials | Jediný admin účet v env proměnných, JWT session s platností 12 h (`lib/auth.ts`, od 2026-11-03), zámek 5 chybných pokusů za 15 min na IP, chráněno i přes `proxy.ts` |
-| Email | Nodemailer + Gmail SMTP | `lib/email.ts` — dva účty (výchozí + VIZEON) + branded HTML layout |
+| Auth | Supabase Auth (e-mail, heslo, TOTP; R-105) | Jediný admin podle `ADMIN_EMAIL`, session 12 h od přihlášení (R-106, `lib/supabase/session-age.ts`), bez zámku na IP (DECISIONS #030), chráněno přes `proxy.ts` a `requireAdminPage()` (`lib/auth.ts`) |
+| Email | Resend z vizeon.cz (R-116) | `lib/email.ts` — `deliver()` přes `sendVizeonMail` (`lib/admin/vizeon-mail.ts`), záložně Nodemailer + Gmail SMTP, když chybí `VIZEON_RESEND_API_KEY`; branded HTML layout |
 | Deployment | Vercel | Zero-ops, napojení na GitHub, Hobby plán (crony max 1× denně) |
 | AI | `@anthropic-ai/sdk` | AI asistenti (Startup) + AI přepis PDF faktur (`lib/invoice-ai.ts`) |
 | PDF | `puppeteer-core` + `@sparticuz/chromium` | Vykreslení PDF (faktury Workspace; admin faktury AD12) |
@@ -310,6 +310,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | Tabulka | Migrace | K čemu |
 |---------|---------|--------|
 | `login_attempts` | 006 | Brute-force lockout přihlášení |
+| `meeting_notes` | 134 | Uložené schůzky z Wispr Flow (R-144). **Funkce je od 2026-11-25 zrušená (R-145)**, tabulka i data zůstaly; kód ji jen maže po retenci (`lib/admin/meeting-notes-retention.ts`) |
 | `api_requests` | 007 | Rate limit veřejných API (`lib/api-rate-limit.ts`) |
 | `client_leads` | 010, 017, 024, 049, 051 | **Hovory** — kontakty/leady, další akce, telefonát zvednut, portfolio odesláno, vazba na kalendář |
 | `lead_notes` | 058 | Poznámky s historií k leadu v Hovorech |
@@ -342,14 +343,14 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 ```
 app/
 ├── (auth)/
-│   └── login/page.tsx           ← Přihlášení (NextAuth credentials)
-├── api/auth/[...nextauth]/
-│   └── route.ts                 ← NextAuth handler
+│   └── login/page.tsx           ← Přihlášení (Supabase Auth: e-mail, heslo, TOTP; R-105)
+├── api/auth/supabase-hook/
+│   └── route.ts                 ← Hook Before User Created (registrace jen s pozvánkou, R-107)
 ├── actions.ts                   ← Server Actions: createProject, updateProject, deleteProject, client messages
 ├── portal-actions.ts            ← Public Server Actions: submitFeedback, submitConsultation (token-only auth, rate-limited)
 ├── calendar-actions.ts          ← Server Actions: createCalendarEvent, deleteCalendarEvent
 ├── dashboard/
-│   ├── layout.tsx               ← Ochrana routy (getServerSession) + kostra; počty posílá jako příslib (AD06)
+│   ├── layout.tsx               ← Ochrana routy (`getAdminSession`) + kostra; počty posílá jako příslib (AD06)
 │   ├── loading.tsx              ← Kostlivec Dnes (další u calls, calendar, faktury, zakazky, klienti…)
 │   ├── page.tsx                 ← Přehled zakázek
 │   ├── new/page.tsx             ← Nová zakázka
@@ -386,15 +387,14 @@ lib/
 ├── lead-origins.ts              ← Zdroje poptávek: název, doména, `source`, klíče API, okno rate limitu (dřív business.ts)
 ├── legacy-redirects.mjs         ← Staré adresy adminu → nové (čte next.config.mjs i test)
 ├── web-leads.ts                 ← Příjem poptávek z webů: booking i kontaktní formulář, jeden inbox (dřív web-booking.ts)
-├── web-booking.ts               ← Sdílená implementace veřejného booking endpointu (obě domény)
-├── auth.ts                      ← NextAuth authOptions
-├── email.ts                     ← Sdílený nodemailer transporter + branded HTML layout (sendBrandedEmail)
+├── auth.ts                      ← Supabase Auth: `getAdminSession`, `requireAdminPage`, TOTP (R-105)
+├── email.ts                     ← Pošta přes Resend (`sendVizeonMail`, R-116), záložně nodemailer; branded HTML layout (sendBrandedEmail)
 ├── feedback-schema.ts           ← Zod schémata: feedbackSchema, bookingSchema
 ├── prague-time.ts               ← Timezone helpery (Europe/Prague), generování slotů, kalendářní utility
 ├── utils.ts
 └── types.ts
 
-proxy.ts                         ← jediný proxy (dřív middleware.ts): NextAuth pro /dashboard (`/alteno` a `/hub` zůstaly jako pojistka před přesměrováním), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
+proxy.ts                         ← jediný proxy (dřív middleware.ts): Supabase Auth pro /dashboard (`/alteno` a `/hub` zůstaly jako pojistka před přesměrováním), Clerk jen pro /w a /api/ws, CSP s nonce (B13)
 migrations/                      ← Inkrementální SQL migrace nad základním schématem
 scripts/                         ← Běhouny migrací (apply-migration.js = obecný) + debug skripty
 docs/                            ← Implementační plány velkých celků (viz memory/index.md)
@@ -413,7 +413,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 | `app/calendar-actions.ts` | Kalendářní události (+ párový lead v Hovorech) |
 | `app/calls-actions.ts` | Hovory: leady, poznámky, waiting stav, převod na zakázku, portfolio email, vlastní email |
 | `app/contacts-actions.ts` | Kontakty (AD09): úprava údajů, sloučení duplicity a jeho „Zpět" |
-| `app/completed-actions.ts` | Dokončené zakázky + dotazníky |
+| `app/closed-actions.ts` | Dokončené zakázky + dotazníky |
 | `app/costs-actions.ts` | Náklady — jediný zdroj pravdy pro firemní i osobní náklady |
 | `app/notification-actions.ts` | Notifikace (přečteno) |
 | `app/project-notes-actions.ts` | Log schůzek u zakázky |
@@ -444,7 +444,7 @@ Strom výše ukazuje jádro. **Úplný seznam** souborů server actions, rout a 
 
 | Endpoint | Auth | Účel |
 |----------|------|------|
-| `POST /api/public/booking` | `x-api-key` = `VIZEON_API_KEY` | Rezervace z vizeon.cz (`lib/web-booking.ts`) |
+| `POST /api/public/booking` | `x-api-key` = `VIZEON_API_KEY` | Rezervace z vizeon.cz (`lib/web-leads.ts`) |
 | `POST /api/public/booking/alteno` | `x-api-key` = `ALTENO_API_KEY` | Rezervace z alteno.cz |
 | `POST /api/public/alteno-leads` | `x-alteno-lead-signature` = `ALTENO_LEAD_WEBHOOK_SECRET` | Kontaktní formulář alteno.cz → nepotvrzená poptávka |
 | `POST /api/public/prvotka-leads` | `x-prvotka-lead-signature` = `PRVOTKA_LEAD_WEBHOOK_SECRET` | Kontaktní formulář prvotka.cz → nepotvrzená poptávka (AD02; web ještě napojený není) |
@@ -484,7 +484,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 ## Stránky — co každá dělá
 
 ### `/login`
-- Email + heslo přes NextAuth Credentials
+- Email + heslo přes Supabase Auth, pak TOTP (R-105)
 - Po přihlášení redirect na `/dashboard`
 - Čistý minimalistický design
 
@@ -498,7 +498,7 @@ Veřejná API: vždy `lib/api-auth.ts` (constant-time porovnání klíče, fail-
 - **Šířka a hlavička patří stránce (AD05).** `<main>` v `AdminShell` nemá šířku ani okraje, jen místo pro spodní lištu telefonu. Každá obrazovka `/dashboard` se obaluje `<PageShell>` z `components/ws/app/page-header.tsx` a volí si šířku: `narrow` 960 · `default` 1280 · `wide` 1440 · `table` 1600 (jedenáctisloupcové tabulky Dokončených a Hovorů). Nadpis dělá `<PageHeader>` (admin posílá `subtitleFont="sans"`, protože podnadpis je věta, ne čísla), řádek filtrů `<Toolbar>` / `<PillNav>`, prázdný stav `<EmptyState>`. Jsou to komponenty Workspace, ale závisí jen na `AccentHeading` a `cn` — žádná data `ws`. **Nová obrazovka adminu začíná `<PageShell>`, ne vlastním `max-w-*`.**
 - **Kostlivci obrazovek (AD06).** `components/admin/page-skeleton.tsx` (`TodaySkeleton`, `TableSkeleton`, `CalendarSkeleton`) a `loading.tsx` u `/dashboard` a devíti podstránek. Kostlivec má **stejnou šířku a rozvržení** jako hotová obrazovka, aby se po načtení nic nepřeskládalo, a nekreslí žádné číslo ani text, co by se dal splést se skutečným údajem. `loading.tsx` u `/dashboard` platí i pro podstránky, které si vlastní nezaložily.
 - **`experimental.staleTimes: { dynamic: 30, static: 180 }`** (`next.config.mjs`, AD06): Zpět a Vpřed po dobu 30 s nesahají do databáze. Data po vlastní akci se obnovují cíleně přes `revalidatePath`, takže se stará data ukážou jen při prostém listování tam a zpět.
-- **Kořenový layout nemá `SessionProvider` (AD06).** `useSession()` v repu nikdo nepoužívá; admin si session čte na serveru (`getServerSession`) a hlavička landing page dostává `signedIn` jako prop z `Hero` / `LegalPage`. Dřív provider obaloval celou aplikaci, takže NextAuth načítal i Workspace a landing a každý návštěvník po načtení volal `/api/auth/session`. `signIn()` a `signOut()` z `next-auth/react` provider nepotřebují.
+- **Kořenový layout nemá `SessionProvider` (AD06).** `useSession()` v repu nikdo nepoužívá; admin si session čte na serveru (`getAdminSession`) a hlavička landing page dostává `signedIn` jako prop z `Hero` / `LegalPage`. Dřív provider obaloval celou aplikaci, takže NextAuth načítal i Workspace a landing a každý návštěvník po načtení volal `/api/auth/session`. `signIn()` a `signOut()` z `next-auth/react` provider nepotřebují.
 - **Odznaky mají jeden systém (AD05, R-091).** `lib/admin-status.ts` má pět tónů `neutral | info | signal | success | danger` a mapy pro stav zakázky, hovoru, typ akce, druh změny, vylepšení, fázi projektu, předplatné klienta a stav faktury. Vykresluje se přes `components/ui/badge.tsx` (`toneVariant(tón)`). **Obrazovka si vlastní barvu odznaku nedefinuje**; nový stav = nový řádek v `lib/admin-status.ts`. Kategorie (typ akce, druh změny, oblast, kategorie nákladu) jsou vždy `neutral`.
 
 ### `/dashboard` — Dnes (KP02, AD03)
@@ -702,8 +702,10 @@ Nehotové (vystavení faktury, AD12) nic nepředstírá — odkáže na záložk
 - **Přiznaná linie** — jestli faktura v ledgeru příjem založila, nebo jen převzala ten od zakázky (`owned_by_invoice`); bez `paid_on` žádný nemá
 - **Co z PDF přečetla AI** — surový `ai_extracted` pro dohledatelnost; pole, kde se uložená hodnota od přepisu liší, jsou označená jako ručně upravená. Platí vždy uložené údaje, ne přepis
 - Data z `getInvoiceDetail()`; akce v `InvoiceDetailActions.tsx`. **Faktura vystavená v adminu**
-  (AD12) má místo nich `IssuedInvoiceActions` (Poslat e-mailem, Storno) a kartu Položky —
-  neupravuje se ani nemaže
+  (AD12) má místo nich `IssuedInvoiceActions` (Poslat e-mailem, Opravit fakturu, Storno) a kartu
+  Položky. Na místě se neupravuje ani nemaže, opravuje se přes „Opravit fakturu“ (R-148)
+- **Stáhnout PDF** u obou druhů faktur: `/api/invoices/[id]/pdf?stazeni=1` vrací `Content-Disposition: attachment`,
+  bez parametru `inline` (náhled, Otevřít v novém okně)
 
 ### Vystavování faktur (AD12, R-098)
 
@@ -797,6 +799,28 @@ Dokud migrace 107 neběží, `isIssuingReady()` nové sloupce vůbec nečte a ad
 - **Bez migrace 132** jde vystavit jen faktura za celé dílo (druh se neuloží), volba druhu se ve formuláři neukáže.
 - Testy `lib/__tests__/admin-faktury-druhy.test.ts` (záloha → částečná → finální, přefakturování, zámek, PDF,
   storno, koncepty), `kp13-penize-faktury` (projekce 133), `invoice-pdf` (nadpisy, rozpis jen v CZK).
+
+### Oprava vystavené faktury (R-148)
+
+Vystavená faktura se dál na místě nemění (R-098). „Opravit fakturu“ v detailu vede na
+`/dashboard/faktury/nova?oprava=<id>`: formulář se vyplní údaji původní faktury (odběratel, e-mail,
+položky, měna, druh a procento, datum plnění, splatnost, pokud neuplynula), vystavuje se dnes a do
+poznámky přibude „Nahrazuje fakturu N.“ (`replacementNote`, při opravě opravy jen jeden odkaz).
+
+- **Nabízí se jen u platné nezaplacené faktury.** Zaplacená je v ledgeru jako příjem a storno by ho
+  vrátilo; tu dál opraví ruční storno a nová faktura.
+- **Nová a storno staré jedním příkazem** (`issueCorrection` v `lib/admin/invoice-issue.ts`): datově
+  měnící CTE stornuje starou, jen když je pořád platná a nezaplacená, a teprve pro ten řádek se zavolá
+  `admin_invoice_issue`. Když ji mezitím někdo zaplatil nebo stornoval, nevznikne nic; když neprojde nová,
+  padá celý příkaz a stará zůstane. Bez migrace.
+- **Opravovaná faktura se nepočítá do rozpisu zakázky** (`loadProjectBilling(projectId, excludeInvoiceId)`),
+  takže záloha 30 % jde opravit třeba na 80 %. Totéž `getProjectBilling` při přepnutí zakázky ve formuláři.
+- Popis položky, který si formulář složil sám („Web — záloha 30 %“), se do opravy nepřebírá, ať po změně
+  procenta nezůstane staré číslo. Vlastní popis ano.
+- Formulář v režimu opravy nemá „Uložit jako koncept“ (koncept by starou nestornoval). Novou fakturu klientovi
+  pošle Kryštof z jejího detailu, sama neodchází.
+- Test `lib/__tests__/admin-faktura-oprava.test.ts` (oprava zálohy, bez zakázky, zaplacená, dvakrát, selhání
+  nové, archiv, předvyplnění, poznámka).
 
 ### Koncepty faktur a pravidelné faktury (R-117)
 
@@ -1337,25 +1361,25 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 
 - Cíl admin oznámení ber vždy z `adminEmail()` v `lib/lead-origins.ts` (`VIZEON_ADMIN_EMAIL`, záloha `ADMIN_EMAIL`) — nikdy nečti `process.env.ADMIN_EMAIL` přímo.
 - Selhání odeslání emailu **nikdy** nesmí shodit DB mutaci — `sendBrandedEmail`/`sendPlainEmail` interně chytají chyby a vrací `false`, voláno bez `await` na výsledek pokud na něm nic nezávisí.
-- **Oznámení posílej z `after()`, ne uprostřed akce (AD08).** Gmail SMTP trvá stovky
+- **Oznámení posílej z `after()`, ne uprostřed akce (AD08).** Odeslání e-mailu (Resend) trvá stovky
   milisekund až sekundy a uložení na něj nemá čekat: `import { after } from 'next/server'`
   a odeslání dovnitř. Platí to i pro `createNotification` — plovoucí `void promise` může
   skončit s odpovědí dřív, než se zápis dokončí. Výjimka jsou akce, **jejichž smyslem je
   ten e-mail** (`sendLeadEmail` v `app/lead-mail-actions.ts`): tam UI hlásí, jestli odešel,
   a po odpovědi už by se to uživatel nedozvěděl. Strop drží
   `lib/__tests__/admin-after-emails.test.ts`.
-- Emaily se neodešlou, pokud chybí odpovídající dvojice `*_USER`/`*_APP_PASSWORD` — v dev prostředí appka funguje i bez nich, jen nechodí maily.
+- Emaily se neodešlou, pokud chybí `VIZEON_RESEND_API_KEY` a zároveň odpovídající dvojice `*_USER`/`*_APP_PASSWORD` (záloha) — v dev prostředí appka funguje i bez nich, jen nechodí maily.
 - Trigger body: `notifyClientOfProjectChange` v `app/actions.ts` (vytvoření/update projektu → klient), `submitConsultation` v `app/portal-actions.ts` (rezervace → admin i klient).
 
 ---
 
 ## Bezpečnost
 
-- **NextAuth JWT session** — admin chráněn `proxy.ts` (matcher `/dashboard`, plus `/alteno` a `/hub` jako pojistka, vč. podcest) + `getServerSession` v layoutu. `/api/*` proxy **nehlídá** — každá neveřejná API routa si session kontroluje sama
+- **Supabase Auth session** (e-mail, heslo, TOTP; R-105) — admin chráněn `proxy.ts` (matcher `/dashboard`, plus `/alteno` a `/hub` jako pojistka, vč. podcest) + `requireAdminPage()` na každé stránce `/dashboard/**`. `/api/*` proxy **nehlídá** přihlášení (na `/api/public`, `/api/klient` a `/embed` dělá jen bránu na IP, DECISIONS #053) — každá neveřejná API routa si session kontroluje sama
 - **Security hlavičky** v `next.config.mjs`, CSP s nonce v `proxy.ts` (admin zatím Report-Only) — stav a pravidla v B13 a `.claude/security/STATE.md`; server actions body limit 5 MB kvůli PDF faktur
 - **Public token** — UUID v4 generovaný databází (`gen_random_uuid()`), nelze uhádnout
 - **HTTPS** — Vercel automaticky
-- **Heslo uloženo jako bcrypt hash** v env proměnné `ADMIN_PASSWORD_HASH`
+- **Heslo drží Supabase Auth** (ne repo ani env; `ADMIN_PASSWORD_HASH` a bcrypt se od R-105 nepoužívají), druhý faktor TOTP
 - **Veřejné server actions** (`submitFeedback`, `submitConsultation`) jsou chráněné jen tokenem (bez auth) — mají DB-backed rate limit (`isRateLimited` v `app/portal-actions.ts`: max 3 hodnocení / 10 min, max 3 rezervace / 30 min per projekt), aby nešlo endpoint zaspamovat
 - **Race condition na rezervacích** řešená přes DB `UNIQUE` constraint na `scheduled_at` + catch na Postgres chybový kód `23505` — nikdy přes "zkontroluj a pak vlož"
 
@@ -1382,7 +1406,7 @@ Veškerá email logika je centralizovaná v `lib/email.ts` (`sendBrandedEmail`/`
 - Nová emailová šablona → rozšiř `lib/email.ts`, nepiš HTML inline v actions
 - `notes` je výhradně pro admina — **nikdy ho neposílej na `/p/[token]`**
 - `public_token` se generuje v databázi — **nikdy ho negeneruj na frontendu**
-- Auth check v server komponentě: `getServerSession(authOptions)` z `next-auth`
+- Auth check v server komponentě: `getAdminSession()` / `requireAdminPage()` z `lib/auth.ts`
 - Výchozí chování na portálu: cena je **skrytá** (volitelné zapnutí)
 - Nová DB změna → nová idempotentní migrace v `migrations/`, ne přímá úprava základního schématu výše
 - Časové sloty/kalendářní logika → vždy přes `lib/prague-time.ts`, nepřepočítávej timezony znovu v komponentě
@@ -1578,8 +1602,25 @@ Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
   jen „odešla". Nad kalendářem je souhrn za nadcházející schůzky zobrazeného období. Detail
   ukáže, kdy a kam pozvánka odešla, a u „Bez pozvánky" tlačítko **Poslat pozvánku** (otevře
   úpravu s předvolenou volbou Meet, `EditableEvent.startAsMeeting`). „Odešla" = e-mail převzal
-  Resend; doručení do schránky ZakazIQ nesleduje (webhook Resendu pro vizeon.cz není).
-  Konzultace z volna značku nemají (rezervuje si je klient sám). Test `admin-pozvanka-znacka.test.ts`.
+  Resend a zprávu o doručení zatím nemáme. Konzultace z volna značku nemají (rezervuje si je
+  klient sám). Test `admin-pozvanka-znacka.test.ts`.
+- **Doručení pozvánek (R-146, migrace 135):** každý e-mail ze `sendVizeonMail` nese štítek
+  `zakaziq=admin`. Webhook Resendu `POST /api/resend/vizeon` (podpis Svix, tajemství
+  `VIZEON_RESEND_WEBHOOK_SECRET`, bez něj 503, tělo do 64 kB) zahodí všechno bez štítku (Growth OS
+  posílá ze stejného účtu) a do `email_deliveries` zapíše jen id e-mailu, stav (`delivered`,
+  `delayed`, `complained`, `bounced`, `failed`, `suppressed`), čas události a u vrácení druh
+  (`Permanent`/`Transient`) — adresu ani text odpovědi serveru ne. Novější událost přepíše starší
+  podle času od Resendu, „zdržuje se" nikdy nepřepíše konečný stav (`lib/admin/email-deliveries.ts`).
+  Kalendář čte doručení samostatným dotazem v okně (bez migrace prázdno), značky přibyly dvě:
+  dvojitá fajfka **Pozvánka dorazila** (i u proběhlé schůzky) a červená obálka **Pozvánka
+  nedorazila** (jen nadcházející). Detail vysvětlí proč (adresa neexistuje, plná schránka, adresa
+  na seznamu blokovaných) a nabídne **Poslat e-mail znovu** — `retryInvite` pošle na adresu, která
+  je u schůzky teď (oprava kontaktu se propíše, R-141), s novým klíčem idempotence; doručenou
+  pozvánku znovu neposílá. Změna na „nedorazila" u nadcházející schůzky založí upozornění
+  `meeting_invite_undelivered` (jednou, opakovaný webhook ho nezdvojí). Nastavení v Resendu:
+  Webhooks → Add endpoint, URL výš, události `email.delivered`, `email.delivery_delayed`,
+  `email.bounced`, `email.complained`, `email.failed`, `email.suppressed`; podpisový klíč do Vercelu.
+  Test `admin-doruceni-emailu.test.ts`.
 - **Detail události** v kalendáři ukazuje stav připomínek (`getMeetingStatus`, načítá se až při
   otevření) a varuje, když spouštěč neběží. Smazání schůzky ji smaže i v Google Kalendáři, ale
   až po 10 s a jen když ji „Zpět" neobnovilo (obnova vrací stejné id i s připomínkami).
@@ -1815,3 +1856,54 @@ Tady jen to, co je v kódu.
   - **Okno (VO11)** napojuje `AppDelegate`: menu Otevřít / Vyzkoušet připojení → `HubWindowController`, Historie
     čte `LocalDB` přes `Dictation/LocalHistorySource.swift` (`pending` → „čeká", Zkusit znovu =
     `retryQueued(id:)`). Volby zapsané oknem do `Preferences` převezme lišta přes `UserDefaults.didChangeNotification`.
+
+## Schůzky z Wispr Flow — zrušené (R-144, R-145)
+
+Obrazovka Schůzky (`/dashboard/schuzky`), vstup `POST`/`GET /api/public/schuzky`, AI shrnutí,
+koncepty v Gmailu a most na Macu (`scripts/wispr-local-most.mjs`, LaunchAgent `cz.zakaziq.wispr-most`)
+byly 2026-11-25 odstraněné na přání Kryštofa (R-145). Google propojení žádá zase jen kalendář.
+**Zůstala tabulka `meeting_notes`** (migrace 134) s uloženými přepisy; čte ji jen denní úklid
+`client-retention` (`purgeMeetingNotes` v `lib/admin/meeting-notes-retention.ts`: 3 roky po schůzce,
+skryté po roce). Kód funkce je v historii gitu (`git show ddba729 -- <cesta>`), kdyby se měla vrátit.
+
+## Navrhovač nabídek: rozbor firmy (R-147, krok N1)
+
+Plán a cenová pravidla: `docs/admin/NABIDKY-PLAN.md`. N1 umí jen **rozbor firmy** u kontaktu, cenu
+ještě nenavrhuje (N2).
+
+**Kde běží (R-149).** Rozbor nedělá server přes placené API. Běží jako **cloudová úloha Claude Code**
+(claude.ai/code/routines, „Rozbor firem pro nabídky") v předplatném Kryštofa: vedoucí na Opusu, dva
+subagenti na Sonnetu. Postup úlohy je projektový skill `.claude/skills/zakaziq-rozbor-firmy/SKILL.md`
+(úloha ho čte z `main`). Managed Agents z prvního návrhu N1 nikdy nevznikly.
+
+**Tok.** Karta „Rozbor firmy" na `/dashboard/kontakty/[id]` (`components/admin/offers/research-section.tsx`
+→ `research-card.tsx`). „Připravit rozbor" (`startResearch`) vezme veřejné údaje o firmě
+(`loadBriefForContact`: kontakt, nejnovější firma od asistenta, web z ručního pole, Growth OS nebo
+z e-mailu na vlastní doméně; jméno ve tvaru e-mailu se vynechá), založí řádek `offer_research` ve stavu
+`queued` a spustí úlohu přes její API trigger (`lib/admin/offers/routine.ts`, posílá **jen id rozboru**).
+Úloha si rozbor vyzvedne `POST /api/public/rozbory` (`claimResearch`, atomicky, stav `running`), pustí
+subagenty a výsledek pošle na `POST /api/public/rozbory/[id]`; server ho zkontroluje (`normalizeResult`),
+uloží (`done`) a dá upozornění do zvonku (`offer_research_done`). Nesedí-li výsledek, vstup vrátí 422
+a rozbor běží dál, aby úloha mohla poslat opravu; `{ "nepodarilo_se": … }` ho ukončí kódem `gave_up`
+(text od modelu se neukládá). Karta se jen každých 15 s dívá do databáze a ukazuje odkaz „Sledovat
+v Claude". Když spuštění selže (bez klíče, 429, chyba), rozbor čeká ve frontě, karta nabídne „Zkusit
+spustit znovu" a jinak ho vyzvedne **ranní průchod úlohy v 7:00** podle rozvrhu. Denní cron
+`client-retention` volá `maintainOfferResearch`: vyzvednutý a do hodiny neodevzdaný → `timeout`,
+nevyzvednutý po 30 h → `not_started`, pak úklid.
+
+**Propojení (env).** `OFFER_RESEARCH_API_KEY` — klíč, kterým se úloha hlásí (min. 32 znaků); tutéž
+hodnotu má cloudové prostředí úlohy jako **network secret** typu Bearer pro `www.zakaziq.cz`, takže klíč
+do běhu úlohy vůbec nevstoupí. `OFFER_RESEARCH_ROUTINE_ID` (`trig_…`) a `OFFER_RESEARCH_FIRE_TOKEN`
+(klíč API triggeru, umí úlohu jen spustit). Bez prvního karta ukáže, že propojení chybí; bez dvou
+dalších rozbor jen čeká na ranní průchod.
+
+**Mantinely.** Úloha smí jen hledat a číst weby a volat dva vstupy ZakazIQ; repozitář nemění.
+Do úlohy nejde telefon, e-mail ani přepis. Tvrzení bez zdroje server zahodí. 15 rozborů za 24 h,
+jeden otevřený (ve frontě nebo běžící) na kontakt, nejvýš 5 rozborů za jeden běh úlohy.
+Rozbory se počítají do limitu předplatného Claude. DECISIONS #056 (nahrazuje #055).
+
+**Data.** Migrace 136 + 137: `offer_research` (kontakt nebo firma od asistenta, stav
+`queued`/`running`/`done`/`failed`, `brief`, `result`, krátký kód chyby, doba běhu, `claimed_at`, id a odkaz
+běhu v Claude Code), funkce `purge_offer_research()` (bez zakázky 12 měsíců). `cost_cents`
+a `admin_settings.offer_agents` zůstaly z prvního návrhu a nepoužívají se. Bez migrace se karta neukáže
+a stránka běží dál. Testy `lib/__tests__/admin-navrhovac-rozbor.test.ts`.
