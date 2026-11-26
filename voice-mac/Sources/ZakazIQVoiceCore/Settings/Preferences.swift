@@ -63,4 +63,12 @@ public struct Preferences: @unchecked Sendable {
     }
     nonmutating set { defaults.set(min(365, max(7, newValue)), forKey: Self.historyDaysKey) }
   }
+
+  static let learnFromEditsKey = "learnFromEdits"
+
+  /// Posílat serveru opravy vloženého textu, aby se učil (VO09, D-V8). Výchozí ano.
+  public var learnFromEdits: Bool {
+    get { defaults.object(forKey: Self.learnFromEditsKey) as? Bool ?? true }
+    nonmutating set { defaults.set(newValue, forKey: Self.learnFromEditsKey) }
+  }
 }
