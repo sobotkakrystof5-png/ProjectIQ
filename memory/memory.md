@@ -149,8 +149,9 @@ Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl)
 **VO04, VO05, VO06 a VO11 v kódu 2026-11-26** (větev `admin/voice-mac`, worktree `.claude/worktrees/voice-mac`,
 odbočená z `945ef61`; VO11 dělalo souběžně sezení `zakaziq-e2` na `admin/voice-okno` a je sloučené): klávesa fn,
 nahrávání, lišta s dílky, odeslání, vložení, historie a fronta, okno jako Wispr Flow. 80 testů, release bez varování.
-**Naostro na Macu nic z toho neběželo** (certifikát, klíč a zkouška jsou na Kryštofovi). VO09 dělá `zakaziq-e2`,
-napojení na vložení zbývá. Pak sloučit `admin/voice-mac` do `admin/zakaziq-voice`.
+**Naostro na Macu nic z toho neběželo.** VO09 (opravy po vložení) dodalo `zakaziq-e2`, sloučené a napojené
+(`bb9d822`, 94 testů). Certifikát „ZakazIQ Voice vývoj" v Klíčence už je. Zbývá: nainstalovat a projít naostro
+(Otevřené problémy), sloučit `admin/voice-mac` do `admin/zakaziq-voice` a VO12 se souhlasem Kryštofa.
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
@@ -2146,7 +2147,9 @@ ve VO02. Žádný nový npm balíček.
   parserem a schématem (dočasný test, smazaný).
 - **feat** VO11 okno jako Wispr Flow (`baf0150`, sezení `zakaziq-e2`), sloučené (`b61a007`) a napojené na menu,
   lištu a místní historii (`1095f01`); malé okno `SettingsView` smazané. `Preferences.learnFromEdits` pro VO09 (`1acf46a`).
-- **chore** Ověřeno: `make -C voice-mac test` 80 testů, release bez varování, `afinfo` formátu nahrávky. Aplikace
+- **feat** VO09 zachycení oprav po vložení (`7bd4836`, sezení `zakaziq-e2`), sloučené (`5a9b88c`) a napojené na
+  vložení, Enter, nový diktát a ukončení aplikace (`bb9d822`); potvrzená oprava označí diktát v místní historii.
+- **chore** Ověřeno: `make -C voice-mac test` 80 testů (po VO09 94), release bez varování, `afinfo` formátu nahrávky. Aplikace
   se nespouštěla (v `~/Applications` běží zkouška připojení z jiného sezení a čtení Klíčenky by vyvolalo dotaz).
 
 ### 2026-11-26 (ZakazIQ Voice — VO03, aplikace na Macu, R-150)
