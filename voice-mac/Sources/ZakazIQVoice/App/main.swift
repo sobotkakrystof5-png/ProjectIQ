@@ -1,8 +1,10 @@
 import AppKit
 
-// Vstup aplikace. Bez SwiftUI `App`: lišta menu a okna řídí AppKit (VO04–VO06 přidají
-// lištu dole a zachytávání Fn, na to je NSStatusItem a NSPanel pružnější).
+// Vstup aplikace. Bez SwiftUI `App`: lišta menu, lišta dole (NSPanel) a okna řídí AppKit.
 MainActor.assumeIsolated {
+  #if DEBUG
+  if BarSnapshot.runIfRequested() { exit(0) }
+  #endif
   let app = NSApplication.shared
   let delegate = AppDelegate()
   app.delegate = delegate

@@ -62,6 +62,15 @@ final class AppModel: ObservableObject {
     shortcut = value
   }
 
+  /// Volba „Ukazovat lištu v klidu" (VO05). Přes `Binding`, ať jde rovnou do přepínače.
+  var showBarWhenIdle: Bool {
+    get { dictation.showBarWhenIdle }
+    set {
+      objectWillChange.send()
+      dictation.setShowBarWhenIdle(newValue)
+    }
+  }
+
   func openKeyboardSettings() {
     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
   }

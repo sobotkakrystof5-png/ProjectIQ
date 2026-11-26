@@ -162,6 +162,12 @@ struct SettingsView: View {
           .foregroundStyle(Dilky.quiet)
           .fixedSize(horizontal: false, vertical: true)
       }
+      Divider().overlay(Dilky.navy100)
+      ToggleRow(
+        title: "Ukazovat lištu v klidu",
+        detail: "Malá lišta dole uprostřed obrazovky. Když ji vypnete, objeví se jen při diktování.",
+        isOn: $model.showBarWhenIdle
+      )
       if model.shortcut == .fn, let advice = model.fnUsage.advice {
         Divider().overlay(Dilky.navy100)
         VStack(alignment: .leading, spacing: 8) {
@@ -338,6 +344,28 @@ private struct SecondaryButton: ButtonStyle {
       .overlay(Capsule().strokeBorder(Dilky.navy100, lineWidth: 1))
       .opacity(enabled ? 1 : 0.4)
       .contentShape(Capsule())
+  }
+}
+
+/// Řádek s přepínačem (plocha 44 px, popis pod názvem).
+private struct ToggleRow: View {
+  let title: String
+  let detail: String
+  @Binding var isOn: Bool
+
+  var body: some View {
+    Toggle(isOn: $isOn) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title).font(DilkyFont.sans(14, weight: 500))
+        Text(detail)
+          .font(DilkyFont.sans(12))
+          .foregroundStyle(Dilky.quiet)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .toggleStyle(.switch)
+    .tint(Dilky.navy700)
+    .frame(minHeight: 44)
   }
 }
 

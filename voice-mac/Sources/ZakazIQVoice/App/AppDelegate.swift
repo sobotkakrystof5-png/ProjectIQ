@@ -16,11 +16,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var window: NSWindow?
   private var permissionTimer: Timer?
   private var hotkeyTimer: Timer?
+  private var bar: FlowBarPanel?
   private var subscriptions = Set<AnyCancellable>()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     DilkyFont.register()
     setUpStatusItem()
+    let bar = FlowBarPanel(model: dictation.bar)
+    bar.placeOnCursorScreen()
+    if dictation.bar.isVisible { bar.orderFrontRegardless() }
+    self.bar = bar
 
     model.$connection
       .receive(on: RunLoop.main)
@@ -85,6 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     menu.addItem(makeItem("Otevřít ZakazIQ Voice…", #selector(openWindow), key: ","))
     menu.addItem(makeItem("Vyzkoušet připojení", #selector(testConnection), key: ""))
+    #if DEBUG
+    menu.addItem(makeItem("Ladění: lišta zpracovává", #selector(debugProcessing), key: ""))
+    #endif
     menu.addItem(.separator())
     menu.addItem(makeItem("Ukončit ZakazIQ Voice", #selector(quit), key: "q"))
 
@@ -105,6 +113,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   @objc private func toggleDictation() { dictation.toggleFromMenu() }
+
+  #if DEBUG
+  @objc private func debugProcessing() { dictation.debugShowProcessing() }
+  #endif
 
   private func updateStatusIcon(_ phase: DictationController.Phase) {
     statusItem?.button?.image = TileMark.menuBarImage(active: phase == .recording)

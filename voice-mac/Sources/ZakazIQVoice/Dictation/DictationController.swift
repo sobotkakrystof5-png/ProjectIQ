@@ -19,11 +19,12 @@ struct FrontApp: Equatable {
 struct DictationContext {
   let id: UUID
   let startedAt: Date
+  let startedUptime: TimeInterval
   let app: FrontApp?
   var mode: DictationMode = .hold
 }
 
-/// Řadič diktátu (VO04): zkratka → `DictationTrigger` → nahrávání.
+/// Řadič diktátu: zkratka → `DictationTrigger` → nahrávání → lišta (VO04, VO05).
 @MainActor
 final class DictationController: ObservableObject {
   enum Phase: Equatable {
@@ -33,12 +34,14 @@ final class DictationController: ObservableObject {
   }
 
   @Published private(set) var phase: Phase = .idle
-  /// Hláška pro člověka (lišta ji ukáže ve VO05; zatím menu).
+  /// Poslední hláška (i do menu).
   @Published private(set) var notice: String?
   /// Zkratka běží (jsou oprávnění)?
   @Published private(set) var hotkeyReady = false
-  /// Poslední hotová nahrávka (VO04: leží na disku, odeslání přidá VO06).
+  /// Poslední hotová nahrávka (odeslání přidá VO06).
   @Published private(set) var lastTake: Recorder.Take?
+
+  let bar = BarModel()
 
   private let prefs: Preferences
   private let monitor = FnMonitor()
@@ -52,13 +55,26 @@ final class DictationController: ObservableObject {
     monitor.shortcut = prefs.shortcut
     monitor.onSignal = { [weak self] signal in self?.handle(signal) }
     recorder.onTick = { [weak self] in self?.send(.tick) }
+    recorder.onLevel = { [weak self] level in self?.pushLevel(level) }
+    bar.shortcut = prefs.shortcut
+    bar.showWhenIdle = prefs.showBarWhenIdle
+    bar.onClick = { [weak self] in self?.toggleFromMenu() }
+    bar.onCancel = { [weak self] in self?.send(.barCancel) }
+    bar.onCopy = { text in Self.copyToPasteboard(text) }
   }
 
   var shortcut: DictationShortcut { prefs.shortcut }
+  var showBarWhenIdle: Bool { prefs.showBarWhenIdle }
 
   func setShortcut(_ shortcut: DictationShortcut) {
     prefs.shortcut = shortcut
     monitor.shortcut = shortcut
+    bar.shortcut = shortcut
+  }
+
+  func setShowBarWhenIdle(_ value: Bool) {
+    prefs.showBarWhenIdle = value
+    bar.showWhenIdle = value
   }
 
   /// Zkusí zapnout zachytávání zkratky; volá se při startu a po změně oprávnění.
@@ -71,9 +87,16 @@ final class DictationController: ObservableObject {
     send(.barClick(secureInput: FnMonitor.secureInputActive))
   }
 
-  func cancelFromBar() {
-    send(.barCancel)
+  #if DEBUG
+  /// Jen ladění vzhledu lišty: stav zpracování na 3 s.
+  func debugShowProcessing() {
+    bar.processing()
+    Task { [weak self] in
+      try? await Task.sleep(for: .seconds(3))
+      self?.bar.done()
+    }
   }
+  #endif
 
   // MARK: Události
 
@@ -100,6 +123,7 @@ final class DictationController: ObservableObject {
     case .showListening(let mode):
       context?.mode = mode
       phase = .recording
+      bar.listening(mode)
     case .finish(let mode):
       context?.mode = mode
       finish()
@@ -107,16 +131,20 @@ final class DictationController: ObservableObject {
       recorder.discard()
       context = nil
       phase = .idle
+      bar.idle()
     case .cancel:
       recorder.discard()
       context = nil
       phase = .idle
+      bar.idle()
     case .abandon:
       break
     case .refuseSecureInput:
-      show(VoiceMessages.secureInput)
+      show(BarMessage(VoiceMessages.secureInput))
     case .warnLong:
-      show(VoiceMessages.longRecording)
+      if case .listening(let mode) = bar.stage {
+        bar.flash(BarMessage(VoiceMessages.longRecording), returningTo: .listening(mode))
+      }
     }
   }
 
@@ -127,36 +155,49 @@ final class DictationController: ObservableObject {
     case .notDetermined:
       trigger.reset()
       Task { _ = await AVCaptureDevice.requestAccess(for: .audio) }
-      show(VoiceMessages.microphoneAsk)
+      show(BarMessage(VoiceMessages.microphoneAsk))
       return
     default:
       trigger.reset()
-      show(VoiceMessages.microphoneDenied)
+      show(BarMessage(VoiceMessages.microphoneDenied, tone: .error))
       return
     }
     let id = UUID()
     guard recorder.start(id: id) else {
       trigger.reset()
-      show(VoiceMessages.microphoneFailed)
+      show(BarMessage(VoiceMessages.microphoneFailed, tone: .error))
       return
     }
-    context = DictationContext(id: id, startedAt: Date(), app: FrontApp.current())
+    context = DictationContext(id: id, startedAt: Date(), startedUptime: ProcessInfo.processInfo.systemUptime, app: FrontApp.current())
+  }
+
+  private func pushLevel(_ level: Double) {
+    guard let context else { return }
+    bar.push(level: level, elapsed: ProcessInfo.processInfo.systemUptime - context.startedUptime)
   }
 
   private func finish() {
     lastTake = recorder.stop()
     context = nil
     phase = .idle
+    bar.done()
     send(.processingDone)
   }
 
-  private func show(_ text: String) {
-    notice = text
+  private func show(_ message: BarMessage) {
+    bar.show(message)
+    notice = message.text
     noticeTask?.cancel()
     noticeTask = Task { [weak self] in
-      try? await Task.sleep(for: .seconds(4))
+      try? await Task.sleep(for: .seconds(message.duration))
       guard !Task.isCancelled else { return }
       self?.notice = nil
     }
+  }
+
+  static func copyToPasteboard(_ text: String) {
+    let board = NSPasteboard.general
+    board.clearContents()
+    board.setString(text, forType: .string)
   }
 }
