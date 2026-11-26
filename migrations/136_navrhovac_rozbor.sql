@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS offer_research (
 );
 
 COMMENT ON TABLE offer_research IS
-  'Rozbor firmy pro navrhovač nabídek (R-147). Veřejné údaje se zdroji; bez zakázky 12 měsíců.';
+  'Rozbor firmy pro navrhovač nabídek (R-147). Veřejné údaje se zdroji, bez zakázky 12 měsíců.';
 
 CREATE INDEX IF NOT EXISTS offer_research_contact_idx
   ON offer_research (contact_id, created_at DESC) WHERE contact_id IS NOT NULL;
