@@ -4,8 +4,9 @@ Diktování do jakékoli aplikace: Mac nahrává, ukazuje a vkládá, přepis, �
 dělá server ZakazIQ (`/api/public/voice/*`). Plán a rozhodnutí: `docs/admin/VOICE-PLAN.md`
 (R-150), technický popis: `docs/admin/AGENTS-ADMIN.md` → ZakazIQ Voice → Aplikace na Macu.
 
-Stav: **VO03** — aplikace v liště menu, okno Nastavení (adresa serveru, klíč zařízení,
-Vyzkoušet připojení, oprávnění). Klávesa Fn a nahrávání přibudou ve VO04.
+Stav: **VO03–VO06 a VO11 v kódu** — lišta menu, klávesa fn a nahrávání, lišta dole
+uprostřed, odeslání, vložení, historie a fronta, okno jako Wispr Flow. Naostro na Macu
+zatím neověřené (chybí podpisový certifikát, viz Podpis).
 
 ## Co je potřeba
 
@@ -61,10 +62,24 @@ klíč použít: zadejte heslo k Macu a zvolte **Vždy povolit**.
 V okně Nastavení je u každého stav a tlačítko **Povolit** (systémový dotaz) nebo
 **Otevřít Nastavení** (přímo na správné místo v Nastavení systému). Stav se při otevřeném
 okně obnovuje každou vteřinu a půl. Po povolení Sledování vstupu může být potřeba aplikaci
-spustit znovu (týká se až VO04).
+spustit znovu.
 
 Pozor: spuštěná přímo z terminálu (`build/…/Contents/MacOS/ZakazIQVoice`) dědí oprávnění
 terminálu nebo editoru. Skutečný stav ukáže jen spuštění přes `open` / `make run`.
+
+## Diktování
+
+- **Podržte fn** (nebo pravý ⌥, volba v Nastavení), mluvte, pusťte: text se vloží tam, kde
+  je kurzor. **Dvakrát fn** = diktát bez držení, ukončí ho další fn nebo Hotovo na liště.
+  **Esc** diktát zruší. Klik na lištu dole uprostřed spustí diktát bez držení.
+- Když fn v systému otevírá výběr emoji nebo mění jazyk, Nastavení poradí, kde to vypnout
+  (Nastavení systému › Klávesnice › Nedělat nic). Aplikace sama nic nemění.
+- Když se mezitím přepne jiná aplikace, text se nevloží, jen se dá do schránky. Schránka
+  se po vložení vrátí, jak byla.
+- Bez sítě diktát počká ve frontě (nejdéle 24 h), přepíše se sám, ale **nevloží se**: lišta
+  nabídne zkopírování a je v Historii. Menu: Zkopírovat poslední diktát, počet ve frontě.
+- Nahrávka leží jen do odeslání v `~/Library/Application Support/ZakazIQ Voice/rec/`,
+  historie a fronta v `voice.sqlite` tamtéž (práva 0600).
 
 ## Připojení
 
@@ -89,16 +104,28 @@ Resources/                 Info.plist, entitlements, AppIcon.icns, Fonts/ (Instr
                            JetBrains Mono, licence OFL)
 Scripts/AppIcon.swift      vykreslí ikonu ze stejné geometrie jako public/ikony/ikona.svg
 Sources/ZakazIQVoiceCore/  logika bez rozhraní (testovaná)
-  Net/                     VoiceClient, ConfigResponse, VoiceError + české hlášky
+  Net/                     VoiceClient, Dictate (meta, multipart, opakování), VoiceAPI (okno),
+                           ConfigResponse, VoiceError + české hlášky
   Settings/                ServerAddress, DeviceKey, Klíčenka (SecretStore), Preferences
+  Dictation/               DictationTrigger (fn, dvojí stisk, Esc, limity), Shortcut, PastePlan
+  Audio/                   SpeechMeter (čas řeči, hlasitost)
+  Bar/                     BarLayout (velikosti a poloha lišty)
+  Store/                   LocalDB (historie a fronta, SQLite)
+  Hub/                     čísla, formát a historie pro okno
 Sources/ZakazIQVoice/      aplikace (AppKit + SwiftUI)
-  App/                     main, AppDelegate (lišta menu, okno), AppModel
+  App/                     main, AppDelegate (menu, lišta, okno), AppModel
+  Hotkey/                  FnMonitor (CGEventTap)
+  Audio/                   Recorder (m4a 16 kHz mono)
+  Bar/                     lišta dole uprostřed (NSPanel + SwiftUI)
+  Paste/                   Paster (⌘V a vrácení schránky)
+  Dictation/               DictationController, LocalHistorySource
+  Window/                  okno: Domů, Historie, Slovník, Styl, Nastavení
   Brand/                   barvy a písma Dílků, mřížka 2×2, logo
   Permissions/             mikrofon, sledování vstupu, zpřístupnění
-  Settings/                okno Nastavení
 Tests/ZakazIQVoiceTests/   Swift Testing + Fixtures/config-ok.json
 ```
 
 Ladicí sestavení (`make app CONFIG=debug SIGN_ID=-`) umí s proměnnou
+`ZAKAZIQ_VOICE_BAR_SNAPSHOT=/cesta.png` vykreslit všechny stavy lišty a skončit, s
 `ZAKAZIQ_VOICE_SNAPSHOT=/cesta.png` vykreslit okno do PNG (kontrola vzhledu bez oprávnění
 Nahrávání obrazovky). Ve vydaném sestavení to není.

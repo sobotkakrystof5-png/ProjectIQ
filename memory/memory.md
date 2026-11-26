@@ -146,6 +146,11 @@ odpovědí).
 a Vyzkoušet připojení s klíčem z adminu proti `npm run dev` (Otevřené problémy). Pak VO04 (Fn a nahrávání),
 VO09 (zachycení oprav) navazuje na VO06.
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
+**VO04, VO05, VO06 a VO11 v kódu 2026-11-26** (větev `admin/voice-mac`, worktree `.claude/worktrees/voice-mac`,
+odbočená z `945ef61`; VO11 dělalo souběžně sezení `zakaziq-e2` na `admin/voice-okno` a je sloučené): klávesa fn,
+nahrávání, lišta s dílky, odeslání, vložení, historie a fronta, okno jako Wispr Flow. 80 testů, release bez varování.
+**Naostro na Macu nic z toho neběželo** (certifikát, klíč a zkouška jsou na Kryštofovi). VO09 dělá `zakaziq-e2`,
+napojení na vložení zbývá. Pak sloučit `admin/voice-mac` do `admin/zakaziq-voice`.
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
@@ -1682,6 +1687,12 @@ ve VO02. Žádný nový npm balíček.
 
 ## 3. Otevřené problémy
 
+- [ ] **ZakazIQ Voice — milník 1 naostro (VO04–VO06):** po certifikátu „ZakazIQ Voice vývoj" `make -C voice-mac run`
+  (z větve `admin/voice-mac`), povolit Mikrofon, Sledování vstupu a Zpřístupnění, klíč zařízení z adminu, pak:
+  podržet fn a mluvit v TextEditu, Mailu, Zprávách, Slacku, Safari, Terminálu a Claude (zapsat do plánu, kde vložení
+  prošlo), dvojí fn, Esc v dialogu, pravý ⌥, pole pro heslo, Wi-Fi vypnout → fronta → zapnout, přepnout aplikaci
+  během zpracování, schránka s obrázkem se vrátí, p50 z 10 krátkých diktátů; lišta: focus při psaní, druhý monitor,
+  celá obrazovka, omezit pohyb · `voice-mac/` · od 2026-11-26
 - [ ] **ZakazIQ Voice — dokončit VO00:** (1) `GROQ_API_KEY` z console.groq.com vložit do `.env.local`
   hlavní složky (worktree na něj odkazuje) a v Groq Data Controls zapnout Zero Data Retention,
   (2) nahrát ~10 vět vlastním hlasem jako `*.m4a` + `*.txt` s přesným textem do `~/ZakazIQ-voice-test/`
@@ -2123,6 +2134,20 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice — VO04, VO05, VO06 a VO11 na Macu, R-150)
+- **feat** VO04 Fn a nahrávání (`8a8cf95`): `FnMonitor` (CGEventTap, pohltí jen Esc), stavový automat
+  `DictationTrigger` (držení 0,3 s, dvojí stisk, Esc, 10 min, pole pro heslo), `Recorder` m4a 16 kHz mono
+  s časem řeči, volba fn / pravý ⌥ a rada k výběru emoji. Soubory `voice-mac/Sources/…/{Hotkey,Audio,Dictation}`.
+- **feat** VO05 lišta s dílky (`de7306a`): `NSPanel` bez focusu, stavy podle `lista-nahled.html`, ladicí PNG
+  `ZAKAZIQ_VOICE_BAR_SNAPSHOT`. `voice-mac/Sources/…/Bar`.
+- **feat** VO06 vložení, historie a fronta (`12c486f`): `/dictate` multipart, ⌘V s vrácením schránky,
+  G1 na Macu, fronta a historie v SQLite (`Core/Store/LocalDB.swift`), menu. Tělo ze Swiftu ověřené serverovým
+  parserem a schématem (dočasný test, smazaný).
+- **feat** VO11 okno jako Wispr Flow (`baf0150`, sezení `zakaziq-e2`), sloučené (`b61a007`) a napojené na menu,
+  lištu a místní historii (`1095f01`); malé okno `SettingsView` smazané. `Preferences.learnFromEdits` pro VO09 (`1acf46a`).
+- **chore** Ověřeno: `make -C voice-mac test` 80 testů, release bez varování, `afinfo` formátu nahrávky. Aplikace
+  se nespouštěla (v `~/Applications` běží zkouška připojení z jiného sezení a čtení Klíčenky by vyvolalo dotaz).
 
 ### 2026-11-26 (ZakazIQ Voice — VO03, aplikace na Macu, R-150)
 - **feat** `voice-mac/`: Swift balíček bez cizích závislostí (knihovna `ZakazIQVoiceCore` + aplikace `ZakazIQVoice`),

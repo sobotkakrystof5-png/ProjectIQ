@@ -1750,10 +1750,10 @@ Tady jen to, co je v kódu.
     `SIGN_ID=-` = ad hoc na zkoušku (oprávnění se pak po každém sestavení ztratí). Poznávací znak pro macOS je
     `certificate leaf = H"…"`, takže oprávnění i přístup ke Klíčence přežijí nové sestavení.
   - **Lišta menu** (`App/AppDelegate.swift`, `NSStatusItem`, `LSUIElement`): ikona 2×2 dílky jako šablonový
-    obrázek (`Brand/TileMark.swift`), menu: stav připojení · Diktovat (vypnuté do VO04) · Otevřít ZakazIQ Voice
+    obrázek (`Brand/TileMark.swift`), menu: stav připojení · hláška · Diktovat / Dokončit diktát · Zkopírovat poslední diktát · Ve frontě: N · Otevřít ZakazIQ Voice
     (⌘,) · Vyzkoušet připojení (otevře okno, ať je výsledek vidět) · Ukončit (⌘Q). Bez klíče se po spuštění
     otevře okno, s klíčem se připojení ověří potichu na pozadí.
-  - **Okno Nastavení** (`Settings/SettingsView.swift`, SwiftUI v `NSWindow`, jen světlé): adresa serveru,
+  - **Okno Nastavení** (VO03; od sloučení VO11 ho nahradila záložka Nastavení v okně `Window/`, soubor smazán): adresa serveru,
     klíč zařízení (vložit, zakrytý, Smazat se Zpět 8 s), **Vyzkoušet připojení** (jediná hlavní akce),
     oprávnění Mikrofon / Sledování vstupu / Zpřístupnění se stavem a tlačítkem Povolit nebo Otevřít Nastavení
     (`Permissions/Permissions.swift`; systémový dotaz jen poprvé, pak rovnou Nastavení systému; stav se při
@@ -1777,3 +1777,41 @@ Tady jen to, co je v kódu.
     308, HTML), tvar požadavku (klíč jen v hlavičce, bez `Origin`), síťové chyby a české hlášky.
   - **Ladicí snímek:** jen sestavení `CONFIG=debug` — `ZAKAZIQ_VOICE_SNAPSHOT=/cesta.png` vykreslí obsah okna
     do PNG (bez oprávnění Nahrávání obrazovky).
+- **Diktování na Macu (VO04–VO06, větev `admin/voice-mac`):** cesta jednoho diktátu z plánu, oddíl 3.
+  - **Zkratka** (`Hotkey/FnMonitor.swift`): `CGEventTap` `.defaultTap` na `flagsChanged` + `keyDown`, fn = kód 63
+    s `maskSecondaryFn` (0x800000), pravý ⌥ = kód 61 s `NX_DEVICERALTKEYMASK` (0x40, levý ⌥ ho nemá). Pohltí
+    **jen Esc** a jen během nahrávání a zpracování; vypnutý tap (`tapDisabledBy…`) zapne znovu. Bez oprávnění
+    (Sledování vstupu + Zpřístupnění) se tap nevytvoří a aplikace to zkouší každé 3 s. Pole pro heslo
+    (`IsSecureEventInputEnabled`) = nenahrává se. Co dělá fn v systému čte `AppleFnUsageType`
+    (`com.apple.HIToolbox`), nic nemění, jen poradí v Nastavení.
+  - **Stavový automat** `Core/Dictation/DictationTrigger.swift` (čistá logika, testy): nahrává se **hned při
+    stisku**; držení ≥ 0,3 s = diktát, kratší stisk čeká 0,4 s na druhý (dvojí stisk = bez držení, nahrávka platí
+    od prvního stisku), jinak se zahodí; jiná klávesa při drženém fn = zrušit; Esc = zrušit (při zpracování jen
+    nevložit); 9:30 upozornění, 10:00 konec. Akce provádí `Dictation/DictationController.swift`.
+  - **Nahrávání** (`Audio/Recorder.swift`): `AVAudioRecorder` AAC/m4a 16 kHz mono 32 kbit/s, měření po 50 ms,
+    `speechMs` = úseky nad −40 dB (`Core/Audio/SpeechMeter.swift`). Soubor
+    `~/Library/Application Support/ZakazIQ Voice/rec/<id>.m4a` (složka 0700, soubor 0600), maže se po odeslání,
+    po zrušení a nejpozději po 24 h ve frontě. `prepareToRecord` běží až při stisku (ne předem), ať mikrofon
+    nesvítí naprázdno.
+  - **Lišta** (`Bar/`): `NSPanel` `.nonactivatingPanel`, `canBecomeKey`/`canBecomeMain` = false, `.statusBar`,
+    všechny plochy a celá obrazovka; pevný průhledný panel 380 × 52 b, pilulka uvnitř podle stavu
+    (`Core/Bar/BarLayout.swift`: klid 48×14, najetí 184×32, poslouchá 216×36, bez držení 252×36, zpracovává 96×28,
+    hláška od 248 podle délky). Najetí myši hlídá `NSTrackingArea .activeAlways` (aplikace není nikdy aktivní).
+    Klik v klidu = diktát bez držení, hláška s textem = zkopírovat, jiná hláška = Historie. Omezit pohyb vypne
+    vlnky i běh dokola. Ladicí `ZAKAZIQ_VOICE_BAR_SNAPSHOT=/cesta.png` (jen `CONFIG=debug`) vykreslí všechny stavy.
+  - **Odeslání** (`Core/Net/Dictate.swift`): `meta` přesně podle kontraktu (server `.strict()`, žádné pole navíc;
+    `null` výslovně), multipart `meta` + `audio` (`diktat.m4a`, `audio/mp4`), limit 30 s, nahrávka nad 4 MB se
+    neposílá. Pod 300 ms řeči nic neodchází (G1 na Macu). Esc/Zrušit pošle jen `meta` s `cancelled: true`.
+    Opakuje se jen síť, 502 a 429 (`RetryPolicy`: 5, 10, 20, 40, 60 s, `Retry-After` 5 s – 10 min).
+  - **Vložení** (`Paste/Paster.swift`, rozhodnutí `Core/Dictation/PastePlan.swift`): jen do aplikace, která byla
+    vpředu při stisku (pid), a jen se Zpřístupněním; jinak text do schránky a hláška. Uloží všechny položky
+    schránky, vloží text s typem `org.nspasteboard.TransientType`, pošle ⌘V (`kVK_ANSI_V` + `maskCommand`
+    na `.cghidEventTap`) a za 0,6 s schránku vrátí, **jen když se `changeCount` nezměnil**.
+  - **Historie a fronta** (`Core/Store/LocalDB.swift`): systémové SQLite3 (`-lsqlite3`, bez balíčků)
+    v `…/ZakazIQ Voice/voice.sqlite` (0600). Tabulky `history` (stav, text, slova, chyba, `total_ms` od puštění
+    klávesy po vložení, `synced`, `user_edited` od verze 2) a `queue` (cesta k nahrávce, `meta` JSON, pokusy,
+    další pokus). Fronta se zkouší při obnovení sítě (`NWPathMonitor`) a každou minutu; přepsaný diktát z fronty
+    se **sám nevkládá** (D-V10), lišta nabídne zkopírování. Historie drží `Preferences.historyDays` (výchozí 90).
+  - **Okno (VO11)** napojuje `AppDelegate`: menu Otevřít / Vyzkoušet připojení → `HubWindowController`, Historie
+    čte `LocalDB` přes `Dictation/LocalHistorySource.swift` (`pending` → „čeká", Zkusit znovu =
+    `retryQueued(id:)`). Volby zapsané oknem do `Preferences` převezme lišta přes `UserDefaults.didChangeNotification`.
