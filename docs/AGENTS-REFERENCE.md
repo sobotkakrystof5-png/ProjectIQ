@@ -148,6 +148,7 @@ Kompletní a komentovaný seznam je v **`.env.example`** — to je zdroj pravdy,
 | Ochrana proti zahlcení | `FRONT_GATE` (volitelné; `off` vypne bránu na IP v `proxy.ts`, jinak je v produkci zapnutá; nouzový vypínač, R-138) |
 | Hub | `LERNSAX_USER`, `LERNSAX_PASS`, `BESTESCHULE_USER`, `BESTESCHULE_PASS`, `BESTESCHULE_URL`, `CHROME_PATH` (dev), `ANTHROPIC_API_KEY` |
 | Požadavky klientů (portál `/p`) | `OPENAI_API_KEY` (přepis hlasu; bez něj je mikrofon skrytý), `OPENAI_TRANSCRIBE_MODEL` (volitelně, výchozí `gpt-4o-transcribe`), `CLIENT_REQUEST_AI_MODEL` (volitelně, výchozí `claude-sonnet-5-5`; používá `ANTHROPIC_API_KEY`) |
+| Navrhovač nabídek (R-148) | `OFFER_RESEARCH_API_KEY` (cloudová úloha Claude Code se jím hlásí na `/api/public/rozbory`, min. 32 znaků; tutéž hodnotu má prostředí úlohy jako network secret pro `www.zakaziq.cz`; bez něj karta rozboru ukáže chybějící propojení), `OFFER_RESEARCH_ROUTINE_ID` (`trig_…`), `OFFER_RESEARCH_FIRE_TOKEN` (klíč API triggeru úlohy; bez těchto dvou rozbor čeká na ranní průchod v 7:00) |
 | Klientský prostor a hlášení (KP03–KP07) | `DATABASE_URL_PORTAL` (role `portal_app`, `scripts/portal-create-role.js` po migracích 093–096), `PORTAL_INVITE_PEPPER` (hash pozvánek i otisk pro hook registrace), `SUPABASE_AUTH_HOOK_SECRET` (podpis hooku Before User Created, R-107), `AGENT_KEY_PEPPER` (hash klíčů projektů pro hlášení z Claude Code); přepis hlasu a shrnutí jako u portálu `/p` |
 
 Nejdůležitější s popisem:

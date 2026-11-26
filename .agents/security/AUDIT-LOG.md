@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-26 — review: rozbor firmy přes cloudovou úlohu Claude Code (R-148)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: přestavba N1 z Managed Agents na úlohu Claude Code — nové veřejné vstupy `app/api/public/rozbory/{route.ts,[id]/route.ts}`, `lib/admin/offers/{research,routine}.ts`, karta, migrace 137, skill `.claude/skills/zakaziq-rozbor-firmy/`, tajemství v diffu.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Oba vstupy: limit 30/min na IP před vším, pak Bearer `OFFER_RESEARCH_API_KEY` v konstantním čase (bez proměnné odmítá vše), až potom čtení těla se stropem (2 kB / 256 kB) a Zod `strict`; id jen uuid, SQL parametrizované, vyzvednutí atomické. (2) Vyzvednutí vrací jen veřejné firemní údaje ze zadání (test hlídá, že v odpovědi není telefon ani e-mail); jméno ve tvaru e-mailu se nově vynechá. (3) Výsledek dál prochází `normalizeResult`, text důvodu neúspěchu se neukládá. (4) Spuštění úlohy posílá jen id rozboru, klíč jen v hlavičce, `redirect: 'error'`, časový limit 10 s, do logu jen stav; odkaz na běh se uloží jen pro `https://claude.ai/` (kontrola v kódu i v databázi) a vykresluje se jako `href` jen po té kontrole. (5) Žádné cookies, tedy ani CSRF; CORS se nepřidává (volá server úlohy). (6) Skill zakazuje úloze měnit repo a přidávat klíč; klíč má prostředí jako network secret, do běhu nevstoupí.
+Opraveno: nic nebylo potřeba. V diffu žádné tajemství ani `NEXT_PUBLIC_`, CSP se nemění.
+Zůstává: chování cloudové úlohy (WebSearch/WebFetch v běhu, network secret) ověří až první skutečný běh; rizika DECISIONS #056.
+
 ## 2026-11-26 — review: navrhovač nabídek, rozbor firmy (R-147, krok N1)
 Spouštěč: před commitem a deployem (`web-security-review`)
 Rozsah: necommitnutý diff na větvi `admin/navrhovac-nabidek` nad `d871974` — `app/offer-research-actions.ts`, `lib/admin/offers/{agent-config,api,result,research}.ts`, `components/admin/offers/*`, migrace 136, cron `client-retention`, karta kontaktu, tajemství v diffu.

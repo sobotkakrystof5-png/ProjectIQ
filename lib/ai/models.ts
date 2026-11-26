@@ -11,21 +11,18 @@
  * - `fast`   — věta → návrh akce, krátká odpověď asistenta
  * - `smart`  — nejednoznačná věta (`kind: 'none'`, nízká `confidence`), práce s pamětí
  * - `vision` — čtení dokumentu (PDF faktury)
- * - `deep`   — vedoucí agent navrhovače nabídek: plán rešerše a závěrečné
- *              shrnutí (R-147). Čtení webů dělají levnější `fast` a `smart`.
  *
  * Název jde přebít proměnnou prostředí, aby se dal model vyměnit bez
  * nasazení. Prázdná nebo chybějící hodnota znamená výchozí z kódu.
  */
 
-export type AiRole = 'fast' | 'smart' | 'vision' | 'deep'
+export type AiRole = 'fast' | 'smart' | 'vision'
 
 /** Výchozí hodnoty. Mění se jen tady. */
 export const AI_MODEL_DEFAULTS: Record<AiRole, string> = {
   fast: 'claude-haiku-5-5',
   smart: 'claude-sonnet-5-5',
   vision: 'claude-haiku-5-5',
-  deep: 'claude-opus-5-5',
 }
 
 /** Proměnná prostředí, která danou roli přebíjí. */
@@ -33,7 +30,6 @@ export const AI_MODEL_ENV: Record<AiRole, string> = {
   fast: 'ADMIN_AI_MODEL_FAST',
   smart: 'ADMIN_AI_MODEL_SMART',
   vision: 'ADMIN_AI_MODEL_VISION',
-  deep: 'ADMIN_AI_MODEL_DEEP',
 }
 
 /** Model pro danou roli. Čte se při každém volání, ne při importu — testy i Vercel env tak platí hned. */

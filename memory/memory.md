@@ -127,8 +127,10 @@
 
 **Rozpracováno — navrhovač nabídek (R-147, od 2026-11-25):** plán `docs/admin/NABIDKY-PLAN.md`, větev
 `admin/navrhovac-nabidek` (worktree `.claude/worktrees/navrhovac-nabidek`). N0 hotové (cenová pravidla
-v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1 na produkci od 2026-11-26 (`7380078`, migrace 136)**:
-karta „Rozbor firmy" u kontaktu, agenti přes Managed Agents. Dál: „Nastavit agenty" a zkouška na 5 firmách
+v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1:** karta „Rozbor firmy" u kontaktu; první verze
+na Managed Agents byla na produkci (`7380078`, migrace 136), nikdy se nespustila. **Přestavěno na cloudovou
+úlohu Claude Code na předplatném (R-148, 2026-11-26):** fronta, API trigger, dva vstupy `/api/public/rozbory`,
+skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Otevřené problémy), zkouška na 5 firmách
 (Kryštof souhlasil 2026-11-26), pak N2 (cena, tři varianty, stránka nabídky).
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
@@ -1719,17 +1721,36 @@ se má stěhovat na Cloudflare (R-135).
 **Důsledek:** plán `docs/admin/NABIDKY-PLAN.md` (kroky N0–N4, otevřené D-N5 retence). Nová cesta k ceně
 nabídky jde přes cenová pravidla v `admin_settings.pricing_rules`, ne natvrdo v kódu. Rozbor osoby (OSVČ) je
 osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
+**Upřesněno:** R-148 (2026-11-26) — rozbor neběží na Managed Agents, ale v Claude Code na předplatném.
+
+### R-148 · Rozbor firmy běží v Claude Code na předplatném, ne na placeném API (2026-11-26)
+**Rozhodnutí:** (1) Rozbor firmy pro navrhovač nabídek dělá **cloudová úloha Claude Code** na claude.ai/code
+v předplatném Kryštofa, ne Managed Agents ani jiné placené API. (2) „Připravit rozbor" zařadí rozbor do fronty
+a úlohu **hned spustí** přes její API trigger; **ráno v 7:00** ji spustí rozvrh jako zálohu. (3) Vedoucí běží na
+**Opusu**, dva subagenti (web firmy, veřejná rešerše) na **Sonnetu**. (4) Úloha si zadání vyzvedne a výsledek
+odevzdá přes `/api/public/rozbory` s klíčem, který přidává cloudové prostředí; server výsledek zkontroluje stejně
+jako dřív (B10).
+**Proč:** Kryštof 2026-11-26: „jde mi čistě o subagenty, nepotřebujeme drahé SDK agenty od Anthropicu… klidně
+samostatné subagenty, které se spustí samy, v rámci mého předplatného". Spouštění a modely vybral z nabídnutých
+variant. Managed Agents (první verze N1) se nikdy nezaložily, nic se nezaplatilo.
+**Důsledek:** mění D-N2 v `docs/admin/NABIDKY-PLAN.md`. Migrace 137 (fronta `queued`, `claimed_at`, odkaz na běh),
+`lib/admin/offers/routine.ts`, vstupy `app/api/public/rozbory/`, skill `.claude/skills/zakaziq-rozbor-firmy/`, env
+`OFFER_RESEARCH_API_KEY`, `OFFER_RESEARCH_ROUTINE_ID`, `OFFER_RESEARCH_FIRE_TOKEN`. Rozbory se počítají do limitu
+předplatného (strop 15 denně, 5 za běh). Postup úlohy se mění v repu (skill), ne v nastavení úlohy. Bezpečnost
+`.claude/security/DECISIONS.md` #056.
 
 ---
 
 ## 3. Otevřené problémy
 
-- [ ] **Navrhovač nabídek N1 (R-147) — vyzkoušet:** ~~migrace 136~~ a ~~nasazení~~ hotové 2026-11-26.
-  Zbývá: (1) na kartě kontaktu „Nastavit agenty" (založí prostředí a tři agenty v účtu Anthropicu),
-  (2) zkouška na 5 firmách s webem (Kryštof 2026-11-26 schválil pět firem od asistenta: reality, instalatérství,
-  truhlářství na Webnode, tesařství s webem jen z e-mailu, elektro), po jednom; po prvním běhu zkontrolovat
-  `offer_research.cost_cents`, jestli API strop ceny 2 USD opravdu uplatnilo (DECISIONS #055 (d)), (3) projít
-  kartu na 390 a 1280 px · od 2026-11-26
+- [ ] **Navrhovač nabídek N1 (R-148) — zapojit a vyzkoušet:** (1) migrace 137 na produkci a nasazení,
+  (2) v prostředí `env_015BA5…` (dřív most Wispr Flow) vyměnit network secret pro `www.zakaziq.cz` za nový
+  `OFFER_RESEARCH_API_KEY` (typ Bearer) a tentýž klíč dát do Vercelu, (3) cloudová úloha „Rozbor firem pro nabídky"
+  (Opus, rozvrh 7:00, bez konektorů) s API triggerem, jeho klíč do Vercelu jako `OFFER_RESEARCH_FIRE_TOKEN`
+  a id jako `OFFER_RESEARCH_ROUTINE_ID`, (4) zkouška na 5 firmách s webem (Kryštof 2026-11-26 schválil pět firem
+  od asistenta: reality, instalatérství, truhlářství na Webnode, tesařství s webem jen z e-mailu, elektro) po jednom;
+  ověřit, že WebSearch a WebFetch v běhu úlohy fungují (dokumentace to neříká), a zapsat dobu a spotřebu limitu,
+  (5) projít kartu na 390 a 1280 px · od 2026-11-26
 - [ ] **Běhoun migrací neumí středník v textu:** `splitStatements` v `scripts/apply-migration.js` dělí podle `;`
   i uvnitř řetězce (komentář migrace 136 by se rozpadl, testy nad PGlite pouštějí soubor vcelku a nepoznají to).
   Zvážit test, který rozdělí každou migraci a ověří sudý počet apostrofů · od 2026-11-26
@@ -2164,6 +2185,27 @@ osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (navrhovač nabídek — rozbor v Claude Code na předplatném, R-148)
+- **refactor** Rozbor firmy už nespouští Managed Agents: „Připravit rozbor" zařadí rozbor do fronty a spustí cloudovou
+  úlohu Claude Code přes API trigger (posílá jen id rozboru). Úloha si zadání vyzvedne `POST /api/public/rozbory`
+  (atomicky), pustí dva subagenty a výsledek pošle na `POST /api/public/rozbory/[id]` (422 = oprav a pošli znovu,
+  `nepodarilo_se` = konec s kódem `gave_up`). Hotový rozbor dá upozornění do zvonku (`offer_research_done`). Karta
+  ukazuje „čeká / běží", odkaz „Sledovat v Claude" a „Zkusit spustit znovu"; „Nastavit agenty" a strop 2 USD zmizely.
+  Kontakt pojmenovaný e-mailem už úloze neprozradí adresu. Pryč `lib/admin/offers/{api,agent-config}.ts` a role
+  modelu `deep`. Soubory: `lib/admin/offers/{research,routine,result}.ts`, `app/offer-research-actions.ts`,
+  `app/api/public/rozbory/{route.ts,[id]/route.ts}`, `components/admin/offers/{research-card,research-section}.tsx`,
+  `lib/notifications.ts`, `components/NotificationList.tsx`, `.claude/skills/zakaziq-rozbor-firmy/SKILL.md` (+ `.agents/`),
+  `.env.example`.
+- **db** Migrace 137 `navrhovac_fronta`: stav `queued`, `claimed_at`, `session_url`, jeden otevřený rozbor na kontakt,
+  nové tělo `purge_offer_research()` (aplikována: ne, nikde). Regex v kontrole odkazu bez opakování přes 255
+  (Postgres víc nedovolí, test to chytil).
+- **docs** `docs/admin/AGENTS-ADMIN.md` → Navrhovač nabídek, `docs/admin/NABIDKY-PLAN.md` (D-N2, oddíly 4, 8, 9, 11),
+  `docs/AGENTS-REFERENCE.md` (env), DECISIONS #056 (nahrazuje #055), STATE.md.
+- **chore** Ověřeno: `npx tsc --noEmit`, přepsaný `lib/__tests__/admin-navrhovac-rozbor.test.ts` (20 testů: kontrola
+  výsledku, spuštění úlohy s podstrčeným `fetch`, celý tok přes oba vstupy nad PGlite s migracemi 136 a 137 dvakrát,
+  přednost spuštěného rozboru, jeden otevřený na kontakt, denní strop, vzdání, údržba), `ws-schema`, hlídací testy
+  adminu a XSS — 179 prošlo. Cloudová úloha zatím neexistuje, nic se nespouštělo.
 
 ### 2026-11-26 (navrhovač nabídek N1 — rozbor firmy, R-147)
 - **feat** Karta „Rozbor firmy" na kartě kontaktu: „Nastavit agenty" založí u Anthropicu prostředí a tým tří

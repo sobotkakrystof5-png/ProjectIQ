@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Calendar, Star, ClipboardList, Inbox, ArrowRightLeft, Bell,
-  CheckCheck, ExternalLink, Sparkles, FileText, MessageSquarePlus, PhoneCall, MailWarning, ListChecks,
+  CheckCheck, ExternalLink, Sparkles, FileText, MessageSquarePlus, PhoneCall, MailWarning, ListChecks, Search,
 } from 'lucide-react'
 import { markNotificationRead, markAllNotificationsRead } from '@/app/notification-actions'
 import { cn } from '@/lib/utils'
@@ -38,6 +38,7 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   client_message:        { icon: MessageSquarePlus, color: ICON, label: 'Zpráva od klienta' },
   meeting_reminder_failed: { icon: Calendar,       color: ICON, label: 'Připomínka schůzky' },
   meeting_invite_undelivered: { icon: MailWarning, color: ICON, label: 'Pozvánka nedorazila' },
+  offer_research_done:   { icon: Search,            color: ICON, label: 'Rozbor firmy' },
 }
 
 function timeAgo(iso: string): string {

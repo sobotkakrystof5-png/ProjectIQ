@@ -1617,28 +1617,39 @@ skryté po roce). Kód funkce je v historii gitu (`git show ddba729 -- <cesta>`)
 Plán a cenová pravidla: `docs/admin/NABIDKY-PLAN.md`. N1 umí jen **rozbor firmy** u kontaktu, cenu
 ještě nenavrhuje (N2).
 
+**Kde běží (R-148).** Rozbor nedělá server přes placené API. Běží jako **cloudová úloha Claude Code**
+(claude.ai/code/routines, „Rozbor firem pro nabídky") v předplatném Kryštofa: vedoucí na Opusu, dva
+subagenti na Sonnetu. Postup úlohy je projektový skill `.claude/skills/zakaziq-rozbor-firmy/SKILL.md`
+(úloha ho čte z `main`). Managed Agents z prvního návrhu N1 nikdy nevznikly.
+
 **Tok.** Karta „Rozbor firmy" na `/dashboard/kontakty/[id]` (`components/admin/offers/research-section.tsx`
-→ `research-card.tsx`). Poprvé ukáže „Nastavit agenty": `setupAgents()` založí u Anthropicu prostředí
-a tři agenty (`lib/admin/offers/agent-config.ts`) a uloží jejich id a verze do `admin_settings.offer_agents`
-s otiskem nastavení (`configHash`). Když se nastavení v kódu změní, karta nabídne „Aktualizovat agenty"
-(nová verze agenta, nikdy nový agent). „Připravit rozbor" (`startResearch`) vezme veřejné údaje o firmě
+→ `research-card.tsx`). „Připravit rozbor" (`startResearch`) vezme veřejné údaje o firmě
 (`loadBriefForContact`: kontakt, nejnovější firma od asistenta, web z ručního pole, Growth OS nebo
-z e-mailu na vlastní doméně), založí řádek `offer_research` a běh u Anthropicu se stropem 2 USD. Karta
-se každých 8 s ptá `refreshResearch`; když vedoucí zavolá `ulozit_rozbor`, server výsledek zkontroluje
-(`normalizeResult`), uloží a běh u Anthropicu smaže. Zavřené okno nevadí: denní cron `client-retention`
-volá `maintainOfferResearch` (převzetí doběhlých, ukončení po 25 minutách, úklid).
+z e-mailu na vlastní doméně; jméno ve tvaru e-mailu se vynechá), založí řádek `offer_research` ve stavu
+`queued` a spustí úlohu přes její API trigger (`lib/admin/offers/routine.ts`, posílá **jen id rozboru**).
+Úloha si rozbor vyzvedne `POST /api/public/rozbory` (`claimResearch`, atomicky, stav `running`), pustí
+subagenty a výsledek pošle na `POST /api/public/rozbory/[id]`; server ho zkontroluje (`normalizeResult`),
+uloží (`done`) a dá upozornění do zvonku (`offer_research_done`). Nesedí-li výsledek, vstup vrátí 422
+a rozbor běží dál, aby úloha mohla poslat opravu; `{ "nepodarilo_se": … }` ho ukončí kódem `gave_up`
+(text od modelu se neukládá). Karta se jen každých 15 s dívá do databáze a ukazuje odkaz „Sledovat
+v Claude". Když spuštění selže (bez klíče, 429, chyba), rozbor čeká ve frontě, karta nabídne „Zkusit
+spustit znovu" a jinak ho vyzvedne **ranní průchod úlohy v 7:00** podle rozvrhu. Denní cron
+`client-retention` volá `maintainOfferResearch`: vyzvednutý a do hodiny neodevzdaný → `timeout`,
+nevyzvednutý po 30 h → `not_started`, pak úklid.
 
-**Tým.** Analytik webů (`aiModel('fast')`), Rešeršista firem (`smart`), Vedoucí (`deep`, nová role
-v `lib/ai/models.ts`, výchozí `claude-opus-5-5`). Tým je ve starším tvaru `multiagent: {type: 'coordinator'}`,
-protože knihovna `@anthropic-ai/sdk` 0.105 novější neumí; dynamické workflow proto nejsou. Typy, které
-knihovna nezná (strop ceny, nastavení webových nástrojů, cena běhu), se předávají v adaptéru
-`lib/admin/offers/api.ts`.
+**Propojení (env).** `OFFER_RESEARCH_API_KEY` — klíč, kterým se úloha hlásí (min. 32 znaků); tutéž
+hodnotu má cloudové prostředí úlohy jako **network secret** typu Bearer pro `www.zakaziq.cz`, takže klíč
+do běhu úlohy vůbec nevstoupí. `OFFER_RESEARCH_ROUTINE_ID` (`trig_…`) a `OFFER_RESEARCH_FIRE_TOKEN`
+(klíč API triggeru, umí úlohu jen spustit). Bez prvního karta ukáže, že propojení chybí; bez dvou
+dalších rozbor jen čeká na ranní průchod.
 
-**Mantinely.** Jen `web_search` a `web_fetch`, žádný příkazový řádek ani soubory; neomezená síť
-(Kryštof 2026-11-25). Agentům nejde telefon, e-mail ani přepis. Tvrzení bez zdroje server zahodí.
-Kroky čekající na schválení server odmítne. 15 běhů za 24 h, jeden běžící na kontakt. DECISIONS #055.
+**Mantinely.** Úloha smí jen hledat a číst weby a volat dva vstupy ZakazIQ; repozitář nemění.
+Do úlohy nejde telefon, e-mail ani přepis. Tvrzení bez zdroje server zahodí. 15 rozborů za 24 h,
+jeden otevřený (ve frontě nebo běžící) na kontakt, nejvýš 5 rozborů za jeden běh úlohy.
+Rozbory se počítají do limitu předplatného Claude. DECISIONS #056 (nahrazuje #055).
 
-**Data.** Migrace 136: `offer_research` (kontakt nebo firma od asistenta, stav `running`/`done`/`failed`,
-`brief`, `result`, krátký kód chyby, cena v centech, doba běhu), `admin_settings.offer_agents`,
-funkce `purge_offer_research()` (bez zakázky 12 měsíců). Bez migrace se karta neukáže a stránka běží
-dál. Testy `lib/__tests__/admin-navrhovac-rozbor.test.ts`.
+**Data.** Migrace 136 + 137: `offer_research` (kontakt nebo firma od asistenta, stav
+`queued`/`running`/`done`/`failed`, `brief`, `result`, krátký kód chyby, doba běhu, `claimed_at`, id a odkaz
+běhu v Claude Code), funkce `purge_offer_research()` (bez zakázky 12 měsíců). `cost_cents`
+a `admin_settings.offer_agents` zůstaly z prvního návrhu a nepoužívají se. Bez migrace se karta neukáže
+a stránka běží dál. Testy `lib/__tests__/admin-navrhovac-rozbor.test.ts`.

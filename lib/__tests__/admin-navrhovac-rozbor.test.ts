@@ -2,38 +2,52 @@ import fs from 'fs'
 import path from 'path'
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { NextRequest } from 'next/server'
 
 /**
- * Navrhovač nabídek, krok N1: rozbor firmy (R-147). Kontrola výsledku od
- * agentů (B10: tvrzení bez zdroje se zahodí), rozhodování o běhu, nastavení
- * agentů a celý tok proti skutečnému Postgresu s migrací 136.
- * Anthropic se nevolá: API je podstrčené.
+ * Navrhovač nabídek, krok N1: rozbor firmy (R-147, běh podle R-148).
+ * Kontrola výsledku (B10: tvrzení bez zdroje se zahodí), spuštění cloudové
+ * úlohy Claude Code, fronta, oba veřejné vstupy pro úlohu a údržba — proti
+ * skutečnému Postgresu s migracemi 136 a 137. Anthropic se nevolá.
  */
 
 const ROOT = path.resolve(__dirname, '../..')
 let db: PGlite
 
+const notifications = vi.hoisted(() => [] as { type: string; title: string; link?: string }[])
+
+vi.mock('server-only', () => ({}))
 vi.mock('@/lib/db', () => ({ sql: async () => [] }))
+vi.mock('@/lib/api-rate-limit', () => ({ isApiRateLimited: async () => false, recordApiRequest: async () => {} }))
+vi.mock('@/lib/notifications', () => ({
+  createNotification: async (n: { type: string; title: string; link?: string }) => {
+    notifications.push(n)
+  },
+}))
 
 import { setAdminDbForTests } from '@/lib/admin/db'
-import { normalizeResult, RESULT_TOOL_NAME } from '@/lib/admin/offers/result'
-import { configHash, environmentSpec, leadSpec, RUN_TIMEOUT_MS, workerSpecs } from '@/lib/admin/offers/agent-config'
-import type { OfferApi, OfferEvent } from '@/lib/admin/offers/api'
+import { normalizeResult, RESULT_JSON_SCHEMA } from '@/lib/admin/offers/result'
+import { fireRoutine, type FireRoutine } from '@/lib/admin/offers/routine'
 import {
-  briefMessage,
-  decide,
+  briefForRoutine,
+  claimResearch,
+  DAILY_RUN_LIMIT,
   deleteResearch,
+  failResearch,
+  getResearch,
   listResearchForContact,
-  loadAgentSetup,
   loadBriefForContact,
   maintainOfferResearch,
-  refreshResearch,
-  setupAgents,
+  researchSetup,
+  retryFire,
   startResearch,
   webFromEmail,
 } from '@/lib/admin/offers/research'
-import { aiModel } from '@/lib/ai/models'
+import { POST as claimRoute } from '@/app/api/public/rozbory/route'
+import { POST as submitRoute } from '@/app/api/public/rozbory/[id]/route'
 import { pgliteAdminDriver } from './helpers/admin-pglite'
+
+const KEY = 'k'.repeat(40)
 
 const SCHEMA = `
 CREATE TABLE admin_settings (id boolean PRIMARY KEY DEFAULT true CHECK (id), updated_at timestamptz NOT NULL DEFAULT now());
@@ -50,7 +64,7 @@ CREATE TABLE outreach_leads (
 );
 `
 
-/** Platný výsledek, jak by ho poslal vedoucí agent. */
+/** Platný výsledek, jak by ho poslala úloha. */
 function goodInput(extra: Record<string, unknown> = {}) {
   return {
     sources: [
@@ -93,7 +107,11 @@ function goodInput(extra: Record<string, unknown> = {}) {
   }
 }
 
-describe('normalizeResult: co od agentů smí do databáze', () => {
+/* ------------------------------------------------------------------ */
+/* Kontrola výsledku                                                   */
+/* ------------------------------------------------------------------ */
+
+describe('normalizeResult: co z rozboru smí do databáze', () => {
   it('zahodí zlé a zdvojené zdroje, přečísluje indexy a zahodí tvrzení bez zdroje', () => {
     const out = normalizeResult(goodInput())
     expect(out.ok).toBe(true)
@@ -143,67 +161,7 @@ describe('normalizeResult: co od agentů smí do databáze', () => {
   })
 })
 
-describe('decide: co s během dál', () => {
-  const tool = (input: unknown): OfferEvent => ({ type: 'custom_tool_use', name: RESULT_TOOL_NAME, input })
-
-  it('odevzdaný výsledek vyhrává', () => {
-    const d = decide([{ type: 'other' }, tool(goodInput()), { type: 'idle', stopReason: 'requires_action' }], 'idle', 1000)
-    expect(d.kind).toBe('done')
-  })
-
-  it('rozbitý výsledek = invalid_result', () => {
-    expect(decide([tool({ nic: true })], 'idle', 1000)).toEqual({ kind: 'failed', error: 'invalid_result' })
-  })
-
-  it('čekající schválení odmítne, už odpovězené ne', () => {
-    const events: OfferEvent[] = [
-      { type: 'tool_ask', id: 'sevt_1' },
-      { type: 'tool_confirmation', toolUseId: 'sevt_1' },
-      { type: 'tool_ask', id: 'sevt_2' },
-    ]
-    expect(decide(events, 'idle', 1000)).toEqual({ kind: 'deny', ids: ['sevt_2'] })
-  })
-
-  it('strop ceny, konec bez výsledku, chyba a dlouhý běh', () => {
-    expect(decide([{ type: 'idle', stopReason: 'budget_reached' }], 'idle', 1000)).toEqual({ kind: 'failed', error: 'budget' })
-    expect(decide([{ type: 'idle', stopReason: 'end_turn' }], 'idle', 1000)).toEqual({ kind: 'failed', error: 'no_result' })
-    expect(decide([], 'terminated', 1000)).toEqual({ kind: 'failed', error: 'terminated' })
-    expect(decide([], 'running', RUN_TIMEOUT_MS + 1)).toEqual({ kind: 'failed', error: 'timeout' })
-    expect(decide([{ type: 'other' }], 'running', 1000)).toEqual({ kind: 'wait' })
-  })
-})
-
-describe('nastavení agentů v kódu', () => {
-  it('agenti mají jen hledání a čtení webů, žádný příkazový řádek ani soubory', () => {
-    for (const spec of [...workerSpecs(), leadSpec({ web: 'a', research: 'b' })]) {
-      const tools = spec.body.tools as Array<Record<string, unknown>>
-      const toolset = tools.find((t) => t.type === 'agent_toolset_20260401') as {
-        default_config: { enabled: boolean }
-        configs: Array<{ name: string; enabled: boolean }>
-      }
-      expect(toolset.default_config.enabled).toBe(false)
-      expect(toolset.configs.filter((c) => c.enabled).map((c) => c.name).sort()).toEqual(['web_fetch', 'web_search'])
-      expect(tools.some((t) => t.type === 'mcp_toolset')).toBe(false)
-    }
-  })
-
-  it('výsledek vrací jen vedoucí, modely jdou přes lib/ai/models.ts', () => {
-    const lead = leadSpec({ web: 'agent_web', research: 'agent_res' }).body
-    const custom = (lead.tools as Array<Record<string, unknown>>).filter((t) => t.type === 'custom')
-    expect(custom.map((t) => t.name)).toEqual([RESULT_TOOL_NAME])
-    expect(lead.multiagent).toEqual({ type: 'coordinator', agents: ['agent_web', 'agent_res'] })
-    expect(lead.model).toBe(aiModel('deep'))
-    expect(workerSpecs().map((w) => w.body.model)).toEqual([aiModel('fast'), aiModel('smart')])
-  })
-
-  it('prostředí s neomezeným přístupem na web (Kryštof 2026-11-25), otisk je stálý', () => {
-    expect(environmentSpec().config).toEqual({ type: 'cloud', networking: { type: 'unrestricted' } })
-    expect(configHash()).toBe(configHash())
-    expect(configHash()).toMatch(/^[0-9a-f]{16}$/)
-  })
-})
-
-describe('zadání pro agenty', () => {
+describe('zadání pro úlohu', () => {
   it('web z e-mailu jen u vlastní domény', () => {
     expect(webFromEmail('info@studny-novak.cz')).toBe('https://studny-novak.cz')
     expect(webFromEmail('novak@seznam.cz')).toBeNull()
@@ -213,67 +171,95 @@ describe('zadání pro agenty', () => {
 })
 
 /* ------------------------------------------------------------------ */
-/* Databáze                                                            */
+/* Spuštění cloudové úlohy                                             */
 /* ------------------------------------------------------------------ */
 
-function fakeApi(overrides: Partial<OfferApi> = {}) {
-  let n = 0
-  const calls = { created: [] as string[], updated: [] as string[], deleted: [] as string[], denied: [] as string[][], messages: [] as string[] }
-  const api: OfferApi = {
-    async createEnvironment() {
-      calls.created.push('env')
-      return { id: 'env_1' }
-    },
-    async updateEnvironment(id) {
-      calls.updated.push(id)
-      return { id }
-    },
-    async createAgent(body) {
-      n++
-      calls.created.push(String(body.name))
-      return { id: `agent_${n}`, version: 1 }
-    },
-    async updateAgent(id, version) {
-      calls.updated.push(id)
-      return { id, version: version + 1 }
-    },
-    async startSession(input) {
-      calls.messages.push(input.message)
-      return { id: `sesn_${Math.random().toString(36).slice(2, 10)}` }
-    },
-    async getSession() {
-      return { status: 'idle', costCents: 73, activeSeconds: 240 }
-    },
-    async listEvents() {
-      return [{ type: 'custom_tool_use', name: RESULT_TOOL_NAME, input: goodInput() }]
-    },
-    async denyTools(_s, ids) {
-      calls.denied.push(ids)
-    },
-    async interruptSession() {},
-    async deleteSession(id) {
-      calls.deleted.push(id)
-    },
-    ...overrides,
-  }
-  return { api, calls }
-}
+describe('fireRoutine: spuštění úlohy v Claude Code', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs()
+    vi.stubEnv('OFFER_RESEARCH_ROUTINE_ID', '')
+    vi.stubEnv('OFFER_RESEARCH_FIRE_TOKEN', '')
+  })
+
+  it('bez id úlohy nebo klíče se nic neposílá', async () => {
+    const fetchImpl = vi.fn()
+    expect(await fireRoutine('x', fetchImpl as unknown as typeof fetch)).toEqual({ ok: false, reason: 'not_configured' })
+    vi.stubEnv('OFFER_RESEARCH_ROUTINE_ID', 'neni-trigger')
+    vi.stubEnv('OFFER_RESEARCH_FIRE_TOKEN', 'tajne')
+    expect(await fireRoutine('x', fetchImpl as unknown as typeof fetch)).toEqual({ ok: false, reason: 'not_configured' })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('pošle jen id rozboru a vrátí běh; cizí odkaz na běh zahodí', async () => {
+    vi.stubEnv('OFFER_RESEARCH_ROUTINE_ID', 'trig_01AbCdEfGh')
+    vi.stubEnv('OFFER_RESEARCH_FIRE_TOKEN', 'tajne')
+    const fetchImpl = vi.fn(async () =>
+      Response.json({ type: 'routine_fire', claude_code_session_id: 'cse_123', claude_code_session_url: 'https://claude.ai/code/session_123' }),
+    )
+    const out = await fireRoutine('11111111-2222-4333-8444-555555555555', fetchImpl as unknown as typeof fetch)
+    expect(out).toEqual({ ok: true, sessionId: 'cse_123', sessionUrl: 'https://claude.ai/code/session_123' })
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.anthropic.com/v1/claude_code/routines/trig_01AbCdEfGh/fire')
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer tajne')
+    expect(JSON.parse(String(init.body))).toEqual({ text: JSON.stringify({ rozbor: '11111111-2222-4333-8444-555555555555' }) })
+
+    const evil = vi.fn(async () => Response.json({ claude_code_session_id: 'cse_1', claude_code_session_url: 'https://zly.cz/' }))
+    expect(await fireRoutine('x', evil as unknown as typeof fetch)).toMatchObject({ ok: true, sessionUrl: null })
+  })
+
+  it('429 je limit, ostatní chyby i výjimka jsou neúspěch', async () => {
+    vi.stubEnv('OFFER_RESEARCH_ROUTINE_ID', 'trig_01AbCdEfGh')
+    vi.stubEnv('OFFER_RESEARCH_FIRE_TOKEN', 'tajne')
+    const status = (s: number) => vi.fn(async () => new Response('{}', { status: s })) as unknown as typeof fetch
+    expect(await fireRoutine('x', status(429))).toEqual({ ok: false, reason: 'rate_limited' })
+    expect(await fireRoutine('x', status(401))).toEqual({ ok: false, reason: 'failed' })
+    const boom = vi.fn(async () => {
+      throw new Error('síť')
+    }) as unknown as typeof fetch
+    expect(await fireRoutine('x', boom)).toEqual({ ok: false, reason: 'failed' })
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/* Databáze                                                            */
+/* ------------------------------------------------------------------ */
 
 async function insertContact(values: { name?: string; company?: string | null; email?: string | null; ico?: string | null } = {}) {
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO contacts (display_name, company, email, phone, ico) VALUES ($1, $2, $3, '+420777111222', $4) RETURNING id::text`,
-    [values.name ?? 'Jan Novák', values.company ?? 'Studny Novák', values.email ?? 'info@studny-novak.cz', values.ico ?? '12345678'],
+    [
+      values.name ?? 'Jan Novák',
+      values.company === undefined ? 'Studny Novák' : values.company,
+      values.email ?? 'info@studny-novak.cz',
+      values.ico ?? '12345678',
+    ],
   )
   return rows[0].id
 }
 
-describe('rozbor proti Postgresu s migrací 136', () => {
+const fired: FireRoutine = async () => ({ ok: true, sessionId: 'cse_abc', sessionUrl: 'https://claude.ai/code/session_abc' })
+const notFired: FireRoutine = async () => ({ ok: false, reason: 'failed' })
+
+function req(url: string, body: unknown, key: string | null = KEY): NextRequest {
+  return new NextRequest(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+const claimUrl = 'https://www.zakaziq.cz/api/public/rozbory'
+const submit = (id: string, body: unknown, key: string | null = KEY) =>
+  submitRoute(req(`${claimUrl}/${id}`, body, key), { params: Promise.resolve({ id }) })
+
+describe('rozbor proti Postgresu s migracemi 136 a 137', () => {
   beforeAll(async () => {
     db = new PGlite()
     await db.exec(SCHEMA)
-    const sql = fs.readFileSync(path.join(ROOT, 'migrations', '136_navrhovac_rozbor.sql'), 'utf8')
-    await db.exec(sql)
-    await db.exec(sql) // idempotence
+    for (const file of ['136_navrhovac_rozbor.sql', '137_navrhovac_fronta.sql']) {
+      const sql = fs.readFileSync(path.join(ROOT, 'migrations', file), 'utf8')
+      await db.exec(sql)
+      await db.exec(sql) // idempotence
+    }
     setAdminDbForTests(pgliteAdminDriver(db))
   })
   afterAll(() => {
@@ -281,46 +267,25 @@ describe('rozbor proti Postgresu s migrací 136', () => {
     vi.unstubAllEnvs()
   })
   beforeEach(async () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', 'test')
-    await db.exec(
-      `DELETE FROM offer_research; DELETE FROM outreach_leads; DELETE FROM contacts; UPDATE admin_settings SET offer_agents = NULL;`,
-    )
+    vi.unstubAllEnvs()
+    vi.stubEnv('OFFER_RESEARCH_API_KEY', KEY)
+    vi.stubEnv('OFFER_RESEARCH_ROUTINE_ID', '')
+    vi.stubEnv('OFFER_RESEARCH_FIRE_TOKEN', '')
+    notifications.length = 0
+    await db.exec(`DELETE FROM offer_research; DELETE FROM outreach_leads; DELETE FROM contacts; DELETE FROM projects;`)
   })
 
-  it('bez klíče k AI se nic nespustí a stav říká proč', async () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', '')
-    vi.stubEnv('ANTHROPIC_AUTH_TOKEN', '')
-    expect(await loadAgentSetup()).toEqual({ status: 'no_api_key' })
+  it('stav propojení: bez klíče nic, bez spouštění jen fronta', async () => {
+    vi.stubEnv('OFFER_RESEARCH_API_KEY', '')
+    expect(researchSetup()).toBe('not_connected')
     const contactId = await insertContact()
-    expect(await startResearch({ contactId }, fakeApi().api)).toEqual({ ok: false, error: 'no_api_key' })
-  })
+    expect(await startResearch({ contactId }, fired)).toEqual({ ok: false, error: 'not_connected' })
 
-  it('nastavení agentů založí prostředí a tři agenty, podruhé je aktualizuje', async () => {
-    expect(await loadAgentSetup()).toEqual({ status: 'missing' })
-    const first = fakeApi()
-    expect(await setupAgents(first.api)).toEqual({ ok: true })
-    expect(first.calls.created).toEqual(['env', 'Analytik webů', 'Rešeršista firem', 'Navrhovač nabídek – rozbor firmy'])
-    expect(await loadAgentSetup()).toEqual({ status: 'ready' })
-
-    // Jiný otisk (změněný kód) → stav „outdated", tlačítko agenty aktualizuje, nezakládá nové.
-    await db.exec(`UPDATE admin_settings SET offer_agents = jsonb_set(offer_agents, '{hash}', '"stary"')`)
-    expect(await loadAgentSetup()).toEqual({ status: 'outdated' })
-    const second = fakeApi()
-    expect(await setupAgents(second.api)).toEqual({ ok: true })
-    expect(second.calls.created).toEqual([])
-    expect(second.calls.updated).toEqual(['env_1', 'agent_1', 'agent_2', 'agent_3'])
-    const { rows } = await db.query<{ v: number }>(`SELECT (offer_agents->'agents'->'lead'->>'version')::int AS v FROM admin_settings`)
-    expect(rows[0].v).toBe(2)
-  })
-
-  it('selhání u Anthropicu nastavení neuloží', async () => {
-    const { api } = fakeApi({
-      async createAgent() {
-        throw Object.assign(new Error('nope'), { status: 400 })
-      },
-    })
-    expect(await setupAgents(api)).toEqual({ ok: false, error: 'setup_failed' })
-    expect(await loadAgentSetup()).toEqual({ status: 'missing' })
+    vi.stubEnv('OFFER_RESEARCH_API_KEY', KEY)
+    expect(researchSetup()).toBe('queue_only')
+    vi.stubEnv('OFFER_RESEARCH_ROUTINE_ID', 'trig_01AbCdEfGh')
+    vi.stubEnv('OFFER_RESEARCH_FIRE_TOKEN', 'tajne')
+    expect(researchSetup()).toBe('ready')
   })
 
   it('zadání nese jen veřejné údaje o firmě: bez telefonu a e-mailu', async () => {
@@ -333,123 +298,128 @@ describe('rozbor proti Postgresu s migrací 136', () => {
     const brief = await loadBriefForContact(contactId)
     expect(brief).toMatchObject({ company: 'Studny Novák', web: 'https://studny-novak.cz/', city: 'Kroměříž', industry: 'studny', ico: '12345678' })
     expect(brief?.prior).toEqual(['Starý web na Webnode', 'Bez ceníku'])
-    const message = briefMessage(brief!)
-    expect(message).not.toContain('+420777111222')
-    expect(message).not.toContain('info@studny-novak.cz')
+    const text = JSON.stringify(briefForRoutine(brief!))
+    expect(text).not.toContain('+420777111222')
+    expect(text).not.toContain('info@studny-novak.cz')
 
     // Web zadaný ručně má přednost; neplatný se ignoruje.
     expect((await loadBriefForContact(contactId, 'https://jiny-web.cz'))?.web).toBe('https://jiny-web.cz/')
     expect((await loadBriefForContact(contactId, 'javascript:alert(1)'))?.web).toBe('https://studny-novak.cz/')
   })
 
-  it('celý tok: spuštění, převzetí výsledku, smazání běhu u Anthropicu', async () => {
-    await setupAgents(fakeApi().api)
-    const contactId = await insertContact()
-    const { api, calls } = fakeApi()
+  it('kontakt pojmenovaný e-mailem nepošle adresu ani jako název firmy', async () => {
+    const contactId = await insertContact({ name: 'novak@studny-novak.cz', company: null })
+    const brief = await loadBriefForContact(contactId)
+    expect(brief?.company).toBe('Firma')
+    expect(brief?.person).toBeNull()
+    expect(JSON.stringify(briefForRoutine(brief!))).not.toContain('novak@')
+  })
 
-    const started = await startResearch({ contactId }, api)
-    expect(started.ok).toBe(true)
+  it('celý tok: fronta → spuštění → vyzvednutí → odevzdání → hotovo a zvonek', async () => {
+    const contactId = await insertContact()
+    const started = await startResearch({ contactId }, fired)
+    expect(started).toMatchObject({ ok: true, fired: true })
     if (!started.ok) return
-    expect(calls.messages[0]).toContain('ulozit_rozbor')
+    expect(await getResearch(started.id)).toMatchObject({ status: 'queued', session_url: 'https://claude.ai/code/session_abc' })
 
-    // Dvojklik: druhý běh u stejného kontaktu se nespustí.
-    expect(await startResearch({ contactId }, api)).toEqual({ ok: false, error: 'already_running' })
+    // Úloha bez klíče nic nevyzvedne.
+    expect((await claimRoute(req(claimUrl, {}, null))).status).toBe(401)
+    expect((await claimRoute(req(claimUrl, {}, 'spatny'.repeat(8)))).status).toBe(401)
 
-    const row = await refreshResearch(started.id, api)
-    expect(row?.status).toBe('done')
-    expect(row?.cost_cents).toBe(73)
+    const claimed = await claimRoute(req(claimUrl, { id: started.id }))
+    expect(claimed.status).toBe(200)
+    const body = (await claimed.json()) as { rozbor: { id: string; zadani: Record<string, unknown>; schema: unknown; odevzdat: string } }
+    expect(body.rozbor.id).toBe(started.id)
+    expect(body.rozbor.zadani).toMatchObject({ firma: 'Studny Novák', web: 'https://studny-novak.cz', ico: '12345678' })
+    expect(JSON.stringify(body)).not.toContain('+420777111222')
+    expect(body.rozbor.schema).toEqual(RESULT_JSON_SCHEMA)
+    expect(body.rozbor.odevzdat).toBe(`/api/public/rozbory/${started.id}`)
+    expect((await getResearch(started.id))?.status).toBe('running')
+
+    // Druhé vyzvednutí už nic nedostane (i s prázdným tělem).
+    expect(await (await claimRoute(req(claimUrl, undefined))).json()).toEqual({ success: true, rozbor: null })
+
+    // Rozbitý výsledek: 422 a rozbor běží dál, oprava projde.
+    expect((await submit(started.id, { vysledek: { nic: 1 } })).status).toBe(422)
+    expect((await getResearch(started.id))?.status).toBe('running')
+    expect((await submit(started.id, { vysledek: goodInput() })).status).toBe(200)
+
+    const row = await getResearch(started.id)
+    expect(row).toMatchObject({ status: 'done', error: null })
     expect(row?.result?.company.summary).toContain('studny')
-    expect(calls.deleted).toHaveLength(1)
+    expect(row?.result?.dropped).toBe(3)
+    expect(notifications).toEqual([
+      expect.objectContaining({ type: 'offer_research_done', link: `/dashboard/kontakty/${contactId}` }),
+    ])
 
-    // Další obnovení už nic nevolá a vrací uložený výsledek.
-    const again = await refreshResearch(started.id, api)
-    expect(again?.status).toBe('done')
-    expect(calls.deleted).toHaveLength(1)
-    expect((await listResearchForContact(contactId)).map((r) => r.status)).toEqual(['done'])
+    // Po dokončení už nic nepřepíše.
+    expect((await submit(started.id, { vysledek: goodInput() })).status).toBe(409)
   })
 
-  it('rozbitý výsledek skončí jako nepovedený a běh se smaže', async () => {
-    await setupAgents(fakeApi().api)
+  it('vstupy pro úlohu odmítnou cizí tělo, špatné id a velké tělo', async () => {
+    expect((await claimRoute(req(claimUrl, { id: 'neni-uuid' }))).status).toBe(400)
+    expect((await claimRoute(req(claimUrl, { id: null, navic: 1 }))).status).toBe(400)
+    expect((await submit('neni-uuid', { vysledek: goodInput() })).status).toBe(404)
+    expect((await submit('11111111-2222-4333-8444-555555555555', { vysledek: goodInput() })).status).toBe(404)
+    expect((await submit('11111111-2222-4333-8444-555555555555', { neco: 1 })).status).toBe(400)
+    expect((await submit('11111111-2222-4333-8444-555555555555', { vysledek: { a: 'x'.repeat(300_000) } })).status).toBe(413)
+  })
+
+  it('úloha může rozbor vzdát; text důvodu se neukládá', async () => {
     const contactId = await insertContact()
-    const { api, calls } = fakeApi({
-      async listEvents() {
-        return [{ type: 'custom_tool_use', name: RESULT_TOOL_NAME, input: { nic: 1 } }]
-      },
-    })
-    const started = await startResearch({ contactId }, api)
+    const started = await startResearch({ contactId }, fired)
     if (!started.ok) throw new Error('mělo se spustit')
-    const row = await refreshResearch(started.id, api)
-    expect(row).toMatchObject({ status: 'failed', error: 'invalid_result', result: null })
-    expect(calls.deleted).toHaveLength(1)
+    await claimResearch(null)
+    expect((await submit(started.id, { nepodarilo_se: 'Web nejde otevřít <script>' })).status).toBe(200)
+    expect(await getResearch(started.id)).toMatchObject({ status: 'failed', error: 'gave_up' })
+    expect(await failResearch(started.id)).toEqual({ ok: false, reason: 'not_running' })
   })
 
-  it('běžící rozbor jen aktualizuje cenu a čeká; čekající krok odmítne', async () => {
-    await setupAgents(fakeApi().api)
+  it('nespuštěná úloha: rozbor čeká ve frontě, znovu spustit jde, vyzvedne se i bez id', async () => {
     const contactId = await insertContact()
-    const { api, calls } = fakeApi({
-      async getSession() {
-        return { status: 'running', costCents: 12, activeSeconds: 30 }
-      },
-      async listEvents() {
-        return [{ type: 'other' }]
-      },
-    })
-    const started = await startResearch({ contactId }, api)
+    const started = await startResearch({ contactId }, notFired)
+    expect(started).toMatchObject({ ok: true, fired: false })
+    if (!started.ok) return
+    expect(await getResearch(started.id)).toMatchObject({ status: 'queued', error: 'fire_failed', session_url: null })
+
+    expect(await retryFire(started.id, fired)).toMatchObject({ status: 'queued', error: null, session_url: 'https://claude.ai/code/session_abc' })
+    const claimed = await claimResearch(null)
+    expect(claimed?.id).toBe(started.id)
+    // Běžící už znovu spustit nejde.
+    const calls = vi.fn(fired)
+    await retryFire(started.id, calls)
+    expect(calls).not.toHaveBeenCalled()
+  })
+
+  it('přednostně se vyzvedne rozbor, pro který byla úloha spuštěna', async () => {
+    const a = await startResearch({ contactId: await insertContact({ company: 'A' }) }, notFired)
+    const b = await startResearch({ contactId: await insertContact({ company: 'B' }) }, notFired)
+    if (!a.ok || !b.ok) throw new Error('měly se spustit')
+    expect((await claimResearch(b.id))?.id).toBe(b.id)
+    expect((await claimResearch(b.id))?.id).toBe(a.id)
+    expect(await claimResearch(null)).toBeNull()
+  })
+
+  it('jeden otevřený rozbor na kontakt a denní strop', async () => {
+    const contactId = await insertContact()
+    expect((await startResearch({ contactId }, fired)).ok).toBe(true)
+    expect(await startResearch({ contactId }, fired)).toEqual({ ok: false, error: 'already_running' })
+    await claimResearch(null)
+    expect(await startResearch({ contactId }, fired)).toEqual({ ok: false, error: 'already_running' })
+
+    const other = await insertContact({ company: 'Jiná' })
+    await db.exec(
+      Array.from({ length: DAILY_RUN_LIMIT }, () => `INSERT INTO offer_research (contact_id, status, brief) VALUES ('${other}', 'done', '{}'::jsonb);`).join('\n'),
+    )
+    expect(await startResearch({ contactId: other }, fired)).toEqual({ ok: false, error: 'daily_limit' })
+  })
+
+  it('smazání kontaktu smaže i rozbor; smazání rozboru', async () => {
+    const contactId = await insertContact()
+    const started = await startResearch({ contactId }, fired)
     if (!started.ok) throw new Error('mělo se spustit')
-    expect(await refreshResearch(started.id, api)).toMatchObject({ status: 'running', cost_cents: 12 })
-
-    const asking = fakeApi({
-      async getSession() {
-        return { status: 'idle', costCents: 15, activeSeconds: 40 }
-      },
-      async listEvents() {
-        return [{ type: 'tool_ask', id: 'sevt_9' }]
-      },
-    })
-    expect(await refreshResearch(started.id, asking.api)).toMatchObject({ status: 'running' })
-    expect(asking.calls.denied).toEqual([['sevt_9']])
-    expect(calls.deleted).toEqual([])
-  })
-
-  it('denní strop a spuštění se starým nastavením', async () => {
-    await setupAgents(fakeApi().api)
-    const contactId = await insertContact()
-    await db.exec(`
-      INSERT INTO offer_research (contact_id, status, brief)
-      SELECT '${contactId}', 'done', '{}'::jsonb FROM generate_series(1, 15)`)
-    expect(await startResearch({ contactId }, fakeApi().api)).toEqual({ ok: false, error: 'daily_limit' })
-
-    await db.exec(`DELETE FROM offer_research; UPDATE admin_settings SET offer_agents = jsonb_set(offer_agents, '{hash}', '"stary"')`)
-    expect(await startResearch({ contactId }, fakeApi().api)).toEqual({ ok: false, error: 'outdated' })
-  })
-
-  it('selhání spuštění u Anthropicu zapíše nepovedený běh, ne zaseknutý', async () => {
-    await setupAgents(fakeApi().api)
-    const contactId = await insertContact()
-    const { api } = fakeApi({
-      async startSession() {
-        throw Object.assign(new Error('rate'), { status: 429 })
-      },
-    })
-    expect(await startResearch({ contactId }, api)).toEqual({ ok: false, error: 'start_failed' })
-    expect((await listResearchForContact(contactId))[0]).toMatchObject({ status: 'failed', error: 'start_failed' })
-  })
-
-  it('smazání kontaktu smaže i rozbor; smazání rozboru ukončí běh', async () => {
-    await setupAgents(fakeApi().api)
-    const contactId = await insertContact()
-    const { api, calls } = fakeApi({
-      async getSession() {
-        return { status: 'running', costCents: 1, activeSeconds: 1 }
-      },
-      async listEvents() {
-        return []
-      },
-    })
-    const started = await startResearch({ contactId }, api)
-    if (!started.ok) throw new Error('mělo se spustit')
-    expect(await deleteResearch(started.id, api)).toBe(true)
-    expect(calls.deleted).toHaveLength(1)
+    expect(await deleteResearch(started.id)).toBe(true)
+    expect(await deleteResearch(started.id)).toBe(false)
 
     await db.exec(`INSERT INTO offer_research (contact_id, status, brief) VALUES ('${contactId}', 'done', '{}'::jsonb)`)
     await db.exec(`DELETE FROM contacts WHERE id = '${contactId}'`)
@@ -457,23 +427,25 @@ describe('rozbor proti Postgresu s migrací 136', () => {
     expect(rows[0].n).toBe(0)
   })
 
-  it('úklid: bez zakázky po 12 měsících pryč, se zakázkou a běžící zůstávají; doběhlé převezme', async () => {
-    await setupAgents(fakeApi().api)
+  it('údržba: zaseknuté a nevyzvednuté ukončí, staré bez zakázky smaže, otevřené a se zakázkou nechá', async () => {
     const contactId = await insertContact()
+    const c2 = await insertContact({ company: 'Druhá' })
+    const c3 = await insertContact({ company: 'Třetí' })
     const { rows: projects } = await db.query<{ id: string }>(`INSERT INTO projects (client_name) VALUES ('Studny') RETURNING id::text`)
     await db.exec(`
       INSERT INTO offer_research (contact_id, status, brief, updated_at) VALUES ('${contactId}', 'done', '{}'::jsonb, now() - interval '13 months');
       INSERT INTO offer_research (contact_id, status, brief, updated_at) VALUES ('${contactId}', 'failed', '{}'::jsonb, now() - interval '11 months');
       INSERT INTO offer_research (contact_id, status, brief, updated_at, project_id)
         VALUES ('${contactId}', 'done', '{}'::jsonb, now() - interval '13 months', '${projects[0].id}');
-      INSERT INTO offer_research (contact_id, status, brief, session_id, created_at, updated_at)
-        VALUES ('${contactId}', 'running', '{}'::jsonb, 'sesn_stary', now() - interval '1 hour', now() - interval '13 months');
+      INSERT INTO offer_research (contact_id, status, brief, claimed_at, updated_at)
+        VALUES ('${contactId}', 'running', '{}'::jsonb, now() - interval '2 hours', now() - interval '13 months');
+      INSERT INTO offer_research (contact_id, status, brief, created_at) VALUES ('${c2}', 'queued', '{}'::jsonb, now() - interval '31 hours');
+      INSERT INTO offer_research (contact_id, status, brief) VALUES ('${c3}', 'queued', '{}'::jsonb);
     `)
-    const { api, calls } = fakeApi()
-    const out = await maintainOfferResearch(api)
-    expect(out).toEqual({ refreshed: 1, purged: 1 })
-    expect(calls.deleted).toEqual(['sesn_stary'])
-    const { rows } = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM offer_research`)
-    expect(rows[0].n).toBe(3)
+    expect(await maintainOfferResearch()).toEqual({ timedOut: 2, purged: 1 })
+    const rows = await listResearchForContact(contactId, 10)
+    expect(rows.map((r) => r.error).filter(Boolean)).toEqual(['timeout'])
+    expect((await listResearchForContact(c2))[0]).toMatchObject({ status: 'failed', error: 'not_started' })
+    expect((await listResearchForContact(c3))[0]).toMatchObject({ status: 'queued' })
   })
 })

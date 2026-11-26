@@ -81,20 +81,21 @@ varianty, zdůvodnění, předpoklady odhadu hodnoty, zdroje, „zjistit od klie
 „Použít v nabídce" (otevře e-mail Nabídka s předvyplněnou cenou a odstavcem o tom, co klient
 dostane; text jde přepsat). Rozpad ceny po položkách ani hodiny se neukazují (D-N4).
 
-### Kde to běží (D-N2: Managed Agents)
+### Kde to běží (D-N2, od 2026-11-26 R-148: Claude Code na předplatném)
 
-Na Vercel Hobby má funkce časový strop a provoz se má později stěhovat na Cloudflare (R-135).
-Proto **Managed Agents od Anthropicu**: smyčku i stahování webu hostuje Anthropic, admin jen
-založí běh a převezme výsledek (webhook nebo dotaz na stav, ověřit v N1). Je v betě a historie
-běhů zůstává u Anthropicu, dokud ji nesmažeme: po převzetí výsledku ji mažeme. Bezpečnostní
-zápis do `.claude/security/DECISIONS.md` v N1.
+Na Vercel Hobby má funkce časový strop a provoz se má později stěhovat na Cloudflare (R-135), proto
+smyčka neběží v adminu. Původně Managed Agents od Anthropicu (placené API); **Kryštof 2026-11-26 rozhodl
+jinak:** rozbor dělá **cloudová úloha Claude Code** na claude.ai/code v jeho předplatném. Tlačítko ji
+spustí hned (API trigger), ráno v 7:00 ji spustí rozvrh jako zálohu. Vedoucí běží na Opusu, dva
+subagenti (web firmy, rešerše) na Sonnetu; postup je skill `.claude/skills/zakaziq-rozbor-firmy/`.
+Úloha si zadání vyzvedne a výsledek odevzdá přes `/api/public/rozbory` s klíčem z prostředí.
+Bezpečnost `.claude/security/DECISIONS.md` #056.
 
-### Cena běhu (ceník Anthropicu, ověřeno 2026-11-25)
+### Cena běhu
 
-Sonnet 5.5 $2 / $10 za milion tokenů (vstup / výstup), Haiku 5.5 $0,10 / $0,50, Opus 5.5 $4 / $20,
-hledání na webu $10 za 1 000 dotazů, běh Managed Agents $0,08 za hodinu. Odhad jednoho běhu
-(sběr na Haiku/Sonnetu, odhad hodnoty a cena na Opusu): **$0,5–1, asi 10–25 Kč**. Skutečnou cenu
-každého běhu ukládáme (`cost_usd`) a N1 ji změří.
+API se neplatí. Rozbor se počítá do limitu předplatného Claude stejně jako práce v Claude Code;
+kolik jeden rozbor z limitu ukousne, ukáže zkouška na 5 firmách. Původní odhad pro Managed Agents
+byl $0,5–2 za běh.
 
 ## 5. Cenová pravidla (vyplní Kryštof v N0)
 
@@ -283,14 +284,15 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | Cena mimo pravidla | Spodní a horní hranice, kontrola na konci kroku 4 |
 | Náklady | Spouští se ručně (D-N1); strop počtu běhů za den |
 | Web firmy blokuje stahování | Rozbor pokračuje bez něj a řekne to; žádné obcházení |
-| Data u Anthropicu (Managed Agents) | Mazání běhů po převzetí výsledku, zápis do DECISIONS v N1 |
+| Data u Anthropicu (běhy úlohy na claude.ai) | Do úlohy jdou jen veřejné firemní údaje; běhy zůstávají v účtu Kryštofa, DECISIONS #056 |
+| Rozbory ukrajují z limitu předplatného | Strop 15 za den, nejvýš 5 za běh, spouští se ručně (D-N1) |
 
 ## 9. Kroky
 
 | Krok | Co | Hotovo, když | Stav |
 |---|---|---|---|
 | **N0** | Cenová pravidla (oddíl 5); k 14 zakázkám obor, co dostal, proč ta cena | Tabulka v oddílu 5 bez `[DOPLNIT]`, vzory zapsané | hotovo 2026-11-25 (dosavadní zakázky a nabídky jsou úvodní ceny, ne vzor) |
-| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh přes Managed Agents, retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřená cena a čas běhu | v kódu 2026-11-26; čeká migrace 136, nastavení agentů a zkouška na 5 firmách se souhlasem Kryštofa |
+| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-148), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
 | **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | čeká |
 | **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | čeká |
 | **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | čeká |
@@ -300,7 +302,7 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | # | Otázka | Rozhodnuto (2026-11-25) |
 |---|---|---|
 | D-N1 | Spouštět ručně, nebo automaticky po souhlasu firmy? | **Ručně tlačítkem** |
-| D-N2 | Managed Agents, nebo vlastní řízení přes Messages API? | **Managed Agents** |
+| D-N2 | Managed Agents, nebo vlastní řízení přes Messages API? | ~~Managed Agents~~ → **cloudová úloha Claude Code na předplatném**, spuštění tlačítkem + ranní průchod, vedoucí Opus, subagenti Sonnet (Kryštof 2026-11-26, R-148) |
 | D-N3 | Jakou zpětnou vazbu zapisovat? | **Výsledek nabídky a poslaná cena; hodiny ne**, cena se odvozuje z hodnoty pro klienta |
 | D-N4 | Co návrh ukáže? | **Cena a zdůvodnění**, bez rozpadu po položkách a hodin |
 | D-N5 | Retence rozboru bez zakázky | **12 měsíců od posledního pohybu**, se zakázkou podle R-076 |
@@ -312,9 +314,10 @@ Technika v `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: rozbor firmy
 
 - **Rozbor je jen u kontaktu.** Firma od asistenta bez kontaktu (bez souhlasu) tlačítko nemá; firmy se
   souhlasem kontakt mají (R-141). Hovory přijdou s N2.
-- **Tým ve starším tvaru `coordinator`, bez dynamických workflow.** Knihovna `@anthropic-ai/sdk` 0.105
-  novější tvar nezná; nová hlavní verze knihovny by byla samostatný krok (R-053). Jeden běh je tak levnější
-  a předvídatelnější.
-- **Výsledek si admin vyzvedává sám** (karta každých 8 s, záložně denní cron), bez webhooku Anthropicu,
-  který by se musel registrovat v Console.
-- Vedoucí běží na `claude-opus-5-5` (nová role `deep`), web čte `claude-haiku-5-5`, rešerši `claude-sonnet-5-5`.
+- **Běh přestavěný na Claude Code (R-148, 2026-11-26).** První verze N1 stála na Managed Agents (tlačítko
+  „Nastavit agenty", strop 2 USD na běh); nasadila se, ale nikdy nespustila. Teď tlačítko zařadí rozbor
+  do fronty a spustí cloudovou úlohu; úloha výsledek sama odevzdá, karta jen čte databázi. Migrace 137
+  přidala stav `queued`, `claimed_at` a odkaz na běh.
+- **Výsledek nesedí → úloha pošle opravu.** Vstup vrátí 422 a rozbor běží dál; po dvou pokusech úloha
+  rozbor vzdá kódem `gave_up`.
+- Vedoucí běží na Opusu (model úlohy), subagenti na Sonnetu (`model: "sonnet"` v nástroji Agent).

@@ -4,21 +4,19 @@ import { safeHttpUrl, stripControlChars } from '@/lib/security/html'
 /**
  * Výsledek rozboru firmy (navrhovač nabídek, N1, R-147).
  *
- * Vedoucí agent ho vrací voláním nástroje `ulozit_rozbor` — to je jediný
- * výstup, který admin od agentů bere. Text pochází od modelu, který četl cizí
- * weby, takže je to **nedůvěryhodný vstup** (R-069): server ho tady ořeže,
- * zahodí, co nesedí, a vykresluje se jen jako text.
+ * Úloha Claude Code ho pošle na `POST /api/public/rozbory/[id]` (R-148) — to
+ * je jediný výstup, který admin z rozboru bere. Text pochází od modelu, který
+ * četl cizí weby, takže je to **nedůvěryhodný vstup** (R-069): server ho tady
+ * ořeže, zahodí, co nesedí, a vykresluje se jen jako text.
  *
  * Pravidlo B10 drží server, ne model: tvrzení bez platného zdroje se zahodí.
  * Odhad typické zakázky smí být bez zdroje, ale pak má vždy nízkou jistotu.
  */
 
-export const RESULT_TOOL_NAME = 'ulozit_rozbor'
-
 const MAX_SOURCES = 40
 
 /* ------------------------------------------------------------------ */
-/* Schéma pro model (JSON Schema nástroje)                             */
+/* Schéma pro model (JSON Schema, posílá ho /api/public/rozbory)       */
 /* ------------------------------------------------------------------ */
 
 const claimSchema = {
@@ -38,8 +36,8 @@ const claimSchema = {
 const claims = (description: string) => ({ type: 'array', items: claimSchema, description }) as const
 const nullable = (type: string, description: string) => ({ type: [type, 'null'], description }) as const
 
-/** Vstup nástroje `ulozit_rozbor`. Musí sedět na `rawResultSchema` níž. */
-export const RESULT_TOOL_INPUT_SCHEMA = {
+/** Tvar výsledku, který úloha posílá. Musí sedět na `rawResultSchema` níž. */
+export const RESULT_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: ['sources', 'web', 'company', 'reviews', 'typical_job', 'competitors', 'signals', 'warnings', 'ask_client'],
