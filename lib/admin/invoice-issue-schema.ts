@@ -82,3 +82,13 @@ export const EMPTY_ISSUER: IssuerProfile = {
 
 /** Výchozí splatnost: čtrnáct dní. */
 export const DEFAULT_DUE_DAYS = 14
+
+/**
+ * Na opravené faktuře je vidět, kterou nahrazuje. Při opravě opravy se starý
+ * odkaz nahradí novým, ať tam nejsou dva. Jde přepsat.
+ */
+export function replacementNote(note: string, number: string): string {
+  const line = `Nahrazuje fakturu ${number}.`
+  const base = note.replace(/\s*Nahrazuje fakturu [0-9A-Za-z/-]+\./g, '').trim()
+  return (base === '' ? line : `${base} ${line}`).slice(0, 2000)
+}

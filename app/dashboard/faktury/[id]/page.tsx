@@ -5,7 +5,7 @@ import { invoiceTone, toneVariant } from '@/lib/admin-status'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ArrowLeft, Ban, FileText, ExternalLink, Sparkles, AlertTriangle, Clock, Landmark, Paperclip,
+  ArrowLeft, Ban, Download, FileText, ExternalLink, Sparkles, AlertTriangle, Clock, Landmark, Paperclip,
 } from 'lucide-react'
 import { itemTotals } from '@/lib/invoice-pdf/totals'
 import { getInvoiceDetail, getInvoiceProjectOptions, getPaymentCandidates } from '@/app/dashboard/finance/invoice-actions'
@@ -140,6 +140,7 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   defaultEmail={invoice.project_client_email}
                   cancelled={invoice.issued.cancelled_at !== null}
                   sentAt={invoice.issued.sent_at}
+                  paid={invoice.paid_on !== null}
                   handoverReady={handover?.saved ?? false}
                 />
               ) : (
@@ -240,10 +241,18 @@ export default async function InvoiceDetailPage(props: PageProps) {
                   </span>
                 )}
                 <a
+                  href={`${pdfHref}?stazeni=1`}
+                  download
+                  className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+                >
+                  <Download size={14} strokeWidth={1.75} aria-hidden="true" />
+                  Stáhnout PDF
+                </a>
+                <a
                   href={pdfHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
                 >
                   <ExternalLink size={11} strokeWidth={1.5} />
                   Otevřít v novém okně
@@ -266,10 +275,18 @@ export default async function InvoiceDetailPage(props: PageProps) {
                 <span className="truncate text-sm text-ink">faktura-{invoice.invoice_number}.pdf</span>
                 <span className="text-xs text-quiet">vyrobí se při otevření</span>
                 <a
+                  href={`${pdfHref}?stazeni=1`}
+                  download
+                  className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full bg-navy-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+                >
+                  <Download size={14} strokeWidth={1.75} aria-hidden="true" />
+                  Stáhnout PDF
+                </a>
+                <a
                   href={pdfHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-semibold text-ink transition-colors hover:bg-navy-50"
                 >
                   <ExternalLink size={11} strokeWidth={1.5} />
                   Otevřít v novém okně

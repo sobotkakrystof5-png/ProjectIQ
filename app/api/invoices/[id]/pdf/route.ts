@@ -88,11 +88,13 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 
   const stored = meta.etag !== null
   const filename = meta.pdf_filename || `faktura-${meta.invoice_number}.pdf`
+  // `?stazeni=1` = tlačítko Stáhnout PDF: soubor se uloží, místo aby se otevřel.
+  const disposition = new URL(req.url).searchParams.get('stazeni') === '1' ? 'attachment' : 'inline'
   const etag = `"${stored ? meta.etag : meta.issued_etag}"`
   const headers = {
     'Content-Type': 'application/pdf',
     // filename* kvůli diakritice v názvu souboru
-    'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    'Content-Disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(filename)}`,
     ETag: etag,
     // `private` = jen prohlížeč, nikdy sdílená cache; `max-age=0,
     // must-revalidate` = při každém otevření se ověří ETag, takže přepsané
@@ -114,7 +116,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       return new NextResponse(new Uint8Array(pdf), {
         headers: {
           ...headers,
-          'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(issued.filename)}`,
+          'Content-Disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(issued.filename)}`,
           'Content-Length': String(pdf.byteLength),
         },
       })

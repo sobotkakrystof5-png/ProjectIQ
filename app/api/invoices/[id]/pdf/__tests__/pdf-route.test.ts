@@ -41,8 +41,8 @@ const ETAG = '"d41d8cd98f00b204e9800998ecf8427e"'
 const ISSUED_ETAG = '"5f2b1c0d9e8a7b6c5d4e3f2a1b0c9d8e"'
 
 const params = Promise.resolve({ id: '11111111-1111-4111-8111-111111111111' })
-const request = (headers: Record<string, string> = {}) =>
-  ({ headers: new Headers(headers), url: 'https://admin.test/api/invoices/x/pdf' }) as Parameters<typeof GET>[0]
+const request = (headers: Record<string, string> = {}, query = '') =>
+  ({ headers: new Headers(headers), url: `https://admin.test/api/invoices/x/pdf${query}` }) as Parameters<typeof GET>[0]
 
 function queue({ meta = true, data = true } = {}) {
   const queries: string[] = []
@@ -113,6 +113,12 @@ describe('PDF faktury', () => {
     expect(Buffer.from(await res.arrayBuffer()).equals(PDF)).toBe(true)
   })
 
+  it('nahrané PDF jde taky stáhnout', async () => {
+    queue()
+    const res = await GET(request({}, '?stazeni=1'), { params })
+    expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename\*=UTF-8''/)
+  })
+
   it('podruhé vrátí 304 a bajty z databáze nečte', async () => {
     const queries = queue()
     const res = await GET(request({ 'if-none-match': ETAG }), { params })
@@ -168,6 +174,15 @@ describe('Faktura vystavená v adminu (AD12)', () => {
     expect(renderMock).toHaveBeenCalledTimes(1)
     // Bajty z `pdf_data` se netahají — žádné uložené PDF neexistuje.
     expect(queries.join(' ')).not.toContain('encode(pdf_data')
+  })
+
+  it('Stáhnout PDF pošle soubor ke stažení, náhled ho otevře', async () => {
+    queueIssued()
+    const download = await GET(request({}, '?stazeni=1'), { params })
+    expect(download.headers.get('content-disposition')).toBe("attachment; filename*=UTF-8''faktura-2026001.pdf")
+    queueIssued()
+    const preview = await GET(request(), { params })
+    expect(preview.headers.get('content-disposition')).toBe("inline; filename*=UTF-8''faktura-2026001.pdf")
   })
 
   it('podruhé vrátí 304 a Chromium se vůbec nespustí', async () => {

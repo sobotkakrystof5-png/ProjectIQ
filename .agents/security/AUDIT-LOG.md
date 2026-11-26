@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-26 — review: oprava a stažení faktury (R-148)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: `issueNewInvoice(…, replacesId)` a `getProjectBilling(…, exclude)` v `app/dashboard/finance/invoice-actions.ts`, `issueCorrection` a `loadCorrectionSource` v `lib/admin/invoice-issue.ts`, `loadProjectBilling` s vyloučením, stránka `/dashboard/faktury/nova?oprava=`, tlačítka v detailu, `?stazeni=1` v `/api/invoices/[id]/pdf`.
+Výsledek: 0 nálezů k opravě.
+Nálezy: (1) Obě akce za `requireAuth`, id opravované faktury i vyloučené faktury ověřené jako UUID, server actions mají vestavěnou kontrolu původu. (2) SQL parametrizované; storno staré a vystavení nové jedním příkazem (CTE), stará se stornuje jen platná a nezaplacená — souběh nevyrobí dvě platné faktury ani storno bez náhrady (test). (3) Stránka `?oprava=` za přihlášením, údaje z DB vykresluje React jako text. (4) `stazeni` jen přepíná `inline`/`attachment` z pevné dvojice, název souboru dál přes `encodeURIComponent`; přihlášení a ETag beze změny.
+Opraveno: nic nebylo potřeba. Žádné tajemství, `NEXT_PUBLIC_` ani změna CSP.
+Zůstává: v prohlížeči neověřeno.
+
 ## 2026-11-26 — review: navrhovač nabídek, rozbor firmy (R-147, krok N1)
 Spouštěč: před commitem a deployem (`web-security-review`)
 Rozsah: necommitnutý diff na větvi `admin/navrhovac-nabidek` nad `d871974` — `app/offer-research-actions.ts`, `lib/admin/offers/{agent-config,api,result,research}.ts`, `components/admin/offers/*`, migrace 136, cron `client-retention`, karta kontaktu, tajemství v diffu.

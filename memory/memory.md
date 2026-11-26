@@ -2,7 +2,11 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-25 · **Doručení pozvánek** (R-146): kalendář ukazuje, jestli pozvánka
+> **Poslední aktualizace:** 2026-11-26 · **Opravit a stáhnout fakturu** (R-148): v detailu vystavené
+> faktury je „Opravit fakturu“ (formulář nové s údaji staré, po vystavení se stará sama stornuje, jedním
+> příkazem v databázi) a „Stáhnout PDF“. Jen u nezaplacené faktury. Bez migrace.
+>
+> Předchozí: 2026-11-25 · **Doručení pozvánek** (R-146): kalendář ukazuje, jestli pozvánka
 > na schůzku klientovi dorazila, nebo se vrátila, podle webhooku Resendu `/api/resend/vizeon` (migrace 135).
 > Nedoručená pozvánka na nadcházející schůzku založí upozornění a nabídne „Poslat e-mail znovu".
 > **Na produkci od 2026-11-25 (`40fff72`) i s migrací 135**; dokud v Resendu není webhook a ve Vercelu
@@ -1720,9 +1724,31 @@ se má stěhovat na Cloudflare (R-135).
 nabídky jde přes cenová pravidla v `admin_settings.pricing_rules`, ne natvrdo v kódu. Rozbor osoby (OSVČ) je
 osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
 
+### R-148 · Oprava vystavené faktury = nová faktura s údaji staré a automatické storno (2026-11-26)
+**Rozhodnutí:** vystavená faktura se dál na místě nemění (R-098). Tlačítko „Opravit fakturu“ otevře formulář
+nové faktury vyplněný údaji té staré; po vystavení dostane nová další číslo a stará se v témže příkazu stornuje.
+Na nové je poznámka „Nahrazuje fakturu N.“ Jen u platné nezaplacené faktury; zaplacenou opraví ruční storno
+a nová faktura. Klientovi se nová posílá ručně z detailu. K tomu „Stáhnout PDF“ u každé faktury.
+**Proč:** Kryštof 2026-11-26 chtěl fakturu „stáhnout a upravovat“ a vybral variantu „Opravit = předvyplněná
+nová“ před úpravou na místě (stejné číslo, dokud neodešla) i úpravou vždy. Klient má v e-mailu původní verzi,
+takže přepsat doklad pod stejným číslem by znamenalo dvě různé faktury se stejným číslem.
+**Důsledek:** `issueCorrection` (CTE storno + `admin_invoice_issue`), `loadCorrectionSource`,
+`loadProjectBilling(…, excludeInvoiceId)`, `issueNewInvoice(raw, email, replacesId)`, `?oprava=` na
+`/dashboard/faktury/nova`, `?stazeni=1` na PDF. Bez migrace. Upřesňuje R-098 (ruční storno zůstává).
+Technika `docs/admin/AGENTS-ADMIN.md` → „Oprava vystavené faktury (R-148)“.
+
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Oprava a stažení faktury (R-148) — nasadit a projít naživo:** ověřeno testy nad PGlite a `tsc`,
+  v prohlížeči ne. Projít za přihlášením: detail 2026001 → Stáhnout PDF (uloží soubor), Opravit fakturu →
+  formulář s údaji a poznámkou „Nahrazuje fakturu 2026001.“ → Vystavit opravenou → nová má další číslo,
+  2026001 je stornovaná, rozpis zakázky ukazuje jen novou → Poslat e-mailem · od 2026-11-26
+- [ ] **Faktura 2026001 „neodešla“ — ověřit přílohu:** v produkční DB má `sent_at` 2026-11-26 17:04 a Resend
+  e-mail přijal (kód vždy přikládá PDF, při chybě PDF by e-mail neodešel vůbec); v logu Vercelu žádná chyba.
+  Záložka Preview v Resendu přílohy neukazuje. Ověřit ve schránce příjemce nebo v detailu e-mailu v Resendu,
+  jestli PDF dorazilo · Kryštof · od 2026-11-26
 
 - [ ] **Navrhovač nabídek N1 (R-147) — vyzkoušet:** ~~migrace 136~~ a ~~nasazení~~ hotové 2026-11-26.
   Zbývá: (1) na kartě kontaktu „Nastavit agenty" (založí prostředí a tři agenty v účtu Anthropicu),
@@ -2164,6 +2190,31 @@ osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (opravit a stáhnout fakturu — R-148)
+- **feat** Detail vystavené faktury: „Opravit fakturu“ → `/dashboard/faktury/nova?oprava=<id>` s údaji původní
+  faktury a poznámkou „Nahrazuje fakturu N.“; po vystavení se původní stornuje v témže příkazu (CTE se stornem
+  a `admin_invoice_issue`), opravovaná se nepočítá do rozpisu zakázky. Jen u nezaplacené. „Stáhnout PDF“
+  (`?stazeni=1` → `attachment`) u vystavených i archivních faktur. Soubory: `lib/admin/{invoice-issue,
+  project-billing,invoice-issue-schema}.ts`, `app/dashboard/finance/invoice-actions.ts`,
+  `app/dashboard/faktury/{nova,[id]}/page.tsx`, `components/admin/invoices/{issue-form,issued-actions}.tsx`,
+  `app/api/invoices/[id]/pdf/route.ts`. Bez migrace.
+- **chore** Kontrola „faktura se neodeslala“: 2026001 má na produkci `sent_at` 17:04, Resend e-mail přijal,
+  v logu žádná chyba; e-mail se bez PDF poslat nedá (při chybě PDF se neodešle nic). Příloha v náhledu
+  Resendu není vidět; zbývá potvrdit ve schránce (Otevřené problémy).
+- **chore** Ověřeno: `npx tsc --noEmit` bez chyby, nový `lib/__tests__/admin-faktura-oprava.test.ts` (9),
+  `pdf-route.test.ts` (15, nově stažení). V prohlížeči neověřeno.
+
+### 2026-11-26 (smazání kontaktu v Hovorech)
+- **feat** Rozbalený kontakt v Hovorech má dole tlačítko „Smazat kontakt" s potvrzením přímo v řádku (co se smaže
+  s ním: poznámky, termín v kalendáři; „Nechat", Escape vrátí fokus). Dřív šlo mazat jen ikonou, která se ukáže
+  až při najetí myší, takže na telefonu vůbec. Ikona v řádku zůstala. Soubor: `components/LeadsTable.tsx`.
+- **fix** `deleteLead` maže kontakt i spárovanou událost jedním příkazem (dřív dva `DELETE` za sebou) a schůzku
+  s Meetem smaže i v Google Kalendáři — dřív tam po smazání kontaktu z Hovorů zůstávala. Soubor:
+  `app/calls-actions.ts`, test `lib/__tests__/admin-hovory-smazani.test.ts` (6). Bez migrace.
+- **chore** Ověřeno: `tsc`, nový test a testy kalendáře, asistenta a tříd adminu (67), dočasná stránka s vymyšlenými
+  kontakty na 1280 a 390 px (tlačítko 44 px, potvrzení, Escape, chyba bez přihlášení vrátí řádek a ukáže hlášku);
+  stránka smazaná. Za přihlášením a s Googlem naživo neověřeno, necommitnuto.
 
 ### 2026-11-26 (navrhovač nabídek N1 — rozbor firmy, R-147)
 - **feat** Karta „Rozbor firmy" na kartě kontaktu: „Nastavit agenty" založí u Anthropicu prostředí a tým tří
