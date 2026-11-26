@@ -126,10 +126,10 @@
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
 
 **Rozpracováno — navrhovač nabídek (R-147, od 2026-11-25):** plán `docs/admin/NABIDKY-PLAN.md`, větev
-`admin/navrhovac-nabidek` (worktree `.claude/worktrees/navrhovac-nabidek`, necommitnuto). N0 hotové
-(cenová pravidla v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1 v kódu** (2026-11-26): karta
-„Rozbor firmy" u kontaktu, agenti přes Managed Agents, migrace 136. Dál: migrace 136, „Nastavit agenty",
-zkouška na 5 firmách (souhlas Kryštofa), pak N2 (cena, tři varianty, stránka nabídky).
+`admin/navrhovac-nabidek` (worktree `.claude/worktrees/navrhovac-nabidek`). N0 hotové (cenová pravidla
+v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1 na produkci od 2026-11-26 (`7380078`, migrace 136)**:
+karta „Rozbor firmy" u kontaktu, agenti přes Managed Agents. Dál: „Nastavit agenty" a zkouška na 5 firmách
+(Kryštof souhlasil 2026-11-26), pak N2 (cena, tři varianty, stránka nabídky).
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
 (34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
@@ -1724,12 +1724,15 @@ osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
 
 ## 3. Otevřené problémy
 
-- [ ] **Navrhovač nabídek N1 (R-147) — spustit a vyzkoušet:** (1) migrace 136 na produkci, (2) nasazení,
-  (3) Kryštof na kartě kontaktu klikne „Nastavit agenty" (založí prostředí a tři agenty v jeho účtu
-  Anthropicu), (4) zkouška na 5 firmách s webem, **seznam firem ukázat předem a pustit až se souhlasem**,
-  odhad 5–10 USD; změřit cenu, dobu a jestli API přijme strop ceny předaný mimo typy knihovny 0.105
-  (DECISIONS #055 (d)), (5) projít kartu na 390 a 1280 px. Ověřeno jen testy nad PGlite s podstrčeným API,
-  `tsc` a hlídacími testy · od 2026-11-26
+- [ ] **Navrhovač nabídek N1 (R-147) — vyzkoušet:** ~~migrace 136~~ a ~~nasazení~~ hotové 2026-11-26.
+  Zbývá: (1) na kartě kontaktu „Nastavit agenty" (založí prostředí a tři agenty v účtu Anthropicu),
+  (2) zkouška na 5 firmách s webem (Kryštof 2026-11-26 schválil pět firem od asistenta: reality, instalatérství,
+  truhlářství na Webnode, tesařství s webem jen z e-mailu, elektro), po jednom; po prvním běhu zkontrolovat
+  `offer_research.cost_cents`, jestli API strop ceny 2 USD opravdu uplatnilo (DECISIONS #055 (d)), (3) projít
+  kartu na 390 a 1280 px · od 2026-11-26
+- [ ] **Běhoun migrací neumí středník v textu:** `splitStatements` v `scripts/apply-migration.js` dělí podle `;`
+  i uvnitř řetězce (komentář migrace 136 by se rozpadl, testy nad PGlite pouštějí soubor vcelku a nepoznají to).
+  Zvážit test, který rozdělí každou migraci a ověří sudý počet apostrofů · od 2026-11-26
 - [ ] **vizeon.cz odporuje cenovým pravidlům (R-147):** správa 480 Kč místo 999 Kč, kód zůstává VIZEONu,
   copywriting mimo cenu, „dohodnutý počet kol". Zadání pro repo webu
   `new - area of zakaziq/prompty/admin/vizeon-web-podminky-a-sprava.md`, spouští Kryštof · od 2026-11-25
@@ -2172,7 +2175,13 @@ osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
   `components/admin/offers/{research-section,research-card,research-view}.tsx`, `app/dashboard/kontakty/[id]/page.tsx`,
   `app/api/cron/client-retention/route.ts`, `lib/ai/models.ts`, `.env.example` (`ADMIN_AI_MODEL_DEEP`).
 - **db** Migrace 136 `navrhovac_rozbor`: `offer_research`, `admin_settings.offer_agents`, `purge_offer_research()`
-  (aplikována: ne, nikde).
+  — **aplikovaná na produkci** 2026-11-26 (Neon MCP v jedné transakci na souhlas Kryštofa, zapsaná
+  v `public.schema_migrations` s otiskem souboru; ověřeno: tabulka, 5 indexů, 3 cizí klíče, sloupec, md5 těla
+  funkce sedí na soubor). Testovací Neon ne. Před aplikací opraven středník v komentáři tabulky, na kterém by
+  běhoun migrací spadl (`7380078`).
+- **chore** **Na produkci** 2026-11-26: fast-forward `main` `d871974` → `7380078`, nasazení `dpl_E95Q…` Ready.
+  Veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard` a `/dashboard/kontakty` 307,
+  cron 401. Za přihlášením a se skutečnými agenty zatím neověřeno.
 - **docs** `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: rozbor firmy", plán oddíl 9 a 11, DECISIONS #055,
   STATE.md (synchronizováno do `.agents/`). Zadání pro vizeon.cz
   `new - area of zakaziq/prompty/admin/vizeon-web-podminky-a-sprava.md`.
