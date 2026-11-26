@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-26 — review: navrhovač nabídek, rozbor firmy (R-147, krok N1)
+Spouštěč: před commitem a deployem (`web-security-review`)
+Rozsah: necommitnutý diff na větvi `admin/navrhovac-nabidek` nad `d871974` — `app/offer-research-actions.ts`, `lib/admin/offers/{agent-config,api,result,research}.ts`, `components/admin/offers/*`, migrace 136, cron `client-retention`, karta kontaktu, tajemství v diffu.
+Výsledek: 0 nálezů k opravě, 1 nejistota k ověření prvním během.
+Nálezy: (1) Všechny čtyři akce stojí za `requireAuth`, id jsou uuid přes Zod, web od Kryštofa má strop 300 znaků a prochází `safeHttpUrl`; web stahuje sandbox Anthropicu, ne náš server, takže SSRF u nás nevzniká. (2) Výsledek od agentů prochází `normalizeResult`: odkazy jen http(s), texty se stropem délky a bez řídicích znaků, vykreslení jen jako text, odkazy s `rel="noopener noreferrer nofollow"`. (3) SQL parametrizované, sloupce `session_id` a `error` mají kontrolu tvaru v databázi. (4) Do agentů nejdou telefony, e-maily, poznámky ani částky (DECISIONS #055). (5) Denní strop 15 běhů se počítá dotazem před vložením, dvě souběžná kliknutí ho můžou o jeden přetáhnout; jeden běžící rozbor na kontakt hlídá unikátní index. U jednoho admina přijatelné.
+Opraveno: nic nebylo potřeba. V diffu žádné tajemství ani `NEXT_PUBLIC_`, CSP se nemění.
+Zůstává: strop ceny 2 USD se předává mimo typy SDK 0.105 (#055 d). Kdyby ho API tiše ignorovalo, chybou se to neprojeví; zkušební rozbory proto jdou po jednom a po prvním se kontroluje cena běhu.
+
 ## 2026-11-25 — review: doručení e-mailů z adminu přes webhook Resendu (R-146)
 Spouštěč: před commitem (`web-security-review`)
 Rozsah: necommitnutý diff nad `ab6ffc3` — `app/api/resend/vizeon/route.ts`, `lib/admin/email-delivery{,ies}.ts`, štítek v `sendVizeonMail`, `retryInvite`, dotaz kalendáře, migrace 135, tajemství v diffu.

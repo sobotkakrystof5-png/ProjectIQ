@@ -1611,3 +1611,34 @@ byly 2026-11-25 odstraněné na přání Kryštofa (R-145). Google propojení ž
 **Zůstala tabulka `meeting_notes`** (migrace 134) s uloženými přepisy; čte ji jen denní úklid
 `client-retention` (`purgeMeetingNotes` v `lib/admin/meeting-notes-retention.ts`: 3 roky po schůzce,
 skryté po roce). Kód funkce je v historii gitu (`git show ddba729 -- <cesta>`), kdyby se měla vrátit.
+
+## Navrhovač nabídek: rozbor firmy (R-147, krok N1)
+
+Plán a cenová pravidla: `docs/admin/NABIDKY-PLAN.md`. N1 umí jen **rozbor firmy** u kontaktu, cenu
+ještě nenavrhuje (N2).
+
+**Tok.** Karta „Rozbor firmy" na `/dashboard/kontakty/[id]` (`components/admin/offers/research-section.tsx`
+→ `research-card.tsx`). Poprvé ukáže „Nastavit agenty": `setupAgents()` založí u Anthropicu prostředí
+a tři agenty (`lib/admin/offers/agent-config.ts`) a uloží jejich id a verze do `admin_settings.offer_agents`
+s otiskem nastavení (`configHash`). Když se nastavení v kódu změní, karta nabídne „Aktualizovat agenty"
+(nová verze agenta, nikdy nový agent). „Připravit rozbor" (`startResearch`) vezme veřejné údaje o firmě
+(`loadBriefForContact`: kontakt, nejnovější firma od asistenta, web z ručního pole, Growth OS nebo
+z e-mailu na vlastní doméně), založí řádek `offer_research` a běh u Anthropicu se stropem 2 USD. Karta
+se každých 8 s ptá `refreshResearch`; když vedoucí zavolá `ulozit_rozbor`, server výsledek zkontroluje
+(`normalizeResult`), uloží a běh u Anthropicu smaže. Zavřené okno nevadí: denní cron `client-retention`
+volá `maintainOfferResearch` (převzetí doběhlých, ukončení po 25 minutách, úklid).
+
+**Tým.** Analytik webů (`aiModel('fast')`), Rešeršista firem (`smart`), Vedoucí (`deep`, nová role
+v `lib/ai/models.ts`, výchozí `claude-opus-5-5`). Tým je ve starším tvaru `multiagent: {type: 'coordinator'}`,
+protože knihovna `@anthropic-ai/sdk` 0.105 novější neumí; dynamické workflow proto nejsou. Typy, které
+knihovna nezná (strop ceny, nastavení webových nástrojů, cena běhu), se předávají v adaptéru
+`lib/admin/offers/api.ts`.
+
+**Mantinely.** Jen `web_search` a `web_fetch`, žádný příkazový řádek ani soubory; neomezená síť
+(Kryštof 2026-11-25). Agentům nejde telefon, e-mail ani přepis. Tvrzení bez zdroje server zahodí.
+Kroky čekající na schválení server odmítne. 15 běhů za 24 h, jeden běžící na kontakt. DECISIONS #055.
+
+**Data.** Migrace 136: `offer_research` (kontakt nebo firma od asistenta, stav `running`/`done`/`failed`,
+`brief`, `result`, krátký kód chyby, cena v centech, doba běhu), `admin_settings.offer_agents`,
+funkce `purge_offer_research()` (bez zakázky 12 měsíců). Bez migrace se karta neukáže a stránka běží
+dál. Testy `lib/__tests__/admin-navrhovac-rozbor.test.ts`.

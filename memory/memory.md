@@ -125,6 +125,12 @@
 
 *Snímek — přepisuje se, nedoplňuje. Předchozí podrobný snímek po sezeních: `archiv/2026-10.md`.*
 
+**Rozpracováno — navrhovač nabídek (R-147, od 2026-11-25):** plán `docs/admin/NABIDKY-PLAN.md`, větev
+`admin/navrhovac-nabidek` (worktree `.claude/worktrees/navrhovac-nabidek`, necommitnuto). N0 hotové
+(cenová pravidla v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1 v kódu** (2026-11-26): karta
+„Rozbor firmy" u kontaktu, agenti přes Managed Agents, migrace 136. Dál: migrace 136, „Nastavit agenty",
+zkouška na 5 firmách (souhlas Kryštofa), pak N2 (cena, tři varianty, stránka nabídky).
+
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
 (34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
 A1–A3, B1, C0–C3 (bez částí čekajících na R1), E1, E3, E4, E6, E7, F1–F4, G1, H1, I1, J1. CI na `main`
@@ -1696,9 +1702,39 @@ plného klíče v aplikaci. Štítek je nutný, protože webhook platí pro cel�
 doručení neuvidíme. U faktur, připomínek a dotazníků se doručení už ukládá, chybí jen zobrazení. Nastavení
 v Resendu a pořadí nasazení: `docs/admin/AGENTS-ADMIN.md` → „Doručení pozvánek", DECISIONS #054.
 
+### R-147 · Navrhovač nabídek: cena podle hodnoty pro klienta, AI navrhne, Kryštof potvrdí (2026-11-25)
+**Rozhodnutí:** (1) V adminu vznikne navrhovač nabídek: tlačítko „Připravit nabídku" u kontaktu, firmy od
+asistenta a v Hovorech pustí na pozadí rozbor webu firmy, rešerši firmy a trhu z veřejných zdrojů, odhad
+hodnoty pro klienta a návrh ceny ve třech variantách (Základ, Doporučená, Plus). (2) **Cena se odvozuje
+z hodnoty, kterou zakázka klientovi přinese, ne z hodin**; systém hodiny nepočítá ani neukazuje a návrh
+ukazuje jen cenu a zdůvodnění. (3) Spouští se **ručně** (D-N1). (4) Běží na **Managed Agents** od
+Anthropicu (D-N2). (5) Učí se zpětnou vazbou, ne dotrénováním: poslaná cena a odpověď klienta na jedno
+klepnutí, měsíční vyhodnocení, návrhy úprav cenových pravidel, které potvrdí Kryštof. (6) Nic neodejde samo
+(R-084, R-111), každé tvrzení o firmě má zdroj (B10).
+**Proč:** Kryštof 2026-11-25: „navrhli vhodnou cenu na základě různých dat… přesně mi bude říkat ceny na míru…
+trénovat, aby to byl plnohodnotný člen týmu"; „neúčtujeme si dle hodiny, účtujeme si podle toho, co to
+klientovi přinese, jakou hodnotu". Na dotrénování nejsou data: na produkci je 14 klientských zakázek s cenou
+a žádný záznam o poslaných nabídkách. Managed Agents proto, že na Vercel Hobby má funkce časový strop a provoz
+se má stěhovat na Cloudflare (R-135).
+**Důsledek:** plán `docs/admin/NABIDKY-PLAN.md` (kroky N0–N4, otevřené D-N5 retence). Nová cesta k ceně
+nabídky jde přes cenová pravidla v `admin_settings.pricing_rules`, ne natvrdo v kódu. Rozbor osoby (OSVČ) je
+osobní údaj: retence a trigger při smazání kontaktu jsou součástí N1.
+
 ---
 
 ## 3. Otevřené problémy
+
+- [ ] **Navrhovač nabídek N1 (R-147) — spustit a vyzkoušet:** (1) migrace 136 na produkci, (2) nasazení,
+  (3) Kryštof na kartě kontaktu klikne „Nastavit agenty" (založí prostředí a tři agenty v jeho účtu
+  Anthropicu), (4) zkouška na 5 firmách s webem, **seznam firem ukázat předem a pustit až se souhlasem**,
+  odhad 5–10 USD; změřit cenu, dobu a jestli API přijme strop ceny předaný mimo typy knihovny 0.105
+  (DECISIONS #055 (d)), (5) projít kartu na 390 a 1280 px. Ověřeno jen testy nad PGlite s podstrčeným API,
+  `tsc` a hlídacími testy · od 2026-11-26
+- [ ] **vizeon.cz odporuje cenovým pravidlům (R-147):** správa 480 Kč místo 999 Kč, kód zůstává VIZEONu,
+  copywriting mimo cenu, „dohodnutý počet kol". Zadání pro repo webu
+  `new - area of zakaziq/prompty/admin/vizeon-web-podminky-a-sprava.md`, spouští Kryštof · od 2026-11-25
+- [ ] **DECISIONS má dvakrát číslo 052** (Wispr Flow a doručení pozvánek); paměť u R-146 odkazuje na #054.
+  Sjednotit číslování v `.claude/security/DECISIONS.md` · od 2026-11-26
 
 - [ ] **Doručení pozvánek (R-146) — nastavit a projít:** ~~(1) migrace 135 na produkci~~ (2026-11-25), (2) v Resendu (účet
   s doménou vizeon.cz) Webhooks → Add endpoint `https://www.zakaziq.cz/api/resend/vizeon` s událostmi
@@ -2125,6 +2161,40 @@ v Resendu a pořadí nasazení: `docs/admin/AGENTS-ADMIN.md` → „Doručení p
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (navrhovač nabídek N1 — rozbor firmy, R-147)
+- **feat** Karta „Rozbor firmy" na kartě kontaktu: „Nastavit agenty" založí u Anthropicu prostředí a tým tří
+  agentů (Analytik webů na `fast`, Rešeršista na `smart`, Vedoucí na nové roli `deep` = `claude-opus-5-5`),
+  „Připravit rozbor" pustí běh se stropem 2 USD, karta každých 8 s převezme výsledek, server ho zkontroluje
+  (tvrzení bez zdroje pryč) a běh u Anthropicu smaže. Zobrazení: firma, web a co mu chybí, typická zakázka
+  klienta, recenze, signály možností, konkurence, varování, otázky na klienta, číslované zdroje. Smazání
+  se Zpět. Soubory: `lib/admin/offers/{agent-config,api,result,research}.ts`, `app/offer-research-actions.ts`,
+  `components/admin/offers/{research-section,research-card,research-view}.tsx`, `app/dashboard/kontakty/[id]/page.tsx`,
+  `app/api/cron/client-retention/route.ts`, `lib/ai/models.ts`, `.env.example` (`ADMIN_AI_MODEL_DEEP`).
+- **db** Migrace 136 `navrhovac_rozbor`: `offer_research`, `admin_settings.offer_agents`, `purge_offer_research()`
+  (aplikována: ne, nikde).
+- **docs** `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: rozbor firmy", plán oddíl 9 a 11, DECISIONS #055,
+  STATE.md (synchronizováno do `.agents/`). Zadání pro vizeon.cz
+  `new - area of zakaziq/prompty/admin/vizeon-web-podminky-a-sprava.md`.
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-navrhovac-rozbor.test.ts` (24 testů: kontrola
+  výsledku, rozhodování o běhu, nastavení a aktualizace agentů, celý tok nad PGlite s migrací 136 dvakrát,
+  denní strop, jeden běh na kontakt, mazání a retence), `ai-models`, `ws-schema`, hlídací testy adminu a XSS
+  (153), `npm run build`. Vzhled karty na dočasné stránce s vymyšlenými daty na 1280 a 390 px (bez přetečení,
+  ovládání ≥ 44 px, konzole bez chyb; stránka smazaná). Anthropic se nevolal. **Za přihlášením a se skutečnými
+  agenty neověřeno.** Bezpečnostní review před commitem bez nálezu k opravě (AUDIT-LOG 2026-11-26).
+
+### 2026-11-25 (navrhovač nabídek — R-147)
+- **docs** Plán navrhovače nabídek `docs/admin/NABIDKY-PLAN.md`: rozbor webu, rešerše firmy, odhad hodnoty
+  pro klienta a tři varianty ceny, Managed Agents, učení ze zpětné vazby, data, rizika, kroky N0–N4.
+  Rozbor před plánem: v historii sezení Claude Code předchozí rozhovor o tomhle není; na produkci 14 klientských
+  zakázek s cenou 4 000–50 000 Kč, odhad hodin jen u jedné, 240 z 372 firem od asistenta má rešerši.
+  Kód zatím žádný, větev `admin/navrhovac-nabidek`.
+- **decision** **R-147** (D-N1–D-N5 rozhodl Kryštof).
+- **docs** Cenotvorba VIZEONu v plánu, oddíl 5: rozhovor s Kryštofem v šesti kolech (Q1–Q39). Pásma podle
+  hodnoty jedné zakázky klienta (prezentace 10–30 tisíc, doporučená až 50 tisíc), e-shop 30–80 tisíc,
+  správa 999 Kč, web patří klientovi, úpravy do spokojenosti, smlouvání jen přes rozsah, nabídka jako stránka
+  ve značce VIZEON. Rozpory s vizeon.cz (správa 480 Kč, vlastnictví kódu, copywriting mimo cenu) zapsané
+  v oddílu 5.2, opravu webu čeká zadání pro repo vizeon.cz.
 
 ### 2026-11-25 (doručení pozvánek — R-146)
 - **feat** Kalendář ukazuje, jestli pozvánka na schůzku opravdu dorazila: dvojitá fajfka „Pozvánka dorazila",
