@@ -335,6 +335,34 @@ struct OkBody: Decodable {
   let ok: Bool
 }
 
+/// Odpověď `POST /feedback`: kolik slov člověk změnil a kolik slov se tím naučilo.
+public struct FeedbackResult: Decodable, Equatable, Sendable {
+  public let userEdits: Int
+  public let learned: Int
+
+  enum CodingKeys: String, CodingKey { case ok, userEdits, learned }
+
+  public init(userEdits: Int, learned: Int) {
+    self.userEdits = userEdits
+    self.learned = learned
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    guard try c.decodeIfPresent(Bool.self, forKey: .ok) == true else {
+      throw DecodingError.dataCorruptedError(forKey: .ok, in: c, debugDescription: "ok není true")
+    }
+    userEdits = try c.decodeIfPresent(Int.self, forKey: .userEdits) ?? 0
+    learned = (try? c.decodeIfPresent(Int.self, forKey: .learned)) ?? 0
+  }
+
+  /// Oprava, kterou nemá smysl posílat znovu (diktát neznámý, starší než 24 h, bez textu).
+  public static func isFinal(_ error: VoiceError) -> Bool {
+    if case .server(let code, _) = error { return ["NOT_FOUND", "TOO_OLD", "NO_TEXT", "INVALID_BODY"].contains(code) }
+    return false
+  }
+}
+
 /// Klient pro okno ZakazIQ Voice: čísla, slovník a nastavení (VO11). Stejná pravidla jako
 /// `VoiceClient` (klíč jen v hlavičce, bez cookie, bez přesměrování, bez `Origin`).
 public struct VoiceAPI: Sendable {
@@ -369,6 +397,15 @@ public struct VoiceAPI: Sendable {
     var request = VoiceClient.request(base: base, path: "terms", key: key, method: "DELETE")
     request.url = Self.withQuery(request.url!, ["id": id])
     return await send(request, as: OkBody.self).map { _ in () }
+  }
+
+  /// Oprava po vložení (VO09): jak vložený úsek vypadá teď. Server se z rozdílu učí.
+  public func feedback(id: UUID, editedText: String) async -> Result<FeedbackResult, VoiceError> {
+    var request = VoiceClient.request(base: base, path: "feedback", key: key, method: "POST")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    struct Body: Encodable { let id: String; let editedText: String }
+    request.httpBody = try? JSONEncoder().encode(Body(id: id.uuidString.lowercased(), editedText: String(editedText.prefix(20_000))))
+    return await send(request, as: FeedbackResult.self)
   }
 
   public func settings() async -> Result<RemoteSettings, VoiceError> {

@@ -173,6 +173,12 @@ struct HubSettingsView: View {
         ProgressView().controlSize(.small)
       }
       Divider().overlay(Dilky.navy100)
+      HubToggleRow(
+        title: "Učit se z mých oprav",
+        detail: "Když vložený text v aplikaci opravíte, ZakazIQ Voice opravu pošle a přepis se zlepší. Pole pro heslo se nečte nikdy.",
+        isOn: $hub.learnFromEdits
+      )
+      Divider().overlay(Dilky.navy100)
       HStack(spacing: 12) {
         VStack(alignment: .leading, spacing: 2) {
           Text("Místní historie").font(DilkyFont.sans(14, weight: 500))
@@ -234,6 +240,23 @@ struct HubSettingsView: View {
         }
         Spacer()
         Button("Ukázat úvod") { hub.reopenOnboarding() }.buttonStyle(HubSecondaryButton(compact: true))
+      }
+      if !hub.unreadable.isEmpty {
+        Divider().overlay(Dilky.navy100)
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Kde se opravy nedají zachytit").font(DilkyFont.sans(13, weight: 500))
+          Text("Tyhle aplikace nedovolí přečíst pole po vložení, opravy z nich se neučí. Diktování v nich funguje normálně.")
+            .font(DilkyFont.sans(12))
+            .foregroundStyle(Dilky.quiet)
+            .fixedSize(horizontal: false, vertical: true)
+          ForEach(hub.unreadable.prefix(8), id: \.app) { item in
+            HStack {
+              Text(item.app).font(DilkyFont.sans(13))
+              Spacer()
+              Text("\(HubFormat.number(item.count))×").font(DilkyFont.mono(12)).foregroundStyle(Dilky.quiet)
+            }
+          }
+        }
       }
     }
   }

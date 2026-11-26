@@ -69,6 +69,10 @@ final class HubModel: ObservableObject {
   @Published var sounds: Bool { didSet { prefs.sounds = sounds } }
   @Published var showBarWhenIdle: Bool { didSet { prefs.showBarWhenIdle = showBarWhenIdle } }
   @Published var historyDays: Int { didSet { prefs.historyDays = historyDays } }
+  /// Číst pole po vložení a posílat opravy (VO09). Vypnuté = nic se nečte.
+  @Published var learnFromEdits: Bool { didSet { prefs.learnFromEdits = learnFromEdits } }
+  /// Kde se pole po vložení nepodařilo přečíst (jen čísla, O aplikaci).
+  @Published private(set) var unreadable: [(app: String, count: Int)] = []
   @Published private(set) var launchAtLogin: LaunchAtLogin.State = LaunchAtLogin.state
   @Published private(set) var launchError: String?
 
@@ -106,6 +110,7 @@ final class HubModel: ObservableObject {
     sounds = prefs.sounds
     showBarWhenIdle = prefs.showBarWhenIdle
     historyDays = prefs.historyDays
+    learnFromEdits = prefs.learnFromEdits
     showOnboarding = !hubPrefs.onboardingDone
     if let cached = cache.load() {
       numbers = .cached(cached.stats, fetchedAt: cached.fetchedAt, reason: "")
@@ -149,6 +154,7 @@ final class HubModel: ObservableObject {
     #endif
     reloadHistory()
     launchAtLogin = LaunchAtLogin.state
+    unreadable = UnreadableFields().sorted
     switch tab {
     case .home: await loadNumbers()
     case .dictionary: await loadDictionary()
