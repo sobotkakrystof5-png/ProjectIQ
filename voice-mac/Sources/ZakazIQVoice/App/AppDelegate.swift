@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private var statusLine: NSMenuItem?
   private var noticeLine: NSMenuItem?
   private var dictateItem: NSMenuItem?
+  private var queueLine: NSMenuItem?
   private var window: NSWindow?
   private var permissionTimer: Timer?
   private var hotkeyTimer: Timer?
@@ -50,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       .store(in: &subscriptions)
 
     startHotkey()
+    dictation.startBackground()
 
     if model.hasKey {
       Task { await model.testConnection() }
@@ -86,6 +88,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     dictate.toolTip = "Diktát bez držení klávesy. Ukončíte ho dalším klepnutím nebo klávesou."
     menu.addItem(dictate)
     dictateItem = dictate
+    menu.addItem(makeItem("Zkopírovat poslední diktát", #selector(copyLast), key: ""))
+    let queue = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    queue.isEnabled = false
+    queue.isHidden = true
+    menu.addItem(queue)
+    queueLine = queue
     menu.addItem(.separator())
 
     menu.addItem(makeItem("Otevřít ZakazIQ Voice…", #selector(openWindow), key: ","))
@@ -110,9 +118,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     statusLine?.title = model.connection.menuLine
     dictateItem?.title = dictation.phase == .recording ? "Dokončit diktát" : "Diktovat"
     dictateItem?.isEnabled = dictation.phase != .processing
+    let waiting = dictation.queueCount
+    queueLine?.isHidden = waiting == 0
+    queueLine?.title = "Ve frontě: \(waiting) \(Self.dictationWord(waiting))"
   }
 
   @objc private func toggleDictation() { dictation.toggleFromMenu() }
+  @objc private func copyLast() { dictation.copyLastDictation() }
+
+  /// 1 diktát, 2–4 diktáty, 5 a víc diktátů.
+  static func dictationWord(_ count: Int) -> String {
+    switch count {
+    case 1: return "diktát"
+    case 2...4: return "diktáty"
+    default: return "diktátů"
+    }
+  }
 
   #if DEBUG
   @objc private func debugProcessing() { dictation.debugShowProcessing() }

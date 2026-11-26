@@ -168,6 +168,11 @@ struct SettingsView: View {
         detail: "Malá lišta dole uprostřed obrazovky. Když ji vypnete, objeví se jen při diktování.",
         isOn: $model.showBarWhenIdle
       )
+      ToggleRow(
+        title: "Zvuk při diktování",
+        detail: "Krátký tón na začátku a na konci nahrávání.",
+        isOn: $model.sounds
+      )
       if model.shortcut == .fn, let advice = model.fnUsage.advice {
         Divider().overlay(Dilky.navy100)
         VStack(alignment: .leading, spacing: 8) {

@@ -49,8 +49,15 @@ public enum BarLayout {
     case .listening(.hold): return CGSize(width: 216, height: 36)
     case .listening(.handsFree): return CGSize(width: 252, height: 36)
     case .processing: return CGSize(width: 96, height: 28)
-    case .message: return CGSize(width: 248, height: 32)
+    case .message(let message): return CGSize(width: messageWidth(message.text), height: 32)
     }
+  }
+
+  /// Šířka hlášky: aspoň 248 (náhled), delší text pilulku roztáhne, nejvýš na šířku panelu.
+  /// Odhad 6,3 bodu na znak Instrument Sans 12 + dílky, mezery a okraje.
+  public static func messageWidth(_ text: String) -> CGFloat {
+    let estimate = 14 + 18 + 10 + CGFloat(text.count) * 6.3 + 14
+    return min(panelSize.width - 8, max(248, estimate.rounded(.up)))
   }
 
   /// Velikost dílku (strana čtverečku) podle stavu.

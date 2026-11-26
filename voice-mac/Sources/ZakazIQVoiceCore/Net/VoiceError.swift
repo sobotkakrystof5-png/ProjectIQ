@@ -71,6 +71,38 @@ public enum VoiceMessages {
   public static let microphoneFailed = "Mikrofon se nepodařilo spustit"
   public static let hotkeyMissing = "Povolte Sledování vstupu a Zpřístupnění, aby fungovala klávesa"
 
+  // Po odeslání (VO06). Krátké, vejdou se do lišty.
+  public static let inClipboard = "Text je ve schránce"
+  public static let inClipboardNoAccess = "Povolte Zpřístupnění, text je ve schránce"
+  public static let nothingHeard = "Nic jsem neslyšel"
+  public static let offlineQueued = "Bez připojení, diktát počká"
+  public static let retryQueued = "Přepis se nepovedl, zkusím to znovu"
+  public static let noKeyQueued = "Chybí klíč zařízení, diktát počká"
+  public static let queueDone = "Diktát z fronty je hotový, klikněte pro kopii"
+  public static let queueExpired = "Diktát se do 24 hodin nepodařilo přepsat"
+  public static let copied = "Zkopírováno"
+
+  /// Krátká hláška do lišty, když diktát neprošel.
+  public static func barText(for error: VoiceError) -> String {
+    switch error {
+    case .offline, .cannotConnect, .timedOut, .network:
+      return offlineQueued
+    case .noKey, .invalidKey:
+      return noKeyQueued
+    case .server(let code, let status):
+      switch code {
+      case "UNAUTHORIZED": return "Klíč zařízení neplatí. Vložte nový v Nastavení."
+      case "TOO_LARGE": return "Nahrávka je moc dlouhá"
+      case "RATE_LIMITED": return "Moc diktátů za sebou, zkusím to za chvíli"
+      case "STT_FAILED": return retryQueued
+      case "NOT_CONFIGURED": return "Server ještě není na diktování připravený"
+      default: return status >= 500 ? "Server teď neodpovídá, zkuste to znovu" : "Server diktát nepřijal"
+      }
+    case .redirected, .unexpectedResponse, .insecureConnection, .invalidAddress:
+      return "Zkontrolujte adresu serveru v Nastavení"
+    }
+  }
+
   public static func text(for error: VoiceError) -> String {
     switch error {
     case .noKey:

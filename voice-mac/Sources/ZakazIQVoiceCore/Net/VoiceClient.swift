@@ -15,8 +15,9 @@ public struct VoiceClient: Sendable {
   public static let basePath = "api/public/voice"
 
   public let base: URL
-  private let key: String
-  private let transport: VoiceTransport
+  // Jen pro tenhle modul (rozšíření v `Dictate.swift`); ven se klíč nedostane.
+  let key: String
+  let transport: VoiceTransport
 
   public init(base: URL, key: String, transport: VoiceTransport = URLSessionTransport()) {
     self.base = base

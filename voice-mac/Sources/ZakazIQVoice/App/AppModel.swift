@@ -62,6 +62,15 @@ final class AppModel: ObservableObject {
     shortcut = value
   }
 
+  /// Zvuk při začátku a konci diktátu (VO06, výchozí vypnuto).
+  var sounds: Bool {
+    get { dictation.sounds }
+    set {
+      objectWillChange.send()
+      dictation.setSounds(newValue)
+    }
+  }
+
   /// Volba „Ukazovat lištu v klidu" (VO05). Přes `Binding`, ať jde rovnou do přepínače.
   var showBarWhenIdle: Bool {
     get { dictation.showBarWhenIdle }
