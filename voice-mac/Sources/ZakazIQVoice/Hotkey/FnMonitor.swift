@@ -17,6 +17,9 @@ final class FnMonitor {
     case up
     case otherKey
     case escape
+    /// Enter (i na numerické klávesnici). Nepohlcuje se; zachycení oprav (VO09) si pole
+    /// přečte dřív, než zpráva odejde.
+    case enter
   }
 
   var shortcut: DictationShortcut = .fn {
@@ -96,6 +99,8 @@ final class FnMonitor {
         }
       } else if triggerHeld {
         post(.otherKey)
+      } else if code == Int64(kVK_Return) || code == Int64(kVK_ANSI_KeypadEnter) {
+        post(.enter)
       }
     default:
       break

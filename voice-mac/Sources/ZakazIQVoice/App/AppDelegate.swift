@@ -187,4 +187,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   @objc private func quit() { NSApp.terminate(nil) }
+
+  func applicationWillTerminate(_ notification: Notification) {
+    dictation.flushEdits()
+  }
 }

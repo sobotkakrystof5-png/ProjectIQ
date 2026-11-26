@@ -55,6 +55,8 @@ final class DictationController: ObservableObject {
   private let monitor = FnMonitor()
   private let recorder = Recorder()
   private let paster = Paster()
+  /// Zachycení oprav po vložení (VO09).
+  private let editWatcher = EditWatcher()
   private var trigger = DictationTrigger()
   private var context: DictationContext?
   private var abandoned = false
@@ -76,6 +78,11 @@ final class DictationController: ObservableObject {
     bar.onClick = { [weak self] in self?.toggleFromMenu() }
     bar.onCancel = { [weak self] in self?.send(.barCancel) }
     bar.onCopy = { [weak self] text in self?.copy(text) }
+    editWatcher.onEdited = { [weak self] id in
+      guard let self else { return }
+      try? self.history?.markEdited(id: id)
+      self.historyRevision += 1
+    }
 
     // Okno (VO11) zapisuje volby rovnou do Preferences; lišta a zkratka je převezmou tady.
     defaultsObserver = NotificationCenter.default.addObserver(
@@ -120,7 +127,10 @@ final class DictationController: ObservableObject {
     let monitor = NWPathMonitor()
     monitor.pathUpdateHandler = { [weak self] path in
       guard path.status == .satisfied else { return }
-      Task { @MainActor in await self?.processQueue() }
+      Task { @MainActor in
+        self?.editWatcher.retryQueue()
+        await self?.processQueue()
+      }
     }
     monitor.start(queue: DispatchQueue(label: "cz.zakaziq.voice.network"))
     pathMonitor = monitor
@@ -185,7 +195,13 @@ final class DictationController: ObservableObject {
     case .up: send(.keyUp)
     case .otherKey: send(.otherKey)
     case .escape: send(.escape)
+    case .enter: editWatcher.enterPressed()
     }
+  }
+
+  /// Ukončení aplikace: poslat rozpracovanou opravu (VO09).
+  func flushEdits() {
+    editWatcher.flush()
   }
 
   private func send(_ event: TriggerEvent) {
@@ -241,6 +257,8 @@ final class DictationController: ObservableObject {
       show(BarMessage(VoiceMessages.microphoneDenied, tone: .error))
       return
     }
+    // Nový diktát: oprava předchozího se odešle hned (VO09).
+    editWatcher.flush()
     let id = UUID()
     guard recorder.start(id: id) else {
       trigger.reset()
@@ -323,6 +341,9 @@ final class DictationController: ObservableObject {
       switch decision {
       case .paste:
         paster.paste(response.text)
+        if prefs.learnFromEdits, let pid = ctx.app?.pid {
+          editWatcher.watch(id: ctx.id, insertedText: response.text, pid: pid)
+        }
         message = nil
       case .clipboardOnly(.abandoned):
         message = nil
