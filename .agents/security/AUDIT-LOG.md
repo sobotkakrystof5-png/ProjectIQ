@@ -1022,3 +1022,18 @@ Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
 - Left open: klientský prostor v Preview nejde přihlásit (druhý Supabase projekt nejde založit, limit
   2 free projektů; rozhodnutí Kryštofa „bez Supabase v Preview"). Preview stále sdílí identitu admina
   s produkcí. Před každým novým `DATABASE_URL*` pro Preview ověřit hostitele (`ep-shiny-union` = test).
+
+## 2026-11-26 — review ZakazIQ Voice VO01 (klíč zařízení, migrace 136)
+
+- Scope: `migrations/136_zakaziq_voice.sql`, `lib/admin/voice/{keys,devices}.ts`, `app/voice-actions.ts`,
+  `app/dashboard/voice/page.tsx`, `components/admin/voice/devices-panel.tsx` (web-security-review, větev
+  `admin/zakaziq-voice`). Veřejný vstup `/api/public/voice/*` zatím není (VO02).
+- Prošlo: všechny tři akce začínají `requireAuth()` (session s `aal2`, když je zapsaný druhý faktor),
+  vstup přes Zod (uuid, název 1–80 znaků), dotazy parametrizované přes `adminDb`; klíč existuje v čitelné
+  podobě jen v odpovědi na vytvoření, v DB prefix + HMAC (`voice:` doména, `timingSafeEqual`), chyby se logují
+  jen názvem; pepř jen na serveru (`server-only`), bez `NEXT_PUBLIC_`; název zařízení se vykresluje jako
+  text Reactu, žádné `dangerouslySetInnerHTML`; strop 10 platných zařízení a „Zpět" jen do 2 min drží SQL,
+  ne klient. CSP beze změny.
+- Fixed: nic k opravě.
+- Left open: přijatá rizika v DECISIONS #055 (klíč v Klíčence Macu, text diktátů bez lhůty, společný
+  `AGENT_KEY_PEPPER`). Migrace 136 na testovacím Neonu ano, na produkci ne.

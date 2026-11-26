@@ -9,7 +9,7 @@
 export type NavIcon =
   | 'today' | 'projects' | 'done' | 'requests' | 'inbox'
   | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
-  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services' | 'messages'
+  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services' | 'messages' | 'voice'
 
 export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts' | 'messages'
 
@@ -80,6 +80,8 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: '/dashboard/projekty', label: 'Projekty', icon: 'personal' },
       { href: '/dashboard/startup', label: 'Startup', icon: 'startup' },
+      // Diktování na Macu přes Fn (R-148): zařízení, později statistiky a učení (VO10).
+      { href: '/dashboard/voice', label: 'ZakazIQ Voice', icon: 'voice' },
     ],
   },
 ]

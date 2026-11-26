@@ -2,10 +2,13 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-25 · **ZakazIQ Voice — VO00** (R-148): vlastní diktování jako
-> Wispr Flow (Fn na Macu, přepis a učení v adminu). Plán `docs/admin/VOICE-PLAN.md` a prompty VO00–VO12
-> jsou na větvi `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`). Text diktátů zůstává
-> natrvalo, dokud ho Kryštof nesmaže. Chybí klíč Groq a test skutečného hlasu; kód zatím žádný.
+> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO01** (R-148): migrace 136 (sedm tabulek
+> `voice_*`) a v adminu `/dashboard/voice` se zařízeními a klíčem `zk_voice_…` ukázaným jednou. Migrace
+> je na **testovacím** Neonu, ne na produkci. Větev `admin/zakaziq-voice` (worktree
+> `.claude/worktrees/zakaziq-voice`). VO00 dál čeká na klíč Groq a nahrávky vlastního hlasu.
+>
+> Předchozí: 2026-11-25 · **ZakazIQ Voice — VO00** (R-148): plán a prompty VO00–VO12 do repa, rozhodnutí,
+> ceny, skript testu přepisu. Text diktátů zůstává natrvalo, dokud ho Kryštof nesmaže.
 >
 > Předchozí: 2026-11-24 · **Faktury s povinnými údaji a druhem** (R-142, R-143): PDF splňuje
 > náležitosti českého dokladu (údaj o zápisu, datum plnění, značka VIZEON, „Vystaveno v systému ZakazIQ" na
@@ -111,9 +114,10 @@
 **ZakazIQ Voice (R-148, od 2026-11-25, větev `admin/zakaziq-voice`):** diktování na Macu přes Fn,
 zpracování a statistiky v adminu `/dashboard/voice`. Třináct sezení VO00–VO12, plán
 `docs/admin/VOICE-PLAN.md` (stav v oddílu 14), prompty `new - area of zakaziq/prompty/voice/`.
-VO00 rozpracované: plán v repu, rozhodnutí, ceny ověřené, `scripts/voice-stt-test.mjs` běží. Další krok:
-Kryštof vloží `GROQ_API_KEY`, nahraje ~10 vět do `~/ZakazIQ-voice-test/`, vytvoří certifikát pro podpis;
-pak dokončit test přepisu a VO01 (migrace 136, klíč zařízení).
+VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01 hotové 2026-11-26**: migrace 136 v repu a na
+testovacím Neonu, `/dashboard/voice` se zařízeními (menu Osobní). Další krok: **VO02** (příjem diktátu,
+potřebuje `GROQ_API_KEY`) nebo **VO03** (kostra aplikace na Macu, potřebuje certifikát pro podpis).
+Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
 
@@ -1658,6 +1662,13 @@ ve VO02. Žádný nový npm balíček.
   (3) před VO03 certifikát pro podpis: Přístup ke klíčence → Asistent certifikátů → Vytvořit certifikát,
   název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu **Code Signing**
   (dnes 0 identit pro podpis). Zatím otestováno jen OpenAI na syntetickém hlasu (plán 12a) · Kryštof · od 2026-11-25
+- [ ] **ZakazIQ Voice — test číslování migrací na větvi `admin/zakaziq-voice` padá:** migrace 136 je za 133,
+  čísla 134 (zrušení schůzek) a 135 (doručení pozvánek) jsou na jiných větvích. Spraví se rebasem po jejich
+  sloučení do `main`; čísla neměnit · `lib/ws/__tests__/ws-schema.test.ts` · od 2026-11-26
+- [ ] **ZakazIQ Voice — `/dashboard/voice` za přihlášením neověřené:** vzhled ověřen jen na dočasné stránce
+  s vymyšlenými zařízeními (1280 a 390 px, bez přetečení, plochy ≥ 44 px, konzole bez chyb). Projít
+  s přihlášením: Přidat zařízení → klíč ukázaný jednou, po obnovení stránky už ne → Zneplatnit → Zpět.
+  Blok s klíčem okem nikdo neviděl (stejné třídy jako klíč webu, KP17) · od 2026-11-26
 - [ ] **Profil dodavatele bez IBANu:** produkční `admin_settings.issuer_profile` je od 2026-11-24 přepsaný na
   skutečné údaje (Kryštof Sobotka, VIZEON, IČO 29977231, neplátce, údaj o zápisu, vizeon.cz; SQL na souhlas
   Kryštofa). Chybí **IBAN** (bez něj faktura nemá účet ani QR) a případně DIČ. Doplnit v Faktury › Údaje
@@ -2067,6 +2078,20 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice — VO01, R-148)
+- **db** Migrace 136 `zakaziq_voice`: `voice_devices`, `voice_dictations`, `voice_terms`, `voice_rules` (13 vestavěných
+  blokovaných frází), `voice_corrections` (kaskáda s diktátem), `voice_suggestions`, `voice_settings` (7 výchozích,
+  `text_retention_days` NULL = natrvalo, `store_text`, `daily_cost_cap_usd`), trigger `voice_dictations_forget`
+  (smazaný diktát zmizí i z příkladů návrhů). Aplikována: **testovací Neon ano** (ZakazIQ RD test, ověřeno přes
+  Neon, 7 tabulek, druhý běh přeskočen), **produkce ne** (až VO12).
+- **feat** Klíč zařízení `zk_voice_…` (`lib/admin/voice/keys.ts`, HMAC s `AGENT_KEY_PEPPER` a doménou `voice:`)
+  a zařízení (`lib/admin/voice/devices.ts`: strop 10 platných, Zpět do 2 min). Admin `/dashboard/voice` (menu
+  Osobní › ZakazIQ Voice, ikona `Mic`) s kartou Zařízení, akce `app/voice-actions.ts`, tón `VOICE_DEVICE_TONE`.
+- **chore** Testy `voice-schema` a `voice-keys` (23 nových, PGlite). Ověřeno: `tsc` čisté, `npm test` 1820 prošlo,
+  4 známá selhání (číslování migrací 134/135, `ws-email` s pevným datem, dva časové limity, samostatně 22/22),
+  `npm run build:check` prošel. Vzhled na dočasné stránce 1280 a 390 px. Bezpečnost DECISIONS #055, STATE,
+  AUDIT-LOG 2026-11-26. Worktree dostal vlastní `node_modules` (klon), odkaz Turbopack odmítl.
 
 ### 2026-11-25 (ZakazIQ Voice — VO00, R-148)
 - **docs** Plán `docs/admin/VOICE-PLAN.md` a prompty `new - area of zakaziq/prompty/voice/` (VO00–VO12,

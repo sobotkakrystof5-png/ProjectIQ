@@ -1,0 +1,202 @@
+-- Migrace 136: ZakazIQ Voice — diktování z Macu (R-148)
+--
+-- Aplikace ZakazIQ Voice na Macu nahraje řeč (podržená klávesa Fn), pošle ji
+-- na `/api/public/voice/dictate` a server ji přepíše, projde pojistkami proti
+-- halucinacím, učeše a vrátí text. Každý diktát je řádek v `voice_dictations`:
+-- z něj se počítá aktivita a slova za den a z oprav, které Kryštof udělá po
+-- vložení, se systém učí (slovník, blokované fráze, pravidla stylu).
+--
+-- Všechno je v adminu (schéma `public`, jeden uživatel, R-001). Tabulky jsou
+-- nové, žádná stávající se nemění.
+--
+-- Soukromí: zvuk se nikam neukládá. Text diktátu zůstává natrvalo, dokud ho
+-- Kryštof nesmaže (D-V7, R-148); nastaví-li `voice_settings.text_retention_days`, denní úklid
+-- ho po lhůtě smaže a zůstanou jen čísla (slova, časy, aplikace) pro statistiky.
+--
+-- Text žije s diktátem: smazání diktátu smaže i jeho opravy (cizí klíč) a vyčistí
+-- odkazy v návrzích z učení (trigger níž), takže po výmazu nezbude stopa textu.
+--
+-- Idempotentní: druhý běh nic nezmění. Aplikuje Kryštof (R-082), ne agent.
+
+-- Zařízení (Mac) s vlastním klíčem. V DB je jen prefix a HMAC klíče, nikdy klíč.
+CREATE TABLE IF NOT EXISTS voice_devices (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name          text        NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
+  prefix        text        NOT NULL UNIQUE CHECK (prefix ~ '^[A-Za-z0-9]{10}$'),
+  key_hash      text        NOT NULL CHECK (key_hash ~ '^[0-9a-f]{64}$'),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  created_by    text,
+  last_used_at  timestamptz,
+  revoked_at    timestamptz,
+  revoked_by    text
+);
+
+-- Jeden řádek = jeden diktát. `id` vytvoří Mac, takže opakované odeslání nic nezdvojí.
+CREATE TABLE IF NOT EXISTS voice_dictations (
+  id                uuid        PRIMARY KEY,
+  device_id         uuid        REFERENCES voice_devices(id) ON DELETE SET NULL,
+  started_at        timestamptz NOT NULL,
+  duration_ms       integer     NOT NULL CHECK (duration_ms BETWEEN 0 AND 3600000),
+  -- Čas řeči bez ticha (měří Mac). Z něj se počítá rychlost.
+  speech_ms         integer     CHECK (speech_ms IS NULL OR speech_ms BETWEEN 0 AND 3600000),
+  mode              text        NOT NULL DEFAULT 'hold' CHECK (mode IN ('hold', 'hands_free')),
+  app_bundle_id     text        CHECK (app_bundle_id IS NULL OR char_length(app_bundle_id) <= 200),
+  app_name          text        CHECK (app_name IS NULL OR char_length(app_name) <= 120),
+  category          text        NOT NULL DEFAULT 'other'
+                                CHECK (category IN ('email', 'work_msg', 'personal_msg', 'ai_prompt', 'document', 'other')),
+  -- ok = učesaný text · raw = čištění odmítnuté pojistkou, vrácen přepis ·
+  -- snippet = vložená zkratka · empty = nic se neřeklo · blocked = pojistka
+  -- zahodila celý přepis jako halucinaci · error = přepis selhal · cancelled = Esc
+  status            text        NOT NULL
+                                CHECK (status IN ('ok', 'raw', 'snippet', 'empty', 'blocked', 'error', 'cancelled')),
+  -- Která pojistka zasáhla (jen kód, bez textu): segments, blocklist, repeat, cleanup_* …
+  guards            text[]      NOT NULL DEFAULT '{}' CHECK (cardinality(guards) <= 20),
+  raw_text          text        CHECK (raw_text IS NULL OR char_length(raw_text) <= 20000),
+  final_text        text        CHECK (final_text IS NULL OR char_length(final_text) <= 20000),
+  -- Jak text vypadal po opravě v aplikaci (z Macu, jen vložený úsek).
+  edited_text       text        CHECK (edited_text IS NULL OR char_length(edited_text) <= 20000),
+  words             integer     NOT NULL DEFAULT 0 CHECK (words >= 0),
+  -- Slova, která změnilo čištění, a náhrady ze slovníku (jako „Fixes made by Flow").
+  words_corrected   integer     NOT NULL DEFAULT 0 CHECK (words_corrected >= 0),
+  dictionary_fixes  integer     NOT NULL DEFAULT 0 CHECK (dictionary_fixes >= 0),
+  -- Slova, která Kryštof po vložení opravil. Měřítko, jestli se systém učí.
+  user_edits        integer     NOT NULL DEFAULT 0 CHECK (user_edits >= 0),
+  stt_provider      text,
+  stt_model         text,
+  llm_model         text,
+  stt_ms            integer,
+  llm_ms            integer,
+  total_ms          integer,
+  audio_seconds     numeric(8,2),
+  tokens_in         integer,
+  tokens_out        integer,
+  cost_usd          numeric(10,6),
+  text_purged_at    timestamptz,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+
+-- Statistiky čtou podle okamžiku (`started_at >= …`), ne `AT TIME ZONE` ve WHERE (R-093).
+CREATE INDEX IF NOT EXISTS voice_dictations_started_idx ON voice_dictations (started_at DESC);
+CREATE INDEX IF NOT EXISTS voice_dictations_purge_idx
+  ON voice_dictations (created_at) WHERE text_purged_at IS NULL;
+
+-- Historie v adminu (VO10) hledá podle zařízení a stavu.
+CREATE INDEX IF NOT EXISTS voice_dictations_device_idx ON voice_dictations (device_id, started_at DESC);
+
+-- Slovník: správný tvar slova a jak ho přepis slyší; zkratky (snippety).
+CREATE TABLE IF NOT EXISTS voice_terms (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind        text        NOT NULL DEFAULT 'term' CHECK (kind IN ('term', 'snippet')),
+  term        text        NOT NULL CHECK (char_length(term) BETWEEN 1 AND 80),
+  heard_as    text[]      NOT NULL DEFAULT '{}',
+  expansion   text        CHECK (expansion IS NULL OR char_length(expansion) <= 2000),
+  source      text        NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'learned')),
+  uses        integer     NOT NULL DEFAULT 0 CHECK (uses >= 0),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CHECK (kind = 'term' OR expansion IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS voice_terms_unique ON voice_terms (kind, lower(term));
+
+-- Pravidla stylu pro čištění a blokované fráze (typické halucinace přepisu).
+-- `mode` u blokované fráze: always = vždy pryč (titulky, reklama),
+-- alone = jen když je to celý přepis krátké nahrávky („Děkuji za pozornost").
+CREATE TABLE IF NOT EXISTS voice_rules (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind        text        NOT NULL CHECK (kind IN ('rule', 'blocklist')),
+  text        text        NOT NULL CHECK (char_length(text) BETWEEN 2 AND 300),
+  mode        text        NOT NULL DEFAULT 'alone' CHECK (mode IN ('always', 'alone')),
+  active      boolean     NOT NULL DEFAULT true,
+  source      text        NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'learned', 'builtin')),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS voice_rules_unique ON voice_rules (kind, lower(text));
+
+-- Opravy po vložení: co přepis napsal a co z toho Kryštof udělal (po slovech).
+CREATE TABLE IF NOT EXISTS voice_corrections (
+  id            bigserial   PRIMARY KEY,
+  dictation_id  uuid        NOT NULL REFERENCES voice_dictations(id) ON DELETE CASCADE,
+  heard         text        NOT NULL CHECK (char_length(heard) BETWEEN 1 AND 120),
+  fixed         text        NOT NULL CHECK (char_length(fixed) BETWEEN 1 AND 120),
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS voice_corrections_pair_idx ON voice_corrections (lower(heard), fixed);
+
+-- Návrhy z logů: co by se mělo naučit. Pravidla a fráze vždy potvrzuje člověk,
+-- slovo se může naučit samo (voice_settings.auto_learn_terms, od 3 výskytů).
+CREATE TABLE IF NOT EXISTS voice_suggestions (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind        text        NOT NULL CHECK (kind IN ('term', 'blocklist', 'rule')),
+  payload     jsonb       NOT NULL,
+  evidence    integer     NOT NULL DEFAULT 1 CHECK (evidence >= 1),
+  examples    uuid[]      NOT NULL DEFAULT '{}',
+  reason      text        CHECK (reason IS NULL OR char_length(reason) <= 300),
+  source      text        NOT NULL DEFAULT 'rules' CHECK (source IN ('rules', 'ai')),
+  status      text        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+  dedupe_key  text        NOT NULL UNIQUE CHECK (char_length(dedupe_key) <= 300),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  decided_at  timestamptz
+);
+CREATE INDEX IF NOT EXISTS voice_suggestions_pending_idx ON voice_suggestions (created_at DESC) WHERE status = 'pending';
+
+-- Smazaný diktát zmizí i z příkladů u návrhů (pole uuid[] cizí klíč neumí).
+-- Nevyřízený návrh, kterému nezbyl žádný příklad, nemá z čeho stát a jde pryč.
+CREATE OR REPLACE FUNCTION voice_forget_dictations() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE voice_suggestions s
+     SET examples = ARRAY(SELECT e FROM unnest(s.examples) AS e WHERE e NOT IN (SELECT id FROM gone))
+   WHERE s.examples && ARRAY(SELECT id FROM gone);
+  DELETE FROM voice_suggestions WHERE status = 'pending' AND cardinality(examples) = 0;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS voice_dictations_forget ON voice_dictations;
+CREATE TRIGGER voice_dictations_forget
+  AFTER DELETE ON voice_dictations
+  REFERENCING OLD TABLE AS gone
+  FOR EACH STATEMENT EXECUTE FUNCTION voice_forget_dictations();
+
+-- Nastavení: styl podle kategorie, rychlost psaní, retence, učení.
+CREATE TABLE IF NOT EXISTS voice_settings (
+  key         text        PRIMARY KEY CHECK (key ~ '^[a-z_]{1,40}$'),
+  value       jsonb       NOT NULL,
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Známé halucinace přepisu češtiny na tichu nebo šumu (Whisper se je naučil
+-- z titulků). Vestavěné, jdou vypnout v adminu.
+INSERT INTO voice_rules (kind, text, mode, source) VALUES
+  ('blocklist', 'Titulky vytvořil JohnyX', 'always', 'builtin'),
+  ('blocklist', 'Titulky vytvořil', 'always', 'builtin'),
+  ('blocklist', 'Titulky:', 'always', 'builtin'),
+  ('blocklist', 'Přepis vytvořil', 'always', 'builtin'),
+  ('blocklist', 'Překlad a titulky', 'always', 'builtin'),
+  ('blocklist', 'Děkuji za pozornost', 'alone', 'builtin'),
+  ('blocklist', 'Děkujeme za pozornost', 'alone', 'builtin'),
+  ('blocklist', 'Děkuji za sledování', 'alone', 'builtin'),
+  ('blocklist', 'Díky za sledování', 'alone', 'builtin'),
+  ('blocklist', 'Nezapomeňte odebírat', 'always', 'builtin'),
+  ('blocklist', 'Konec', 'alone', 'builtin'),
+  ('blocklist', 'Thank you for watching', 'always', 'builtin'),
+  ('blocklist', 'Thanks for watching', 'always', 'builtin')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO voice_settings (key, value) VALUES
+  ('styles', '{"email":"formal","work_msg":"neutral","personal_msg":"casual","ai_prompt":"exact","document":"formal","other":"neutral"}'),
+  ('typing_wpm', '40'),
+  -- NULL = text natrvalo, dokud ho Kryštof nesmaže (D-V7, R-148).
+  ('text_retention_days', 'null'),
+  ('cleanup_enabled', 'true'),
+  ('auto_learn_terms', 'true'),
+  -- false = „jen čísla": text diktátu se na serveru vůbec neuloží.
+  ('store_text', 'true'),
+  -- Denní strop nákladů v USD (D-V11); nad ním bez čištění.
+  ('daily_cost_cap_usd', '1')
+ON CONFLICT (key) DO NOTHING;
+
+COMMENT ON TABLE voice_dictations IS
+  'ZakazIQ Voice (R-148): jeden diktát z Macu. Text zůstává, dokud ho Kryštof nesmaže (nebo po text_retention_days, je-li nastavená).';
+COMMENT ON TABLE voice_corrections IS
+  'ZakazIQ Voice: opravy po vložení (slovo → slovo). Z nich se učí slovník.';

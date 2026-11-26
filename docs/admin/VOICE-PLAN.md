@@ -501,7 +501,7 @@ Co z toho plyne:
 | # | Stav | Datum | Poznámka |
 |---|---|---|---|
 | VO00 | rozpracováno | 2026-11-25 | Plán na větvi `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`), R-148, ceny ověřené, skript testu přepisu hotový. Chybí: klíč Groq, test Groq a skutečného hlasu, certifikát pro podpis |
-| VO01 | čeká | | |
+| VO01 | hotovo | 2026-11-26 | Migrace 136 v repu a na testovacím Neonu (produkce ne), `/dashboard/voice` se zařízeními, klíč `zk_voice_…`, DECISIONS #055. Za přihlášením neověřené |
 | VO02 | čeká | | |
 | VO03 | čeká | | |
 | VO04 | čeká | | |

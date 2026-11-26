@@ -139,3 +139,9 @@ export const AGENT_LEAD_PRIORITY_LABEL: Record<'LOW' | 'MEDIUM' | 'HIGH', string
   MEDIUM: 'Střední priorita',
   LOW: 'Nízká priorita',
 }
+
+/** Zařízení ZakazIQ Voice (R-148): platný klíč běží, zneplatněný je jen záznam. */
+export const VOICE_DEVICE_TONE = {
+  active: 'info',
+  revoked: 'neutral',
+} as const satisfies Record<'active' | 'revoked', AdminTone>

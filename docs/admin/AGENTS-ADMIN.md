@@ -1584,3 +1584,34 @@ Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
   otevření) a varuje, když spouštěč neběží. Smazání schůzky ji smaže i v Google Kalendáři, ale
   až po 10 s a jen když ji „Zpět" neobnovilo (obnova vrací stejné id i s připomínkami).
 - Testy: `lib/__tests__/admin-pripominky.test.ts` (PGlite se SQL 114, 115, 128).
+
+## ZakazIQ Voice: diktování z Macu (R-148)
+
+Plán, rozhodnutí a stav sezení: `docs/admin/VOICE-PLAN.md`, prompty `new - area of zakaziq/prompty/voice/`.
+Tady jen to, co je v kódu.
+
+- **Tabulky (migrace 136, schéma `public`):** `voice_devices` (Mac s klíčem: `name`, `prefix`, `key_hash`,
+  `last_used_at`, `revoked_at`, `revoked_by`), `voice_dictations` (jeden diktát; `id` vytváří Mac, stav
+  `ok|raw|snippet|empty|blocked|error|cancelled`, kategorie `email|work_msg|personal_msg|ai_prompt|document|other`,
+  `guards[]` jen kódy pojistek), `voice_terms` (slovník a zkratky, unikátní `(kind, lower(term))`), `voice_rules`
+  (pravidla stylu a blokované fráze, 13 vestavěných), `voice_corrections` (opravy po vložení, `ON DELETE CASCADE`
+  s diktátem), `voice_suggestions` (návrhy z učení, `examples uuid[]`), `voice_settings` (klíč → jsonb:
+  `styles`, `typing_wpm` 40, `text_retention_days` **NULL = text natrvalo** (D-V7), `cleanup_enabled`,
+  `auto_learn_terms`, `store_text`, `daily_cost_cap_usd` 1). Trigger `voice_dictations_forget` (po smazání
+  diktátů, pro celý příkaz) vyřadí smazané id z `voice_suggestions.examples` a smaže nevyřízené návrhy, kterým
+  žádný příklad nezbyl. Smazání zařízení diktáty neruší (`ON DELETE SET NULL`).
+- **Klíč zařízení** (`lib/admin/voice/keys.ts`): `zk_voice_<prefix 10>_<tajemství 32>`, HMAC-SHA256
+  s `AGENT_KEY_PEPPER` a doménou `voice:` (jiný otisk než `zk_agent_` i pro stejný řetězec), bez pepře
+  `VoiceKeyConfigError`. `voiceBearerFrom` čte `Authorization: Bearer`.
+- **Zařízení** (`lib/admin/voice/devices.ts`, čte i zapisuje přes `adminDb`): `listDevices` (bez migrace
+  `missing_tables`), `createDevice` (klíč jen v návratové hodnotě, strop `MAX_ACTIVE_DEVICES` = 10 hlídá týž
+  INSERT), `revokeDevice`, `restoreDevice` (jen do `RESTORE_WINDOW_SECONDS` = 120 po zneplatnění),
+  `resolveDevice` (špatný tvar, neznámý prefix, neshoda i zneplatněné = `null`), `touchDevice`.
+- **Admin:** `/dashboard/voice` (menu Osobní › ZakazIQ Voice, ikona `Mic`) má zatím jen kartu Zařízení
+  (`components/admin/voice/devices-panel.tsx`): přidat (název 1–80 znaků), klíč ukázaný jednou se Zkopírovat,
+  Zneplatnit se Zpět v toastu, zneplatněná pod rozbalením. Akce `app/voice-actions.ts` (`requireAuth`, Zod,
+  výsledek `{ ok, error }`). Přehled, Historie, Učení a Slovník přidá VO10. Tón stavu `VOICE_DEVICE_TONE`
+  v `lib/admin-status.ts`.
+- **Testy:** `lib/__tests__/voice-schema.test.ts` (migrace dvakrát, CHECK, unikátnost, úklid návrhů),
+  `lib/__tests__/voice-keys.test.ts` (klíč, zařízení a akce nad PGlite).
+- **Vývojový skript:** `scripts/voice-stt-test.mjs` — porovnání přepisu češtiny (Groq, OpenAI), nahrávky mimo repo.
