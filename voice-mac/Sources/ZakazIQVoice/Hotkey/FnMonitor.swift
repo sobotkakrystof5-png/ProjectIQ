@@ -1,0 +1,123 @@
+import AppKit
+import Carbon.HIToolbox
+import CoreGraphics
+import ZakazIQVoiceCore
+
+/// Zachytávání zkratky diktování (VO04, D-V6) přes `CGEventTap`.
+///
+/// - Fn = `flagsChanged` s kódem 63 a příznakem `maskSecondaryFn`. Šipky a F-klávesy nesou
+///   příznak taky, proto rozhoduje kód klávesy.
+/// - Tap je `.defaultTap` (potřebuje Zpřístupnění), ale **pohltí jen Esc**, a to jen během
+///   nahrávání a zpracování. Všechno ostatní propouští beze změny.
+/// - Když ho macOS vypne (pomalé zpětné volání, zásah uživatele), znovu ho zapne.
+@MainActor
+final class FnMonitor {
+  enum Signal: Equatable {
+    case down
+    case up
+    case otherKey
+    case escape
+  }
+
+  var shortcut: DictationShortcut = .fn {
+    didSet { if shortcut != oldValue { triggerHeld = false } }
+  }
+
+  /// Nastavuje řadič diktátu: `true` jen během nahrávání a zpracování.
+  var capturesEscape = false
+
+  var onSignal: ((Signal) -> Void)?
+
+  private var tap: CFMachPort?
+  private var source: CFRunLoopSource?
+  private var triggerHeld = false
+
+  var isRunning: Bool { tap != nil }
+
+  /// Spustí zachytávání. `false` = chybí oprávnění (Sledování vstupu a Zpřístupnění).
+  @discardableResult
+  func start() -> Bool {
+    if tap != nil { return true }
+    let mask = (CGEventMask(1) << CGEventType.flagsChanged.rawValue) | (CGEventMask(1) << CGEventType.keyDown.rawValue)
+    guard let tap = CGEvent.tapCreate(
+      tap: .cgSessionEventTap,
+      place: .headInsertEventTap,
+      options: .defaultTap,
+      eventsOfInterest: mask,
+      callback: fnMonitorCallback,
+      userInfo: Unmanaged.passUnretained(self).toOpaque()
+    ) else { return false }
+    let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+    CGEvent.tapEnable(tap: tap, enable: true)
+    self.tap = tap
+    self.source = source
+    return true
+  }
+
+  func stop() {
+    if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
+    if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+    tap = nil
+    source = nil
+    triggerHeld = false
+  }
+
+  /// Zpětné volání běží na hlavním vlákně (zdroj je v hlavní smyčce); musí být rychlé,
+  /// proto se signál posílá dál asynchronně. Rozhodnutí o pohlcení Esc je synchronní.
+  fileprivate func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+    switch type {
+    case .tapDisabledByTimeout, .tapDisabledByUserInput:
+      if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+      triggerHeld = false
+    case .flagsChanged:
+      let code = event.getIntegerValueField(.keyboardEventKeycode)
+      if code == shortcut.keyCode {
+        let down = shortcut.isDown(flags: event.flags.rawValue)
+        if down != triggerHeld {
+          triggerHeld = down
+          post(down ? .down : .up)
+        }
+      } else if triggerHeld {
+        post(.otherKey)
+      }
+    case .keyDown:
+      let code = event.getIntegerValueField(.keyboardEventKeycode)
+      if code == Int64(kVK_Escape) {
+        if capturesEscape {
+          post(.escape)
+          return nil
+        }
+      } else if triggerHeld {
+        post(.otherKey)
+      }
+    default:
+      break
+    }
+    return Unmanaged.passUnretained(event)
+  }
+
+  private func post(_ signal: Signal) {
+    DispatchQueue.main.async { [weak self] in self?.onSignal?(signal) }
+  }
+
+  /// Je zapnutý bezpečný vstup (pole pro heslo)? Tehdy se nenahrává.
+  static var secureInputActive: Bool { IsSecureEventInputEnabled() }
+
+  /// Co dělá klávesa fn v systému (jen čtení, nic se nemění).
+  static var fnKeyUsage: FnKeyUsage {
+    let value = CFPreferencesCopyAppValue("AppleFnUsageType" as CFString, "com.apple.HIToolbox" as CFString)
+    return FnKeyUsage(rawValue: (value as? NSNumber)?.intValue)
+  }
+}
+
+private func fnMonitorCallback(
+  proxy: CGEventTapProxy,
+  type: CGEventType,
+  event: CGEvent,
+  refcon: UnsafeMutableRawPointer?
+) -> Unmanaged<CGEvent>? {
+  guard let refcon else { return Unmanaged.passUnretained(event) }
+  let monitor = Unmanaged<FnMonitor>.fromOpaque(refcon).takeUnretainedValue()
+  return MainActor.assumeIsolated { monitor.handle(type: type, event: event) }
+}

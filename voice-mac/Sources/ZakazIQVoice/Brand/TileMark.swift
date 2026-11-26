@@ -5,10 +5,12 @@ import SwiftUI
 /// zaoblení 28 % dílku.
 enum TileMark {
   /// Ikona v liště menu: jen dílky, šablonový obrázek (barvu dodá systém, světlá i tmavá lišta).
-  static func menuBarImage() -> NSImage {
+  /// `active` = právě se nahrává: dílky v barvě vlnek (`navy-300`), aby to bylo vidět
+  /// i bez lišty. Mimo nahrávání šablona, kterou obarví systém.
+  static func menuBarImage(active: Bool = false) -> NSImage {
     let size = NSSize(width: 18, height: 18)
     let image = NSImage(size: size, flipped: false) { rect in
-      NSColor.black.setFill()
+      (active ? NSColor(hex: 0x8AAEE3) : NSColor.black).setFill()
       let tile: CGFloat = 7
       let gap: CGFloat = 2
       let origin = (rect.width - (tile * 2 + gap)) / 2
@@ -25,8 +27,8 @@ enum TileMark {
       }
       return true
     }
-    image.isTemplate = true
-    image.accessibilityDescription = "ZakazIQ Voice"
+    image.isTemplate = !active
+    image.accessibilityDescription = active ? "ZakazIQ Voice nahrává" : "ZakazIQ Voice"
     return image
   }
 }

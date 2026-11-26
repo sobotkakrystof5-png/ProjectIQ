@@ -57,6 +57,20 @@ public enum VoiceMessages {
   public static let transcriptionMissing =
     "Na serveru zatím chybí přepis řeči, diktovat ještě nepůjde."
 
+  // MARK: Diktování (lišta a menu, VO04–VO06)
+
+  /// Nápověda na liště při najetí myší.
+  public static func barHint(_ shortcut: DictationShortcut) -> String {
+    "Podržte \(shortcut.title) a mluvte"
+  }
+
+  public static let secureInput = "V poli pro heslo diktování nejde"
+  public static let longRecording = "Už nahráváte 9 a půl minuty"
+  public static let microphoneAsk = "Povolte mikrofon a zkuste to znovu"
+  public static let microphoneDenied = "Povolte mikrofon v Nastavení ZakazIQ Voice"
+  public static let microphoneFailed = "Mikrofon se nepodařilo spustit"
+  public static let hotkeyMissing = "Povolte Sledování vstupu a Zpřístupnění, aby fungovala klávesa"
+
   public static func text(for error: VoiceError) -> String {
     switch error {
     case .noKey:

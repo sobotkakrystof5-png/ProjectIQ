@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import ZakazIQVoiceCore
 
 /// Stav připojení, jak ho ukazuje okno i menu v liště.
@@ -36,16 +36,34 @@ final class AppModel: ObservableObject {
   @Published private(set) var connection: ConnectionState = .unknown
   @Published private(set) var permissions: [PermissionKind: PermissionState] = Permissions.snapshot()
 
+  /// Zkratka diktování (fn / pravý ⌥) a co dělá fn v systému (výběr emoji apod.).
+  @Published private(set) var shortcut: DictationShortcut
+  @Published private(set) var fnUsage: FnKeyUsage = FnMonitor.fnKeyUsage
+
+  let dictation: DictationController
   private let store: SecretStore
   private let prefs: Preferences
   private var deletedKey: String?
   private var restoreTask: Task<Void, Never>?
 
-  init(store: SecretStore = KeychainSecretStore(), prefs: Preferences = Preferences()) {
+  init(dictation: DictationController, store: SecretStore = KeychainSecretStore(), prefs: Preferences = Preferences()) {
+    self.dictation = dictation
     self.store = store
     self.prefs = prefs
+    shortcut = prefs.shortcut
     serverText = ServerAddress.display(prefs.serverAddress)
     loadMaskedKey()
+  }
+
+  // MARK: Zkratka
+
+  func setShortcut(_ value: DictationShortcut) {
+    dictation.setShortcut(value)
+    shortcut = value
+  }
+
+  func openKeyboardSettings() {
+    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
   }
 
   var hasKey: Bool { maskedKey != nil }
@@ -166,6 +184,9 @@ final class AppModel: ObservableObject {
   func refreshPermissions() {
     let now = Permissions.snapshot()
     if now != permissions { permissions = now }
+    let usage = FnMonitor.fnKeyUsage
+    if usage != fnUsage { fnUsage = usage }
+    if !dictation.hotkeyReady { dictation.startHotkey() }
   }
 
   func request(_ kind: PermissionKind) async {

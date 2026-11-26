@@ -9,11 +9,8 @@ struct SettingsView: View {
     VStack(alignment: .leading, spacing: 16) {
       header
       connectionCard
+      dictationCard
       permissionsCard
-      Text("Klávesa Fn a diktování přibudou v další verzi.")
-        .font(DilkyFont.sans(12))
-        .foregroundStyle(Dilky.quiet)
-        .padding(.horizontal, 4)
     }
     .padding(.horizontal, 24)
     .padding(.top, 40)
@@ -144,6 +141,35 @@ struct SettingsView: View {
       Message(text: text, tone: .danger)
     case .unknown, .checking:
       EmptyView()
+    }
+  }
+
+  // MARK: Diktování
+
+  private var dictationCard: some View {
+    Card(title: "Diktování") {
+      VStack(alignment: .leading, spacing: 8) {
+        FieldLabel("Klávesa")
+        HStack(spacing: 8) {
+          ForEach(DictationShortcut.allCases) { shortcut in
+            Button { model.setShortcut(shortcut) } label: { Text(verbatim: shortcut.title) }
+              .buttonStyle(ChoiceButton(selected: model.shortcut == shortcut))
+              .accessibilityAddTraits(model.shortcut == shortcut ? .isSelected : [])
+          }
+        }
+        Text("Podržte klávesu a mluvte, po puštění se text vloží. Dvojím klepnutím diktujete bez držení, Esc diktát zruší.")
+          .font(DilkyFont.sans(12))
+          .foregroundStyle(Dilky.quiet)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if model.shortcut == .fn, let advice = model.fnUsage.advice {
+        Divider().overlay(Dilky.navy100)
+        VStack(alignment: .leading, spacing: 8) {
+          Message(text: advice, tone: .quiet)
+          Button("Otevřít Nastavení klávesnice") { model.openKeyboardSettings() }
+            .buttonStyle(SecondaryButton())
+        }
+      }
     }
   }
 
@@ -311,6 +337,22 @@ private struct SecondaryButton: ButtonStyle {
       .background(configuration.isPressed ? Dilky.navy50 : Dilky.surface, in: Capsule())
       .overlay(Capsule().strokeBorder(Dilky.navy100, lineWidth: 1))
       .opacity(enabled ? 1 : 0.4)
+      .contentShape(Capsule())
+  }
+}
+
+/// Výběr z několika možností (zkratka): vybraná pilulka plná `navy-700`, ostatní obrys.
+private struct ChoiceButton: ButtonStyle {
+  let selected: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(DilkyFont.sans(13, weight: selected ? 600 : 500))
+      .foregroundStyle(selected ? Color.white : Dilky.navy950)
+      .padding(.horizontal, 18)
+      .frame(minWidth: 72, minHeight: 40)
+      .background(selected ? Dilky.navy700 : (configuration.isPressed ? Dilky.navy50 : Dilky.surface), in: Capsule())
+      .overlay(Capsule().strokeBorder(selected ? Dilky.navy700 : Dilky.navy100, lineWidth: 1))
       .contentShape(Capsule())
   }
 }
