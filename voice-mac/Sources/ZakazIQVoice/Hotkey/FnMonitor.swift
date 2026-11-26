@@ -69,10 +69,16 @@ final class FnMonitor {
     switch type {
     case .tapDisabledByTimeout, .tapDisabledByUserInput:
       if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-      triggerHeld = false
+      // Puštění klávesy mohlo přijít, zatímco byl tap vypnutý: srovnat se skutečným stavem,
+      // jinak by diktát „s drženou klávesou" běžel až do limitu 10 minut.
+      let down = shortcut.isDown(flags: CGEventSource.flagsState(.combinedSessionState).rawValue)
+      if down != triggerHeld {
+        triggerHeld = down
+        post(down ? .down : .up)
+      }
     case .flagsChanged:
       let code = event.getIntegerValueField(.keyboardEventKeycode)
-      if code == shortcut.keyCode {
+      if shortcut.matches(keyCode: code) {
         let down = shortcut.isDown(flags: event.flags.rawValue)
         if down != triggerHeld {
           triggerHeld = down

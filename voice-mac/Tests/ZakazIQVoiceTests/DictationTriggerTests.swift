@@ -192,6 +192,8 @@ struct ShortcutTests {
     #expect(!DictationShortcut.rightOption.isDown(flags: 0x0008_0120))
     #expect(DictationShortcut.rightOption.isDown(flags: 0x0008_0140))
     #expect(DictationShortcut.fn.keyCode == 63 && DictationShortcut.rightOption.keyCode == 61)
+    #expect(DictationShortcut.fn.matches(keyCode: 63) && DictationShortcut.fn.matches(keyCode: 179))
+    #expect(!DictationShortcut.fn.matches(keyCode: 61) && !DictationShortcut.rightOption.matches(keyCode: 58))
   }
 
   @Test("výběr emoji na fn: rada jen když fn něco dělá")

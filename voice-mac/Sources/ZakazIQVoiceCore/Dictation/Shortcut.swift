@@ -16,6 +16,15 @@ public enum DictationShortcut: String, CaseIterable, Sendable, Identifiable {
     }
   }
 
+  /// Je to tahle klávesa? Klávesa 🌐/fn na novějších klávesnicích Applu může mít kód 179
+  /// místo 63; jiná klávesa ho nemá, proto se bere taky.
+  public func matches(keyCode code: Int64) -> Bool {
+    switch self {
+    case .fn: return code == 63 || code == 179
+    case .rightOption: return code == 61
+    }
+  }
+
   /// Bit příznaku v `CGEventFlags.rawValue`: fn = `maskSecondaryFn`, pravý ⌥ =
   /// `NX_DEVICERALTKEYMASK` (rozliší pravý od levého, který nese stejný `maskAlternate`).
   public var flagBit: UInt64 {
