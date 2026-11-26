@@ -1,5 +1,5 @@
 /**
- * ZakazIQ Voice (R-148): práce s textem diktátu — slova a porovnání.
+ * ZakazIQ Voice (R-150): práce s textem diktátu — slova a porovnání.
  * Čisté funkce bez DB a sítě. Rozdíl po slovech pro učení (dvojice oprav) přidá VO08.
  */
 

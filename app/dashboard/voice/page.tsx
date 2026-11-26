@@ -28,7 +28,7 @@ export const metadata: Metadata = { title: 'ZakazIQ Voice' }
 export const dynamic = 'force-dynamic'
 
 /**
- * ZakazIQ Voice (R-148, VO10): Přehled · Historie · Učení · Slovník · Nastavení.
+ * ZakazIQ Voice (R-150, VO10): Přehled · Historie · Učení · Slovník · Nastavení.
  * Záložka v adrese (`?tab=`), každá záložka čte jednou dávkou (R-092).
  */
 
@@ -48,7 +48,7 @@ function MissingTables() {
   return (
     <Card>
       <p className="text-sm text-quiet">
-        Databáze ještě nemá tabulky ZakazIQ Voice. Až proběhne migrace 136, uvidíte tady diktáty, slovník a nastavení.
+        Databáze ještě nemá tabulky ZakazIQ Voice. Až proběhne migrace 138, uvidíte tady diktáty, slovník a nastavení.
       </p>
     </Card>
   )

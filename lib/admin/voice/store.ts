@@ -9,7 +9,7 @@ import type { PipelineConfig, PipelineOutcome } from './pipeline'
 import { mapVoiceToday, voiceTodayQuery } from './queries'
 
 /**
- * ZakazIQ Voice (R-148): databáze diktátů, slovníku a nastavení (migrace 136).
+ * ZakazIQ Voice (R-150): databáze diktátů, slovníku a nastavení (migrace 138).
  * Čtení jde v dávkách přes `adminDb` (R-092). Text diktátu se nikdy nelogguje.
  */
 

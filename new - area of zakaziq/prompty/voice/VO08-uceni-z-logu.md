@@ -70,7 +70,7 @@ Zachycení oprav na Macu (VO09), obrazovky v adminu (VO10).
   a projeví v dalším diktátu.
 - Rozbor AI jen navrhuje, nic nemění sám.
 - Úklid maže texty podle nastavení.
-- `tsc`, `npm test`, `build:check` prošly. DECISIONS #055: co se z oprav ukládá a jak dlouho,
+- `tsc`, `npm test`, `build:check` prošly. DECISIONS #057: co se z oprav ukládá a jak dlouho,
   co jde do rozboru AI.
 
 ## Konec sezení

@@ -11,7 +11,7 @@ import { VOICE_DEVICE_TONE, toneVariant } from '@/lib/admin-status'
 import type { VoiceDevice } from '@/lib/admin/voice/devices'
 
 /**
- * Zařízení ZakazIQ Voice (VO01, R-148). Klíč se ukáže jednou hned po přidání
+ * Zařízení ZakazIQ Voice (VO01, R-150). Klíč se ukáže jednou hned po přidání
  * a drží ho jen tahle komponenta, dokud se stránka neobnoví.
  */
 

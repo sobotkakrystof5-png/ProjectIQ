@@ -260,8 +260,8 @@ export async function GET(req: NextRequest) {
         console.error('[cron] Pravidelné faktury selhaly:', (err as Error).message)
         return 0
       }),
-    // ZakazIQ Voice (R-148, VO08): učení z oprav denně, v pondělí i rozbor AI.
-    // Jen navrhuje; bez migrace 136 nic. Chyba nesmí zastavit zbytek cronu.
+    // ZakazIQ Voice (R-150, VO08): učení z oprav denně, v pondělí i rozbor AI.
+    // Jen navrhuje; bez migrace 138 nic. Chyba nesmí zastavit zbytek cronu.
     runDailyVoiceLearning().catch((err) => {
       console.error('[cron] Učení ZakazIQ Voice selhalo:', err instanceof Error ? err.name : 'unknown')
       return null

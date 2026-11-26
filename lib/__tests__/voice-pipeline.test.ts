@@ -5,7 +5,7 @@ import type { CleanupCaller } from '@/lib/admin/voice/cleanup'
 import { runPipeline, type PipelineConfig } from '@/lib/admin/voice/pipeline'
 import { transcribeVoice, type SttResult } from '@/lib/admin/voice/stt'
 
-// ZakazIQ Voice (R-148, VO02): cesta diktátu s podvrženým přepisem a přepis
+// ZakazIQ Voice (R-150, VO02): cesta diktátu s podvrženým přepisem a přepis
 // s podvrženým fetch (ukázková odpověď Groq je soubor ve fixtures).
 
 const GROQ_VERBOSE = fs.readFileSync(path.join(__dirname, 'fixtures/voice-groq-verbose.json'), 'utf8')

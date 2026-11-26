@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { randomToken } from '@/lib/agent-keys'
 
 /**
- * ZakazIQ Voice (R-148): klíč zařízení (Macu).
+ * ZakazIQ Voice (R-150): klíč zařízení (Macu).
  *
  * `zk_voice_<prefix>_<tajemství>` umí jen poslat diktát, zpětnou vazbu a číst
  * slovník a statistiky diktování — nic jiného v adminu. Ukáže se jednou při

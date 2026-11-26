@@ -3,7 +3,7 @@ import { isMissingVoiceSchema } from '@/lib/admin/voice/devices'
 import { authorizeVoiceDevice, voiceFail, voiceOk } from '@/lib/admin/voice/http'
 import { STATS_RANGES, loadMacStats, type StatsRange } from '@/lib/admin/voice/queries'
 
-// ZakazIQ Voice (R-148, VO10): čísla pro okno na Macu (Domů) — stejná jako
+// ZakazIQ Voice (R-150, VO10): čísla pro okno na Macu (Domů) — stejná jako
 // admin `/dashboard/voice`, ze stejných dotazů (lib/admin/voice/queries.ts).
 
 export const dynamic = 'force-dynamic'

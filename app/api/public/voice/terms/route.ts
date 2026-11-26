@@ -6,7 +6,7 @@ import { deleteTerm, saveSnippet, saveTerm, snippetInput, termInput } from '@/li
 import { loadMacConfig } from '@/lib/admin/voice/store'
 import { readJsonLimited } from '@/lib/security/request-body'
 
-// ZakazIQ Voice (R-148, VO08): slovník a zkratky z okna na Macu. Stejná pravidla
+// ZakazIQ Voice (R-150, VO08): slovník a zkratky z okna na Macu. Stejná pravidla
 // jako v adminu (`lib/admin/voice/manage.ts`), zápis má vlastní limit (`write`).
 
 export const dynamic = 'force-dynamic'

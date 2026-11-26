@@ -1,7 +1,7 @@
 import { foldText, fold, similarity, words } from './text'
 
 /**
- * ZakazIQ Voice (R-148): učení z logů — čisté funkce.
+ * ZakazIQ Voice (R-150): učení z logů — čisté funkce.
  *
  * Systém se neučí přetrénováním modelu, ale tím, co mu dáváme do ruky:
  * slovník (nápověda pro přepis a náhrady), blokované fráze a pravidla stylu

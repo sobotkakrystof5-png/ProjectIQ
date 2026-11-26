@@ -4,7 +4,7 @@ import { runPipeline } from '@/lib/admin/voice/pipeline'
 import type { SttResult } from '@/lib/admin/voice/stt'
 import { GOLDEN_CONFIG, durationFor, loadGoldenCases, styleOf, type GoldenCase } from './golden-cases'
 
-// ZakazIQ Voice (R-148, VO07): zlatá sada čištění přes celou cestu diktátu.
+// ZakazIQ Voice (R-150, VO07): zlatá sada čištění přes celou cestu diktátu.
 // Přepis i odpověď modelu jsou podvržené, takže test ověřuje pojistky a
 // pipeline, ne kvalitu modelu (tu měří scripts/voice-eval.mjs).
 

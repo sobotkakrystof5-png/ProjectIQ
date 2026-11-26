@@ -4,7 +4,7 @@
 
 ## Cíl jednou větou
 
-Dostat plán ZakazIQ Voice do repa na novou větev, potvrdit s Kryštofem rozhodnutí (R-148),
+Dostat plán ZakazIQ Voice do repa na novou větev, potvrdit s Kryštofem rozhodnutí (R-150),
 ověřit aktuální ceny a podmínky poskytovatelů a změřit, který přepis češtiny je nejlepší.
 
 ## Než začneš
@@ -26,7 +26,7 @@ ověřit aktuální ceny a podmínky poskytovatelů a změřit, který přepis �
    to, co není jasné nebo co by šlo udělat jinak s velkým dopadem: D-V2 (server, nebo přímo
    z Macu), D-V5 (složka `voice-mac/` v repu), D-V7 (90 dní textu), D-V8 (učení samo).
    Ostatní ber jako potvrzené. Výsledek zapiš:
-   - do `memory/memory.md` → Rozhodnutí jako **R-148 · ZakazIQ Voice** (číslo ověř — má být
+   - do `memory/memory.md` → Rozhodnutí jako **R-150 · ZakazIQ Voice** (číslo ověř — má být
      další volné; Rozhodnutí, Proč, Důsledek, odkaz na plán),
    - změny do plánu, oddíl 2.
 4. **Ověř, co se mění v čase** (WebSearch / WebFetch, s datem do plánu, oddíl 12 a 13):
@@ -71,7 +71,7 @@ ověřit aktuální ceny a podmínky poskytovatelů a změřit, který přepis �
 ## Hotovo, když
 
 - Větev `admin/zakaziq-voice` existuje a má plán a prompty v repu.
-- R-148 je v paměti, plán oddíl 2 odpovídá tomu, co Kryštof potvrdil.
+- R-150 je v paměti, plán oddíl 2 odpovídá tomu, co Kryštof potvrdil.
 - Ceny a podmínky jsou ověřené s datem a odkazem; odhad nákladů přepočtený.
 - `scripts/voice-stt-test.mjs` běží a výsledek testu přepisu je v plánu (nebo je jasně
   napsané, proč chybí).
@@ -81,5 +81,5 @@ ověřit aktuální ceny a podmínky poskytovatelů a změřit, který přepis �
 ## Konec sezení
 
 Skill `zakaziq-memory` (konec sezení). Commit na `admin/zakaziq-voice`: `docs: voice plán,
-rozhodnutí R-148 a test přepisu` (stageuj jen dotčené soubory). Napiš Kryštofovi výsledek
+rozhodnutí R-150 a test přepisu` (stageuj jen dotčené soubory). Napiš Kryštofovi výsledek
 testu přepisu jednou větou a že další je VO01.

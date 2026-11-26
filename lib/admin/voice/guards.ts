@@ -12,7 +12,7 @@ import {
 import { countWords, fold, foldText, isFiller, words } from './text'
 
 /**
- * ZakazIQ Voice (R-148): pojistky proti halucinacím přepisu (plán, oddíl 4).
+ * ZakazIQ Voice (R-150): pojistky proti halucinacím přepisu (plán, oddíl 4).
  *
  * Whisper si na tichu, šumu nebo dozvuku vymýšlí věty z titulků („Titulky
  * vytvořil…", „Děkuji za pozornost"), zacyklí se, nebo vrátí nápovědu

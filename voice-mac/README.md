@@ -2,7 +2,7 @@
 
 Diktování do jakékoli aplikace: Mac nahrává, ukazuje a vkládá, přepis, čištění a učení
 dělá server ZakazIQ (`/api/public/voice/*`). Plán a rozhodnutí: `docs/admin/VOICE-PLAN.md`
-(R-148), technický popis: `docs/admin/AGENTS-ADMIN.md` → ZakazIQ Voice → Aplikace na Macu.
+(R-150), technický popis: `docs/admin/AGENTS-ADMIN.md` → ZakazIQ Voice → Aplikace na Macu.
 
 Stav: **VO03** — aplikace v liště menu, okno Nastavení (adresa serveru, klíč zařízení,
 Vyzkoušet připojení, oprávnění). Klávesa Fn a nahrávání přibudou ve VO04.

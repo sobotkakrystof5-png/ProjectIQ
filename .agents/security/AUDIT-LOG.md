@@ -20,9 +20,9 @@ Zůstává: co zůstává a proč
 Spouštěč: před commitem (`web-security-review`)
 Rozsah: necommitnutý diff nad `e54865c` na větvi `admin/zakaziq-voice` — `app/api/public/voice/{feedback,terms,settings}/route.ts`, `lib/admin/voice/{learn,learner,retention,http}.ts`, cron `send-reminders` a `client-retention`, akce `runVoiceLearning`, tajemství v diffu.
 Výsledek: 0 zneužitelných nálezů, 3 opravy před commitem, 2 přijatá rizika.
-Nálezy: (1) Routy mají společné ověření z VO02 (`Origin` 403, klíč v `Authorization`, limit po IP i zařízení), tělo přes `readJsonLimited` se stropem a Zod `.strict()`; oprava je vázaná na `device_id` a 24 h. (2) SQL celé parametrizované, pole přes `unnest(…::text[])`. (3) Rozbor AI: vstup přes `redactSensitive` a oříznutý, výstup přes Zod a kontrolu id, vznikne jen čekající návrh; do logu jen druh chyby. (4) Server action `runVoiceLearning` jde přes `guarded` s `requireAuth`. (5) **Opraveno:** oprava po vložení ukládala opravený text a dvojice i při vypnutém „ukládat text" (porušení „jen čísla", D-V7) — teď jen počet slov. (6) **Opraveno:** úklid textu po lhůtě nechával dvojice oprav z téhož textu. (7) **Opraveno:** tichý `catch` u úklidu v cronu `client-retention` — teď loguje druh chyby a chybějící migraci 136 řeší sám úklid.
+Nálezy: (1) Routy mají společné ověření z VO02 (`Origin` 403, klíč v `Authorization`, limit po IP i zařízení), tělo přes `readJsonLimited` se stropem a Zod `.strict()`; oprava je vázaná na `device_id` a 24 h. (2) SQL celé parametrizované, pole přes `unnest(…::text[])`. (3) Rozbor AI: vstup přes `redactSensitive` a oříznutý, výstup přes Zod a kontrolu id, vznikne jen čekající návrh; do logu jen druh chyby. (4) Server action `runVoiceLearning` jde přes `guarded` s `requireAuth`. (5) **Opraveno:** oprava po vložení ukládala opravený text a dvojice i při vypnutém „ukládat text" (porušení „jen čísla", D-V7) — teď jen počet slov. (6) **Opraveno:** úklid textu po lhůtě nechával dvojice oprav z téhož textu. (7) **Opraveno:** tichý `catch` u úklidu v cronu `client-retention` — teď loguje druh chyby a chybějící migraci 138 řeší sám úklid.
 Opraveno: viz (5)–(7), testy doplněné. V diffu žádné tajemství ani `NEXT_PUBLIC_`. CSP se nemění (Mac není prohlížeč, cesty bez CORS).
-Zůstává: přijatá rizika DECISIONS #055 (h), (i); rozbor se skutečným modelem neověřený. `curl` proti lokálnímu serveru prošel (oprava 200, cizí `Origin` 403).
+Zůstává: přijatá rizika DECISIONS #057 (h), (i); rozbor se skutečným modelem neověřený. `curl` proti lokálnímu serveru prošel (oprava 200, cizí `Origin` 403).
 
 ## 2026-11-24 — review: faktura s povinnými údaji (R-142) a druh faktury (R-143)
 Spouštěč: před commitem a deployem (`web-security-review`)
@@ -1031,9 +1031,9 @@ Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
   2 free projektů; rozhodnutí Kryštofa „bez Supabase v Preview"). Preview stále sdílí identitu admina
   s produkcí. Před každým novým `DATABASE_URL*` pro Preview ověřit hostitele (`ep-shiny-union` = test).
 
-## 2026-11-26 — review ZakazIQ Voice VO01 (klíč zařízení, migrace 136)
+## 2026-11-26 — review ZakazIQ Voice VO01 (klíč zařízení, migrace 138)
 
-- Scope: `migrations/136_zakaziq_voice.sql`, `lib/admin/voice/{keys,devices}.ts`, `app/voice-actions.ts`,
+- Scope: `migrations/138_zakaziq_voice.sql`, `lib/admin/voice/{keys,devices}.ts`, `app/voice-actions.ts`,
   `app/dashboard/voice/page.tsx`, `components/admin/voice/devices-panel.tsx` (web-security-review, větev
   `admin/zakaziq-voice`). Veřejný vstup `/api/public/voice/*` zatím není (VO02).
 - Prošlo: všechny tři akce začínají `requireAuth()` (session s `aal2`, když je zapsaný druhý faktor),
@@ -1043,8 +1043,8 @@ Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
   text Reactu, žádné `dangerouslySetInnerHTML`; strop 10 platných zařízení a „Zpět" jen do 2 min drží SQL,
   ne klient. CSP beze změny.
 - Fixed: nic k opravě.
-- Left open: přijatá rizika v DECISIONS #055 (klíč v Klíčence Macu, text diktátů bez lhůty, společný
-  `AGENT_KEY_PEPPER`). Migrace 136 na testovacím Neonu ano, na produkci ne.
+- Left open: přijatá rizika v DECISIONS #057 (klíč v Klíčence Macu, text diktátů bez lhůty, společný
+  `AGENT_KEY_PEPPER`). Migrace 138 na testovacím Neonu ano, na produkci ne.
 
 ## 2026-11-26 — review ZakazIQ Voice VO07 (čištění modelem, útok pokynem v diktátu)
 
@@ -1061,9 +1061,9 @@ Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
   G3 slučovala telefonní číslo diktované po číslicích; slovník a příklady oprav (zčásti z Macu) šly do systémového
   promptu bez úpravy — teď bez `<>` a s větou, že nejsou pokyny.
 - Fix before launch (VO12): denní strop nezastaví přepis, jen čištění; ukradený klíč do zneplatnění platí přepis
-  až do limitu po zařízení (DECISIONS #055 (g)). Návrh: nad násobkem stropu odmítnout i přepis.
+  až do limitu po zařízení (DECISIONS #057 (g)). Návrh: nad násobkem stropu odmítnout i přepis.
 - Left open: běh `scripts/voice-eval.mjs --ano` se skutečným modelem (Kryštof); posun významu jedním obyčejným
-  slovem kontrola nepozná (DECISIONS #055 (e)).
+  slovem kontrola nepozná (DECISIONS #057 (e)).
 
 ## 2026-11-26 — review ZakazIQ Voice VO02 (veřejný vstup diktátu)
 

@@ -5,7 +5,7 @@ import { STYLE_KEYS } from '@/lib/admin/voice/categories'
 import { authorizeVoiceDevice, voiceFail } from '@/lib/admin/voice/http'
 import { loadSettings, saveSettings } from '@/lib/admin/voice/store'
 
-// ZakazIQ Voice (R-148): styl podle kategorie z okna aplikace na Macu
+// ZakazIQ Voice (R-150): styl podle kategorie z okna aplikace na Macu
 // (záložka Styl, jako ve Wispr Flow). Ostatní nastavení jen v adminu.
 
 export const dynamic = 'force-dynamic'

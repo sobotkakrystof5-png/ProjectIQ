@@ -1,5 +1,5 @@
 /**
- * ZakazIQ Voice (R-148): české popisky stavů diktátu a pojistek pro admin.
+ * ZakazIQ Voice (R-150): české popisky stavů diktátu a pojistek pro admin.
  * Kód pojistky se ukládá do `voice_dictations.guards` (guards.ts); tady je jen
  * to, co uvidí člověk. Bez importů ze serveru — čtou to i komponenty v prohlížeči.
  */

@@ -2,7 +2,7 @@ import { STT_PROMPT_LEAD } from './guards'
 import { fold, foldText, words } from './text'
 
 /**
- * ZakazIQ Voice (R-148): slovník a zkratky.
+ * ZakazIQ Voice (R-150): slovník a zkratky.
  *
  * Slovník dělá tři věci, všechny bez jazykového modelu:
  * 1. nápověda pro přepis řeči (Whisper dostane seznam jmen a výrazů),

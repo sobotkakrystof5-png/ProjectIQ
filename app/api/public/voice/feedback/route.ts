@@ -4,7 +4,7 @@ import { FEEDBACK_MAX_BYTES, authorizeVoiceDevice, feedbackSchema, voiceFail, vo
 import { recordFeedback } from '@/lib/admin/voice/learner'
 import { readJsonLimited } from '@/lib/security/request-body'
 
-// ZakazIQ Voice (R-148, VO08): oprava po vložení. Mac pošle, jak vložený úsek
+// ZakazIQ Voice (R-150, VO08): oprava po vložení. Mac pošle, jak vložený úsek
 // vypadá chvíli po vložení; server uloží rozdíl po slovech a učí se z něj.
 // Jen pro diktát téhož zařízení, jen do 24 h od diktátu a jen dokud má text.
 

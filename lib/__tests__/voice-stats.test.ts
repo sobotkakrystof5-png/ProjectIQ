@@ -18,7 +18,7 @@ import {
 } from '@/lib/admin/voice/stats'
 import { pragueDayOf } from '@/lib/prague-time'
 
-// ZakazIQ Voice (R-148, VO10): definice čísel z plánu, oddíl 8.
+// ZakazIQ Voice (R-150, VO10): definice čísel z plánu, oddíl 8.
 
 describe('série', () => {
   it('končí dneškem, nebo včerejškem, když se dnes ještě nediktovalo', () => {

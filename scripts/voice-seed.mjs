@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Ukázková data pro ZakazIQ Voice (VO10, R-148): fiktivní diktáty za 60 dní,
+// Ukázková data pro ZakazIQ Voice (VO10, R-150): fiktivní diktáty za 60 dní,
 // tři návrhy z učení a jedno naučené slovo, aby šel admin /dashboard/voice
 // projít v prohlížeči bez Macu.
 //

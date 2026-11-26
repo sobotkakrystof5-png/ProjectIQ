@@ -24,7 +24,7 @@ import {
 import { parseSettings, type VoiceSettings } from './store'
 
 /**
- * ZakazIQ Voice (R-148): čtení pro admin `/dashboard/voice`, kartu na Dnes
+ * ZakazIQ Voice (R-150): čtení pro admin `/dashboard/voice`, kartu na Dnes
  * a `GET /api/public/voice/stats`. Každá obrazovka je jedna dávka (R-092).
  * Podmínky porovnávají okamžiky (`started_at >= $1`) spočítané v TypeScriptu,
  * pražský den se počítá jen v SELECTu (R-093). Text diktátu se nikdy neloguje.
@@ -40,7 +40,7 @@ const PENDING_SQL = q`SELECT count(*)::int AS n FROM voice_suggestions WHERE sta
 
 export type VoiceLoad<T> = { ok: true; data: T; pending: number } | { ok: false; reason: 'missing_tables' }
 
-/** Dávka + počet návrhů ke schválení (odznak záložky Učení). Bez migrace 136 `missing_tables`. */
+/** Dávka + počet návrhů ke schválení (odznak záložky Učení). Bez migrace 138 `missing_tables`. */
 async function load<T>(queries: AdminQuery[], map: (rows: AdminRow[][]) => T): Promise<VoiceLoad<T>> {
   try {
     const rows = await adminDb.batch([...queries, PENDING_SQL])
@@ -114,7 +114,7 @@ export function voiceTodayQuery(today: string): AdminQuery {
   }
 }
 
-/** Bez migrace 136 (prázdná odpověď `batchTolerant`) nebo bez jediného diktátu `null` = karta se neukáže. */
+/** Bez migrace 138 (prázdná odpověď `batchTolerant`) nebo bez jediného diktátu `null` = karta se neukáže. */
 export function mapVoiceToday(rows: AdminRow[] | undefined, today: string): VoiceToday | null {
   const row = rows?.[0] as { today?: number; days?: string[] | null } | undefined
   const active = row?.days ?? []

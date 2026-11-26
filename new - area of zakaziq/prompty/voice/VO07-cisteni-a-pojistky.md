@@ -74,7 +74,7 @@ porovnej přepis a výsledek. Zapiš do plánu, kolik diktátů skončilo `raw` 
 - Diktát je učesaný podle stylu aplikace, a když model ujede, vrátí se přepis.
 - Zlatá sada (≥ 40 případů včetně útoků) prochází v `npm test`.
 - Náklad každého diktátu je v `cost_usd`, strop funguje.
-- `tsc`, `npm test`, `build:check` prošly. DECISIONS #055 doplněné o čištění a útok pokynem
+- `tsc`, `npm test`, `build:check` prošly. DECISIONS #057 doplněné o čištění a útok pokynem
   v diktátu.
 
 ## Konec sezení

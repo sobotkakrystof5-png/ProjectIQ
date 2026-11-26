@@ -7,7 +7,7 @@ import { saveSettings } from '@/lib/admin/voice/manage'
 import { loadMacConfig } from '@/lib/admin/voice/store'
 import { readJsonLimited } from '@/lib/security/request-body'
 
-// ZakazIQ Voice (R-148, VO08): nastavení z okna na Macu. Jde měnit jen styl
+// ZakazIQ Voice (R-150, VO08): nastavení z okna na Macu. Jde měnit jen styl
 // podle kategorie, „jen čísla", učení a čištění — strop nákladů, lhůtu textu
 // a rychlost psaní mění jen admin.
 

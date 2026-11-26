@@ -3,7 +3,7 @@ import { readJsonLimited } from '@/lib/security/request-body'
 import { authorizeVoiceDevice, feedbackSchema, voiceFail } from '@/lib/admin/voice/http'
 import { recordFeedback } from '@/lib/admin/voice/store'
 
-// ZakazIQ Voice (R-148): oprava po vložení. Mac pošle, jak vložený úsek
+// ZakazIQ Voice (R-150): oprava po vložení. Mac pošle, jak vložený úsek
 // vypadá chvíli po vložení; server spočítá rozdíl po slovech a uloží opravy,
 // ze kterých se učí slovník. Jen jednou na diktát a jen pro vlastní diktát.
 

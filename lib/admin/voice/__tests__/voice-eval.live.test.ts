@@ -5,7 +5,7 @@ import { runPipeline } from '@/lib/admin/voice/pipeline'
 import type { SttResult } from '@/lib/admin/voice/stt'
 import { GOLDEN_CONFIG, durationFor, loadGoldenCases, styleOf } from './golden-cases'
 
-// ZakazIQ Voice (R-148, VO07): zlatá sada se SKUTEČNÝM modelem. Neběží v
+// ZakazIQ Voice (R-150, VO07): zlatá sada se SKUTEČNÝM modelem. Neběží v
 // `npm test` — pouští ji jen `node scripts/voice-eval.mjs --ano` (VOICE_EVAL=1),
 // protože volá Claude a stojí peníze. Přepisy jsou ze zlaté sady (vymyšlené
 // věty), ne skutečné diktáty. Výsledek zapíše jako JSON do VOICE_EVAL_OUT.

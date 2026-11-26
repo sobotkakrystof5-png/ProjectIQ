@@ -1,7 +1,7 @@
 import { countWords, fold, foldText, isNumberToken, words } from './text'
 
 /**
- * ZakazIQ Voice (R-148): pojistky proti halucinacím.
+ * ZakazIQ Voice (R-150): pojistky proti halucinacím.
  *
  * Halucinace přicházejí ze dvou míst a každé má jinou pojistku:
  *

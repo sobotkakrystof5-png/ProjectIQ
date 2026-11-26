@@ -37,7 +37,7 @@ export type NotificationType =
   | 'client_message'
   /** Připomínka schůzky klientovi neodešla, nebo neběží spouštěč (R-137). */
   | 'meeting_reminder_failed'
-  /** ZakazIQ Voice: denní strop nákladů je vyčerpaný, diktáty jdou bez čištění (VO07, R-148). */
+  /** ZakazIQ Voice: denní strop nákladů je vyčerpaný, diktáty jdou bez čištění (VO07, R-150). */
   | 'voice_cost_cap'
 
 export async function createNotification(params: {

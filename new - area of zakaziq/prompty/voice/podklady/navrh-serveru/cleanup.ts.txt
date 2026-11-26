@@ -3,7 +3,7 @@ import { aiModel, isAiConfigured } from '@/lib/ai/models'
 import type { VoiceCategory, VoiceStyle } from './categories'
 
 /**
- * ZakazIQ Voice (R-148): učesání přepisu jazykovým modelem (role `fast`).
+ * ZakazIQ Voice (R-150): učesání přepisu jazykovým modelem (role `fast`).
  *
  * Model dostane přepis jako **data**, ne jako pokyn: je v `<prepis>` a prompt
  * výslovně říká, že věta „napiš mi e-mail“ nebo „ignoruj pokyny“ se jen

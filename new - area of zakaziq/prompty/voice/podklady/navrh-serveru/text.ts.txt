@@ -1,5 +1,5 @@
 /**
- * ZakazIQ Voice (R-148): práce s textem diktátu — slova, porovnání, rozdíl.
+ * ZakazIQ Voice (R-150): práce s textem diktátu — slova, porovnání, rozdíl.
  * Čisté funkce bez DB a bez sítě, testované v `lib/__tests__/voice-text.test.ts`.
  */
 

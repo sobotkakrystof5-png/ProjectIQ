@@ -18,7 +18,7 @@ import { parseSettings } from './store'
 import { countWords, foldText } from './text'
 
 /**
- * ZakazIQ Voice (R-148, VO08): učení z logů (plán, oddíl 5).
+ * ZakazIQ Voice (R-150, VO08): učení z logů (plán, oddíl 5).
  *
  * - **Oprava po vložení** (`recordFeedback`, z `POST /feedback`): uloží opravený
  *   text a dvojice „slyšel → opravil"; hned potom proběhne pravidlová část,
@@ -371,7 +371,7 @@ export interface LearningRun extends RulesResult {
 
 const isPragueMonday = (now: Date) => new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Europe/Prague' }).format(now) === 'Mon'
 
-/** Denní cron `send-reminders`: pravidla vždy, rozbor AI v pondělí. Bez migrace 136 nic. */
+/** Denní cron `send-reminders`: pravidla vždy, rozbor AI v pondělí. Bez migrace 138 nic. */
 export async function runDailyVoiceLearning(now: Date = new Date(), call?: AiCall): Promise<LearningRun | null> {
   try {
     const rules = await learnFromRules()

@@ -8,7 +8,7 @@ import type { PipelineConfig, PipelineOutcome } from './pipeline'
 import { wordDiff } from './text'
 
 /**
- * ZakazIQ Voice (R-148): databáze. Čtení jde v dávkách přes `adminDb` (R-092).
+ * ZakazIQ Voice (R-150): databáze. Čtení jde v dávkách přes `adminDb` (R-092).
  */
 
 // --- Nastavení ---------------------------------------------------------------

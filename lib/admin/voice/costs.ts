@@ -1,7 +1,7 @@
 import { AI_MODEL_DEFAULTS } from '@/lib/ai/models'
 
 /**
- * ZakazIQ Voice (R-148): ceny na jednom místě (plán, oddíl 12).
+ * ZakazIQ Voice (R-150): ceny na jednom místě (plán, oddíl 12).
  *
  * Ověřeno 2026-11-25: Groq console.groq.com/docs/speech-to-text (nejkratší
  * účtovaná délka 10 s), OpenAI developers.openai.com/api/docs/pricing

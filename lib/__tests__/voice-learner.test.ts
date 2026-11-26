@@ -11,11 +11,11 @@ import { loadPipelineContext } from '@/lib/admin/voice/store'
 import { buildSttPrompt } from '@/lib/admin/voice/dictionary'
 import { buildSystemPrompt } from '@/lib/admin/voice/cleanup'
 
-// ZakazIQ Voice (R-148, VO08): učení z oprav nad PGlite s migrací 136.
+// ZakazIQ Voice (R-150, VO08): učení z oprav nad PGlite s migrací 138.
 
 vi.setConfig({ testTimeout: 30_000 })
 
-const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/136_zakaziq_voice.sql'), 'utf8')
+const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/138_zakaziq_voice.sql'), 'utf8')
 const DEVICE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
 const OTHER = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
 

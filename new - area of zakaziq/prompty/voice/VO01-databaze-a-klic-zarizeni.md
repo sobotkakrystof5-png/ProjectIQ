@@ -4,25 +4,25 @@
 
 ## Cíl jednou větou
 
-Připravit tabulky ZakazIQ Voice (migrace 136) a v adminu stránku, kde si Kryštof vytvoří klíč
+Připravit tabulky ZakazIQ Voice (migrace 138) a v adminu stránku, kde si Kryštof vytvoří klíč
 pro svůj Mac — klíč se ukáže jednou a jde zneplatnit.
 
 ## Než začneš
 
 1. Skill `zakaziq-memory` (začátek), pak `zakaziq-workspace-backend`.
-2. Přečti `docs/admin/VOICE-PLAN.md` oddíly 2, 6 a 7 a R-148 v paměti.
+2. Přečti `docs/admin/VOICE-PLAN.md` oddíly 2, 6 a 7 a R-150 v paměti.
 3. Podívej se na vzory: `lib/agent-keys.ts` a `lib/client-web/keys.ts` (klíč s pepřem),
    `components/admin/web-key-panel.tsx` (klíč ukázaný jednou), `lib/admin/db.ts`,
    `lib/__tests__/helpers/admin-pglite.ts`, `lib/admin-nav.ts`, `components/admin/card.tsx`.
 4. Návrh z jiného sezení: `new - area of zakaziq/prompty/voice/podklady/navrh-serveru/`
-   (`136_zakaziq_voice.sql.txt`, `keys.ts.txt`, `store.ts.txt`). Neověřený; vyjdi z něj, kde
+   (`138_zakaziq_voice.sql.txt`, `keys.ts.txt`, `store.ts.txt`). Neověřený; vyjdi z něj, kde
    sedí s plánem.
 
 ## Rozsah
 
-- `migrations/136_zakaziq_voice.sql` (číslo ověř proti `ls migrations`): všech sedm tabulek
+- `migrations/138_zakaziq_voice.sql` (číslo ověř proti `ls migrations`): všech sedm tabulek
   z plánu, oddíl 6, včetně vestavěných blokovaných frází a výchozích nastavení
-  (`styles`, `typing_wpm` 40, `text_retention_days` NULL = natrvalo (D-V7, R-148), `cleanup_enabled`, `auto_learn_terms`,
+  (`styles`, `typing_wpm` 40, `text_retention_days` NULL = natrvalo (D-V7, R-150), `cleanup_enabled`, `auto_learn_terms`,
   `store_text` true, `daily_cost_cap_usd` 1). Idempotentní, jen nové tabulky.
 - `lib/admin/voice/keys.ts`: `zk_voice_<prefix>_<tajemství>`, HMAC-SHA256 s `AGENT_KEY_PEPPER`
   a doménou `voice:`, porovnání `timingSafeEqual`, bez pepře selže zavřeně.
@@ -55,8 +55,8 @@ Příjem diktátu (VO02), statistiky (VO10), aplikace na Macu.
 ## Migrace na testovací Neon
 
 Aby šel ve VO03 vytvořit skutečný klíč, potřebuje testovací Neon („ZakazIQ RD test", na který
-míří `.env.local`) migraci 136. **Zeptej se Kryštofa**; se souhlasem
-`node scripts/apply-migration.js migrations/136_zakaziq_voice.sql`. Bez souhlasu nech stránku
+míří `.env.local`) migraci 138. **Zeptej se Kryštofa**; se souhlasem
+`node scripts/apply-migration.js migrations/138_zakaziq_voice.sql`. Bez souhlasu nech stránku
 odolnou proti chybějící tabulce (prázdný stav „Databáze ještě nemá tabulky ZakazIQ Voice") a
 napiš to do Otevřených problémů.
 
@@ -68,15 +68,15 @@ napiš.
 
 ## Hotovo, když
 
-- Migrace 136 je v repu, test v PGlite prochází dvakrát po sobě.
+- Migrace 138 je v repu, test v PGlite prochází dvakrát po sobě.
 - Klíč zařízení jde vytvořit a zneplatnit v adminu, v DB je jen prefix a otisk.
 - `npx tsc --noEmit`, `npm test`, `npm run build:check` prošly.
-- `.claude/security/DECISIONS.md` má **#055 ZakazIQ Voice — klíč zařízení** (číslo ověř):
+- `.claude/security/DECISIONS.md` má **#057 ZakazIQ Voice — klíč zařízení** (číslo ověř):
   co klíč smí, kde leží, jak se zneplatní, přijatá rizika. `STATE.md` řádek. Sync `--write`
   a `--check`.
 - `docs/admin/AGENTS-ADMIN.md` má oddíl „ZakazIQ Voice" (tabulky, klíč, stránka).
 
 ## Konec sezení
 
-`web-security-review` na změnu. Skill `zakaziq-memory` (changelog: migrace 136 aplikovaná:
+`web-security-review` na změnu. Skill `zakaziq-memory` (changelog: migrace 138 aplikovaná:
 ne / testovací Neon ano-ne). Stav VO01 v plánu. Commit `feat: voice databáze a klíč zařízení`.

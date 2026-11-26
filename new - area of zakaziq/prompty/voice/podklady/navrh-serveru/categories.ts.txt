@@ -1,5 +1,5 @@
 /**
- * ZakazIQ Voice (R-148): do jaké kategorie diktát patří — podle aplikace,
+ * ZakazIQ Voice (R-150): do jaké kategorie diktát patří — podle aplikace,
  * do které se psalo. Stejné kategorie jako Wispr Flow, aby šly statistiky
  * porovnat, a podle nich se volí styl čištění.
  *

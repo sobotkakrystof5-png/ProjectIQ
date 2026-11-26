@@ -15,7 +15,7 @@ import { sttCostUsd, type SttResult } from './stt'
 import { countWords, stripFillers, tidy, wordDiff } from './text'
 
 /**
- * ZakazIQ Voice (R-148): cesta jednoho diktátu od nahrávky k textu.
+ * ZakazIQ Voice (R-150): cesta jednoho diktátu od nahrávky k textu.
  *
  *   řeč? → přepis → pojistky přepisu → zkratka? → slovník → vycpávky
  *        → čištění modelem → kontrola výstupu → text

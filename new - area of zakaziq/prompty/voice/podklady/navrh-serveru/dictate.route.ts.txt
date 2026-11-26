@@ -7,7 +7,7 @@ import { runPipeline } from '@/lib/admin/voice/pipeline'
 import { findDictation, loadPipelineContext, saveCancelled, saveDictation } from '@/lib/admin/voice/store'
 import { transcribeVoice } from '@/lib/admin/voice/stt'
 
-// ZakazIQ Voice (R-148): diktát z Macu → text.
+// ZakazIQ Voice (R-150): diktát z Macu → text.
 //
 // Multipart: `audio` (m4a/wav, nejvýš 4 MB ≈ 20 minut AAC 16 kHz mono) a `meta`
 // (JSON podle dictationMetaSchema). Server přepíše, projde pojistkami proti

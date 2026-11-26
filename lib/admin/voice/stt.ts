@@ -1,7 +1,7 @@
 import type { SttSegment } from './guards'
 
 /**
- * ZakazIQ Voice (R-148): přepis řeči na text (D-V3).
+ * ZakazIQ Voice (R-150): přepis řeči na text (D-V3).
  *
  * Hlavní poskytovatel `VOICE_STT_PROVIDER` (`groq` výchozí, nebo `openai`),
  * když selže nebo nemá klíč, zkusí se druhý. Groq vrací segmenty s jistotou

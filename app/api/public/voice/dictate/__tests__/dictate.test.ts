@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { NextRequest } from 'next/server'
 
 let db: PGlite
-/** Databáze bez migrace 136 — zakládá se v beforeAll, uvnitř testu by PGlite pod zátěží přetáhla limit 5 s. */
+/** Databáze bez migrace 138 — zakládá se v beforeAll, uvnitř testu by PGlite pod zátěží přetáhla limit 5 s. */
 let emptyDb: PGlite
 
 vi.mock('server-only', () => ({}))
@@ -29,11 +29,11 @@ import { POST as FEEDBACK } from '@/app/api/public/voice/feedback/route'
 import { DELETE as TERMS_DELETE, GET as TERMS_GET, POST as TERMS_POST } from '@/app/api/public/voice/terms/route'
 import { GET as SETTINGS_GET, PATCH as SETTINGS_PATCH } from '@/app/api/public/voice/settings/route'
 
-// ZakazIQ Voice (R-148, VO02): veřejný vstup diktátu přes skutečný route
-// handler, PGlite s migrací 136 a podvržený Groq.
+// ZakazIQ Voice (R-150, VO02): veřejný vstup diktátu přes skutečný route
+// handler, PGlite s migrací 138 a podvržený Groq.
 
 const ROOT = path.resolve(__dirname, '../../../../../..')
-const MIGRATION = fs.readFileSync(path.join(ROOT, 'migrations/136_zakaziq_voice.sql'), 'utf8')
+const MIGRATION = fs.readFileSync(path.join(ROOT, 'migrations/138_zakaziq_voice.sql'), 'utf8')
 const GROQ_VERBOSE = fs.readFileSync(path.join(ROOT, 'lib/__tests__/fixtures/voice-groq-verbose.json'), 'utf8')
 
 const M4A_HEAD = [0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x4d, 0x34, 0x41, 0x20]

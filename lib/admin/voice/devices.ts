@@ -3,7 +3,7 @@ import { adminDb, q } from '@/lib/admin/db'
 import { generateVoiceKey, maskVoiceKey, voiceKeyMatches, voiceKeyPrefixOf } from '@/lib/admin/voice/keys'
 
 /**
- * ZakazIQ Voice (R-148): zařízení s vlastním klíčem (migrace 136).
+ * ZakazIQ Voice (R-150): zařízení s vlastním klíčem (migrace 138).
  *
  * Klíč v čitelné podobě existuje jen v návratové hodnotě `createDevice` —
  * nikam se neukládá ani neloguje. V DB je prefix a HMAC. Zneplatněné zařízení
@@ -32,7 +32,7 @@ export type VoiceDevicesResult = { ok: true; devices: VoiceDevice[] } | { ok: fa
 
 const iso = (value: unknown): string | null => (value ? new Date(value as string).toISOString() : null)
 
-/** Tabulka nebo sloupec z migrace 136 ještě nejsou v databázi. */
+/** Tabulka nebo sloupec z migrace 138 ještě nejsou v databázi. */
 export function isMissingVoiceSchema(err: unknown): boolean {
   const code = (err as { code?: string })?.code
   return code === '42P01' || code === '42703'
@@ -64,7 +64,7 @@ export const DEVICES_SQL = q`
   LIMIT 100
 `
 
-/** Seznam pro admin. Bez migrace 136 `missing_tables`. */
+/** Seznam pro admin. Bez migrace 138 `missing_tables`. */
 export async function listDevices(): Promise<VoiceDevicesResult> {
   try {
     const [rows] = await adminDb.batch([DEVICES_SQL])

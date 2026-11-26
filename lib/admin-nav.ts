@@ -80,7 +80,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: '/dashboard/projekty', label: 'Projekty', icon: 'personal' },
       { href: '/dashboard/startup', label: 'Startup', icon: 'startup' },
-      // Diktování na Macu přes Fn (R-148): zařízení, později statistiky a učení (VO10).
+      // Diktování na Macu přes Fn (R-150): zařízení, později statistiky a učení (VO10).
       { href: '/dashboard/voice', label: 'ZakazIQ Voice', icon: 'voice' },
     ],
   },

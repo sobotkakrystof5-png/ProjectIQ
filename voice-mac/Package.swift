@@ -1,5 +1,5 @@
 // swift-tools-version:6.0
-// ZakazIQ Voice — aplikace na Macu (R-148, docs/admin/VOICE-PLAN.md).
+// ZakazIQ Voice — aplikace na Macu (R-150, docs/admin/VOICE-PLAN.md).
 // Bez cizích balíčků: jen Apple frameworky. Jazykový režim Swift 5 (plán, D-V5).
 import PackageDescription
 

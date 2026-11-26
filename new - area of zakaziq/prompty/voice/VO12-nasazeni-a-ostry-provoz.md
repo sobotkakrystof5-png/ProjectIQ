@@ -14,7 +14,7 @@ pojistky, čištění a učení.
 1. Skill `zakaziq-memory` (začátek). Zjisti z paměti, jestli jde o **nasazení**, nebo
    o **vyhodnocení po týdnu**.
 2. Plán `docs/admin/VOICE-PLAN.md` oddíly 14 (stav všech sezení), 11, 13 a 16.
-3. `.claude/security/STATE.md` a `DECISIONS.md` #055.
+3. `.claude/security/STATE.md` a `DECISIONS.md` #057.
 
 ## Část A — nasazení
 
@@ -24,7 +24,7 @@ jednom a řekni, co přesně se stane.
 1. Kontrola větve: `npx tsc --noEmit`, `npm test`, `npm run build`, `make -C voice-mac test app`,
    regresní kontrola `/login`, `/dashboard`, `/dashboard/finance`, `/p/[token]` (B12).
    `web-security-review` na celý rozdíl větve proti `main`.
-2. **Migrace 136 na produkci** — se souhlasem: buď ji pustí Kryštof, nebo agent přes Neon
+2. **Migrace 138 na produkci** — se souhlasem: buď ji pustí Kryštof, nebo agent přes Neon
    MCP v jedné transakci se zápisem do `public.schema_migrations` (jako u migrací 130–135).
    Ověř tabulky a výchozí řádky čtením.
 3. **`GROQ_API_KEY` do Vercelu Production** jako sensitive — vloží Kryštof (nebo agent přes
@@ -37,7 +37,7 @@ jednom a řekni, co přesně se stane.
    `https://www.zakaziq.cz`, vloží nový klíč, Vyzkoušet připojení. Starý vývojový klíč
    v aplikaci smazat.
 7. `make -C voice-mac app install` z `main`, Spustit po přihlášení zapnout.
-8. Zapiš do paměti: na produkci od data a commitu, migrace 136 aplikovaná, co je ověřené
+8. Zapiš do paměti: na produkci od data a commitu, migrace 138 aplikovaná, co je ověřené
    a co ne. Otevřený problém „Vyhodnotit týden ZakazIQ Voice" s datem za 7 dní.
 
 ## Část B — vyhodnocení po týdnu
@@ -56,7 +56,7 @@ jednom a řekni, co přesně se stane.
 
 ## Hotovo, když
 
-- ZakazIQ Voice běží proti produkci, migrace 136 a env jsou venku, bez běhových chyb.
+- ZakazIQ Voice běží proti produkci, migrace 138 a env jsou venku, bez běhových chyb.
 - Po týdnu jsou čísla v paměti, ladění je v kódu i ve zlaté sadě a plán je uzavřený.
 - Nic, co se neověřilo, není označené za hotové.
 

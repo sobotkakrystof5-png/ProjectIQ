@@ -3,9 +3,9 @@ import path from 'path'
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-// ZakazIQ Voice (R-148, VO01): migrace 136 nad čistou PGlite, dvakrát po sobě.
+// ZakazIQ Voice (R-150, VO01): migrace 138 nad čistou PGlite, dvakrát po sobě.
 
-const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/136_zakaziq_voice.sql'), 'utf8')
+const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/138_zakaziq_voice.sql'), 'utf8')
 
 const TABLES = [
   'voice_devices',
@@ -49,7 +49,7 @@ afterAll(async () => {
   await db?.close()
 })
 
-describe('migrace 136 (ZakazIQ Voice)', () => {
+describe('migrace 138 (ZakazIQ Voice)', () => {
   it('založí všech sedm tabulek a druhý běh nic nezmění', async () => {
     const first = await fingerprint()
     expect(first.columns.map((r) => r.t)).toEqual([...TABLES].sort())

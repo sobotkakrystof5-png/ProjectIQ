@@ -5,7 +5,7 @@ import type { VoiceToday } from '@/lib/admin/voice/queries'
 import { formatDays, wordsNoun } from '@/lib/admin/voice/stats'
 import { cn } from '@/lib/utils'
 
-/** Diktování (ZakazIQ Voice, VO10): dnešní slova a série. Bez diktátu ani migrace 136 se neukáže. */
+/** Diktování (ZakazIQ Voice, VO10): dnešní slova a série. Bez diktátu ani migrace 138 se neukáže. */
 export function VoiceTodayCard({ voice }: { voice: VoiceToday }) {
   return (
     <Card className="min-w-0 p-5">

@@ -25,7 +25,7 @@ import type { SttResult } from './stt'
 import { applyLineCommands, changedWords, countWords, stripFillers, tidy } from './text'
 
 /**
- * ZakazIQ Voice (R-148): cesta jednoho diktátu od nahrávky k textu (plán, oddíl 3).
+ * ZakazIQ Voice (R-150): cesta jednoho diktátu od nahrávky k textu (plán, oddíl 3).
  *
  *   G1 řeč? → přepis (záloha) → G12 ozvěna nápovědy → G2 segmenty → G3 opakování
  *   → G4 blokované fráze → G5 rychlost → zkratka? → slovník → „nový řádek",

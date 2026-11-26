@@ -63,7 +63,7 @@ Okno na Macu (VO11). Změny jiných obrazovek adminu kromě karty na Dnes a polo
 
 - `stats`: série přes půlnoc a přes změnu času, dnes bez diktátu, rychlost bez `speech_ms`,
   ušetřený čas nikdy záporný, pásma heatmapy, p50/p95.
-- `queries` v PGlite s migrací 136: součty za den v pražském čase, kategorie, bez tabulek
+- `queries` v PGlite s migrací 138: součty za den v pražském čase, kategorie, bez tabulek
   prázdný výsledek.
 - `admin-db-rounds`: Dnes pořád v limitu, `/dashboard/voice` jedno kolo.
 - Hlídací testy adminu (`components/admin/__tests__/admin-page-guard.test.ts`,

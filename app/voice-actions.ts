@@ -41,7 +41,7 @@ import { SEARCH_MAX } from '@/lib/admin/voice/queries'
 import { runVoiceLearningNow } from '@/lib/admin/voice/learner'
 import { isIsoDate } from '@/lib/prague-time'
 
-// ZakazIQ Voice (R-148): zařízení s klíčem v adminu (VO01). Klíč se vrací jen
+// ZakazIQ Voice (R-150): zařízení s klíčem v adminu (VO01). Klíč se vrací jen
 // z vytvoření a nikam se neloguje; chyby se logují jen názvem.
 
 export type VoiceResult<T = Record<never, never>> = ({ ok: true } & T) | { ok: false; error: string }
@@ -53,7 +53,7 @@ const nameSchema = z
   .transform((s) => s.replace(/\s+/g, ' ').trim())
   .pipe(z.string().min(1, 'Napište název zařízení, třeba „MacBook".').max(80, 'Název může mít nejvýš 80 znaků.'))
 
-const MISSING = 'Databáze ještě nemá tabulky ZakazIQ Voice (migrace 136).'
+const MISSING = 'Databáze ještě nemá tabulky ZakazIQ Voice (migrace 138).'
 
 function failure(err: unknown, what: string): { ok: false; error: string } {
   if (err instanceof VoiceKeyConfigError) {

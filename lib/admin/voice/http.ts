@@ -7,7 +7,7 @@ import { isMissingVoiceSchema, resolveDevice, touchDevice, type ResolvedVoiceDev
 import { isVoiceKeyConfigured, voiceBearerFrom } from './keys'
 
 /**
- * ZakazIQ Voice (R-148): společné ověření pro `/api/public/voice/*` (plán, oddíl 7).
+ * ZakazIQ Voice (R-150): společné ověření pro `/api/public/voice/*` (plán, oddíl 7).
  *
  * Volá je jen aplikace na Macu, ne prohlížeč: bez CORS, bez cookie a požadavek
  * s hlavičkou `Origin` dostane 403 (klíč nesmí skončit v JavaScriptu stránky).

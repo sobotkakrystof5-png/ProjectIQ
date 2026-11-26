@@ -221,9 +221,9 @@ function mapMoney([incomeRows, invoiceRows]: AdminRow[][], month: string, year: 
  * Odděleně by to byla víc kol v jedné vlně a navigace na Dnes by stála víc
  * než dvě (menu + obsah).
  *
- * Diktování je na konci dávky: databáze bez migrace 136 shodí transakci,
+ * Diktování je na konci dávky: databáze bez migrace 138 shodí transakci,
  * `batchTolerant` pak zkusí dotazy jednotlivě a karta se jen neukáže. Takových
- * kol je víc, proto se 136 nasazuje spolu s kódem (VO12).
+ * kol je víc, proto se 138 nasazuje spolu s kódem (VO12).
  */
 export async function loadTodayScreen(
   todayIso: string = getPragueTodayISO(),

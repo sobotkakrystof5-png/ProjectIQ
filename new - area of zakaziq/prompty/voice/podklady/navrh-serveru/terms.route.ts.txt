@@ -4,7 +4,7 @@ import { readJsonLimited } from '@/lib/security/request-body'
 import { authorizeVoiceDevice, termInputSchema, voiceFail } from '@/lib/admin/voice/http'
 import { deleteTerm, upsertTerm } from '@/lib/admin/voice/store'
 
-// ZakazIQ Voice (R-148): slovník a zkratky z okna aplikace na Macu.
+// ZakazIQ Voice (R-150): slovník a zkratky z okna aplikace na Macu.
 // Totéž jde v adminu na /dashboard/voice?tab=slovnik.
 
 export const dynamic = 'force-dynamic'

@@ -24,7 +24,7 @@ import { finishShort, runPipeline, type PipelineConfig } from '@/lib/admin/voice
 import type { SttResult } from '@/lib/admin/voice/stt'
 import { applyLineCommands, changedWords, stripFillers } from '@/lib/admin/voice/text'
 
-// ZakazIQ Voice (R-148, VO07): čištění modelem, kontrola výstupu (G6–G9),
+// ZakazIQ Voice (R-150, VO07): čištění modelem, kontrola výstupu (G6–G9),
 // časový limit (G10) a denní strop (G11). Zlatá sada je zvlášť
 // (lib/admin/voice/__tests__/voice-golden.test.ts).
 

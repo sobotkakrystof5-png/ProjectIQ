@@ -25,11 +25,11 @@ import {
   undoSuggestion,
 } from '@/lib/admin/voice/manage'
 
-// ZakazIQ Voice (R-148, VO10): dotazy a zápisy adminu nad PGlite s migrací 136.
+// ZakazIQ Voice (R-150, VO10): dotazy a zápisy adminu nad PGlite s migrací 138.
 
 vi.setConfig({ testTimeout: 30_000 })
 
-const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/136_zakaziq_voice.sql'), 'utf8')
+const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/138_zakaziq_voice.sql'), 'utf8')
 const TODAY = '2026-11-26'
 
 let db: PGlite
@@ -299,7 +299,7 @@ describe('nastavení a chybějící migrace', () => {
     await saveSettings({ typingWpm: 40, textRetentionDays: null, storeText: true })
   })
 
-  it('bez migrace 136 vrátí missing_tables, ne chybu', async () => {
+  it('bez migrace 138 vrátí missing_tables, ne chybu', async () => {
     const empty = new PGlite()
     setAdminDbForTests(pgliteAdminDriver(empty))
     try {

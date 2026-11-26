@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { diffFeedback, looksLikeTerm, similarity } from '@/lib/admin/voice/learn'
 
-// ZakazIQ Voice (R-148, VO08): rozdíl po slovech a co z opravy vypadá jako pojem.
+// ZakazIQ Voice (R-150, VO08): rozdíl po slovech a co z opravy vypadá jako pojem.
 // Rozbor odpovědi AI je v voice-learner.test.ts (modul je jen pro server).
 
 describe('rozdíl po vložení', () => {

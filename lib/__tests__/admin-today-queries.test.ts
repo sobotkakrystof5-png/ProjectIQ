@@ -157,7 +157,7 @@ describe('kola do databáze — Dnes', () => {
     expect(probe.rounds()).toBe(10)
   })
 
-  it('bez tabulek ZakazIQ Voice (migrace 136) se karta Diktování jen neukáže', async () => {
+  it('bez tabulek ZakazIQ Voice (migrace 138) se karta Diktování jen neukáže', async () => {
     missingTable = 'voice_dictations'
     const { voice, money } = await loadTodayScreen('2026-11-11')
     expect(voice).toBeNull()

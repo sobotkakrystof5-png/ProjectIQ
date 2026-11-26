@@ -8,7 +8,7 @@ import { isVoiceKeyConfigured } from './keys'
 import { resolveDevice, touchDevice } from './store'
 
 /**
- * ZakazIQ Voice (R-148): společné ověření pro `/api/public/voice/*`.
+ * ZakazIQ Voice (R-150): společné ověření pro `/api/public/voice/*`.
  *
  * Volá je jen aplikace na Macu (ne prohlížeč), proto bez CORS a bez cookie.
  * Klíč zařízení v `Authorization: Bearer …`. Limit po IP se počítá u každého
@@ -46,7 +46,7 @@ export async function authorizeVoiceDevice(
   try {
     device = key ? await resolveDevice(key) : null
   } catch {
-    // Tabulka zařízení neexistuje (migrace 136 neproběhla).
+    // Tabulka zařízení neexistuje (migrace 138 neproběhla).
     return { ok: false, res: voiceFail(503, 'NOT_CONFIGURED') }
   }
   if (!device) return { ok: false, res: voiceFail(401, 'UNAUTHORIZED') }

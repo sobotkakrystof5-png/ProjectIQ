@@ -35,13 +35,13 @@ import {
 } from '@/lib/admin/voice/devices'
 import { addVoiceDevice, restoreVoiceDevice, revokeVoiceDevice } from '@/app/voice-actions'
 
-// ZakazIQ Voice (R-148, VO01): klíč zařízení a zařízení nad migrací 136 v PGlite.
+// ZakazIQ Voice (R-150, VO01): klíč zařízení a zařízení nad migrací 138 v PGlite.
 
 const PEPPER = 'p'.repeat(40)
-const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/136_zakaziq_voice.sql'), 'utf8')
+const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/138_zakaziq_voice.sql'), 'utf8')
 
 let db: PGlite
-/** Databáze bez migrace 136 — v beforeAll, uvnitř testu by PGlite pod zátěží přetáhla limit 5 s. */
+/** Databáze bez migrace 138 — v beforeAll, uvnitř testu by PGlite pod zátěží přetáhla limit 5 s. */
 let emptyDb: PGlite
 
 beforeAll(async () => {
@@ -159,11 +159,11 @@ describe('zařízení', () => {
     expect(JSON.stringify(list.devices)).not.toContain(b.key)
   })
 
-  it('bez migrace 136 seznam řekne missing_tables, ne chybu', async () => {
+  it('bez migrace 138 seznam řekne missing_tables, ne chybu', async () => {
     setAdminDbForTests(pgliteAdminDriver(emptyDb))
     try {
       expect(await listDevices()).toEqual({ ok: false, reason: 'missing_tables' })
-      expect(await addVoiceDevice('MacBook')).toEqual({ ok: false, error: expect.stringContaining('migrace 136') })
+      expect(await addVoiceDevice('MacBook')).toEqual({ ok: false, error: expect.stringContaining('migrace 138') })
     } finally {
       setAdminDbForTests(pgliteAdminDriver(db))
     }

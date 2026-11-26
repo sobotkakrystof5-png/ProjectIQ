@@ -1,7 +1,7 @@
 import { fold, foldText, words } from './text'
 
 /**
- * ZakazIQ Voice (R-148, VO08): učení z oprav po vložení — čisté funkce bez DB.
+ * ZakazIQ Voice (R-150, VO08): učení z oprav po vložení — čisté funkce bez DB.
  *
  * Mac pošle, jak vložený úsek vypadá chvíli po vložení (`POST /feedback`).
  * Rozdíl po slovech (nejdelší společná posloupnost) dá dvojice „slyšel →

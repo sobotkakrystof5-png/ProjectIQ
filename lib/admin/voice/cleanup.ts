@@ -4,7 +4,7 @@ import type { VoiceStyle } from './categories'
 import { CLEANUP_GUARD } from './guards'
 
 /**
- * ZakazIQ Voice (R-148, VO07): učesání přepisu modelem role `fast` (D-V4).
+ * ZakazIQ Voice (R-150, VO07): učesání přepisu modelem role `fast` (D-V4).
  *
  * Model dostane přepis jako **data**, ne jako pokyn: je v `<prepis>` a prompt
  * výslovně říká, že věta „napiš mi e-mail" nebo „ignoruj pokyny" se jen

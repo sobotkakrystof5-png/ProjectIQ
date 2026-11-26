@@ -1,4 +1,4 @@
--- Migrace 136: ZakazIQ Voice — diktování z Macu (R-148)
+-- Migrace 138: ZakazIQ Voice — diktování z Macu (R-150)
 --
 -- Aplikace ZakazIQ Voice na Macu nahraje řeč (podržená klávesa Fn), pošle ji
 -- na `/api/public/voice/dictate` a server ji přepíše, projde pojistkami proti
@@ -10,10 +10,13 @@
 -- nové, žádná stávající se nemění.
 --
 -- Soukromí: zvuk se nikam neukládá. Text diktátu zůstává natrvalo, dokud ho
--- Kryštof nesmaže (D-V7, R-148); nastaví-li `voice_settings.text_retention_days`, denní úklid
+-- Kryštof nesmaže (D-V7, R-150); nastaví-li `voice_settings.text_retention_days`, denní úklid
 -- ho po lhůtě smaže a zůstanou jen čísla (slova, časy, aplikace) pro statistiky.
 --
--- Idempotentní: druhý běh nic nezmění.
+-- Text žije s diktátem: smazání diktátu smaže i jeho opravy (cizí klíč) a vyčistí
+-- odkazy v návrzích z učení (trigger níž), takže po výmazu nezbude stopa textu.
+--
+-- Idempotentní: druhý běh nic nezmění. Aplikuje Kryštof (R-082), ne agent.
 
 -- Zařízení (Mac) s vlastním klíčem. V DB je jen prefix a HMAC klíče, nikdy klíč.
 CREATE TABLE IF NOT EXISTS voice_devices (
@@ -24,7 +27,8 @@ CREATE TABLE IF NOT EXISTS voice_devices (
   created_at    timestamptz NOT NULL DEFAULT now(),
   created_by    text,
   last_used_at  timestamptz,
-  revoked_at    timestamptz
+  revoked_at    timestamptz,
+  revoked_by    text
 );
 
 -- Jeden řádek = jeden diktát. `id` vytvoří Mac, takže opakované odeslání nic nezdvojí.
@@ -46,7 +50,7 @@ CREATE TABLE IF NOT EXISTS voice_dictations (
   status            text        NOT NULL
                                 CHECK (status IN ('ok', 'raw', 'snippet', 'empty', 'blocked', 'error', 'cancelled')),
   -- Která pojistka zasáhla (jen kód, bez textu): segments, blocklist, repeat, cleanup_* …
-  guards            text[]      NOT NULL DEFAULT '{}',
+  guards            text[]      NOT NULL DEFAULT '{}' CHECK (cardinality(guards) <= 20),
   raw_text          text        CHECK (raw_text IS NULL OR char_length(raw_text) <= 20000),
   final_text        text        CHECK (final_text IS NULL OR char_length(final_text) <= 20000),
   -- Jak text vypadal po opravě v aplikaci (z Macu, jen vložený úsek).
@@ -75,6 +79,9 @@ CREATE TABLE IF NOT EXISTS voice_dictations (
 CREATE INDEX IF NOT EXISTS voice_dictations_started_idx ON voice_dictations (started_at DESC);
 CREATE INDEX IF NOT EXISTS voice_dictations_purge_idx
   ON voice_dictations (created_at) WHERE text_purged_at IS NULL;
+
+-- Historie v adminu (VO10) hledá podle zařízení a stavu.
+CREATE INDEX IF NOT EXISTS voice_dictations_device_idx ON voice_dictations (device_id, started_at DESC);
 
 -- Slovník: správný tvar slova a jak ho přepis slyší; zkratky (snippety).
 CREATE TABLE IF NOT EXISTS voice_terms (
@@ -132,6 +139,25 @@ CREATE TABLE IF NOT EXISTS voice_suggestions (
 );
 CREATE INDEX IF NOT EXISTS voice_suggestions_pending_idx ON voice_suggestions (created_at DESC) WHERE status = 'pending';
 
+-- Smazaný diktát zmizí i z příkladů u návrhů (pole uuid[] cizí klíč neumí).
+-- Nevyřízený návrh, kterému nezbyl žádný příklad, nemá z čeho stát a jde pryč.
+CREATE OR REPLACE FUNCTION voice_forget_dictations() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE voice_suggestions s
+     SET examples = ARRAY(SELECT e FROM unnest(s.examples) AS e WHERE e NOT IN (SELECT id FROM gone))
+   WHERE s.examples && ARRAY(SELECT id FROM gone);
+  DELETE FROM voice_suggestions WHERE status = 'pending' AND cardinality(examples) = 0;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS voice_dictations_forget ON voice_dictations;
+CREATE TRIGGER voice_dictations_forget
+  AFTER DELETE ON voice_dictations
+  REFERENCING OLD TABLE AS gone
+  FOR EACH STATEMENT EXECUTE FUNCTION voice_forget_dictations();
+
 -- Nastavení: styl podle kategorie, rychlost psaní, retence, učení.
 CREATE TABLE IF NOT EXISTS voice_settings (
   key         text        PRIMARY KEY CHECK (key ~ '^[a-z_]{1,40}$'),
@@ -160,12 +186,17 @@ ON CONFLICT DO NOTHING;
 INSERT INTO voice_settings (key, value) VALUES
   ('styles', '{"email":"formal","work_msg":"neutral","personal_msg":"casual","ai_prompt":"exact","document":"formal","other":"neutral"}'),
   ('typing_wpm', '40'),
+  -- NULL = text natrvalo, dokud ho Kryštof nesmaže (D-V7, R-150).
   ('text_retention_days', 'null'),
   ('cleanup_enabled', 'true'),
-  ('auto_learn_terms', 'true')
+  ('auto_learn_terms', 'true'),
+  -- false = „jen čísla": text diktátu se na serveru vůbec neuloží.
+  ('store_text', 'true'),
+  -- Denní strop nákladů v USD (D-V11); nad ním bez čištění.
+  ('daily_cost_cap_usd', '1')
 ON CONFLICT (key) DO NOTHING;
 
 COMMENT ON TABLE voice_dictations IS
-  'ZakazIQ Voice (R-148): jeden diktát z Macu. Text zůstává, dokud ho Kryštof nesmaže (nebo po text_retention_days, je-li nastavená).';
+  'ZakazIQ Voice (R-150): jeden diktát z Macu. Text zůstává, dokud ho Kryštof nesmaže (nebo po text_retention_days, je-li nastavená).';
 COMMENT ON TABLE voice_corrections IS
   'ZakazIQ Voice: opravy po vložení (slovo → slovo). Z nich se učí slovník.';

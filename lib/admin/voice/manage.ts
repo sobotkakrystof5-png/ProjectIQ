@@ -7,7 +7,7 @@ import { historyWhere, type HistoryFilter } from './queries'
 import { pragueDayStart } from './stats'
 
 /**
- * ZakazIQ Voice (R-148): zápisy z adminu (VO10) — návrhy z učení, slovník,
+ * ZakazIQ Voice (R-150): zápisy z adminu (VO10) — návrhy z učení, slovník,
  * pravidla, nastavení a mazání diktátů. Volají je jen server actions
  * v `app/voice-actions.ts`, které ověří přihlášení a vstup.
  *
@@ -390,7 +390,7 @@ export async function countDictations(scope: DeleteScope): Promise<number> {
 
 /**
  * Smaže diktáty i s opravami (cizí klíč) a s odkazy v návrzích (trigger
- * z migrace 136). Nejde vrátit — proto se ptá potvrzením s počtem.
+ * z migrace 138). Nejde vrátit — proto se ptá potvrzením s počtem.
  */
 export async function deleteDictations(scope: DeleteScope): Promise<number> {
   const w = scopeWhere(scope)

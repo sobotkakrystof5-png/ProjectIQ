@@ -6,7 +6,7 @@
 >
 > **Zdroj pravdy pro rozsah.** Prompty sezení jsou v `new - area of zakaziq/prompty/voice/`
 > (jedno sezení = jedna nová konverzace v Claude Code). Stav sezení je v oddílu 14, rozhodnutí
-> v `memory/memory.md` jako **R-148** (zapsáno ve VO00, 2026-11-25; číslo R-147 má navrhovač
+> v `memory/memory.md` jako **R-150** (zapsáno ve VO00, 2026-11-25; číslo R-147 má navrhovač
 > nabídek na jiné větvi). Plán napsán 2026-11-25.
 
 ---
@@ -40,7 +40,7 @@ týdnech (oddíl 8).
 ## 2. Rozhodnutí
 
 Kryštof prošel 2026-11-25 (VO00): D-V2, D-V5 a D-V8 podle doporučení, **D-V7 změnil** (text
-natrvalo, dokud ho sám nesmaže). Ostatní platí, jak jsou. Zapsáno jako R-148.
+natrvalo, dokud ho sám nesmaže). Ostatní platí, jak jsou. Zapsáno jako R-150.
 
 | # | Rozhodnutí | Doporučení | Proč | Alternativa |
 |---|---|---|---|---|
@@ -173,10 +173,10 @@ Pravidla:
 
 ---
 
-## 6. Datový model (migrace 136, schéma `public`)
+## 6. Datový model (migrace 138, schéma `public`)
 
 Číslo migrace = další volné (`ls migrations`; dnes poslední 135). Návrh SQL je
-v `new - area of zakaziq/prompty/voice/podklady/navrh-serveru/136_zakaziq_voice.sql.txt`.
+v `new - area of zakaziq/prompty/voice/podklady/navrh-serveru/138_zakaziq_voice.sql.txt`.
 
 | Tabulka | K čemu | Hlavní sloupce |
 |---|---|---|
@@ -347,8 +347,8 @@ MacBooku (potřebuje `swift`, mikrofon a oprávnění). Serverová sezení jdou 
 
 | # | Sezení | Kde | Odhad | Potřebuje |
 |---|---|---|---|---|
-| VO00 | Příprava: plán do repa, větev, rozhodnutí R-148, ceny a test přepisu češtiny | Mac | 1–2 h | — |
-| VO01 | Databáze (migrace 136) a klíč zařízení, v adminu Zařízení | kdekoli | 2 h | VO00 |
+| VO00 | Příprava: plán do repa, větev, rozhodnutí R-150, ceny a test přepisu češtiny | Mac | 1–2 h | — |
+| VO01 | Databáze (migrace 138) a klíč zařízení, v adminu Zařízení | kdekoli | 2 h | VO00 |
 | VO02 | Příjem diktátu: přepis, pojistky, slovník, `dictate` a `config` | kdekoli | 3–4 h | VO01 |
 | VO03 | Mac: kostra aplikace, značka, oprávnění, připojení | Mac | 2–3 h | VO01 |
 | VO04 | Mac: Fn a nahrávání | Mac | 2–3 h | VO03 |
@@ -510,8 +510,8 @@ nápovědu** a G12 ji zahodilo (`blocked`). Čísla dál slovy („čtyřicet os
 
 | # | Stav | Datum | Poznámka |
 |---|---|---|---|
-| VO00 | rozpracováno | 2026-11-25 | Plán na větvi `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`), R-148, ceny ověřené, skript testu přepisu hotový. Chybí: klíč Groq, test Groq a skutečného hlasu, certifikát pro podpis |
-| VO01 | hotovo | 2026-11-26 | Migrace 136 v repu a na testovacím Neonu (produkce ne), `/dashboard/voice` se zařízeními, klíč `zk_voice_…`, DECISIONS #055. Za přihlášením neověřené |
+| VO00 | rozpracováno | 2026-11-25 | Plán na větvi `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`), R-150, ceny ověřené, skript testu přepisu hotový. Chybí: klíč Groq, test Groq a skutečného hlasu, certifikát pro podpis |
+| VO01 | hotovo | 2026-11-26 | Migrace 138 v repu a na testovacím Neonu (produkce ne), `/dashboard/voice` se zařízeními, klíč `zk_voice_…`, DECISIONS #057. Za přihlášením neověřené |
 | VO02 | hotovo | 2026-11-26 | `POST /dictate`, `GET /config`, G1–G5 a G12, slovník bez diakritiky, záloha OpenAI. Naostro jen přes OpenAI (Groq bez klíče): odpověď 0,9–1,9 s, G1 i G12 zasáhly. S Groq a za přihlášením neověřené |
 | VO03 | rozpracováno | 2026-11-26 | `voice-mac/`: lišta menu s dílky, okno Nastavení (adresa, klíč v Klíčence, Vyzkoušet připojení, tři oprávnění), `make test app install`, 24 testů. Odchylky: Swift Testing místo XCTest (Command Line Tools XCTest nemají), logika v knihovně `ZakazIQVoiceCore`, ikona kreslená skriptem `Scripts/AppIcon.swift` místo `sips` z PNG, bez ikon v okně. Ověřeno: testy, sestavení bez varování, vzhled okna (ladicí snímek), klient naživo (apex 308 → zastaveno, 404, nedostupný localhost). **Chybí certifikát „ZakazIQ Voice vývoj"** — bez něj neprošel `make app` se stálým podpisem, instalace ani připojení s klíčem proti `npm run dev` |
 | VO04 | čeká | | |

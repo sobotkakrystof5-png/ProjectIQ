@@ -1,5 +1,5 @@
 /**
- * ZakazIQ Voice (R-148): statistiky diktování — čisté výpočty bez DB.
+ * ZakazIQ Voice (R-150): statistiky diktování — čisté výpočty bez DB.
  * Definice odpovídají záložce Insights ve Wispr Flow (rychlost z času řeči,
  * série dní v místním čase, pásma heatmapy), aby šla čísla porovnat.
  */

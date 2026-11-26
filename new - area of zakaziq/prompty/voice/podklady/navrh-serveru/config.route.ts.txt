@@ -3,7 +3,7 @@ import { authorizeVoiceDevice } from '@/lib/admin/voice/http'
 import { loadVoiceSummaryForMac } from '@/lib/admin/voice/queries'
 import { listTerms, loadSettings } from '@/lib/admin/voice/store'
 
-// ZakazIQ Voice (R-148): co potřebuje okno aplikace na Macu — slovník,
+// ZakazIQ Voice (R-150): co potřebuje okno aplikace na Macu — slovník,
 // zkratky, styl podle kategorie a krátký přehled (dnes, týden, série).
 // Slouží i jako „Vyzkoušet připojení“.
 

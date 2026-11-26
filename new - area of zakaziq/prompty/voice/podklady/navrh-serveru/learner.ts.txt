@@ -15,7 +15,7 @@ import {
 import { addRule, loadSettings, purgeVoiceText, upsertTerm } from './store'
 
 /**
- * ZakazIQ Voice (R-148): běh učení nad logy.
+ * ZakazIQ Voice (R-150): běh učení nad logy.
  *
  * Volá se jednou denně z cronu `send-reminders` (R-006: jeden běh denně)
  * a tlačítkem „Projít logy teď“ v adminu. Pravidlová část je levná a běží
@@ -284,7 +284,7 @@ export async function runDailyVoiceMaintenance(now = new Date()): Promise<Learni
     const ai = monday ? await learnWithAi() : { added: 0, skipped: 'AI rozbor běží v pondělí.' }
     return { ...rules, aiSuggestions: ai.added, aiSkipped: ai.skipped, purged }
   } catch (err) {
-    // Migrace 136 ještě neproběhla nebo DB nejede — ostatní úlohy cronu musí doběhnout.
+    // Migrace 138 ještě neproběhla nebo DB nejede — ostatní úlohy cronu musí doběhnout.
     console.error('[voice] denní údržba selhala:', err instanceof Error ? err.name : 'unknown')
     return null
   }

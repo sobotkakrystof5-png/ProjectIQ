@@ -11,7 +11,7 @@ slovníku a vrátí text; každý diktát zapíše do `voice_dictations`. Čišt
 ## Než začneš
 
 1. Skill `zakaziq-memory` (začátek), `zakaziq-workspace-backend`, `web-security-memory`.
-2. Plán `docs/admin/VOICE-PLAN.md` oddíly 3, 4 (G1–G5 a G12), 6, 7. R-148 a výsledek testu přepisu
+2. Plán `docs/admin/VOICE-PLAN.md` oddíly 3, 4 (G1–G5 a G12), 6, 7. R-150 a výsledek testu přepisu
    z VO00 (D-V3).
 3. Vzory: `app/api/public/web-udalost/route.ts` (veřejný vstup bez prohlížeče, `Origin` = 403),
    `app/api/public/portal/[token]/transcribe/route.ts` a `lib/transcribe.ts` (přepis přes
@@ -64,7 +64,7 @@ slovníku a vrátí text; každý diktát zapíše do `voice_dictations`. Čišt
 - Route (`app/api/public/voice/dictate/__tests__/`): bez klíče 401, zneplatněný 401,
   s `Origin` 403, velké tělo 413, špatný typ i podvržené bajty 415, špatné meta 400, limit 429,
   idempotence (dvakrát stejné `id` = jeden řádek, jeden přepis), bez tabulek 503.
-  PGlite s migrací 136.
+  PGlite s migrací 138.
 
 ## Ověření naostro
 
@@ -80,7 +80,7 @@ a časy zapiš. V cloudu bez Macu jen testy, napiš to.
 - Diktát je v `voice_dictations` s časy, poskytovatelem, cenou a kódy pojistek; text
   v logu není.
 - Testy, `tsc`, `build:check` prošly.
-- `.claude/security/`: STATE (nový veřejný vstup), DECISIONS #055 doplněné (zpracovatelé
+- `.claude/security/`: STATE (nový veřejný vstup), DECISIONS #057 doplněné (zpracovatelé
   Groq a OpenAI, co se posílá, uchovávání), sync `--write`/`--check`.
 - `docs/admin/AGENTS-ADMIN.md` → ZakazIQ Voice: cesta diktátu, pojistky, API.
 

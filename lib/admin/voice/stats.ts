@@ -1,7 +1,7 @@
 import { addIsoDays, isoWeekday, pragueWallClockToISO } from '@/lib/prague-time'
 
 /**
- * ZakazIQ Voice (R-148): statistiky diktování — čisté výpočty bez databáze
+ * ZakazIQ Voice (R-150): statistiky diktování — čisté výpočty bez databáze
  * (plán, oddíl 8). Admin `/dashboard/voice`, karta na Dnes i `GET /stats` pro
  * okno na Macu počítají tytéž čísla odtud, takže se nikde neliší.
  *

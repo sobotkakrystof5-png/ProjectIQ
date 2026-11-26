@@ -6,7 +6,7 @@ import { addDays, editRate, fillDays, savedMinutes, streaks, wpm, type DayRow } 
 import { parseSettings, type VoiceSettings } from './store'
 
 /**
- * ZakazIQ Voice (R-148): dotazy pro stránku v adminu, kartu na Dnes a přehled
+ * ZakazIQ Voice (R-150): dotazy pro stránku v adminu, kartu na Dnes a přehled
  * v aplikaci na Macu. Celá obrazovka je jedna dávka (R-092). Podmínky jsou nad
  * okamžikem (`started_at >= …`), pražský den se počítá až v SELECTu (R-093).
  */
@@ -45,7 +45,7 @@ export interface VoiceToday {
   streak: number
 }
 
-/** Karta na Dnes: dnešní a včerejší slova a série. Bez tabulky (migrace 136) = null. */
+/** Karta na Dnes: dnešní a včerejší slova a série. Bez tabulky (migrace 138) = null. */
 export async function loadVoiceToday(): Promise<VoiceToday | null> {
   const today = getPragueTodayISO()
   try {
@@ -66,7 +66,7 @@ export async function loadVoiceToday(): Promise<VoiceToday | null> {
       streak: streaks(active, today).current,
     }
   } catch {
-    // Migrace 136 ještě neproběhla — Dnes se kvůli tomu nesmí rozbít.
+    // Migrace 138 ještě neproběhla — Dnes se kvůli tomu nesmí rozbít.
     return null
   }
 }

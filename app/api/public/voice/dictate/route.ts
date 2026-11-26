@@ -24,7 +24,7 @@ import {
 } from '@/lib/admin/voice/store'
 import { transcribeVoice } from '@/lib/admin/voice/stt'
 
-// ZakazIQ Voice (R-148): diktát z Macu → text (plán, oddíly 3, 4 a 7).
+// ZakazIQ Voice (R-150): diktát z Macu → text (plán, oddíly 3, 4 a 7).
 //
 // Multipart: `audio` (m4a nebo wav, nejvýš 4 MB) a `meta` (JSON). Server
 // přepíše, projde pojistkami G1–G5 a G12, opraví slova ze slovníku, učeše

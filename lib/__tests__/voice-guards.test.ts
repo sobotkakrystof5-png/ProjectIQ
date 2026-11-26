@@ -13,7 +13,7 @@ import { categoryFor } from '@/lib/admin/voice/categories'
 import { countWords, fold, foldText, tidy, words } from '@/lib/admin/voice/text'
 import { sttCostUsd } from '@/lib/admin/voice/costs'
 
-// ZakazIQ Voice (R-148, VO02): čisté funkce cesty diktátu.
+// ZakazIQ Voice (R-150, VO02): čisté funkce cesty diktátu.
 
 const BUILTIN: BlockPhrase[] = [
   { text: 'Titulky vytvořil', mode: 'always' },

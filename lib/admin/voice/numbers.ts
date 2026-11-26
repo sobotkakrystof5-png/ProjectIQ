@@ -1,7 +1,7 @@
 import { fold, words } from './text'
 
 /**
- * ZakazIQ Voice (R-148, VO07): čísla v diktátu pro pojistku G9.
+ * ZakazIQ Voice (R-150, VO07): čísla v diktátu pro pojistku G9.
  *
  * Čištění smí napsat číslo číslicemi („dvacet pět tisíc korun" → „25 000 Kč",
  * „dvacátého pátého listopadu" → „25. 11."), ale nesmí si číslo vymyslet ani

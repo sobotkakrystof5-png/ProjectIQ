@@ -24,8 +24,8 @@ a oprávnění systému). Ostatní jdou kdekoli.
 
 | # | Sezení | Kde | Hlavní skilly | Potřebuje |
 |---|---|---|---|---|
-| VO00 | Příprava: plán do repa, větev, R-148, ceny, test přepisu češtiny | Mac | zakaziq-memory | — |
-| VO01 | Databáze (migrace 136) a klíč zařízení | kdekoli | zakaziq-workspace-backend, web-security-review | VO00 |
+| VO00 | Příprava: plán do repa, větev, R-150, ceny, test přepisu češtiny | Mac | zakaziq-memory | — |
+| VO01 | Databáze (migrace 138) a klíč zařízení | kdekoli | zakaziq-workspace-backend, web-security-review | VO00 |
 | VO02 | Příjem diktátu: přepis, pojistky, slovník, API | kdekoli | zakaziq-workspace-backend, web-security-memory | VO01 |
 | VO03 | Mac: kostra aplikace, značka, oprávnění, připojení | Mac | zakaziq-design-dilky, zakaziq-ux-texty-cs | VO01 |
 | VO04 | Mac: Fn a nahrávání | Mac | — | VO03 |
@@ -46,7 +46,7 @@ VO05 se doplní potom).
 ## Společná pravidla (platí v každém sezení)
 
 - Česky, stručně. Na začátku řekni záměr, na konci výsledek, skutečné ověření a co zbývá.
-- **Tohle je výslovné zadání změny adminu** (R-148 z VO00). Mění se jen to, co sezení
+- **Tohle je výslovné zadání změny adminu** (R-150 z VO00). Mění se jen to, co sezení
   jmenuje; stávající obrazovky adminu, Workspace, landing a klientský prostor beze změny.
 - Větev `admin/zakaziq-voice`. **Commit na téhle větvi po uceleném kroku Kryštof povoluje
   tímto promptem**, zpráva česky `feat: voice …` / `fix: voice …` / `docs: voice …`.
@@ -54,7 +54,7 @@ VO05 se doplní potom).
 - Stageuj jen konkrétní soubory, nikdy `git add -A`. Cizí neuložené změny nepřepisuj,
   nevracej ani nestaguj.
 - **Migrace jen připravit**; na testovací Neon jen se souhlasem, na produkci až ve VO12.
-  Číslo si vždy ověř proti `ls migrations` (plán počítá s 136). Idempotentní, aditivní,
+  Číslo si vždy ověř proti `ls migrations` (plán počítá s 138). Idempotentní, aditivní,
   test v PGlite dvakrát po sobě.
 - **Žádný nový npm balíček.** Groq se volá přes `fetch`. Aplikace na Macu bez cizích balíčků
   (jen Apple frameworky a systémové `sqlite3`).

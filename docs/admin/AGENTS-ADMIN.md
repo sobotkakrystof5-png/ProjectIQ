@@ -1585,12 +1585,12 @@ Test: `lib/__tests__/admin-kontakt-jeden-zdroj.test.ts`.
   až po 10 s a jen když ji „Zpět" neobnovilo (obnova vrací stejné id i s připomínkami).
 - Testy: `lib/__tests__/admin-pripominky.test.ts` (PGlite se SQL 114, 115, 128).
 
-## ZakazIQ Voice: diktování z Macu (R-148)
+## ZakazIQ Voice: diktování z Macu (R-150)
 
 Plán, rozhodnutí a stav sezení: `docs/admin/VOICE-PLAN.md`, prompty `new - area of zakaziq/prompty/voice/`.
 Tady jen to, co je v kódu.
 
-- **Tabulky (migrace 136, schéma `public`):** `voice_devices` (Mac s klíčem: `name`, `prefix`, `key_hash`,
+- **Tabulky (migrace 138, schéma `public`):** `voice_devices` (Mac s klíčem: `name`, `prefix`, `key_hash`,
   `last_used_at`, `revoked_at`, `revoked_by`), `voice_dictations` (jeden diktát; `id` vytváří Mac, stav
   `ok|raw|snippet|empty|blocked|error|cancelled`, kategorie `email|work_msg|personal_msg|ai_prompt|document|other`,
   `guards[]` jen kódy pojistek), `voice_terms` (slovník a zkratky, unikátní `(kind, lower(term))`), `voice_rules`
@@ -1610,7 +1610,7 @@ Tady jen to, co je v kódu.
 - **Admin (VO10):** `/dashboard/voice` (menu Osobní › ZakazIQ Voice, ikona `Mic`), záložky `?tab=` **Přehled ·
   Historie (`historie`, `hledat`, `stav`) · Učení (`uceni`, odznak s počtem návrhů) · Slovník (`slovnik`) ·
   Nastavení (`nastaveni`, kotva `#zarizeni`)**. Každá záložka = jedna dávka (`lib/admin/voice/queries.ts`, test
-  `admin-db-rounds`); bez migrace 136 `{ ok: false, reason: 'missing_tables' }` a věta místo chyby.
+  `admin-db-rounds`); bez migrace 138 `{ ok: false, reason: 'missing_tables' }` a věta místo chyby.
   - **Čísla** (`lib/admin/voice/stats.ts`, čisté funkce, plán oddíl 8): slova jen u `ok|raw|snippet`
     (`COUNTED_STATUSES`), pražský den v SELECTu, podmínky přes okamžik `pragueDayStart(day)` (R-093); rychlost
     jen z diktátů s řečí ≥ 2 s (`WPM_MIN_SPEECH_MS`), ušetřený čas `max(0, slova/typing_wpm − minuty řeči)`,
@@ -1630,8 +1630,8 @@ Tady jen to, co je v kódu.
     `VOICE_DICTATION_TONE`, `VOICE_SUGGESTION_TONE` (signal) a `VOICE_DEVICE_TONE` v `lib/admin-status.ts`.
     Grafy bez knihovny (hodnota při najetí, `sr-only` tabulka), heatmapa na telefonu posuvná a otevřená u dneška.
   - **Dnes:** karta „Diktování dnes" (slova, série) — dotaz `voiceTodayQuery` je 9. v dávce `loadTodayScreen`
-    (`batchTolerant`); bez migrace 136 nebo bez diktátu za 400 dní se karta neukáže. Na databázi bez 136 stojí
-    Dnes kvůli tomu víc kol (záloha po jednom dotazu), proto 136 jde na produkci spolu s kódem (VO12).
+    (`batchTolerant`); bez migrace 138 nebo bez diktátu za 400 dní se karta neukáže. Na databázi bez 138 stojí
+    Dnes kvůli tomu víc kol (záloha po jednom dotazu), proto 138 jde na produkci spolu s kódem (VO12).
   - **Ukázková data:** `node scripts/voice-seed.mjs [--smazat] --ano` (250 diktátů za 60 dní, aplikace
     „Ukázka …" s bundle id `ukazka.*`, návrhy `ukazka:*`, slova Dílkovna a Dílkovník); se skutečnými diktáty
     v DB se zastaví (`--i-s-daty`).
@@ -1667,7 +1667,7 @@ Tady jen to, co je v kódu.
   Kategorie podle bundle id (`categories.ts`), titulek okna jen jako nápověda, neukládá se.
 - **Testy (VO02):** `lib/__tests__/voice-guards.test.ts`, `voice-pipeline.test.ts` (podvržený přepis i `fetch`,
   ukázková odpověď `fixtures/voice-groq-verbose.json`), `app/api/public/voice/dictate/__tests__/dictate.test.ts`
-  (route nad PGlite s migrací 136).
+  (route nad PGlite s migrací 138).
 - **Vývojový skript:** `scripts/voice-stt-test.mjs` — porovnání přepisu češtiny (Groq, OpenAI), nahrávky mimo repo.
 - **Čištění modelem (VO07, `cleanup.ts`):** role `fast` (`aiModel`), `thinking: disabled`, `output_config.effort: low`,
   **bez `temperature`** (Haiku 5.5 jinou než výchozí odmítne 400), limit 6 s (`CLEANUP_TIMEOUT_MS`, G10) bez
@@ -1721,12 +1721,12 @@ Tady jen to, co je v kódu.
   pravidel do 300 znaků, každé s ≥ 2 id z logu, cizí id, tajný údaj nebo `<>` = zahodit. Vznikne jen návrh
   `rule` (`source = ai`), nic se nepoužije bez přijetí. `last_review_at` se zapíše i bez návrhů.
 - **Spouštění:** denní cron `send-reminders` → `runDailyVoiceLearning` (pravidla denně, rozbor AI v pražské
-  pondělí; bez migrace 136 nic). Admin Učení › „Spustit učení teď" (`runVoiceLearning` v `app/voice-actions.ts`,
+  pondělí; bez migrace 138 nic). Admin Učení › „Spustit učení teď" (`runVoiceLearning` v `app/voice-actions.ts`,
   `RunLearningButton`) pustí obojí hned a vrátí větu se souhrnem.
 - **Úklid** (`retention.ts`): cron `client-retention` → `purgeVoiceText`. Jen s nastavenou
   `text_retention_days` (výchozí NULL = nic): diktátům starším než lhůta (`created_at`) smaže `raw_text`,
   `final_text`, `edited_text` a jejich `voice_corrections`, zapíše `text_purged_at`; čísla zůstanou. Bez
-  migrace 136 vrátí `{ days: null }`.
+  migrace 138 vrátí `{ days: null }`.
 - **Slovník a nastavení z Macu:** `GET /api/public/voice/terms` (`config`) vrací `{ terms, snippets }`;
   `POST` `{ kind: 'term', id?, term, heardAs[] }` nebo `{ kind: 'snippet', id?, term, expansion }` přes
   `termInput`/`snippetInput` z `manage.ts` (409 `DUPLICATE`, 404 `NOT_FOUND`); `DELETE ?id=`.

@@ -4,7 +4,7 @@ import { authorizeVoiceDevice, voiceFail, voiceOk } from '@/lib/admin/voice/http
 import { loadMacConfig } from '@/lib/admin/voice/store'
 import { isSttConfigured } from '@/lib/admin/voice/stt'
 
-// ZakazIQ Voice (R-148): co potřebuje aplikace na Macu — slovník, zkratky
+// ZakazIQ Voice (R-150): co potřebuje aplikace na Macu — slovník, zkratky
 // a styl podle kategorie. Slouží i jako „Vyzkoušet připojení" (plán, oddíl 7).
 // `summary` = dnešní slova a série, tatáž čísla jako admin (VO10).
 

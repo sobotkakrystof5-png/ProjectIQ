@@ -79,5 +79,5 @@ oprávnění. Vzhled okna porovnej s Dílky. Co nešlo, napiš.
 
 ## Konec sezení
 
-Skill `zakaziq-memory` (rozhodnutí o podpisu do R-148 jako upřesnění, je-li jiné než plán).
+Skill `zakaziq-memory` (rozhodnutí o podpisu do R-150 jako upřesnění, je-li jiné než plán).
 Stav VO03 v plánu. Commit `feat: voice aplikace na Macu, kostra a připojení`.

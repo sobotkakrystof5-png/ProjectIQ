@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ZakazIQ Voice (R-148, VO07): zlatá sada čištění se SKUTEČNÝM modelem.
+// ZakazIQ Voice (R-150, VO07): zlatá sada čištění se SKUTEČNÝM modelem.
 //
 // Projde případy ze zlaté sady (lib/admin/voice/__tests__/golden/), pošle
 // přepisy modelu role `fast` (lib/ai/models.ts) a vypíše, kolik výstupů prošlo
