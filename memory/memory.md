@@ -2,7 +2,13 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO03, aplikace na Macu** (R-150): `voice-mac/` se
+> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice na produkci** (R-150): serverová část (VO01, VO02,
+> VO07, VO08, VO10) je **na produkci od 2026-11-26 (`b319355`) i s migrací 138**. Před nasazením přečíslováno
+> kvůli `main`: migrace 136 → 138, R-148 → R-150, DECISIONS #055 → #057. Veřejně ověřeno: `/dashboard/voice` 307,
+> `/api/public/voice/config` bez klíče i se špatným 401, s `Origin` 403, bez běhových chyb. Za přihlášením
+> nikdo nic neviděl; zkouška připojení z Macu proti www.zakaziq.cz čeká na Kryštofa.
+>
+> Předchozí: 2026-11-26 · **ZakazIQ Voice — VO03, aplikace na Macu** (R-150): `voice-mac/` se
 > sestaví `make`, běží v liště menu s ikonou dílků a má okno Nastavení (adresa serveru, klíč zařízení jen v Klíčence,
 > Vyzkoušet připojení, tři oprávnění). 24 testů, vzhled ověřený snímkem okna, klient naživo proti produkci.
 > **Čeká na certifikát „ZakazIQ Voice vývoj"** — bez něj neprošel stálý podpis, instalace ani připojení s klíčem.
@@ -169,8 +175,9 @@ výstupu a denním stropem (milník 2, bez skutečného modelu neověřené), ad
 (milník 3, za přihlášením neověřené), učení z oprav, slovník a nastavení z Macu (VO08, rozbor AI jen s podvrženou
 odpovědí).
 **VO03 rozpracované 2026-11-26:** kostra aplikace `voice-mac/` (lišta menu, okno Nastavení, Klíčenka, oprávnění,
-`make test app install`) je v kódu a testy prochází; chybí certifikát pro podpis, pak `make -C voice-mac run`
-a Vyzkoušet připojení s klíčem z adminu proti `npm run dev` (Otevřené problémy). Pak VO04 (Fn a nahrávání),
+`make test app install`) je v kódu a testy prochází. Server Voice je od 2026-11-26 na produkci (`b319355`, migrace 138),
+takže připojení se zkouší rovnou proti www.zakaziq.cz (Kryštof nechce localhost). Chybí certifikát pro stálý podpis
+(do té doby `make -C voice-mac run SIGN_ID=-`) a zkouška klíčem z produkčního adminu (Otevřené problémy). Pak VO04 (Fn a nahrávání),
 VO09 (zachycení oprav) navazuje na VO06.
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
 
@@ -1836,8 +1843,9 @@ ve VO02. Žádný nový npm balíček.
 - [ ] **ZakazIQ Voice — dokončit VO03 (certifikát a ověření naostro):** (1) Kryštof: Přístup ke klíčenkám → Asistent
   certifikátů → Vytvořit certifikát, název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu
   **Code Signing** (důvěru nastavovat netřeba, ověřeno na dočasné klíčence), (2) `make -C voice-mac run` (při prvním
-  podpisu heslo k Macu a „Vždy povolit"), (3) `npm run dev` ve worktree, v adminu Voice › Zařízení nový klíč,
-  vložit do okna, adresa localhost:3000, Vyzkoušet připojení → „Připojeno k zařízení …", (4) povolit mikrofon
+  podpisu heslo k Macu a „Vždy povolit"; bez certifikátu zatím `SIGN_ID=-`), (3) na www.zakaziq.cz/dashboard/voice
+  › Zařízení nový klíč, vložit do okna, adresa www.zakaziq.cz, Vyzkoušet připojení → „Připojeno k zařízení …"
+  (server je na produkci od `b319355`), (4) povolit mikrofon
   a zpřístupnění, `make -C voice-mac install` znovu a zkontrolovat, že se na povolení neptá znovu · od 2026-11-26
 - [ ] **ZakazIQ Voice — čištění se skutečným modelem neověřené (VO07):** zlatá sada běží s podvrženými odpověďmi.
   Pustit `node scripts/voice-eval.mjs --ano` (volá Claude, stojí pod 1 Kč) a výsledek zapsat do plánu oddíl 14;
@@ -2307,6 +2315,22 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice na produkci, R-150)
+- **chore** Přečíslování Voice kvůli `main` (tam mezitím vznikly migrace 136 a 137 navrhovače, R-148, R-149
+  a DECISIONS #055, #056): migrace `136_zakaziq_voice.sql` → `138_zakaziq_voice.sql`, R-148 → R-150, DECISIONS
+  #055 → #057 ve 95 souborech; R-136 (vizeon.cz) zůstalo. Commit `945ef61`.
+- **chore** Sloučení `origin/main` do `admin/zakaziq-voice` (`b319355`): 11 konfliktů, všechny „obojí". Oprava:
+  `/dashboard/voice` volá `requireAdminPage()` (audit B1, hlídací test padal). Ověřeno: `npx tsc --noEmit`,
+  `npx vitest run` 2141 prošlo / 4 přeskočené, `npm run build`, `sync-agent-context --check`.
+- **db** Migrace 138 `zakaziq_voice` **aplikovaná na produkci** 2026-11-26 (Neon MCP, jedna transakce na souhlas
+  Kryštofa, zapsaná v `public.schema_migrations` s otiskem souboru): 7 tabulek `voice_*`, 13 vestavěných pravidel,
+  7 nastavení, trigger. Testovací Neon ji má pod starým názvem `136_zakaziq_voice.sql` (obsah stejný).
+- **chore** **Na produkci** 2026-11-26: fast-forward `main` `b1e5133` → `b319355`, nasazení `dpl_Hp7X…` Ready.
+  Veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard` a `/dashboard/voice` 307,
+  `/api/public/voice/config` 401 (bez klíče i se špatným), s `Origin` 403; 15 min bez běhových chyb. Ve Vercelu
+  je `AGENT_KEY_PEPPER`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`; `GROQ_API_KEY` chybí, přepis tedy jde přes OpenAI.
+  Za přihlášením neověřeno.
 
 ### 2026-11-26 (ZakazIQ Voice — VO03, aplikace na Macu, R-150)
 - **feat** `voice-mac/`: Swift balíček bez cizích závislostí (knihovna `ZakazIQVoiceCore` + aplikace `ZakazIQVoice`),
