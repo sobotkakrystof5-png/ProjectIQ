@@ -4,6 +4,8 @@ import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('server-only', () => ({}))
+// PGlite a první požadavek na routu jsou pod zátěží celé sady pomalé (známé u testů nad PGlite).
+vi.setConfig({ testTimeout: 30_000 })
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(async () => undefined),
@@ -39,16 +41,22 @@ const PEPPER = 'p'.repeat(40)
 const MIGRATION = fs.readFileSync(path.join(__dirname, '../../migrations/136_zakaziq_voice.sql'), 'utf8')
 
 let db: PGlite
+/** Databáze bez migrace 136 — v beforeAll, uvnitř testu by PGlite pod zátěží přetáhla limit 5 s. */
+let emptyDb: PGlite
 
 beforeAll(async () => {
   db = new PGlite()
+  emptyDb = new PGlite()
+  // PGlite startuje až prvním dotazem; ať se to nestane uvnitř testu.
+  await emptyDb.query('SELECT 1')
   await db.exec(MIGRATION)
   setAdminDbForTests(pgliteAdminDriver(db))
 })
 
 afterAll(async () => {
   setAdminDbForTests(null)
-  await db.close()
+  await db?.close()
+  await emptyDb?.close()
 })
 
 beforeEach(async () => {
@@ -152,14 +160,12 @@ describe('zařízení', () => {
   })
 
   it('bez migrace 136 seznam řekne missing_tables, ne chybu', async () => {
-    const empty = new PGlite()
-    setAdminDbForTests(pgliteAdminDriver(empty))
+    setAdminDbForTests(pgliteAdminDriver(emptyDb))
     try {
       expect(await listDevices()).toEqual({ ok: false, reason: 'missing_tables' })
       expect(await addVoiceDevice('MacBook')).toEqual({ ok: false, error: expect.stringContaining('migrace 136') })
     } finally {
       setAdminDbForTests(pgliteAdminDriver(db))
-      await empty.close()
     }
   })
 })

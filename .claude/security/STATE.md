@@ -130,7 +130,7 @@ Hodnoty SPF/DKIM vždy z Resend dashboardu, ne odsud — tady je jen tvar a zji�
 - Zálohy: Neon point-in-time restore (podle plánu Neonu) — test obnovy nikdy neproběhl
 
 - **Vercel Preview (od 2026-11-21):** `DATABASE_URL` a `DATABASE_URL_WS` míří na testovací Neon „ZakazIQ RD test“ (`ep-shiny-union-b922fwm5`), ne na produkci — do té doby `DATABASE_URL` pro Preview mířil na produkci (AUDIT-LOG 2026-11-21). Přihlášení admina v Preview přes Supabase `zakaziq` (jen identita), klientský prostor v Preview přihlásit nejde. Kontrolní větev `preview/test`.
-- ZakazIQ Voice (R-148, VO01, migrace 136 — aplikovaná: ne): zařízení (Mac) s klíčem `zk_voice_…` (HMAC s `AGENT_KEY_PEPPER`, doména `voice:`, prefix + otisk v `voice_devices`, ukázaný jednou v `/dashboard/voice`, zneplatnění okamžité, Zpět do 2 min, nejvýš 10 platných). Veřejné cesty `/api/public/voice/*` zatím nejsou (VO02). Text diktátů natrvalo do ručního smazání, zvuk se neukládá, DECISIONS #055
+- ZakazIQ Voice (R-148, VO01, migrace 136 — aplikovaná: ne): zařízení (Mac) s klíčem `zk_voice_…` (HMAC s `AGENT_KEY_PEPPER`, doména `voice:`, prefix + otisk v `voice_devices`, ukázaný jednou v `/dashboard/voice`, zneplatnění okamžité, Zpět do 2 min, nejvýš 10 platných). Veřejné cesty (VO02): `POST /api/public/voice/dictate` (multipart do 4 MB + 64 kB, zvuk ověřený podle prvních bajtů, `Origin` = 403, limity po IP a zařízení, idempotentní `id`) a `GET /api/public/voice/config`; přepis Groq, záloha OpenAI; text do logu nejde. Text diktátů natrvalo do ručního smazání, zvuk se neukládá, DECISIONS #055
 
 ## Ochrana proti XSS a DDoS (2026-11-20, DECISIONS #050)
 

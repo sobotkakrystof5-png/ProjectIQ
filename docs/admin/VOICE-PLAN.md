@@ -474,6 +474,13 @@ Co z toho plyne:
   `node scripts/voice-stt-test.mjs ~/ZakazIQ-voice-test` (bez nápovědy i s `--napoveda "…"`)
   a doplnit sem tabulku. Do té doby platí D-V3 podle doporučení.
 
+**Naostro přes server ve VO02 (2026-11-26):** `POST /api/public/voice/dictate` na lokálním serveru, testovací
+Neon, OpenAI `gpt-4o-mini-transcribe` (Groq bez klíče), syntetický hlas, slovník ZakazIQ / Prvotka / VIZEON.
+Celá cesta na serveru 0,9–1,7 s (první požadavek 3,5 s kvůli sestavení routy), od odeslání po odpověď
+0,9–1,9 s. Slovník opravil „ZakazIQ“ a „VIZEON“; „prvotku“ (4. pád) nezná — skloňování řeší učení nebo
+čištění. Ticho s `speechMs: 0` → `empty` bez přepisu (G1), ticho bez měření řeči → OpenAI **znovu vrátilo
+nápovědu** a G12 ji zahodilo (`blocked`). Čísla dál slovy („čtyřicet osm tisíc“) — VO07.
+
 ---
 
 ## 13. Rizika
@@ -502,7 +509,7 @@ Co z toho plyne:
 |---|---|---|---|
 | VO00 | rozpracováno | 2026-11-25 | Plán na větvi `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`), R-148, ceny ověřené, skript testu přepisu hotový. Chybí: klíč Groq, test Groq a skutečného hlasu, certifikát pro podpis |
 | VO01 | hotovo | 2026-11-26 | Migrace 136 v repu a na testovacím Neonu (produkce ne), `/dashboard/voice` se zařízeními, klíč `zk_voice_…`, DECISIONS #055. Za přihlášením neověřené |
-| VO02 | čeká | | |
+| VO02 | hotovo | 2026-11-26 | `POST /dictate`, `GET /config`, G1–G5 a G12, slovník bez diakritiky, záloha OpenAI. Naostro jen přes OpenAI (Groq bez klíče): odpověď 0,9–1,9 s, G1 i G12 zasáhly. S Groq a za přihlášením neověřené |
 | VO03 | čeká | | |
 | VO04 | čeká | | |
 | VO05 | čeká | | |

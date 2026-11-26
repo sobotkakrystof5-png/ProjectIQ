@@ -1,0 +1,33 @@
+{
+  "task": "transcribe",
+  "language": "czech",
+  "duration": 6.42,
+  "text": " Dobrý den, posílám nabídku na nový web pro prvotko. Titulky vytvořil JohnyX",
+  "segments": [
+    {
+      "id": 0,
+      "seek": 0,
+      "start": 0,
+      "end": 4.8,
+      "text": " Dobrý den, posílám nabídku na nový web pro prvotko.",
+      "tokens": [50365, 1012, 7802],
+      "temperature": 0,
+      "avg_logprob": -0.21,
+      "compression_ratio": 1.12,
+      "no_speech_prob": 0.02
+    },
+    {
+      "id": 1,
+      "seek": 480,
+      "start": 4.8,
+      "end": 6.42,
+      "text": " Titulky vytvořil JohnyX",
+      "tokens": [50605, 7192],
+      "temperature": 0,
+      "avg_logprob": -1.35,
+      "compression_ratio": 0.9,
+      "no_speech_prob": 0.83
+    }
+  ],
+  "x_groq": { "id": "req_ukazka" }
+}

@@ -1614,4 +1614,29 @@ Tady jen to, co je v kódu.
   v `lib/admin-status.ts`.
 - **Testy:** `lib/__tests__/voice-schema.test.ts` (migrace dvakrát, CHECK, unikátnost, úklid návrhů),
   `lib/__tests__/voice-keys.test.ts` (klíč, zařízení a akce nad PGlite).
+- **Příjem diktátu (VO02):** `POST /api/public/voice/dictate` (multipart `audio` m4a/wav do 4 MB + `meta` JSON,
+  `maxDuration` 60) a `GET /api/public/voice/config` (zařízení, slovník, zkratky, styl, `storeText`,
+  `transcriptionReady`; slouží jako „Vyzkoušet připojení“). Společné ověření `lib/admin/voice/http.ts`:
+  `Origin` → 403 `ORIGIN_NOT_ALLOWED`, bez pepře nebo tabulek 503 `NOT_CONFIGURED`, limit 1 200/h po IP
+  a 400 diktátů/240 načtení za hodinu po zařízení (`api_requests`), klíč → 401 `UNAUTHORIZED`, `touchDevice`.
+  Další kódy: 400 `INVALID_BODY|INVALID_META|INVALID_AUDIO`, 413 `TOO_LARGE`, 415 `UNSUPPORTED_TYPE` (typ i první
+  bajty: `ftyp` / `RIFF…WAVE`), 429 `RATE_LIMITED`, 502 `STT_FAILED`. Odpověď `{ ok, id, status, text, words, guards }`.
+  Stejné `id` téhož zařízení podruhé vrátí uložený výsledek bez přepisu; `cancelled` uloží jen čísla.
+- **Cesta diktátu** (`lib/admin/voice/pipeline.ts`, čistá funkce, přepis zvenku): G1 řeč pod 300 ms → `empty`
+  bez přepisu → přepis (`stt.ts`: Groq `verbose_json`, záloha OpenAI, limit 20 s, model z env, pokus bez klíče
+  se přeskočí) → G12 ozvěna nápovědy → G2 segmenty (`no_speech_prob > 0,6` a `avg_logprob < −1`, nebo
+  `compression_ratio > 2,4`) → G3 opakování → G4 blokované fráze (`always`/`alone` pod 4 s) → G5 víc než 8 slov
+  za sekundu nahrávky (od 7 slov) → zkratka (celý diktát) → slovník → `tidy`. Prázdný výsledek po zásahu pojistky
+  = `blocked`, bez zásahu `empty`. Kódy pojistek `GUARD` v `guards.ts`, čísla jako konstanty tamtéž. Místo pro
+  čištění modelem (VO07) je vyznačené.
+- **Slovník** (`dictionary.ts`): náhrady `heard_as → term` po celých slovech bez ohledu na velikost písmen
+  a diakritiku, srovnání velkých písmen u výrazu, který je má; nápověda pro přepis „Diktát v češtině. Výrazy: …“
+  do 450 znaků (strop Groq 224 tokenů), nejpoužívanější slova první (`uses += 1` při použití). Skloňované tvary
+  („prvotku“) slovník nezná — doplní je učení (VO08) nebo čištění (VO07).
+- **Uložení** (`store.ts`): nastavení, slovník a blokované fráze jedním kolem; zápis s časy, poskytovatelem,
+  modelem, cenou (`costs.ts`) a kódy pojistek. Při `store_text = false` se `raw_text` ani `final_text` neuloží.
+  Kategorie podle bundle id (`categories.ts`), titulek okna jen jako nápověda, neukládá se.
+- **Testy (VO02):** `lib/__tests__/voice-guards.test.ts`, `voice-pipeline.test.ts` (podvržený přepis i `fetch`,
+  ukázková odpověď `fixtures/voice-groq-verbose.json`), `app/api/public/voice/dictate/__tests__/dictate.test.ts`
+  (route nad PGlite s migrací 136).
 - **Vývojový skript:** `scripts/voice-stt-test.mjs` — porovnání přepisu češtiny (Groq, OpenAI), nahrávky mimo repo.

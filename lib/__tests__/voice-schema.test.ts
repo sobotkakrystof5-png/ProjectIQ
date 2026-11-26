@@ -46,7 +46,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await db.close()
+  await db?.close()
 })
 
 describe('migrace 136 (ZakazIQ Voice)', () => {

@@ -1037,3 +1037,19 @@ Platí výsledek prvního běhu. Audit produkce pouštět jednou, ne v cyklu.
 - Fixed: nic k opravě.
 - Left open: přijatá rizika v DECISIONS #055 (klíč v Klíčence Macu, text diktátů bez lhůty, společný
   `AGENT_KEY_PEPPER`). Migrace 136 na testovacím Neonu ano, na produkci ne.
+
+## 2026-11-26 — review ZakazIQ Voice VO02 (veřejný vstup diktátu)
+
+- Scope: `app/api/public/voice/{dictate,config}/route.ts`, `lib/admin/voice/{http,stt,pipeline,store,guards,dictionary,categories,text,costs}.ts` (web-security-review).
+- Prošlo: vstup jen ze serveru/aplikace (`Origin` → 403, bez CORS), klíč jen v hlavičce, limity po IP i zařízení
+  (DB + paměťová předbrána), tělo se čte se stropem i bez `Content-Length`, `meta` striktní Zod se stropem 4 kB,
+  typ zvuku i první bajty ověřené před odesláním poskytovateli, idempotence podle `id` a zařízení, chyby
+  `{ ok:false, code }` bez rozlišení „zařízení neexistuje" a „zneplatněné", parametrizované dotazy přes `adminDb`.
+  Text diktátu ani tělo chyby poskytovatele nejdou do logu (test `dictate.test.ts`, `voice-pipeline.test.ts`).
+  Žádný výstup se nevykresluje jako HTML (odpověď je JSON pro aplikaci). CSP beze změny (prohlížeč na Groq ani
+  OpenAI nesahá).
+- Fixed během sezení: stav 503 od poskytovatele se pletl s „chybí klíč" (odhalil test) — pokus má teď vlastní
+  příznak `skipped`.
+- Ověřeno naostro proti testovacímu Neonu a OpenAI (syntetický hlas, dočasný pepř jen pro proces): 401 bez klíče,
+  403 s `Origin`, G1 a G12 zasáhly, zkušební zařízení a diktáty po zkoušce smazané.
+- Left open: Groq Zero Data Retention zapnout (Kryštof), `AGENT_KEY_PEPPER` chybí v lokálním `.env.local`.

@@ -2,10 +2,10 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO01** (R-148): migrace 136 (sedm tabulek
-> `voice_*`) a v adminu `/dashboard/voice` se zařízeními a klíčem `zk_voice_…` ukázaným jednou. Migrace
-> je na **testovacím** Neonu, ne na produkci. Větev `admin/zakaziq-voice` (worktree
-> `.claude/worktrees/zakaziq-voice`). VO00 dál čeká na klíč Groq a nahrávky vlastního hlasu.
+> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice — VO01 a VO02** (R-148): migrace 136, zařízení
+> s klíčem v `/dashboard/voice` a příjem diktátu `POST /api/public/voice/dictate` (přepis Groq se zálohou
+> OpenAI, pojistky G1–G5 a G12, slovník). Naostro ověřené přes OpenAI a testovací Neon, ne na produkci.
+> Větev `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`). VO00 čeká na klíč Groq.
 >
 > Předchozí: 2026-11-25 · **ZakazIQ Voice — VO00** (R-148): plán a prompty VO00–VO12 do repa, rozhodnutí,
 > ceny, skript testu přepisu. Text diktátů zůstává natrvalo, dokud ho Kryštof nesmaže.
@@ -114,9 +114,9 @@
 **ZakazIQ Voice (R-148, od 2026-11-25, větev `admin/zakaziq-voice`):** diktování na Macu přes Fn,
 zpracování a statistiky v adminu `/dashboard/voice`. Třináct sezení VO00–VO12, plán
 `docs/admin/VOICE-PLAN.md` (stav v oddílu 14), prompty `new - area of zakaziq/prompty/voice/`.
-VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01 hotové 2026-11-26**: migrace 136 v repu a na
-testovacím Neonu, `/dashboard/voice` se zařízeními (menu Osobní). Další krok: **VO02** (příjem diktátu,
-potřebuje `GROQ_API_KEY`) nebo **VO03** (kostra aplikace na Macu, potřebuje certifikát pro podpis).
+VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01 a VO02 hotové 2026-11-26**: migrace 136 v repu a na
+testovacím Neonu, `/dashboard/voice` se zařízeními, `POST /api/public/voice/dictate` a `GET …/config`.
+Další krok: **VO07** (čištění textu, jde hned) nebo **VO03** (kostra aplikace na Macu, potřebuje certifikát).
 Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl).
 
 **Admin konzole (produkce):** `/dashboard` a portál `/p/[token]`; deploy z `main`, produkce běží od 2026-11-14 na **`8210f04`** (celá modernizace AD00–AD18 + klientský prostor + Workspace + landing). `/alteno` a `/hub` zanikly a přesměrovávají (R-087, R-088). Popis: `docs/admin/AGENTS-ADMIN.md`. Ověřeno po nasazení (veřejně, bez přihlášení): `/` 200 (landing), `/login` 200, `/h/<token>` 404 (tj. **102 i 106 na produkci jsou**), `/p/<token>` 404, `/dashboard` 307 na `/login`, cron 401, veřejná API 405 na GET, `/w/prihlaseni` a `/klient/prihlaseni` 200. **Za přihlášením okem nikdo nic neviděl.**
@@ -1662,6 +1662,9 @@ ve VO02. Žádný nový npm balíček.
   (3) před VO03 certifikát pro podpis: Přístup ke klíčence → Asistent certifikátů → Vytvořit certifikát,
   název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu **Code Signing**
   (dnes 0 identit pro podpis). Zatím otestováno jen OpenAI na syntetickém hlasu (plán 12a) · Kryštof · od 2026-11-25
+- [ ] **ZakazIQ Voice — `AGENT_KEY_PEPPER` chybí v lokálním `.env.local`:** bez něj lokálně nejde přidat zařízení
+  a `/api/public/voice/*` vrací 503. Doplnit libovolný náhodný řetězec aspoň 32 znaků, jen pro vývoj;
+  produkce má vlastní ve Vercelu · Kryštof · od 2026-11-26
 - [ ] **ZakazIQ Voice — test číslování migrací na větvi `admin/zakaziq-voice` padá:** migrace 136 je za 133,
   čísla 134 (zrušení schůzek) a 135 (doručení pozvánek) jsou na jiných větvích. Spraví se rebasem po jejich
   sloučení do `main`; čísla neměnit · `lib/ws/__tests__/ws-schema.test.ts` · od 2026-11-26
@@ -2078,6 +2081,20 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-26 (ZakazIQ Voice — VO02, R-148)
+- **feat** Příjem diktátu `POST /api/public/voice/dictate` a `GET /api/public/voice/config`: ověření klíče zařízení,
+  `Origin` → 403, limity po IP a zařízení, tělo do 4 MB + 64 kB, zvuk m4a/wav ověřený podle prvních bajtů, idempotentní
+  `id`, `cancelled` jen čísla. Moduly `lib/admin/voice/{http,stt,pipeline,store,guards,dictionary,categories,text,costs}.ts`:
+  přepis Groq `verbose_json` se zálohou OpenAI (20 s), pojistky G1–G5 a G12, slovník bez ohledu na diakritiku, zkratky,
+  „jen čísla“, ceny na jednom místě. Bez migrace (používá 136).
+- **fix** Během testů: HTTP 503 od poskytovatele se pletl s „chybí klíč“ — pokus přepisu má příznak `skipped`.
+- **fix** Diktát, jehož přepis selhal (502), se při opakovaném odeslání z fronty se stejným `id` zpracuje znovu
+  (dřív by se vrátil uložený neúspěch a fronta na Macu by diktát nikdy nepřepsala).
+- **chore** Testy `voice-guards`, `voice-pipeline` (podvržený `fetch`, ukázková odpověď Groq) a route `dictate.test.ts`
+  nad PGlite — Voice dohromady 70 testů. Naostro: lokální server, testovací Neon, OpenAI, syntetický hlas — 0,9–1,9 s,
+  G1 a G12 zasáhly, slovník opravil jména; zkušební zařízení, diktáty i slova po zkoušce smazané. Bezpečnost DECISIONS
+  #055 doplnění, STATE, AUDIT-LOG.
 
 ### 2026-11-26 (ZakazIQ Voice — VO01, R-148)
 - **db** Migrace 136 `zakaziq_voice`: `voice_devices`, `voice_dictations`, `voice_terms`, `voice_rules` (13 vestavěných
