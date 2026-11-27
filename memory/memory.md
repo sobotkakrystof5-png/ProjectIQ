@@ -2471,12 +2471,12 @@ ve VO02. Žádný nový npm balíček.
 - **feat** Rozbalený kontakt v Hovorech má dole tlačítko „Smazat kontakt" s potvrzením přímo v řádku (co se smaže
   s ním: poznámky, termín v kalendáři; „Nechat", Escape vrátí fokus). Dřív šlo mazat jen ikonou, která se ukáže
   až při najetí myší, takže na telefonu vůbec. Ikona v řádku zůstala. Soubor: `components/LeadsTable.tsx`.
-- **fix** `deleteLead` maže kontakt i spárovanou událost jedním příkazem (dřív dva `DELETE` za sebou) a schůzku
-  s Meetem smaže i v Google Kalendáři — dřív tam po smazání kontaktu z Hovorů zůstávala. Soubor:
-  `app/calls-actions.ts`, test `lib/__tests__/admin-hovory-smazani.test.ts` (6). Bez migrace.
-- **chore** Ověřeno: `tsc`, nový test a testy kalendáře, asistenta a tříd adminu (67), dočasná stránka s vymyšlenými
-  kontakty na 1280 a 390 px (tlačítko 44 px, potvrzení, Escape, chyba bez přihlášení vrátí řádek a ukáže hlášku);
-  stránka smazaná. Za přihlášením a s Googlem naživo neověřeno, necommitnuto.
+- **fix** Oprava `deleteLead` z téhož sezení (jeden příkaz, Meet i z Googlu) se necommitla, protože ji předběhla
+  oprava z auditu E (`ba5210a`, test `admin-propojeni.test.ts`); platí ta. Starý test `admin-hovory-smazani.test.ts`
+  odpadl.
+- **chore** Ověřeno: dočasná stránka s vymyšlenými kontakty na 1280 a 390 px (tlačítko 44 px, potvrzení, Escape,
+  chyba bez přihlášení vrátí řádek a ukáže hlášku), stránka smazaná. 2026-11-27 přenesené na aktuální `main`:
+  `tsc`, testy tříd adminu, `admin-propojeni` a XSS (38). Za přihlášením naživo neověřeno.
 
 ### 2026-11-26 (navrhovač nabídek N1 — rozbor firmy, R-147)
 - **feat** Karta „Rozbor firmy" na kartě kontaktu: „Nastavit agenty" založí u Anthropicu prostředí a tým tří
