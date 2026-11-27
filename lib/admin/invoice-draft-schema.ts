@@ -28,6 +28,8 @@ export const draftFieldsSchema = z.object({
     address: text(400),
     ico: text(8).regex(/^\d{8}$/, 'IČO má osm číslic.').or(z.literal('')),
     dic: text(20),
+    /** Telefon odběratele na faktuře (R-153). Koncepty před R-153 ho nemají. */
+    phone: text(40).regex(/^[+0-9 ()/-]*$/, 'Telefon může mít jen číslice, mezery a +.').optional(),
   }),
   email: text(254).email('Zkontrolujte e-mail odběratele.').or(z.literal('')),
   items: z.array(draftItemSchema).max(50, 'Nejvíc padesát položek.'),

@@ -15,8 +15,9 @@ import { isKindsReady, loadProjectBilling } from '@/lib/admin/project-billing'
  * nahrálo PDF; tady vzniká rovnou — s číslem z vlastní řady, položkami,
  * QR kódem a PDF ke stažení.
  *
- * `?zakazka=<id>` předvyplní odběratele a částku ze zakázky (cena mínus
- * zaplacená záloha), takže odkaz jde dát kamkoli k zakázce.
+ * `?zakazka=<id>` předvyplní odběratele (i se sídlem z rejstříku, R-153)
+ * a částku ze zakázky (cena mínus zaplacená záloha), takže odkaz jde dát
+ * kamkoli k zakázce. Stejné údaje formulář dotáhne i po výběru zakázky.
  *
  * `?koncept=<id>` otevře koncept faktury (R-117) k úpravě. Formulář ho pak
  * jen ukládá; vystavuje se ve Fakturách › Ke schválení.
@@ -46,7 +47,7 @@ export default async function NewInvoicePage(props: {
 
   const [{ profile, configured }, prefill, projects, draftsEnabled, kindsEnabled, concept, correction] = await Promise.all([
     getIssuerSettings(),
-    loadIssueDraft(projectId),
+    loadIssueDraft(projectId, { registry: true }),
     getInvoiceProjectOptions(),
     isDraftsReady(),
     isKindsReady(),
@@ -167,13 +168,14 @@ function fromConcept(concept: NonNullable<Awaited<ReturnType<typeof getDraft>>>,
     issuedOn: today,
     suppliedOn: concept.suppliedOn || today,
     dueOn: addIsoDays(today, concept.dueDays),
-    counterparty: concept.counterparty,
+    counterparty: { ...concept.counterparty, phone: concept.counterparty.phone ?? '' },
     email: concept.email,
     amount: 0,
     projectId: concept.projectId,
     projectLabel: concept.projectLabel,
     items: concept.items,
     billing,
+    sources: null,
   }
 }
 
@@ -201,6 +203,7 @@ function fromCorrection(source: CorrectionSource, billing: IssueDraft['billing']
     projectLabel,
     items,
     billing,
+    sources: null,
   }
 }
 

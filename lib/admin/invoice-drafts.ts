@@ -6,6 +6,7 @@ import {
   loadIssueDraft,
   loadIssuerProfile,
   prepareKindIssue,
+  rememberCounterpartyOnContact,
 } from './invoice-issue'
 import { isKindsReady } from './project-billing'
 import { billingOverview, isInvoiceKind, kindItemDescription, type InvoiceKind, type KindPlan } from './invoice-kinds'
@@ -111,6 +112,7 @@ function toDraft(row: DraftRow): InvoiceDraft {
       address: row.counterparty?.address ?? '',
       ico: row.counterparty?.ico ?? '',
       dic: row.counterparty?.dic ?? '',
+      phone: row.counterparty?.phone ?? '',
     },
     email: row.client_email ?? '',
     items: Array.isArray(row.items) ? row.items : [],
@@ -542,7 +544,8 @@ export async function issueDraft(id: string, to?: string): Promise<IssueDraftRes
   const today = getPragueTodayISO()
   const parsed = issueInvoiceSchema.safeParse({
     projectId: draft.projectId,
-    counterparty: draft.counterparty,
+    // E-mail, kam faktura odchází, se tiskne i na ni (R-153).
+    counterparty: { ...draft.counterparty, email: draft.email },
     issuedOn: today,
     suppliedOn: draft.suppliedOn || today,
     dueOn: addIsoDays(today, draft.dueDays),
@@ -600,5 +603,14 @@ export async function issueDraft(id: string, to?: string): Promise<IssueDraftRes
   const numbered = await adminDb<{ invoice_number: string }>`
     UPDATE invoices SET client_email = ${draft.email} WHERE id = ${invoiceId} RETURNING invoice_number
   `
+  // Údaje ze schváleného konceptu do kontaktu zakázky, jen na prázdné místo (R-153).
+  // Faktura je vystavená; chyba tady ji nesmí vrátit.
+  if (draft.projectId) {
+    try {
+      await rememberCounterpartyOnContact(draft.projectId, { ...draft.counterparty, email: draft.email })
+    } catch (err) {
+      console.error('[faktury] údaje z konceptu se do kontaktu nezapsaly', err instanceof Error ? err.message : 'neznámá chyba')
+    }
+  }
   return { ok: true, invoiceId, number: numbered[0]?.invoice_number ?? '', email: draft.email }
 }

@@ -17,6 +17,9 @@ import {
   type Settlement,
 } from './invoice-kinds'
 import { addIsoDays, getPragueTodayISO } from '@/lib/prague-time'
+import { isValidIco, lookupIco } from '@/lib/ares'
+import type { PrefillSources } from './invoice-prefill'
+import { absorbBillingIntoContact, type BillingValues } from './contact-sync'
 import {
   DEFAULT_DUE_DAYS,
   EMPTY_ISSUER,
@@ -198,6 +201,7 @@ export async function loadCorrectionSource(id: string): Promise<CorrectionLookup
         SELECT i.id::text, i.invoice_number, i.project_id::text AS project_id,
                i.client_name, i.client_ico, i.client_dic, i.client_address,
                to_jsonb(i)->>'client_email' AS client_email,
+               to_jsonb(i)->'client_contact' AS client_contact,
                i.supplied_on::text, i.due_on::text, i.currency, i.note, i.items,
                i.paid_on IS NOT NULL AS paid, i.cancelled_at IS NOT NULL AS cancelled,
                to_jsonb(i)->>'invoice_kind' AS invoice_kind,
@@ -219,6 +223,7 @@ export async function loadCorrectionSource(id: string): Promise<CorrectionLookup
         client_dic: string | null
         client_address: string | null
         client_email: string | null
+        client_contact: PrintedContact | null
         supplied_on: string | null
         due_on: string | null
         currency: string
@@ -244,8 +249,9 @@ export async function loadCorrectionSource(id: string): Promise<CorrectionLookup
         address: row.client_address ?? '',
         ico: row.client_ico ?? '',
         dic: row.client_dic ?? '',
+        phone: clean(row.client_contact?.phone),
       },
-      email: row.client_email?.trim() ?? '',
+      email: clean(row.client_contact?.email) || clean(row.client_email),
       suppliedOn: row.supplied_on,
       dueOn: row.due_on,
       currency: row.currency,
@@ -279,6 +285,8 @@ export function issuePayload(input: IssueInvoiceInput, issuer: IssuerProfile, pl
     client_ico: input.counterparty.ico,
     client_dic: input.counterparty.dic,
     client_address: input.counterparty.address,
+    // Vytištěný kontakt odběratele (R-153, migrace 140). Databáze bez 140 klíč ignoruje.
+    client_contact: { email: input.counterparty.email ?? '', phone: input.counterparty.phone ?? '' },
     issued_on: input.issuedOn,
     supplied_on: input.suppliedOn,
     due_on: input.dueOn,
@@ -375,7 +383,8 @@ export type IssueDraft = {
   issuedOn: string
   suppliedOn: string
   dueOn: string
-  counterparty: { name: string; address: string; ico: string; dic: string }
+  /** Odběratel; telefon se tiskne na fakturu (R-153). */
+  counterparty: { name: string; address: string; ico: string; dic: string; phone: string }
   /** Kam fakturu poslat: e-mail ze zakázky (R-117). Prázdné = zeptat se. */
   email: string
   /** Cena ze zakázky mínus zaplacená záloha; 0 = nic k předvyplnění. */
@@ -390,6 +399,8 @@ export type IssueDraft = {
   items: { description: string; quantity: number; unitPrice: number; vatRate?: 0 | 12 | 21 }[]
   /** Cena zakázky, co je zaplacené a vyfakturované (R-143). Bez zakázky null. */
   billing: ProjectBilling | null
+  /** Odkud jsou údaje odběratele (R-153). Bez zakázky null. */
+  sources: PrefillSources | null
 }
 
 /**
@@ -407,23 +418,40 @@ function suggestItems(facts: AdminFacts, amount: number): IssueDraft['items'] {
 }
 
 /**
- * Co jde vyplnit za uživatele: datum, splatnost +14 dní, odběratel z poslední
- * faktury téhož kontaktu (AD09) a částka ze zakázky po odečtení zálohy.
- * Nic z toho není závazné — všechno jde ve formuláři přepsat.
+ * Co jde vyplnit za uživatele: datum, splatnost +14 dní, odběratel a částka
+ * ze zakázky po odečtení zálohy. Nic z toho není závazné — všechno jde ve
+ * formuláři přepsat.
+ *
+ * Odběratel (R-153), u každého údaje první, který je k dispozici:
+ * - jméno: poslední faktura klienta → rejstřík firem → firma u kontaktu
+ *   → firma u zakázky → jméno ze zakázky,
+ * - sídlo: poslední faktura → kontakt → rejstřík firem podle IČO,
+ * - IČO a DIČ: poslední faktura → kontakt → (DIČ) rejstřík,
+ * - e-mail: poslední faktura → zakázka → kontakt,
+ * - telefon: poslední faktura → zakázka → kontakt.
+ *
+ * Rejstřík (`registry`) se ptá jen formulář — koncepty z cronu a asistent
+ * do sítě nesahají. Nedostupný rejstřík nic neblokuje, pole zůstanou prázdná.
+ * Volitelné sloupce se čtou přes `to_jsonb`, ať to běží i na databázi bez
+ * migrací 104, 106, 117 a 140.
  */
-export async function loadIssueDraft(projectId: string | null): Promise<IssueDraft> {
+export async function loadIssueDraft(
+  projectId: string | null,
+  options: { registry?: boolean; excludeInvoiceId?: string | null } = {},
+): Promise<IssueDraft> {
   const today = getPragueTodayISO()
   const draft: IssueDraft = {
     issuedOn: today,
     suppliedOn: today,
     dueOn: addIsoDays(today, DEFAULT_DUE_DAYS),
-    counterparty: { name: '', address: '', ico: '', dic: '' },
+    counterparty: { name: '', address: '', ico: '', dic: '', phone: '' },
     email: '',
     amount: 0,
     projectId,
     projectLabel: null,
     items: [],
     billing: null,
+    sources: null,
   }
   if (!projectId) return draft
 
@@ -434,7 +462,12 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
                p.deposit_amount::float AS deposit_amount, p.deposit_paid, p.paid,
                ${extraDepositsSql('p')}::float AS extra_deposits,
                ${invoicePaymentsSql('p')}::float AS invoice_payments,
-               c.ico AS contact_ico, c.dic AS contact_dic, c.company AS contact_company
+               to_jsonb(p) ->> 'company' AS project_company,
+               to_jsonb(p) ->> 'client_phone' AS client_phone,
+               c.ico AS contact_ico, c.dic AS contact_dic, c.company AS contact_company,
+               to_jsonb(c) ->> 'email' AS contact_email,
+               to_jsonb(c) ->> 'phone' AS contact_phone,
+               to_jsonb(c) ->> 'address' AS contact_address
         FROM projects p
         LEFT JOIN contacts c ON c.id = ${CONTACT_ROOT}
         WHERE p.id = $1
@@ -444,14 +477,18 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     },
     {
       // Poslední doklad téhož kontaktu: odběratele stačí opsat jednou.
+      // Stornovaný se nebere — bývá to právě ten s chybou.
       text: `
-        SELECT i.client_name, i.client_ico, i.client_dic, i.client_address
+        SELECT i.client_name, i.client_ico, i.client_dic, i.client_address,
+               to_jsonb(i) ->> 'client_email' AS client_email,
+               to_jsonb(i) -> 'client_contact' AS client_contact
         FROM invoices i
         JOIN projects p ON p.id = i.project_id
         WHERE coalesce(${CONTACT_ROOT}, p.id) = (
                 SELECT coalesce(${CONTACT_ROOT}, p.id) FROM projects p WHERE p.id = $1
               )
           AND i.client_name IS NOT NULL
+          AND i.cancelled_at IS NULL
         ORDER BY i.issued_on DESC, i.created_at DESC
         LIMIT 1
       `,
@@ -470,15 +507,27 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
         paid: boolean | null
         extra_deposits: number | null
         invoice_payments: number | null
+        project_company: string | null
         contact_ico: string | null
         contact_dic: string | null
         contact_company: string | null
+        contact_email: string | null
+        client_phone: string | null
+        contact_phone: string | null
+        contact_address: string | null
       }
     | undefined
   if (!project) return draft
 
   const last = invoiceRows[0] as
-    | { client_name: string | null; client_ico: string | null; client_dic: string | null; client_address: string | null }
+    | {
+        client_name: string | null
+        client_ico: string | null
+        client_dic: string | null
+        client_address: string | null
+        client_email: string | null
+        client_contact: PrintedContact | null
+      }
     | undefined
 
   // Doplatek: cena − vlastní záloha − zálohy zapsané z Podnikání (R-110)
@@ -491,25 +540,69 @@ export async function loadIssueDraft(projectId: string | null): Promise<IssueDra
     invoicePayments: Number(project.invoice_payments ?? 0),
     paid: project.paid === true,
   })
-  draft.email = project.client_email?.trim() ?? ''
+  draft.email =
+    clean(last?.client_contact?.email) || clean(last?.client_email) || clean(project.client_email) || clean(project.contact_email)
   draft.projectLabel = project.description ? `${project.client_name} — ${project.description}` : project.client_name
-  draft.counterparty = {
-    name: last?.client_name ?? project.contact_company ?? project.client_name,
-    address: last?.client_address ?? '',
-    ico: last?.client_ico ?? project.contact_ico ?? '',
-    dic: last?.client_dic ?? project.contact_dic ?? '',
+
+  const counterparty = {
+    name: clean(last?.client_name),
+    address: clean(last?.client_address) || clean(project.contact_address),
+    ico: clean(last?.client_ico) || clean(project.contact_ico),
+    dic: clean(last?.client_dic) || clean(project.contact_dic),
+    phone: clean(last?.client_contact?.phone) || clean(project.client_phone) || clean(project.contact_phone),
   }
+  const sources: PrefillSources = { lastInvoice: last !== undefined, registry: false }
+
+  // Sídlo podle IČO z rejstříku. Jméno z rejstříku je právní jméno, které na
+  // fakturu patří; přednost má jen jméno z minulé faktury.
+  if (options.registry && counterparty.address === '' && isValidIco(counterparty.ico)) {
+    const found = await lookupIco(counterparty.ico)
+    if (found.status === 'ok') {
+      counterparty.address = found.subject.address
+      counterparty.name ||= found.subject.name
+      counterparty.dic ||= found.subject.dic
+      sources.registry = found.subject.address !== ''
+    }
+  }
+  counterparty.name ||= clean(project.contact_company) || clean(project.project_company) || project.client_name
+  draft.counterparty = counterparty
+  draft.sources = sources
 
   // Popis položky dřív nikdo nepředvyplňoval, takže se u stálého klienta
   // opisoval pokaždé znovu (zjištěno při průchodu AD12). Fakta vědí, co se
   // mu fakturovalo naposledy.
   const [facts, billing] = await Promise.all([
     contactOfProject(projectId).then(loadFacts),
-    loadProjectBilling(projectId),
+    loadProjectBilling(projectId, options.excludeInvoiceId ?? null),
   ])
   draft.items = suggestItems(facts, draft.amount)
   draft.billing = billing
   return draft
+}
+
+function clean(value: string | null | undefined): string {
+  return value?.trim() ?? ''
+}
+
+/** E-mail a telefon odběratele vytištěné na faktuře (migrace 140). */
+type PrintedContact = { email?: string; phone?: string }
+
+/**
+ * Kontakt zakázky po vystavení faktury (R-153): údaje z faktury se zapíšou
+ * do kontaktu a odtud propíšou dál. Pravidla drží `absorbBillingIntoContact`.
+ * Bez kontaktu (zakázka ho nemá) se nic neděje.
+ */
+export async function rememberCounterpartyOnContact(
+  projectId: string,
+  issued: Partial<BillingValues>,
+  prefilled: Partial<BillingValues> | null = null,
+): Promise<void> {
+  const [rows] = await adminDb.batch([
+    { text: `SELECT ${CONTACT_ROOT}::text AS id FROM projects p WHERE p.id = $1`, params: [projectId] },
+  ])
+  const contactId = rows[0]?.id
+  if (typeof contactId !== 'string' || contactId === '') return
+  await absorbBillingIntoContact(contactId, issued, prefilled)
 }
 
 // ─── PDF ─────────────────────────────────────────────────────────────────────
@@ -526,6 +619,7 @@ export async function loadIssuedInvoiceForPdf(id: string): Promise<IssuedInvoice
     {
       text: `
         SELECT invoice_number, client_name, client_ico, client_dic, client_address,
+               to_jsonb(i)->'client_contact' AS client_contact,
                issued_on::text, supplied_on::text, due_on::text, paid_on::text,
                cancelled_at, amount::float AS amount, currency, items, issuer, note,
                to_jsonb(i)->>'invoice_kind' AS invoice_kind,
@@ -546,6 +640,7 @@ export async function loadIssuedInvoiceForPdf(id: string): Promise<IssuedInvoice
         client_ico: string | null
         client_dic: string | null
         client_address: string | null
+        client_contact: PrintedContact | null
         issued_on: string
         supplied_on: string | null
         due_on: string | null
@@ -588,6 +683,8 @@ export async function loadIssuedInvoiceForPdf(id: string): Promise<IssuedInvoice
       address: row.client_address ?? '',
       ico: row.client_ico,
       dic: row.client_dic,
+      email: clean(row.client_contact?.email) || null,
+      phone: clean(row.client_contact?.phone) || null,
     },
     issuedOn: row.issued_on,
     suppliedOn: row.supplied_on ?? row.issued_on,

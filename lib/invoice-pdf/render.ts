@@ -58,10 +58,16 @@ export type PdfIssuer = PdfParty & {
   web?: string | null
 }
 
+/** Odběratel. E-mail a telefon jsou nepovinné a tisknou se drobně pod IČO (R-153). */
+export type PdfCustomer = PdfParty & {
+  email?: string | null
+  phone?: string | null
+}
+
 export type PdfInvoice = {
   number: string
   issuer: PdfIssuer
-  counterparty: PdfParty
+  counterparty: PdfCustomer
   issuedOn: string
   /** Datum uskutečnění plnění — tiskne se jen plátci DPH. */
   suppliedOn: string
@@ -485,11 +491,13 @@ export async function invoiceHtml(invoice: PdfInvoice, brand: PdfBrand): Promise
     (filled(issuer.registry) ? '<p class="fine">' + text(filled(issuer.registry)) + '</p>' : '') +
     (contact.length ? '<p class="fine">' + contact.map(text).join(' · ') + '</p>' : '') +
     '</section>'
+  const customerContact = [filled(invoice.counterparty.email), filled(invoice.counterparty.phone)].filter(Boolean)
   const customer =
     '<section class="party"><span class="label">Odběratel</span>' +
     '<strong>' + text(invoice.counterparty.name) + '</strong>' +
     (invoice.counterparty.address ? '<p>' + text(invoice.counterparty.address) + '</p>' : '') +
     '<div class="ids">' + ids(invoice.counterparty) + '</div>' +
+    (customerContact.length ? '<p class="fine">' + customerContact.map(text).join(' · ') + '</p>' : '') +
     '</section>'
 
   // ─── Data dokladu ───

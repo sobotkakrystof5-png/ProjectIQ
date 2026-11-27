@@ -16,6 +16,23 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-27 — review: fakturační údaje klienta (R-153, migrace 140)
+Spouštěč: před commitem a nasazením (`web-security-review`)
+Rozsah: `getProjectIssueDraft` a `issueNewInvoice` (nový argument `prefilled`), `saveContact` (sídlo),
+`lookupCompany` z karty kontaktu, `lib/admin/{invoice-issue,contact-sync,contacts,invoice-drafts}.ts`,
+`lib/invoice-pdf/render.ts`, `lib/portal/money.ts`, `migrations/140_fakturacni_udaje_klienta.sql`.
+Výsledek: 0 chyb.
+Nálezy: žádné. Všechny akce začínají `requireAuth()`; id přes UUID, `prefilled` a sídlo přes Zod se stropy délek,
+telefon odběratele jen číslice, mezery a `+()/-`, e-mail přes `.email()`. SQL parametrizované; v `billingQueries`
+se do textu vkládá jen název pole z pevného seznamu (`ico`, `dic`, `address`, `phone`). E-mail a telefon v PDF
+jdou přes `escapeHtml`, ve formulářích jako text Reactu. ARES jen ze serveru a jen s IČO, které prošlo
+kontrolní číslicí (#023 doplnění). `admin_invoice_issue` ořezává `client_contact` na 254 / 40 znaků a zámek
+`admin_invoice_locked` ho po vystavení drží. `portal.put_invoice` beze změny práv, do projekce jen klientův
+vlastní e-mail a telefon (#042 doplnění). Žádný nový secret ani `NEXT_PUBLIC_`, CSP beze změny.
+Opraveno: nic.
+Zůstává: migrace 140 neaplikovaná; do té doby se kontakt odběratele na fakturu nezapisuje a sídlo kontaktu
+se neuloží (kód to snese, ověřeno čtením přes `to_jsonb` a odchycením `42703`).
+
 ## 2026-11-27 — review: ZakazIQ Voice, schůzky s klientem (R-151)
 Spouštěč: před commitem a nasazením (`web-security-review`)
 Rozsah: `/api/public/voice/meetings/**` (5 vstupů), `lib/admin/voice/meeting*.ts`, nové rozsahy v `lib/admin/voice/http.ts`, admin akce schůzek v `app/voice-actions.ts`, záložka Schůzky (`components/admin/voice/meeting*.tsx`, `app/dashboard/voice/page.tsx`), migrace 139, aplikace na Macu (`Meeting/*`, `Window/Meetings*.swift`, `Info.plist`)

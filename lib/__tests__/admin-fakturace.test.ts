@@ -42,11 +42,13 @@ import {
   loadIssueDraft,
   loadIssuedInvoiceForPdf,
   loadIssuerProfile,
+  rememberCounterpartyOnContact,
   resetIssuingReadyForTests,
   saveIssuerProfile,
 } from '@/lib/admin/invoice-issue'
 import type { IssuerProfile } from '@/lib/admin/invoice-issue-schema'
-import { cancelIssuedInvoice, issueNewInvoice, saveIssuer } from '@/app/dashboard/finance/invoice-actions'
+import { cancelIssuedInvoice, getProjectIssueDraft, issueNewInvoice, saveIssuer } from '@/app/dashboard/finance/invoice-actions'
+import { clearAresCache } from '@/lib/ares'
 import { invoiceHtml } from '@/lib/invoice-pdf/render'
 import { invoiceTotal } from '@/lib/invoice-pdf/totals'
 import { syncInvoiceTransaction } from '@/lib/invoices'
@@ -373,6 +375,105 @@ describe('profil dodavatele a předvyplnění', () => {
     const draft = await loadIssueDraft(null)
     expect(draft.amount).toBe(0)
     expect(draft.counterparty.name).toBe('')
+  })
+})
+
+describe('odběratel ze zakázky (R-153)', () => {
+  const ORIGINAL_FETCH = globalThis.fetch
+
+  async function projectWithContact(contact: { company?: string; ico?: string; dic?: string; email?: string }, project: { email?: string; company?: string } = {}) {
+    await db.exec(`
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email text;
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS phone text;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS company text;
+    `)
+    const c = await db.query<{ id: string }>(
+      `INSERT INTO contacts (display_name, company, ico, dic, email) VALUES ('Petr Malý', $1, $2, $3, $4) RETURNING id::text`,
+      [contact.company ?? null, contact.ico ?? null, contact.dic ?? null, contact.email ?? null],
+    )
+    const p = await db.query<{ id: string }>(
+      `INSERT INTO projects (client_name, client_email, company, description, price, contact_id)
+       VALUES ('Petr Malý', $1, $2, 'Web', 30000, $3) RETURNING id::text`,
+      [project.email ?? null, project.company ?? null, c.rows[0].id],
+    )
+    return { contactId: c.rows[0].id, projectId: p.rows[0].id }
+  }
+
+  function aresAnswers(body: unknown, status = 200) {
+    const spy = vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }))
+    globalThis.fetch = spy as unknown as typeof fetch
+    return spy
+  }
+
+  afterAll(() => {
+    globalThis.fetch = ORIGINAL_FETCH
+  })
+
+  it('bez minulé faktury vezme IČO, DIČ a e-mail z kontaktu a sídlo s právním jménem z rejstříku', async () => {
+    clearAresCache()
+    const spy = aresAnswers({ ico: '45274649', obchodniJmeno: 'Malý stavby s.r.o.', dic: 'CZ45274649', sidlo: { textovaAdresa: 'Hlavní 5, 110 00 Praha' } })
+    const { projectId } = await projectWithContact({ company: 'Malý — stavby', ico: '45274649', email: 'petr@maly.cz' })
+
+    const draft = await getProjectIssueDraft(projectId)
+    expect(draft?.counterparty).toEqual({ name: 'Malý stavby s.r.o.', address: 'Hlavní 5, 110 00 Praha', ico: '45274649', dic: 'CZ45274649', phone: '' })
+    expect(draft?.email).toBe('petr@maly.cz')
+    expect(draft?.sources).toEqual({ lastInvoice: false, registry: true })
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('nedostupný rejstřík nic neblokuje: jméno z kontaktu, sídlo prázdné', async () => {
+    clearAresCache()
+    globalThis.fetch = (async () => { throw new Error('síť') }) as unknown as typeof fetch
+    const { projectId } = await projectWithContact({ company: 'Malý — truhlářství', ico: '25596641' }, { email: 'zakazka@maly.cz' })
+
+    const draft = await getProjectIssueDraft(projectId)
+    expect(draft?.counterparty).toEqual({ name: 'Malý — truhlářství', address: '', ico: '25596641', dic: '', phone: '' })
+    expect(draft?.email).toBe('zakazka@maly.cz')
+    expect(draft?.sources?.registry).toBe(false)
+  })
+
+  it('bez kontaktu s firmou vezme firmu ze zakázky; bez IČO se do rejstříku neptá', async () => {
+    const spy = aresAnswers({})
+    const { projectId } = await projectWithContact({}, { company: 'Malý a syn' })
+
+    const draft = await getProjectIssueDraft(projectId)
+    expect(draft?.counterparty.name).toBe('Malý a syn')
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('minulá faktura má přednost a do rejstříku se kvůli ní nikdo neptá; stornovaná se nebere', async () => {
+    const spy = aresAnswers({})
+    const { projectId } = await projectWithContact({ company: 'Malý — elektro', ico: '00006947' })
+    await issueInvoice(input({ projectId, counterparty: { name: 'Malý elektro s.r.o.', address: 'Krátká 2, Brno', ico: '00006947', dic: '' } }), ISSUER)
+    const wrong = await issueInvoice(input({ projectId, issuedOn: '2026-11-13', dueOn: '2026-11-27', counterparty: { name: 'Překlep', address: 'Špatně 1', ico: '00006947', dic: '' } }), ISSUER)
+    await cancelInvoice(wrong.id)
+
+    const draft = await getProjectIssueDraft(projectId)
+    expect(draft?.counterparty).toEqual({ name: 'Malý elektro s.r.o.', address: 'Krátká 2, Brno', ico: '00006947', dic: '', phone: '' })
+    expect(draft?.sources).toEqual({ lastInvoice: true, registry: false })
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('koncepty a asistent (bez volby registry) do sítě nesahají', async () => {
+    const spy = aresAnswers({})
+    const { projectId } = await projectWithContact({ ico: '26185610' })
+    await loadIssueDraft(projectId)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('po vystavení si kontakt zapamatuje IČO a DIČ jen do prázdného místa', async () => {
+    const empty = await projectWithContact({})
+    await rememberCounterpartyOnContact(empty.projectId, { ico: '27074358', dic: 'CZ27074358' })
+    const filled = await projectWithContact({ ico: '45274649' })
+    await rememberCounterpartyOnContact(filled.projectId, { ico: '27074358', dic: 'CZ27074358' })
+
+    const rows = await db.query<{ id: string; ico: string | null; dic: string | null }>(
+      `SELECT id::text, ico, dic FROM contacts WHERE id = ANY($1::uuid[])`,
+      [[empty.contactId, filled.contactId]],
+    )
+    const byId = Object.fromEntries(rows.rows.map(r => [r.id, r]))
+    expect(byId[empty.contactId]).toMatchObject({ ico: '27074358', dic: 'CZ27074358' })
+    expect(byId[filled.contactId]).toMatchObject({ ico: '45274649', dic: 'CZ27074358' })
   })
 })
 
