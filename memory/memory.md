@@ -2332,6 +2332,12 @@ ve VO02. Žádný nový npm balíček.
 - **fix** V okně aplikace nešlo nic vložit ⌘V (ani ⌘C, ⌘X, ⌘A, ⌘Z): aplikace v liště menu neměla hlavní menu
   a AppKit zkratky v polích hledá v něm. Skryté hlavní menu s Úpravami a „Zavřít okno" ⌘W,
   `voice-mac/Sources/ZakazIQVoice/App/MainMenu.swift`. Ověřeno sestavením a `make run`; vložení klíče zkouší Kryštof.
+- **chore** První ostré diktáty: 2026-11-27 7:09–7:10 sedm diktátů z Macu na produkci (podržení Fn i bez držení,
+  Safari a okno aplikace), 6 `ok`, 1 `empty` (24 s nahrávky, < 1 s řeči, nic nevloženo), žádná pojistka nezasáhla,
+  přepis OpenAI (Groq bez klíče), medián serveru 1,9 s (cíl 1,5 s), celkem ~0,006 USD. Připojení s klíčem
+  z produkčního adminu tím funguje. Oprav zatím 0. Čteno jen čísly z `voice_dictations`, bez textu.
+- **chore** Aplikace pro Mac (`voice-mac/`, větve `admin/voice-mac` a `admin/voice-okno`) sloučená do `main`.
+  Webový kód beze změny proti `origin/main`. Ověřeno: `make -C voice-mac test` 94/94, `sync-agent-context --check`.
 
 ### 2026-11-26 (ZakazIQ Voice — VO04, VO05, VO06 a VO11 na Macu, R-150)
 - **feat** VO04 Fn a nahrávání (`8a8cf95`): `FnMonitor` (CGEventTap, pohltí jen Esc), stavový automat
