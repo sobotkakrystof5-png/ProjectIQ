@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useOptimistic, useState, useTransition } from 'react'
+import { Fragment, useEffect, useOptimistic, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Plus, Trash2, Pencil, Check, X, Phone, Mail, Building2, User, ChevronDown, ChevronRight, FolderPlus, PhoneCall, Users, AtSign, MessageCircle, Video, MoreHorizontal, Clock, Undo2, Send, CheckCircle2, CalendarDays, StickyNote, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { Badge, badgeVariants } from '@/components/ui/badge'
@@ -420,6 +420,7 @@ function LeadRow({
   notes,
   onEdit,
   onDelete,
+  onDeleteConfirmed,
   onConvert,
   onMoveToWaiting,
   onToggleAnswered,
@@ -434,7 +435,10 @@ function LeadRow({
   lead: ClientLead
   notes: LeadNote[]
   onEdit: () => void
+  /** Ikona v řádku — zeptá se oknem prohlížeče. */
   onDelete: () => void
+  /** Tlačítko v rozbaleném detailu — potvrzení už proběhlo v řádku. */
+  onDeleteConfirmed: () => void
   onConvert: () => void
   onMoveToWaiting: () => void
   onToggleAnswered: (val: boolean | null) => void
@@ -543,7 +547,14 @@ function LeadRow({
       </td>
     </tr>
     {expanded && (
-      <LeadDetailRow lead={lead} notes={notes} onAddNote={onAddNote} onDeleteNote={onDeleteNote} isPending={isPending} />
+      <LeadDetailRow
+        lead={lead}
+        notes={notes}
+        onAddNote={onAddNote}
+        onDeleteNote={onDeleteNote}
+        onDelete={onDeleteConfirmed}
+        isPending={isPending}
+      />
     )}
     </Fragment>
   )
@@ -555,15 +566,29 @@ function LeadDetailRow({
   notes,
   onAddNote,
   onDeleteNote,
+  onDelete,
   isPending,
 }: {
   lead: ClientLead
   notes: LeadNote[]
   onAddNote: (content: string) => void
   onDeleteNote: (id: string) => void
+  /** Smaže kontakt bez dalšího dotazu — potvrzení drží řádek sám. */
+  onDelete: () => void
   isPending: boolean
 }) {
   const [draft, setDraft] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null)
+
+  /** Zavřít potvrzení a vrátit fokus na tlačítko, ať klávesnice nespadne na začátek stránky. */
+  const cancelDelete = () => {
+    setConfirmingDelete(false)
+    requestAnimationFrame(() => deleteTriggerRef.current?.focus())
+  }
+
+  // Co všechno smazání vezme s sebou, ať to není překvapení.
+  const takes = [notes.length > 0 && 'poznámkami', lead.calendar_event_id && 'termínem v kalendáři'].filter(Boolean)
 
   const submit = () => {
     const content = draft.trim()
@@ -643,6 +668,45 @@ function LeadDetailRow({
             context={{ at: pragueDateTimeToISO(lead.next_action_date, lead.next_action_time) }}
             emptyHint="Kontakt nemá telefon ani e-mail. Doplňte je úpravou kontaktu a zavoláte jedním klikem."
           />
+        </div>
+
+        {/* Smazání patří až na konec detailu, daleko od hlavních akcí. Vlevo,
+            protože tabulka bývá širší než obrazovka a pravý okraj je mimo
+            pohled. Potvrzení přímo v řádku místo okna prohlížeče, Escape ho zavře. */}
+        <div className="mt-4 border-t border-navy-100 pt-3">
+          {confirmingDelete ? (
+            <div
+              className="flex max-w-[19rem] flex-wrap items-center gap-2 sm:max-w-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') cancelDelete()
+              }}
+            >
+              <p className="min-w-0 max-w-xl text-sm text-ink" role="status">
+                Smazat {lead.company_name} z Hovorů?
+                {takes.length > 0 && ` Smaže se i s ${takes.join(' a ')}.`} Vrátit to nepůjde.
+              </p>
+              <Button variant="outline" autoFocus onClick={cancelDelete}>
+                Nechat
+              </Button>
+              <Button variant="danger" disabled={isPending} onClick={onDelete}>
+                <Trash2 size={15} strokeWidth={1.5} aria-hidden="true" />
+                Smazat
+              </Button>
+            </div>
+          ) : (
+            <div className="flex">
+              <Button
+                ref={deleteTriggerRef}
+                variant="ghost"
+                disabled={isPending}
+                onClick={() => setConfirmingDelete(true)}
+                className="text-danger hover:bg-danger/5"
+              >
+                <Trash2 size={15} strokeWidth={1.5} aria-hidden="true" />
+                Smazat kontakt
+              </Button>
+            </div>
+          )}
         </div>
       </td>
     </tr>
@@ -978,9 +1042,14 @@ export default function LeadsTable({
     })
   }
 
+  /** Smazání bez dotazu — volá ho detail kontaktu, který si potvrzení drží sám. */
+  const removeLead = (id: string) => {
+    optimisticky({ type: 'remove', id }, () => deleteLead(id))
+  }
+
   const handleDelete = (id: string) => {
     if (!confirm('Opravdu smazat tento kontakt?')) return
-    optimisticky({ type: 'remove', id }, () => deleteLead(id))
+    removeLead(id)
   }
 
   const handleConvert = (id: string) => {
@@ -1199,6 +1268,7 @@ export default function LeadsTable({
                       setAddingNew(false)
                     }}
                     onDelete={() => handleDelete(lead.id)}
+                    onDeleteConfirmed={() => removeLead(lead.id)}
                     onConvert={() => handleConvert(lead.id)}
                     onMoveToWaiting={() => handleMoveToWaiting(lead.id)}
                     onToggleAnswered={(val) => handleToggleAnswered(lead.id, val)}
