@@ -1852,9 +1852,8 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
 
 ## 3. Otevřené problémy
 
-- [ ] **Schůzky ve Voice (R-151) — nasadit a vyzkoušet:** kód na větvi `admin/voice-schuzky`, necommitnutý.
-  Zbývá: (1) migrace 139 na produkci (souhlas Kryštofa), (2) sloučit do `main` a nasadit, (3) `make -C voice-mac install`,
-  (4) zkušební online schůzka (Meet se sluchátky i bez nich, aspoň 10 minut): přepis obou stran, ozvěna bez sluchátek,
+- [ ] **Schůzky ve Voice (R-151) — vyzkoušet naostro:** na produkci od 2026-11-27 (`c10be81`, migrace 139), aplikace
+  na Macu nainstalovaná. Zbývá: zkušební online schůzka (Meet se sluchátky i bez nich, aspoň 10 minut): přepis obou stran, ozvěna bez sluchátek,
   Shrnout pomocí AI, přiřazení ke kontaktu v adminu, (5) co dělá tap při přepnutí výstupu (AirPods během hovoru —
   tap zůstane na původním zařízení). Fronta promluv bez sítě přežije jen do ukončení aplikace · od 2026-11-27
 - [ ] **ZakazIQ Voice — milník 1 naostro (VO04–VO06):** po certifikátu „ZakazIQ Voice vývoj" `make -C voice-mac run`
@@ -2355,11 +2354,16 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
 - **feat** Server: `/api/public/voice/meetings` (+ `[id]`, `turns`, `finish`, `summary`), `lib/admin/voice/meeting-{turn,transcript,summary}.ts`,
   `meetings.ts`; přepis s G1–G5, G12 a slovníkem bez čištění, skládání rozhovoru s vynecháním ozvěny, shrnutí Claude `smart`.
   Admin `/dashboard/voice?tab=schuzky` (seznam, detail, shrnutí, kontakt, přejmenování, smazání).
-- **db** Migrace 139 `voice_schuzky` (aplikována: ne, nikde).
+- **db** Migrace 139 `voice_schuzky` **aplikovaná na produkci** 2026-11-27 (Neon MCP v jedné transakci na souhlas
+  Kryštofa, zapsaná v `public.schema_migrations` s otiskem souboru; ověřeno 16 + 14 sloupců, 5 indexů, cizí klíče
+  CASCADE/SET NULL). Testovací Neon ne.
+- **chore** **Na produkci** 2026-11-27: fast-forward `main` `f838cb9` → `c10be81`, aplikace nainstalovaná `make run`
+  (stejný otisk certifikátu). Veřejně: `/api/public/voice/meetings` a `…/turns` bez klíče 401, s `Origin` 403,
+  `/login` 200, `/dashboard/voice` 307. Bezpečnostní review: strop promluvy snížen na 768 kB (AUDIT-LOG).
 - **chore** Ověřeno: `npx tsc --noEmit`, vitest 233 (Voice, hlídací testy adminu a XSS; nové 14), `swift test` 114
   (nové 10), naostro tap: zvuk z `say` → promluva druhé strany 6,6 s → `gpt-4o-transcribe` vrátil větu přesně;
   admin na dočasné stránce 1280 a 390 px (opraveno přetečení tlačítek na telefonu, stránka smazaná).
-  **Skutečná schůzka, nasazení a migrace neověřené.**
+  **Skutečná schůzka neověřená.**
 
 ### 2026-11-27 (ZakazIQ Voice — konec Enterem a tichem, karta s přepisem)
 - **feat** Diktát na Macu končí i **Enterem** (během nahrávání se pohltí i s opakováním a puštěním, do Claude Code
