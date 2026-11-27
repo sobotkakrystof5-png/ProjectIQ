@@ -46,6 +46,8 @@ final class DictationController: ObservableObject {
   @Published private(set) var historyRevision = 0
 
   let bar = BarModel()
+  /// Karta s přepisem nad lištou (volba „Po diktátu: Ukázat přepis").
+  let transcript = TranscriptModel()
   /// Místní historie a fronta; `nil`, když se databázi nepodařilo otevřít (diktát jde dál,
   /// jen bez historie a fronty).
   let history: LocalDB?
@@ -72,12 +74,14 @@ final class DictationController: ObservableObject {
     monitor.shortcut = prefs.shortcut
     monitor.onSignal = { [weak self] signal in self?.handle(signal) }
     recorder.onTick = { [weak self] in self?.send(.tick) }
+    recorder.onSpeech = { [weak self] in self?.send(.speech) }
     recorder.onLevel = { [weak self] level in self?.pushLevel(level) }
     bar.shortcut = prefs.shortcut
     bar.showWhenIdle = prefs.showBarWhenIdle
     bar.onClick = { [weak self] in self?.toggleFromMenu() }
     bar.onCancel = { [weak self] in self?.send(.barCancel) }
     bar.onCopy = { [weak self] text in self?.copy(text) }
+    transcript.onCopy = { [weak self] text in self?.paster.copy(text) }
     editWatcher.onEdited = { [weak self] id in
       guard let self else { return }
       try? self.history?.markEdited(id: id)
@@ -196,6 +200,7 @@ final class DictationController: ObservableObject {
     case .otherKey: send(.otherKey)
     case .escape: send(.escape)
     case .enter: editWatcher.enterPressed()
+    case .finishKey: send(.enter)
     }
   }
 
@@ -209,6 +214,7 @@ final class DictationController: ObservableObject {
     let actions = trigger.handle(event, at: now)
     for action in actions { perform(action) }
     monitor.capturesEscape = trigger.capturesEscape
+    monitor.capturesEnter = trigger.capturesEnter
   }
 
   private func perform(_ action: TriggerAction) {
@@ -218,6 +224,8 @@ final class DictationController: ObservableObject {
     case .showListening(let mode):
       context?.mode = mode
       phase = .recording
+      // Nový diktát: karta s minulým přepisem zmizí (text zůstává v Historii).
+      transcript.hide()
       bar.listening(mode)
       playSound("Tink")
     case .finish(let mode):
@@ -330,31 +338,19 @@ final class DictationController: ObservableObject {
     switch outcome {
     case .success(let response):
       try? FileManager.default.removeItem(at: take.url)
-      let decision = PastePlan.decide(
-        response: response,
-        startPid: ctx.app?.pid,
-        frontPid: FrontApp.current()?.pid,
-        canPostEvents: Paster.canPostEvents,
-        abandoned: abandoned
-      )
       let message: BarMessage?
-      switch decision {
-      case .paste:
-        paster.paste(response.text)
-        if prefs.learnFromEdits, let pid = ctx.app?.pid {
-          editWatcher.watch(id: ctx.id, insertedText: response.text, pid: pid)
+      if prefs.afterDictation == .showText {
+        // Nic se nevkládá: přepis se ukáže v kartě a zkopíruje se jedním tlačítkem.
+        if !response.hasText {
+          message = BarMessage(VoiceMessages.nothingHeard)
+        } else {
+          if !abandoned {
+            transcript.show(.init(id: ctx.id, text: response.text, words: response.words, appName: ctx.app?.name))
+          }
+          message = nil
         }
-        message = nil
-      case .clipboardOnly(.abandoned):
-        message = nil
-      case .clipboardOnly(.appChanged):
-        paster.copy(response.text)
-        message = BarMessage(VoiceMessages.inClipboard)
-      case .clipboardOnly(.noAccessibility):
-        paster.copy(response.text)
-        message = BarMessage(VoiceMessages.inClipboardNoAccess, tone: .error)
-      case .nothing:
-        message = BarMessage(VoiceMessages.nothingHeard)
+      } else {
+        message = pasteResult(response, ctx: ctx)
       }
       let totalMs = Int(((ProcessInfo.processInfo.systemUptime - released) * 1000).rounded())
       record(HistoryEntry(
@@ -382,6 +378,37 @@ final class DictationController: ObservableObject {
         complete(BarMessage(VoiceMessages.barText(for: error), tone: .error))
       }
     }
+  }
+
+  /// Volba „Vložit text": ⌘V do aplikace, ve které se diktovalo, jinak schránka a hláška.
+  private func pasteResult(_ response: DictateResponse, ctx: DictationContext) -> BarMessage? {
+    let decision = PastePlan.decide(
+      response: response,
+      startPid: ctx.app?.pid,
+      frontPid: FrontApp.current()?.pid,
+      canPostEvents: Paster.canPostEvents,
+      abandoned: abandoned
+    )
+    let message: BarMessage?
+    switch decision {
+    case .paste:
+      paster.paste(response.text)
+      if prefs.learnFromEdits, let pid = ctx.app?.pid {
+        editWatcher.watch(id: ctx.id, insertedText: response.text, pid: pid)
+      }
+      message = nil
+    case .clipboardOnly(.abandoned):
+      message = nil
+    case .clipboardOnly(.appChanged):
+      paster.copy(response.text)
+      message = BarMessage(VoiceMessages.inClipboard)
+    case .clipboardOnly(.noAccessibility):
+      paster.copy(response.text)
+      message = BarMessage(VoiceMessages.inClipboardNoAccess, tone: .error)
+    case .nothing:
+      message = BarMessage(VoiceMessages.nothingHeard)
+    }
+    return message
   }
 
   /// Konec zpracování: hláška, nebo bliknutí „hotovo", nebo klid.

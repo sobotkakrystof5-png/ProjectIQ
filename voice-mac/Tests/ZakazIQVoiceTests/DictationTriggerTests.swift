@@ -215,11 +215,127 @@ struct ShortcutTests {
     #expect(prefs.showBarWhenIdle)
     #expect(!prefs.sounds)
     #expect(prefs.historyDays == 90)
+    #expect(prefs.afterDictation == .showText)
+    prefs.afterDictation = .paste
+    #expect(prefs.afterDictation == .paste)
+    defaults.set("nesmysl", forKey: "afterDictation")
+    #expect(prefs.afterDictation == .showText)
     prefs.shortcut = .rightOption
     prefs.showBarWhenIdle = false
     prefs.historyDays = 2
     #expect(prefs.shortcut == .rightOption)
     #expect(!prefs.showBarWhenIdle)
     #expect(prefs.historyDays == 7)
+  }
+
+}
+
+@Suite("Enter a ticho ukončí diktát")
+struct DictationStopTests {
+  private func run(_ steps: [(TriggerEvent, TimeInterval)], trigger: inout DictationTrigger) -> [TriggerAction] {
+    steps.flatMap { trigger.handle($0.0, at: $0.1) }
+  }
+
+
+  /// Diktát bez držení spuštěný klikem na lištu v čase 0.
+  private func handsFree() -> DictationTrigger {
+    var t = DictationTrigger()
+    _ = t.handle(.barClick(secureInput: false), at: 0)
+    return t
+  }
+
+  @Test("Enter ukončí diktát bez držení a pohltí se jen během nahrávání")
+  func enterFinishesHandsFree() {
+    var t = DictationTrigger()
+    #expect(!t.capturesEnter)
+    _ = t.handle(.barClick(secureInput: false), at: 0)
+    #expect(t.capturesEnter)
+    #expect(t.handle(.enter, at: 3) == [.finish(.handsFree)])
+    #expect(t.state == .processing)
+    #expect(!t.capturesEnter)
+    #expect(t.handle(.enter, at: 3.1) == [])
+  }
+
+  @Test("Enter při drženém fn diktát odešle, nezahodí ho jako zkratku")
+  func enterFinishesHold() {
+    var t = DictationTrigger()
+    let actions = run([
+      (.keyDown(secureInput: false), 0),
+      (.tick, 0.35),
+      (.enter, 2),
+      (.keyUp, 2.2),
+    ], trigger: &t)
+    #expect(actions == [.startRecording, .showListening(.hold), .finish(.hold)])
+    #expect(t.state == .processing)
+  }
+
+  @Test("Enter před rozhodnutím o diktátu se nepohltí (krátký stisk fn)")
+  func enterNotCapturedWhilePressing() {
+    var t = DictationTrigger()
+    _ = t.handle(.keyDown(secureInput: false), at: 0)
+    #expect(!t.capturesEnter)
+    _ = t.handle(.keyUp, at: 0.1)
+    #expect(!t.capturesEnter)
+  }
+
+  @Test("10 s bez řeči ukončí diktát bez držení")
+  func silenceStopsHandsFree() {
+    var t = handsFree()
+    #expect(t.handle(.speech, at: 1) == [])
+    #expect(t.handle(.tick, at: 10.9) == [])
+    #expect(t.handle(.tick, at: 11) == [.finish(.handsFree)])
+    #expect(t.state == .processing)
+  }
+
+  @Test("řeč odkládá konec, ticho se počítá od poslední řeči")
+  func speechKeepsRecording() {
+    var t = handsFree()
+    var actions: [TriggerAction] = []
+    var time: TimeInterval = 0
+    // Mluví se s pauzami po 9 s, 40 s v kuse.
+    while time < 40 {
+      actions += t.handle(.speech, at: time)
+      actions += t.handle(.tick, at: time + 9)
+      time += 9
+    }
+    #expect(actions.isEmpty)
+    #expect(t.lastSpeechAt == 36)
+    #expect(t.handle(.tick, at: 46) == [.finish(.handsFree)])
+  }
+
+  @Test("bez řeči od začátku skončí po 10 s (Mac pak nic neodešle)")
+  func silenceFromStart() {
+    var t = handsFree()
+    #expect(t.handle(.tick, at: 9.95) == [])
+    #expect(t.handle(.tick, at: 10) == [.finish(.handsFree)])
+  }
+
+  @Test("při drženém fn ticho diktát neukončí")
+  func silenceDoesNotStopHold() {
+    var t = DictationTrigger()
+    _ = t.handle(.keyDown(secureInput: false), at: 0)
+    _ = t.handle(.tick, at: 0.35)
+    #expect(t.handle(.tick, at: 30) == [])
+    #expect(t.handle(.keyUp, at: 31) == [.finish(.hold)])
+  }
+
+  @Test("dvojí fn: ticho se počítá od prvního stisku a nový diktát začíná bez staré řeči")
+  func silenceAfterDoubleTapAndReset() {
+    var t = DictationTrigger()
+    _ = run([
+      (.keyDown(secureInput: false), 0),
+      (.speech, 0.05),
+      (.keyUp, 0.1),
+      (.keyDown(secureInput: false), 0.3),
+      (.keyUp, 0.4),
+    ], trigger: &t)
+    #expect(t.handle(.tick, at: 10) == [])
+    #expect(t.handle(.tick, at: 10.1) == [.finish(.handsFree)])
+    _ = t.handle(.processingDone, at: 12)
+    // Řeč mimo nahrávání se nepočítá.
+    _ = t.handle(.speech, at: 13)
+    #expect(t.lastSpeechAt == 0.05)
+    _ = t.handle(.barClick(secureInput: false), at: 20)
+    #expect(t.lastSpeechAt == nil)
   }
 }

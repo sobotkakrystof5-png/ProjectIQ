@@ -71,6 +71,8 @@ final class HubModel: ObservableObject {
   @Published var historyDays: Int { didSet { prefs.historyDays = historyDays } }
   /// Číst pole po vložení a posílat opravy (VO09). Vypnuté = nic se nečte.
   @Published var learnFromEdits: Bool { didSet { prefs.learnFromEdits = learnFromEdits } }
+  /// Po diktátu ukázat přepis ke zkopírování, nebo ho vložit.
+  @Published var afterDictation: AfterDictation { didSet { prefs.afterDictation = afterDictation } }
   /// Kde se pole po vložení nepodařilo přečíst (jen čísla, O aplikaci).
   @Published private(set) var unreadable: [(app: String, count: Int)] = []
   @Published private(set) var launchAtLogin: LaunchAtLogin.State = LaunchAtLogin.state
@@ -111,6 +113,7 @@ final class HubModel: ObservableObject {
     showBarWhenIdle = prefs.showBarWhenIdle
     historyDays = prefs.historyDays
     learnFromEdits = prefs.learnFromEdits
+    afterDictation = prefs.afterDictation
     showOnboarding = !hubPrefs.onboardingDone
     if let cached = cache.load() {
       numbers = .cached(cached.stats, fetchedAt: cached.fetchedAt, reason: "")

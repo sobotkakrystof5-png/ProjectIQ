@@ -1828,7 +1828,10 @@ Tady jen to, co je v kódu.
   - **Stavový automat** `Core/Dictation/DictationTrigger.swift` (čistá logika, testy): nahrává se **hned při
     stisku**; držení ≥ 0,3 s = diktát, kratší stisk čeká 0,4 s na druhý (dvojí stisk = bez držení, nahrávka platí
     od prvního stisku), jinak se zahodí; jiná klávesa při drženém fn = zrušit; Esc = zrušit (při zpracování jen
-    nevložit); 9:30 upozornění, 10:00 konec. Akce provádí `Dictation/DictationController.swift`.
+    nevložit); **Enter během nahrávání = konec** (i při drženém fn; `FnMonitor` ho pohltí i s opakováním
+    a puštěním, do aplikace nepropadne); **bez držení 10 s bez řeči = konec** (`silenceStop`, počítá se od poslední
+    události `.speech` z `Recorder`, nebo od začátku); 9:30 upozornění, 10:00 konec. Akce provádí
+    `Dictation/DictationController.swift`.
   - **Nahrávání** (`Audio/Recorder.swift`): `AVAudioRecorder` AAC/m4a 16 kHz mono 32 kbit/s, měření po 50 ms,
     `speechMs` = úseky nad −40 dB (`Core/Audio/SpeechMeter.swift`). Soubor
     `~/Library/Application Support/ZakazIQ Voice/rec/<id>.m4a` (složka 0700, soubor 0600), maže se po odeslání,
@@ -1844,6 +1847,13 @@ Tady jen to, co je v kódu.
     `null` výslovně), multipart `meta` + `audio` (`diktat.m4a`, `audio/mp4`), limit 30 s, nahrávka nad 4 MB se
     neposílá. Pod 300 ms řeči nic neodchází (G1 na Macu). Esc/Zrušit pošle jen `meta` s `cancelled: true`.
     Opakuje se jen síť, 502 a 429 (`RetryPolicy`: 5, 10, 20, 40, 60 s, `Retry-After` 5 s – 10 min).
+  - **Po diktátu** (`Core/Dictation/AfterDictation.swift`, `Preferences.afterDictation`, Nastavení › Diktování):
+    výchozí **Ukázat přepis** = nic se nevkládá, přepis se ukáže v kartě nad lištou (`Transcript/`: `NSPanel`
+    bez focusu jako lišta, 520 b široká, text do 240 b, delší se posouvá; rozměry `Core/Bar/TranscriptLayout.swift`)
+    s jedinou akcí **Zkopírovat** (do schránky bez vracení, karta za 1,2 s zmizí; × zavře, nový diktát ji schová).
+    Zachycení oprav (VO09) se v tomhle režimu nespouští, nic vložené není. Druhá volba **Vložit text** = dosavadní
+    chování níž. Ladicí `ZAKAZIQ_VOICE_TRANSCRIPT_SNAPSHOT=/cesta.png` vykreslí dlouhou kartu ve skutečném okně
+    (`ImageRenderer` posuvnou oblast nekreslí).
   - **Vložení** (`Paste/Paster.swift`, rozhodnutí `Core/Dictation/PastePlan.swift`): jen do aplikace, která byla
     vpředu při stisku (pid), a jen se Zpřístupněním; jinak text do schránky a hláška. Uloží všechny položky
     schránky, vloží text s typem `org.nspasteboard.TransientType`, pošle ⌘V (`kVK_ANSI_V` + `maskCommand`

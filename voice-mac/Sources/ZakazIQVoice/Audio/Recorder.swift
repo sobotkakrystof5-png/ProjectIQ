@@ -19,6 +19,8 @@ final class Recorder: NSObject {
   var onLevel: ((Double) -> Void)?
   /// Tik každých 50 ms během nahrávání (hlídání prahů v `DictationTrigger`).
   var onTick: (() -> Void)?
+  /// Úsek nad prahem řeči (volá se před `onTick`, ať tik vidí čerstvý čas řeči).
+  var onSpeech: (() -> Void)?
 
   private var recorder: AVAudioRecorder?
   private var meter = SpeechMeter()
@@ -103,6 +105,7 @@ final class Recorder: NSObject {
     let power = rec.averagePower(forChannel: 0)
     meter.add(averagePowerDb: power)
     onLevel?(SpeechMeter.normalized(power))
+    if power > SpeechMeter.speechThresholdDb { onSpeech?() }
     onTick?()
   }
 

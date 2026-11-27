@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private lazy var hub = HubWindowController(app: model, history: dictation.history == nil ? nil : historySource)
   private var hotkeyTimer: Timer?
   private var bar: FlowBarPanel?
+  private var transcript: TranscriptPanel?
   private var subscriptions = Set<AnyCancellable>()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     bar.placeOnCursorScreen()
     if dictation.bar.isVisible { bar.orderFrontRegardless() }
     self.bar = bar
+    transcript = TranscriptPanel(model: dictation.transcript)
 
     model.$connection
       .receive(on: RunLoop.main)

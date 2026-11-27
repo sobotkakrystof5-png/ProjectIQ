@@ -16,6 +16,10 @@ public enum TriggerEvent: Equatable, Sendable {
   /// Jiná klávesa při držené zkratce (fn+F5, fn+šipka) = uživatel chtěl zkratku.
   case otherKey
   case escape
+  /// Enter během nahrávání: diktát skončí (aplikace klávesu do pole nepustí).
+  case enter
+  /// Měření právě zachytilo řeč (úsek 50 ms nad prahem). Hlídá konec po tichu.
+  case speech
   /// Klik na lištu: v klidu spustí diktát bez držení, během něj ho dokončí.
   case barClick(secureInput: Bool)
   /// Tlačítko Zrušit (×) na liště.
@@ -60,6 +64,8 @@ public struct DictationTrigger: Sendable {
   public static let doubleTapWindow: TimeInterval = 0.4
   public static let warnAfter: TimeInterval = 9 * 60 + 30
   public static let maxDuration: TimeInterval = 10 * 60
+  /// Diktát bez držení skončí sám, když tolik sekund nikdo nemluví.
+  public static let silenceStop: TimeInterval = 10
 
   public enum State: Equatable, Sendable {
     case idle
@@ -72,6 +78,8 @@ public struct DictationTrigger: Sendable {
   }
 
   public private(set) var state: State = .idle
+  /// Kdy naposledy zazněla řeč (`.speech`). Nová nahrávka ho vynuluje.
+  public private(set) var lastSpeechAt: TimeInterval?
 
   public init() {}
 
@@ -86,10 +94,20 @@ public struct DictationTrigger: Sendable {
   /// Esc se pohltí jen během nahrávání a zpracování, jinak patří aplikaci vpředu.
   public var capturesEscape: Bool { state != .idle }
 
+  /// Enter se pohltí jen během nahrávání (diktát ukončí). Jindy patří aplikaci vpředu.
+  public var capturesEnter: Bool {
+    if case .recording = state { return true }
+    return false
+  }
+
   /// Návrat do klidu bez akcí (např. když se nahrávání nepodařilo spustit).
   public mutating func reset() { state = .idle }
 
   public mutating func handle(_ event: TriggerEvent, at now: TimeInterval) -> [TriggerAction] {
+    if event == .speech {
+      if isRecording { lastSpeechAt = now }
+      return []
+    }
     switch state {
     case .idle:
       return idle(event, now)
@@ -119,10 +137,12 @@ public struct DictationTrigger: Sendable {
     case .keyDown(let secure):
       if secure { return [.refuseSecureInput] }
       state = .pressing(since: now)
+      lastSpeechAt = nil
       return [.startRecording]
     case .barClick(let secure):
       if secure { return [.refuseSecureInput] }
       state = .recording(mode: .handsFree, startedAt: now, keyHeld: false, warned: false)
+      lastSpeechAt = nil
       return [.startRecording, .showListening(.handsFree)]
     default:
       return []
@@ -169,6 +189,7 @@ public struct DictationTrigger: Sendable {
         return [.discard(.tooShort), .refuseSecureInput]
       }
       state = .pressing(since: now)
+      lastSpeechAt = nil
       return [.discard(.tooShort), .startRecording]
     case .tick:
       guard now - releasedAt > Self.doubleTapWindow else { return [] }
@@ -207,6 +228,9 @@ public struct DictationTrigger: Sendable {
       guard mode == .hold, keyHeld else { return [] }
       state = .idle
       return [.discard(.otherKey)]
+    case .enter:
+      state = .processing
+      return [.finish(mode)]
     case .escape, .barCancel:
       state = .idle
       return [.cancel]
@@ -220,12 +244,18 @@ public struct DictationTrigger: Sendable {
         state = .processing
         return [.finish(mode)]
       }
+      // Bez držení: 10 s ticha od poslední řeči (nebo od začátku) diktát ukončí.
+      // Při držení rozhoduje puštění klávesy, pauza na rozmyšlenou nevadí.
+      if mode == .handsFree, now - max(startedAt, lastSpeechAt ?? startedAt) >= Self.silenceStop {
+        state = .processing
+        return [.finish(mode)]
+      }
       if elapsed >= Self.warnAfter, !warned {
         state = .recording(mode: mode, startedAt: startedAt, keyHeld: keyHeld, warned: true)
         return [.warnLong]
       }
       return []
-    case .processingDone:
+    case .processingDone, .speech:
       return []
     }
   }

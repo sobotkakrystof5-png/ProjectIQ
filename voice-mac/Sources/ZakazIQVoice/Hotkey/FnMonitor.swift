@@ -7,8 +7,9 @@ import ZakazIQVoiceCore
 ///
 /// - Fn = `flagsChanged` s kódem 63 a příznakem `maskSecondaryFn`. Šipky a F-klávesy nesou
 ///   příznak taky, proto rozhoduje kód klávesy.
-/// - Tap je `.defaultTap` (potřebuje Zpřístupnění), ale **pohltí jen Esc**, a to jen během
-///   nahrávání a zpracování. Všechno ostatní propouští beze změny.
+/// - Tap je `.defaultTap` (potřebuje Zpřístupnění), ale **pohltí jen Esc** (během nahrávání
+///   a zpracování) **a Enter** (jen během nahrávání: diktát ukončí, do pole nepropadne).
+///   Všechno ostatní propouští beze změny.
 /// - Když ho macOS vypne (pomalé zpětné volání, zásah uživatele), znovu ho zapne.
 @MainActor
 final class FnMonitor {
@@ -20,6 +21,8 @@ final class FnMonitor {
     /// Enter (i na numerické klávesnici). Nepohlcuje se; zachycení oprav (VO09) si pole
     /// přečte dřív, než zpráva odejde.
     case enter
+    /// Enter během nahrávání: diktát skončí. Klávesa se pohltí, aplikace ji nedostane.
+    case finishKey
   }
 
   var shortcut: DictationShortcut = .fn {
@@ -28,12 +31,17 @@ final class FnMonitor {
 
   /// Nastavuje řadič diktátu: `true` jen během nahrávání a zpracování.
   var capturesEscape = false
+  /// Nastavuje řadič diktátu: `true` jen během nahrávání (Enter diktát ukončí).
+  var capturesEnter = false
 
   var onSignal: ((Signal) -> Void)?
 
   private var tap: CFMachPort?
   private var source: CFRunLoopSource?
   private var triggerHeld = false
+  /// Pohlcený Enter: jeho opakování a puštění se pohltí taky, jinak by držený Enter
+  /// po konci nahrávání odeslal zprávu v Claude Code.
+  private var swallowingEnter = false
 
   var isRunning: Bool { tap != nil }
 
@@ -41,7 +49,9 @@ final class FnMonitor {
   @discardableResult
   func start() -> Bool {
     if tap != nil { return true }
-    let mask = (CGEventMask(1) << CGEventType.flagsChanged.rawValue) | (CGEventMask(1) << CGEventType.keyDown.rawValue)
+    let mask = (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
+      | (CGEventMask(1) << CGEventType.keyDown.rawValue)
+      | (CGEventMask(1) << CGEventType.keyUp.rawValue)
     guard let tap = CGEvent.tapCreate(
       tap: .cgSessionEventTap,
       place: .headInsertEventTap,
@@ -64,6 +74,7 @@ final class FnMonitor {
     tap = nil
     source = nil
     triggerHeld = false
+    swallowingEnter = false
   }
 
   /// Zpětné volání běží na hlavním vlákně (zdroj je v hlavní smyčce); musí být rychlé,
@@ -92,20 +103,37 @@ final class FnMonitor {
       }
     case .keyDown:
       let code = event.getIntegerValueField(.keyboardEventKeycode)
+      let isEnter = Self.isEnter(code)
       if code == Int64(kVK_Escape) {
         if capturesEscape {
           post(.escape)
           return nil
         }
+      } else if isEnter && swallowingEnter {
+        // Opakování drženého Enteru po konci nahrávání.
+        return nil
+      } else if isEnter && capturesEnter {
+        swallowingEnter = true
+        post(.finishKey)
+        return nil
       } else if triggerHeld {
         post(.otherKey)
-      } else if code == Int64(kVK_Return) || code == Int64(kVK_ANSI_KeypadEnter) {
+      } else if isEnter {
         post(.enter)
+      }
+    case .keyUp:
+      if swallowingEnter, Self.isEnter(event.getIntegerValueField(.keyboardEventKeycode)) {
+        swallowingEnter = false
+        return nil
       }
     default:
       break
     }
     return Unmanaged.passUnretained(event)
+  }
+
+  private static func isEnter(_ code: Int64) -> Bool {
+    code == Int64(kVK_Return) || code == Int64(kVK_ANSI_KeypadEnter)
   }
 
   private func post(_ signal: Signal) {

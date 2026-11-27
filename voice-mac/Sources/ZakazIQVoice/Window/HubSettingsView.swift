@@ -32,7 +32,7 @@ struct HubSettingsView: View {
               .accessibilityAddTraits(app.shortcut == shortcut ? .isSelected : [])
           }
         }
-        Text("Podržte klávesu a mluvte, po puštění se text vloží. Dvojím klepnutím diktujete bez držení, Esc diktát zruší.")
+        Text("Podržte klávesu a mluvte, puštěním diktát skončí. Dvojím klepnutím diktujete bez držení: skončíte klávesou, Enterem, nebo tím, že 10 sekund nemluvíte. Esc diktát zruší.")
           .font(DilkyFont.sans(12))
           .foregroundStyle(Dilky.quiet)
           .fixedSize(horizontal: false, vertical: true)
@@ -41,6 +41,21 @@ struct HubSettingsView: View {
           Button("Otevřít Nastavení klávesnice") { app.openKeyboardSettings() }
             .buttonStyle(HubSecondaryButton(compact: true))
         }
+      }
+      Divider().overlay(Dilky.navy100)
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Po diktátu").font(DilkyFont.sans(13, weight: 500))
+        HStack(spacing: 8) {
+          ForEach(AfterDictation.allCases) { choice in
+            Button { hub.afterDictation = choice } label: { Text(verbatim: choice.title) }
+              .buttonStyle(HubChoiceButton(selected: hub.afterDictation == choice))
+              .accessibilityAddTraits(hub.afterDictation == choice ? .isSelected : [])
+          }
+        }
+        Text(hub.afterDictation.detail)
+          .font(DilkyFont.sans(12))
+          .foregroundStyle(Dilky.quiet)
+          .fixedSize(horizontal: false, vertical: true)
       }
       Divider().overlay(Dilky.navy100)
       HubToggleRow(title: "Zvuky", detail: "Krátký zvuk při začátku a konci diktátu.", isOn: $hub.sounds)

@@ -64,6 +64,15 @@ public struct Preferences: @unchecked Sendable {
     nonmutating set { defaults.set(min(365, max(7, newValue)), forKey: Self.historyDaysKey) }
   }
 
+  static let afterDictationKey = "afterDictation"
+
+  /// Co udělat s přepisem. Výchozí je ukázat ho ke zkopírování (Kryštof 2026-11-27: přepis
+  /// si zkontroluje a vloží do Claude Code sám).
+  public var afterDictation: AfterDictation {
+    get { defaults.string(forKey: Self.afterDictationKey).flatMap(AfterDictation.init(rawValue:)) ?? .showText }
+    nonmutating set { defaults.set(newValue.rawValue, forKey: Self.afterDictationKey) }
+  }
+
   static let learnFromEditsKey = "learnFromEdits"
 
   /// Posílat serveru opravy vloženého textu, aby se učil (VO09, D-V8). Výchozí ano.

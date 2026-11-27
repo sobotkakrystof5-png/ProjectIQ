@@ -2328,6 +2328,19 @@ ve VO02. Žádný nový npm balíček.
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
+### 2026-11-27 (ZakazIQ Voice — konec Enterem a tichem, karta s přepisem)
+- **feat** Diktát na Macu končí i **Enterem** (během nahrávání se pohltí i s opakováním a puštěním, do Claude Code
+  nepropadne) a bez držení sám po **10 s ticha** (`DictationTrigger.silenceStop`, události `.enter` a `.speech`).
+  Po diktátu se výchozí **ukáže karta s přepisem** nad lištou s jedinou akcí **Zkopírovat**, nic se samo nevkládá;
+  volba Nastavení › Diktování › Po diktátu (Ukázat přepis / Vložit text). Kryštof chtěl přepis vidět a vložit
+  do Claude Code sám. Soubory: `voice-mac/Sources/ZakazIQVoiceCore/Dictation/{DictationTrigger,AfterDictation}.swift`,
+  `Core/Bar/TranscriptLayout.swift`, `Core/Settings/Preferences.swift`, `ZakazIQVoice/Transcript/`,
+  `Hotkey/FnMonitor.swift`, `Audio/Recorder.swift`, `Dictation/DictationController.swift`, `Window/{HubModel,HubSettingsView}.swift`.
+  Bez změny serveru.
+- **chore** Ověřeno: `swift test` 104/104 (10 nových), vzhled karty z ladicích snímků (krátký, zkopírováno,
+  dlouhý s posuvem), `make run` s certifikátem „ZakazIQ Voice vývoj" (stejný otisk, oprávnění zůstala).
+  **Naostro neověřeno**: Enter v Claude Code, 10 s ticha při hluku v místnosti (práh −40 dB), klik na Zkopírovat.
+
 ### 2026-11-27 (ZakazIQ Voice — vložení do polí)
 - **fix** V okně aplikace nešlo nic vložit ⌘V (ani ⌘C, ⌘X, ⌘A, ⌘Z): aplikace v liště menu neměla hlavní menu
   a AppKit zkratky v polích hledá v něm. Skryté hlavní menu s Úpravami a „Zavřít okno" ⌘W,

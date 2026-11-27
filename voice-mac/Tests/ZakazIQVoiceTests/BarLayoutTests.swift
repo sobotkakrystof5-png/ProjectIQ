@@ -67,4 +67,27 @@ struct BarLayoutTests {
     #expect(BarMessage("Bez připojení, diktát počká", tone: .error).duration == 3)
     #expect(BarMessage("Přepsáno", copyText: "ahoj").duration == 8)
   }
+
+  @Test("karta s přepisem: výška textu mezi mezemi, delší se posouvá")
+  func transcriptHeight() {
+    #expect(TranscriptLayout.textHeight(measured: 3) == TranscriptLayout.minTextHeight)
+    #expect(TranscriptLayout.textHeight(measured: 61.2) == 62)
+    #expect(TranscriptLayout.textHeight(measured: 900) == TranscriptLayout.maxTextHeight)
+    #expect(!TranscriptLayout.isScrollable(measured: 240))
+    #expect(TranscriptLayout.isScrollable(measured: 240.5))
+    let panel = TranscriptLayout.panelSize(textHeight: 62)
+    #expect(panel.width == TranscriptLayout.cardWidth + 2 * TranscriptLayout.shadowInset)
+    #expect(panel.height == TranscriptLayout.chromeHeight + 62 + 2 * TranscriptLayout.shadowInset)
+  }
+
+  @Test("karta s přepisem je uprostřed nad lištou, nepřekrývá ji")
+  func transcriptPlacement() {
+    let size = TranscriptLayout.panelSize(textHeight: 62)
+    let origin = TranscriptLayout.panelOrigin(panelSize: size, visibleFrame: builtInVisible)
+    #expect(origin.x == (builtInVisible.midX - size.width / 2).rounded())
+    let barTop = BarLayout.panelOrigin(visibleFrame: builtInVisible).y + BarLayout.panelSize.height
+    let cardBottom = origin.y + TranscriptLayout.shadowInset
+    #expect(cardBottom > barTop)
+    #expect(cardBottom - barTop == TranscriptLayout.gapAboveBar)
+  }
 }

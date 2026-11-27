@@ -69,9 +69,13 @@ terminálu nebo editoru. Skutečný stav ukáže jen spuštění přes `open` / 
 
 ## Diktování
 
-- **Podržte fn** (nebo pravý ⌥, volba v Nastavení), mluvte, pusťte: text se vloží tam, kde
-  je kurzor. **Dvakrát fn** = diktát bez držení, ukončí ho další fn nebo Hotovo na liště.
-  **Esc** diktát zruší. Klik na lištu dole uprostřed spustí diktát bez držení.
+- **Podržte fn** (nebo pravý ⌥, volba v Nastavení), mluvte, pusťte. **Dvakrát fn** = diktát bez
+  držení, ukončí ho další fn, **Enter**, Hotovo na liště, nebo **10 s ticha**. Enter během nahrávání
+  diktát jen ukončí, do aplikace (třeba Claude Code) nepropadne. **Esc** diktát zruší. Klik na lištu
+  dole uprostřed spustí diktát bez držení.
+- **Po diktátu** (Nastavení › Diktování): výchozí **Ukázat přepis** = nad lištou se ukáže karta
+  s přepisem a tlačítkem **Zkopírovat**, nic se samo nevkládá (kurzor zůstane, kde byl, stačí ⌘V).
+  Volba **Vložit text** vloží text tam, kde je kurzor.
 - Když fn v systému otevírá výběr emoji nebo mění jazyk, Nastavení poradí, kde to vypnout
   (Nastavení systému › Klávesnice › Nedělat nic). Aplikace sama nic nemění.
 - Když se mezitím přepne jiná aplikace, text se nevloží, jen se dá do schránky. Schránka
@@ -107,9 +111,10 @@ Sources/ZakazIQVoiceCore/  logika bez rozhraní (testovaná)
   Net/                     VoiceClient, Dictate (meta, multipart, opakování), VoiceAPI (okno),
                            ConfigResponse, VoiceError + české hlášky
   Settings/                ServerAddress, DeviceKey, Klíčenka (SecretStore), Preferences
-  Dictation/               DictationTrigger (fn, dvojí stisk, Esc, limity), Shortcut, PastePlan
+  Dictation/               DictationTrigger (fn, dvojí stisk, Esc, Enter, 10 s ticha, limity), Shortcut,
+                           PastePlan, AfterDictation (ukázat přepis / vložit)
   Audio/                   SpeechMeter (čas řeči, hlasitost)
-  Bar/                     BarLayout (velikosti a poloha lišty)
+  Bar/                     BarLayout (velikosti a poloha lišty), TranscriptLayout (karta s přepisem)
   Store/                   LocalDB (historie a fronta, SQLite)
   Hub/                     čísla, formát a historie pro okno
 Sources/ZakazIQVoice/      aplikace (AppKit + SwiftUI)
@@ -117,6 +122,7 @@ Sources/ZakazIQVoice/      aplikace (AppKit + SwiftUI)
   Hotkey/                  FnMonitor (CGEventTap)
   Audio/                   Recorder (m4a 16 kHz mono)
   Bar/                     lišta dole uprostřed (NSPanel + SwiftUI)
+  Transcript/              karta s přepisem nad lištou a tlačítkem Zkopírovat
   Paste/                   Paster (⌘V a vrácení schránky)
   Dictation/               DictationController, LocalHistorySource
   Window/                  okno: Domů, Historie, Slovník, Styl, Nastavení
@@ -126,6 +132,7 @@ Tests/ZakazIQVoiceTests/   Swift Testing + Fixtures/config-ok.json
 ```
 
 Ladicí sestavení (`make app CONFIG=debug SIGN_ID=-`) umí s proměnnou
-`ZAKAZIQ_VOICE_BAR_SNAPSHOT=/cesta.png` vykreslit všechny stavy lišty a skončit, s
+`ZAKAZIQ_VOICE_BAR_SNAPSHOT=/cesta.png` vykreslit všechny stavy lišty a karty s přepisem a skončit,
+s `ZAKAZIQ_VOICE_TRANSCRIPT_SNAPSHOT=/cesta.png` dlouhou kartu ve skutečném okně, s
 `ZAKAZIQ_VOICE_SNAPSHOT=/cesta.png` vykreslit okno do PNG (kontrola vzhledu bez oprávnění
 Nahrávání obrazovky). Ve vydaném sestavení to není.
