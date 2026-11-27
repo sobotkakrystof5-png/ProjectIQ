@@ -31,7 +31,7 @@ ALTER TABLE ws.accounts ALTER COLUMN clerk_org_id DROP NOT NULL;
 COMMENT ON COLUMN ws.members.clerk_user_id IS
   'Id uživatele v Supabase Auth (od migrace 141, R-154). Starší hodnoty user_… jsou z Clerku a nikoho nepustí.';
 COMMENT ON COLUMN ws.accounts.clerk_org_id IS
-  'Organizace Clerku z doby před migrací 141. Nové účty ji nemají; aplikace ji nečte.';
+  'Organizace Clerku z doby před migrací 141. Nové účty ji nemají a aplikace ji nečte.';
 
 CREATE INDEX IF NOT EXISTS members_user_idx ON ws.members (clerk_user_id);
 
