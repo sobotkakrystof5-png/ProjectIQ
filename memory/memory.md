@@ -2150,10 +2150,12 @@ krok. Technika reference B4, bezpečnost DECISIONS #059, CSP-LOG v11.
 - [ ] **Člověk ve dvou prostorech vidí jen ten první:** `portal.member_lookup` vrací členství podle data
   vzniku a `/klient` bere první. Pozvání proto stejný e-mail drží v jednom prostoru (s potvrzením); kdyby
   měl někdo pracovat pro dvě firmy, chce to výběr prostoru v `/klient` · `lib/portal/context.ts` · od 2026-11-18
-- [ ] **Workspace na Supabase (R-154) — nasadit a projít:** v kódu na větvi `ws/supabase-auth`. Pořadí:
-  (1) migrace 141 na produkci (aditivní, **před** nasazením — bez ní `/w` nikoho nepustí), (2) v Supabase
-  Redirect URL `https://www.zakaziq.cz/w/auth/potvrzeni?**` a česká šablona „Magic Link" s `{{ .Token }}`,
-  (3) merge a nasazení, (4) průchod: Pozvat klienta z adminu na vlastní e-mail → `/w/pozvanka/…` → přístup →
+- [ ] **Workspace na Supabase (R-154) — dokončit nastavení a projít:** ~~(1) migrace 141 na produkci~~
+  (2026-11-27), (2) v Supabase (Authentication → URL Configuration) Redirect URL
+  `https://www.zakaziq.cz/w/auth/potvrzeni?**` a (Emails → Templates → Magic Link) česká šablona
+  `docs/workspace/supabase-sablona-kod.html` s předmětem „Kód pro přihlášení do ZakazIQ" — do té doby nejde ve
+  Workspace přihlášení kódem ani zapomenuté heslo (odkaz skončí na Site URL), heslo a pozvánka fungují,
+  (3) ~~nasazení~~, (4) průchod: Pozvat klienta z adminu na vlastní e-mail → `/w/pozvanka/…` → přístup →
   krok 2 (předplatné); přihlášení heslem i kódem; zapomenuté heslo; účet z `/klient` přijme pozvánku;
   odhlášení všude; 390 a 1280 px, (5) smazat `CLERK_*` z Vercelu, aplikaci v Clerku a 5 CNAME Clerku u WEDOS.
   Free plán Supabase pro placený Workspace je přijaté riziko (DECISIONS #059 b) · od 2026-11-27
@@ -2408,7 +2410,11 @@ krok. Technika reference B4, bezpečnost DECISIONS #059, CSP-LOG v11.
   `lib/ws/clerk-{orgs,webhook}.ts`, `lib/security/clerk.ts`, `clerk-appearance.ts`, `ActivateAccount`, zdroje v CSP
   (CSP-LOG v11), `CLERK_*` z `.env.example`. Zpracovatel Clerk v právních textech nahrazen Supabase (`LEGAL_VERSION`
   27. 11. 2026; Workspace nemá platící zákazníky, oznamovat není komu).
-- **db** Migrace 141 `ws_supabase_auth` (aplikována: ne, nikde).
+- **db** Migrace 141 `ws_supabase_auth` **aplikovaná na produkci** 2026-11-27 (Neon MCP v jedné transakci na souhlas
+  Kryštofa, 23 příkazů, zapsaná v `public.schema_migrations` s otiskem souboru). Před tím opravený středník v textu
+  komentáře, na kterém by se běhoun rozpadl. Ověřeno: `clerk_org_id` volitelný, 5 indexů, RLS a politika na
+  `account_invites`, práva `ws_app` bez BYPASSRLS, veřejnost funkce nespustí, md5 všech pěti těl sedí na soubor.
+  Na produkci byl 1 testovací účet „ahoj" s vlastníkem z Clerku — ten se už nepřihlásí. Testovací Neon ne.
 - **chore** Ověřeno: `npx tsc --noEmit`, `npx vitest run` 2154 prošlo / 1 padá (číslování migrací — chybí 140,
   která byla zatím jen rozdělaná v `main`; po sloučení `main` 2175 prošlo, 0 selhalo), `npm run build`, `next start` lokálně: nepřihlášený `/w` → přihlášení
   s `next`, neplatná pozvánka → vysvětlení, stránky 390 a 1280 px bez chyb v konzoli. `web-security-review`:
