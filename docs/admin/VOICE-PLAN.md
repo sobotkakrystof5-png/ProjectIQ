@@ -464,6 +464,18 @@ OpenAI `gpt-4o-mini-transcribe`** — klíč Groq v `.env.local` ještě není. 
 | OpenAI `gpt-4o-mini-transcribe` | bez | 11,6 % | 46,2 % (čísla a datum slovy) | 0 | 904 / 2 945 ms |
 | OpenAI `gpt-4o-mini-transcribe` | `ZakazIQ, Prvotka, VIZEON, SmartCalendar, Vercel, Turbopack` | 5,5 % | 18,2 % („ZakasIQ", „Vizeon") | **6 — opsal celou nápovědu** | 808 / 1 777 ms |
 
+**Doplnění 2026-11-27, Groq** (tytéž syntetické nahrávky, `--jen groq-turbo,openai`; OpenAI se mezi běhy liší):
+
+| Poskytovatel | Nápověda | WER průměr | WER nejhorší | Ticho (vymyšlená slova) | p50 / p95 času |
+|---|---|---|---|---|---|
+| Groq `whisper-large-v3-turbo` | bez | **6,9 %** | 18,2 % (jména) | 3 — „Titulky vytvořil JohnyX.“, G2 nezachytí, G4 ano | 438 / 1 133 ms |
+| OpenAI `gpt-4o-mini-transcribe` | bez | 18,9 % | 123,1 % (čísla slovy) | 0 | 910 / 2 177 ms |
+| Groq `whisper-large-v3-turbo` | `ZakazIQ, Prvotka, VIZEON, Claude, Slack, Vercel` | 5,5 % | 21,1 % | 3 | 354 / 806 ms |
+| OpenAI `gpt-4o-mini-transcribe` | totéž | 4,7 % | 21,1 % | 6 | 742 / 1 120 ms |
+
+Groq čísla slovy přepsal bez chyby, je 2–3× rychlejší a stojí asi třetinu. Od 2026-11-27 je hlavní cestou
+na produkci (`GROQ_API_KEY` ve Vercelu), OpenAI záloha.
+
 Co z toho plyne:
 
 - **Nápověda ze slovníku pomáhá** (WER na polovinu, čísla a „SmartCalendar" správně), ale
@@ -472,7 +484,7 @@ Co z toho plyne:
 - Bez nápovědy přepis píše čísla slovy („čtyřicet osm tisíc", „ve čtrnácti celých třiceti");
   s nápovědou číslicemi. Převod čísel řeší čištění (VO07), ne slovník.
 - Jména bez nápovědy nepozná („zákaz ITV", „vyzion"): slovník je nutnost, ne bonus.
-- **Groq a skutečný hlas chybí.** Po vložení `GROQ_API_KEY` a nahrání asi 10 vět vlastním
+- **Skutečný hlas chybí** (Groq změřený 2026-11-27, tabulka výš). Po nahrání asi 10 vět vlastním
   hlasem do `~/ZakazIQ-voice-test/` pustit
   `node scripts/voice-stt-test.mjs ~/ZakazIQ-voice-test` (bez nápovědy i s `--napoveda "…"`)
   a doplnit sem tabulku. Do té doby platí D-V3 podle doporučení.

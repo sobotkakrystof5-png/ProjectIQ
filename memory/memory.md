@@ -33,7 +33,7 @@
 > Předchozí: 2026-11-26 · **ZakazIQ Voice — VO01 a VO02** (R-150): migrace 138, zařízení
 > s klíčem v `/dashboard/voice` a příjem diktátu `POST /api/public/voice/dictate` (přepis Groq se zálohou
 > OpenAI, pojistky G1–G5 a G12, slovník). Naostro ověřené přes OpenAI a testovací Neon, ne na produkci.
-> Větev `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`). VO00 čeká na klíč Groq.
+> Větev `admin/zakaziq-voice` (worktree `.claude/worktrees/zakaziq-voice`). VO00: klíč Groq na produkci od 2026-11-27, chybí nahrávky vlastním hlasem.
 >
 > Předchozí: 2026-11-25 · **ZakazIQ Voice — VO00** (R-150): plán a prompty VO00–VO12 do repa, rozhodnutí,
 > ceny, skript testu přepisu. Text diktátů zůstává natrvalo, dokud ho Kryštof nesmaže.
@@ -169,7 +169,7 @@
 **ZakazIQ Voice (R-150, od 2026-11-25, větev `admin/zakaziq-voice`):** diktování na Macu přes Fn,
 zpracování a statistiky v adminu `/dashboard/voice`. Třináct sezení VO00–VO12, plán
 `docs/admin/VOICE-PLAN.md` (stav v oddílu 14), prompty `new - area of zakaziq/prompty/voice/`.
-VO00 rozpracované (čeká na klíč Groq a nahrávky), **VO01, VO02, VO07, VO08 a VO10 hotové 2026-11-26**: migrace 138 v repu
+VO00 rozpracované (klíč Groq na produkci od 2026-11-27, chybí nahrávky vlastním hlasem), **VO01, VO02, VO07, VO08 a VO10 hotové 2026-11-26**: migrace 138 v repu
 a na testovacím Neonu, `POST /api/public/voice/dictate`, `GET …/config` a `GET …/stats`, čištění Claude s kontrolou
 výstupu a denním stropem (milník 2, bez skutečného modelu neověřené), admin s pěti záložkami a karta na Dnes
 (milník 3, za přihlášením neověřené), učení z oprav, slovník a nastavení z Macu (VO08, rozbor AI jen s podvrženou
@@ -1862,12 +1862,12 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
   prošlo), dvojí fn, Esc v dialogu, pravý ⌥, pole pro heslo, Wi-Fi vypnout → fronta → zapnout, přepnout aplikaci
   během zpracování, schránka s obrázkem se vrátí, p50 z 10 krátkých diktátů; lišta: focus při psaní, druhý monitor,
   celá obrazovka, omezit pohyb · `voice-mac/` · od 2026-11-26
-- [ ] **ZakazIQ Voice — dokončit VO00:** (1) `GROQ_API_KEY` z console.groq.com vložit do `.env.local`
-  hlavní složky (worktree na něj odkazuje) a v Groq Data Controls zapnout Zero Data Retention,
+- [ ] **ZakazIQ Voice — dokončit VO00:** (1) ~~`GROQ_API_KEY`~~ v `.env.local` i ve Vercelu Production a ~~Zero Data Retention v Groq~~ (Kryštof)
+  od 2026-11-27,
   (2) nahrát ~10 vět vlastním hlasem jako `*.m4a` + `*.txt` s přesným textem do `~/ZakazIQ-voice-test/`
   (e-mail klientovi, Slack, zadání pro Claude s anglickými slovy, čísla a data, „ZakazIQ", „Prvotka",
   „VIZEON") a pustit `node scripts/voice-stt-test.mjs ~/ZakazIQ-voice-test` bez nápovědy i s `--napoveda`,
-  (3) certifikát pro podpis — přesunuto do bodu VO03 níž. Zatím otestováno jen OpenAI na syntetickém hlasu
+  (3) certifikát pro podpis — přesunuto do bodu VO03 níž. Groq i OpenAI zatím jen na syntetickém hlasu
   (plán 12a) · Kryštof · od 2026-11-25
 - [ ] **ZakazIQ Voice — dokončit VO03 (certifikát a ověření naostro):** (1) Kryštof: Přístup ke klíčenkám → Asistent
   certifikátů → Vytvořit certifikát, název „ZakazIQ Voice vývoj", typ identity Self Signed Root, typ certifikátu
@@ -2344,6 +2344,17 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-27 (ZakazIQ Voice — přepis přes Groq)
+- **chore** Přepis diktátů a schůzek jde od 2026-11-27 přes Groq `whisper-large-v3-turbo` ($0,04 za hodinu zvuku
+  místo $0,18 u OpenAI `gpt-4o-mini-transcribe`), OpenAI zůstává záloha při chybě nebo limitu. `GROQ_API_KEY`
+  v `.env.local` a ve Vercelu Production (Sensitive, přes CLI ze souboru, hodnota nevypsaná), redeploy produkce
+  `dpl_4JWC…` → `project-5knqy4p1d` (commit `2e9217e`), `www.zakaziq.cz` 200, `/dashboard/voice` 307,
+  `/api/public/voice/config` 401. Odhad Voice ~$3,5 → ~$1,5 měsíčně při 3 000 slovech denně. Bez změny kódu.
+- **docs** Test přepisu (plán 12a) na syntetickém hlasu: Groq bez nápovědy WER 6,9 % (OpenAI 18,9 %), s nápovědou
+  5,5 % (4,7 %), 2–3× rychlejší; na tichu „Titulky vytvořil JohnyX.“, které vyhodí G4. První ostrý diktát přes
+  Groq zatím nikdo neověřil (admin poskytovatele neukazuje). Registrace na console.groq.com v Safari padala na
+  obecné chybě, v Chromu prošla. Zero Data Retention v Groq Data Controls zapnul Kryštof.
 
 ### 2026-11-27 (ZakazIQ Voice — schůzky s klientem, R-151)
 - **feat** Mac: Začít/Ukončit schůzku (menu, okno, lišta s časem), mikrofon přes `AVAudioEngine` a zvuk počítače
