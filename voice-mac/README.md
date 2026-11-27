@@ -85,6 +85,19 @@ terminálu nebo editoru. Skutečný stav ukáže jen spuštění přes `open` / 
 - Nahrávka leží jen do odeslání v `~/Library/Application Support/ZakazIQ Voice/rec/`,
   historie a fronta v `voice.sqlite` tamtéž (práva 0600).
 
+## Schůzky (R-151)
+
+- Menu v liště nebo záložka **Schůzky** v okně → **Začít schůzku**. Nahrává se zvlášť mikrofon (vy)
+  a zvuk počítače (druhá strana v Meetu, Zoomu, WhatsAppu), nejvýš 2 hodiny (upozornění 5 minut předem).
+  Lišta ukazuje čas a tlačítko Ukončit. Během schůzky se nediktuje.
+- Poprvé se macOS zeptá na **Nahrávání zvuku systému** (Soukromí a zabezpečení › Nahrávání obrazovky
+  a zvuku systému). Potřebuje macOS 14.2 nebo novější.
+- Promluvy odcházejí na server už během hovoru, takže po konci je přepis hned v okně: Zkopírovat přepis,
+  Shrnout pomocí AI, Otevřít v adminu. Bez sítě čekají ve frontě (jen v paměti, do ukončení aplikace).
+- Sluchátka pomůžou: bez nich mikrofon slyší druhou stranu i z reproduktorů (server takovou ozvěnu
+  z přepisu vynechá, ale ne vždy).
+- Nahrávky leží jen do odeslání v `~/Library/Application Support/ZakazIQ Voice/meet/<id>/`.
+
 ## Připojení
 
 - **Adresa serveru** (`UserDefaults`, klíč `serverAddress`): výchozí `https://www.zakaziq.cz`,
@@ -117,11 +130,13 @@ Sources/ZakazIQVoiceCore/  logika bez rozhraní (testovaná)
   Bar/                     BarLayout (velikosti a poloha lišty), TranscriptLayout (karta s přepisem)
   Store/                   LocalDB (historie a fronta, SQLite)
   Hub/                     čísla, formát a historie pro okno
+  Meeting/                 TurnSegmenter (promluvy podle pauz), MeetingAPI (schůzky na serveru)
 Sources/ZakazIQVoice/      aplikace (AppKit + SwiftUI)
   App/                     main, AppDelegate (menu, lišta, okno), AppModel
   Hotkey/                  FnMonitor (CGEventTap)
   Audio/                   Recorder (m4a 16 kHz mono)
   Bar/                     lišta dole uprostřed (NSPanel + SwiftUI)
+  Meeting/                 schůzka: zvuk počítače (Core Audio tap), mikrofon, promluvy, fronta
   Transcript/              karta s přepisem nad lištou a tlačítkem Zkopírovat
   Paste/                   Paster (⌘V a vrácení schránky)
   Dictation/               DictationController, LocalHistorySource

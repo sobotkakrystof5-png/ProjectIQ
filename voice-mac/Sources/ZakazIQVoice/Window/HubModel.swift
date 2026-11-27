@@ -5,7 +5,7 @@ import ZakazIQVoiceCore
 
 /// Záložky okna (⌘1–⌘5).
 enum HubTab: String, CaseIterable, Identifiable {
-  case home, history, dictionary, style, settings
+  case home, history, meetings, dictionary, style, settings
 
   var id: String { rawValue }
 
@@ -13,6 +13,7 @@ enum HubTab: String, CaseIterable, Identifiable {
     switch self {
     case .home: return "Domů"
     case .history: return "Historie"
+    case .meetings: return "Schůzky"
     case .dictionary: return "Slovník"
     case .style: return "Styl"
     case .settings: return "Nastavení"
@@ -23,6 +24,7 @@ enum HubTab: String, CaseIterable, Identifiable {
     switch self {
     case .home: return "house"
     case .history: return "clock.arrow.circlepath"
+    case .meetings: return "person.2.wave.2"
     case .dictionary: return "character.book.closed"
     case .style: return "textformat"
     case .settings: return "gearshape"
@@ -85,6 +87,8 @@ final class HubModel: ObservableObject {
   @Published private(set) var toast: String?
 
   let app: AppModel
+  /// Záložka Schůzky (R-151).
+  let meetings = MeetingsModel()
   private let prefs: Preferences
   private let hubPrefs: HubPreferences
   private let cache: StatsCache
@@ -115,6 +119,7 @@ final class HubModel: ObservableObject {
     learnFromEdits = prefs.learnFromEdits
     afterDictation = prefs.afterDictation
     showOnboarding = !hubPrefs.onboardingDone
+    meetings.toast = { [weak self] text in self?.show(text) }
     if let cached = cache.load() {
       numbers = .cached(cached.stats, fetchedAt: cached.fetchedAt, reason: "")
     }
@@ -163,6 +168,7 @@ final class HubModel: ObservableObject {
     case .dictionary: await loadDictionary()
     case .style, .settings: await loadRemote()
     case .history: break
+    case .meetings: await meetings.refresh()
     }
   }
 

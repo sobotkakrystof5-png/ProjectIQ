@@ -66,6 +66,8 @@ final class DictationController: ObservableObject {
   private var pathMonitor: NWPathMonitor?
   private var queueTimer: Timer?
   private var queueRunning = false
+  /// Během schůzky (R-151) se nediktuje: mikrofon patří schůzce. Text hlášky, nebo `nil`.
+  var blockedMessage: String?
 
   init(prefs: Preferences = Preferences(), store: SecretStore = KeychainSecretStore()) {
     self.prefs = prefs
@@ -153,7 +155,15 @@ final class DictationController: ObservableObject {
 
   /// Položka menu Diktovat a klik na lištu.
   func toggleFromMenu() {
+    if refuseWhileBlocked() { return }
     send(.barClick(secureInput: FnMonitor.secureInputActive))
+  }
+
+  /// Schůzka běží: nový diktát nezačne, jen hláška.
+  private func refuseWhileBlocked() -> Bool {
+    guard let message = blockedMessage, trigger.state == .idle else { return false }
+    show(BarMessage(message))
+    return true
   }
 
   /// Menu „Zkopírovat poslední diktát".
@@ -195,7 +205,9 @@ final class DictationController: ObservableObject {
 
   private func handle(_ signal: FnMonitor.Signal) {
     switch signal {
-    case .down: send(.keyDown(secureInput: FnMonitor.secureInputActive))
+    case .down:
+      if refuseWhileBlocked() { return }
+      send(.keyDown(secureInput: FnMonitor.secureInputActive))
     case .up: send(.keyUp)
     case .otherKey: send(.otherKey)
     case .escape: send(.escape)

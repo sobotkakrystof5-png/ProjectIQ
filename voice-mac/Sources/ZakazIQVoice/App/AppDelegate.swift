@@ -20,6 +20,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private lazy var hub = HubWindowController(app: model, history: dictation.history == nil ? nil : historySource)
   private var hotkeyTimer: Timer?
   private var bar: FlowBarPanel?
+  /// Schůzky s klientem (R-151).
+  private lazy var meeting = MeetingController(dictation: dictation)
+  private weak var meetingItem: NSMenuItem?
   private var transcript: TranscriptPanel?
   private var subscriptions = Set<AnyCancellable>()
 
@@ -68,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     startHotkey()
     dictation.startBackground()
+    wireMeetings()
 
     if model.hasKey {
       Task { await model.testConnection() }
@@ -106,6 +110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     menu.addItem(dictate)
     dictateItem = dictate
     menu.addItem(makeItem("Zkopírovat poslední diktát", #selector(copyLast), key: ""))
+    let meetingItem = makeItem("Začít schůzku", #selector(toggleMeeting), key: "")
+    meetingItem.toolTip = "Nahraje váš mikrofon i zvuk hovoru (Meet, Zoom), nejvýš 2 hodiny. Na konci uvidíte přepis."
+    menu.addItem(meetingItem)
+    self.meetingItem = meetingItem
     let queue = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     queue.isEnabled = false
     queue.isHidden = true
@@ -134,7 +142,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   func menuWillOpen(_ menu: NSMenu) {
     statusLine?.title = model.connection.menuLine
     dictateItem?.title = dictation.phase == .recording ? "Dokončit diktát" : "Diktovat"
-    dictateItem?.isEnabled = dictation.phase != .processing
+    dictateItem?.isEnabled = dictation.phase != .processing && !meeting.isActive
+    switch meeting.phase {
+    case .idle: meetingItem?.title = "Začít schůzku"
+    case .recording: meetingItem?.title = "Ukončit schůzku (\(BarLayout.elapsedText(meeting.elapsed)))"
+    case .finishing: meetingItem?.title = "Dokončuji přepis schůzky…"
+    }
+    meetingItem?.isEnabled = meeting.phase != .finishing
     let waiting = dictation.queueCount
     queueLine?.isHidden = waiting == 0
     queueLine?.title = "Ve frontě: \(waiting) \(Self.dictationWord(waiting))"
@@ -142,6 +156,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   @objc private func toggleDictation() { dictation.toggleFromMenu() }
   @objc private func copyLast() { dictation.copyLastDictation() }
+  @objc private func toggleMeeting() {
+    meeting.phase == .idle ? meeting.start() : meeting.stop()
+  }
+
+  /// Schůzka ↔ záložka Schůzky v okně a otevření přepisu po konci.
+  private func wireMeetings() {
+    let model = hub.hub.meetings
+    model.startMeeting = { [weak self] in self?.meeting.start() }
+    model.stopMeeting = { [weak self] in self?.meeting.stop() }
+    meeting.$phase
+      .receive(on: RunLoop.main)
+      .sink { [weak self] phase in
+        model.recording = phase == .recording
+        model.finishing = phase == .finishing
+        self?.updateStatusIcon(self?.dictation.phase ?? .idle)
+      }
+      .store(in: &subscriptions)
+    meeting.$elapsed
+      .receive(on: RunLoop.main)
+      .sink { model.elapsed = $0 }
+      .store(in: &subscriptions)
+    meeting.onShowMeeting = { [weak self] id in
+      guard let self else { return }
+      if let id {
+        self.hub.show(tab: .meetings)
+        model.show(id)
+      } else {
+        self.hub.show(tab: .settings)
+      }
+    }
+  }
 
   /// 1 diktát, 2–4 diktáty, 5 a víc diktátů.
   static func dictationWord(_ count: Int) -> String {
@@ -157,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   #endif
 
   private func updateStatusIcon(_ phase: DictationController.Phase) {
-    statusItem?.button?.image = TileMark.menuBarImage(active: phase == .recording)
+    statusItem?.button?.image = TileMark.menuBarImage(active: phase == .recording || meeting.phase == .recording)
   }
 
   // MARK: Zkratka
@@ -192,6 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   @objc private func quit() { NSApp.terminate(nil) }
 
   func applicationWillTerminate(_ notification: Notification) {
+    meeting.shutdown()
     dictation.flushEdits()
   }
 }

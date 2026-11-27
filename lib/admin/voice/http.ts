@@ -15,11 +15,23 @@ import { isVoiceKeyConfigured, voiceBearerFrom } from './keys'
  * limit po zařízení až po ověření. Chyba neprozradí, jestli zařízení existuje.
  */
 
-export type VoiceScope = 'dictate' | 'config' | 'stats' | 'feedback' | 'write'
+export type VoiceScope = 'dictate' | 'config' | 'stats' | 'feedback' | 'write' | 'meeting' | 'summary'
 
 /** D-V11: 400 diktátů za hodinu na zařízení. */
 /** `feedback` = oprava po vložení (nejvýš jedna na diktát), `write` = slovník a nastavení z okna na Macu (VO08). */
-export const PER_DEVICE_HOURLY: Record<VoiceScope, number> = { dictate: 400, config: 240, stats: 240, feedback: 400, write: 120 }
+/**
+ * `meeting` = schůzky (R-151): promluvy dvou stran po pauzách, hodina hovoru je
+ * stovky promluv; `summary` = shrnutí modelem (placené, na kliknutí).
+ */
+export const PER_DEVICE_HOURLY: Record<VoiceScope, number> = {
+  dictate: 400,
+  config: 240,
+  stats: 240,
+  feedback: 400,
+  write: 120,
+  meeting: 1500,
+  summary: 30,
+}
 const IP_ENDPOINT = 'voice_ip'
 export const IP_HOURLY = 1200
 

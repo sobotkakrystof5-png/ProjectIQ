@@ -4,6 +4,7 @@ import AppKit
 MainActor.assumeIsolated {
   #if DEBUG
   if BarSnapshot.runIfRequested() { exit(0) }
+  if MeetingSelfTest.runIfRequested() { exit(0) }
   #endif
   let app = NSApplication.shared
   let delegate = AppDelegate()

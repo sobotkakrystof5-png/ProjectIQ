@@ -13,6 +13,10 @@ final class BarModel: ObservableObject {
   @Published private(set) var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
   @Published var shortcut: DictationShortcut = .fn
   @Published var showWhenIdle = true
+  /// Probíhá schůzka (R-151): lišta se v klidu vrací do stavu schůzky, ne do klidu.
+  @Published private(set) var meetingActive = false
+  @Published private(set) var meetingElapsed: TimeInterval = 0
+  @Published private(set) var meetingLevel: Double = 0
 
   static let waveCount = 16
 
@@ -22,6 +26,8 @@ final class BarModel: ObservableObject {
   var onCopy: ((String) -> Void)?
   /// Klik na hlášku bez nabídky kopírování (plán: „klik otevře Historii").
   var onOpenHistory: (() -> Void)?
+  /// Tlačítko Ukončit na liště během schůzky.
+  var onStopMeeting: (() -> Void)?
 
   private var messageTask: Task<Void, Never>?
   private var observer: NSObjectProtocol?
@@ -66,9 +72,35 @@ final class BarModel: ObservableObject {
 
   func idle() {
     cancelMessage()
-    stage = .idle
+    stage = rest
     resetLevels()
   }
+
+  /// Kam se lišta vrací po hlášce: do klidu, nebo do schůzky.
+  private var rest: BarStage { meetingActive ? .meeting : .idle }
+
+  func startMeeting() {
+    meetingActive = true
+    meetingElapsed = 0
+    cancelMessage()
+    stage = .meeting
+  }
+
+  func meetingTick(elapsed: TimeInterval) {
+    meetingElapsed = elapsed
+  }
+
+  func meetingLevel(_ level: Double) {
+    meetingLevel = level
+  }
+
+  func endMeeting() {
+    meetingActive = false
+    meetingLevel = 0
+    if stage == .meeting { stage = .idle }
+  }
+
+  func stopMeeting() { onStopMeeting?() }
 
   /// Hotovo: dílky bliknou a lišta se vrátí do klidu.
   func done() {
@@ -77,8 +109,8 @@ final class BarModel: ObservableObject {
     resetLevels()
     messageTask = Task { [weak self] in
       try? await Task.sleep(for: .milliseconds(300))
-      guard !Task.isCancelled else { return }
-      self?.stage = .idle
+      guard !Task.isCancelled, let self else { return }
+      self.stage = self.rest
     }
   }
 
@@ -88,8 +120,8 @@ final class BarModel: ObservableObject {
     resetLevels()
     messageTask = Task { [weak self] in
       try? await Task.sleep(for: .seconds(message.duration))
-      guard !Task.isCancelled else { return }
-      self?.stage = .idle
+      guard !Task.isCancelled, let self else { return }
+      self.stage = self.rest
     }
   }
 
@@ -111,6 +143,7 @@ final class BarModel: ObservableObject {
   }
 
   func click() {
+    if stage == .meeting { return }
     if case .message(let message) = stage {
       if let text = message.copyText {
         onCopy?(text)

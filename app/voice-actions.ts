@@ -39,6 +39,8 @@ import {
 } from '@/lib/admin/voice/manage'
 import { SEARCH_MAX } from '@/lib/admin/voice/queries'
 import { runVoiceLearningNow } from '@/lib/admin/voice/learner'
+import { summarizeMeeting } from '@/lib/admin/voice/meeting-summary'
+import { deleteMeeting, loadMeeting, renameMeeting, saveMeetingSummary, setMeetingContact } from '@/lib/admin/voice/meetings'
 import { isIsoDate } from '@/lib/prague-time'
 
 // ZakazIQ Voice (R-150): zařízení s klíčem v adminu (VO01). Klíč se vrací jen
@@ -357,4 +359,88 @@ export async function runVoiceLearning(): Promise<VoiceResult<{ summary: string;
       note: run.ai?.skipped ? AI_SKIP[run.ai.skipped] : null,
     }
   })
+}
+
+// --- Schůzky (R-151) -----------------------------------------------------------
+
+const MISSING_MEETINGS = 'Databáze ještě nemá tabulky schůzek (migrace 139).'
+
+function meetingFailure(err: unknown, what: string): { ok: false; error: string } {
+  if (isMissingVoiceSchema(err)) return { ok: false, error: MISSING_MEETINGS }
+  return failure(err, what)
+}
+
+const SUMMARY_ERRORS: Record<string, string> = {
+  NOT_CONFIGURED: 'AI není nastavená (chybí ANTHROPIC_API_KEY).',
+  EMPTY: 'Schůzka zatím nemá přepis, není co shrnout.',
+  REFUSED: 'Model shrnutí odmítl. Zkuste to prosím znovu, nebo přepis zkopírujte.',
+  TRUNCATED: 'Shrnutí vyšlo příliš dlouhé a nedokončilo se. Zkuste to znovu.',
+  FAILED: 'Shrnutí se nepodařilo vytvořit. Zkuste to prosím znovu.',
+}
+
+/** „Shrnout pomocí AI" u schůzky. Placené volání, jen na kliknutí. */
+export async function summarizeVoiceMeeting(rawId: unknown): Promise<VoiceResult> {
+  await requireAuth()
+  const id = idSchema.safeParse(rawId)
+  if (!id.success) return { ok: false, error: 'Schůzka nenalezena.' }
+  try {
+    const meeting = await loadMeeting(id.data, null)
+    if (!meeting) return { ok: false, error: 'Schůzka nenalezena.' }
+    const res = await summarizeMeeting(meeting.transcript, meeting.startedAt)
+    if (!res.ok) return { ok: false, error: SUMMARY_ERRORS[res.code] ?? SUMMARY_ERRORS.FAILED }
+    await saveMeetingSummary(id.data, res.summary, res.model, res.costUsd)
+    revalidatePath(PAGE)
+    return { ok: true }
+  } catch (err) {
+    return meetingFailure(err, 'shrnutí schůzky')
+  }
+}
+
+export async function deleteVoiceMeeting(rawId: unknown): Promise<VoiceResult> {
+  await requireAuth()
+  const id = idSchema.safeParse(rawId)
+  if (!id.success) return { ok: false, error: 'Schůzka nenalezena.' }
+  try {
+    if (!(await deleteMeeting(id.data, null))) return { ok: false, error: 'Schůzka nenalezena.' }
+    revalidatePath(PAGE)
+    return { ok: true }
+  } catch (err) {
+    return meetingFailure(err, 'smazání schůzky')
+  }
+}
+
+/** Přiřadí schůzku ke kontaktu, `null` ji odpojí. */
+export async function setVoiceMeetingContact(rawId: unknown, rawContactId: unknown): Promise<VoiceResult> {
+  await requireAuth()
+  const id = idSchema.safeParse(rawId)
+  const contact = rawContactId === null ? { success: true as const, data: null } : idSchema.safeParse(rawContactId)
+  if (!id.success || !contact.success) return { ok: false, error: 'Schůzka nebo kontakt nenalezen.' }
+  try {
+    if (!(await setMeetingContact(id.data, contact.data))) return { ok: false, error: 'Schůzka nenalezena.' }
+    revalidatePath(PAGE)
+    return { ok: true }
+  } catch (err) {
+    if ((err as { code?: string })?.code === '23503') return { ok: false, error: 'Kontakt nenalezen.' }
+    return meetingFailure(err, 'přiřazení schůzky')
+  }
+}
+
+const titleSchema = z
+  .string()
+  .transform((s) => s.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().max(160, 'Název může mít nejvýš 160 znaků.'))
+
+export async function renameVoiceMeeting(rawId: unknown, rawTitle: unknown): Promise<VoiceResult> {
+  await requireAuth()
+  const id = idSchema.safeParse(rawId)
+  const title = titleSchema.safeParse(typeof rawTitle === 'string' ? rawTitle : '')
+  if (!id.success) return { ok: false, error: 'Schůzka nenalezena.' }
+  if (!title.success) return { ok: false, error: title.error.issues[0]?.message ?? 'Neplatný název.' }
+  try {
+    if (!(await renameMeeting(id.data, title.data || null))) return { ok: false, error: 'Schůzka nenalezena.' }
+    revalidatePath(PAGE)
+    return { ok: true }
+  } catch (err) {
+    return meetingFailure(err, 'přejmenování schůzky')
+  }
 }

@@ -524,6 +524,7 @@ nápovědu** a G12 ji zahodilo (`blocked`). Čísla dál slovy („čtyřicet os
 | VO11 | hotovo | 2026-11-26 | Sezení `zakaziq-e2`, `baf0150`, sloučeno do `admin/voice-mac` (`b61a007`): okno s pěti záložkami, čísla z `/stats` s cache, slovník `/terms`, styl a soukromí `/settings`, SMAppService, úvod; ověřeno ladicím snímkem všech záložek s vymyšlenými daty (`ZAKAZIQ_VOICE_DEMO=1`, jen DEBUG), za běhu proti serveru a s místní historií neověřeno. Napojení na menu, lištu a `LocalDB` `1095f01` |
 | VO12 | čeká | | |
 | doplněk | v kódu | 2026-11-27 | Na přání Kryštofa: diktát končí i Enterem (pohltí se) a po 10 s ticha (jen bez držení); po diktátu výchozí **karta s přepisem a tlačítkem Zkopírovat** místo vložení (Nastavení › Diktování › Po diktátu, druhá volba Vložit text). 104 testů, vzhled karty ze snímku, nainstalováno. **Naostro neověřeno** (Enter v Claude Code, 10 s ticha s hlukem v místnosti) |
+| schůzky | v kódu | 2026-11-27 | R-151: online schůzka až 2 h, mikrofon + zvuk počítače (Core Audio tap) zvlášť, promluvy po pauzách na server během hovoru, přepis rozhovoru, shrnutí Claude na kliknutí, záložka Schůzky na Macu i v adminu, migrace 139. Ověřeno: testy (server 14, Mac 114), tap naostro zachytil `say` a přepis seděl slovo od slova, admin na dočasné stránce 1280 a 390 px. **Neověřeno:** skutečná schůzka, migrace 139 a nasazení |
 
 ---
 

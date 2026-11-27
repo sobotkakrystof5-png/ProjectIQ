@@ -81,6 +81,23 @@ struct FlowBarView: View {
     case .processing:
       DilkyMark(tile: tile, mode: .spin, reduceMotion: model.reduceMotion)
         .opacity(model.reduceMotion ? 0.7 : 1)
+    case .meeting:
+      HStack(spacing: 10) {
+        DilkyMark(tile: tile, mode: .level(model.meetingLevel), reduceMotion: model.reduceMotion)
+        Text("Schůzka")
+          .font(DilkyFont.sans(12, weight: 500))
+          .foregroundStyle(Color.white)
+        Spacer(minLength: 0)
+        Text(verbatim: BarLayout.elapsedText(model.meetingElapsed))
+          .font(DilkyFont.mono(11, weight: 500))
+          .foregroundStyle(Dilky.navy200)
+          .monospacedDigit()
+        BarButton(label: "Ukončit schůzku") {
+          RoundedRectangle(cornerRadius: 2, style: .continuous).fill(Color.white).frame(width: 9, height: 9)
+        } action: { model.stopMeeting() }
+      }
+      .padding(.leading, 14)
+      .padding(.trailing, 4)
     case .message(let message):
       HStack(spacing: 10) {
         DilkyMark(tile: tile, mode: .solid, reduceMotion: model.reduceMotion)
@@ -110,6 +127,7 @@ struct FlowBarView: View {
     switch model.stage {
     case .hidden, .idle, .done: return "ZakazIQ Voice. " + VoiceMessages.barHint(model.shortcut)
     case .listening: return "ZakazIQ Voice nahrává, \(BarLayout.elapsedText(model.elapsed))"
+    case .meeting: return "ZakazIQ Voice nahrává schůzku, \(BarLayout.elapsedText(model.meetingElapsed))"
     case .processing: return "ZakazIQ Voice zpracovává diktát"
     case .message(let message): return message.text
     }

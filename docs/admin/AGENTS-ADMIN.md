@@ -1779,6 +1779,23 @@ Tady jen to, co je v kódu.
   blokovaná fráze, rozbor AI s podvrženou odpovědí, pondělí, „jen čísla", úklid; naučené slovo v nápovědě přepisu
   i v promptu čištění), route testy v `dictate.test.ts` (`/feedback`, `/terms`, `/settings`: 404, 409, 400, 413,
   401, 403, limit 429).
+- **Schůzky (R-151, migrace 139):** online schůzka až 2 h. Mac nahrává dvě stopy zvlášť — mikrofon (`me`,
+  Kryštof) přes `AVAudioEngine` a zvuk počítače (`other`, druhá strana) přes Core Audio tap
+  (`voice-mac/…/Meeting/SystemAudioCapture.swift`, macOS 14.2+, oprávnění Nahrávání zvuku systému). `TrackRecorder`
+  převede stopu na 16 kHz mono, `TurnSegmenter` (Core, testy) ji dělí na promluvy (náběh 300 ms, konec po 1,2 s ticha,
+  po 45 s v první pauze, natvrdo v 60 s, pod 300 ms řeči nic) a `MeetingUploader` je posílá dvě naráz už během hovoru.
+  Server: `POST /api/public/voice/meetings` (založení, id z Macu), `POST …/[id]/turns` (multipart `meta` + `audio`
+  do 768 kB, přepis s G1–G5, G12 a slovníkem, **bez čištění modelem**, `lib/admin/voice/meeting-turn.ts`),
+  `POST …/[id]/finish`, `GET …/[id]` a `GET /meetings` (přepis a seznam), `POST …/[id]/summary` (Claude `smart`,
+  `lib/admin/voice/meeting-summary.ts`), `DELETE …/[id]`. Přepis skládá `buildTranscript`
+  (`lib/admin/voice/meeting-transcript.ts`): promluvy podle času, téhož mluvčího s mezerou do 30 s v jednom odstavci,
+  **ozvěna** (promluva z mikrofonu, která se z ≥ 50 % kryje s druhou stranou a má ≥ 60 % stejných slov) se vynechá.
+  Admin: `/dashboard/voice?tab=schuzky&schuzka=<id>` (seznam, shrnutí, přepis, přiřazení ke kontaktu, přejmenování,
+  smazání; akce v `app/voice-actions.ts`). Na Macu záložka Schůzky v okně, položka Začít/Ukončit schůzku v menu,
+  lišta ve stavu `meeting`; během schůzky se nediktuje. Text natrvalo do smazání; DECISIONS #058. Testy
+  `lib/admin/voice/__tests__/meeting-{transcript,turn}.test.ts`, `app/api/public/voice/meetings/__tests__/meetings.test.ts`,
+  `voice-mac/Tests/…/MeetingTests.swift`; ladicí `ZAKAZIQ_VOICE_MEETING_TEST=/složka` (jen debug) nahraje schůzku
+  bez serveru do souborů.
 - **Aplikace na Macu (VO03, `voice-mac/`, postup v `voice-mac/README.md`):** Swift balíček bez cizích závislostí
   (nástroje Swift 6, jazykový režim 5, macOS 14), dva cíle: **`ZakazIQVoiceCore`** (logika bez rozhraní, kterou
   pokrývají testy) a **`ZakazIQVoice`** (aplikace, AppKit + SwiftUI). Sestavení `make -C voice-mac test app install`

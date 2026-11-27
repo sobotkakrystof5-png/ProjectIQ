@@ -81,6 +81,7 @@ struct HubRootView: View {
     switch hub.tab {
     case .home: HomeView(hub: hub, app: app)
     case .history: HistoryView(hub: hub)
+    case .meetings: MeetingsView(model: hub.meetings)
     case .dictionary: DictionaryView(hub: hub)
     case .style: StyleView(hub: hub)
     case .settings: HubSettingsView(hub: hub, app: app)

@@ -11,6 +11,8 @@ public enum BarStage: Equatable, Sendable {
   /// Dílky krátce bliknou (300 ms) a lišta se vrátí do klidu.
   case done
   case message(BarMessage)
+  /// Probíhá schůzka (R-151): čas a tlačítko Ukončit.
+  case meeting
 }
 
 public struct BarMessage: Equatable, Sendable {
@@ -50,6 +52,7 @@ public enum BarLayout {
     case .listening(.handsFree): return CGSize(width: 252, height: 36)
     case .processing: return CGSize(width: 96, height: 28)
     case .message(let message): return CGSize(width: messageWidth(message.text), height: 32)
+    case .meeting: return CGSize(width: 236, height: 36)
     }
   }
 
@@ -65,7 +68,7 @@ public enum BarLayout {
     switch stage {
     case .hidden: return 0
     case .idle, .done: return hovering ? 10 : 4
-    case .listening, .message: return 8
+    case .listening, .message, .meeting: return 8
     case .processing: return 7
     }
   }
@@ -92,6 +95,8 @@ public enum BarLayout {
   /// Čas nahrávky na liště: „0:07", „9:30".
   public static func elapsedText(_ seconds: TimeInterval) -> String {
     let total = max(0, Int(seconds.rounded(.down)))
+    // Schůzka (R-151) trvá i přes hodinu: „1:05:09".
+    if total >= 3600 { return "\(total / 3600):" + String(format: "%02d:%02d", (total % 3600) / 60, total % 60) }
     return "\(total / 60):" + String(format: "%02d", total % 60)
   }
 }

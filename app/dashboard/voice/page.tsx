@@ -8,10 +8,14 @@ import { VoiceDevicesPanel } from '@/components/admin/voice/devices-panel'
 import { VoiceDictionaryPanel } from '@/components/admin/voice/dictionary-panel'
 import { VoiceHistoryView } from '@/components/admin/voice/history'
 import { VoiceLearningPanel } from '@/components/admin/voice/learning-panel'
+import { VoiceMeetingDetail, VoiceMeetingsList } from '@/components/admin/voice/meetings'
 import { RunLearningButton } from '@/components/admin/voice/run-learning'
 import { VoiceOverviewView } from '@/components/admin/voice/overview'
 import { VoiceDeleteCard, VoiceSettingsForm } from '@/components/admin/voice/settings-panel'
 import { isVoiceKeyConfigured } from '@/lib/admin/voice/keys'
+import { isMissingVoiceSchema } from '@/lib/admin/voice/devices'
+import { listMeetings, loadMeeting } from '@/lib/admin/voice/meetings'
+import { isAiConfigured } from '@/lib/ai/models'
 import { isDictationStatus } from '@/lib/admin/voice/labels'
 import {
   SEARCH_MAX,
@@ -36,6 +40,7 @@ const PATH = '/dashboard/voice'
 const TABS = [
   { key: 'prehled', label: 'Přehled' },
   { key: 'historie', label: 'Historie' },
+  { key: 'schuzky', label: 'Schůzky' },
   { key: 'uceni', label: 'Učení' },
   { key: 'slovnik', label: 'Slovník' },
   { key: 'nastaveni', label: 'Nastavení' },
@@ -54,8 +59,36 @@ function MissingTables() {
   )
 }
 
-async function tabContent(tab: Tab, filter: HistoryFilter): Promise<{ body: React.ReactNode; pending: number | null }> {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Schůzky (R-151): seznam vlevo, vybraná schůzka vpravo (na telefonu pod sebou). */
+async function meetingsContent(meetingId: string | null): Promise<React.ReactNode> {
+  try {
+    const id = meetingId && UUID_RE.test(meetingId) ? meetingId : null
+    const [meetings, detail] = await Promise.all([listMeetings(null), id ? loadMeeting(id, null) : Promise.resolve(null)])
+    const active = detail ?? (meetings[0] ? await loadMeeting(meetings[0].id, null) : null)
+    return (
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <VoiceMeetingsList meetings={meetings} activeId={active?.id ?? null} />
+        {active && <VoiceMeetingDetail meeting={active} aiReady={isAiConfigured()} />}
+      </div>
+    )
+  } catch (err) {
+    if (isMissingVoiceSchema(err)) {
+      return (
+        <Card>
+          <p className="text-sm text-quiet">Databáze ještě nemá tabulky schůzek. Až proběhne migrace 139, uvidíte tady přepisy schůzek.</p>
+        </Card>
+      )
+    }
+    throw err
+  }
+}
+
+async function tabContent(tab: Tab, filter: HistoryFilter, meetingId: string | null): Promise<{ body: React.ReactNode; pending: number | null }> {
   switch (tab) {
+    case 'schuzky':
+      return { body: await meetingsContent(meetingId), pending: null }
     case 'historie': {
       const res = await loadVoiceHistory(filter)
       if (!res.ok) return { body: <MissingTables />, pending: null }
@@ -131,7 +164,7 @@ export default async function VoicePage({ searchParams }: { searchParams: Promis
   const status = one(params.stav)
   const filter: HistoryFilter = { query, status: isDictationStatus(status) ? status : null }
 
-  const { body, pending } = await tabContent(tab, filter)
+  const { body, pending } = await tabContent(tab, filter, one(params.schuzka) ?? null)
 
   return (
     <PageShell width="wide">

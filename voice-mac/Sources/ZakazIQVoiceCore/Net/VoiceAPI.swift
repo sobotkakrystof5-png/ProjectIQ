@@ -367,7 +367,7 @@ public struct FeedbackResult: Decodable, Equatable, Sendable {
 /// `VoiceClient` (klíč jen v hlavičce, bez cookie, bez přesměrování, bez `Origin`).
 public struct VoiceAPI: Sendable {
   public let base: URL
-  private let key: String
+  let key: String
   private let transport: VoiceTransport
 
   public init(base: URL, key: String, transport: VoiceTransport = URLSessionTransport()) {
@@ -440,7 +440,7 @@ public struct VoiceAPI: Sendable {
     return components.url ?? url
   }
 
-  private func send<T: Decodable>(_ request: URLRequest, as type: T.Type) async -> Result<T, VoiceError> {
+  func send<T: Decodable>(_ request: URLRequest, as type: T.Type) async -> Result<T, VoiceError> {
     do {
       let (data, response) = try await transport.send(request)
       return VoiceClient.parse(T.self, data: data, status: response.statusCode)

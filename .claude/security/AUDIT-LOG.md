@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-27 — review: ZakazIQ Voice, schůzky s klientem (R-151)
+Spouštěč: před commitem a nasazením (`web-security-review`)
+Rozsah: `/api/public/voice/meetings/**` (5 vstupů), `lib/admin/voice/meeting*.ts`, nové rozsahy v `lib/admin/voice/http.ts`, admin akce schůzek v `app/voice-actions.ts`, záložka Schůzky (`components/admin/voice/meeting*.tsx`, `app/dashboard/voice/page.tsx`), migrace 139, aplikace na Macu (`Meeting/*`, `Window/Meetings*.swift`, `Info.plist`)
+Výsledek: 1 nález opravený, jinak bez nálezu. Prošlo: klíč zařízení a `Origin` 403 před čtením těla u všech 5 vstupů; vlastnictví schůzky (`device_id`) u čtení, promluvy, konce, shrnutí i smazání (test s cizím zařízením: 404, žádné volání přepisu); Zod u `meta`, JSON i id z URL; zvuk podle prvních bajtů; SQL jen s parametry (pevné části dotazu jsou konstanty); žádný `NEXT_PUBLIC_` ani klíč v klientu; přepis a shrnutí v adminu i na Macu jen jako text (0× `dangerouslySetInnerHTML`); admin akce za `requireAuth`, kontakt jen UUID (cizí klíč); log jen název chyby; přepis jde modelu v `<prepis>` bez značek, výstup přes Zod se zkrácením
+Nálezy: (1) Fix before launch — strop zvuku promluvy 2 MB (~8 min zvuku při 32 kbit/s), přitom promluva smí mít nejvýš 2 min; s ukradeným klíčem by šlo platit přepis zbytečně dlouhého zvuku, při 3 000 promluvách/h až stovky hodin zvuku za hodinu
+Opraveno: strop `TURN_MAX_AUDIO_BYTES` 768 kB a rozsah `meeting` 1 500/h (`lib/admin/voice/{meeting-turn,http}.ts`), DECISIONS #058 (c)
+Zůstává: přijatá rizika v DECISIONS #058 (text natrvalo, tap nahraje vše, co Mac přehraje, shrnutí mimo denní strop, fronta bez sítě jen v paměti)
+
 ## 2026-11-26 — review: ZakazIQ Voice VO08, učení z oprav a zápis z Macu
 Spouštěč: před commitem (`web-security-review`)
 Rozsah: necommitnutý diff nad `e54865c` na větvi `admin/zakaziq-voice` — `app/api/public/voice/{feedback,terms,settings}/route.ts`, `lib/admin/voice/{learn,learner,retention,http}.ts`, cron `send-reminders` a `client-retention`, akce `runVoiceLearning`, tajemství v diffu.

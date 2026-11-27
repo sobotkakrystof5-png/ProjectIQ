@@ -1835,10 +1835,28 @@ test VO00 ukázal, že přepis s nápovědou slovníku na tichu vrátí celou n�
 v `lib/ai/models.ts`, ceny v `lib/admin/voice/costs.ts`. Zpracovatel Groq do `.claude/security/DECISIONS.md`
 ve VO02. Žádný nový npm balíček.
 
+### R-151 · Schůzky v ZakazIQ Voice: dvě stopy, přepis natrvalo, shrnutí na kliknutí (2026-11-27)
+**Rozhodnutí:** (1) ZakazIQ Voice umí nahrát **online** schůzku s klientem (Meet, Zoom, WhatsApp v počítači)
+až na **2 hodiny**: mikrofon (Kryštof) a zvuk počítače (druhá strana) zvlášť, takže je jisté, kdo mluví. Osobní
+schůzky u jednoho stolu se nedělají. (2) Přepis a shrnutí jsou **na Macu i v adminu** (Voice › Schůzky, přiřazení
+ke kontaktu). (3) Text schůzek zůstává **natrvalo, dokud ho Kryštof nesmaže**. (4) Shrnutí dělá Claude `smart` jen
+na kliknutí; přepis se nečeše modelem. (5) Během schůzky se nediktuje.
+**Proč:** Kryštof 2026-11-27 („přepisuje mně i klienta, na konci uvidím přepis a nechám si to shrnout"); volby
+„Jen online", „Mac i admin", „Natrvalo". Dvě stopy jsou přesnější a levnější než rozpoznávání hlasů modelem.
+Promluvy se posílají během hovoru, aby byl přepis po konci hned.
+**Důsledek:** migrace 139 (`voice_meetings`, `voice_meeting_turns`), vstupy `/api/public/voice/meetings/**`,
+nové oprávnění na Macu (Nahrávání zvuku systému, macOS 14.2+). Zrušené Schůzky z Wispr Flow (R-145) se nevrací,
+tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika `docs/admin/AGENTS-ADMIN.md` → Schůzky.
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Schůzky ve Voice (R-151) — nasadit a vyzkoušet:** kód na větvi `admin/voice-schuzky`, necommitnutý.
+  Zbývá: (1) migrace 139 na produkci (souhlas Kryštofa), (2) sloučit do `main` a nasadit, (3) `make -C voice-mac install`,
+  (4) zkušební online schůzka (Meet se sluchátky i bez nich, aspoň 10 minut): přepis obou stran, ozvěna bez sluchátek,
+  Shrnout pomocí AI, přiřazení ke kontaktu v adminu, (5) co dělá tap při přepnutí výstupu (AirPods během hovoru —
+  tap zůstane na původním zařízení). Fronta promluv bez sítě přežije jen do ukončení aplikace · od 2026-11-27
 - [ ] **ZakazIQ Voice — milník 1 naostro (VO04–VO06):** po certifikátu „ZakazIQ Voice vývoj" `make -C voice-mac run`
   (z větve `admin/voice-mac`), povolit Mikrofon, Sledování vstupu a Zpřístupnění, klíč zařízení z adminu, pak:
   podržet fn a mluvit v TextEditu, Mailu, Zprávách, Slacku, Safari, Terminálu a Claude (zapsat do plánu, kde vložení
@@ -2327,6 +2345,21 @@ ve VO02. Žádný nový npm balíček.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-27 (ZakazIQ Voice — schůzky s klientem, R-151)
+- **feat** Mac: Začít/Ukončit schůzku (menu, okno, lišta s časem), mikrofon přes `AVAudioEngine` a zvuk počítače
+  přes Core Audio tap, `TurnSegmenter` dělí stopy na promluvy podle pauz, `MeetingUploader` je posílá dvě naráz už
+  během hovoru, po konci záložka Schůzky s přepisem, Zkopírovat přepis, Shrnout pomocí AI, Otevřít v adminu.
+  Limit 2 h s upozorněním 5 min předem, během schůzky se nediktuje. Soubory `voice-mac/Sources/ZakazIQVoice/Meeting/`,
+  `ZakazIQVoiceCore/Meeting/`, `Window/Meetings{Model,View}.swift`, `Bar/*`, `App/AppDelegate.swift`, `Info.plist`.
+- **feat** Server: `/api/public/voice/meetings` (+ `[id]`, `turns`, `finish`, `summary`), `lib/admin/voice/meeting-{turn,transcript,summary}.ts`,
+  `meetings.ts`; přepis s G1–G5, G12 a slovníkem bez čištění, skládání rozhovoru s vynecháním ozvěny, shrnutí Claude `smart`.
+  Admin `/dashboard/voice?tab=schuzky` (seznam, detail, shrnutí, kontakt, přejmenování, smazání).
+- **db** Migrace 139 `voice_schuzky` (aplikována: ne, nikde).
+- **chore** Ověřeno: `npx tsc --noEmit`, vitest 233 (Voice, hlídací testy adminu a XSS; nové 14), `swift test` 114
+  (nové 10), naostro tap: zvuk z `say` → promluva druhé strany 6,6 s → `gpt-4o-transcribe` vrátil větu přesně;
+  admin na dočasné stránce 1280 a 390 px (opraveno přetečení tlačítek na telefonu, stránka smazaná).
+  **Skutečná schůzka, nasazení a migrace neověřené.**
 
 ### 2026-11-27 (ZakazIQ Voice — konec Enterem a tichem, karta s přepisem)
 - **feat** Diktát na Macu končí i **Enterem** (během nahrávání se pohltí i s opakováním a puštěním, do Claude Code

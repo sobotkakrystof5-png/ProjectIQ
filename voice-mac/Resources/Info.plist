@@ -33,6 +33,8 @@
   <true/>
   <key>NSHumanReadableCopyright</key>
   <string>ZakazIQ · Kryštof Sobotka</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>ZakazIQ Voice nahrává zvuk hovoru jen během schůzky, kterou sami spustíte, aby přepis obsahoval i druhou stranu.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>ZakazIQ Voice nahrává váš hlas jen během diktování, aby ho přepsal na text.</string>
   <!-- Vývoj proti http://localhost:3000. Jinam aplikace nešifrovaně nepustí (ServerAddress). -->

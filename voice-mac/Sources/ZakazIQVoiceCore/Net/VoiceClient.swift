@@ -79,7 +79,8 @@ public struct URLSessionTransport: VoiceTransport {
     config.httpShouldSetCookies = false
     config.urlCache = nil
     config.timeoutIntervalForRequest = request.timeoutInterval
-    config.timeoutIntervalForResource = 120
+    // Shrnutí schůzky (R-151) smí trvat až 5 minut, ostatní požadavky 2 minuty.
+    config.timeoutIntervalForResource = max(120, request.timeoutInterval)
     let session = URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
     defer { session.finishTasksAndInvalidate() }
     let (data, response) = try await session.data(for: request)
