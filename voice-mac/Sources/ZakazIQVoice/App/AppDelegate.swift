@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     DilkyFont.register()
+    NSApp.mainMenu = MainMenu.make()
     setUpStatusItem()
     let bar = FlowBarPanel(model: dictation.bar)
     bar.placeOnCursorScreen()

@@ -2328,6 +2328,11 @@ ve VO02. Žádný nový npm balíček.
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
 
+### 2026-11-27 (ZakazIQ Voice — vložení do polí)
+- **fix** V okně aplikace nešlo nic vložit ⌘V (ani ⌘C, ⌘X, ⌘A, ⌘Z): aplikace v liště menu neměla hlavní menu
+  a AppKit zkratky v polích hledá v něm. Skryté hlavní menu s Úpravami a „Zavřít okno" ⌘W,
+  `voice-mac/Sources/ZakazIQVoice/App/MainMenu.swift`. Ověřeno sestavením a `make run`; vložení klíče zkouší Kryštof.
+
 ### 2026-11-26 (ZakazIQ Voice — VO04, VO05, VO06 a VO11 na Macu, R-150)
 - **feat** VO04 Fn a nahrávání (`8a8cf95`): `FnMonitor` (CGEventTap, pohltí jen Esc), stavový automat
   `DictationTrigger` (držení 0,3 s, dvojí stisk, Esc, 10 min, pole pro heslo), `Recorder` m4a 16 kHz mono
