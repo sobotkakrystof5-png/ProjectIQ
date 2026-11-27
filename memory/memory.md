@@ -1871,9 +1871,8 @@ Bezpečnost DECISIONS #023 a #042 doplnění.
 
 ## 3. Otevřené problémy
 
-- [ ] **Fakturační údaje klienta (R-153) — migrace 140 a průchod naživo:** kód na produkci od 2026-11-27
-  (`7cfd718`), migrace 140 není aplikovaná nikde (aditivní; do té doby chybí telefon a e-mail na faktuře a sídlo
-  kontaktu). Ověřeno testy nad PGlite, `tsc` a vzhled obou formulářů na dočasné stránce
+- [ ] **Fakturační údaje klienta (R-153) — průchod naživo:** kód na produkci od 2026-11-27 (`7cfd718`),
+  migrace 140 taky (testovací Neon ji nemá). Ověřeno testy nad PGlite, `tsc` a vzhled obou formulářů na dočasné stránce
   s vymyšlenými daty (1280 a 390 px); za přihlášením ne. Projít: Kontakty › karta (Sídlo, Načíst z rejstříku,
   Uložit → koncept faktury té zakázky má nové sídlo), `/dashboard/faktury/nova` (výběr zakázky doplní vše včetně
   telefonu, PDF má e-mail a telefon odběratele), po vystavení má kontakt IČO a sídlo · Kryštof · od 2026-11-27
@@ -2384,12 +2383,15 @@ Bezpečnost DECISIONS #023 a #042 doplnění.
   Soubory: `lib/admin/{contact-sync,contacts}.ts`, `app/contacts-actions.ts`, `components/admin/contacts/contact-form.tsx`,
   `app/dashboard/kontakty/[id]/page.tsx`.
 - **db** Migrace 140 `fakturacni_udaje_klienta` (`contacts.address`, `invoices.client_contact`, nová těla
-  `admin_invoice_issue`, `admin_invoice_locked`, `portal.put_invoice`). Aplikována: ne.
+  `admin_invoice_issue`, `admin_invoice_locked`, `portal.put_invoice`). **Aplikovaná na produkci** 2026-11-27
+  (Neon MCP v jedné transakci na souhlas Kryštofa, s kontrolou otisků těl funkcí proti souboru, zapsaná
+  v `public.schema_migrations`). Ověřeno: oba sloupce, kontrola `invoices_client_contact_check`, md5 všech tří
+  těl, `put_invoice` dál `SECURITY DEFINER`, `portal_app` bez práva spouštět. Testovací Neon ne.
 - **chore** Ověřeno: `npx tsc --noEmit`, nové testy `admin-fakturacni-udaje.test.ts` (9, migrace 140 dvakrát
   po sobě), `invoice-prefill.test.ts` (5) a 6 v `admin-fakturace.test.ts`; testy faktur, konceptů, kontaktů,
   asistenta, tříd adminu, XSS a číslování migrací 207 prošlo. Formuláře na dočasné stránce 1280 a 390 px (bez
   přetečení, stránka smazaná). **Za přihlášením a PDF okem neověřeno.**
-- **chore** **Na produkci** 2026-11-27: `7cfd718` (`dpl_BiaH…` Ready), bez migrace 140. Plná sada 2176 testů
+- **chore** **Na produkci** 2026-11-27: `7cfd718` (`dpl_BiaH…` Ready), migrace 140 hned po něm. Plná sada 2176 testů
   a `npm run build` prošly; veřejně `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard`,
   `/dashboard/faktury/nova` a `/dashboard/kontakty` 307, `/p/<nesmysl>` 404, 15 min bez běhových chyb.
 
