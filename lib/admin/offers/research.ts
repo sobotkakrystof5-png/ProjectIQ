@@ -4,9 +4,12 @@ import { createNotification } from '@/lib/notifications'
 import { safeHttpUrl, stripControlChars } from '@/lib/security/html'
 import { fireRoutine, routineConfigured, type FireRoutine } from './routine'
 import { normalizeResult, readStoredResult, RESULT_JSON_SCHEMA, type OfferResearchResult } from './result'
+import { createProposalAfterResearch } from './proposals'
 
 /**
  * Rozbor firmy pro navrhovač nabídek (R-147, krok N1; běh podle R-149).
+ *
+ * Po odevzdání se rovnou připraví návrh nabídky (`proposals.ts`, N2).
  *
  * Tok: Kryštof u kontaktu klikne → `startResearch` založí řádek ve frontě
  * (`queued`) a spustí cloudovou úlohu Claude Code (`fireRoutine`) → úloha si
@@ -336,10 +339,12 @@ export async function submitResult(id: string, input: unknown): Promise<SubmitOu
   if (!row) return whyNotRunning(id)
 
   if (row.contact_id !== null) {
+    // Návrh nabídky se třemi variantami (N2) se připraví hned; když selže, rozbor zůstává.
+    await createProposalAfterResearch(id)
     await createNotification({
       type: 'offer_research_done',
       title: `Rozbor firmy je hotový: ${(row.company ?? 'firma').slice(0, 120)}`,
-      body: 'Podklad pro nabídku čeká na kartě kontaktu.',
+      body: 'Návrh nabídky se třemi variantami čeká na kartě kontaktu.',
       link: `/dashboard/kontakty/${row.contact_id}`,
     })
   }

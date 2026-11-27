@@ -9,7 +9,7 @@
 export type NavIcon =
   | 'today' | 'projects' | 'done' | 'requests' | 'inbox'
   | 'calendar' | 'calls' | 'contacts' | 'invoices' | 'costs' | 'finance' | 'clients' | 'news'
-  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services' | 'messages' | 'voice'
+  | 'personal' | 'startup' | 'bell' | 'profile' | 'assistant' | 'services' | 'messages' | 'voice' | 'offers'
 
 export type CountKey = 'requests' | 'leads' | 'notifications' | 'drafts' | 'messages'
 
@@ -52,6 +52,8 @@ export const ADMIN_NAV: NavGroup[] = [
       // Hovory z Growth OS: kontakty od robota, denní reporty a analýza (R-118).
       { href: '/dashboard/ai-asistent', label: 'AI asistent', icon: 'assistant' },
       { href: '/dashboard/kontakty', label: 'Kontakty', icon: 'contacts' },
+      // Navrhovač nabídek (R-147, R-155): odeslané nabídky, vyhodnocení a cenová pravidla.
+      { href: '/dashboard/nabidky', label: 'Nabídky', icon: 'offers' },
       { href: '/dashboard/calendar', label: 'Kalendář', icon: 'calendar' },
       // Hodnocení v menu není (AD11, R-090): je na zakázce, souhrn na Profilu.
     ],

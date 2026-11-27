@@ -50,6 +50,9 @@ export type LeadEmailTarget = {
   estimatedValue?: number | string | null
 }
 
+/** Nabídka z navrhovače (R-155): okno otevře šablonu Nabídka s odkazem na stránku nabídky. */
+export type LeadEmailOffer = { id: string; url: string; price: number }
+
 const TEMPLATE_ICON: Record<LeadMailTemplateId, React.ReactNode> = {
   portfolio: <Briefcase size={18} strokeWidth={1.5} aria-hidden="true" />,
   nabidka: <Tag size={18} strokeWidth={1.5} aria-hidden="true" />,
@@ -74,13 +77,17 @@ export function LeadEmailDialog({
   target,
   readiness,
   onClose,
+  offer,
+  onSent,
 }: {
   target: LeadEmailTarget
   readiness: LeadEmailReadiness
   onClose: () => void
+  offer?: LeadEmailOffer
+  onSent?: () => void
 }) {
   const [pending, start] = useTransition()
-  const [template, setTemplate] = useState<LeadMailTemplateId | null>(null)
+  const [template, setTemplate] = useState<LeadMailTemplateId | null>(offer ? 'nabidka' : null)
   const first = useMemo(() => initialSlot(target), [target])
   const [date, setDate] = useState(first.date)
   const [time, setTime] = useState(first.time)
@@ -88,7 +95,7 @@ export function LeadEmailDialog({
   const [subjectEdited, setSubjectEdited] = useState<string | null>(null)
   const [bodyEdited, setBodyEdited] = useState<string | null>(null)
   // Cena se u každé zakázky říká jinak; výchozí je odhadovaná hodnota kontaktu.
-  const [price, setPrice] = useState(formatPrice(target.estimatedValue))
+  const [price, setPrice] = useState(formatPrice(offer ? offer.price : target.estimatedValue))
 
   const startsAt = pragueDateTimeToISO(date, time)
   const defaults = useMemo(
@@ -99,15 +106,16 @@ export function LeadEmailDialog({
             nextCallDate: target.nextActionDate ?? null,
             startsAt,
             price,
+            offerUrl: template === 'nabidka' ? (offer?.url ?? null) : null,
           })
         : null,
-    [template, target.nextActionDate, startsAt, price],
+    [template, target.nextActionDate, startsAt, price, offer?.url],
   )
   const subject = subjectEdited ?? defaults?.subject ?? ''
   const body = bodyEdited ?? defaults?.body ?? ''
 
   const meeting = template === 'schuzka'
-  const offer = template === 'nabidka'
+  const offerTemplate = template === 'nabidka'
   const blocker = meeting
     ? !readiness.google
       ? 'google'
@@ -121,7 +129,7 @@ export function LeadEmailDialog({
     blocker === null &&
     subject.trim() !== '' &&
     body.trim() !== '' &&
-    (!offer || price.trim() !== '') &&
+    (!offerTemplate || price.trim() !== '') &&
     (!meeting || startsAt !== null)
 
   const choose = (id: LeadMailTemplateId) => {
@@ -140,12 +148,14 @@ export function LeadEmailDialog({
         subject,
         body,
         ...(meeting ? { date, time, minutes } : {}),
+        ...(offer && template === 'nabidka' ? { offerId: offer.id } : {}),
       })
       if (!result.ok) {
         toast.error(result.error)
         return
       }
       toast.success(result.message)
+      onSent?.()
       onClose()
     })
   }
@@ -236,7 +246,7 @@ export function LeadEmailDialog({
               </>
             )}
 
-            {offer && (
+            {offerTemplate && (
               <label className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium text-ink">Cena za tuhle zakázku</span>
                 <Input
@@ -247,7 +257,9 @@ export function LeadEmailDialog({
                 />
                 <span className="text-xs text-quiet">
                   {price.trim() === '' ? 'Bez ceny nabídku odeslat nejde. ' : ''}
-                  Cena se vloží do textu; po ručním přepsání textu ji měňte přímo v něm.
+                  {offer
+                    ? 'Doporučená varianta z nabídky. Odkaz na celou nabídku je v textu, začne fungovat po odeslání.'
+                    : 'Cena se vloží do textu; po ručním přepsání textu ji měňte přímo v něm.'}
                 </span>
               </label>
             )}

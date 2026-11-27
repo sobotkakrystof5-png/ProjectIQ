@@ -11,6 +11,10 @@ import { safeHttpUrl, stripControlChars } from '@/lib/security/html'
  *
  * Pravidlo B10 drží server, ne model: tvrzení bez platného zdroje se zahodí.
  * Odhad typické zakázky smí být bez zdroje, ale pak má vždy nízkou jistotu.
+ *
+ * Verze 2 (N2, R-155) přidává `value` (odhad, kolik web klientovi přinese)
+ * a `offer` (pozice v cenovém pásmu a obsah variant). **Ceny model neposílá**,
+ * spočítá je server z pravidel (`pricing.ts`). Texty pro klienta jsou bez odkazů.
  */
 
 const MAX_SOURCES = 40
@@ -40,7 +44,7 @@ const nullable = (type: string, description: string) => ({ type: [type, 'null'],
 export const RESULT_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['sources', 'web', 'company', 'reviews', 'typical_job', 'competitors', 'signals', 'warnings', 'ask_client'],
+  required: ['sources', 'web', 'company', 'reviews', 'typical_job', 'competitors', 'signals', 'warnings', 'ask_client', 'value', 'offer'],
   properties: {
     sources: {
       type: 'array',
@@ -145,6 +149,65 @@ export const RESULT_JSON_SCHEMA = {
       items: { type: 'string' },
       description: 'Co se nepodařilo zjistit a je potřeba se zeptat klienta. Krátké otázky.',
     },
+    value: {
+      type: 'object',
+      additionalProperties: false,
+      description: 'Odhad, kolik dobrý web klientovi přinese. Je to odhad, ne fakt: vždy s předpoklady.',
+      required: ['inquiries_per_month_min', 'inquiries_per_month_max', 'win_rate', 'current_loss', 'assumptions', 'confidence', 'sources'],
+      properties: {
+        inquiries_per_month_min: nullable('integer', 'Kolik poptávek měsíčně může dobrý web firmě přinést, spodní odhad.'),
+        inquiries_per_month_max: nullable('integer', 'Totéž, horní odhad.'),
+        win_rate: nullable('number', 'Jaký podíl poptávek se v oboru obvykle změní v zakázku, číslo 0–1 (0.3 = 30 %).'),
+        current_loss: { type: 'string', description: 'Jednou až dvěma větami: o co firma dnes bez dobrého webu přichází.' },
+        assumptions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Předpoklady odhadu, každý jednou větou (např. „v okolí hledá službu měsíčně kolem 200 lidí").',
+        },
+        confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+        sources: { type: 'array', items: { type: 'integer' }, description: 'Odkud předpoklady jsou, pokud nějaký zdroj mají.' },
+      },
+    },
+    offer: {
+      type: 'object',
+      additionalProperties: false,
+      description: 'Podklad pro tři varianty nabídky. Ceny nepiš, spočítá je server podle pravidel.',
+      required: ['kind', 'position', 'position_reason', 'plus_system', 'extras', 'client_intro'],
+      properties: {
+        kind: {
+          type: 'string',
+          enum: ['web', 'eshop'],
+          description: 'eshop jen když firma prodává zboží a dává smysl prodávat ho online, jinak web.',
+        },
+        position: {
+          type: 'string',
+          enum: ['low', 'mid', 'high'],
+          description: 'Kde v cenovém pásmu firma je podle všeho, co o ní víš: velikost, obrat, recenze, aktivita, kolik si může dovolit.',
+        },
+        position_reason: { type: 'string', description: 'Jedna věta, proč tahle pozice. Jen pro Kryštofa.' },
+        plus_system: {
+          type: 'string',
+          enum: ['rezervace', 'eshop', 'jine'],
+          description: 'Jaký systém navíc dává ve variantě Plus smysl: rezervace termínů, e-shop, nebo jiné.',
+        },
+        extras: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['zaklad', 'doporucena', 'plus'],
+          description: 'Nejvýš tři položky navíc ke každé variantě, šité na firmu (konkrétní služby, co klientům chybí). Pro klienta, bez cen a odkazů.',
+          properties: {
+            zaklad: { type: 'array', items: { type: 'string' } },
+            doporucena: { type: 'array', items: { type: 'string' } },
+            plus: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        client_intro: {
+          type: 'string',
+          description:
+            'Odstavec pro klienta, 2–4 věty, oslovení vy: co mu web přinese. Bez údajů z rešerše (obrat, recenze, konkurence), bez cen a odkazů.',
+        },
+      },
+    },
   },
 } as const
 
@@ -161,6 +224,24 @@ const optionalText = (max: number) => text(max).transform((v) => (v === '' ? nul
 const indexList = z
   .unknown()
   .transform((v) => (Array.isArray(v) ? v.filter((n): n is number => Number.isInteger(n)).slice(0, 10) : []))
+
+/** Text, který uvidí klient: bez odkazů a adres (obsah cizích webů nesmí klientovi podstrčit odkaz). */
+export function stripLinks(value: string): string {
+  return value
+    .replace(/\b(?:https?:\/\/|www\.)\S+/gi, '')
+    .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const clientText = (max: number) => text(max * 2).transform((v) => stripLinks(v).slice(0, max))
+
+const extraList = z
+  .unknown()
+  .transform((v) => (Array.isArray(v) ? v.slice(0, 3) : []))
+  .pipe(z.array(clientText(120)))
+  .transform((list) => list.filter((x) => x !== ''))
 
 const rawClaim = z.object({ text: text(300), sources: indexList })
 const rawClaims = (max: number) =>
@@ -240,12 +321,62 @@ const rawResultSchema = z.object({
     .transform((v) => (Array.isArray(v) ? v.slice(0, 8) : []))
     .pipe(z.array(text(200)))
     .transform((list) => list.filter((q) => q !== '')),
+  value: z
+    .object({
+      inquiries_per_month_min: intOrNull(0, 10_000),
+      inquiries_per_month_max: intOrNull(0, 10_000),
+      win_rate: z.unknown().transform((v) => (typeof v === 'number' && v > 0 && v <= 1 ? Math.round(v * 100) / 100 : null)),
+      current_loss: clientText(400),
+      assumptions: z
+        .unknown()
+        .transform((v) => (Array.isArray(v) ? v.slice(0, 6) : []))
+        .pipe(z.array(text(200)))
+        .transform((list) => list.filter((a) => a !== '')),
+      confidence,
+      sources: indexList,
+    })
+    .nullable()
+    .optional()
+    .catch(null),
+  offer: z
+    .object({
+      kind: z.enum(['web', 'eshop']).catch('web'),
+      position: z.enum(['low', 'mid', 'high']).catch('mid'),
+      position_reason: text(300),
+      plus_system: z.enum(['rezervace', 'eshop', 'jine']).catch('jine'),
+      extras: z
+        .object({ zaklad: extraList, doporucena: extraList, plus: extraList })
+        .catch({ zaklad: [], doporucena: [], plus: [] }),
+      client_intro: clientText(1200),
+    })
+    .nullable()
+    .optional()
+    .catch(null),
 })
 
 export type Claim = { text: string; sources: number[] }
 
+export type ValueEstimate = {
+  inquiries: { min: number; max: number } | null
+  win_rate: number | null
+  current_loss: string
+  assumptions: string[]
+  confidence: 'low' | 'medium' | 'high'
+  sources: number[]
+}
+
+export type OfferSuggestion = {
+  kind: 'web' | 'eshop'
+  position: 'low' | 'mid' | 'high'
+  position_reason: string
+  plus_system: 'rezervace' | 'eshop' | 'jine'
+  extras: { zaklad: string[]; doporucena: string[]; plus: string[] }
+  client_intro: string
+}
+
 export type OfferResearchResult = {
-  v: 1
+  /** 1 = rozbor N1 (bez odhadu hodnoty), 2 = s odhadem a podkladem pro varianty (N2). */
+  v: 1 | 2
   sources: { url: string; title: string }[]
   web: {
     url: string | null
@@ -276,6 +407,8 @@ export type OfferResearchResult = {
   signals: { text: string; direction: 'up' | 'down' | 'neutral'; sources: number[] }[]
   warnings: Claim[]
   ask_client: string[]
+  value: ValueEstimate | null
+  offer: OfferSuggestion | null
   /** Kolik tvrzení server zahodil, protože neměla platný zdroj. Jen pro kontrolu kvality. */
   dropped: number
 }
@@ -359,8 +492,21 @@ export function normalizeResult(input: unknown): NormalizeOutcome {
 
   const ico = typeof raw.company.ico === 'string' && /^\d{8}$/.test(raw.company.ico.replace(/\s/g, '')) ? raw.company.ico.replace(/\s/g, '') : null
 
+  const jobConfidence = jobSources.length === 0 ? 'low' : raw.typical_job.confidence
+  const value = normalizeValue(raw.value ?? null, mapIndexes, jobConfidence)
+  const offer: OfferSuggestion | null = raw.offer
+    ? {
+        kind: raw.offer.kind,
+        position: raw.offer.position,
+        position_reason: raw.offer.position_reason,
+        plus_system: raw.offer.plus_system,
+        extras: raw.offer.extras,
+        client_intro: raw.offer.client_intro,
+      }
+    : null
+
   const result: OfferResearchResult = {
-    v: 1,
+    v: 2,
     sources,
     web: {
       url: safeHttpUrl(raw.web.url),
@@ -389,7 +535,7 @@ export function normalizeResult(input: unknown): NormalizeOutcome {
     typical_job: {
       min_czk,
       max_czk,
-      confidence: jobSources.length === 0 ? 'low' : raw.typical_job.confidence,
+      confidence: jobConfidence,
       reasoning: raw.typical_job.reasoning,
       sources: jobSources,
     },
@@ -397,16 +543,57 @@ export function normalizeResult(input: unknown): NormalizeOutcome {
     signals,
     warnings: keepClaims(raw.warnings),
     ask_client: raw.ask_client,
+    value,
+    offer,
     dropped: 0,
   }
   result.dropped = dropped
   return { ok: true, result }
 }
 
-/** Uložený výsledek z databáze zpět do typu. Starý nebo poškozený záznam = null. */
+const CONFIDENCE_ORDER = { low: 0, medium: 1, high: 2 } as const
+
+/**
+ * Odhad hodnoty: rozmezí poptávek srovnané, jistota nikdy vyšší než jistota
+ * ceny typické zakázky (bez ceny zakázky je roční hodnota jen hádání).
+ * Bez poptávek i předpokladů = žádný odhad.
+ */
+function normalizeValue(
+  raw: {
+    inquiries_per_month_min: number | null
+    inquiries_per_month_max: number | null
+    win_rate: number | null
+    current_loss: string
+    assumptions: string[]
+    confidence: 'low' | 'medium' | 'high'
+    sources: number[]
+  } | null,
+  mapIndexes: (list: number[]) => number[],
+  jobConfidence: 'low' | 'medium' | 'high',
+): ValueEstimate | null {
+  if (raw === null) return null
+  let lo = raw.inquiries_per_month_min
+  let hi = raw.inquiries_per_month_max
+  if (lo === null) lo = hi
+  if (hi === null) hi = lo
+  if (lo !== null && hi !== null && lo > hi) [lo, hi] = [hi, lo]
+  const inquiries = lo !== null && hi !== null ? { min: lo, max: hi } : null
+  if (inquiries === null && raw.assumptions.length === 0 && raw.current_loss === '') return null
+  const confidence = CONFIDENCE_ORDER[raw.confidence] > CONFIDENCE_ORDER[jobConfidence] ? jobConfidence : raw.confidence
+  return {
+    inquiries,
+    win_rate: raw.win_rate,
+    current_loss: raw.current_loss,
+    assumptions: raw.assumptions,
+    confidence,
+    sources: mapIndexes(raw.sources),
+  }
+}
+
+/** Uložený výsledek z databáze zpět do typu. Starý nebo poškozený záznam = null. Verze 1 dostane prázdný odhad. */
 export function readStoredResult(value: unknown): OfferResearchResult | null {
   if (value === null || typeof value !== 'object') return null
   const v = value as Partial<OfferResearchResult>
-  if (v.v !== 1 || !Array.isArray(v.sources) || typeof v.company?.summary !== 'string') return null
-  return v as OfferResearchResult
+  if ((v.v !== 1 && v.v !== 2) || !Array.isArray(v.sources) || typeof v.company?.summary !== 'string') return null
+  return { ...(v as OfferResearchResult), value: v.value ?? null, offer: v.offer ?? null }
 }

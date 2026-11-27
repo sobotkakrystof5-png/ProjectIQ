@@ -162,3 +162,19 @@ export const VOICE_DICTATION_TONE = {
 
 /** Návrh z učení čeká na vás (R-091: jediná teplá barva). */
 export const VOICE_SUGGESTION_TONE: AdminTone = 'signal'
+
+/**
+ * Nabídka z navrhovače (R-155). Smlouvání čeká na vás, přijatá je konec
+ * s výsledkem, odmítnutá konec bez výsledku; koncept a bez odpovědi jen záznam.
+ */
+export const OFFER_STATUS_TONE = {
+  draft: 'neutral',
+  sent: 'info',
+  accepted: 'success',
+  declined: 'danger',
+  negotiating: 'signal',
+  no_reply: 'neutral',
+} as const satisfies Record<'draft' | 'sent' | 'accepted' | 'declined' | 'negotiating' | 'no_reply', AdminTone>
+
+/** Návrh úpravy cenových pravidel čeká na vás. */
+export const OFFER_SUGGESTION_TONE: AdminTone = 'signal'

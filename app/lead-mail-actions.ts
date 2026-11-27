@@ -13,6 +13,7 @@ import {
   recordMailSent,
 } from '@/lib/admin/lead-mail-target'
 import { pragueWallClockToISO } from '@/lib/prague-time'
+import { canPublish, publishProposal } from '@/lib/admin/offers/proposals'
 
 /**
  * „Poslat e-mail" (R-132): tři šablony — Portfolio, Nabídka a Schůzka
@@ -48,7 +49,9 @@ const body = z
   .refine((s) => !/\[(doplnit|sem )/i.test(s), 'V textu zůstalo místo k dopsání v hranatých závorkách.')
 
 const schema = z.discriminatedUnion('template', [
-  z.object({ template: z.enum(['portfolio', 'nabidka']), target, subject, body }),
+  z.object({ template: z.literal('portfolio'), target, subject, body }),
+  // `offerId` = nabídka z navrhovače (R-155): po odeslání se zapíše jako odeslaná a odkaz začne fungovat.
+  z.object({ template: z.literal('nabidka'), target, subject, body, offerId: z.string().regex(UUID).optional() }),
   z.object({
     template: z.literal('schuzka'),
     target,
@@ -96,8 +99,33 @@ export async function sendLeadEmail(raw: unknown): Promise<LeadEmailResult> {
     return { ok: true, message: `E-mail se schůzkou odeslán (${result.when}).` }
   }
 
+  // Nabídka z navrhovače jde jen kontaktu, ke kterému patří, a cena nad stropem jen potvrzená.
+  const offerId = data.template === 'nabidka' ? data.offerId : undefined
+  if (offerId) {
+    if (data.target.kind !== 'contact') return { ok: false, error: 'Nabídku z navrhovače posílejte z karty kontaktu.' }
+    const check = await canPublish(offerId, data.target.id)
+    if (!check.ok) {
+      return {
+        ok: false,
+        error:
+          check.error === 'needs_confirmation'
+            ? 'Cena je nad 50 000 Kč. Potvrďte ji u nabídky, pak ji pošlete.'
+            : 'Nabídka k tomuhle kontaktu nepatří. Obnovte stránku.',
+      }
+    }
+  }
+
   const sent = await sendPlainEmail({ to: recipient.email, subject: data.subject, text: data.body })
   if (!sent) return { ok: false, error: 'Nepodařilo se odeslat e-mail. Zkontrolujte prosím nastavení odesílání.' }
+
+  if (offerId) {
+    // E-mail už odešel: odkaz musí začít fungovat, chyba zápisu se jen zaloguje.
+    await publishProposal(offerId, data.target.id).catch((err) =>
+      console.error('[navrhovac] Nabídka se nezapsala jako odeslaná:', (err as Error).message.slice(0, 120)),
+    )
+    revalidatePath(`/dashboard/kontakty/${data.target.id}`)
+    revalidatePath('/dashboard/nabidky')
+  }
 
   // E-mail už odešel, takže zápis do historie nesmí vrátit chybu.
   await recordMailSent(recipient, data.subject).catch((err) =>

@@ -1935,3 +1935,55 @@ Rozbory se počítají do limitu předplatného Claude. DECISIONS #056 (nahrazuj
 běhu v Claude Code), funkce `purge_offer_research()` (bez zakázky 12 měsíců). `cost_cents`
 a `admin_settings.offer_agents` zůstaly z prvního návrhu a nepoužívají se. Bez migrace se karta neukáže
 a stránka běží dál. Testy `lib/__tests__/admin-navrhovac-rozbor.test.ts`.
+
+## Navrhovač nabídek: nabídka, stránka pro klienta a vyhodnocení (R-155, kroky N2–N4)
+
+Plán a cenová pravidla: `docs/admin/NABIDKY-PLAN.md`. Cenu **nepočítá model**: rozbor (výsledek verze 2) dodá
+odhad hodnoty pro klienta (`value`: poptávky měsíčně, podíl zakázek, předpoklady, jistota) a podklad pro varianty
+(`offer`: web/e-shop, pozice v pásmu, systém navíc, položky šité na firmu, úvod pro klienta). Čísla spočítá
+`lib/admin/offers/pricing.ts` z pravidel v `admin_settings.pricing_rules` (bez uložených platí tabulka z plánu,
+`DEFAULT_PRICING_RULES`): pásmo podle ceny jedné typické zakázky klienta, střed dolní / střední / horní třetiny,
+celé tisíce, Základ < Doporučená < Plus, web nikdy pod spodní hranicí, příplatky spěch a jazyk, nad stropem
+(50 000 Kč) příznak „potvrdit".
+
+**Tok.** Po odevzdání rozboru `submitResult` zavolá `createProposalAfterResearch` → koncept v `offer_proposals`
+(`buildProposal` v `lib/admin/offers/proposal-model.ts`). Karta **Nabídka** na kartě kontaktu
+(`components/admin/offers/proposal-{section,card,value}.tsx`) ukáže odhad hodnoty, vstupy (cena zakázky klienta,
+pozice, web/e-shop, jazyky, spěch), tři varianty s cenou „podle pravidel" a odchylkou, úvod pro klienta a větu
+o návratnosti. Uložení (`saveProposalAction` → `updateProposal`, jen koncept) přepočítá „podle pravidel" pro nové
+vstupy a ponechá ruční ceny. **Poslat nabídku** otevře `LeadEmailDialog` se šablonou Nabídka (`offer` prop,
+`buildOfferBody(price, url)`); `sendLeadEmail` s `offerId` nejdřív `canPublish` (kontakt sedí, cena nad stropem
+potvrzená), po odeslání `publishProposal` (status `sent`, `sent_variants` = snímek cen, `valid_until` +14 dní).
+Bez e-mailu kontaktu **Zkopírovat odkaz** (`publishProposalAction`). Náhled `/dashboard/nabidky/[id]/nahled`.
+
+**Stránka pro klienta** `/nabidka/[token]` (`app/nabidka/[token]/`, `components/offers/offer-{document,choice,seen}.tsx`):
+značka a kontakt z profilu dodavatele (`lib/admin/offers/issuer.ts`), jen `clientOffer` (bez odhadu a rešerše),
+výběr varianty a správy („Beru tuhle variantu" → `chooseVariant`, zvonek `offer_chosen`), otevření zapisuje
+prohlížeč (`markOpened`, první otevření = zvonek `offer_opened`). Koncept je 404, po lhůtě výběr nejde, po vzniku
+zakázky je zamčený. Bezpečnost DECISIONS #060.
+
+**Výsledek (N3).** Samo: výběr varianty = přijal (`client`); nová zakázka u kontaktu (i sloučeného) do 120 dní od
+odeslání = přijal s cenou zakázky (trigger `trg_projects_offer_proposals`, migrace 142, propíše i změnu ceny
+a `offer_research.project_id`); 14 dní bez odpovědi = `no_reply` (`maintainOfferProposals` v cronu
+`send-reminders`). Kryštof kliká jen **Odmítl** a **Smlouvá** (Zpět v toastu), **Prodloužit** a **Cena kvůli
+referenci** (z takové se navrhovač neučí).
+
+**Vyhodnocení (N3, N4).** `/dashboard/nabidky` (menu Práce › Nabídky): poslední 3 měsíce (`evaluateOffers`
+v `lib/admin/offers/review.ts`: úspěšnost, doporučená cena poslaná ±10 % od pravidel, otevření, pásma), návrhy
+úprav pravidel a odhad proti skutečnosti. Návrhy (`offer_rule_suggestions`, `suggestRuleChanges`): úspěšnost
+pásma nad 60 % (≥ 4 s výsledkem) → zvednout o 10 %; varianta opakovaně (≥ 3, dvě třetiny) poslaná o víc než
+10 % jinak → posunout rozmezí o medián rozdílu; celková úspěšnost pod 20 % → postřeh, kde to vázne (cena se
+nesnižuje); obor, kde web opakovaně přinesl méně / víc poptávek než odhad → postřeh. Otisk návrhu je vázaný na
+verzi pravidel nebo měsíc. Přijetí uloží novou verzi pravidel (předchozí v `payload.before`, Zpět do 5 min).
+Jednou měsíčně `runMonthlyOfferReview` z cronu (zámek `admin_settings.offer_review_period`, zvonek
+`offer_review`), kdykoli tlačítkem **Vyhodnotit teď**. N4 bere poptávky z webu zakázky (`project_web_keys`,
+`project_web_events`, KP17) za prvních 6 nebo 12 měsíců od klíče, nejdřív po měsíci provozu.
+
+**Pravidla** upravuje `/dashboard/nabidky/pravidla` (`components/admin/offers/rules-form.tsx`): pásma, e-shop,
+hranice a příplatky, co varianty obsahují, co je v ceně vždy a ve správě. Uložení = nová verze; odeslané
+nabídky nesou snímek (`inputs.terms`, `sent_variants`) a nemění se.
+
+**Data.** Migrace 142: `offer_proposals`, `offer_rule_suggestions`, `admin_settings.pricing_rules`
+a `offer_review_period`, trigger na `projects`, `purge_offer_proposals()` (bez zakázky 12 měsíců, cron
+`client-retention`). Bez migrace se karta ani přehled neukáží, rozbor běží dál. Testy
+`lib/__tests__/admin-navrhovac-nabidky.test.ts`.

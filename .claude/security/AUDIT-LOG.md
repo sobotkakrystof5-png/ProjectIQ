@@ -24,6 +24,14 @@ Nálezy: (1) Fix before launch — přihlášení heslem a ověření kódu jdou
 Opraveno: vlastní limity v `ws.rate_limits` — heslo 20 / 10 min na IP, kód 10 / 10 min na IP, 10 pokusů / 10 min na e-mail (`app/w/auth-actions.ts`), DECISIONS #059 (4)
 Zůstává: přijatá rizika v DECISIONS #059 (12h cookie pro všechny, Free plán Supabase, šablona „Magic Link" s kódem, login CSRF přes odkaz z e-mailu). Klientský prostor (`app/klient/actions.ts`) má stejné přihlášení heslem bez vlastního limitu — sjednotit samostatně
 
+## 2026-11-27 — review: navrhovač nabídek N2–N4, stránka nabídky pro klienta (R-155)
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: veřejná stránka `/nabidka/[token]` a její akce (`app/nabidka/[token]/{page,actions}.ts`), admin akce `app/offer-proposal-actions.ts`, `lib/admin/offers/{proposals,pricing,proposal-model,review,issuer,result}.ts`, `offerId` v `app/lead-mail-actions.ts`, stránky `/dashboard/nabidky/**`, migrace 142 (trigger na `projects`), `next.config.mjs` (noindex)
+Výsledek: 0 nálezů k opravě. Prošlo: token projde `publicToken()` před dotazem, neodeslaná nabídka je 404; klient dostane jen `clientOffer` (bez odhadu hodnoty, oboru, zdůvodnění pozice a ceny podle pravidel, hlídá test); obě veřejné akce mají Zod a limit na IP (výběr 20/10 min, otevření 60/10 min, počítá se každý pokus), server actions hlídá kontrola `Origin` v Next; otevření zapisuje až prohlížeč (ne náhled odkazu v poštovním filtru); texty od modelu pro klienta (`client_intro`, položky variant) bez odkazů, e-mailů a `<>` (`stripLinks`) a na stránce jen jako text (0× `dangerouslySetInnerHTML`); SQL jen s parametry; admin akce za `requireAuth`, Zod s délkami; nabídka z e-mailu jen ke kontaktu, kterému patří, cena nad stropem jen potvrzená; `/nabidka` v `X-Robots-Tag` i meta `noindex`, `referrer: no-referrer`; CSP beze změny (profil admin, vynucená, žádný cizí zdroj); trigger bez `SECURITY DEFINER`; nová tabulka bez práv pro `ws_app` a `portal_app`
+Nálezy: žádný
+Opraveno: —
+Zůstává: přijatá rizika v DECISIONS #060 (kdo má odkaz, vidí nabídku a může vybrat variantu; údaje dodavatele na stránce)
+
 ## 2026-11-27 — review: fakturační údaje klienta (R-153, migrace 140)
 Spouštěč: před commitem a nasazením (`web-security-review`)
 Rozsah: `getProjectIssueDraft` a `issueNewInvoice` (nový argument `prefilled`), `saveContact` (sídlo),

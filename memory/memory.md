@@ -2,7 +2,16 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-27 · **Celý projekt jen na Supabase, Clerk pryč** (R-154): Workspace `/w`
+> **Poslední aktualizace:** 2026-11-27 · **Navrhovač nabídek N2–N4 v kódu** (R-155): z hotového rozboru
+> firmy vznikne sám návrh nabídky se třemi variantami. Cenu počítá server z cenových pravidel (tabulka pásem,
+> editor `/dashboard/nabidky/pravidla`), model dodá odhad hodnoty pro klienta a pozici v pásmu. Kryštof návrh
+> upraví u kontaktu a pošle e-mailem Nabídka s odkazem na stránku `/nabidka/<token>` (VIZEON), kde klient vybere
+> variantu. Výsledek se zapisuje sám (výběr, zakázka u kontaktu, 14 dní ticha), Kryštof kliká jen „odmítl"
+> a „smlouvá". Přehled `/dashboard/nabidky`: úspěšnost, cena podle pravidel ±10 %, měsíční návrhy úprav pravidel,
+> odhad poptávek proti skutečnosti z webu zakázky. Migrace 142 na produkci od 2026-11-27, větev `admin/nabidky-n2`
+> (worktree `.claude/worktrees/nabidky-n2`, přeskládaná na `main`). Ověřeno testy, buildem a vzhledem na dočasné stránce; naostro nic.
+>
+> Předchozí: 2026-11-27 · **Celý projekt jen na Supabase, Clerk pryč** (R-154): Workspace `/w`
 > se přihlašuje heslem nebo kódem z e-mailu přes Supabase, účet a role jsou jen v `ws.members`, pozvání klienta
 > z adminu posílá vlastní pozvánku z krystof@vizeon.cz, registrace zůstává zavřená do Stripe live. `@clerk/*`,
 > webhook a zdroje v CSP odešly. **V kódu na větvi `ws/supabase-auth`** (worktree `.claude/worktrees/ws-supabase-auth`),
@@ -199,7 +208,9 @@ v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1:** karta „Rozbor
 na Managed Agents byla na produkci (`7380078`, migrace 136), nikdy se nespustila. **Přestavěno na cloudovou
 úlohu Claude Code na předplatném (R-149, 2026-11-26):** fronta, API trigger, dva vstupy `/api/public/rozbory`,
 skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Otevřené problémy), zkouška na 5 firmách
-(Kryštof souhlasil 2026-11-26), pak N2 (cena, tři varianty, stránka nabídky).
+(Kryštof souhlasil 2026-11-26). **N2–N4 v kódu 2026-11-27 (R-155)** na větvi `admin/nabidky-n2`
+(worktree `.claude/worktrees/nabidky-n2`): návrh nabídky, stránka `/nabidka/<token>`, výsledek a vyhodnocení,
+migrace 142 na produkci od 2026-11-27. Dál: nasazení a první skutečná nabídka (Otevřené problémy).
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
 (34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
@@ -1891,10 +1902,33 @@ ověření e-mailu při registraci.
 zakládá účet v Supabase, musí nést oprávnění, které zná hook (`lib/supabase/signup-hook.ts`). Google přihlášení
 a volitelné dvoufázové ověření pro firmy nejsou postavené — vyžadují Google OAuth klienta (Kryštof) a samostatný
 krok. Technika reference B4, bezpečnost DECISIONS #059, CSP-LOG v11.
+
+### R-155 · Navrhovač nabídek N2–N4: cenu počítá server z pravidel, klient vybírá na stránce (2026-11-27)
+**Rozhodnutí:** (1) Z hotového rozboru vznikne sám koncept nabídky se třemi variantami. **Cenu nepočítá model:**
+rozbor dodá odhad hodnoty pro klienta a pozici v pásmu (dolní / střední / horní třetina), ceny spočítá server
+z cenových pravidel v `admin_settings.pricing_rules` (střed třetiny, celé tisíce, Základ < Doporučená < Plus,
+nad 50 000 Kč jen s potvrzením). (2) Kryštof koncept upraví na kartě kontaktu a pošle e-mailem Nabídka s odkazem
+na stránku `/nabidka/<token>` ve značce VIZEON; klient tam vybere variantu a správu. (3) Výsledek: výběr na
+stránce, zakázka u kontaktu do 120 dní a 14 dní bez odpovědi se zapíšou samy, Kryštof kliká jen „odmítl"
+a „smlouvá"; cena kvůli referenci se z učení vynechá. (4) Jednou měsíčně vyhodnocení a návrhy úprav pravidel,
+platí až po přijetí, cenu nikdy nenavrhují snížit. (5) Horní meze Plus a rozložení e-shopu doplnil agent
+(plán, oddíl 12), mění se v editoru pravidel.
+**Proč:** Kryštof 2026-11-27 („okamžitě pojďme na to a dokončeme to") po popisu N2–N4; pravidla z rozhovoru
+2026-11-25 (oddíl 5 plánu). Cena z modelu by se nedala vysvětlit ani hlídat, pravidla Kryštof mění sám.
+**Důsledek:** migrace 142 (`offer_proposals`, `offer_rule_suggestions`, trigger na `projects`), výsledek rozboru
+verze 2, nová veřejná stránka (DECISIONS #060), menu Práce › Nabídky. Nová cesta k ceně nabídky jde přes
+`lib/admin/offers/pricing.ts`, ne natvrdo jinde. Přepisy schůzek do rozboru dál nejdou (DECISIONS #056).
+Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, stránka pro klienta a vyhodnocení".
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Navrhovač nabídek N2–N4 (R-155) — nasadit a vyzkoušet:** ~~(1) migrace 142 na produkci~~ (2026-11-27, Neon MCP,
+  v evidenci), (2) sloučit `admin/nabidky-n2` do `main` a nasadit, (3) Kryštof: projít Nabídky › Cenová pravidla
+  (hlavně horní meze Plus a e-shop, které doplnil agent), (4) první skutečná nabídka: rozbor firmy → koncept →
+  upravit → Poslat nabídku na vlastní e-mail → otevřít odkaz na telefonu → vybrat variantu → zvonek, (5) karta
+  i stránka za přihlášením na 390 a 1280 px. Cloudová úloha čte skill z `main`, takže odhad hodnoty začne posílat
+  až po nasazení; starší rozbory dají návrh jen z ceny zakázky · od 2026-11-27
 - [ ] **Fakturační údaje klienta (R-153) — průchod naživo:** kód na produkci od 2026-11-27 (`7cfd718`),
   migrace 140 taky (testovací Neon ji nemá). Ověřeno testy nad PGlite, `tsc` a vzhled obou formulářů na dočasné stránce
   s vymyšlenými daty (1280 a 390 px); za přihlášením ne. Projít: Kontakty › karta (Sídlo, Načíst z rejstříku,
@@ -2395,6 +2429,38 @@ krok. Technika reference B4, bezpečnost DECISIONS #059, CSP-LOG v11.
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-27 (navrhovač nabídek N2–N4, R-155)
+- **chore** Větev `admin/nabidky-n2` přeskládaná na `main` (`6f33b6e`) jedním commitem a přečíslovaná: R-153 → **R-155**,
+  migrace 140 → **142**, DECISIONS #059 → **#060**. R-153 a migraci 140 mezitím dostaly v `main` fakturační údaje
+  klienta; R-154, migraci 141 a #059 přechod Workspace na Supabase (`ws/supabase-auth`, sloučený do `main` 2026-11-27).
+- **fix** Upozornění „Klient otevřel nabídku" mohlo přijít dvakrát, když dvě otevření padla do stejného okamžiku
+  `now()` (podmínka `opened_at = last_opened_at`); teď `open_count = 1` po atomickém zvýšení. Nový test se dvěma
+  otevřeními v jedné transakci (se starým kódem padá). Soubory: `lib/admin/offers/proposals.ts`, test.
+- **fix** Věta pro klienta „Web se vám zaplatí ze dvou / ze tří zakázek" (dřív „z tří"). `lib/admin/offers/pricing.ts`.
+- **docs** Porovnání pravidel s 6 dosavadními nabídkami z Gmailu (plán, oddíl 12.1); zakázky z produkční databáze
+  agent číst nesměl. Ověřeno: `tsc`, celá sada 2204 prošlo / 0 selhalo (před opravami), testy navrhovače 28/28 po nich,
+  `npm run build`.
+- **feat** N2: cenová pravidla (`lib/admin/offers/pricing.ts`, výchozí tabulka z plánu, editor
+  `/dashboard/nabidky/pravidla`), návrh nabídky z rozboru (`proposal-model.ts`, `proposals.ts`), karta Nabídka na
+  kartě kontaktu (`components/admin/offers/proposal-{section,card,value}.tsx`), e-mail Nabídka s odkazem
+  (`LeadEmailDialog` `offer`, `sendLeadEmail` `offerId`), stránka pro klienta `/nabidka/[token]`
+  (`components/offers/`), náhled `/dashboard/nabidky/[id]/nahled`. Výsledek rozboru verze 2 (`value`, `offer`,
+  texty pro klienta bez odkazů), skill `zakaziq-rozbor-firmy` dodá odhad hodnoty a podklad pro varianty.
+- **feat** N3 a N4: výsledek nabídky (výběr, zakázka triggerem, 14 dní ticha v cronu `send-reminders`, „Odmítl"
+  a „Smlouvá" se Zpět, cena kvůli referenci), přehled `/dashboard/nabidky` s vyhodnocením 3 měsíců, návrhy úprav
+  pravidel (`review.ts`, přijetí = nová verze, Zpět 5 min, měsíční běh z cronu) a porovnání odhadu s poptávkami
+  z webu zakázky. Menu Práce › Nabídky, zvonek `offer_opened`, `offer_chosen`, `offer_review`.
+- **db** Migrace 142 `navrhovac_nabidky` (aplikována: produkce 2026-11-27 přes Neon MCP v jedné transakci na souhlas
+  Kryštofa, zapsaná v `public.schema_migrations` s otiskem souboru; ověřeno 35 + 10 sloupců, 9 indexů, trigger zapnutý,
+  0 řádků; testovací Neon ne): `offer_proposals`, `offer_rule_suggestions`,
+  `admin_settings.pricing_rules` a `offer_review_period`, trigger `trg_projects_offer_proposals`,
+  `purge_offer_proposals()` (cron `client-retention`).
+- **chore** Ověřeno: `npx tsc --noEmit`, nový `lib/__tests__/admin-navrhovac-nabidky.test.ts` (27 testů, migrace
+  136, 137, 142 dvakrát nad PGlite), celá sada 2183 prošlo / 0 selhalo, `npm run build`. Stránka nabídky a karta
+  u kontaktu na dočasné stránce s vymyšlenými daty na 390 a 1280 px (bez vodorovného přetečení, opravená výška
+  odkazu „Cenová pravidla"), stránka smazaná. Bezpečnostní review bez nálezu (AUDIT-LOG, DECISIONS #060).
+  **Za přihlášením a s databází naostro neověřeno.**
 
 ### 2026-11-27 (celý projekt na Supabase, Clerk pryč — R-154)
 - **feat** Workspace přihlášení přes Supabase: `app/w/auth-actions.ts` (heslo, kód z e-mailu, registrace za

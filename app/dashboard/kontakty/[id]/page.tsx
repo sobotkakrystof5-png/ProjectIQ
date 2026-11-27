@@ -11,6 +11,7 @@ import { ContactForm } from '@/components/admin/contacts/contact-form'
 import { MergeButton, UnmergeButton } from '@/components/admin/contacts/merge-actions'
 import { MemoryCard } from '@/components/admin/memory/memory-card'
 import { ResearchSection } from '@/components/admin/offers/research-section'
+import { ProposalSection } from '@/components/admin/offers/proposal-section'
 import { loadContactDetail, type ContactOccurrence } from '@/lib/admin/contacts'
 import { formatDate } from '@/lib/utils'
 import { nameKey } from '@/lib/contacts/normalize'
@@ -158,7 +159,15 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
       */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-8">
-          {/* Rozbor firmy pro nabídku (R-147, N1). Sloučený kontakt rozbor nemá: patří kořeni. */}
+          {/* Nabídka a rozbor firmy (R-147, R-155). Sloučený kontakt je nemá: patří kořeni. */}
+          {contact.merged_into === null && (
+            <ProposalSection
+              contactId={contact.id}
+              company={contact.company ?? contact.display_name}
+              email={contact.email}
+              readiness={readiness}
+            />
+          )}
           {contact.merged_into === null && <ResearchSection contactId={contact.id} />}
 
           {/* Paměť kontaktu (AD15): co o něm víme z historie a co si k němu někdo zapsal. */}

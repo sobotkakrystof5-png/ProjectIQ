@@ -9,6 +9,7 @@ import { purgeVoiceText } from '@/lib/admin/voice/retention'
 import { purgeMeetingNotes } from '@/lib/admin/meeting-notes-retention'
 import { chatStorageConfigured, deleteStoredFiles } from '@/lib/chat/storage'
 import { maintainOfferResearch } from '@/lib/admin/offers/research'
+import { purgeOfferProposals } from '@/lib/admin/offers/proposals'
 
 // Denní úklid dat klientů po dokončených zakázkách (D-K10, R-076, vercel.json).
 //
@@ -44,7 +45,9 @@ export async function GET(req: NextRequest) {
     const meetingNotes = await purgeMeetingNotes().catch(() => null)
     // Rozbory firem: převzít doběhlé, ukončit zaseknuté, bez zakázky smazat po 12 měsících (R-147, migrace 136).
     const offerResearch = await maintainOfferResearch().catch(() => null)
-    return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails, attachments, voice, meetingNotes, offerResearch })
+    // Nabídky bez zakázky po 12 měsících (D-N5, migrace 142).
+    const offerProposals = await purgeOfferProposals().catch(() => null)
+    return NextResponse.json({ success: true, ...result, memory, outreach, outreachEmails, attachments, voice, meetingNotes, offerResearch, offerProposals })
   } catch (e) {
     console.error('cron.client-retention: úklid selhal', { error: e instanceof Error ? e.message : 'unknown' })
     return NextResponse.json({ success: false, error: 'Retention failed' }, { status: 500 })

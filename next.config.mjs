@@ -41,9 +41,9 @@ const portalPermissionsPolicy = securityHeaders
 const notEmbeddable = '/((?!r/|r$|embed/|api/public/v1/).*)'
 
 // Do vyhledávačů smí jen landing page a právní stránky (S05). Aplikace, admin, API,
-// objednávací stránky klientů, widget a portály (/z, /p, /h — odkazy s tokenem) dostanou
+// objednávací stránky klientů, widget a portály (/z, /p, /h, /nabidka — odkazy s tokenem) dostanou
 // noindex hlavičkou: funguje i pro soubory a přesměrování, kde meta značka není.
-const notIndexed = '/:area(w|r|z|klient|embed|api|dashboard|alteno|hub|login|p|h)/:path*'
+const notIndexed = '/:area(w|r|z|klient|embed|api|dashboard|alteno|hub|login|p|h|nabidka)/:path*'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

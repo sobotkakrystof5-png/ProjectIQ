@@ -6,8 +6,8 @@
 > cenu Kryštof poslal, co klient odpověděl, co web klientovi pak skutečně přinesl), ne dotrénováním
 > modelu. Rozhodnutí **R-147**.
 >
-> Stav: **N0 hotové** (2026-11-25, pravidla v oddílu 5). **N1 v kódu** (2026-11-26, migrace 136),
-> neaplikované a nevyzkoušené na skutečných firmách.
+> Stav: **N0 hotové** (2026-11-25, pravidla v oddílu 5). **N1 na produkci** (2026-11-26, migrace 136 a 137),
+> naostro nevyzkoušené. **N2–N4 v kódu** (2026-11-27, migrace 142 na produkci, R-155), naostro nevyzkoušené.
 
 ## 1. Proč a co z toho má být
 
@@ -293,9 +293,9 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 |---|---|---|---|
 | **N0** | Cenová pravidla (oddíl 5); k 14 zakázkám obor, co dostal, proč ta cena | Tabulka v oddílu 5 bez `[DOPLNIT]`, vzory zapsané | hotovo 2026-11-25 (dosavadní zakázky a nabídky jsou úvodní ceny, ne vzor) |
 | **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
-| **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | čeká |
-| **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | čeká |
-| **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | čeká |
+| **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | v kódu 2026-11-27 (migrace 142 na produkci); stránka ověřená na 390 a 1280 px s vymyšlenými daty; porovnání s minulými nabídkami v oddílu 12.1 (6 nabídek z Gmailu, ne zakázky z databáze); čeká nasazení a první skutečná nabídka |
+| **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | v kódu 2026-11-27; první vyhodnocení po měsíci provozu |
+| **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; přepisy schůzek do rozboru nejdou (DECISIONS #056), rozhodne Kryštof |
 
 ## 10. Rozhodnutí
 
@@ -321,3 +321,46 @@ Technika v `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: rozbor firmy
 - **Výsledek nesedí → úloha pošle opravu.** Vstup vrátí 422 a rozbor běží dál; po dvou pokusech úloha
   rozbor vzdá kódem `gave_up`.
 - Vedoucí běží na Opusu (model úlohy), subagenti na Sonnetu (`model: "sonnet"` v nástroji Agent).
+
+## 12. Jak jsou N2–N4 postavené (2026-11-27, R-155)
+
+Technika v `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, stránka pro klienta a vyhodnocení".
+Výklad agenta (Kryštof může změnit, všechno je v cenových pravidlech v adminu):
+
+- **Cenu počítá server, ne model.** Model dodá pozici v pásmu (dolní / střední / horní třetina) a obsah variant,
+  cena je střed třetiny rozmezí z tabulky 5.3, zaokrouhlená na tisíce.
+- **Horní meze varianty Plus** tabulka nemá („od 18 000"): doplněno 18–24, 30–40, 45–55 a 55–70 tisíc
+  (nad 50 000 vždy s potvrzením). **E-shop** rozložený na 30–40 / 40–50 / 50–80 tisíc.
+- **Neznámá cena zakázky klienta** = druhé pásmo s poznámkou „cena zakázky chybí"; v editoru jde zadat z hovoru.
+- **Věta o návratnosti** jen do tří zakázek („zaplatí se z jedné / ze dvou / ze tří zakázek"), jinak se neukáže.
+- **Zakázka z kontaktu s nabídkou** se k nabídce přiřadí, když vznikne do 120 dní od odeslání.
+- **Návrhy úprav pravidel** nikdy cenu nesnižují: pod 20 % úspěšnosti jen postřeh, kde to vázne.
+- **Přepisy schůzek** do rozboru nejdou (DECISIONS #056): úloze jdou jen veřejné údaje o firmě. Cenu zakázky
+  klienta z hovoru zapíše Kryštof do editoru nabídky.
+
+### 12.1 Pravidla proti dosavadním nabídkám (2026-11-27)
+
+Kritérium N2 „na 5 minulých zakázkách návrh porovnaný se skutečnou cenou". Zakázky z produkční databáze
+agent číst nesměl (automatický režim čtení zamítl), porovnání je proto na šesti nabídkách s cenou z oddílu 5.4.
+**Cena jedné zakázky klienta je odhad agenta z oboru** (rozbor firmy ji zatím u žádné nemá), pozice v pásmu
+vždy střed, bez příplatků. Výpočet `priceVariants` s výchozími pravidly.
+
+| Nabídka | Poslaná cena | Odhad zakázky klienta → pásmo | Základ / Doporučená / Plus | Odpovídá | Rozdíl |
+|---|---|---|---|---|---|
+| kavárna, jednostránkový web | 5 000 | 200–2 000 → pod 10 000 | 10 000 / 14 000 / 21 000 | Základ 10 000 | +100 % |
+| restaurace A, jednostránkový web | 5 000 | 300–5 000 → pod 10 000 | 10 000 / 14 000 / 21 000 | Základ 10 000 | +100 % |
+| restaurace B, jednostránkový web | 5 000 | 300–5 000 → pod 10 000 | 10 000 / 14 000 / 21 000 | Základ 10 000 | +100 % |
+| masáže, web | 10 000 | 800–2 000 → pod 10 000 | 10 000 / 14 000 / 21 000 | Základ 10 000 | 0 % |
+| malíř, web s databází a upozorněními | 15 000 | 15 000–60 000 → 10–100 tisíc | 15 000 / 22 000 / 35 000 | Plus 35 000 | +133 % |
+| spolek s restaurací, web + e-shop + automatizace | 45 000 | e-shop | 35 000 / 45 000 / 65 000 | Plus 65 000 (potvrdit) | +44 % |
+
+Co z toho plyne:
+- Jednostránkové weby za 5 000 Kč pravidla nedovolí (spodní hranice 10 000 Kč, Micro a Promo jen na výslovné přání).
+  Studené oslovení za 5 000 stejně nepřineslo odpověď, takže cena nebyla to, co rozhodovalo.
+- U malíře je rozdíl největší: web s databází je podle pravidel Plus (systém navíc). Kdyby ho Kryštof poslal
+  jako Doporučenou, vyšlo by 22 000 Kč (+47 %).
+- E-shop spolku za 45 000 Kč sedí přesně na Doporučenou e-shopu; Plus nad 50 000 Kč chce potvrzení.
+- Věta o návratnosti se ukázala jen u malíře („ze tří zakázek"); u kavárny, restaurací a masáží by web
+  zaplatily až desítky zakázek, takže se věta neukáže, jak má.
+- Spolehlivé porovnání přijde s N3: z poslaných nabídek a odpovědí klientů, ne z úvodních cen.
+

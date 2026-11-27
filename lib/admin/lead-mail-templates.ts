@@ -15,6 +15,7 @@
 import { buildPortfolioEmailBody, PORTFOLIO_EMAIL_SUBJECT } from '@/lib/portfolio-email'
 import { EMAIL_SIGNATURE } from '@/lib/message-templates'
 import { defaultIntro, defaultSubject, renderMeetingEmail, VIZEON_WEB } from '@/lib/admin/meeting-email'
+import { offerEmailLines } from '@/lib/admin/offers/proposal-model'
 
 export type LeadMailTemplateId = 'portfolio' | 'nabidka' | 'schuzka'
 
@@ -49,9 +50,13 @@ export function formatPrice(value: number | string | null | undefined): string {
 /**
  * Nabídka: cena je vždy ta, kterou Kryštof zadá k téhle zakázce. Bez ceny
  * řádek chybí a okno nabídku odeslat nedovolí.
+ *
+ * S odkazem na stránku nabídky z navrhovače (R-155) e-mail jen uvede tři
+ * varianty a doporučenou cenu; co obsahují, je na stránce.
  */
-export function buildOfferBody(price?: string | null): string {
+export function buildOfferBody(price?: string | null, offerUrl?: string | null): string {
   const cena = price?.trim()
+  if (offerUrl) return ['Dobrý den,', ...offerEmailLines(cena ?? '', offerUrl), EMAIL_SIGNATURE].join('\n\n')
   return [
     'Dobrý den,',
     'děkuji za váš čas. Posílám vám svou nabídku.',
@@ -75,6 +80,8 @@ export type LeadMailContext = {
   startsAt?: string | null
   /** Cena do nabídky, jak ji Kryštof napsal („12 000 Kč", „10 000 až 15 000 Kč"). */
   price?: string | null
+  /** Odkaz na stránku nabídky z navrhovače (R-155). */
+  offerUrl?: string | null
 }
 
 /** Výchozí předmět a text šablony. Člověk je před odesláním může přepsat. */
@@ -86,7 +93,7 @@ export function leadMailDefaults(id: LeadMailTemplateId, ctx: LeadMailContext): 
         body: buildPortfolioEmailBody({ todayISO: ctx.todayISO, nextCallDateISO: ctx.nextCallDate }),
       }
     case 'nabidka':
-      return { subject: NABIDKA_SUBJECT, body: buildOfferBody(ctx.price) }
+      return { subject: NABIDKA_SUBJECT, body: buildOfferBody(ctx.price, ctx.offerUrl) }
     case 'schuzka':
       return {
         subject: ctx.startsAt ? defaultSubject(ctx.startsAt) : 'Naše schůzka',

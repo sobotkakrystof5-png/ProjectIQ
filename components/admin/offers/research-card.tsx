@@ -167,7 +167,7 @@ export function ResearchCard({
   const head = (
     <CardHead
       title="Rozbor firmy"
-      hint="Subagenti v Claude Code projdou web firmy, rejstříky, recenze a konkurenci. Podklad pro nabídku, zatím bez ceny."
+      hint="Subagenti v Claude Code projdou web firmy, rejstříky, recenze a konkurenci. Z rozboru se pak sám připraví návrh nabídky."
     />
   )
 

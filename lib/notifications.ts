@@ -43,6 +43,12 @@ export type NotificationType =
   | 'meeting_invite_undelivered'
   /** Rozbor firmy pro navrhovač nabídek doběhl v Claude Code (R-149). */
   | 'offer_research_done'
+  /** Klient poprvé otevřel stránku nabídky (N2, R-155). */
+  | 'offer_opened'
+  /** Klient na stránce nabídky vybral variantu (N2, R-155). */
+  | 'offer_chosen'
+  /** Měsíční vyhodnocení nabídek a návrhy úprav cenových pravidel (N3, R-155). */
+  | 'offer_review'
 
 export async function createNotification(params: {
   type: NotificationType

@@ -18,6 +18,7 @@ import { runDailyVoiceLearning } from '@/lib/admin/voice/learner'
 import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
+import { maintainOfferProposals, runMonthlyOfferReview } from '@/lib/admin/offers/proposals'
 
 export const dynamic = 'force-dynamic'
 
@@ -266,6 +267,14 @@ export async function GET(req: NextRequest) {
       console.error('[cron] Učení ZakazIQ Voice selhalo:', err instanceof Error ? err.name : 'unknown')
       return null
     }),
+    // Nabídky (R-155): 14 dní bez odpovědi = „neodpověděl", jednou za měsíc vyhodnocení
+    // s návrhy úprav cenových pravidel. Nic se nemění samo, návrhy čekají na kliknutí.
+    maintainOfferProposals()
+      .then(() => runMonthlyOfferReview())
+      .catch((err) => {
+        console.error('[cron] Nabídky selhaly:', err instanceof Error ? err.message.slice(0, 120) : 'unknown')
+        return null
+      }),
   ])
 
   const results = { day_before: 0, two_hours: 0, lead_day_before: 0, lead_two_hours: 0, surveys: surveys.sent, errors: surveys.failed }
