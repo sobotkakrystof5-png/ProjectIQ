@@ -95,16 +95,17 @@ export async function liveSubscriptionIds(scope: { accountId: string }): Promise
 
 // --- Denní úklid ------------------------------------------------------------------
 
-export type GdprRun = { accountsClosed: number; invoicesAnonymized: number; accountsDeleted: number; orgsFailed: number }
+export type GdprRun = { accountsClosed: number; invoicesAnonymized: number; accountsDeleted: number; usersFailed: number }
 
 /**
  * Účty po konci zaplaceného období (záloha, kdyby nedorazil webhook Stripe),
  * faktury po zákonné lhůtě a účty po 30 dnech. Předplatná obnovuje ze Stripe
- * `syncSub`, organizaci v Clerku maže `deleteOrg` (obojí předává cron); jejich
- * chyba ostatní úklid nezastaví, jen se zapíše.
+ * `syncSub`, přístup členů smazaného účtu v Supabase maže `deleteUser` (jen když
+ * ho nepotřebují jinde, `lib/supabase/admin-users.ts`; obojí předává cron). Jejich
+ * chyba ostatní úklid nezastaví, jen se zapíše. Prošlá povolení k registraci se mažou.
  */
 export async function runDailyGdpr(
-  deleteOrg: (orgId: string) => Promise<void>,
+  deleteUser: (userId: string) => Promise<unknown>,
   syncSub: (subscriptionId: string) => Promise<unknown> = async () => null,
 ): Promise<GdprRun> {
   let accountsClosed = 0
@@ -119,17 +120,21 @@ export async function runDailyGdpr(
   }
 
   const [inv] = await wsSystem<{ n: number }>`SELECT ws.anonymize_expired_invoices() AS n`
-  const purged = await wsSystem<{ account_id: string; clerk_org_id: string }>`SELECT account_id, clerk_org_id FROM ws.purge_closed_accounts()`
-  let orgsFailed = 0
+  const purged = await wsSystem<{ purged_account_id: string; member_user_ids: string[] | null }>`
+    SELECT purged_account_id, member_user_ids FROM ws.purge_closed_accounts_with_members()`
+  await wsSystem`DELETE FROM ws.signup_permits WHERE expires_at < now() - interval '1 day'`
+  let usersFailed = 0
   for (const p of purged) {
-    try {
-      await deleteOrg(p.clerk_org_id)
-    } catch (e) {
-      orgsFailed++
-      console.error('cron.ws-gdpr: organizaci se nepodařilo smazat', { accountId: p.account_id, error: e instanceof Error ? e.message : 'unknown' })
+    for (const userId of p.member_user_ids ?? []) {
+      try {
+        await deleteUser(userId)
+      } catch (e) {
+        usersFailed++
+        console.error('cron.ws-gdpr: přístup v Supabase se nepodařilo smazat', { accountId: p.purged_account_id, error: e instanceof Error ? e.message : 'unknown' })
+      }
     }
   }
-  return { accountsClosed, invoicesAnonymized: Number(inv?.n ?? 0), accountsDeleted: purged.length, orgsFailed }
+  return { accountsClosed, invoicesAnonymized: Number(inv?.n ?? 0), accountsDeleted: purged.length, usersFailed }
 }
 
 // --- Export -----------------------------------------------------------------------

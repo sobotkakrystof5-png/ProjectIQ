@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useClerk } from '@clerk/nextjs'
+import { useTransition } from 'react'
+import { signOutWorkspace } from '@/app/w/auth-actions'
 import { CreditCard, LogOut, Palette, Settings, ShieldCheck, type LucideIcon } from 'lucide-react'
 import {
   DropdownMenu,
@@ -44,7 +45,7 @@ export function AccountMenu({
   triggerClassName: string
 }) {
   const { pref, setPref } = useWsTheme()
-  const { signOut } = useClerk()
+  const [, startSignOut] = useTransition()
   const main = links.filter((l) => l.key !== 'zpracovani')
   const processing = links.find((l) => l.key === 'zpracovani')
 
@@ -82,7 +83,7 @@ export function AccountMenu({
         </DropdownMenuSub>
         {processing && <LinkItem link={processing} />}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void signOut({ redirectUrl: '/' })}>
+        <DropdownMenuItem onSelect={() => startSignOut(() => signOutWorkspace())}>
           <LogOut aria-hidden size={18} strokeWidth={1.5} />
           Odhlásit se
         </DropdownMenuItem>
@@ -109,7 +110,7 @@ const linkActive = (pathname: string, link: AccountLink): boolean =>
 
 /** Účet ve výsuvném menu na telefonu: odkazy, Vzhled a Odhlásit pod oddělovačem. */
 export function AccountSheetSection({ links, pathname }: { links: AccountLink[]; pathname: string }) {
-  const { signOut } = useClerk()
+  const [, startSignOut] = useTransition()
   return (
     <section aria-label="Účet" className="mt-auto flex flex-col gap-1 border-t pt-3">
       <p className="px-3 pb-1 font-num text-[11px] uppercase tracking-[0.08em] text-quiet">Účet</p>
@@ -138,7 +139,7 @@ export function AccountSheetSection({ links, pathname }: { links: AccountLink[];
       </div>
       <button
         type="button"
-        onClick={() => void signOut({ redirectUrl: '/' })}
+        onClick={() => startSignOut(() => signOutWorkspace())}
         className={cn('flex min-h-12 items-center gap-3 rounded-chip px-3 text-[15px] text-quiet hover:bg-accent hover:text-ink', focusRing)}
       >
         <LogOut aria-hidden size={20} strokeWidth={1.5} />

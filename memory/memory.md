@@ -2,7 +2,13 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-26 · **ZakazIQ Voice na produkci** (R-150): serverová část (VO01, VO02,
+> **Poslední aktualizace:** 2026-11-27 · **Celý projekt jen na Supabase, Clerk pryč** (R-154): Workspace `/w`
+> se přihlašuje heslem nebo kódem z e-mailu přes Supabase, účet a role jsou jen v `ws.members`, pozvání klienta
+> z adminu posílá vlastní pozvánku z krystof@vizeon.cz, registrace zůstává zavřená do Stripe live. `@clerk/*`,
+> webhook a zdroje v CSP odešly. **V kódu na větvi `ws/supabase-auth`** (worktree `.claude/worktrees/ws-supabase-auth`),
+> migrace 141 neaplikovaná, nenasazeno. Testy 2154 prošlo (padá jen číslování, dokud nepřijde migrace 140), build prošel.
+>
+> Předchozí: 2026-11-26 · **ZakazIQ Voice na produkci** (R-150): serverová část (VO01, VO02,
 > VO07, VO08, VO10) je **na produkci od 2026-11-26 (`b319355`) i s migrací 138**. Před nasazením přečíslováno
 > kvůli `main`: migrace 136 → 138, R-148 → R-150, DECISIONS #055 → #057. Veřejně ověřeno: `/dashboard/voice` 307,
 > `/api/public/voice/config` bez klíče i se špatným 401, s `Origin` 403, bez běhových chyb. Za přihlášením
@@ -1848,6 +1854,25 @@ Promluvy se posílají během hovoru, aby byl přepis po konci hned.
 nové oprávnění na Macu (Nahrávání zvuku systému, macOS 14.2+). Zrušené Schůzky z Wispr Flow (R-145) se nevrací,
 tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika `docs/admin/AGENTS-ADMIN.md` → Schůzky.
 
+
+### R-154 · Celý projekt jen na Supabase Auth, Clerk pryč; nejlepší přihlášení pro klienty (2026-11-27)
+**Rozhodnutí:** (1) Workspace `/w` se přihlašuje přes Supabase Auth jako admin a klientský prostor; Clerk
+(balíčky, webhook, zdroje v CSP, env) z projektu odchází celý (F2 + F3 z R-107). (2) Účet firmy a členství
+jsou jen v Neonu: `ws.members.clerk_user_id` nese id ze Supabase (název kvůli opakovanému běhu migrace 064),
+role z `ws.members`, jeden vlastněný účet na člověka. (3) Tentýž účet v Supabase platí pro `/klient` i `/w`.
+(4) Přihlášení **heslem, nebo jednorázovým kódem z e-mailu** (bez hesla); zapomenuté heslo, první heslo, odhlášení
+všude. (5) „Pozvat klienta" z adminu založí účet a pošle z krystof@vizeon.cz pozvánku s kódem (14 dní, jen pro
+ten e-mail); registrace z landing page je připravená s ověřením e-mailu kódem, ale **zavřená** (`WS_SIGNUP_OPEN`)
+do spuštění plateb — Kryštof 2026-11-27 odpověděl „YES" na zavření `/w/registrace`. (6) Po smazání zrušeného
+účtu cron smaže i přístup v Supabase, když ho člověk nepotřebuje jinde.
+**Proč:** Kryštof 2026-11-27: „chceme pouze Supabase pro celý projekt… od Clerku se dnes úplně odvracíme… pro
+klienty pouze Supabase a nejlepší možnou autentizaci a maximální službu". Workspace na produkci běžel na
+vývojové instanci Clerku a registrace byla veřejně otevřená. Kód z e-mailu = nic, co by šlo zapomenout, a zároveň
+ověření e-mailu při registraci.
+**Důsledek:** migrace 141 (před nasazením). Nahrazuje R-037 a v části přihlášení R-014 a R-017. Nová cesta, která
+zakládá účet v Supabase, musí nést oprávnění, které zná hook (`lib/supabase/signup-hook.ts`). Google přihlášení
+a volitelné dvoufázové ověření pro firmy nejsou postavené — vyžadují Google OAuth klienta (Kryštof) a samostatný
+krok. Technika reference B4, bezpečnost DECISIONS #059, CSP-LOG v11.
 ---
 
 ## 3. Otevřené problémy
@@ -2102,9 +2127,16 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
 - [ ] **Člověk ve dvou prostorech vidí jen ten první:** `portal.member_lookup` vrací členství podle data
   vzniku a `/klient` bere první. Pozvání proto stejný e-mail drží v jednom prostoru (s potvrzením); kdyby
   měl někdo pracovat pro dvě firmy, chce to výběr prostoru v `/klient` · `lib/portal/context.ts` · od 2026-11-18
-- [ ] **Workspace a úklid Clerku (R-107, F2 + F3):** nezačato. Před F2 rozhodnout, jestli
-  placený Workspace může běžet na Free projektu Supabase (uspání po týdnu bez provozu,
-  limity e-mailů, sdílený projekt s adminem) · `docs/AUTH-SUPABASE-PLAN.md` · od 2026-11-15
+- [ ] **Workspace na Supabase (R-154) — nasadit a projít:** v kódu na větvi `ws/supabase-auth`. Pořadí:
+  (1) migrace 141 na produkci (aditivní, **před** nasazením — bez ní `/w` nikoho nepustí), (2) v Supabase
+  Redirect URL `https://www.zakaziq.cz/w/auth/potvrzeni?**` a česká šablona „Magic Link" s `{{ .Token }}`,
+  (3) merge a nasazení, (4) průchod: Pozvat klienta z adminu na vlastní e-mail → `/w/pozvanka/…` → přístup →
+  krok 2 (předplatné); přihlášení heslem i kódem; zapomenuté heslo; účet z `/klient` přijme pozvánku;
+  odhlášení všude; 390 a 1280 px, (5) smazat `CLERK_*` z Vercelu, aplikaci v Clerku a 5 CNAME Clerku u WEDOS.
+  Free plán Supabase pro placený Workspace je přijaté riziko (DECISIONS #059 b) · od 2026-11-27
+- [ ] **Klientský prostor bez vlastního limitu pokusů o heslo:** `signInClient` (`app/klient/actions.ts`) jde do
+  Supabase z našeho serveru, limity Supabase vidí jen IP Vercelu. Workspace to od R-154 má (heslo i kód na IP
+  i na e-mail), sjednotit · AUDIT-LOG 2026-11-27 · od 2026-11-27
 - [ ] **Pošta adminu přes Resend (R-116) naživo neověřená:** Gmail SMTP odmítal heslo
   (535 BadCredentials, od 2026-08-18 do 2026-11-17 neodešlo z adminu nic — připomínky, zprávy
   klientům, faktury, dotazníky). Od R-116 jde všechno přes Resend z vizeon.cz. Ověřit první
@@ -2307,12 +2339,7 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
 - [ ] **Tmavý režim — nové třídy:** přemapování v `app/ws-tokens.css` pokrývá třídy použité k 2026-10-17; nová světlá třída (např. `bg-navy-200/50`) potřebuje vlastní `dark:` nebo řádek v tokenech. `/r`, `/z` a landing zůstávají světlé (rozhodnout, jestli i ony) · od 2026-10-17
 - [ ] **Upgrade Next 16 — admin s přihlášením:** Workspace (Clerk) a PDF ověřeny na Preview 2026-10-31; zbývá admin NextAuth na datech (Preview má testovací DB bez admin tabulek) · od 2026-10-17
 - [ ] **Připomínky 2 h před konzultací:** po R-006 není jasné, jestli běží externí hodinový cron (commit 2026-06-20 zmiňuje „externí hodinový cron"). Ověřit u uživatele · od 2026-06-25
-- [ ] **Workspace — env ve Vercelu:** Production i Preview mají `DATABASE_URL_WS`, klíče Clerku, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (2026-10-10). Zbývá: `STRIPE_WEBHOOK_SECRET` v Production je od Kryštofa a nemusí patřit produkčnímu endpointu (ten ještě neexistuje) — přepsat podpisovým klíčem endpointu `https://www.zakaziq.cz/api/stripe/webhook` při nasazení `/w`; `NEXT_PUBLIC_APP_URL` v Preview míří na produkční adresu (pro větev `ws/redesign-app` přepsáno 2026-10-31, ostatní větve dál vrací Checkout na produkci) · od 2026-10-08
-- [ ] **Clerk — webhook:** v Clerk dashboardu založit endpoint `https://<doména>/api/clerk/webhook` (události `organization.updated`, `organizationMembership.*`) a jeho podpisový klíč dát do `CLERK_WEBHOOK_SECRET` (`.env.local` i Vercel). Do té doby route vrací 503 a členové se nesynchronizují (vlastníka zapíše průvodce) · od 2026-10-09
-- [ ] **Clerk — produkční instance:** založená, DNS, SSL a pošta hotové (2026-11-03). Zbývá vlastní Google OAuth klient (consent screen „In production“, jinak limit 100 testovacích uživatelů), `force_organization_selection=false`, produkční klíče jen do Vercel Production. Dev instance nesmí do produkce · od 2026-10-09
-- [ ] **Clerk — limit 5 členů na organizaci** (výchozí v Clerku). R-020 slibuje neomezeně pracovníků — pracovníci ve `ws.staff` se přihlašovat nemusí, ale přihlašovací účty pro tým (S13?) limit narazí. Ověřit, jestli jde zvednout na našem plánu Clerku · od 2026-10-09
-- [ ] **Clerk — e-maily s kódem** chodí z Clerku (šablona a jazyk podle nastavení instance). Ověřit při první registraci, že jsou česky a jménem ZakazIQ; jinak nastavit v dashboardu Clerku (Customization → Emails) · od 2026-10-09
-- [ ] **Clerk — `user.updated`** (změna jména/e-mailu) se do `ws.members` nepropisuje — webhook ho nezpracovává, payload nemá organizace. Řešit, až se jména členů budou někde zobrazovat (S13) · od 2026-10-09
+- [ ] **Workspace — env ve Vercelu:** Production i Preview mají `DATABASE_URL_WS`, klíče Clerku (od R-154 nepoužívané, smazat), `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (2026-10-10). Zbývá: `STRIPE_WEBHOOK_SECRET` v Production je od Kryštofa a nemusí patřit produkčnímu endpointu (ten ještě neexistuje) — přepsat podpisovým klíčem endpointu `https://www.zakaziq.cz/api/stripe/webhook` při nasazení `/w`; `NEXT_PUBLIC_APP_URL` v Preview míří na produkční adresu (pro větev `ws/redesign-app` přepsáno 2026-10-31, ostatní větve dál vrací Checkout na produkci) · od 2026-10-08
 - [ ] **Stripe — lokální webhook:** pro `stripe listen` chybí CLI profil ZakazIQ (`stripe login --project-name zakaziq`), omezený klíč na listen nestačí (403); po přihlášení dát jeho `whsec_` do `.env.local`. Potřeba jen při lokálním testu plateb · od 2026-10-09
 - [ ] **Stripe — live mód** (produkt, cena, Portal, e-maily, šablona faktury s IČO a „Nejsem plátce DPH“, webhook endpoint, live klíče jen do Vercelu Production) · před S19 · od 2026-10-09
 - [ ] **`ws.accounts.trial_ends_at`** se po R-038 nepoužívá. Nechat, nebo odstranit migrací (data se tím nemažou)? Neblokuje · od 2026-10-09
@@ -2320,10 +2347,9 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
 - [ ] **Resend jen kvůli waitlistu:** závislost `resend` slouží jedné funkci (`sendLaunchEmailBlast`). Zvážit převod na `lib/email.ts` (R-004) · od 2026-10-08
 - [ ] **Workspace — SMS poskytovatel** pro připomínky a „Komu napsat". Blokuje S12/S15 (lze odložit) · od 2026-10-08
 - [ ] **Workspace — zálohy online přes Stripe Connect** teď, nebo až po spuštění? Neblokuje · od 2026-10-08
-- [ ] **Workspace — admin přihlášení:** nechat NextAuth natrvalo, nebo později převést na Clerk? Neblokuje · od 2026-10-08
 - [ ] **S16 naostro:** ověřit skutečný termín, zakázku, fakturu a hodnocení v `/z/[token]` (migrace 082 na Neonu) · od 2026-10-10
 - [ ] **S17 — pozvaní klienti a platba:** pozvaný klient prochází stejným Checkoutem (14 dní s kartou, R-038). Rozhodnout, jestli klienti, kterým Kryštof staví web, mají mít Workspace zdarma nebo se slevou (kupón ve Stripe) · od 2026-10-10
-- [ ] **S17 naostro:** pozvánka Clerku (e-mail, registrace s `__clerk_ticket` na `/w/registrace`, aktivace organizace, `ensureMember`) a obě admin stránky s přihlášením neověřené · od 2026-10-10
+- [ ] **S17 naostro:** pozvánka z adminu (od R-154 vlastní e-mail a `/w/pozvanka/<kód>`) a obě admin stránky s přihlášením neověřené · od 2026-10-10
 - [ ] **S15 — odesílání e-mailů:** ~~doména v Resendu, `WS_EMAIL_FROM`, webhook + `RESEND_WEBHOOK_SECRET`~~ hotovo 2026-11-01 pro Production (webhook vypnutý do nasazení, pak zapnout). Zbývá doplnit `rua` do DMARC (záznam `_dmarc` existuje, `p=none` bez reportů, ověřeno 2026-11-03) a klíč jen pro odesílání. Postup `docs/workspace/SETUP.md` → E-maily · od 2026-10-10
 - [ ] **S15 — naostro neověřeno:** Nastavení › E-maily (náhled, zkušební e-mail) s přihlášením, skutečné doručení a vzhled v Gmailu/Outlooku/Apple Mailu, odkaz Potvrdit z telefonu, cron na Vercelu · od 2026-10-10
 - [ ] **Workspace — cena za další byznys na účtu** a kdy ho zapnout (R-026). Neblokuje · od 2026-10-08
@@ -2344,6 +2370,26 @@ tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika 
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-27 (celý projekt na Supabase, Clerk pryč — R-154)
+- **feat** Workspace přihlášení přes Supabase: `app/w/auth-actions.ts` (heslo, kód z e-mailu, registrace za
+  `WS_SIGNUP_OPEN`, pozvánka, zapomenuté a nové heslo, odhlášení i všude, limity na IP a e-mail), stránky
+  `/w/prihlaseni`, `/w/registrace`, `/w/pozvanka/[kod]`, `/w/zapomenute-heslo`, `/w/nove-heslo`, odkaz z e-mailu
+  `/w/auth/potvrzeni`, formuláře `components/ws/auth/auth-forms.tsx`. Identita `lib/ws/context.ts` (`getClaims`),
+  účet a role `ws.member_account` / `ws.business_scope_for_user` (`lib/ws/scope.ts`). `proxy.ts` obnovuje session
+  na `/w` a `/api/ws` jako na `/klient`.
+- **feat** Pozvat klienta z adminu bez Clerku: `lib/ws/admin/invite.ts` + `invite-email.ts` (kód `zw_…`, e-mail
+  z krystof@vizeon.cz), detail klienta ukazuje stav pozvánky. Hook registrace zná pozvánky a povolení Workspace
+  (`lib/supabase/signup-hook.ts`). Cron `ws-gdpr` maže nepotřebný přístup v Supabase (`lib/supabase/admin-users.ts`).
+- **refactor** Clerk pryč: `@clerk/nextjs`, `@clerk/localizations` (14 balíčků), `app/api/clerk/webhook`,
+  `lib/ws/clerk-{orgs,webhook}.ts`, `lib/security/clerk.ts`, `clerk-appearance.ts`, `ActivateAccount`, zdroje v CSP
+  (CSP-LOG v11), `CLERK_*` z `.env.example`. Zpracovatel Clerk v právních textech nahrazen Supabase (`LEGAL_VERSION`
+  27. 11. 2026; Workspace nemá platící zákazníky, oznamovat není komu).
+- **db** Migrace 141 `ws_supabase_auth` (aplikována: ne, nikde).
+- **chore** Ověřeno: `npx tsc --noEmit`, `npx vitest run` 2154 prošlo / 1 padá (číslování migrací — chybí 140,
+  která je zatím jen rozdělaná v `main`), `npm run build`, `next start` lokálně: nepřihlášený `/w` → přihlášení
+  s `next`, neplatná pozvánka → vysvětlení, stránky 390 a 1280 px bez chyb v konzoli. `web-security-review`:
+  1 nález opravený (AUDIT-LOG). **Přihlášení naostro proti Supabase nikdo nezkusil.**
 
 ### 2026-11-27 (ZakazIQ Voice — přepis přes Groq)
 - **chore** Přepis diktátů a schůzek jde od 2026-11-27 přes Groq `whisper-large-v3-turbo` ($0,04 za hodinu zvuku

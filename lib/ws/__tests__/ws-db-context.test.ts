@@ -92,18 +92,29 @@ describe('requireWorkspace', () => {
     expect(await digestOf(requireWorkspace())).toContain('/w/prihlaseni')
   })
 
-  it('přihlášený bez firmy nebo s neznámou firmou → nový byznys', async () => {
-    setWsAuthProvider(async () => ({ userId: 'user_x', orgId: null, orgRole: null }))
+  it('přihlášený bez členství v účtu → nový byznys (session sama nestačí)', async () => {
+    setWsAuthProvider(async () => ({ userId: 'user_x', email: 'x@example.cz' }))
     expect(await digestOf(requireWorkspace())).toContain('/w/novy')
-    setWsAuthProvider(async () => ({ userId: 'user_x', orgId: 'org_neexistuje', orgRole: 'org:admin' }))
+    setWsAuthProvider(async () => ({ userId: '', email: null }))
     expect(await digestOf(requireWorkspace())).toContain('/w/novy')
   })
 
-  it('účet se bere z Clerk organizace, role z role v organizaci', async () => {
-    setWsAuthProvider(async () => ({ userId: 'user_a', orgId: 'org_a', orgRole: 'org:admin' }))
+  it('účet a role se berou z ws.members, ne z ničeho, co pošle přihlášení', async () => {
+    await db.query("INSERT INTO ws.members (account_id, clerk_user_id, role) VALUES ($1, 'user_b2', 'staff') ON CONFLICT DO NOTHING", [B.account])
+    setWsAuthProvider(async () => ({ userId: 'user_a', email: 'a@example.cz' }))
     expect(await requireWorkspace()).toEqual({ userId: 'user_a', accountId: A.account, role: 'owner' })
-    setWsAuthProvider(async () => ({ userId: 'user_b2', orgId: 'org_b', orgRole: 'org:member' }))
+    setWsAuthProvider(async () => ({ userId: 'user_b2', email: 'b2@example.cz' }))
     expect(await requireWorkspace()).toEqual({ userId: 'user_b2', accountId: B.account, role: 'staff' })
+  })
+
+  it('vlastněný účet má přednost před členstvím jinde; dva vlastněné účty nejdou', async () => {
+    await db.query("INSERT INTO ws.members (account_id, clerk_user_id, role) VALUES ($1, 'user_a', 'staff') ON CONFLICT DO NOTHING", [B.account])
+    setWsAuthProvider(async () => ({ userId: 'user_a', email: 'a@example.cz' }))
+    expect((await requireWorkspace()).accountId).toBe(A.account)
+    await expect(
+      db.query("UPDATE ws.members SET role = 'owner' WHERE account_id = $1 AND clerk_user_id = 'user_a'", [B.account]),
+    ).rejects.toMatchObject({ code: '23505' })
+    await db.query("DELETE FROM ws.members WHERE account_id = $1 AND clerk_user_id = 'user_a'", [B.account])
   })
 })
 

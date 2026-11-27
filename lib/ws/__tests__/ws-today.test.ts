@@ -77,7 +77,6 @@ describe('getTodayData', () => {
 
   it('nový účet bez dat je prázdný (jeden úkol místo tří sloupců)', async () => {
     const { accountId } = await createAccountWithBusiness({
-      orgId: 'org_dnes_prazdny',
       name: 'Zámečnictví Prázdné',
       industry: 'zamecnictvi',
       owner: { userId: 'user_p', name: null, email: null },
@@ -121,7 +120,6 @@ describe('hlavní věc v datech Dnes', () => {
 
   it('bez poptávky je to nejbližší dnešní termín, který ještě neskončil', async () => {
     const { accountId } = await createAccountWithBusiness({
-      orgId: 'org_dnes_termin',
       name: 'Zámečnictví Termín',
       industry: 'zamecnictvi',
       owner: { userId: 'user_t', name: null, email: null },

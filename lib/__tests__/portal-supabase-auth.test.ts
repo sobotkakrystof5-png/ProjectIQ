@@ -102,7 +102,6 @@ describe('Clerk v klientském prostoru', () => {
       pathname: '/klient/prihlaseni',
       profile: 'workspace',
       mode: 'enforce',
-      clerkHost: 'neco.clerk.accounts.dev',
     })
     expect(csp).not.toContain('clerk')
   })

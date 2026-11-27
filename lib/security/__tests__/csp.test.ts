@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCsp, clerkFrontendApiHost, createNonce, cspProfileFor, hasPrefix } from '@/lib/security/csp'
+import { buildCsp, createNonce, cspProfileFor, hasPrefix } from '@/lib/security/csp'
 
 const directive = (csp: string, name: string) =>
   csp.split('; ').find((d) => d === name || d.startsWith(`${name} `))
@@ -106,43 +106,21 @@ describe('buildCsp', () => {
   })
 })
 
-describe('Clerk', () => {
-  const nonce = 'dGVzdG5vbmNl'
-  // pk_test_ + base64("demo-app-12.clerk.accounts.dev$")
-  const key = `pk_test_${btoa('demo-app-12.clerk.accounts.dev$')}`
-  const host = 'demo-app-12.clerk.accounts.dev'
-
-  it('host Frontend API z publishable key', () => {
-    expect(clerkFrontendApiHost(key)).toBe(host)
-    expect(clerkFrontendApiHost(`pk_live_${btoa('clerk.zakaziq.cz$')}`)).toBe('clerk.zakaziq.cz')
-  })
-
-  it('neplatný klíč nepustí nic', () => {
-    expect(clerkFrontendApiHost(undefined)).toBeNull()
-    expect(clerkFrontendApiHost('sk_test_abc')).toBeNull()
-    expect(clerkFrontendApiHost(`pk_test_${btoa('*.evil.com$')}`)).toBeNull()
-    expect(clerkFrontendApiHost(`pk_test_${btoa('a.b.cz https://x.cz$')}`)).toBeNull()
-    expect(clerkFrontendApiHost(`pk_test_${btoa('bez-dolaru.cz')}`)).toBeNull()
-  })
-
-  it('jen na /w, konkrétní hosty, script-src beze změny', () => {
-    const w = buildCsp({ nonce, pathname: '/w/prihlaseni', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    expect(directive(w, 'connect-src')).toBe(`connect-src 'self' https://${host}`)
-    expect(directive(w, 'img-src')).toContain('https://img.clerk.com')
-    expect(directive(w, 'frame-src')).toBe('frame-src https://challenges.cloudflare.com')
-    expect(directive(w, 'script-src')).not.toContain(host)
-    expect(w).not.toContain('*')
-
-    // Klientský prostor se od R-107 přihlašuje přes Supabase na serveru: žádný Clerk.
-    const klient = buildCsp({ nonce, pathname: '/klient/prihlaseni', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    expect(directive(klient, 'connect-src')).toBe(`connect-src 'self'`)
-    expect(klient).not.toContain('clerk')
-    expect(klient).not.toContain('*')
-
-    const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    const admin = buildCsp({ nonce, pathname: '/dashboard', profile: 'admin', mode: 'report-only', clerkHost: host })
-    const portal = buildCsp({ nonce, pathname: '/z/abc', profile: 'workspace', mode: 'enforce', clerkHost: host })
-    for (const csp of [landing, admin, portal]) expect(csp).not.toContain('clerk')
+describe('přihlášení bez cizích hostů (R-154, Clerk z repa odešel)', () => {
+  const nonce = 'abc'
+  it('/w, /klient, landing, portál i admin: connect-src jen vlastní doména, žádný Clerk ani Turnstile', () => {
+    const w = buildCsp({ nonce, pathname: '/w/prihlaseni', profile: 'workspace', mode: 'enforce' })
+    expect(directive(w, 'connect-src')).toBe(`connect-src 'self'`)
+    expect(directive(w, 'frame-src')).toBe(`frame-src 'none'`)
+    const klient = buildCsp({ nonce, pathname: '/klient/prihlaseni', profile: 'workspace', mode: 'enforce' })
+    const landing = buildCsp({ nonce, pathname: '/', profile: 'workspace', mode: 'enforce' })
+    const admin = buildCsp({ nonce, pathname: '/dashboard', profile: 'admin', mode: 'report-only' })
+    const portal = buildCsp({ nonce, pathname: '/z/abc', profile: 'workspace', mode: 'enforce' })
+    for (const csp of [w, klient, landing, admin, portal]) {
+      expect(csp).not.toContain('clerk')
+      expect(csp).not.toContain('challenges.cloudflare.com')
+      expect(csp).not.toContain('*')
+    }
   })
 })
 

@@ -10,8 +10,8 @@
 |---|---|---|
 | F0 | Admin `/dashboard` (R-105, R-106) | na produkci od 2026-11-15 |
 | **F1** | Klientský prostor `/klient` | **na produkci od 2026-11-21** (`fa79603`, převzato z `auth/supabase-klient` v KP11); migrace 113 od 2026-11-20, HTTPS hook, SMTP a šablona hesla nastavené 2026-11-21; naostro prošlo pozvánka → heslo → obnova hesla |
-| F2 | Workspace `/w`, `/api/ws`, pozvání klientů z adminu (S17) | nezačato |
-| F3 | Odstranění Clerku z repa (`@clerk/*`, webhook, CSP, env) | nezačato, až po F2 |
+| **F2** | Workspace `/w`, `/api/ws`, pozvání klientů z adminu (S17) | **v kódu 2026-11-27** (větev `ws/supabase-auth`, R-154, migrace 141 neaplikovaná) |
+| **F3** | Odstranění Clerku z repa (`@clerk/*`, webhook, CSP, env) | **v kódu 2026-11-27** spolu s F2; zbývá Vercel env, aplikace v Clerku a DNS (Kryštof) |
 
 ## Omezení, se kterými plán počítá
 
@@ -83,7 +83,11 @@
 7. Deploy větve, pak průchod: pozvánka z adminu → založení přístupu → přehled →
    odhlášení → přihlášení → zapomenuté heslo. Na 390 a 1280 px.
 
-## F2 — Workspace `/w` (nezačato)
+## F2 — Workspace `/w` (v kódu 2026-11-27, R-154)
+
+**Jak to dopadlo:** účet a členství jen v Neonu (`ws.members.clerk_user_id` = id ze Supabase), `ws.member_account` a `ws.business_scope_for_user`, pozvánka vlastníka `ws.account_invites` z adminu, povolení k registraci `ws.signup_permits` (registrace zavřená do Stripe live), přihlášení heslem nebo kódem z e-mailu, odkaz z e-mailu `/w/auth/potvrzeni`. Technika v referenci B4, bezpečnost DECISIONS #059. Bod 6 (Free plán) zůstává přijatým rizikem (#059 b).
+
+Původní návrh:
 
 Clerk tu drží víc než přihlášení: **organizace** (účet = organizace,
 `ws.accounts.clerk_org_id`), členy (`ws.members.clerk_user_id`), pozvánky členů
@@ -106,7 +110,11 @@ týmu a klientů z adminu (S17, `lib/ws/admin/invite.ts`), webhook
 6. **Rozhodnout před F2:** placený Workspace na Free projektu Supabase (uspání,
    limity e-mailů, jeden projekt s adminem) — buď Pro, nebo uvolnit druhý projekt.
 
-## F3 — úklid (nezačato)
+## F3 — úklid (v kódu 2026-11-27)
+
+V repu hotovo (`git grep @clerk` prázdný, hlídá test `ws-supabase-auth`). Zbývá mimo kód: smazat `CLERK_*` z Vercelu, aplikaci v Clerku a 5 CNAME Clerku u WEDOS.
+
+Původní zadání:
 
 Odebrat `@clerk/nextjs`, `@clerk/localizations`, `lib/security/clerk.ts`,
 `components/ws/auth/clerk-appearance.ts`, webhook, Clerk zdroje v CSP, env

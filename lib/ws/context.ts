@@ -6,28 +6,43 @@ import { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH } from './paths'
 // Kontext každé server action, route handleru a server komponenty Workspace
 // (AGENTS.md B3): `const ctx = await requireWorkspace()` je první řádek.
 //
-// Přihlášení je za rozhraním WsAuthProvider. Výchozí je Clerk (auth() z
-// @clerk/nextjs/server → userId, aktivní organizace, role). Testy si přes
-// setWsAuthProvider podstrčí vlastní identitu a Clerk se v nich nenačte.
+// Kdo je přihlášený, řekne podepsaný token Supabase Auth (R-154, dřív Clerk).
+// Ke kterému účtu patří a s jakou rolí, řekne až tabulka ws.members — Supabase
+// o účtech nic neví a session sama do Workspace nepustí (platí i pro admina,
+// který je ve stejném projektu Supabase). Přihlášení je za rozhraním
+// WsAuthProvider; testy si přes setWsAuthProvider podstrčí vlastní identitu.
 
 export type WsRole = 'owner' | 'staff'
 export type WsContext = { userId: string; accountId: string; role: WsRole }
 
-export type WsIdentity = { userId: string; orgId: string | null; orgRole: string | null }
+export type WsIdentity = { userId: string; email: string | null; name?: string | null }
 export type WsAuthProvider = () => Promise<WsIdentity | null>
 
-const clerkAuthProvider: WsAuthProvider = async () => {
-  const { auth } = await import('@clerk/nextjs/server')
-  const { userId, orgId, orgRole } = await auth()
+const supabaseAuthProvider: WsAuthProvider = async () => {
+  const { supabaseConfigured } = await import('@/lib/supabase/config')
+  if (!supabaseConfigured()) return null
+  const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+  const supabase = await createSupabaseServerClient()
+  // getClaims() ověří podpis tokenu (ES256) lokálně; getSession() by jen přečetl cookie.
+  const { data, error } = await supabase.auth.getClaims()
+  const claims = error ? null : data?.claims
+  const userId = typeof claims?.sub === 'string' ? claims.sub : ''
   if (!userId) return null
-  return { userId, orgId: orgId ?? null, orgRole: orgRole ?? null }
+  const meta = claims?.user_metadata as Record<string, unknown> | undefined
+  const name = typeof meta?.name === 'string' && meta.name.trim() ? meta.name.trim().slice(0, 200) : null
+  return { userId, email: typeof claims?.email === 'string' ? claims.email : null, name }
 }
 
-let authProvider: WsAuthProvider = clerkAuthProvider
+let authProvider: WsAuthProvider = supabaseAuthProvider
 
-/** Jen pro testy: vlastní identita. `null` vrátí Clerk. */
+/** Jen pro testy: vlastní identita. `null` vrátí Supabase. */
 export function setWsAuthProvider(provider: WsAuthProvider | null): void {
-  authProvider = provider ?? clerkAuthProvider
+  authProvider = provider ?? supabaseAuthProvider
+}
+
+/** Přihlášený člověk, nebo `null` (průvodce, pozvánka, přihlášení). */
+export async function getWsIdentity(): Promise<WsIdentity | null> {
+  return authProvider()
 }
 
 export { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH }
@@ -39,15 +54,14 @@ export { WS_ONBOARDING_PATH, WS_SIGN_IN_PATH }
 type Cache = <F extends (...args: never[]) => unknown>(fn: F) => F
 const cache: Cache = (React as unknown as { cache?: Cache }).cache ?? ((fn) => fn)
 
-/** Přihlášený člověk s aktivní organizací; jinak přesměruje na přihlášení nebo průvodce. */
-export async function requireIdentity(): Promise<WsIdentity & { orgId: string }> {
+/** Přihlášený člověk; jinak přesměruje na přihlášení. Účet řeší `requireWorkspace()`. */
+export async function requireIdentity(): Promise<WsIdentity> {
   const identity = await authProvider()
   if (!identity) redirect(WS_SIGN_IN_PATH)
-  if (!identity.orgId) redirect(WS_ONBOARDING_PATH)
-  return { ...identity, orgId: identity.orgId }
+  return identity
 }
 
-export const roleOf = (orgRole: string | null): WsRole => (orgRole === 'org:admin' ? 'owner' : 'staff')
+export const roleOf = (role: unknown): WsRole => (role === 'owner' ? 'owner' : 'staff')
 
 // Co o účtu a byznysu už víme z jednoho dotazu na začátku požadavku
 // (`loadBusinessScope` v scope.ts, RD02). Stejný React.cache jako výše, takže
@@ -79,17 +93,20 @@ export const requireWorkspace = cache(async function requireWorkspace(): Promise
   if (seeded) return seeded
 
   const identity = await requireIdentity()
-
-  // Účet ještě neznáme, proto SECURITY DEFINER funkce místo SELECT pod RLS.
-  const [row] = await wsSystem<{ id: string | null }>`SELECT ws.account_by_clerk_org(${identity.orgId}) AS id`
-  if (!row?.id) redirect(WS_ONBOARDING_PATH)
-
-  return {
-    userId: identity.userId,
-    accountId: row.id,
-    role: roleOf(identity.orgRole),
-  }
+  const membership = await accountForUser(identity.userId)
+  if (!membership) redirect(WS_ONBOARDING_PATH)
+  return { userId: identity.userId, accountId: membership.accountId, role: membership.role }
 })
+
+/**
+ * Účet a role člověka podle ws.members (vlastněný účet má přednost). Účet ještě
+ * neznáme, proto SECURITY DEFINER funkce místo SELECT pod RLS (migrace 141).
+ */
+export async function accountForUser(userId: string): Promise<{ accountId: string; role: WsRole } | null> {
+  if (!userId) return null
+  const [row] = await wsSystem<{ account_id: string; role: string }>`SELECT account_id, role FROM ws.member_account(${userId})`
+  return row ? { accountId: row.account_id, role: roleOf(row.role) } : null
+}
 
 export type WsBusiness = {
   id: string

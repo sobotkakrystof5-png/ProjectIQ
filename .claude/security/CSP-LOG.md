@@ -92,11 +92,17 @@ Změna: z profilu `admin` odebráno `frame-src https://www.tradingview-widget.co
 Kvůli: graf ETF z Finance › Osobní zmizel na přání Kryštofa (`components/TradingViewChart.tsx` smazaný), skript ani iframe TradingView se už nenačítají. Politika se zpřísnila, nic se nepřidalo.
 Ověřeno: testy `lib/security/__tests__/csp.test.ts`. V prohlížeči neověřeno.
 
+## v11 — 2026-11-27
+Změna: z profilu `workspace` na `/w/*` odebrány zdroje Clerku — `connect-src https://<frontend api Clerku>`, `img-src https://img.clerk.com`, `frame-src https://challenges.cloudflare.com`. Funkce `clerkFrontendApiHost` a volba `clerkHost` v `buildCsp` zmizely. Všechny cesty mají zase `connect-src 'self'` a `frame-src 'none'` (kromě náhledu PDF v adminu).
+Kvůli: Workspace se od R-154 přihlašuje přes Supabase Auth **na serveru** (server actions), Clerk z repa odešel (DECISIONS #059). Politika se zpřísnila, nic se nepřidalo.
+Ověřeno: `npm run build` + `next start` lokálně — `/w/prihlaseni`, `/w/registrace`, `/w/zapomenute-heslo` vracejí 200 s `connect-src 'self'`, konzole prohlížeče bez chyb (Playwright, 390 a 1280 px); testy `lib/security/__tests__/csp.test.ts` a `proxy-gate-only.test.ts`.
+
 ## Čeká (zapsat jako vN při přidání)
-- Clerk produkční instance (`clerk.zakaziq.cz`): host se změní sám s klíčem, ověřit konzoli po nasazení. Kdyby se Turnstile nebo Google přihlášení zasekly na CSP, doplnit jen to, co ukáže konzole.
+- Přihlášení přes Google (pokud se zavede): přesměrování na Supabase a Google je navigace, ne `connect-src`; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat jen to, co ukáže konzole.
 - S08 Stripe Checkout: přesměrování, pravděpodobně nic; kdyby redirect po odeslání formuláře narazil na `form-action`, přidat `https://checkout.stripe.com`.
 
 ## Odebrané
+- Zdroje Clerku na `/w/*` (`connect-src` Frontend API, `img-src img.clerk.com`, `frame-src challenges.cloudflare.com`) — odebráno 2026-11-27 ve v11, Workspace přešel na Supabase Auth (R-154, DECISIONS #059).
 - `frame-src https://www.tradingview-widget.com` (profil `admin`) — odebráno 2026-11-15 ve v10, graf ETF z Financí zrušen.
 - Zdroje Clerku na `/klient/*` (`connect-src` Frontend API, `img-src img.clerk.com`, `frame-src challenges.cloudflare.com`) — odebráno 2026-11-15 ve v9, klientský prostor přešel na Supabase Auth (R-107, DECISIONS #031).
 - `style-src https://fonts.googleapis.com`, `font-src https://fonts.gstatic.com` (profil `admin`) — odebráno 2026-11-11 ve v8, protože Inter se přes `@import` už nenačítá (AD04, R-081).

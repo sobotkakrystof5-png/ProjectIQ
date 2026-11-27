@@ -1,3 +1,5 @@
+import { WS_SIGNUP_OPEN } from '@/lib/ws/paths'
+
 // Obsah landing page na jednom místě (docs/landing/PROJECT-BRIEF.md § 4).
 // Nevymýšlet údaje (AGENTS.md → B10). Fakta o ceně a zkušební době: R-018, R-026,
 // R-038. Provozovatel a zpracovatelé pro právní texty: legal.ts (R-079).
@@ -14,7 +16,7 @@ export const COMPANY_ID = '29977231'
 /** Kde běží databáze: Neon eu-central-1 (Dotazy, ochrana údajů). */
 export const DATA_LOCATION = 'Databáze běží v Evropské unii, ve Frankfurtu v Německu.'
 
-/** Cesty do aplikace — přesné cesty Clerku potvrdí S07. */
+/** Cesty do aplikace. */
 export const ROUTES = {
   signUp: '/w/registrace',
   signIn: '/w/prihlaseni',
@@ -29,18 +31,17 @@ export const ROUTES = {
 export const PRICE_LABEL = '249 Kč'
 
 /**
- * Jde se do Workspace zaregistrovat sám? (R-134, D-KV2)
+ * Jde se do Workspace zaregistrovat sám? (R-134, D-KV2, R-154)
  *
- * Do spuštění Workspace na Supabase (R-107, F2) ne: registrace na produkci
- * běží na vývojové instanci Clerku a Stripe v sandboxu, takže by ji nikdo
- * nedokončil. Hlavní akce proto vede na formulář do Hovorů (R-065) a přístup
- * nastavuje Kryštof osobně. „Přihlásit" vede do klientského prostoru — jediní,
- * kdo se dnes z landing page skutečně přihlašují, jsou klienti webu.
+ * Do spuštění plateb (Stripe live) ne. Hlavní akce proto vede na formulář do
+ * Hovorů (R-065) a přístup nastavuje Kryštof osobně pozvánkou z adminu.
+ * „Přihlásit" vede do klientského prostoru — jediní, kdo se dnes z landing
+ * page skutečně přihlašují, jsou klienti webu (tentýž účet platí i pro /w).
  *
- * Po spuštění přepnout na `true`: vrátí se registrace, „Přihlásit" do
- * Workspace i původní texty.
+ * Jediný vypínač je `WS_SIGNUP_OPEN` v `lib/ws/paths.ts`: otevře registraci
+ * s ověřením e-mailu kódem, průvodce i texty tady.
  */
-export const SIGNUP_OPEN = false
+export const SIGNUP_OPEN = WS_SIGNUP_OPEN
 
 /** Kotva formuláře s předvyplněnou zprávou „Chci vyzkoušet ZakazIQ". */
 export const TRY_ANCHOR = 'vyzkouset'

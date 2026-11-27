@@ -195,13 +195,35 @@ describe('oddělení účtů (RLS jako ws_app)', () => {
     expect(await pgCode(asApp(db, A.account, (tx) => tx.query('ALTER TABLE ws.customers DISABLE ROW LEVEL SECURITY')))).toBe('42501')
   })
 
-  it('ws.account_by_clerk_org najde účet bez kontextu, přímý SELECT ne', async () => {
+  it('ws.member_account najde účet a roli člena bez kontextu, přímý SELECT ne', async () => {
     const res = await asApp(db, null, async (tx) => ({
-      viaFunction: (await tx.query<{ id: string }>(`SELECT ws.account_by_clerk_org('org_b') AS id`)).rows[0].id,
+      viaFunction: (await tx.query<{ account_id: string; role: string }>(`SELECT account_id, role FROM ws.member_account('user_b')`)).rows[0],
       direct: (await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM ws.accounts`)).rows[0].n,
-      unknown: (await tx.query<{ id: string | null }>(`SELECT ws.account_by_clerk_org('org_neni') AS id`)).rows[0].id,
+      unknown: (await tx.query(`SELECT * FROM ws.member_account('user_neni')`)).rows.length,
+      empty: (await tx.query(`SELECT * FROM ws.member_account('')`)).rows.length,
     }))
-    expect(res).toEqual({ viaFunction: B.account, direct: 0, unknown: null })
+    expect(res).toEqual({ viaFunction: { account_id: B.account, role: 'owner' }, direct: 0, unknown: 0, empty: 0 })
+  })
+
+  it('pozvánky vlastníka: ws_app vidí jen svoje, náhled a uplatnění jdou jen přes funkce', async () => {
+    const hash = 'c'.repeat(64)
+    await db.query(
+      `INSERT INTO ws.account_invites (account_id, email, code_hash, expires_at) VALUES ($1, 'novy@example.cz', $2, now() + interval '1 day')`,
+      [A.account, hash],
+    )
+    try {
+      const res = await asApp(db, null, async (tx) => ({
+        direct: (await tx.query(`SELECT * FROM ws.account_invites`)).rows.length,
+        preview: (await tx.query<{ email: string }>(`SELECT email FROM ws.account_invite_preview($1)`, [hash])).rows,
+        unknown: (await tx.query(`SELECT * FROM ws.account_invite_preview($1)`, ['d'.repeat(64)])).rows.length,
+      }))
+      expect(res).toEqual({ direct: 0, preview: [{ email: 'novy@example.cz' }], unknown: 0 })
+      const otherAccount = await asApp(db, B.account, (tx) => tx.query<{ account_id: string; code_hash: string }>(`SELECT account_id, code_hash FROM ws.account_invites`))
+      expect(otherAccount.rows.every((r) => r.account_id === B.account)).toBe(true)
+      expect(otherAccount.rows.some((r) => r.code_hash === hash)).toBe(false)
+    } finally {
+      await db.query(`DELETE FROM ws.account_invites WHERE code_hash = $1`, [hash])
+    }
   })
 
   it('pomocné funkce migrací ws_app spustit nesmí', async () => {

@@ -99,13 +99,11 @@ beforeAll(async () => {
   setStripeForTests(fakeStripe)
   const owner = (userId: string) => ({ userId, name: null, email: `${userId}@example.cz` })
   ;({ accountId: A } = await createAccountWithBusiness({
-    orgId: 'org_bill_a',
     name: 'Zámečnictví Novák',
     industry: 'zamecnictvi',
     owner: owner('user_bill_a'),
   }))
   ;({ accountId: B } = await createAccountWithBusiness({
-    orgId: 'org_bill_b',
     name: 'Úklid Svoboda',
     industry: 'uklid',
     owner: owner('user_bill_b'),
@@ -298,7 +296,6 @@ describe('createCheckoutSession', () => {
     process.env.STRIPE_PRICE_MONTHLY = 'price_test_249'
     process.env.NEXT_PUBLIC_APP_URL = 'https://zakaziq.test/'
     ;({ accountId: C } = await createAccountWithBusiness({
-      orgId: 'org_bill_c',
       name: 'Autoservis Dvořák',
       industry: 'autoservis',
       owner: { userId: 'user_bill_c', name: null, email: 'user_bill_c@example.cz' },

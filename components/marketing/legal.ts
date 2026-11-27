@@ -18,7 +18,7 @@ export const OPERATOR = {
 export const OPERATOR_LINE = `${OPERATOR.name}, ${OPERATOR.address}, IČO ${OPERATOR.companyId}`
 
 /** Verze právních textů. Při změně obsahu posunout a změnu oznámit e-mailem (podmínky, Změny podmínek). */
-export const LEGAL_VERSION = '3. 11. 2026'
+export const LEGAL_VERSION = '27. 11. 2026'
 
 export type Processor = {
   name: string
@@ -34,7 +34,7 @@ export const PROCESSORS: readonly Processor[] = [
   { name: 'Vercel', role: 'provoz aplikace a webu', where: 'EU (Frankfurt), společnost z USA', customerData: true },
   { name: 'Neon', role: 'databáze', where: 'EU (Frankfurt), společnost z USA', customerData: true },
   { name: 'Resend', role: 'odesílání e-mailů z aplikace', where: 'EU (Irsko), společnost z USA', customerData: true },
-  { name: 'Clerk', role: 'přihlášení do účtu', where: 'USA', customerData: true },
+  { name: 'Supabase', role: 'přihlášení do účtu', where: 'EU (Frankfurt), společnost z USA', customerData: true },
   {
     name: 'Anthropic',
     role: 'přepis přijatých faktur z PDF, jen když ho použijete',

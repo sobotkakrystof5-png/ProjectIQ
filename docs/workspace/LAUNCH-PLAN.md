@@ -2,6 +2,8 @@
 
 > Plán, **jak** se dostat od stavu „hotové v kódu a ověřené na Preview" k veřejnému spuštění. Kontrolní seznam *co* musí platit je v [`LAUNCH.md`](LAUNCH.md); postupy nastavení služeb v [`SETUP.md`](SETUP.md). Tenhle dokument je řadí do pořadí, přiděluje práci a hlídá závislosti.
 >
+> **2026-11-27 (R-154):** Clerk z projektu odešel, Workspace se přihlašuje přes Supabase Auth jako admin a klientský prostor. Všechny kroky s Clerkem níž (produkční instance, Google OAuth pro Clerk, webhook, DNS záznamy Clerku) **odpadají**; místo nich nastavení Supabase pro Workspace v `.claude/security/STATE.md` → Otevřené položky a v `docs/AUTH-SUPABASE-PLAN.md`.
+>
 > **Stav k:** 2026-11-03 · větev `ws/redesign-app` · produkce běží na starém `main` (`d948400`), nic z Workspace tam není.
 > **Značky:** **[K]** dělá Kryštof (účty, identita, DNS, rozhodnutí, ostré karty) · **[C]** dělá agent (kód, texty, ověření, zápisy do paměti) · **[K+C]** společně.
 > Tajné hodnoty se do repa, paměti ani sem nikdy nepíší (jen názvy proměnných).

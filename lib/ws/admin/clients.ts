@@ -163,8 +163,11 @@ export type ClientBusiness = { id: string; name: string; slug: string; industry:
 export type ClientMember = { role: 'owner' | 'staff'; name: string | null; email: string | null; createdAt: Date }
 export type ClientAudit = { at: Date; actor: string; action: string }
 
+export type ClientInvite = { email: string; expiresAt: Date; expired: boolean }
+
 export type ClientDetail = ClientRow & {
-  clerkOrgId: string
+  /** Poslední nevyužitá pozvánka vlastníka (R-154), nebo null. */
+  invite: ClientInvite | null
   ico: string | null
   newsEmails: boolean
   cancelAtPeriodEnd: boolean
@@ -178,9 +181,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** Detail účtu, nebo null. `accountId` z URL adminu — ověřený jen tvarem, data čte admin. */
 export async function getClientDetail(accountId: string): Promise<ClientDetail | null> {
   if (!UUID_RE.test(accountId)) return null
-  const [base, extra, businesses, members, audit] = await adminDb.batch([
+  const [base, extra, businesses, members, audit, invites] = await adminDb.batch([
     { text: `${LIST_SQL} WHERE a.id = $1`, params: [accountId] },
-    q`SELECT a.clerk_org_id, a.ico, a.news_emails FROM ws.accounts a WHERE a.id = ${accountId}`,
+    q`SELECT a.ico, a.news_emails FROM ws.accounts a WHERE a.id = ${accountId}`,
     q`SELECT b.id, b.name, b.slug, b.industry, b.archived_at IS NOT NULL AS archived,
         (SELECT max(w.last_used_at) FROM ws.web_integrations w WHERE w.account_id = b.account_id AND w.business_id = b.id AND w.active AND w.revoked_at IS NULL) AS web_used_at,
         EXISTS (SELECT 1 FROM ws.web_integrations w WHERE w.account_id = b.account_id AND w.business_id = b.id AND w.active AND w.revoked_at IS NULL) AS web_ready,
@@ -188,13 +191,18 @@ export async function getClientDetail(accountId: string): Promise<ClientDetail |
       FROM ws.businesses b WHERE b.account_id = ${accountId} ORDER BY b.created_at`,
     q`SELECT role, name, email, created_at FROM ws.members WHERE account_id = ${accountId} ORDER BY role DESC, created_at`,
     q`SELECT created_at, actor, action FROM ws.audit_log WHERE account_id = ${accountId} ORDER BY created_at DESC LIMIT 30`,
+    q`SELECT email, expires_at, expires_at <= now() AS expired FROM ws.account_invites
+      WHERE account_id = ${accountId} AND used_at IS NULL AND revoked_at IS NULL
+      ORDER BY created_at DESC LIMIT 1`,
   ])
   if (!base[0] || !extra[0]) return null
   const row = mapClient(base[0])
   const billing = billingStateFrom(subscriptionRows(base[0].subscriptions))
   return {
     ...row,
-    clerkOrgId: String(extra[0].clerk_org_id),
+    invite: invites[0]
+      ? { email: String(invites[0].email), expiresAt: new Date(String(invites[0].expires_at)), expired: Boolean(invites[0].expired) }
+      : null,
     ico: (extra[0].ico as string | null) ?? null,
     newsEmails: Boolean(extra[0].news_emails),
     cancelAtPeriodEnd: billing.cancelAtPeriodEnd,

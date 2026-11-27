@@ -5,10 +5,9 @@ import { setAdminAuthForTests } from '../admin/auth'
 import { setAdminDriverForTests } from '../admin/db'
 import { CLIENT_SORT, getClientDetail, listClients } from '../admin/clients'
 import { parseTableParams } from '@/lib/admin-table'
-import { InviteSetupError, inviteClient, setInviteClerkForTests, type InviteClerk } from '../admin/invite'
+import { inviteClient, setInviteMailerForTests, type InviteMailer } from '../admin/invite'
 import { generateWebKeys } from '../admin/web-keys'
 import { deleteNewsDraft, newsRecipients, parseNewsImage, publishNews, saveNews, sendNewsEmail, unpublishNews } from '../admin/news'
-import { ensureMember } from '../onboarding'
 import { resolveSecretKey } from '../keys'
 import { getNews } from '../email/inbox'
 import { queueNewsForAccount } from '../email/scheduled'
@@ -48,20 +47,15 @@ function ownerDriver(pg: PGlite): WsDriver {
 }
 
 const calls: string[] = []
-const fakeClerk = (over: Partial<InviteClerk> = {}): InviteClerk => ({
-  createOrganization: async (name) => {
-    calls.push(`org:${name}`)
-    return { id: `org_pozvany_${calls.length}` }
-  },
-  inviteOwner: async (orgId, email, redirect) => {
-    calls.push(`invite:${orgId}:${email}:${redirect}`)
-    return { id: 'orginv_1' }
-  },
-  deleteOrganization: async (orgId) => {
-    calls.push(`delete:${orgId}`)
-  },
-  ...over,
-})
+const sentMails: { to: string; text: string }[] = []
+const fakeMailer = (ok = true): InviteMailer => async (mail) => {
+  calls.push(`mail:${mail.to}`)
+  sentMails.push({ to: mail.to, text: mail.text })
+  return { ok }
+}
+
+/** Kód pozvánky z odkazu v e-mailu (/w/pozvanka/zw_…). */
+const codeFromMail = (text: string): string => /\/w\/pozvanka\/(zw_[A-Za-z0-9]{32})/.exec(text)?.[1] ?? ''
 
 const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex')
 
@@ -72,6 +66,7 @@ beforeAll(async () => {
   setLinkSecretForTests('test-pepper-'.repeat(4))
   setEmailTransportForTests(null)
   process.env.WS_KEY_PEPPER = 'p'.repeat(40)
+  process.env.PORTAL_INVITE_PEPPER = 'i'.repeat(40)
   await db.query(`UPDATE ws.members SET email = 'majitel-' || account_id::text || '@example.cz'`)
 }, 60_000)
 
@@ -79,7 +74,7 @@ afterAll(async () => {
   setWsDriverForTests(null)
   setAdminDriverForTests(null)
   setAdminAuthForTests(null)
-  setInviteClerkForTests(null)
+  setInviteMailerForTests(null)
   setLinkSecretForTests(null)
   setEmailTransportForTests(undefined)
   await db?.close()
@@ -87,12 +82,13 @@ afterAll(async () => {
 
 beforeEach(() => {
   calls.length = 0
+  sentMails.length = 0
   setAdminAuthForTests(async () => admin)
-  setInviteClerkForTests(fakeClerk())
+  setInviteMailerForTests(fakeMailer())
 })
 
 describe('bez admina nic', () => {
-  it('každá akce adminu bez NextAuth session odmítne a nic nezapíše', async () => {
+  it('každá akce adminu bez přihlášeného admina odmítne a nic nezapíše', async () => {
     setAdminAuthForTests(async () => null)
     const before = await rows<{ n: number }>(`SELECT (SELECT count(*) FROM ws.accounts) + (SELECT count(*) FROM ws.product_news) + (SELECT count(*) FROM ws.audit_log) AS n`)
     const results = await Promise.all([
@@ -143,12 +139,14 @@ describe('přehled klientů', () => {
 })
 
 describe('pozvat klienta', () => {
-  it('založí organizaci, účet s byznysem ze šablony bez člena, pošle pozvánku a zapíše audit', async () => {
-    const res = await inviteClient(admin, { email: 'klient@example.cz', businessName: 'Zámečnictví Pozvánka', industry: 'zamecnictvi' })
+  it('založí účet s byznysem ze šablony bez člena, pošle pozvánku s kódem a zapíše audit', async () => {
+    const res = await inviteClient(admin, { email: 'Klient@Example.cz', businessName: 'Zámečnictví Pozvánka', industry: 'zamecnictvi' })
     expect(res.status).toBe('invited')
     const accountId = res.accountId
-    expect(calls[0]).toBe('org:Zámečnictví Pozvánka')
-    expect(calls[1]).toMatch(/^invite:org_pozvany_1:klient@example\.cz:https?:\/\/.+\/w\/registrace$/)
+    expect(calls).toEqual(['mail:klient@example.cz'])
+    const code = codeFromMail(sentMails[0].text)
+    expect(code).toMatch(/^zw_/)
+    expect(sentMails[0].text).toContain('Zámečnictví Pozvánka')
 
     const [biz] = await rows<{ industry: string; stages: number; fields: number }>(
       `SELECT b.industry, (SELECT count(*)::int FROM ws.stages s WHERE s.business_id = b.id) AS stages,
@@ -161,6 +159,12 @@ describe('pozvat klienta', () => {
     expect(biz.fields).toBeGreaterThan(0)
     expect(await rows(`SELECT 1 FROM ws.members WHERE account_id = $1`, [accountId])).toHaveLength(0)
 
+    // V DB je jen otisk kódu, nikdy kód sám.
+    const invites = await rows<{ email: string; code_hash: string }>(`SELECT email, code_hash FROM ws.account_invites WHERE account_id = $1`, [accountId])
+    expect(invites).toHaveLength(1)
+    expect(invites[0].email).toBe('klient@example.cz')
+    expect(JSON.stringify(invites)).not.toContain(code)
+
     const audit = await rows<{ actor: string; action: string; details: Record<string, unknown> }>(
       `SELECT actor, action, details FROM ws.audit_log WHERE account_id = $1 ORDER BY created_at, action`,
       [accountId],
@@ -170,28 +174,37 @@ describe('pozvat klienta', () => {
     expect(JSON.stringify(audit)).not.toContain('admin@example.cz')
     expect(JSON.stringify(audit)).not.toContain('klient@example.cz')
 
-    // Klient přijme pozvánku a otevře průvodce: zapíše se jako vlastník, jednou.
-    const ctx = { accountId, userId: 'user_pozvany', role: 'owner' as const }
-    expect(await ensureMember(ctx, async () => ({ name: 'Jan Pozvaný', email: 'klient@example.cz' }))).toBe(true)
-    expect(await ensureMember(ctx, async () => ({ name: 'Jiné', email: 'jine@example.cz' }))).toBe(false)
+    // Klient pozvánku přijme: zapíše se jako vlastník, jednou; druhé použití nejde.
+    const { hashWsInviteCode } = await import('../invite')
+    const hash = hashWsInviteCode(code)
+    const redeem = (user: string, email: string) =>
+      rows<{ a: string | null }>(`SELECT ws.redeem_account_invite($1, $2, $3, 'Jan Pozvaný') AS a`, [hash, user, email])
+    expect((await redeem('sb-jan', 'jine@example.cz'))[0].a).toBeNull()
+    expect((await redeem('sb-jan', 'KLIENT@example.cz'))[0].a).toBe(accountId)
+    expect((await redeem('sb-jan', 'klient@example.cz'))[0].a).toBeNull()
     expect(await rows(`SELECT role, name FROM ws.members WHERE account_id = $1`, [accountId])).toEqual([{ role: 'owner', name: 'Jan Pozvaný' }])
   })
 
-  it('když pozvánka neodejde, účet zůstane a jde poslat znovu', async () => {
-    setInviteClerkForTests(fakeClerk({ inviteOwner: async () => Promise.reject(new Error('duplicate')) }))
+  it('nová pozvánka zneplatní starou; když e-mail neodejde, účet zůstane a jde poslat znovu', async () => {
+    setInviteMailerForTests(fakeMailer(false))
     const res = await inviteClient(admin, { email: 'druhy@example.cz', businessName: 'Úklid Druhý', industry: 'uklid' })
     expect(res.status).toBe('invite_failed')
     expect(await rows(`SELECT 1 FROM ws.accounts WHERE id = $1`, [res.accountId])).toHaveLength(1)
+
+    setInviteMailerForTests(fakeMailer())
+    expect((await resendInviteAction({ accountId: res.accountId, email: 'druhy@example.cz' })).ok).toBe(true)
+    const open = await rows(`SELECT 1 FROM ws.account_invites WHERE account_id = $1 AND used_at IS NULL AND revoked_at IS NULL`, [res.accountId])
+    expect(open).toHaveLength(1)
+    const detail = await getClientDetail(res.accountId)
+    expect(detail?.invite).toMatchObject({ email: 'druhy@example.cz', expired: false })
   })
 
-  it('selže-li Clerk nebo založení účtu, nic nezůstane', async () => {
-    setInviteClerkForTests(fakeClerk({ createOrganization: async () => Promise.reject(new Error('clerk down')) }))
-    await expect(inviteClient(admin, { email: 'x@example.cz', businessName: 'Nic', industry: 'uklid' })).rejects.toBeInstanceOf(InviteSetupError)
-
-    // Organizace už má účet A → unikátní clerk_org_id vrátí existující účet, ne nový.
-    setInviteClerkForTests(fakeClerk({ createOrganization: async () => ({ id: 'org_a' }) }))
-    const res = await inviteClient(admin, { email: 'x@example.cz', businessName: 'Kolize', industry: 'uklid' })
-    expect(res.accountId).toBe(A.account)
+  it('kdo už vlastní jiný účet, druhý vlastnit nemůže (23505), pozvánka zůstane nevyužitá', async () => {
+    const res = await inviteClient(admin, { email: 'user_a@example.cz', businessName: 'Druhý účet', industry: 'uklid' })
+    const { hashWsInviteCode } = await import('../invite')
+    const hash = hashWsInviteCode(codeFromMail(sentMails[0].text))
+    await expect(rows(`SELECT ws.redeem_account_invite($1, 'user_a', 'user_a@example.cz', NULL)`, [hash])).rejects.toMatchObject({ code: '23505' })
+    expect(await rows(`SELECT 1 FROM ws.account_invites WHERE account_id = $1 AND used_at IS NULL`, [res.accountId])).toHaveLength(1)
   })
 
   it('akce ověří vstup (e-mail, obor)', async () => {
@@ -300,7 +313,7 @@ describe('novinky', () => {
     // Hodiny PGlite mezi transakcemi neběží spolehlivě — odeslání posuneme do minulosti.
     await db.query(`UPDATE ws.product_news SET emailed_at = now() - interval '1 hour' WHERE emailed_at IS NOT NULL`)
     const res = await inviteClient(admin, { email: 'pozdni@example.cz', businessName: 'Pozdní Klient', industry: 'uklid' })
-    await ensureMember({ accountId: res.accountId, userId: 'user_pozdni', role: 'owner' }, async () => ({ name: null, email: 'pozdni@example.cz' }))
+    await db.query(`INSERT INTO ws.members (account_id, clerk_user_id, role, email) VALUES ($1, 'user_pozdni', 'owner', 'pozdni@example.cz')`, [res.accountId])
     expect(await queueNewsForAccount({ accountId: res.accountId })).toBe(0)
   })
 })

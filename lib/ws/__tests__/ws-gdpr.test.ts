@@ -189,17 +189,17 @@ describe('zrušení účtu', () => {
     expect(await reopenAccount(ctxB)).toBe(false)
   })
 
-  it('cron smaže účet po lhůtě celý a vrátí organizaci ke smazání v Clerku', async () => {
+  it('cron smaže účet po lhůtě celý a předá jeho členy ke smazání přístupu v Supabase', async () => {
     await closeAccount(ctxB)
     expect((await runDailyGdpr(async () => {})).accountsDeleted).toBe(0) // lhůta neuplynula
     await db.query(`UPDATE ws.accounts SET delete_after = now() - interval '1 minute' WHERE id = $1`, [B.account])
-    const orgs: string[] = []
-    const run = await runDailyGdpr(async (org) => {
-      orgs.push(org)
-      throw new Error('Clerk nedostupný') // chyba Clerku výmaz dat nezastaví
+    const users: string[] = []
+    const run = await runDailyGdpr(async (user) => {
+      users.push(user)
+      throw new Error('Supabase nedostupný') // chyba Supabase výmaz dat nezastaví
     })
-    expect(run).toMatchObject({ accountsDeleted: 1, orgsFailed: 1 })
-    expect(orgs).toEqual(['org_b'])
+    expect(run).toMatchObject({ accountsDeleted: 1, usersFailed: 1 })
+    expect(users).toEqual(['user_b'])
 
     const { rows } = await db.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.columns WHERE table_schema = 'ws' AND column_name = 'account_id'`)

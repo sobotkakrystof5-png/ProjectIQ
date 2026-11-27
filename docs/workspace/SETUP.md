@@ -193,7 +193,7 @@ Cron `/api/cron/ws-email` běží denně v 5:00 UTC (7:00 letního času, 6:00 z
 Po 082 aplikovat `migrations/083_ws_admin_klienti_novinky.sql` rolí vlastníka a znovu `scripts/ws-grants.sql` (odebere `ws_app` práva na `ws.account_admin_notes`; migrace to dělá i sama). Data nemění. Na Neonu ověřeno čtením 2026-10-10: sloupce novinek, tabulka poznámek s RLS a bez práv `ws_app`.
 
 - `/dashboard/klienti` a `/dashboard/novinky` čtou `ws` přes `DATABASE_URL` (stejná proměnná jako zbytek adminu), nová env není potřeba.
-- Pozvání klienta volá Clerk Backend API (`CLERK_SECRET_KEY`), pozvánku posílá Clerk e-mailem; odkaz vede na `NEXT_PUBLIC_APP_URL` + `/w/registrace`. V produkci musí být produkční instance Clerku (Otevřené problémy).
+- Pozvání klienta (R-154) založí účet a pozvánku v `ws.account_invites` a pošle ji z krystof@vizeon.cz (`VIZEON_RESEND_API_KEY`); odkaz vede na `NEXT_PUBLIC_APP_URL` + `/w/pozvanka/<kód>`. Kód se hashuje s `PORTAL_INVITE_PEPPER`.
 - Klíče pro web potřebují `WS_KEY_PEPPER` jako Nastavení › Napojený web.
 - Novinky e-mailem odcházejí přes frontu S15 — bez `WS_EMAIL_FROM` čekají ve frontě.
 
@@ -201,7 +201,7 @@ Po 082 aplikovat `migrations/083_ws_admin_klienti_novinky.sql` rolí vlastníka 
 
 Po 083 aplikovat `migrations/084_ws_gdpr.sql` rolí vlastníka a znovu `scripts/ws-grants.sql` (dá `ws_app` právo spouštět `ws.anonymize_expired_invoices()` a `ws.purge_closed_accounts()`; migrace to dělá i sama). Data nemění, jen přidá sloupce a funkce.
 
-- Cron `/api/cron/ws-gdpr` je ve `vercel.json`, potřebuje `CRON_SECRET` (už existuje) a pro smazání organizace `CLERK_SECRET_KEY`.
+- Cron `/api/cron/ws-gdpr` je ve `vercel.json`, potřebuje `CRON_SECRET` (už existuje) a pro smazání přístupu v Supabase `SUPABASE_SERVICE_ROLE_KEY` (bez něj se přístup jen nesmaže, data ano).
 - Ověření po migraci: `SELECT proname FROM pg_proc WHERE pronamespace = 'ws'::regnamespace AND proname IN ('erase_customer','close_account','reopen_account','anonymize_expired_invoices','purge_closed_accounts')` vrátí 5 řádků.
 
 ## Fakturace (RD10): migrace 088

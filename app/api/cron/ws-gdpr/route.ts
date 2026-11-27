@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { clerkClient } from '@clerk/nextjs/server'
+import { deleteAuthUserIfUnused } from '@/lib/supabase/admin-users'
 import { isCronAuthorized } from '@/lib/ws/cron'
 import { syncSubscription } from '@/lib/ws/billing'
 import { runDailyGdpr } from '@/lib/ws/gdpr'
 
 // Denní úklid GDPR Workspace (S18, R-054, vercel.json): faktury vymazaných
-// zákazníků po 10 letech, účty po konci zaplaceného období (R-074), zrušené účty po 30 dnech (data i organizace v Clerku).
+// zákazníků po 10 letech, účty po konci zaplaceného období (R-074), zrušené účty po 30 dnech (data i přístup v Supabase,
+// pokud ho člověk nepotřebuje jinde).
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -14,11 +15,6 @@ export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req.headers.get('authorization'))) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
-  const result = await runDailyGdpr(
-    async (orgId) => {
-      await (await clerkClient()).organizations.deleteOrganization(orgId)
-    },
-    syncSubscription,
-  )
+  const result = await runDailyGdpr(deleteAuthUserIfUnused, syncSubscription)
   return NextResponse.json({ success: true, ...result })
 }

@@ -2,6 +2,8 @@
 
 Pořadí, rozdělení práce a rizika: [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
 
+> **2026-11-27 (R-154):** Clerk z projektu odešel, Workspace se přihlašuje přes Supabase Auth jako admin a klientský prostor. Všechny kroky s Clerkem níž (produkční instance, Google OAuth pro Clerk, webhook, DNS záznamy Clerku) **odpadají**; místo nich nastavení Supabase pro Workspace v `.claude/security/STATE.md` → Otevřené položky a v `docs/AUTH-SUPABASE-PLAN.md`.
+
 Stav k 2026-11-03. Položky označené **blokuje spuštění** musí být hotové a doložené
 před veřejným spuštěním. Vercel eviduje `zakaziq.cz` i `www.zakaziq.cz` jako ověřené
 domény projektu `project-iq`; produkce stále běží ze staršího `main`.

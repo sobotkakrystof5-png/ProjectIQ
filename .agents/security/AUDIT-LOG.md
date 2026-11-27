@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-27 — review: Workspace přes Supabase Auth, odstranění Clerku (R-154)
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: větev `ws/supabase-auth` — server actions přihlášení `app/w/auth-actions.ts` (heslo, kód z e-mailu, registrace, pozvánka, heslo, odhlášení), odkaz z e-mailu `app/w/auth/potvrzeni/route.ts`, stránka pozvánky, `lib/ws/context.ts` a `lib/ws/scope.ts` (identita a účet), hook `lib/supabase/signup-hook.ts`, úklid přístupů `lib/supabase/admin-users.ts`, pozvání z adminu `lib/ws/admin/invite.ts` + akce, migrace 141 (SECURITY DEFINER funkce, RLS, granty), `proxy.ts`, `lib/security/csp.ts`
+Výsledek: 1 nález opravený, jinak bez nálezu. Prošlo: identita jen z `getClaims()` (podpis), účet a role jen z `ws.members` — session sama nikoho do účtu nepustí; `next` jen uvnitř `/w` (`safeWsNext`, test s `//host`, `\`, cizí doménou); typy odkazu z e-mailu jen ze seznamu, délky omezené; e-mail pozvánky z DB a ze session, nikdy z formuláře; uplatnění pozvánky zamkne řádek, jedno použití, cizí e-mail = NULL; funkce s `search_path = pg_catalog, pg_temp` a plnými názvy, `EXECUTE` jen `ws_app`; `account_invites` pod RLS (test: účet B nevidí pozvánky A); `signup_permits` bez čitelného e-mailu; hook pouští jen otisk vázaný na e-mail, každý druh zvlášť, bez pepře selže zavřeně; `SUPABASE_SERVICE_ROLE_KEY` jen v `server-only` modulu volaném z cronu, mazání nikdy pro admina (kontrola e-mailu u Supabase) ani pro člověka s jiným členstvím; žádné nové `NEXT_PUBLIC_`; e-mail pozvánky escapovaný, odkaz jen https; CSP se zpřísnila (CSP-LOG v11); `@clerk/` v repu nezůstal (test)
+Nálezy: (1) Fix before launch — přihlášení heslem a ověření kódu jdou do Supabase z našeho serveru, takže limity Supabase vidí jen IP Vercelu: útočník by mohl zkoušet heslo nebo šestimístný kód jednoho e-mailu z mnoha adres a jeden útočník by zároveň mohl vyčerpat limit všem
+Opraveno: vlastní limity v `ws.rate_limits` — heslo 20 / 10 min na IP, kód 10 / 10 min na IP, 10 pokusů / 10 min na e-mail (`app/w/auth-actions.ts`), DECISIONS #059 (4)
+Zůstává: přijatá rizika v DECISIONS #059 (12h cookie pro všechny, Free plán Supabase, šablona „Magic Link" s kódem, login CSRF přes odkaz z e-mailu). Klientský prostor (`app/klient/actions.ts`) má stejné přihlášení heslem bez vlastního limitu — sjednotit samostatně
+
 ## 2026-11-27 — review: ZakazIQ Voice, schůzky s klientem (R-151)
 Spouštěč: před commitem a nasazením (`web-security-review`)
 Rozsah: `/api/public/voice/meetings/**` (5 vstupů), `lib/admin/voice/meeting*.ts`, nové rozsahy v `lib/admin/voice/http.ts`, admin akce schůzek v `app/voice-actions.ts`, záložka Schůzky (`components/admin/voice/meeting*.tsx`, `app/dashboard/voice/page.tsx`), migrace 139, aplikace na Macu (`Meeting/*`, `Window/Meetings*.swift`, `Info.plist`)

@@ -17,7 +17,7 @@ export const WS_MIGRATIONS = fs
   .sort()
 
 /** Tabulky bez dat účtů a bez RLS (migrace 073, 075). Nová tabulka sem patří jen s důvodem. */
-export const WS_SYSTEM_TABLES = ['rate_limits', 'stripe_events', 'webhook_events']
+export const WS_SYSTEM_TABLES = ['rate_limits', 'stripe_events', 'webhook_events', 'signup_permits']
 
 /** Globální obsah bez dat účtů (novinky ZakazIQ, migrace 081): ws_app jen čte. */
 export const WS_GLOBAL_TABLES = ['product_news']
@@ -114,6 +114,7 @@ export async function seedAccount(db: PGlite, L: 'a' | 'b'): Promise<void> {
     INSERT INTO ws.action_tokens (account_id, business_id, request_id, expires_at) VALUES ('${i.account}', '${i.business}', '${i.request}', now() + interval '72 hours');
     INSERT INTO ws.job_updates (account_id, business_id, job_id, body) VALUES ('${i.account}', '${i.business}', '${i.job}', 'Materiál je objednaný.');
     INSERT INTO ws.reviews (account_id, business_id, customer_id, appointment_id, score) VALUES ('${i.account}', '${i.business}', '${i.customer}', '${i.appointment}', 9);
+    INSERT INTO ws.account_invites (account_id, email, code_hash, expires_at) VALUES ('${i.account}', 'pozvany-${L}@example.cz', repeat('${L}', 64), now() + interval '14 days');
   `)
 }
 

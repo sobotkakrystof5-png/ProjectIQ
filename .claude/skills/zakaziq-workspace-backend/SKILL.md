@@ -1,6 +1,6 @@
 ---
 name: zakaziq-workspace-backend
-description: Backendové vzory ZakazIQ Workspace — schéma ws a oddělení účtů (account_id, requireWorkspace, RLS), idempotentní migrace od 064, server actions se Zodem, veřejné API pro poptávky z webů (schema/requests, veřejný a tajný klíč), Clerk organizace a webhook, Stripe předplatné 249 Kč a webhooky, fronta e-mailů, cron. Použij vždy, když píšeš migraci, dotaz do databáze, server action, route handler, webhook, cron, práci s klíči nebo cokoli, co čte či zapisuje data klientů.
+description: Backendové vzory ZakazIQ Workspace — schéma ws a oddělení účtů (account_id, requireWorkspace, RLS), idempotentní migrace od 064, server actions se Zodem, veřejné API pro poptávky z webů (schema/requests, veřejný a tajný klíč), přihlášení přes Supabase Auth (účet a členství jen v Neonu, pozvánky), Stripe předplatné 249 Kč a webhooky, fronta e-mailů, cron. Použij vždy, když píšeš migraci, dotaz do databáze, server action, route handler, webhook, cron, práci s klíči nebo cokoli, co čte či zapisuje data klientů.
 ---
 
 # Backend ZakazIQ Workspace
@@ -24,7 +24,7 @@ lib/ws/
   loyalty.ts        pravidla razítek
 app/w/[business]/** obrazovky + actions.ts
 app/api/public/v1/  schema, requests (veřejné)
-app/api/stripe/webhook, app/api/clerk/webhook, app/api/cron/ws-*
+app/api/stripe/webhook, app/api/auth/supabase-hook, app/api/cron/ws-*
 migrations/064_ws_*.sql …
 ```
 
@@ -35,11 +35,10 @@ migrations/064_ws_*.sql …
 export type WsContext = { userId: string; accountId: string; role: 'owner' | 'staff' }
 
 export async function requireWorkspace(): Promise<WsContext> {
-  const { userId, orgId, orgRole } = await auth()          // @clerk/nextjs/server
-  if (!userId || !orgId) redirect('/w/prihlaseni')
-  const [acc] = await sqlWs`SELECT id FROM ws.accounts WHERE clerk_org_id = ${orgId}`
-  if (!acc) redirect('/w/novy')
-  return { userId, accountId: acc.id, role: orgRole === 'org:admin' ? 'owner' : 'staff' }
+  const identity = await requireIdentity()                 // Supabase getClaims(), jinak /w/prihlaseni
+  const m = await accountForUser(identity.userId)          // ws.member_account() — účet a role z ws.members
+  if (!m) redirect('/w/novy')                              // session sama do účtu nepustí
+  return { userId: identity.userId, accountId: m.accountId, role: m.role }
 }
 
 export async function requireBusiness(ctx: WsContext, slug: string) {
@@ -125,12 +124,16 @@ Chybové hlášky česky, lidsky, bez technických slov a bez ID.
   neposílají e-maily zákazníkovi).
 - Idempotence: volitelná hlavička `Idempotency-Key`, uložená 24 h.
 
-## 6. Clerk
+## 6. Přihlášení (Supabase Auth, R-154)
 
-- Organization = `ws.accounts` (1:1 přes `clerk_org_id`), členové v `ws.members`.
-- `/api/clerk/webhook` ověřuje podpis (svix), zpracuje `organization.*`, `organizationMembership.*`,
-  `user.deleted`; každá událost idempotentně (`ws.webhook_events`).
-- Přihlášení: e-mailový kód + Google, bez hesel. Po registraci → `/w/novy` (obor, název) → Stripe.
+- Clerk z repa odešel. Identitu dává Supabase (`getClaims()`, nikdy `getSession()`), účet a roli
+  `ws.members` (`clerk_user_id` = id uživatele v Supabase). Jeden vlastněný účet na člověka.
+- Tentýž účet v Supabase platí pro `/w` i `/klient` (a admina pouští jen `ADMIN_EMAIL` + TOTP).
+- Účet vzniká jen s oprávněním, které hlídá hook „Before User Created" (`lib/supabase/signup-hook.ts`):
+  pozvánka vlastníka od admina (`ws.account_invites`) nebo povolení k registraci (`ws.signup_permits`,
+  jen při `WS_SIGNUP_OPEN`). Obojí vázané na e-mail, v DB jen HMAC.
+- Přihlášení heslem nebo kódem z e-mailu (`app/w/auth-actions.ts`), prohlížeč na Supabase nesahá
+  (CSP beze změny). Po registraci → `/w/novy` (obor, název) → Stripe. Podrobně reference B4.
 
 ## 7. Stripe
 

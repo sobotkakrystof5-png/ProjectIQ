@@ -145,7 +145,7 @@ Texty níže jsou návrh (prošly `zakaziq-ux-texty-cs` a `humanize-text-cs`). S
 - Uvnitř tmavého hero, není to samostatný bílý pruh. Vlevo `Logo` + „ZakazIQ“. Uprostřed pilulková navigace (průhledná pilulka s okrajem `navy-200/15`): **Funkce · Jak to funguje · Napojení webu · Ceník**. Vpravo „Přihlásit“ (tichý odkaz) a „14 dní zdarma“ (bílá pilulka, `navy-950` text).
 - Po odjetí z hero se hlavička přichytí nahoře jako kompaktní tmavá pilulka. Bez rozmazaného skla, plné `navy-950/95`.
 - Mobil: logo + „Zkusit zdarma“ + tlačítko menu (`aria-label="Otevřít menu"`), menu jako panel shora se stejnými kotvami a odkazem Přihlásit.
-- Odkazy: „Přihlásit“ → `/w/prihlaseni`, „14 dní zdarma“ → `/w/registrace`. Přesné cesty Clerku potvrdí S07. Do té doby vedou na 404 a to je v pořádku.
+- Odkazy: „Přihlásit“ → `/w/prihlaseni`, „14 dní zdarma“ → `/w/registrace`. Cesty existují (od R-154 přes Supabase); dokud je registrace zavřená, vedou tlačítka na formulář (R-134). Dřív vedly na 404 a to bylo v pořádku.
 
 ### 4.1 Hero
 

@@ -3,7 +3,7 @@ import { clientIpFromHeaders, ipRateKey, UNKNOWN_IP } from './client-ip'
 import { createMemoryLimiter, type MemoryLimiter } from './memory-limiter'
 
 // Brána na vstupu `proxy.ts`: strop počtu požadavků z jedné IP za 10 s, dřív než
-// se spustí Clerk, Supabase nebo kterýkoli dotaz do databáze. Je to PRVNÍ vrstva
+// se spustí Supabase nebo kterýkoli dotaz do databáze. Je to PRVNÍ vrstva
 // aplikace — před ní je firewall platformy (Vercel WAF) a za ní databázové
 // limity jednotlivých vstupů. Hodnoty jsou záměrně velkorysé: běžný člověk
 // (i kancelář za jednou IP) se k nim nedostane, robot, který stránku zasypává,

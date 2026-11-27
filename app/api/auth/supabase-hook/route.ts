@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { readBodyLimited } from '@/lib/security/request-body'
 import { verifySvix } from '@/lib/security/webhook-signature'
-import { decideSignup, inviteEmailByHash, type SignupHookPayload } from '@/lib/supabase/signup-hook'
+import { decideSignup, signupPermitLookups, type SignupHookPayload } from '@/lib/supabase/signup-hook'
 
 // Hook Supabase Auth „Before User Created" (R-107, `lib/supabase/signup-hook.ts`).
 // Volá ho jen Supabase, podepsaně tajemstvím SUPABASE_AUTH_HOOK_SECRET (Standard
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const decision = await decideSignup(payload, inviteEmailByHash)
+    const decision = await decideSignup(payload, signupPermitLookups)
     if (!decision.allow) return refuse(403, decision.message)
     return NextResponse.json({})
   } catch (err) {

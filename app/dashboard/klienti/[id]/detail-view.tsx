@@ -45,7 +45,7 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
         subtitle={
           <>
             Účet od {formatDate(client.createdAt)}
-            {client.ico ? ` · IČO ${client.ico}` : ''} · {client.clerkOrgId}
+            {client.ico ? ` · IČO ${client.ico}` : ''}
           </>
         }
         action={
@@ -105,7 +105,18 @@ export function ClientDetailView({ client }: { client: ClientDetail }) {
         </ul>
       </Section>
 
-      <Section title="Členové" hint={client.members === 0 ? 'Nikdo se zatím nepřihlásil. Pozvánku jde poslat znovu.' : undefined}>
+      <Section
+        title="Členové"
+        hint={
+          client.invite
+            ? client.invite.expired
+              ? `Pozvánka pro ${client.invite.email} vypršela ${formatDate(client.invite.expiresAt)}. Pošli novou.`
+              : `Pozvánka pro ${client.invite.email} čeká do ${formatDate(client.invite.expiresAt)}.`
+            : client.members === 0
+              ? 'Nikdo se zatím nepřihlásil. Pozvánku jde poslat znovu.'
+              : undefined
+        }
+      >
         {client.membersList.length > 0 && (
           <ul className="space-y-1.5">
             {client.membersList.map((m, i) => (

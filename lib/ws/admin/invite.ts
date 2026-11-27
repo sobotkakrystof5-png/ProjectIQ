@@ -1,59 +1,35 @@
 import 'server-only'
+import { sendVizeonMail, type VizeonMail } from '@/lib/admin/vizeon-mail'
+import { q, wsDb } from '../db'
+import { generateWsInviteCode, wsInviteExpiry } from '../invite'
 import { createAccountWithBusiness } from '../onboarding'
-import { WS_SIGN_UP_PATH } from '../paths'
+import { WS_INVITE_PATH } from '../paths'
 import type { IndustryKey } from '../templates'
 import { type AdminIdentity } from './auth'
 import { auditAdmin } from './clients'
+import { renderWsInviteEmail } from './invite-email'
 
-// „Pozvat klienta“ z /dashboard/klienti (S17, R-052). Admin klientovi založí
-// organizaci v Clerku, účet a byznys ze šablony oboru (stejná transakce jako
-// průvodce /w/novy, jen bez vlastníka) a pošle pozvánku e-mailem z Clerku.
-// Klient se zaregistruje z pozvánky, stane se vlastníkem (org:admin) a průvodce
-// ho pošle rovnou na krok 2 (předplatné, R-038) — účet už nezakládá.
+// „Pozvat klienta“ z /dashboard/klienti (S17, R-052; od R-154 bez Clerku).
+// Admin klientovi založí účet a byznys ze šablony oboru (stejná transakce jako
+// průvodce /w/novy, jen bez vlastníka) a pošle mu e-mailem pozvánku s kódem.
+// Klient si z ní nastaví přístup (nebo se přihlásí účtem z klientského
+// prostoru), stane se vlastníkem a průvodce ho pošle rovnou na předplatné (R-038).
 
-export type InviteClerk = {
-  createOrganization(name: string): Promise<{ id: string }>
-  inviteOwner(orgId: string, email: string, redirectUrl: string): Promise<{ id: string }>
-  deleteOrganization(orgId: string): Promise<void>
+export type InviteMailer = (mail: VizeonMail) => Promise<{ ok: boolean }>
+
+let mailer: InviteMailer = sendVizeonMail
+
+/** Jen pro testy. `null` vrátí skutečné odesílání. */
+export function setInviteMailerForTests(next: InviteMailer | null): void {
+  mailer = next ?? sendVizeonMail
 }
 
-const realClerk: InviteClerk = {
-  async createOrganization(name) {
-    const { clerkClient } = await import('@clerk/nextjs/server')
-    const clerk = await clerkClient()
-    const org = await clerk.organizations.createOrganization({ name })
-    return { id: org.id }
-  },
-  async inviteOwner(orgId, email, redirectUrl) {
-    const { clerkClient } = await import('@clerk/nextjs/server')
-    const clerk = await clerkClient()
-    const inv = await clerk.organizations.createOrganizationInvitation({
-      organizationId: orgId,
-      emailAddress: email,
-      role: 'org:admin',
-      redirectUrl,
-    })
-    return { id: inv.id }
-  },
-  async deleteOrganization(orgId) {
-    const { clerkClient } = await import('@clerk/nextjs/server')
-    const clerk = await clerkClient()
-    await clerk.organizations.deleteOrganization(orgId)
-  },
+function appOrigin(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.zakaziq.cz').replace(/\/+$/, '')
 }
 
-let clerk: InviteClerk = realClerk
-
-/** Jen pro testy. `null` vrátí skutečný Clerk. */
-export function setInviteClerkForTests(next: InviteClerk | null): void {
-  clerk = next ?? realClerk
-}
-
-/** Kam pozvánka vede: registrace Workspace (Clerk si přidá __clerk_ticket). */
-export function inviteRedirectUrl(): string {
-  const origin = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.zakaziq.cz').replace(/\/+$/, '')
-  return `${origin}${WS_SIGN_UP_PATH}`
-}
+/** Odkaz z e-mailu: /w/pozvanka/<kód>. */
+export const inviteUrl = (code: string): string => `${appOrigin()}${WS_INVITE_PATH}/${code}`
 
 export type InviteInput = { email: string; businessName: string; industry: IndustryKey }
 
@@ -62,26 +38,8 @@ export type InviteResult =
   /** Účet je založený, jen pozvánka neodešla — jde poslat znovu z detailu. */
   | { status: 'invite_failed'; accountId: string }
 
-/** Chyba Clerku před založením účtu (nic nevzniklo). */
-export class InviteSetupError extends Error {}
-
 export async function inviteClient(admin: AdminIdentity, input: InviteInput): Promise<InviteResult> {
-  let orgId: string
-  try {
-    orgId = (await clerk.createOrganization(input.businessName)).id
-  } catch (e) {
-    throw new InviteSetupError(e instanceof Error ? e.message : 'clerk')
-  }
-
-  let accountId: string
-  try {
-    ;({ accountId } = await createAccountWithBusiness({ orgId, name: input.businessName, industry: input.industry, owner: null }))
-  } catch (e) {
-    // Organizace bez účtu by se při registraci klienta jinou cestou použila
-    // jako „spadlé založení“ — radši ji smazat.
-    await clerk.deleteOrganization(orgId).catch(() => undefined)
-    throw e
-  }
+  const { accountId } = await createAccountWithBusiness({ name: input.businessName, industry: input.industry, owner: null })
 
   await auditAdmin(admin, {
     accountId,
@@ -91,19 +49,46 @@ export async function inviteClient(admin: AdminIdentity, input: InviteInput): Pr
     details: { industry: input.industry },
   })
 
-  const sent = await sendInvite(admin, accountId, orgId, input.email)
+  const sent = await sendInvite(admin, accountId, input.email)
   return sent ? { status: 'invited', accountId } : { status: 'invite_failed', accountId }
 }
 
-/** Pozvánka vlastníka do existujícího účtu (i opakovaně). Vrací false, když ji Clerk odmítl. */
-export async function sendInvite(admin: AdminIdentity, accountId: string, orgId: string, email: string): Promise<boolean> {
+/**
+ * Pozvánka vlastníka do existujícího účtu (i opakovaně). Předchozí nevyužité
+ * pozvánky účtu zneplatní, ať platí jen ta poslední. Vrací false, když e-mail neodešel.
+ */
+export async function sendInvite(admin: AdminIdentity, accountId: string, email: string): Promise<boolean> {
+  const to = email.trim().toLowerCase()
+  let code: string
+  let expiresAt: Date
+  let businessName: string
   try {
-    await clerk.inviteOwner(orgId, email, inviteRedirectUrl())
+    const generated = generateWsInviteCode()
+    code = generated.code
+    expiresAt = wsInviteExpiry()
+    const db = wsDb({ accountId })
+    const [, , rows] = await db.batch([
+      q`UPDATE ws.account_invites SET revoked_at = now() WHERE account_id = ${accountId} AND used_at IS NULL AND revoked_at IS NULL`,
+      q`
+        INSERT INTO ws.account_invites (account_id, email, code_hash, role, expires_at)
+        VALUES (${accountId}, ${to}, ${generated.hash}, 'owner', ${expiresAt})`,
+      q`SELECT name FROM ws.businesses WHERE account_id = ${accountId} AND archived_at IS NULL ORDER BY created_at LIMIT 1`,
+    ])
+    businessName = String((rows[0] as { name?: unknown } | undefined)?.name ?? 'vaši firmu')
+  } catch (e) {
+    console.error('admin.invite', { accountId, error: e instanceof Error ? e.message : 'unknown' })
+    return false
+  }
+
+  try {
+    const mail = renderWsInviteEmail({ businessName, url: inviteUrl(code), expiresAt })
+    const res = await mailer({ to, subject: mail.subject, text: mail.text, html: mail.html })
+    if (!res.ok) return false
   } catch (e) {
     console.error('admin.invite', { accountId, error: e instanceof Error ? e.message : 'unknown' })
     return false
   }
   // E-mail klienta do auditu nepíšeme (audit čte i klient) — jen doménu.
-  await auditAdmin(admin, { accountId, action: 'admin.invite_sent', entity: 'account', entityId: accountId, details: { domain: email.split('@')[1] ?? null } })
+  await auditAdmin(admin, { accountId, action: 'admin.invite_sent', entity: 'account', entityId: accountId, details: { domain: to.split('@')[1] ?? null } })
   return true
 }
