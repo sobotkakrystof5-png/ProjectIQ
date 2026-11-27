@@ -15,12 +15,19 @@ import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
 const text = (max: number) => z.string().trim().max(max)
 const day = z.string().max(10).refine(isIsoDate, 'Vyberte platné datum.')
 
+/** Telefon, jak se píše na doklad: číslice, mezery, +, závorky, pomlčky a lomítka. */
+export const partyPhoneSchema = text(40).regex(/^[+0-9 ()/-]*$/, 'Telefon může mít jen číslice, mezery a +.')
+
 /** Strana dokladu. Adresa je povinná jen u dodavatele — odběratel může být i člověk bez IČO. */
 export const partySchema = z.object({
   name: text(160).min(1, 'Doplňte jméno odběratele.'),
   address: text(400),
   ico: text(8).regex(/^\d{8}$/, 'IČO má osm číslic.').or(z.literal('')),
   dic: text(20),
+  // R-153: e-mail a telefon odběratele se tisknou na fakturu (migrace 140).
+  // Nepovinné, ať projdou i koncepty a volání sestavená před R-153.
+  email: text(254).email('E-mail odběratele nevypadá správně.').or(z.literal('')).optional(),
+  phone: partyPhoneSchema.optional(),
 })
 
 export const issuerProfileSchema = z.object({

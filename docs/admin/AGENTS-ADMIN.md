@@ -265,6 +265,7 @@ název zakázky v klientském prostoru.
 | email | text | Malými písmeny; částečný UNIQUE nad `lower(email)` pro nesloučené |
 | phone | text | E.164 (`+420777123456`), CHECK opsaný ze `ws.customers`; částečný UNIQUE pro nesloučené |
 | ico, dic | text | IČO osmimístné, DIČ bez mezer velkými (ARES doplní AD12) |
+| address | text | Sídlo / fakturační adresa (migrace 140, R-153). Bere ho formulář faktury, vystavená faktura ho vrací |
 | note | text | Poznámka k člověku (ne k zakázce) |
 | source | text | `backfill` / `lead` / `project` / `web` / `manual` |
 | last_seen_at | timestamptz | Kdy se kontakt naposledy objevil |
@@ -321,7 +322,7 @@ Detail sloupců hledej v příslušné migraci a v `lib/types.ts` — tady je je
 | `project_surveys` | 016, 046, **106**, **118** | Dotazník spokojenosti (`/h/[token]`, `projects.survey_token`) — max 1 na zakázku. Od AD11 visí na `project_id`; `completed_project_id` je jen odkaz do archivu. Je to **odpověď** klienta, proto razítka odeslání nesou `projects.survey_*` (AD16). Od 118 (R-119): `nps` 0–10, `rating_result/communication/schedule/value` 1–5, `improve_text`, `publish_mode` (`named`/`anonymous`/`private`, drží `consent`), `reviewer_role`, `completed_at` (řádek vzniká už známkou), `detractor_alerted_at`, `followed_up_at`, `google_review_clicked_at`; staré `rating_*` nejsou povinné. `admin_settings.google_review_url`. |
 | `notifications` | 018 | In-app notifikace (`/dashboard/notifications`) |
 | `client_requests` | 092 | Požadavky klientů z portálu `/p/[token]` (text nebo přepis hlasu, shrnutí a zadání od AI, stav nové/hotovo/zahozeno); audio se neukládá |
-| `invoices` | 053, 056, **107**, **108** | Faktury. Archiv cizích PDF (AI přepis, vazba na transakci) **i doklady vystavené tady** (AD12): `direction` (`issued`/`received`), `pdf_generated`, `items`, `issuer` (snímek dodavatele), `client_address`, `supplied_on`, `vat_total`, `number_seq`, `cancelled_at`, `sent_at`. Vystavená tady = `number_seq IS NOT NULL`. Unikátnost čísla je částečná (`WHERE direction='issued'`), aby přijatá faktura mohla nést číslo dodavatele |
+| `invoices` | 053, 056, **107**, **108**, 132, 140 | Faktury. Archiv cizích PDF (AI přepis, vazba na transakci) **i doklady vystavené tady** (AD12): `direction` (`issued`/`received`), `pdf_generated`, `items`, `issuer` (snímek dodavatele), `client_address`, `supplied_on`, `vat_total`, `number_seq`, `cancelled_at`, `sent_at`, `client_contact` (e-mail a telefon odběratele vytištěné na faktuře, zamčené po vystavení; `client_email` je dál jen „kam poslat“ a měnit se smí, R-153). Vystavená tady = `number_seq IS NOT NULL`. Unikátnost čísla je částečná (`WHERE direction='issued'`), aby přijatá faktura mohla nést číslo dodavatele |
 | `admin_settings` | **107** | Jeden řádek pro celý admin (`id boolean PK CHECK (id)`): `invoice_sequences` (řada čísel po letech) a `issuer_profile` (údaje dodavatele) |
 | `tax_news` | 055 | Novinky z legislativy (RSS FS + ČSSZ, cron) |
 | `project_notes` | 059, 063 | Log schůzek/hovorů u zakázky (autor + snapshot progressu) |
@@ -714,7 +715,7 @@ archiv (`number_seq IS NULL`, chová se přesně jako dřív) a doklad vystaven�
 
 | Kde | Co dělá |
 |---|---|
-| `/dashboard/faktury/nova` | Formulář: odběratel (IČO → ARES), položky s živým součtem, data, měna, zakázka, poznámka. `?zakazka=<id>` předvyplní odběratele z poslední faktury téhož kontaktu a částku `price − zaplacená záloha` |
+| `/dashboard/faktury/nova` | Formulář: odběratel (IČO → ARES), položky s živým součtem, data, měna, zakázka, poznámka. `?zakazka=<id>` i výběr zakázky ve formuláři předvyplní odběratele (R-153: jméno, sídlo, IČO, DIČ, e-mail — z poslední nestornované faktury téhož kontaktu, z kontaktu a zakázky, sídlo podle IČO z ARES) a částku `price − zaplacená záloha`; ručně přepsané pole se při změně zakázky nemění (`lib/admin/invoice-prefill.ts`). Telefon a e-mail odběratele jdou na fakturu. Po vystavení (i schválením konceptu) se údaje zapíšou do kontaktu přes `absorbBillingIntoContact` (`lib/admin/contact-sync.ts`): IČO, DIČ, sídlo a telefon na prázdné místo nebo místo předvyplněné hodnoty, e-mail jen na prázdné místo, firma jen na prázdné. Úprava kontaktu se propíše do nevystavených konceptů a pravidelných faktur jeho zakázek (`propagateContact`) |
 | `/dashboard/faktury/dodavatel` | Údaje dodavatele (jméno, adresa, IČO, DIČ, IBAN pro QR, plátce DPH). Na doklad se ukládá **snímek**, pozdější změna starší faktury nepřepíše |
 | `lib/admin/invoice-issue.ts` | Serverové jádro: `issueInvoice`, `cancelInvoice`, `loadIssueDraft`, `loadIssuedInvoiceForPdf`, profil dodavatele, `isIssuingReady()` |
 | `lib/admin/invoice-issue-schema.ts` | Zod schémata; bez `server-only`, protože podle nich počítá i formulář |

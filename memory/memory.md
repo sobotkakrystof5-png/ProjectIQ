@@ -1854,6 +1854,24 @@ Promluvy se posílají během hovoru, aby byl přepis po konci hned.
 nové oprávnění na Macu (Nahrávání zvuku systému, macOS 14.2+). Zrušené Schůzky z Wispr Flow (R-145) se nevrací,
 tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika `docs/admin/AGENTS-ADMIN.md` → Schůzky.
 
+### R-153 · Fakturační údaje klienta na jednom místě, propis oběma směry (2026-11-27)
+**Rozhodnutí:** (1) Po výběru zakázky ve formuláři nové faktury se doplní jméno, sídlo, IČO, DIČ, e-mail a telefon
+odběratele: poslední nestornovaná faktura téhož kontaktu → kontakt → zakázka; sídlo (a bez minulé faktury i právní
+jméno a DIČ) podle IČO z ARES. Ručně přepsané pole se při změně zakázky nemění. (2) **E-mail a telefon odběratele
+jsou na faktuře** a po vystavení se nemění (`invoices.client_contact`); `client_email` zůstává „kam poslat“.
+(3) **Kontakt má sídlo** (`contacts.address`) a v kartě „Načíst z rejstříku“. (4) **Propis oběma směry** pravidlem
+R-141: úprava kontaktu → Hovory, zakázky, schůzky a nově nevystavené koncepty a pravidelné faktury jeho zakázek;
+vystavená faktura (i schválený koncept) → kontakt: IČO, DIČ, sídlo, telefon na prázdné místo nebo místo hodnoty,
+kterou formulář předvyplnil (= oprava); e-mail jen na prázdné místo (fakturační adresa bývá účtárna); firma jen na
+prázdné. Vystavené faktury se nemění. (5) Koncepty z cronu a asistent se do ARES neptají.
+**Proč:** Kryštof 2026-11-27: „systém by už měl mít kompletní přehled o kontaktu… ať se to propíše do políček“
+a pak „chci, aby to takto fungovalo všude, aby se to v celém systému ihned na sebe propisovalo“ (ano i telefonu
+na faktuře). Kontakt adresu neměl, výběr zakázky dřív načetl jen cenu a zálohy.
+**Důsledek:** migrace 140 (**před nasazením**, aditivní; bez ní se telefon a e-mail na fakturu nezapíšou a sídlo
+kontaktu se neuloží, zbytek běží). `lib/admin/{invoice-issue,invoice-prefill,contact-sync,contacts}.ts`,
+`getProjectIssueDraft`, formuláře faktury a kontaktu. Nová cesta, která vystavuje fakturu k zakázce, volá
+`rememberCounterpartyOnContact`; nová tabulka s údaji klienta k zakázce patří do `propagateContact`.
+Bezpečnost DECISIONS #023 a #042 doplnění.
 
 ### R-154 · Celý projekt jen na Supabase Auth, Clerk pryč; nejlepší přihlášení pro klienty (2026-11-27)
 **Rozhodnutí:** (1) Workspace `/w` se přihlašuje přes Supabase Auth jako admin a klientský prostor; Clerk
@@ -1877,6 +1895,11 @@ krok. Technika reference B4, bezpečnost DECISIONS #059, CSP-LOG v11.
 
 ## 3. Otevřené problémy
 
+- [ ] **Fakturační údaje klienta (R-153) — průchod naživo:** kód na produkci od 2026-11-27 (`7cfd718`),
+  migrace 140 taky (testovací Neon ji nemá). Ověřeno testy nad PGlite, `tsc` a vzhled obou formulářů na dočasné stránce
+  s vymyšlenými daty (1280 a 390 px); za přihlášením ne. Projít: Kontakty › karta (Sídlo, Načíst z rejstříku,
+  Uložit → koncept faktury té zakázky má nové sídlo), `/dashboard/faktury/nova` (výběr zakázky doplní vše včetně
+  telefonu, PDF má e-mail a telefon odběratele), po vystavení má kontakt IČO a sídlo · Kryštof · od 2026-11-27
 - [ ] **Schůzky ve Voice (R-151) — vyzkoušet naostro:** na produkci od 2026-11-27 (`c10be81`, migrace 139), aplikace
   na Macu nainstalovaná. Zbývá: zkušební online schůzka (Meet se sluchátky i bez nich, aspoň 10 minut): přepis obou stran, ozvěna bez sluchátek,
   Shrnout pomocí AI, přiřazení ke kontaktu v adminu, (5) co dělá tap při přepnutí výstupu (AirPods během hovoru —
@@ -2387,9 +2410,36 @@ krok. Technika reference B4, bezpečnost DECISIONS #059, CSP-LOG v11.
   27. 11. 2026; Workspace nemá platící zákazníky, oznamovat není komu).
 - **db** Migrace 141 `ws_supabase_auth` (aplikována: ne, nikde).
 - **chore** Ověřeno: `npx tsc --noEmit`, `npx vitest run` 2154 prošlo / 1 padá (číslování migrací — chybí 140,
-  která je zatím jen rozdělaná v `main`), `npm run build`, `next start` lokálně: nepřihlášený `/w` → přihlášení
+  která byla zatím jen rozdělaná v `main`; po sloučení `main` 2175 prošlo, 0 selhalo), `npm run build`, `next start` lokálně: nepřihlášený `/w` → přihlášení
   s `next`, neplatná pozvánka → vysvětlení, stránky 390 a 1280 px bez chyb v konzoli. `web-security-review`:
   1 nález opravený (AUDIT-LOG). **Přihlášení naostro proti Supabase nikdo nezkusil.**
+
+### 2026-11-27 (fakturační údaje klienta — R-153)
+- **feat** Formulář nové faktury po výběru zakázky doplní odběratele (jméno, sídlo, IČO, DIČ, e-mail, telefon):
+  minulá nestornovaná faktura klienta → kontakt → zakázka, sídlo podle IČO z ARES. Ručně přepsané pole zůstane,
+  pod nadpisem Odběratel je věta, odkud údaje jsou. Soubory: `lib/admin/{invoice-issue,invoice-prefill}.ts`,
+  `app/dashboard/finance/invoice-actions.ts` (`getProjectIssueDraft`), `app/dashboard/faktury/nova/page.tsx`,
+  `components/admin/invoices/issue-form.tsx`.
+- **feat** E-mail a telefon odběratele na faktuře (PDF v adminu i v klientském prostoru), po vystavení zamčené.
+  Soubory: `lib/invoice-pdf/render.ts`, `lib/admin/{invoice-issue-schema,invoice-draft-schema,invoice-drafts}.ts`,
+  `lib/portal/money.ts`.
+- **feat** Kontakt má sídlo a „Načíst z rejstříku“; údaje se propisují oběma směry: kontakt → koncepty
+  a pravidelné faktury jeho zakázek, vystavená faktura → kontakt (a odtud do Hovorů, zakázek a schůzek).
+  Soubory: `lib/admin/{contact-sync,contacts}.ts`, `app/contacts-actions.ts`, `components/admin/contacts/contact-form.tsx`,
+  `app/dashboard/kontakty/[id]/page.tsx`.
+- **db** Migrace 140 `fakturacni_udaje_klienta` (`contacts.address`, `invoices.client_contact`, nová těla
+  `admin_invoice_issue`, `admin_invoice_locked`, `portal.put_invoice`). **Aplikovaná na produkci** 2026-11-27
+  (Neon MCP v jedné transakci na souhlas Kryštofa, s kontrolou otisků těl funkcí proti souboru, zapsaná
+  v `public.schema_migrations`). Ověřeno: oba sloupce, kontrola `invoices_client_contact_check`, md5 všech tří
+  těl, `put_invoice` dál `SECURITY DEFINER`, `portal_app` bez práva spouštět. Testovací Neon ne.
+- **chore** Ověřeno: `npx tsc --noEmit`, nové testy `admin-fakturacni-udaje.test.ts` (9, migrace 140 dvakrát
+  po sobě), `invoice-prefill.test.ts` (5) a 6 v `admin-fakturace.test.ts`; testy faktur, konceptů, kontaktů,
+  asistenta, tříd adminu, XSS a číslování migrací 207 prošlo. Formuláře na dočasné stránce 1280 a 390 px (bez
+  přetečení, stránka smazaná). **Za přihlášením a PDF okem neověřeno.**
+- **chore** **Na produkci** 2026-11-27: `7cfd718` (`dpl_BiaH…` Ready), migrace 140 hned po něm. Plná sada 2176 testů
+  a `npm run build` prošly; veřejně `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard`,
+  `/dashboard/faktury/nova` a `/dashboard/kontakty` 307, `/p/<nesmysl>` 404, 15 min bez běhových chyb.
+
 
 ### 2026-11-27 (ZakazIQ Voice — přepis přes Groq)
 - **chore** Přepis diktátů a schůzek jde od 2026-11-27 přes Groq `whisper-large-v3-turbo` ($0,04 za hodinu zvuku

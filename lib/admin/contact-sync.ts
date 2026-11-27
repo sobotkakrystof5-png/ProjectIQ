@@ -25,12 +25,25 @@ import { normalizeEmail, normalizePhone } from '@/lib/contacts/normalize'
  *    si od ní, co kontaktu chybí. Zobrazení firmy pak čte údaje z kontaktu
  *    (`outreachContactOverlay`), takže snímek z Growth OS ruční opravu nepřebije.
  *
+ * Fakturační údaje (R-153): IČO, DIČ a sídlo drží taky kontakt. Úprava se
+ * propíše do nevystavených konceptů a pravidelných faktur jeho zakázek
+ * (`propagateContact`); vystavená faktura je vrátí do kontaktu
+ * (`absorbBillingIntoContact`) — se stejným pravidlem o prázdném místě
+ * a staré hodnotě.
+ *
  * Doklady (faktury, předávací dokumenty) se nemění: nesou údaje z doby vystavení.
  * Propisování nikdy neshodí hlavní akci — chybějící tabulka nebo sloupec
  * (testovací databáze, neaplikovaná migrace) se přeskočí.
  */
 
-export type ContactValues = { email: string | null; phone: string | null }
+export type ContactValues = {
+  email: string | null
+  phone: string | null
+  /** Fakturační údaje (R-153). Chybí u volání, kterým jde jen o e-mail a telefon. */
+  ico?: string | null
+  dic?: string | null
+  address?: string | null
+}
 
 const MISSING_SCHEMA = new Set(['42P01', '42703', '42883'])
 
@@ -69,14 +82,93 @@ const DIGITS = (expr: string) => `right(regexp_replace(coalesce(${expr}, ''), '\
 /** Dá se tenhle telefon dát do schůzky? (CHECK z migrace 128 je o číslici přísnější než u kontaktu.) */
 const MEETING_PHONE = /^\+[1-9][0-9]{7,14}$/
 
-type ContactRow = { id: string; email: string | null; phone: string | null }
+type ContactRow = {
+  id: string
+  email: string | null
+  phone: string | null
+  ico: string | null
+  dic: string | null
+  address: string | null
+  company: string | null
+  displayName: string
+}
 
 async function loadRoot(contactId: string): Promise<ContactRow | null> {
+  // Sídlo přes `to_jsonb`: bez migrace 140 sloupec není a propis e-mailu
+  // a telefonu se kvůli tomu nesmí zastavit.
   const [rows] = await batchSchemaTolerant([
-    { text: `SELECT id::text AS id, email, phone FROM contacts WHERE id = ${ROOT}`, params: [contactId] },
+    {
+      text: `SELECT c.id::text AS id, c.email, c.phone, c.ico, c.dic, c.company, c.display_name,
+                    to_jsonb(c) ->> 'address' AS address
+             FROM contacts c WHERE c.id = ${ROOT}`,
+      params: [contactId],
+    },
   ])
   const row = rows?.[0]
-  return row ? { id: String(row.id), email: (row.email as string | null) ?? null, phone: (row.phone as string | null) ?? null } : null
+  if (!row) return null
+  const str = (key: string) => {
+    const value = row[key]
+    return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
+  }
+  return {
+    id: String(row.id),
+    email: str('email'),
+    phone: str('phone'),
+    ico: str('ico'),
+    dic: str('dic'),
+    address: str('address'),
+    company: str('company'),
+    displayName: str('display_name') ?? '',
+  }
+}
+
+/** Nevystavené koncepty a pravidelné faktury zakázek rodiny kontaktu. */
+const BILLING_TARGETS = [
+  { table: 'invoice_drafts d', where: `d.status = 'draft' AND d.project_id IN (SELECT p.id FROM projects p WHERE p.contact_id IN ${FAMILY})` },
+  { table: 'invoice_recurring d', where: `d.project_id IN (SELECT p.id FROM projects p WHERE p.contact_id IN ${FAMILY})` },
+]
+
+/**
+ * Údaje kontaktu do konceptů faktur (R-153): pole s prázdnou nebo starou
+ * hodnotou dostane novou, ručně napsané jiné zůstane. Telefon se porovnává
+ * podle číslic, ostatní podle textu bez mezer na okraji.
+ */
+function billingQueries(contact: ContactRow, previous: ContactValues): AdminQuery[] {
+  const queries: AdminQuery[] = []
+  const fields: { key: 'ico' | 'dic' | 'address' | 'phone'; value: string | null; old: string | null }[] = [
+    { key: 'ico', value: contact.ico, old: previous.ico?.trim() || null },
+    { key: 'dic', value: contact.dic, old: previous.dic?.trim() || null },
+    { key: 'address', value: contact.address, old: previous.address?.trim() || null },
+    { key: 'phone', value: contact.phone, old: previous.phone?.trim() || null },
+  ]
+  for (const { key, value, old } of fields) {
+    if (!value) continue
+    const col = `(d.counterparty ->> '${key}')`
+    const same = key === 'phone' ? (a: string, b: string) => `${DIGITS(a)} = ${DIGITS(b)}` : (a: string, b: string) => `btrim(${a}) = btrim(${b})`
+    for (const { table, where } of BILLING_TARGETS) {
+      queries.push({
+        text: `UPDATE ${table} SET counterparty = jsonb_set(coalesce(d.counterparty, '{}'::jsonb), '{${key}}', to_jsonb($2::text)),
+                                  updated_at = now()
+                WHERE ${where}
+                  AND (nullif(btrim(coalesce(${col}, '')), '') IS NULL OR ($3::text IS NOT NULL AND ${same(col, '$3::text')}))
+                  AND NOT ${same(`coalesce(${col}, '')`, '$2::text')}`,
+        params: [contact.id, value, old],
+      })
+    }
+  }
+  if (contact.email) {
+    const old = normalizeEmail(previous.email)
+    for (const { table, where } of BILLING_TARGETS) {
+      queries.push({
+        text: `UPDATE ${table} SET client_email = $2, updated_at = now()
+                WHERE ${where}
+                  AND (nullif(btrim(d.client_email), '') IS NULL OR ($3::text IS NOT NULL AND lower(btrim(d.client_email)) = lower($3::text)))
+                  AND lower(coalesce(btrim(d.client_email), '')) <> lower($2::text)`,
+        params: [contact.id, contact.email, old],
+      })
+    }
+  }
+  return queries
 }
 
 /**
@@ -157,6 +249,9 @@ export async function propagateContact(contactId: string, previous: ContactValue
     }
   }
 
+  // Koncepty a pravidelné faktury až za ostatním: indexy výsledků schůzek se nemění.
+  queries.push(...billingQueries(contact, previous))
+
   const results = await batchSchemaTolerant(queries)
   const events = new Set<string>()
   for (const i of meetingQueries) for (const row of results[i] ?? []) events.add(String(row.id))
@@ -211,6 +306,75 @@ export async function absorbIntoContact(
     }
   }
   await propagateContact(contact.id, { email: contact.email, phone: contact.phone })
+}
+
+export type BillingValues = { name: string; address: string; ico: string; dic: string; email: string; phone: string }
+
+/**
+ * Údaje z vystavené faktury do kontaktu zakázky (R-153). `replaceable` = co
+ * formulář sám předvyplnil: když ho kontakt pořád drží a na faktuře je jiná
+ * hodnota, šlo o opravu a kontakt ji převezme. Prázdné místo se doplní vždy.
+ *
+ * - IČO, DIČ, sídlo a telefon: prázdné nebo stará hodnota → nová,
+ * - e-mail jen na prázdné místo — fakturační adresa (účtárna) bývá jiná
+ *   než ta, na kterou se klientovi píše,
+ * - firma jen na prázdné místo a jen když se liší od jména kontaktu.
+ *
+ * Pak se změna propíše dál (Hovory, zakázky, schůzky, koncepty).
+ */
+export async function absorbBillingIntoContact(
+  contactId: string,
+  incoming: Partial<BillingValues>,
+  replaceable: Partial<BillingValues> | null = null,
+): Promise<void> {
+  const contact = await loadRoot(contactId)
+  if (!contact) return
+  const value = (v: string | undefined) => v?.trim() ?? ''
+  const takes = (current: string | null, next: string, old: string, same = (a: string, b: string) => a === b) =>
+    next !== '' && (current === null || (!same(current, next) && old !== '' && same(current, old)))
+  const digits = (v: string) => v.replace(/\D/g, '').slice(-9)
+
+  const ico = value(incoming.ico)
+  const dic = value(incoming.dic)
+  const address = value(incoming.address)
+  const name = value(incoming.name)
+  const takeIco = takes(contact.ico, ico, value(replaceable?.ico))
+  const takeDic = takes(contact.dic, dic, value(replaceable?.dic))
+  const takeAddress = takes(contact.address, address, value(replaceable?.address))
+  const takeCompany =
+    contact.company === null && name !== '' && name.toLowerCase() !== contact.displayName.trim().toLowerCase()
+
+  if (takeIco || takeDic || takeCompany) {
+    await adminDb.batch([
+      {
+        text: `UPDATE contacts SET ico = coalesce($2, ico), dic = coalesce($3, dic), company = coalesce($4, company) WHERE id = $1::uuid`,
+        params: [contact.id, takeIco ? ico : null, takeDic ? dic : null, takeCompany ? name : null],
+      },
+    ])
+  }
+  if (takeAddress) {
+    await batchSchemaTolerant([{ text: `UPDATE contacts SET address = $2 WHERE id = $1::uuid`, params: [contact.id, address] }])
+  }
+
+  const phone = value(incoming.phone)
+  const email = value(incoming.email)
+  const takePhone = takes(contact.phone, phone, value(replaceable?.phone), (a, b) => digits(a) === digits(b))
+  const takeEmail = contact.email === null && email !== ''
+  if (takePhone || takeEmail) {
+    // Unikátnost a normalizaci telefonu a e-mailu hlídá `absorbIntoContact`; ten pak propíše i zbytek.
+    await absorbIntoContact(
+      contact.id,
+      { email: takeEmail ? email : null, phone: takePhone ? phone : null },
+      { email: null, phone: takePhone ? contact.phone : null },
+    )
+  }
+  await propagateContact(contact.id, {
+    email: contact.email,
+    phone: contact.phone,
+    ico: contact.ico,
+    dic: contact.dic,
+    address: contact.address,
+  })
 }
 
 // ─── Firma od AI asistenta ───────────────────────────────────────────────────

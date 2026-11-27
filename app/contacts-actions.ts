@@ -35,6 +35,7 @@ const fieldsSchema = z.object({
   phone: z.string().trim().max(40).nullable(),
   ico: z.string().trim().max(20).nullable(),
   dic: z.string().trim().max(20).nullable(),
+  address: z.string().trim().max(400).nullable(),
   note: z.string().trim().max(2000).nullable(),
 })
 
@@ -66,6 +67,7 @@ export async function saveContact(id: string, raw: unknown): Promise<ContactWrit
   revalidatePath('/dashboard/calls')
   revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard/ai-asistent')
+  revalidatePath('/dashboard/faktury')
   return { ok: true, id: result.id }
 }
 

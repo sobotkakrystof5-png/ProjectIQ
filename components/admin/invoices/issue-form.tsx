@@ -1,18 +1,19 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Plus, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { itemTotals, invoiceTotal } from '@/lib/invoice-pdf/totals'
-import { getProjectBilling, issueNewInvoice, lookupCompany } from '@/app/dashboard/finance/invoice-actions'
+import { getProjectIssueDraft, issueNewInvoice, lookupCompany } from '@/app/dashboard/finance/invoice-actions'
 import { saveInvoiceDraft } from '@/app/dashboard/faktury/koncepty-actions'
 import type { InvoiceProjectOption } from '@/app/dashboard/finance/invoice-actions'
 import type { IssueDraft } from '@/lib/admin/invoice-issue'
 import type { InvoiceIssueItem } from '@/lib/admin/invoice-issue-schema'
 import { INVOICE_CURRENCIES } from '@/lib/invoice-constants'
+import { EMPTY_PARTY, followField, followParty, prefillNote, type PrefillSources } from '@/lib/admin/invoice-prefill'
 import {
   DEFAULT_DEPOSIT_PERCENT,
   INVOICE_KINDS,
@@ -59,6 +60,26 @@ const emptyItem = (vatRate: 0 | 12 | 21): ItemDraft => ({
   unitPrice: '',
   vatRate,
 })
+
+/**
+ * Položky z předvyplnění: z konceptu nebo z minula, jinak jedna prázdná
+ * s částkou, kterou zakázka ještě nezaplatila.
+ */
+function itemsFromDraft(draft: IssueDraft, vatPayer: boolean): ItemDraft[] {
+  const vatRate = vatPayer ? 21 : 0
+  if (draft.items.length > 0) {
+    return draft.items.map((item) => ({
+      description: item.description,
+      quantity: String(item.quantity),
+      unitPrice: String(item.unitPrice),
+      // Koncept si sazbu pamatuje; předvyplnění z historie ji nenese.
+      vatRate: 'vatRate' in item && (item.vatRate === 0 || item.vatRate === 12 || item.vatRate === 21) ? item.vatRate : vatRate,
+    }))
+  }
+  return [{ ...emptyItem(vatRate), unitPrice: draft.amount > 0 ? String(draft.amount) : '' }]
+}
+
+const sameItems = (a: ItemDraft[], b: ItemDraft[]) => JSON.stringify(a) === JSON.stringify(b)
 
 const toItem = (item: ItemDraft): InvoiceIssueItem => ({
   description: item.description,
@@ -142,19 +163,14 @@ export function IssueInvoiceForm({
   const [note, setNote] = useState(initial?.note ?? '')
   // Popis i cena z historie klienta (AD15): co se mu fakturovalo naposledy.
   // Bez toho se u stálého klienta opisovalo totéž pokaždé znovu.
-  const [items, setItems] = useState<ItemDraft[]>(() => {
-    const vatRate = vatPayer ? 21 : 0
-    if (draft.items.length > 0) {
-      return draft.items.map((item) => ({
-        description: item.description,
-        quantity: String(item.quantity),
-        unitPrice: String(item.unitPrice),
-        // Koncept si sazbu pamatuje; předvyplnění z historie ji nenese.
-        vatRate: 'vatRate' in item && (item.vatRate === 0 || item.vatRate === 12 || item.vatRate === 21) ? item.vatRate : vatRate,
-      }))
-    }
-    return [{ ...emptyItem(vatRate), unitPrice: draft.amount > 0 ? String(draft.amount) : '' }]
-  })
+  const [items, setItems] = useState<ItemDraft[]>(() => itemsFromDraft(draft, vatPayer))
+  // Co formulář vyplnil sám (R-153). Po výběru jiné zakázky se přepíše jen
+  // pole, které pořád drží tuhle hodnotu nebo je prázdné.
+  const autoParty = useRef<Party>(draft.counterparty)
+  const autoEmail = useRef(draft.email)
+  const autoItems = useRef<ItemDraft[]>(itemsFromDraft(draft, vatPayer))
+  const requestedProject = useRef(draft.projectId ?? '')
+  const [sources, setSources] = useState<PrefillSources | null>(draft.sources)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const [aresPending, startAres] = useTransition()
@@ -194,18 +210,38 @@ export function IssueInvoiceForm({
     if (next === 'deposit' && toPercent(percentText) === null) setPercentText(String(DEFAULT_DEPOSIT_PERCENT))
   }
 
+  /** Odběratel, e-mail a položky podle zakázky; ručně přepsané pole zůstane. */
+  const followDraft = (party: Party, nextEmail: string, nextItems: ItemDraft[]) => {
+    const prevParty = autoParty.current
+    const prevEmail = autoEmail.current
+    const prevItems = autoItems.current
+    setCounterparty(current => followParty(current, prevParty, party))
+    setEmail(current => followField(current, prevEmail, nextEmail))
+    setItems(current => (sameItems(current, prevItems) ? nextItems : current))
+    autoParty.current = party
+    autoEmail.current = nextEmail
+    autoItems.current = nextItems
+  }
+
   const changeProject = (id: string) => {
     setProjectId(id)
     setError(null)
+    requestedProject.current = id
     if (id === '') {
       setBilling(null)
+      setSources(null)
+      followDraft(EMPTY_PARTY, '', [emptyItem(vatPayer ? 21 : 0)])
       if (kind && kind !== 'single') setKind(kindsEnabled ? null : 'single')
       return
     }
     startBilling(async () => {
-      const next = await getProjectBilling(id, replaces?.id ?? null)
-      setBilling(next)
-      if (kindsEnabled && kind && kindAvailability(next)[kind] !== null) setKind(null)
+      const next = await getProjectIssueDraft(id, replaces?.id ?? null)
+      // Mezitím vybraná jiná zakázka má přednost před pomalejší odpovědí.
+      if (requestedProject.current !== id || !next) return
+      setBilling(next.billing)
+      setSources(next.sources)
+      followDraft(next.counterparty, next.email, itemsFromDraft(next, vatPayer))
+      if (kindsEnabled && kind && kindAvailability(next.billing)[kind] !== null) setKind(null)
     })
   }
 
@@ -291,7 +327,7 @@ export function IssueInvoiceForm({
       const result = await issueNewInvoice(
         {
           projectId: projectId === '' ? null : projectId,
-          counterparty,
+          counterparty: { ...counterparty, email: email.trim(), phone: counterparty.phone.trim() },
           issuedOn,
           suppliedOn,
           dueOn,
@@ -303,6 +339,8 @@ export function IssueInvoiceForm({
         },
         email.trim(),
         replaces?.id ?? null,
+        // Co formulář sám vyplnil: podle toho server pozná opravu údajů klienta (R-153).
+        { ...autoParty.current, email: autoEmail.current },
       )
       if (result.error || !result.id) {
         setError(result.error ?? 'Fakturu se nepodařilo vystavit.')
@@ -439,7 +477,14 @@ export function IssueInvoiceForm({
       )}
 
       <section className="flex flex-col gap-4 rounded-box border border-navy-100 bg-surface p-4 sm:p-5">
-        <h2 className="text-sm font-semibold text-ink">Odběratel</h2>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold text-ink">Odběratel</h2>
+          {billingPending ? (
+            <p className="text-xs text-quiet">Načítám údaje klienta…</p>
+          ) : (
+            sources && <p className="text-xs text-quiet">{prefillNote(sources)} Zkontrolujte, jestli sedí.</p>
+          )}
+        </div>
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
           <Field label="IČO" hint="Doplním jméno a adresu z rejstříku firem.">
             <Input
@@ -467,9 +512,21 @@ export function IssueInvoiceForm({
             <Input value={counterparty.dic} onChange={e => setCounterparty(p => ({ ...p, dic: e.target.value }))} />
           </Field>
         </div>
-        <Field label="E-mail pro fakturu" hint="Sem fakturu pošlu. Na fakturu se netiskne.">
-          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="adresa@klient.cz" />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="E-mail" hint="Sem fakturu pošlu a vytisknu ho na ni.">
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="adresa@klient.cz" />
+          </Field>
+          <Field label="Telefon" hint="Nepovinné. Vytisknu na fakturu.">
+            <Input
+              type="tel"
+              inputMode="tel"
+              value={counterparty.phone}
+              maxLength={40}
+              onChange={e => setCounterparty(p => ({ ...p, phone: e.target.value }))}
+              placeholder="+420 777 123 456"
+            />
+          </Field>
+        </div>
       </section>
 
       {byPercent ? (

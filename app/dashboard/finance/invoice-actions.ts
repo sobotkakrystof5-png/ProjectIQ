@@ -15,8 +15,9 @@ import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/
 import { getPragueTodayISO, isIsoDate } from '@/lib/prague-time'
 import { isInvoiceOutstanding, isInvoiceOverdue, invoiceSql } from '@/lib/invoice-status'
 import {
-  cancelInvoiceQuery, issueCorrection, issueInvoice, issueErrorMessage, isIssuingReady, loadIssuerProfile, prepareKindIssue, saveIssuerProfile,
-  type IssuerSettings,
+  cancelInvoiceQuery, issueCorrection, issueInvoice, issueErrorMessage, isIssuingReady, loadIssueDraft, loadIssuerProfile, prepareKindIssue,
+  rememberCounterpartyOnContact, saveIssuerProfile,
+  type IssueDraft, type IssuerSettings,
 } from '@/lib/admin/invoice-issue'
 import { issueInvoiceSchema, issuerProfileSaveSchema } from '@/lib/admin/invoice-issue-schema'
 import { isInvoiceKind, issueKindSchema, type InvoiceKind, type ProjectBilling } from '@/lib/admin/invoice-kinds'
@@ -716,6 +717,11 @@ export async function issueNewInvoice(
    * u platné nezaplacené faktury vystavené tady.
    */
   replacesId?: string | null,
+  /**
+   * Co formulář sám předvyplnil (R-153). Když kontakt pořád drží tuhle
+   * hodnotu a na faktuře je jiná, byla to oprava a kontakt ji převezme.
+   */
+  prefilled?: unknown,
 ): Promise<{ error?: string; id?: string; number?: string }> {
   await requireAuth()
   const replaces = replacesId ?? null
@@ -727,6 +733,12 @@ export async function issueNewInvoice(
   if (!kind.success) return { error: kind.error.issues[0]?.message ?? 'Vyberte, o jakou fakturu jde.' }
   const parsed = issueInvoiceSchema.safeParse(raw)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Něco ve faktuře nesedí.' }
+  const email = z.string().trim().max(254).email().safeParse(clientEmail ?? '')
+  // Adresa, kam faktura odchází, je i ta vytištěná (R-153), pokud formulář neposlal jinou.
+  const input = {
+    ...parsed.data,
+    counterparty: { ...parsed.data.counterparty, email: parsed.data.counterparty.email || (email.success ? email.data : '') },
+  }
 
   const { profile, configured } = await loadIssuerProfile()
   if (!configured) return { error: 'Nejdřív vyplňte údaje dodavatele v Profilu dodavatele.' }
@@ -735,7 +747,7 @@ export async function issueNewInvoice(
   }
 
   try {
-    const prepared = await prepareKindIssue(parsed.data, kind.data, profile, replaces)
+    const prepared = await prepareKindIssue(input, kind.data, profile, replaces)
     if (!prepared.ok) return { error: prepared.error }
     let issued: { id: string; number: string }
     if (replaces === null) {
@@ -753,12 +765,44 @@ export async function issueNewInvoice(
       revalidateInvoicePaths((oldRows[0] as { project_id: string | null } | undefined)?.project_id ?? null)
       revalidatePath(`/dashboard/faktury/${replaces}`)
     }
-    const email = z.string().trim().max(254).email().safeParse(clientEmail ?? '')
     if (email.success) await rememberClientEmail(issued.id, email.data)
+    if (input.projectId) {
+      const before = prefilledSchema.safeParse(prefilled ?? null)
+      await rememberOnContact(input.projectId, input.counterparty, before.success ? before.data : null)
+    }
     revalidateInvoicePaths(parsed.data.projectId)
     return issued
   } catch (err) {
     return { error: issueErrorMessage(err) }
+  }
+}
+
+const prefilledText = (max: number) => z.string().max(max).default('')
+const prefilledSchema = z
+  .object({
+    name: prefilledText(160),
+    address: prefilledText(400),
+    ico: prefilledText(20),
+    dic: prefilledText(20),
+    email: prefilledText(254),
+    phone: prefilledText(40),
+  })
+  .nullable()
+
+/**
+ * Údaje z faktury do kontaktu zakázky a odtud dál (R-153). Faktura je
+ * v tu chvíli vystavená, takže chyba tady nesmí vrátit chybu vystavení.
+ */
+async function rememberOnContact(
+  projectId: string,
+  issued: Parameters<typeof rememberCounterpartyOnContact>[1],
+  prefilled: Parameters<typeof rememberCounterpartyOnContact>[2],
+): Promise<void> {
+  try {
+    await rememberCounterpartyOnContact(projectId, issued, prefilled)
+    revalidatePath('/dashboard/kontakty', 'layout')
+  } catch (err) {
+    console.error('[faktury] IČO a DIČ se do kontaktu nezapsaly', err instanceof Error ? err.message : 'neznámá chyba')
   }
 }
 
@@ -786,6 +830,17 @@ export async function getProjectBilling(projectId: string, excludeInvoiceId: str
   // Při opravě (R-148) se opravovaná faktura do rozpisu nepočítá.
   const exclude = excludeInvoiceId !== null && UUID_RE.test(excludeInvoiceId) ? excludeInvoiceId : null
   return loadProjectBilling(projectId, exclude)
+}
+
+/**
+ * Všechno, co formulář po výběru zakázky doplní (R-153): odběratel včetně
+ * sídla z rejstříku, e-mail, položky z minula a platby zakázky.
+ */
+export async function getProjectIssueDraft(projectId: string, excludeInvoiceId: string | null = null): Promise<IssueDraft | null> {
+  await requireAuth()
+  if (!UUID_RE.test(projectId)) return null
+  const exclude = excludeInvoiceId !== null && UUID_RE.test(excludeInvoiceId) ? excludeInvoiceId : null
+  return loadIssueDraft(projectId, { registry: true, excludeInvoiceId: exclude })
 }
 
 /** Storno: vystavený doklad se nepřepisuje, opravuje se novou fakturou. */

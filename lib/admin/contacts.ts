@@ -36,6 +36,8 @@ export type ContactRow = {
   phone: string | null
   ico: string | null
   dic: string | null
+  /** Sídlo / fakturační adresa (R-153, migrace 140). */
+  address: string | null
   note: string | null
   source: string
   last_seen_at: string | null
@@ -71,7 +73,8 @@ const OCCURRENCES = `
       (SELECT count(*) FROM agent_leads a        WHERE a.contact_id = ANY(fam.ids))::int AS poptavky
   ) occ ON true`
 
-const ROW_COLUMNS = `c.id::text, c.display_name, c.company, c.email, c.phone, c.ico, c.dic, c.note,
+const ROW_COLUMNS = `c.id::text, c.display_name, c.company, c.email, c.phone, c.ico, c.dic,
+  to_jsonb(c) ->> 'address' AS address, c.note,
   c.source, c.last_seen_at, c.created_at, c.merged_into::text,
   t.display_name AS merged_into_name,
   occ.zakazky, occ.hovory, occ.konzultace, occ.poptavky`
@@ -287,6 +290,8 @@ export type ContactFields = {
   phone: string | null
   ico: string | null
   dic: string | null
+  /** Sídlo / fakturační adresa (R-153). Chybí u volání sestavených před ním. */
+  address?: string | null
   note: string | null
 }
 
@@ -299,6 +304,7 @@ export function normalizeContactFields(input: ContactFields): ContactFields {
     phone: normalizePhone(input.phone),
     ico: normalizeIco(input.ico),
     dic: normalizeDic(input.dic),
+    address: input.address === undefined ? undefined : trimOrNull(input.address),
     note: trimOrNull(input.note),
   }
 }
@@ -307,8 +313,17 @@ export type ContactWriteResult = { ok: true; id: string } | { ok: false; error: 
 
 /** Úspěšné uložení nese i to, co kontakt měl předtím — podle toho se změna propíše dál (R-141). */
 export type ContactSaveResult =
-  | { ok: true; id: string; previous: { email: string | null; phone: string | null } }
+  | { ok: true; id: string; previous: ContactPrevious }
   | { ok: false; error: string }
+
+/** Co měl kontakt před uložením: podle toho se změna propíše dál (R-141, R-153). */
+export type ContactPrevious = {
+  email: string | null
+  phone: string | null
+  ico: string | null
+  dic: string | null
+  address: string | null
+}
 
 /** Kdo už ten telefon nebo e-mail má — pro hlášku místo kódu chyby. */
 async function holder(fields: ContactFields, exceptId: string | null): Promise<string | null> {
@@ -328,6 +343,19 @@ const DUPLICATE = '23505'
 const isDuplicate = (e: unknown): boolean =>
   typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === DUPLICATE
 
+/**
+ * Sídlo kontaktu (R-153) zvlášť: sloupec přidává migrace 140 a na databázi
+ * bez ní se uložení ostatních údajů nesmí zastavit. Chybějící sloupec se
+ * přeskočí, jiná chyba projde.
+ */
+async function saveContactAddress(id: string, address: string | null): Promise<void> {
+  try {
+    await adminDb.batch([{ text: `UPDATE contacts SET address = $2 WHERE id = $1`, params: [id, address] }])
+  } catch (e) {
+    if ((e as { code?: string })?.code !== '42703') throw e
+  }
+}
+
 export async function saveContactFields(id: string, input: ContactFields): Promise<ContactSaveResult> {
   const fields = normalizeContactFields(input)
   if (fields.display_name === '') return { ok: false, error: 'Jméno kontaktu musí být vyplněné.' }
@@ -342,20 +370,24 @@ export async function saveContactFields(id: string, input: ContactFields): Promi
     const [rows] = await adminDb.batch([
       {
         // `old` vidí řádek před úpravou (stejný snímek příkazu).
-        text: `WITH old AS (SELECT id, email, phone FROM contacts WHERE id = $1)
+        text: `WITH old AS (SELECT o.id, o.email, o.phone, o.ico, o.dic, to_jsonb(o) ->> 'address' AS address
+                           FROM contacts o WHERE o.id = $1)
                UPDATE contacts c
                SET display_name = $2, company = $3, email = $4, phone = $5, ico = $6, dic = $7, note = $8
                FROM old
                WHERE c.id = old.id
-               RETURNING c.id::text, old.email AS old_email, old.phone AS old_phone`,
+               RETURNING c.id::text, old.email AS old_email, old.phone AS old_phone,
+                         old.ico AS old_ico, old.dic AS old_dic, old.address AS old_address`,
         params: [id, fields.display_name, fields.company, fields.email, fields.phone, fields.ico, fields.dic, fields.note],
       },
     ])
     if (rows.length === 0) return { ok: false, error: 'Kontakt už neexistuje.' }
+    if (fields.address !== undefined) await saveContactAddress(id, fields.address)
+    const old = (key: string) => (rows[0][key] as string | null) ?? null
     return {
       ok: true,
       id: String(rows[0].id),
-      previous: { email: (rows[0].old_email as string | null) ?? null, phone: (rows[0].old_phone as string | null) ?? null },
+      previous: { email: old('old_email'), phone: old('old_phone'), ico: old('old_ico'), dic: old('old_dic'), address: old('old_address') },
     }
   } catch (e) {
     if (!isDuplicate(e)) throw e

@@ -233,6 +233,7 @@ export default async function KontaktPage(props: { params: Promise<{ id: string 
                 phone: contact.phone,
                 ico: contact.ico,
                 dic: contact.dic,
+                address: contact.address,
                 note: contact.note,
               }}
             />

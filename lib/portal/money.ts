@@ -80,6 +80,9 @@ const customerSchema = z.object({
   address: z.string().max(600).nullish(),
   ico: z.string().max(20).nullish(),
   dic: z.string().max(20).nullish(),
+  // Kontakt odběratele z faktury (R-153, migrace 140) — klientovy vlastní údaje.
+  email: z.string().max(254).nullish(),
+  phone: z.string().max(40).nullish(),
 })
 
 /**
@@ -138,6 +141,8 @@ export function pdfInvoiceFromRow(row: PortalRow): PdfInvoice | null {
       address: customer.data.address ?? '',
       ico: customer.data.ico ?? null,
       dic: customer.data.dic ?? null,
+      email: customer.data.email ?? null,
+      phone: customer.data.phone ?? null,
     },
     issuedOn,
     suppliedOn: day(row.supplied_on) ?? issuedOn,
