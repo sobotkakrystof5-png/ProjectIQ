@@ -4,7 +4,8 @@
 >
 > **Poslední aktualizace:** 2026-11-28 · **Opravy z testu klientského prostoru** (R-156): pozvání čerstvé zakázky,
 > název zakázky u klienta, tlačítka v řádku výpisu, posun data o den, NPS v Profilu, „Vrátit" u konzultace a drobnosti.
-> Větev `admin/klient-opravy`, migrace 143 a 144 jen na testovacím Neonu; **nic na produkci**.
+> **Na produkci od 2026-11-28 (`eefdd68`) i s migracemi 143 a 144**; veřejně ověřeno, bez běhových chyb,
+> za přihlášením nikdo neviděl.
 >
 > Předchozí: 2026-11-27 · **Navrhovač nabídek N2–N4 na produkci** (R-155): z hotového rozboru
 > firmy vznikne sám návrh nabídky se třemi variantami. Cenu počítá server z cenových pravidel (tabulka pásem,
@@ -1943,11 +1944,10 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
 
 ## 3. Otevřené problémy
 
-- [ ] **Opravy klientského prostoru (R-156) — nasadit:** větev `admin/klient-opravy` (worktree
-  `.claude/worktrees/klient-test-local`). Migrace 143 a 144 jsou jen na testovacím Neonu; na produkci je pouští
-  Kryštof nebo agent s jeho souhlasem, **143 před nasazením kódu** (bez ní pozvání čerstvé zakázky dál padá; kód
-  sám nic nerozbije). Po nasazení: pozvat do prostoru novou neuloženou zakázku, „Zaplaceno" ve výpisu faktur myší,
-  termín ve Zprávách, NPS v Profilu · od 2026-11-28
+- [ ] **Opravy klientského prostoru (R-156) — projít naživo:** na produkci od 2026-11-28 (`eefdd68`, migrace 143
+  a 144). Ověřeno testy, buildem a na localhostu proti testovacímu Neonu; za přihlášením na produkci ne. Projít:
+  „Zaplaceno" ve výpisu faktur myší (nesmí otevřít detail), termín ve Zprávách, NPS v Profilu, u klienta druh faktury
+  a název zakázky „firma · druh práce", odkaz ve zprávě chatu je klikací · od 2026-11-28
 - [ ] **Navrhovač nabídek N2–N4 (R-155) — vyzkoušet naostro:** ~~(1) migrace 142 na produkci~~ (2026-11-27, Neon MCP,
   v evidenci), ~~(2) sloučit do `main` a nasadit~~ (2026-11-27, `afe75fc`), (3) Kryštof: projít Nabídky › Cenová pravidla
   (hlavně horní meze Plus a e-shop, které doplnil agent), (4) první skutečná nabídka: rozbor firmy → koncept →
@@ -2487,6 +2487,10 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
   Testovací Neon taky. Na produkci měl `projects.updated_at` výchozí `now()` už předtím a žádná zakázka NULL, takže
   pozvání čerstvé zakázky tam nepadalo (padalo jen na testovacím Neonu); 143 tam přidává jen název a `coalesce`.
   Jediná zakázka v prostoru (BARINGOTKA) nemá druh práce, název se nezměnil.
+- **chore** **Na produkci** 2026-11-28: větev přeskládaná na `main` po Voice (`89eb51c`), konflikty jen v paměti
+  a AUDIT-LOG (oba záznamy zůstaly), celá sada 2 222 testů a `npm run build` prošly; push `89eb51c..eefdd68`,
+  nasazení `dpl_HawKW…` Ready. Veřejně: `/`, `/login`, `/klient/prihlaseni`, `/w/prihlaseni` 200, admin a `/klient`
+  307, `/p/<nesmysl>` 404, PDF faktury klienta bez přihlášení 401, CSP, HSTS a `X-Frame-Options`; 30 min bez chyb.
 - **chore** Ověřeno: `npx tsc --noEmit`, celá sada 2 213 testů (padá jen `admin-supabase-auth` na lokální simulaci
   přihlášení; s čistým `lib/auth.ts` 14/14), nové `klient-opravy.test.ts` (11, produkční tvar `projects`, bez migrací
   spadne) a `klient-opravy-texty.test.ts`. Na localhostu proti testovacímu Neonu: pozvání zakázky s `updated_at` NULL
