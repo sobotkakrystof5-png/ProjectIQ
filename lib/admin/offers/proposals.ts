@@ -6,6 +6,7 @@ import {
   applyProposalEdit,
   buildProposal,
   clientOffer,
+  normalizeInputs,
   variantOf,
   type ClientOffer,
   type ProposalDraft,
@@ -123,6 +124,10 @@ function toRow(raw: Record<string, unknown>): ProposalRow {
   for (const key of DATE_FIELDS) {
     const v = row[key]
     row[key] = v === null || v === undefined ? null : new Date(v as string | Date).toISOString()
+  }
+  // Koncepty z doby před R-157 nemají počet zakázek: doplní se z odhadu poptávek.
+  if (row.inputs && typeof row.inputs === 'object') {
+    row.inputs = normalizeInputs(row.inputs as ProposalInputs, (row.value as ProposalValue | null) ?? null)
   }
   return row as unknown as ProposalRow
 }

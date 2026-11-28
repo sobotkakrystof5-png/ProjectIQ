@@ -1967,7 +1967,11 @@ Plán a cenová pravidla: `docs/admin/NABIDKY-PLAN.md`. Cenu **nepočítá model
 odhad hodnoty pro klienta (`value`: poptávky měsíčně, podíl zakázek, předpoklady, jistota) a podklad pro varianty
 (`offer`: web/e-shop, pozice v pásmu, systém navíc, položky šité na firmu, úvod pro klienta). Čísla spočítá
 `lib/admin/offers/pricing.ts` z pravidel v `admin_settings.pricing_rules` (bez uložených platí tabulka z plánu,
-`DEFAULT_PRICING_RULES`): pásmo podle ceny jedné typické zakázky klienta, střed dolní / střední / horní třetiny,
+`DEFAULT_PRICING_RULES`): pásmo podle přínosu webu za měsíc (`upTo`; zakázky z webu za měsíc × cena jedné typické
+zakázky, R-157), bez počtu zakázek podle ceny zakázky (záložní hranice `jobUpTo`), bez obojího druhé pásmo
+(`bandIndexFor` vrací i `basis`: `value` / `job` / `assumed`). Počet zakázek dá `jobsPerMonthFrom` (střed poptávek ×
+podíl) do `inputs.jobsPerMonth` (`jobsSource` research/manual/none, Kryštof ho přepíše v editoru); koncepty uložené
+před R-157 ho dostanou při čtení (`normalizeInputs` v `toRow`). Dál střed dolní / střední / horní třetiny,
 celé tisíce, Základ < Doporučená < Plus, web nikdy pod spodní hranicí, příplatky spěch a jazyk, nad stropem
 (50 000 Kč) příznak „potvrdit".
 

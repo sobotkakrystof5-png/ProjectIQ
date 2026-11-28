@@ -38,6 +38,8 @@ const editSchema = z
       .object({
         kind: z.enum(['web', 'eshop']),
         typicalJobCzk: z.number().int().min(0).max(1_000_000_000).nullable(),
+        // Zakázky z webu za měsíc; desetinné kvůli firmám s pár zakázkami za rok (0,3 = jedna za čtvrt roku).
+        jobsPerMonth: z.number().min(0).max(10_000).transform((v) => Math.round(v * 10) / 10).nullable(),
         position: z.enum(['low', 'mid', 'high']),
         rush: z.boolean(),
         languages: z.number().int().min(0).max(5),

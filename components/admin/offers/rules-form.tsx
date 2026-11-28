@@ -11,6 +11,7 @@ import {
   VARIANT_KEYS,
   VARIANT_NAMES,
   bandLabel,
+  jobBandLabel,
   type PricingRules,
   type VariantKey,
   type VariantRanges,
@@ -83,8 +84,8 @@ export function RulesForm({ rules: initial, stored, updatedAt }: { rules: Pricin
       ...r,
       bands: r.bands.map((b, j) => (j === i ? { ...b, ranges: { ...b.ranges, [key]: { ...b.ranges[key], [edge]: value } } } : b)),
     }))
-  const setUpTo = (i: number, value: number) =>
-    setRules((r) => ({ ...r, bands: r.bands.map((b, j) => (j === i ? { ...b, upTo: value } : b)) }))
+  const setUpTo = (i: number, key: 'upTo' | 'jobUpTo', value: number) =>
+    setRules((r) => ({ ...r, bands: r.bands.map((b, j) => (j === i ? { ...b, [key]: value } : b)) }))
   const setEshop = (key: VariantKey, edge: 'min' | 'max', value: number) =>
     setRules((r) => ({ ...r, eshop: { ...r.eshop, [key]: { ...r.eshop[key], [edge]: value } } }))
   const setField = (key: keyof PricingRules, value: number) => setRules((r) => ({ ...r, [key]: value }))
@@ -141,27 +142,40 @@ export function RulesForm({ rules: initial, stored, updatedAt }: { rules: Pricin
 
       <Card>
         <CardHead
-          title="Pásma podle ceny jedné zakázky klienta"
-          hint="Kde v pásmu firma je (dolní třetina, střed, horní třetina) navrhne rozbor firmy. Ceny se zaokrouhlí na celé tisíce."
+          title="Pásma podle toho, co web klientovi přinese za měsíc"
+          hint="Přínos = zakázky z webu za měsíc × cena jedné zakázky. Když počet zakázek odhadnout nejde, pásmo se vybere podle ceny jedné zakázky. Kde v pásmu firma je, navrhne rozbor firmy. Ceny se zaokrouhlí na celé tisíce."
         />
         <div className="flex flex-col gap-6">
           {rules.bands.map((band, i) => (
             <div key={i} className="flex flex-col gap-3 border-t border-navy-100 pt-4 first:border-t-0 first:pt-0">
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col gap-0.5">
                 <p className="text-sm font-semibold text-ink">{bandLabel(rules, i)}</p>
-                {band.upTo !== null && (
-                  <label className="flex items-center gap-2 text-sm text-quiet">
-                    hranice
+                <p className="text-sm text-quiet">Bez počtu zakázek: {jobBandLabel(rules, i)}</p>
+              </div>
+              {band.upTo !== null && band.jobUpTo !== null && (
+                <div className="flex flex-wrap gap-x-6 gap-y-3">
+                  <label className="flex flex-wrap items-center gap-2 text-sm text-quiet">
+                    Přínos pod
                     <input
                       inputMode="numeric"
                       value={band.upTo}
-                      onChange={(e) => setUpTo(i, toInt(e.target.value))}
+                      onChange={(e) => setUpTo(i, 'upTo', toInt(e.target.value))}
+                      className={`${num} w-36`}
+                    />
+                    Kč měsíčně
+                  </label>
+                  <label className="flex flex-wrap items-center gap-2 text-sm text-quiet">
+                    Zakázka pod
+                    <input
+                      inputMode="numeric"
+                      value={band.jobUpTo}
+                      onChange={(e) => setUpTo(i, 'jobUpTo', toInt(e.target.value))}
                       className={`${num} w-36`}
                     />
                     Kč
                   </label>
-                )}
-              </div>
+                </div>
+              )}
               <RangeInputs ranges={band.ranges} label={bandLabel(rules, i)} onChange={(k, edge, v) => setBand(i, k, edge, v)} />
             </div>
           ))}

@@ -4,9 +4,14 @@ import { z } from 'zod'
  * Cenová pravidla navrhovače nabídek (R-147, N2; pravidla v docs/admin/NABIDKY-PLAN.md, oddíl 5).
  *
  * Cenu **nepočítá model**. Model z rozboru odhadne, kolik stojí jedna typická
- * zakázka klienta a kde v pásmu firma je (dolní / střední / horní třetina);
+ * zakázka klienta, kolik poptávek měsíčně mu web přinese, kolik z nich se změní
+ * v zakázku, a kde v pásmu firma je (dolní / střední / horní třetina);
  * čísla spočítá tenhle soubor z pravidel, která žijí v `admin_settings.pricing_rules`
  * a Kryštof je mění v adminu. Výchozí hodnoty níž jsou tabulka z oddílu 5.3.
+ *
+ * Pásmo určuje **měsíční přínos webu** = zakázky z webu za měsíc × cena jedné
+ * zakázky (R-157, Kryštof 2026-11-28: počet zakázek hraje velkou roli). Když
+ * počet zakázek odhadnout nejde, pásmo se vezme z ceny jedné zakázky jako dřív.
  *
  * Soubor je čistý (žádná databáze, žádné `server-only`): čte ho server
  * i editor nabídky v prohlížeči, takže přepočet v okně a na serveru sedí.
@@ -23,8 +28,15 @@ export type OfferKind = 'web' | 'eshop'
 
 export type Range = { min: number; max: number }
 export type VariantRanges = Record<VariantKey, Range>
-/** Pásmo podle ceny jedné typické zakázky klienta: platí pro zakázky pod `upTo` Kč, poslední bez horní meze. */
-export type PricingBand = { upTo: number | null; ranges: VariantRanges }
+/**
+ * Pásmo podle měsíčního přínosu webu: platí pro přínos pod `upTo` Kč měsíčně.
+ * Když počet zakázek chybí, platí záložní hranice `jobUpTo` pro cenu jedné zakázky.
+ * Poslední pásmo je bez horní meze v obou řadách.
+ */
+export type PricingBand = { upTo: number | null; jobUpTo: number | null; ranges: VariantRanges }
+
+/** Z čeho se pásmo vzalo: měsíční přínos, jen cena zakázky, nebo nic (druhé pásmo naslepo). */
+export type BandBasis = 'value' | 'job' | 'assumed'
 
 export type PricingRules = {
   version: number
@@ -53,14 +65,17 @@ export type PricingRules = {
 
 const r = (min: number, max: number): Range => ({ min, max })
 
-/** Tabulka z oddílu 5.3 (přijata 2026-11-25). Horní meze Plus doplnil agent (R-155), Kryštof je mění v adminu. */
+/**
+ * Tabulka z oddílu 5.3 (přijata 2026-11-25, Plus a e-shop potvrzené 2026-11-28).
+ * Hranice měsíčního přínosu navrhl agent 2026-11-28 (R-157), Kryštof je mění v adminu.
+ */
 export const DEFAULT_PRICING_RULES: PricingRules = {
   version: 1,
   bands: [
-    { upTo: 10_000, ranges: { zaklad: r(10_000, 10_000), doporucena: r(12_000, 15_000), plus: r(18_000, 24_000) } },
-    { upTo: 100_000, ranges: { zaklad: r(12_000, 18_000), doporucena: r(18_000, 25_000), plus: r(30_000, 40_000) } },
-    { upTo: 1_000_000, ranges: { zaklad: r(18_000, 25_000), doporucena: r(25_000, 40_000), plus: r(45_000, 55_000) } },
-    { upTo: null, ranges: { zaklad: r(25_000, 30_000), doporucena: r(40_000, 50_000), plus: r(55_000, 70_000) } },
+    { upTo: 20_000, jobUpTo: 10_000, ranges: { zaklad: r(10_000, 10_000), doporucena: r(12_000, 15_000), plus: r(18_000, 24_000) } },
+    { upTo: 100_000, jobUpTo: 100_000, ranges: { zaklad: r(12_000, 18_000), doporucena: r(18_000, 25_000), plus: r(30_000, 40_000) } },
+    { upTo: 500_000, jobUpTo: 1_000_000, ranges: { zaklad: r(18_000, 25_000), doporucena: r(25_000, 40_000), plus: r(45_000, 55_000) } },
+    { upTo: null, jobUpTo: null, ranges: { zaklad: r(25_000, 30_000), doporucena: r(40_000, 50_000), plus: r(55_000, 70_000) } },
   ],
   eshop: { zaklad: r(30_000, 40_000), doporucena: r(40_000, 50_000), plus: r(50_000, 80_000) },
   floor: 10_000,
@@ -122,7 +137,7 @@ export const pricingRulesSchema = z
   .object({
     version: z.number().int().min(1).max(1_000_000),
     bands: z
-      .array(z.object({ upTo: money.nullable(), ranges: rangesSchema }))
+      .array(z.object({ upTo: money.nullable(), jobUpTo: money.nullable(), ranges: rangesSchema }))
       .min(1)
       .max(8),
     eshop: rangesSchema,
@@ -140,15 +155,18 @@ export const pricingRulesSchema = z
   })
   .superRefine((rules, ctx) => {
     const last = rules.bands.length - 1
-    rules.bands.forEach((band, i) => {
-      if (i === last ? band.upTo !== null : band.upTo === null) {
-        ctx.addIssue({ code: 'custom', message: 'Jen poslední pásmo je bez horní meze.', path: ['bands', i, 'upTo'] })
-      }
-      const prev = i > 0 ? rules.bands[i - 1].upTo : 0
-      if (band.upTo !== null && prev !== null && band.upTo <= prev) {
-        ctx.addIssue({ code: 'custom', message: 'Hranice pásem musí stoupat.', path: ['bands', i, 'upTo'] })
-      }
-    })
+    for (const key of ['upTo', 'jobUpTo'] as const) {
+      rules.bands.forEach((band, i) => {
+        if (i === last ? band[key] !== null : band[key] === null) {
+          ctx.addIssue({ code: 'custom', message: 'Jen poslední pásmo je bez horní meze.', path: ['bands', i, key] })
+        }
+        const prev = i > 0 ? rules.bands[i - 1][key] : 0
+        const current = band[key]
+        if (current !== null && prev !== null && current <= prev) {
+          ctx.addIssue({ code: 'custom', message: 'Hranice pásem musí stoupat.', path: ['bands', i, key] })
+        }
+      })
+    }
   })
 
 /** Uložená pravidla, nebo výchozí, když chybí nebo nesedí (starý tvar, ruční zásah). Nikdy nevyhazuje. */
@@ -169,21 +187,65 @@ export function typicalJobPoint(min: number | null, max: number | null): number 
   return min ?? max ?? null
 }
 
-/** Které pásmo podle ceny jedné zakázky. Neznámá cena = druhé pásmo (nejběžnější), ale s příznakem. */
-export function bandIndexFor(rules: PricingRules, jobCzk: number | null): { band: number; assumed: boolean } {
-  if (jobCzk === null) return { band: Math.min(1, rules.bands.length - 1), assumed: true }
-  const i = rules.bands.findIndex((b) => b.upTo === null || jobCzk < b.upTo)
-  return { band: i === -1 ? rules.bands.length - 1 : i, assumed: false }
+/** Zakázky z webu za měsíc: poptávky (střed odhadu) × podíl, který se změní v zakázku. Jedno desetinné místo. */
+export function jobsPerMonthFrom(inquiries: Range | null, winRate: number | null): number | null {
+  if (inquiries === null || winRate === null || winRate <= 0) return null
+  // Malý přídavek proti chybě plovoucí čárky (4,5 × 0,3 = 1,3499…).
+  return Math.round(((inquiries.min + inquiries.max) / 2) * winRate * 10 + 1e-9) / 10
 }
 
-/** Pásmo jako text pro obrazovku: „pod 10 000 Kč", „10 000–100 000 Kč", „nad 1 000 000 Kč". */
+/** Měsíční přínos webu v Kč = zakázky z webu za měsíc × cena jedné zakázky. `null`, když jedno chybí. */
+export function monthlyValue(jobCzk: number | null, jobsPerMonth: number | null | undefined): number | null {
+  if (jobCzk === null || jobsPerMonth === null || jobsPerMonth === undefined || jobsPerMonth < 0) return null
+  return Math.round(jobCzk * jobsPerMonth)
+}
+
+export type BandPick = { band: number; basis: BandBasis; assumed: boolean; monthlyValue: number | null }
+
+/**
+ * Které pásmo. Přednost má měsíční přínos (zakázky za měsíc × cena zakázky);
+ * bez počtu zakázek rozhodne cena jedné zakázky podle záložních hranic; bez
+ * obojího druhé pásmo (nejběžnější) s příznakem.
+ */
+export function bandIndexFor(rules: PricingRules, jobCzk: number | null, jobsPerMonth?: number | null): BandPick {
+  const last = rules.bands.length - 1
+  const pick = (amount: number, key: 'upTo' | 'jobUpTo') => {
+    const i = rules.bands.findIndex((b) => b[key] === null || amount < (b[key] as number))
+    return i === -1 ? last : i
+  }
+  const value = monthlyValue(jobCzk, jobsPerMonth)
+  if (value !== null) return { band: pick(value, 'upTo'), basis: 'value', assumed: false, monthlyValue: value }
+  if (jobCzk !== null) return { band: pick(jobCzk, 'jobUpTo'), basis: 'job', assumed: false, monthlyValue: null }
+  return { band: Math.min(1, last), basis: 'assumed', assumed: true, monthlyValue: null }
+}
+
+const fmtCzk = (n: number) => n.toLocaleString('cs-CZ')
+
+function rangeText(rules: PricingRules, band: number, key: 'upTo' | 'jobUpTo'): string {
+  const upTo = rules.bands[band]?.[key] ?? null
+  const from = band > 0 ? (rules.bands[band - 1]?.[key] ?? 0) : 0
+  if (band === 0 && upTo !== null) return `pod ${fmtCzk(upTo)} Kč`
+  if (upTo === null) return `nad ${fmtCzk(from)} Kč`
+  return `${fmtCzk(from)}–${fmtCzk(upTo)} Kč`
+}
+
+/** Pásmo jako text podle měsíčního přínosu: „přínos pod 20 000 Kč měsíčně", „přínos 20 000–100 000 Kč měsíčně"… */
 export function bandLabel(rules: PricingRules, band: number): string {
-  const fmt = (n: number) => n.toLocaleString('cs-CZ')
-  const upTo = rules.bands[band]?.upTo ?? null
-  const from = band > 0 ? (rules.bands[band - 1]?.upTo ?? 0) : 0
-  if (band === 0 && upTo !== null) return `pod ${fmt(upTo)} Kč`
-  if (upTo === null) return `nad ${fmt(from)} Kč`
-  return `${fmt(from)}–${fmt(upTo)} Kč`
+  return `přínos ${rangeText(rules, band, 'upTo')} měsíčně`
+}
+
+/** Totéž pásmo podle záložní hranice ceny jedné zakázky: „zakázka pod 10 000 Kč"… */
+export function jobBandLabel(rules: PricingRules, band: number): string {
+  return `zakázka ${rangeText(rules, band, 'jobUpTo')}`
+}
+
+/** Pásmo pro editor nabídky: podle čeho se vybralo, a s částkou, ze které se počítalo. */
+export function bandPickLabel(rules: PricingRules, pick: BandPick): string {
+  if (pick.basis === 'value' && pick.monthlyValue !== null) {
+    return `${bandLabel(rules, pick.band)} (odhad ${fmtCzk(pick.monthlyValue)} Kč)`
+  }
+  if (pick.basis === 'job') return `${jobBandLabel(rules, pick.band)} (počet zakázek chybí)`
+  return `${bandLabel(rules, pick.band)} (cena zakázky chybí)`
 }
 
 /** Střed třetiny pásma: dolní 1/6, střed 1/2, horní 5/6. */
@@ -193,6 +255,8 @@ export type PriceInputs = {
   kind: OfferKind
   /** Jedna typická zakázka klienta v Kč (střed odhadu, nebo zadaná Kryštofem). */
   typicalJobCzk: number | null
+  /** Kolik zakázek měsíčně web klientovi přinese (odhad rozboru, nebo zadané Kryštofem). Chybí = pásmo podle ceny zakázky. */
+  jobsPerMonth?: number | null
   position: Position
   rush: boolean
   /** Kolik jazyků navíc k češtině. */
@@ -202,6 +266,9 @@ export type PriceInputs = {
 export type PricedVariants = {
   band: number | null
   assumedBand: boolean
+  /** Z čeho se pásmo vzalo; u e-shopu `null` (pásma neplatí). */
+  basis: BandBasis | null
+  monthlyValue: number | null
   prices: Record<VariantKey, number>
   needsConfirmation: Record<VariantKey, boolean>
 }
@@ -212,7 +279,8 @@ export type PricedVariants = {
  * třem a cena se znovu zaokrouhlí. Nad stropem příznak „potvrdit".
  */
 export function priceVariants(rules: PricingRules, input: PriceInputs): PricedVariants {
-  const { band, assumed } = input.kind === 'eshop' ? { band: null, assumed: false } : bandIndexFor(rules, input.typicalJobCzk)
+  const pick = input.kind === 'eshop' ? null : bandIndexFor(rules, input.typicalJobCzk, input.jobsPerMonth)
+  const band = pick?.band ?? null
   const ranges = band === null ? rules.eshop : rules.bands[band].ranges
   const f = POSITION_FACTOR[input.position]
   const languages = Math.max(0, Math.min(5, Math.floor(input.languages)))
@@ -234,7 +302,14 @@ export function priceVariants(rules: PricingRules, input: PriceInputs): PricedVa
 
   const needsConfirmation = {} as Record<VariantKey, boolean>
   for (const key of VARIANT_KEYS) needsConfirmation[key] = prices[key] > rules.confirmAbove
-  return { band, assumedBand: assumed, prices, needsConfirmation }
+  return {
+    band,
+    assumedBand: pick?.assumed ?? false,
+    basis: pick?.basis ?? null,
+    monthlyValue: pick?.monthlyValue ?? null,
+    prices,
+    needsConfirmation,
+  }
 }
 
 /** Kolik zakázek klienta zaplatí web. `null`, když cenu zakázky neznáme. */

@@ -8,6 +8,8 @@
 >
 > Stav: **N0 hotové** (2026-11-25, pravidla v oddílu 5). **N1 na produkci** (2026-11-26, migrace 136 a 137),
 > naostro nevyzkoušené. **N2–N4 na produkci** (2026-11-27, `afe75fc`, migrace 142, R-155), naostro nevyzkoušené.
+> 2026-11-28 Kryštof potvrdil Plus a e-shop a rozhodl, že pásmo určuje **přínos webu za měsíc** (zakázky z webu
+> za měsíc × cena zakázky, R-157); v kódu na větvi `admin/nabidky-n3`, nenasazené.
 
 ## 1. Proč a co z toho má být
 
@@ -104,7 +106,7 @@ upravuje je Kryštof v adminu; agent smí navrhnout změnu, kterou Kryštof potv
 
 | Pravidlo | Hodnota |
 |---|---|
-| Z čeho se hodnota určuje | Hodnota jedné typické zakázky klienta → pásmo (tabulka níž); uvnitř pásma rozsah a vlastní obrázek o firmě ze všeho veřejně dostupného (aktivity, recenze, další aspekty) |
+| Z čeho se hodnota určuje | Přínos webu za měsíc = zakázky z webu za měsíc × cena jedné typické zakázky → pásmo (tabulka níž, R-157, 2026-11-28: „počet zakázek hraje velkou roli"); bez počtu zakázek cena jedné zakázky. Uvnitř pásma rozsah a vlastní obrázek o firmě ze všeho veřejně dostupného (aktivity, recenze, další aspekty) |
 | Pásma a varianty | Tabulka v oddílu 5.3 |
 | Spodní hranice | 10 000 Kč za web; Micro (od 4 999) a Promo (od 9 999) jen když klient výslovně chce jednu stránku |
 | Horní hranice | 50 000 Kč za web; výš jen e-shop nebo systém na míru, vždy s potvrzením Kryštofa předem |
@@ -177,20 +179,28 @@ Zapisuje se doslova podle smyslu, s datem. Z toho se plní tabulka výš.
 - Q38: tabulka pásem a variant v oddílu 5.3 přijata. Q39: **nabídka jako stránka ve značce VIZEON**
   s výběrem varianty, stavět v N2.
 
-### 5.3 Pásma a varianty (přijato 2026-11-25)
+### 5.3 Pásma a varianty (přijato 2026-11-25, upraveno 2026-11-28)
 
-Pásmo určuje hodnota jedné typické zakázky klienta. Uvnitř rozmezí rozhoduje obrázek o firmě
-(dolní / střední / horní třetina). Ceny na celé tisíce. Platí Základ < Doporučená < Plus.
+Pásmo určuje **přínos webu za měsíc**: kolik zakázek měsíčně web klientovi přinese × cena jedné typické
+zakázky (R-157). Když počet zakázek odhadnout nejde, pásmo se vybere podle ceny jedné zakázky (sloupec vlevo,
+pásma z 25. 11.). Uvnitř rozmezí rozhoduje obrázek o firmě (dolní / střední / horní třetina). Ceny na celé
+tisíce. Platí Základ < Doporučená < Plus.
 
-| Jedna zakázka klienta | Základ (prezentace) | Doporučená | Plus |
-|---|---|---|---|
-| pod 10 000 Kč | 10 000 | 12 000–15 000 | od 18 000 |
-| 10 000–100 000 Kč | 12 000–18 000 | 18 000–25 000 | od 30 000 |
-| 100 000 Kč – 1 milion | 18 000–25 000 | 25 000–40 000 | od 45 000 |
-| nad 1 milion | 25 000–30 000 | 40 000–50 000 | nad 50 000 jen s potvrzením Kryštofa |
+| Přínos za měsíc | Bez počtu zakázek: jedna zakázka | Základ (prezentace) | Doporučená | Plus |
+|---|---|---|---|---|
+| pod 20 000 Kč | pod 10 000 Kč | 10 000 | 12 000–15 000 | 18 000–24 000 |
+| 20 000–100 000 Kč | 10 000–100 000 Kč | 12 000–18 000 | 18 000–25 000 | 30 000–40 000 |
+| 100 000–500 000 Kč | 100 000 Kč – 1 milion | 18 000–25 000 | 25 000–40 000 | 45 000–55 000 |
+| nad 500 000 Kč | nad 1 milion | 25 000–30 000 | 40 000–50 000 | 55 000–70 000 |
 
-E-shop mimo tabulku: 30 000–80 000 Kč, nad 50 000 s potvrzením. Příplatky (spěch, jazyk, napojení,
-víc než 10 podstránek) se přičítají k variantě.
+Hranice přínosu (20 / 100 / 500 tisíc měsíčně) navrhl agent 2026-11-28 a Kryštof je vybral s příklady:
+kavárna 100 hostů × 150 Kč = 15 000 → Doporučená 14 000; zámečník 10 zakázek × 4 000 = 40 000 → 22 000
+(dřív 14 000); malíř 4 × 30 000 = 120 000 → 33 000 (dřív 22 000); stavební firma jedna zakázka za čtvrtletí
+× 2 miliony → 45 000 (ceny pro střed pásma). Horní meze Plus doplnil agent 2026-11-27, Kryštof je potvrdil
+2026-11-28. Nad 50 000 Kč jen s potvrzením Kryštofa.
+
+E-shop mimo tabulku (potvrzeno 2026-11-28): Základ 30 000–40 000, Doporučená 40 000–50 000, Plus 50 000–80 000 Kč,
+nad 50 000 s potvrzením. Příplatky (spěch, jazyk, napojení, víc než 10 podstránek) se přičítají k variantě.
 
 ### 5.4 Dosavadní nabídky z Gmailu (anonymně, zjištěno 2026-11-25)
 
@@ -330,8 +340,11 @@ Výklad agenta (Kryštof může změnit, všechno je v cenových pravidlech v ad
 - **Cenu počítá server, ne model.** Model dodá pozici v pásmu (dolní / střední / horní třetina) a obsah variant,
   cena je střed třetiny rozmezí z tabulky 5.3, zaokrouhlená na tisíce.
 - **Horní meze varianty Plus** tabulka nemá („od 18 000"): doplněno 18–24, 30–40, 45–55 a 55–70 tisíc
-  (nad 50 000 vždy s potvrzením). **E-shop** rozložený na 30–40 / 40–50 / 50–80 tisíc.
-- **Neznámá cena zakázky klienta** = druhé pásmo s poznámkou „cena zakázky chybí"; v editoru jde zadat z hovoru.
+  (nad 50 000 vždy s potvrzením). **E-shop** rozložený na 30–40 / 40–50 / 50–80 tisíc. Obojí Kryštof potvrdil 2026-11-28.
+- **Pásmo podle přínosu za měsíc** (2026-11-28, R-157): zakázky z webu za měsíc = střed odhadu poptávek × podíl
+  zakázek z rozboru (jedno desetinné místo, 0,3 = jedna za čtvrt roku), × cena zakázky. Obojí jde v editoru přepsat
+  z hovoru („Jedna zakázka klienta", „Zakázek z webu za měsíc"). Bez počtu zakázek platí pásmo podle ceny zakázky
+  s poznámkou „počet zakázek chybí", bez obojího druhé pásmo s poznámkou „cena zakázky chybí".
 - **Věta o návratnosti** jen do tří zakázek („zaplatí se z jedné / ze dvou / ze tří zakázek"), jinak se neukáže.
 - **Zakázka z kontaktu s nabídkou** se k nabídce přiřadí, když vznikne do 120 dní od odeslání.
 - **Návrhy úprav pravidel** nikdy cenu nesnižují: pod 20 % úspěšnosti jen postřeh, kde to vázne.

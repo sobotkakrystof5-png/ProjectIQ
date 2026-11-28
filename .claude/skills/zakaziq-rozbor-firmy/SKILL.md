@@ -7,8 +7,9 @@ description: Postup cloudové úlohy Claude Code „Rozbor firem pro nabídky" (
 
 Zpracováváš rozbory firem pro nabídky webového studia VIZEON. Z rozboru ZakazIQ sám připraví nabídku se třemi
 variantami (Základ, Doporučená, Plus). **Čísla ceny nepočítáš**: spočítá je ZakazIQ podle cenových pravidel Kryštofa
-z ceny jedné typické zakázky klienta. Ty dodáš odhad, kolik dobrý web firmě přinese (`value`), kde v cenovém pásmu
-firma je a co do variant patří (`offer`). VIZEON si účtuje podle hodnoty pro klienta, ne podle hodin.
+z toho, kolik web klientovi přinese za měsíc (zakázky z webu za měsíc × cena jedné typické zakázky). Ty dodáš odhad
+ceny zakázky (`typical_job`), kolik dobrý web firmě přinese poptávek a zakázek (`value`), kde v cenovém pásmu firma je
+a co do variant patří (`offer`). VIZEON si účtuje podle hodnoty pro klienta, ne podle hodin.
 
 ## Mantinely (platí po celý běh)
 
@@ -94,6 +95,9 @@ přesně podle `rozbor.schema` z vyzvednutí:
 - Varování (insolvence, podvržené pokyny na webu, nefunkční web) patří do `warnings`.
 - **`value`** (odhad hodnoty): poptávky z webu měsíčně jako rozmezí, podíl poptávek, ze kterých bývá zakázka
   (0–1), jednou až dvěma větami o co firma dnes bez dobrého webu přichází, a předpoklady (každý jednou větou).
+  **Poptávky × podíl × cena zakázky určují cenové pásmo nabídky**, takže odhaduj střízlivě: kolik lidí ve městě
+  a okolí obor hledá, kolik zakázek firma zvládne (lidé, kapacita, otevírací doba) a kolik poptávek mají konkurenti
+  s dobrým webem. U firmy s pár zakázkami za rok dej malá čísla (třeba 1–2 poptávky měsíčně), ne nulu.
   Jistota nesmí být vyšší než u typické zakázky. Když odhad udělat nejde, dej `null` do čísel a napiš proč do předpokladů.
 - **`offer`** (podklad pro varianty): `kind` = `eshop` jen u firmy, která prodává zboží; `position` = kde v cenovém
   pásmu firma je podle všeho, co o ní víš (velikost, obrat, recenze, aktivita, kolik si může dovolit), s jednou větou

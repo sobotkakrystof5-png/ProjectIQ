@@ -23,6 +23,8 @@ import {
   VARIANT_KEYS,
   bandIndexFor,
   bandLabel,
+  bandPickLabel,
+  jobBandLabel,
   paybackJobs,
   paybackSentence,
   type OfferKind,
@@ -51,6 +53,7 @@ type VariantState = { key: VariantKey; price: string; includes: string }
 type EditState = {
   kind: OfferKind
   typicalJob: string
+  jobsPerMonth: string
   position: Position
   rush: boolean
   languages: number
@@ -66,6 +69,14 @@ const digits = (s: string): number | null => {
   const clean = s.replace(/[^\d]/g, '')
   return clean === '' ? null : Number(clean)
 }
+/** Počet zakázek za měsíc: dovolí desetinnou čárku i tečku („0,5" = jedna za dva měsíce), jedno desetinné místo. */
+const decimal = (s: string): number | null => {
+  const clean = s.replace(/\s/g, '').replace(',', '.').replace(/[^\d.]/g, '')
+  if (clean === '' || clean === '.') return null
+  const n = Number(clean)
+  return Number.isFinite(n) ? Math.round(n * 10) / 10 : null
+}
+const decimalText = (n: number | null): string => (n === null ? '' : String(n).replace('.', ','))
 const DELETE_DELAY_MS = 6_000
 
 const dateText = (iso: string) =>
@@ -82,6 +93,7 @@ function stateFrom(p: ProposalRow): EditState {
   return {
     kind: p.inputs.kind,
     typicalJob: p.inputs.typicalJobCzk === null ? '' : String(p.inputs.typicalJobCzk),
+    jobsPerMonth: decimalText(p.inputs.jobsPerMonth ?? null),
     position: p.inputs.position,
     rush: p.inputs.rush,
     languages: p.inputs.languages,
@@ -101,6 +113,7 @@ function payloadFrom(s: EditState) {
     inputs: {
       kind: s.kind,
       typicalJobCzk: digits(s.typicalJob),
+      jobsPerMonth: decimal(s.jobsPerMonth),
       position: s.position,
       rush: s.rush,
       languages: s.languages,
@@ -294,13 +307,22 @@ function ProposalEditor({
   const dirty = JSON.stringify(state) !== JSON.stringify(saved)
 
   const job = digits(state.typicalJob)
-  const band = state.kind === 'eshop' ? null : bandIndexFor(rules, job)
-  const bandText = band === null ? 'E-shop' : `${bandLabel(rules, band.band)}${band.assumed ? ' (cena zakázky chybí)' : ''}`
+  const jobs = decimal(state.jobsPerMonth)
+  const band = state.kind === 'eshop' ? null : bandIndexFor(rules, job, jobs)
+  const bandText = band === null ? 'E-shop' : bandPickLabel(rules, band)
   const capAt = proposal.inputs.terms.confirmAbove
   const overCap = state.variants.some((v) => (digits(v.price) ?? 0) > capAt)
   const proposedByRules = useMemo(
-    () => rulePrices(rules, { kind: state.kind, typicalJobCzk: job, position: state.position, rush: state.rush, languages: state.languages }),
-    [rules, state.kind, job, state.position, state.rush, state.languages],
+    () =>
+      rulePrices(rules, {
+        kind: state.kind,
+        typicalJobCzk: job,
+        jobsPerMonth: jobs,
+        position: state.position,
+        rush: state.rush,
+        languages: state.languages,
+      }),
+    [rules, state.kind, job, jobs, state.position, state.rush, state.languages],
   )
   const recPrice = digits(state.variants.find((v) => v.key === state.recommended)?.price ?? '') ?? 0
   const jobMin = job === proposal.inputs.typicalJobCzk ? (proposal.value.typicalJob?.min ?? job) : job
@@ -364,13 +386,23 @@ function ProposalEditor({
 
       <fieldset className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <legend className="sr-only">Z čeho se cena počítá</legend>
-        <label className="flex flex-col gap-1.5 xl:col-span-2">
+        <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-ink">Jedna zakázka klienta (Kč)</span>
           <input
             inputMode="numeric"
             value={state.typicalJob}
             onChange={(e) => set({ typicalJob: e.target.value })}
             placeholder="třeba 60 000"
+            className={cn(fieldClass, 'font-num')}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-ink">Zakázek z webu za měsíc</span>
+          <input
+            inputMode="decimal"
+            value={state.jobsPerMonth}
+            onChange={(e) => set({ jobsPerMonth: e.target.value })}
+            placeholder="třeba 6"
             className={cn(fieldClass, 'font-num')}
           />
         </label>
@@ -574,7 +606,13 @@ function ProposalSent({
   const canMark = proposal.project_id === null && ['sent', 'no_reply', 'negotiating', 'declined'].includes(proposal.status)
   const chosen = proposal.chosen_variant ? variantOf(variants, proposal.chosen_variant) : null
   const bandText =
-    proposal.kind === 'eshop' ? 'E-shop' : proposal.band !== null ? bandLabel(rules, proposal.band) : 'pásmo neznámé'
+    proposal.kind === 'eshop'
+      ? 'E-shop'
+      : proposal.band === null
+        ? 'pásmo neznámé'
+        : proposal.inputs.bandBasis === 'job'
+          ? jobBandLabel(rules, proposal.band)
+          : bandLabel(rules, proposal.band)
 
   const mark = (outcome: 'declined' | 'negotiating') =>
     startTransition(async () => {

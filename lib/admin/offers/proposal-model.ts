@@ -1,11 +1,14 @@
 import {
   VARIANT_KEYS,
   VARIANT_NAMES,
+  jobsPerMonthFrom,
   paybackJobs,
   paybackSentence,
   priceVariants,
+  roundThousands,
   typicalJobPoint,
   yearlyValue,
+  type BandBasis,
   type OfferKind,
   type Position,
   type PricingRules,
@@ -54,10 +57,15 @@ export type ProposalVariant = {
 
 export type ProposalInputs = {
   kind: OfferKind
-  /** Jedna typická zakázka klienta (Kč), ze které se bere pásmo. */
+  /** Jedna typická zakázka klienta (Kč). Spolu s počtem zakázek určuje pásmo. */
   typicalJobCzk: number | null
   /** Odkud je: z rozboru, nebo ji zadal Kryštof (třeba z hovoru). */
   jobSource: 'research' | 'manual' | 'none'
+  /** Kolik zakázek měsíčně web klientovi přinese (R-157). Pásmo = tohle × cena zakázky. */
+  jobsPerMonth: number | null
+  jobsSource: 'research' | 'manual' | 'none'
+  /** Z čeho se pásmo vzalo (měsíční přínos, jen cena zakázky, naslepo); u e-shopu `null`. */
+  bandBasis: BandBasis | null
   position: Position
   rush: boolean
   languages: number
@@ -144,10 +152,11 @@ function priced(
   inputs: ProposalInputs,
   contents: Record<VariantKey, string[]>,
   manual?: Partial<Record<VariantKey, number>>,
-): { variants: ProposalVariant[]; band: number | null; assumedBand: boolean } {
+): { variants: ProposalVariant[]; band: number | null; assumedBand: boolean; basis: BandBasis | null } {
   const out = priceVariants(rules, {
     kind: inputs.kind,
     typicalJobCzk: inputs.typicalJobCzk,
+    jobsPerMonth: inputs.jobsPerMonth,
     position: inputs.position,
     rush: inputs.rush,
     languages: inputs.languages,
@@ -163,7 +172,7 @@ function priced(
       needsConfirmation: price > rules.confirmAbove,
     }
   })
-  return { variants, band: out.band, assumedBand: out.assumedBand }
+  return { variants, band: out.band, assumedBand: out.assumedBand, basis: out.basis }
 }
 
 /**
@@ -193,11 +202,17 @@ export function buildProposal(
       : null
   const jobConfidence: Confidence = job?.confidence ?? 'low'
   const value = research?.value ?? null
+  const inquiries = value?.inquiries ?? null
+  const winRate = value?.win_rate ?? null
+  const jobsPerMonth = jobsPerMonthFrom(inquiries, winRate)
 
   const inputs: ProposalInputs = {
     kind,
     typicalJobCzk: jobPoint,
     jobSource: jobPoint === null ? 'none' : 'research',
+    jobsPerMonth,
+    jobsSource: jobsPerMonth === null ? 'none' : 'research',
+    bandBasis: null,
     position: offer?.position ?? 'mid',
     rush: false,
     languages: 0,
@@ -211,12 +226,11 @@ export function buildProposal(
       validityDays: rules.validityDays,
     },
   }
-  const { variants, band, assumedBand } = priced(rules, inputs, contents)
+  const { variants, band, assumedBand, basis } = priced(rules, inputs, contents)
   inputs.band = band
   inputs.assumedBand = assumedBand
+  inputs.bandBasis = basis
 
-  const inquiries = value?.inquiries ?? null
-  const winRate = value?.win_rate ?? null
   return {
     company,
     kind,
@@ -249,7 +263,7 @@ export function buildProposal(
 /* ------------------------------------------------------------------ */
 
 export type ProposalEdit = {
-  inputs: Pick<ProposalInputs, 'kind' | 'typicalJobCzk' | 'position' | 'rush' | 'languages' | 'showPayback'>
+  inputs: Pick<ProposalInputs, 'kind' | 'typicalJobCzk' | 'jobsPerMonth' | 'position' | 'rush' | 'languages' | 'showPayback'>
   variants: { key: VariantKey; price: number; includes: string[] }[]
   recommended: VariantKey
   intro: string
@@ -258,19 +272,22 @@ export type ProposalEdit = {
 /**
  * Nový stav návrhu po úpravě. „Podle pravidel" (`proposed`) se přepočítá pro
  * nové vstupy, cena zůstane ta, kterou Kryštof napsal. Zadaná cena zakázky
- * přepíše odhad z rozboru (je z hovoru, ne z webu).
+ * i počet zakázek přepíše odhad z rozboru (je z hovoru, ne z webu).
  */
 export function applyProposalEdit(
   rules: PricingRules,
   current: Pick<ProposalDraft, 'inputs' | 'value'>,
   edit: ProposalEdit,
 ): Pick<ProposalDraft, 'inputs' | 'value' | 'variants' | 'recommended' | 'intro' | 'kind' | 'band'> {
-  const jobChanged = edit.inputs.typicalJobCzk !== current.inputs.typicalJobCzk
+  const before = normalizeInputs(current.inputs, current.value)
+  const jobChanged = edit.inputs.typicalJobCzk !== before.typicalJobCzk
+  const jobsChanged = edit.inputs.jobsPerMonth !== before.jobsPerMonth
   const inputs: ProposalInputs = {
-    ...current.inputs,
+    ...before,
     ...edit.inputs,
     languages: Math.max(0, Math.min(5, Math.floor(edit.inputs.languages))),
-    jobSource: edit.inputs.typicalJobCzk === null ? 'none' : jobChanged ? 'manual' : current.inputs.jobSource,
+    jobSource: edit.inputs.typicalJobCzk === null ? 'none' : jobChanged ? 'manual' : before.jobSource,
+    jobsSource: edit.inputs.jobsPerMonth === null ? 'none' : jobsChanged ? 'manual' : before.jobsSource,
   }
   const contents = Object.fromEntries(VARIANT_KEYS.map((key) => [key, [] as string[]])) as Record<VariantKey, string[]>
   const manual: Partial<Record<VariantKey, number>> = {}
@@ -279,18 +296,23 @@ export function applyProposalEdit(
     manual[v.key] = v.price
   }
   const confirmAbove = current.inputs.terms.confirmAbove
-  const { variants, band, assumedBand } = priced({ ...rules, confirmAbove }, inputs, contents, manual)
+  const { variants, band, assumedBand, basis } = priced({ ...rules, confirmAbove }, inputs, contents, manual)
   inputs.band = band
   inputs.assumedBand = assumedBand
+  inputs.bandBasis = basis
 
   let value = current.value
-  if (jobChanged) {
-    const typicalJob = inputs.typicalJobCzk === null ? null : { min: inputs.typicalJobCzk, max: inputs.typicalJobCzk }
+  if (jobChanged || jobsChanged) {
+    const typicalJob = jobChanged
+      ? inputs.typicalJobCzk === null
+        ? null
+        : { min: inputs.typicalJobCzk, max: inputs.typicalJobCzk }
+      : value.typicalJob
     value = {
       ...value,
       typicalJob,
-      jobConfidence: typicalJob === null ? 'low' : 'high',
-      yearly: typicalJob ? yearlyValue(value.inquiries, value.winRate, typicalJob) : null,
+      jobConfidence: jobChanged ? (typicalJob === null ? 'low' : 'high') : value.jobConfidence,
+      yearly: yearlyFor(inputs, value, typicalJob),
     }
   }
   return {
@@ -304,10 +326,48 @@ export function applyProposalEdit(
   }
 }
 
+/**
+ * Roční přínos pro náhled. Ručně zadaný počet zakázek platí přímo (× 12 × cena
+ * zakázky), jinak odhad z poptávek a podílu z rozboru.
+ */
+function yearlyFor(
+  inputs: Pick<ProposalInputs, 'jobsPerMonth' | 'jobsSource'>,
+  value: Pick<ProposalValue, 'inquiries' | 'winRate'>,
+  typicalJob: Range | null,
+): Range | null {
+  if (typicalJob === null) return null
+  if (inputs.jobsSource === 'manual' && inputs.jobsPerMonth !== null) {
+    return {
+      min: roundThousands(inputs.jobsPerMonth * 12 * typicalJob.min),
+      max: roundThousands(inputs.jobsPerMonth * 12 * typicalJob.max),
+    }
+  }
+  return yearlyValue(value.inquiries, value.winRate, typicalJob)
+}
+
+/**
+ * Vstupy uložené před R-157 počet zakázek nemají: doplní se z odhadu poptávek
+ * v `value`, takže starý koncept po úpravě dostane pásmo podle přínosu, jen
+ * když ho rozbor uměl odhadnout.
+ */
+export function normalizeInputs(
+  inputs: ProposalInputs,
+  value?: Pick<ProposalValue, 'inquiries' | 'winRate'> | null,
+): ProposalInputs {
+  if (inputs.jobsSource !== undefined && inputs.jobsPerMonth !== undefined) return inputs
+  const jobsPerMonth = value ? jobsPerMonthFrom(value.inquiries, value.winRate) : null
+  return {
+    ...inputs,
+    jobsPerMonth,
+    jobsSource: jobsPerMonth === null ? 'none' : 'research',
+    bandBasis: inputs.bandBasis ?? (inputs.kind === 'eshop' ? null : inputs.assumedBand ? 'assumed' : 'job'),
+  }
+}
+
 /** Ceny přesně podle pravidel pro dané vstupy (tlačítko „Přepočítat ceny" v editoru). */
 export function rulePrices(
   rules: PricingRules,
-  inputs: Pick<ProposalInputs, 'kind' | 'typicalJobCzk' | 'position' | 'rush' | 'languages'>,
+  inputs: Pick<ProposalInputs, 'kind' | 'typicalJobCzk' | 'jobsPerMonth' | 'position' | 'rush' | 'languages'>,
 ): Record<VariantKey, number> {
   return priceVariants(rules, inputs).prices
 }

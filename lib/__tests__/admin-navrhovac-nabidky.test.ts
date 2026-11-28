@@ -30,6 +30,10 @@ import {
   applyRuleChange,
   bandIndexFor,
   bandLabel,
+  bandPickLabel,
+  jobBandLabel,
+  jobsPerMonthFrom,
+  monthlyValue,
   paybackJobs,
   paybackSentence,
   priceVariants,
@@ -43,7 +47,9 @@ import {
   applyProposalEdit,
   buildProposal,
   clientOffer,
+  normalizeInputs,
   offerEmailLines,
+  type ProposalInputs,
   type ProposalVariant,
 } from '@/lib/admin/offers/proposal-model'
 import { compareActual, evaluateOffers, previousPeriod, shareBucket, slug, suggestRuleChanges, type ReviewRow } from '@/lib/admin/offers/review'
@@ -78,16 +84,69 @@ const R = DEFAULT_PRICING_RULES
 /* Cenová pravidla                                                     */
 /* ------------------------------------------------------------------ */
 
-describe('cenová pravidla: pásmo podle ceny jedné zakázky klienta', () => {
-  it('vybere pásmo, neznámá cena = druhé pásmo s příznakem', () => {
-    expect(bandIndexFor(R, 5_000)).toEqual({ band: 0, assumed: false })
-    expect(bandIndexFor(R, 10_000)).toEqual({ band: 1, assumed: false })
-    expect(bandIndexFor(R, 99_999)).toEqual({ band: 1, assumed: false })
-    expect(bandIndexFor(R, 100_000)).toEqual({ band: 2, assumed: false })
-    expect(bandIndexFor(R, 6_000_000)).toEqual({ band: 3, assumed: false })
-    expect(bandIndexFor(R, null)).toEqual({ band: 1, assumed: true })
-    expect(bandLabel(R, 0)).toBe(`pod ${(10_000).toLocaleString('cs-CZ')} Kč`)
-    expect(bandLabel(R, 3)).toBe(`nad ${(1_000_000).toLocaleString('cs-CZ')} Kč`)
+describe('cenová pravidla: pásmo podle měsíčního přínosu webu (R-157)', () => {
+  const cz = (n: number) => n.toLocaleString('cs-CZ')
+
+  it('bez počtu zakázek pásmo podle ceny jedné zakázky, bez obojího druhé pásmo s příznakem', () => {
+    expect(bandIndexFor(R, 5_000)).toMatchObject({ band: 0, basis: 'job', assumed: false })
+    expect(bandIndexFor(R, 10_000)).toMatchObject({ band: 1, basis: 'job' })
+    expect(bandIndexFor(R, 99_999)).toMatchObject({ band: 1, basis: 'job' })
+    expect(bandIndexFor(R, 100_000)).toMatchObject({ band: 2, basis: 'job' })
+    expect(bandIndexFor(R, 6_000_000)).toMatchObject({ band: 3, basis: 'job' })
+    expect(bandIndexFor(R, null)).toEqual({ band: 1, basis: 'assumed', assumed: true, monthlyValue: null })
+    expect(bandIndexFor(R, null, 10)).toMatchObject({ band: 1, basis: 'assumed' })
+    expect(jobBandLabel(R, 0)).toBe(`zakázka pod ${cz(10_000)} Kč`)
+    expect(jobBandLabel(R, 3)).toBe(`zakázka nad ${cz(1_000_000)} Kč`)
+  })
+
+  it('s počtem zakázek rozhoduje přínos za měsíc = zakázky × cena zakázky', () => {
+    // Příklady, které Kryštof viděl při volbě 2026-11-28.
+    expect(bandIndexFor(R, 150, 100)).toEqual({ band: 0, basis: 'value', assumed: false, monthlyValue: 15_000 })
+    expect(bandIndexFor(R, 4_000, 10)).toMatchObject({ band: 1, monthlyValue: 40_000 })
+    expect(bandIndexFor(R, 30_000, 4)).toMatchObject({ band: 2, monthlyValue: 120_000 })
+    expect(bandIndexFor(R, 2_000_000, 0.3)).toMatchObject({ band: 3, monthlyValue: 600_000 })
+    expect(bandIndexFor(R, 4_000, 0)).toMatchObject({ band: 0, basis: 'value', monthlyValue: 0 })
+    expect(bandIndexFor(R, 4_000, 5)).toMatchObject({ band: 1, monthlyValue: 20_000 })
+    expect(bandLabel(R, 0)).toBe(`přínos pod ${cz(20_000)} Kč měsíčně`)
+    expect(bandLabel(R, 1)).toBe(`přínos ${cz(20_000)}–${cz(100_000)} Kč měsíčně`)
+    expect(bandLabel(R, 3)).toBe(`přínos nad ${cz(500_000)} Kč měsíčně`)
+    expect(bandPickLabel(R, bandIndexFor(R, 4_000, 10))).toBe(`přínos ${cz(20_000)}–${cz(100_000)} Kč měsíčně (odhad ${cz(40_000)} Kč)`)
+    expect(bandPickLabel(R, bandIndexFor(R, 4_000))).toBe(`zakázka pod ${cz(10_000)} Kč (počet zakázek chybí)`)
+  })
+
+  it('zakázky z webu za měsíc z odhadu poptávek a podílu, jedno desetinné místo', () => {
+    expect(jobsPerMonthFrom({ min: 3, max: 6 }, 0.3)).toBe(1.4)
+    expect(jobsPerMonthFrom({ min: 10, max: 20 }, 0.5)).toBe(7.5)
+    expect(jobsPerMonthFrom(null, 0.3)).toBeNull()
+    expect(jobsPerMonthFrom({ min: 3, max: 6 }, null)).toBeNull()
+    expect(jobsPerMonthFrom({ min: 3, max: 6 }, 0)).toBeNull()
+    expect(monthlyValue(4_000, 2.5)).toBe(10_000)
+    expect(monthlyValue(null, 2)).toBeNull()
+    expect(monthlyValue(4_000, undefined)).toBeNull()
+  })
+
+  it('počet zakázek posune cenu: zámečník za 4 000 s deseti zakázkami měsíčně je ve druhém pásmu', () => {
+    const rec = (job: number, jobs?: number | null) =>
+      priceVariants(R, { kind: 'web', typicalJobCzk: job, jobsPerMonth: jobs, position: 'mid', rush: false, languages: 0 }).prices.doporucena
+    expect(rec(150, 100)).toBe(14_000)
+    expect(rec(4_000)).toBe(14_000)
+    expect(rec(4_000, 10)).toBe(22_000)
+    expect(rec(30_000, 4)).toBe(33_000)
+    expect(rec(2_000_000, 0.3)).toBe(45_000)
+    const out = priceVariants(R, { kind: 'web', typicalJobCzk: 4_000, jobsPerMonth: 10, position: 'mid', rush: false, languages: 0 })
+    expect(out).toMatchObject({ band: 1, basis: 'value', monthlyValue: 40_000, assumedBand: false })
+  })
+
+  it('obě řady hranic musí stoupat a jen poslední pásmo je bez meze', () => {
+    const bad = structuredClone(R)
+    bad.bands[1].jobUpTo = 5_000
+    expect(pricingRulesSchema.safeParse(bad).success).toBe(false)
+    const open = structuredClone(R)
+    open.bands[3].jobUpTo = 2_000_000
+    expect(pricingRulesSchema.safeParse(open).success).toBe(false)
+    const missing = structuredClone(R) as unknown as { bands: Record<string, unknown>[] }
+    delete missing.bands[0].jobUpTo
+    expect(pricingRulesSchema.safeParse(missing).success).toBe(false)
   })
 
   it('střed třetiny pásma, celé tisíce, Základ < Doporučená < Plus', () => {
@@ -271,16 +330,59 @@ describe('návrh nabídky z rozboru', () => {
   it('úprava: cena zakázky z hovoru přepočítá „podle pravidel", ruční cena zůstane', () => {
     const draft = buildProposal(R, result, 'Studny Novák')
     const next = applyProposalEdit(R, draft, {
-      inputs: { kind: 'web', typicalJobCzk: 8_000, position: 'mid', rush: false, languages: 0, showPayback: true },
+      inputs: {
+        kind: 'web',
+        typicalJobCzk: 8_000,
+        jobsPerMonth: draft.inputs.jobsPerMonth,
+        position: 'mid',
+        rush: false,
+        languages: 0,
+        showPayback: true,
+      },
       variants: draft.variants.map((v) => ({ key: v.key, price: v.key === 'doporucena' ? 16_000 : v.price, includes: v.includes })),
       recommended: 'doporucena',
       intro: ' Úvod ',
     })
     expect(next.inputs.jobSource).toBe('manual')
+    expect(next.inputs.jobsSource).toBe('research')
+    // 8 000 × 1,4 zakázky = 11 200 Kč měsíčně → první pásmo.
     expect(next.band).toBe(0)
+    expect(next.inputs.bandBasis).toBe('value')
     expect(next.variants[1]).toMatchObject({ price: 16_000, proposed: 14_000 })
     expect(next.value.typicalJob).toEqual({ min: 8_000, max: 8_000 })
     expect(next.intro).toBe('Úvod')
+  })
+
+  it('počet zakázek z rozboru určí pásmo; zadaný z hovoru ho přepíše a přepočítá roční přínos', () => {
+    const draft = buildProposal(R, result, 'Studny Novák')
+    // 3–6 poptávek × 30 % = 1,4 zakázky; × 120 000 Kč = 168 000 Kč měsíčně → třetí pásmo.
+    expect(draft.inputs).toMatchObject({ jobsPerMonth: 1.4, jobsSource: 'research', bandBasis: 'value' })
+    const edit = (jobsPerMonth: number | null) =>
+      applyProposalEdit(R, draft, {
+        inputs: { kind: 'web', typicalJobCzk: 120_000, jobsPerMonth, position: 'high', rush: false, languages: 0, showPayback: true },
+        variants: draft.variants.map((v) => ({ key: v.key, price: v.price, includes: v.includes })),
+        recommended: 'doporucena',
+        intro: 'Úvod',
+      })
+    const five = edit(5)
+    expect(five.inputs.jobsSource).toBe('manual')
+    expect(five.band).toBe(3)
+    expect(five.variants.map((v) => v.proposed)).toEqual([29_000, 48_000, 68_000])
+    // Cena zakázky zůstala z rozboru (60–180 tisíc): 5 zakázek × 12 měsíců × rozmezí.
+    expect(five.value.yearly).toEqual({ min: 3_600_000, max: 10_800_000 })
+    const none = edit(null)
+    expect(none.inputs).toMatchObject({ jobsSource: 'none', bandBasis: 'job' })
+    expect(none.band).toBe(2)
+  })
+
+  it('koncept uložený před R-157 dostane počet zakázek z odhadu poptávek', () => {
+    const draft = buildProposal(R, result, 'Studny Novák')
+    const { jobsPerMonth: _j, jobsSource: _s, bandBasis: _b, ...old } = draft.inputs
+    const restored = normalizeInputs(old as ProposalInputs, draft.value)
+    expect(restored).toMatchObject({ jobsPerMonth: 1.4, jobsSource: 'research', bandBasis: 'job' })
+    const blank = normalizeInputs(old as ProposalInputs, { inquiries: null, winRate: null })
+    expect(blank).toMatchObject({ jobsPerMonth: null, jobsSource: 'none' })
+    expect(normalizeInputs(draft.inputs, draft.value)).toBe(draft.inputs)
   })
 
   it('e-mail Nabídka s odkazem na stránku nabídky, odkaz na konci řádku bez tečky', () => {

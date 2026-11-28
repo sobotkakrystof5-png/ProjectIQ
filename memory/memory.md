@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-28 · **Navrhovač nabídek N3 doplněný** (R-155): v konceptu nabídky blok
+> **Poslední aktualizace:** 2026-11-28 · **Cena nabídky podle přínosu webu za měsíc** (R-157): Kryštof potvrdil
+> horní meze Plus a rozdělení e-shopu a rozhodl, že pásmo ceny určuje zakázky z webu za měsíc × cena jedné zakázky
+> (bez počtu zakázek jako dřív cena zakázky). Editor nabídky má pole „Zakázek z webu za měsíc", pravidla druhou řadu
+> hranic. Bez migrace. Ověřeno testy, `tsc` a buildem; za přihlášením ne. Větev `admin/nabidky-n3`, nenasazené.
+>
+> Předchozí: 2026-11-28 · **Navrhovač nabídek N3 doplněný** (R-155): v konceptu nabídky blok
 > Podobné nabídky (dřívější nabídky jiným firmám se stejným oborem nebo pásmem, s cenou a výsledkem) a ve vyhodnocení
 > `/dashboard/nabidky` úspěšnost podle podílu ceny z odhadovaného ročního přínosu. Bez migrace. Ověřeno testy, `tsc`,
 > buildem a vzhledem na dočasné stránce (390 a 1280 px); za přihlášením ne. Větev `admin/nabidky-n3`.
@@ -1948,6 +1953,7 @@ platí až po přijetí, cenu nikdy nenavrhují snížit. (5) Horní meze Plus a
 verze 2, nová veřejná stránka (DECISIONS #060), menu Práce › Nabídky. Nová cesta k ceně nabídky jde přes
 `lib/admin/offers/pricing.ts`, ne natvrdo jinde. Přepisy schůzek do rozboru dál nejdou (DECISIONS #056).
 Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, stránka pro klienta a vyhodnocení".
+
 ### R-156 · Opravy z testu klientského prostoru: zakázka „firma · druh práce", zrušení konzultace si pamatuje přesuny (2026-11-28)
 **Rozhodnutí:** (1) Zakázka se v klientském prostoru jmenuje „firma · druh práce" (`service_type`), bez druhu
 práce jen jménem firmy (`portal.project_display_name`). (2) `projects.updated_at` má výchozí `now()` a kopie do
@@ -1963,6 +1969,20 @@ z `portal.project_display_name`. Sloupec `date` z databáze se převádí `pgDat
 `toISOString().slice(0, 10)` (v Praze dá předchozí den). Testy prostoru, které chtějí produkční tvar `projects`,
 staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodnoty).
 
+### R-157 · Pásmo ceny nabídky určuje přínos webu za měsíc, ne jen cena zakázky (2026-11-28)
+*Číslo R-156 už má na `main` oprava klientského prostoru.*
+**Rozhodnutí:** (1) Pásmo ceny webu = **zakázky z webu za měsíc × cena jedné typické zakázky klienta**, hranice
+20 000 / 100 000 / 500 000 Kč měsíčně. Počet zakázek = střed odhadu poptávek z rozboru × podíl zakázek; Kryštof
+ho i cenu zakázky přepíše v editoru z hovoru. (2) Když počet zakázek odhadnout nejde, pásmo se vybere podle ceny
+jedné zakázky (dosavadní hranice 10 000 / 100 000 / 1 000 000 Kč, v pravidlech `jobUpTo`). (3) Rozmezí variant
+v pásmech se nemění; horní meze Plus (18–24 / 30–40 / 45–55 / 55–70 tisíc) a e-shop (30–40 / 40–50 / 50–80 tisíc)
+Kryštof potvrdil.
+**Proč:** Kryštof 2026-11-28: „chceme se zaměřovat jak na cenu jedné zakázky, tak i na počet těch zakázek… hraje
+velkou roli, je to u nás velmi důležitý faktor". Z nabídnutých variant vybral „Co web přinese za měsíc" (příklady:
+zámečník 10 zakázek × 4 000 Kč → Doporučená 22 000 místo 14 000). Hranice přínosu navrhl agent.
+**Důsledek:** odhad poptávek a podílu v rozboru (skill `zakaziq-rozbor-firmy`) teď přímo hýbe cenou, proto
+v něm pokyn odhadovat střízlivě podle kapacity firmy. Bez migrace; koncepty uložené dřív dostanou počet zakázek
+při čtení (`normalizeInputs`). Upřesňuje R-147 a R-155 (pásmo už není jen podle ceny zakázky). Plán oddíl 5.3 a 12.
 ---
 
 ## 3. Otevřené problémy
@@ -1972,8 +1992,9 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
   „Zaplaceno" ve výpisu faktur myší (nesmí otevřít detail), termín ve Zprávách, NPS v Profilu, u klienta druh faktury
   a název zakázky „firma · druh práce", odkaz ve zprávě chatu je klikací · od 2026-11-28
 - [ ] **Navrhovač nabídek N2–N4 (R-155) — vyzkoušet naostro:** ~~(1) migrace 142 na produkci~~ (2026-11-27, Neon MCP,
-  v evidenci), ~~(2) sloučit do `main` a nasadit~~ (2026-11-27, `afe75fc`), (3) Kryštof: projít Nabídky › Cenová pravidla
-  (hlavně horní meze Plus a e-shop, které doplnil agent), (4) první skutečná nabídka: rozbor firmy → koncept →
+  v evidenci), ~~(2) sloučit do `main` a nasadit~~ (2026-11-27, `afe75fc`), ~~(3) projít Nabídky › Cenová pravidla~~
+  (2026-11-28: Plus a e-shop potvrzené, pásmo podle přínosu za měsíc R-157 v kódu na `admin/nabidky-n3`, čeká nasazení;
+  editor a formulář pravidel za přihlášením neviděné), (4) první skutečná nabídka: rozbor firmy → koncept →
   upravit → Poslat nabídku na vlastní e-mail → otevřít odkaz na telefonu → vybrat variantu → zvonek, (5) karta
   i stránka za přihlášením na 390 a 1280 px. Cloudová úloha čte skill z `main`, odhad hodnoty posílá od nasazení
   `afe75fc`; starší rozbory dají návrh jen z ceny zakázky · od 2026-11-27
@@ -2485,6 +2506,22 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-28 (navrhovač nabídek — cena podle přínosu webu za měsíc, R-157)
+- **feat** Pásmo ceny nabídky určuje přínos webu za měsíc = zakázky z webu za měsíc × cena jedné zakázky (hranice
+  20 / 100 / 500 tisíc Kč), bez počtu zakázek cena zakázky jako dřív (`jobUpTo`). `bandIndexFor` vrací i z čeho
+  pásmo je, `jobsPerMonthFrom`, `monthlyValue`, popisky `bandLabel` (přínos), `jobBandLabel`, `bandPickLabel`.
+  Editor nabídky: pole „Zakázek z webu za měsíc" (desetinná čárka), pásmo s odhadem přínosu; formulář pravidel:
+  „Přínos pod … Kč měsíčně" a „Zakázka pod … Kč" u každého pásma. Ruční počet zakázek přepočítá roční přínos.
+  Starší koncepty dostanou počet při čtení. Skill `zakaziq-rozbor-firmy`: odhad poptávek teď hýbe cenou, odhadovat
+  střízlivě. Soubory: `lib/admin/offers/{pricing,proposal-model,proposals}.ts`, `app/offer-proposal-actions.ts`,
+  `components/admin/offers/{proposal-card,rules-form}.tsx`, `.claude/skills/zakaziq-rozbor-firmy/SKILL.md` (+ `.agents/`),
+  plán oddíl 5.3 a 12, `docs/admin/AGENTS-ADMIN.md`. Bez migrace.
+- **decision** **R-157**; Plus a e-shop z R-155 Kryštof potvrdil beze změny. V produkci uložená pravidla nejsou
+  (`admin_settings.pricing_rules` prázdné), takže po nasazení platí nové výchozí hodnoty.
+- **chore** Ověřeno: `npx tsc --noEmit`, `admin-navrhovac-nabidky.test.ts` 37/37 (7 nových: pásmo podle přínosu,
+  záloha podle ceny zakázky, počet z odhadu, příklady z volby, hranice v pravidlech, ruční počet v editoru, starý
+  koncept), testy rozboru, tříd adminu a XSS 83/83, `npm run build:check`. **Editor a pravidla v prohlížeči neviděné.**
 
 ### 2026-11-28 (navrhovač nabídek N3 — podobné nabídky a podíl z hodnoty, R-155)
 - **feat** Koncept nabídky na kartě kontaktu má blok **Podobné nabídky**: nejvýš tři dřívější odeslané nabídky
