@@ -6,8 +6,8 @@
 > od AI asistenta řekne ano a po poptávce z webu s webem firmy nebo firemním e-mailem (nejvýš 10 denně, kontakt
 > jednou za rok); když není podle čeho hledat, strop je vyčerpaný nebo úloha nic nenajde, přijde upozornění.
 > U konceptu nabídky blok Ze schůzky: poslední schůzka ze ZakazIQ Voice a návrhy vstupů s citací z přepisu,
-> použité až kliknutím. Bez migrace. Ověřeno testy, `tsc` a vzhledem na dočasné stránce (390 a 1280 px);
-> za přihlášením a naostro ne. Větev `admin/nabidky-n4`.
+> použité až kliknutím. Bez migrace. **Na produkci od 2026-11-28 (`159b8de`)**; veřejně ověřeno, bez běhových chyb,
+> za přihlášením a naostro nikdo neviděl.
 >
 > Předchozí: 2026-11-28 · **Cena nabídky podle přínosu webu za měsíc** (R-157): Kryštof potvrdil
 > horní meze Plus a rozdělení e-shopu a rozhodl, že pásmo ceny určuje zakázky z webu za měsíc × cena jedné zakázky
@@ -235,7 +235,7 @@ skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Ot
 (Kryštof souhlasil 2026-11-26). **N2–N4 na produkci od 2026-11-27 (`afe75fc`, R-155, migrace 142):** návrh nabídky,
 stránka `/nabidka/<token>`, výsledek a vyhodnocení. **N3 doplněné 2026-11-28** (větev `admin/nabidky-n3`):
 podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty. **R-157 na produkci 2026-11-28** (pásmo podle
-přínosu za měsíc). **N4 dokončené v kódu 2026-11-28 (R-158, větev `admin/nabidky-n4`):** rozbor se spouští sám
+přínosu za měsíc). **N4 na produkci od 2026-11-28 (R-158, `159b8de`):** rozbor se spouští sám
 (souhlas firmy, poptávka z webu) a vstupy nabídky ze schůzky ve Voice. Zkouška N1 na 5 firmách je hotová na větvi
 `admin/nabidky-tok` (worktree `n1-zkouska`, `758d106`, jen dokumentace a skill), na `main` zatím není. Dál: první
 skutečná nabídka (Otevřené problémy) a první měsíční vyhodnocení, až nabídky poběží měsíc.
@@ -2077,8 +2077,7 @@ z limitu předplatného víc (zkouška N1: ~2–2,7 min a ~540 tisíc tokenů su
   s vymyšlenými zařízeními (1280 a 390 px, bez přetečení, plochy ≥ 44 px, konzole bez chyb). Projít
   s přihlášením: Přidat zařízení → klíč ukázaný jednou, po obnovení stránky už ne → Zneplatnit → Zpět.
   Blok s klíčem okem nikdo neviděl (stejné třídy jako klíč webu, KP17) · od 2026-11-26
-- [ ] **Navrhovač N4 (R-158) — nasadit a projít naživo:** větev `admin/nabidky-n4` (worktree
-  `.claude/worktrees/nabidky-n4`). Projít: zkušební poptávka z vizeon.cz s webem firmy → kontakt, rozbor sám,
+- [ ] **Navrhovač N4 (R-158) — projít naživo:** na produkci od 2026-11-28 (`159b8de`). Projít: zkušební poptávka z vizeon.cz s webem firmy → kontakt, rozbor sám,
   zvonek; bez webu → věta v upozornění o poptávce; firma od asistenta, která řekne ano → rozbor; kontakt se schůzkou
   ve Voice → u konceptu Ze schůzky → Načíst → Použít → Uložit. Hlídat spotřebu limitu předplatného (až 10
   automatických rozborů denně) a jestli spam z formulářů nezakládá kontakty · od 2026-11-28
@@ -2557,6 +2556,10 @@ z limitu předplatného víc (zkouška N1: ~2–2,7 min a ~540 tisíc tokenů su
   PGlite s migracemi 136–139; test souhlasu v `admin-kontakt-jeden-zdroj`), vzhled bloku na dočasné stránce
   s vymyšlenými daty na 390 a 1280 px (bez přetečení; stránka smazaná). Model ani úloha naostro nevolané.
   Worktree `nabidky-n4` z `main`; worktree `nabidky-n3` mezitím použilo sezení R-157, N3 šlo na produkci s ním.
+- **chore** **Na produkci** 2026-11-28: push `cbca20f..159b8de`, nasazení `dpl_2XuW…` Ready (`fra1`). Před pushem
+  `npm run build` prošel. Veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard`,
+  `/dashboard/nabidky`, `/dashboard/kontakty` 307, `/nabidka/<uuid>` a `/p/<nesmysl>` 404, `/api/public/outreach`,
+  `/api/public/vizeon-leads` a `/api/public/rozbory` bez klíče 401; 30 min bez běhových chyb.
 
 ### 2026-11-28 (navrhovač nabídek — cena podle přínosu webu za měsíc, R-157)
 - **feat** Pásmo ceny nabídky určuje přínos webu za měsíc = zakázky z webu za měsíc × cena jedné zakázky (hranice

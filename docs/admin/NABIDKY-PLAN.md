@@ -10,7 +10,7 @@
 > naostro nevyzkoušené. **N2–N4 na produkci** (2026-11-27, `afe75fc`, migrace 142, R-155), naostro nevyzkoušené.
 > 2026-11-28 Kryštof potvrdil Plus a e-shop a rozhodl, že pásmo určuje **přínos webu za měsíc** (zakázky z webu
 > za měsíc × cena zakázky, R-157); na produkci od 2026-11-28 (`eed30ca`), naostro nevyzkoušené.
-> **N4 dokončené v kódu 2026-11-28 (R-158):** rozbor se spouští sám (souhlas firmy od asistenta, poptávka z webu)
+> **N4 na produkci od 2026-11-28 (R-158, `159b8de`):** rozbor se spouští sám (souhlas firmy od asistenta, poptávka z webu)
 > a u konceptu nabídky jsou návrhy vstupů ze schůzky ve Voice (oddíl 13).
 
 ## 1. Proč a co z toho má být
@@ -309,7 +309,7 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
 | **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | v kódu 2026-11-27 (migrace 142 na produkci); stránka ověřená na 390 a 1280 px s vymyšlenými daty; porovnání s minulými nabídkami v oddílu 12.1 (6 nabídek z Gmailu, ne zakázky z databáze); na produkci od 2026-11-27 (`afe75fc`), čeká první skutečná nabídka |
 | **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | v kódu 2026-11-27; 2026-11-28 doplněné podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty (oddíl 6); čeká první vyhodnocení po měsíci provozu |
-| **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; **2026-11-28 (R-158)** automatické spuštění (souhlas firmy, poptávka z webu) a návrhy vstupů ze schůzky ve Voice (oddíl 13); naostro nevyzkoušené |
+| **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; **2026-11-28 (R-158)** automatické spuštění (souhlas firmy, poptávka z webu) a návrhy vstupů ze schůzky ve Voice (oddíl 13); na produkci od 2026-11-28 (`159b8de`), naostro nevyzkoušené |
 
 ## 10. Rozhodnutí
 
