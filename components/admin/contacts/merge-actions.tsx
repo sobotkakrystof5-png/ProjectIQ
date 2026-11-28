@@ -5,6 +5,7 @@ import { Merge, Undo2 } from 'lucide-react'
 import { mergeDuplicate, undoMerge } from '@/app/contacts-actions'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
+import { withPeriod } from '@/lib/ws/sentence'
 
 /**
  * Sloučení duplicit (AD09). Nikdy se nedělá samo a nikdy se na nic neptá
@@ -39,7 +40,7 @@ export function MergeButton({
         toast.error(result.error)
         return
       }
-      toast.success(`${sourceName} je teď součástí kontaktu ${targetName}.`, {
+      toast.success(`${sourceName} je teď součástí kontaktu ${withPeriod(targetName)}`, {
         description: 'Nic se nesmazalo — zakázky a hovory se jen počítají k jednomu člověku.',
         undo,
       })

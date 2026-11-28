@@ -19,6 +19,7 @@ import { createDraft, OUTREACH_KINDS, setDraftDiscarded } from '@/lib/ws/outreac
 import { fail, ok, type Result } from '@/lib/ws/result'
 import { refreshSegmentsSafely } from '@/lib/ws/segments'
 import { isIsoDate, pragueToday } from '@/lib/ws/time'
+import { withPeriod } from '@/lib/ws/sentence'
 
 // Akce zákazníků, věrnosti a „Komu napsat“ (S12). Každá: requireWorkspace →
 // Zod → byznys z URL ověřený proti účtu → assertWritable → zápis
@@ -277,7 +278,7 @@ export async function updateCustomer(raw: unknown): Promise<Result<{ duplicateOf
     const res = await customers.updateCustomer(c.ctx, input.customerId, { name: input.name, phone, email, birthday, note: input.note })
     if (res.ok) return ok({})
     if (res.reason === 'not_found') return fail(GONE)
-    if (res.other) return { ok: false, error: `Tenhle telefon nebo e-mail už má ${res.other.name}. Zákazníky můžete sloučit níže.` }
+    if (res.other) return { ok: false, error: `Tenhle telefon nebo e-mail už má ${withPeriod(res.other.name)} Zákazníky můžete sloučit níže.` }
     return fail('Tenhle telefon nebo e-mail už má jiný zákazník.')
   })
 }

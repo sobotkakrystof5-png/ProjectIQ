@@ -2,6 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 import { adminDb, q, type AdminQuery } from '@/lib/admin/db'
 import { CONSULTATION_SLOT_MINUTES } from '@/lib/consultations/rules'
+import { pgDate } from '@/lib/pg-date'
 
 /**
  * Volno pro klienty v kalendáři adminu (KP14, migrace 123, R-126).
@@ -23,10 +24,7 @@ export type RawAvailability = {
   repeat_until: string | null
 }
 
-const dayOnly = (v: unknown): string | null => {
-  if (v == null) return null
-  return v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10)
-}
+const dayOnly = (v: unknown): string | null => pgDate(v)
 
 /** Výskyty volna v pražských dnech `[from, toInclusive]`. */
 export function availabilityQuery(from: string, toInclusive: string): AdminQuery {

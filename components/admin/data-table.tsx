@@ -101,6 +101,15 @@ function HeaderCell<T>({ column, sort }: { column: AdminColumn<T>; sort?: { para
   )
 }
 
+/**
+ * Odkaz řádku je roztažený přes celý řádek (`after:absolute after:inset-0`).
+ * Tlačítka, odkazy a pole v ostatních buňkách proto musí ležet nad ním,
+ * jinak klik na „Zaplaceno" otevře detail místo akce.
+ */
+const ABOVE_ROW_LINK =
+  '[&_a]:relative [&_a]:z-[1] [&_button]:relative [&_button]:z-[1] [&_input]:relative [&_input]:z-[1] ' +
+  '[&_select]:relative [&_select]:z-[1] [&_label]:relative [&_label]:z-[1]'
+
 /** Karta jednoho řádku na telefonu — stejná data, jiné rozložení. */
 function MobileCard<T>({
   row,
@@ -127,7 +136,7 @@ function MobileCard<T>({
   return (
     <li className="relative border-t border-navy-100 px-4 py-3 first:border-t-0">
       <div className="flex items-start gap-3">
-        {selection && <span className="pt-1">{selection.cell(row)}</span>}
+        {selection && <span className={cn('pt-1', ABOVE_ROW_LINK)}>{selection.cell(row)}</span>}
         <div className="min-w-0 flex-1">
           {href ? (
             <Link href={href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-tiny after:absolute after:inset-0">
@@ -142,7 +151,7 @@ function MobileCard<T>({
               {meta.map((c) => (
                 <div key={c.key} className="contents">
                   <dt className="text-xs text-quiet">{c.header}</dt>
-                  <dd className="min-w-0 text-sm text-ink">{c.cell(row)}</dd>
+                  <dd className={cn('min-w-0 text-sm text-ink', ABOVE_ROW_LINK)}>{c.cell(row)}</dd>
                 </div>
               ))}
             </dl>
@@ -200,7 +209,7 @@ export function DataTable<T>({
                   const rowHref = href?.(row)
                   return (
                     <tr key={rowKey(row)} className="relative border-t border-navy-100 transition-colors first:border-t-0 hover:bg-navy-50/60">
-                      {selection && <td className="px-3 py-2.5 align-top">{selection.cell(row)}</td>}
+                      {selection && <td className={cn('px-3 py-2.5 align-top', ABOVE_ROW_LINK)}>{selection.cell(row)}</td>}
                       {columns.map((column) => (
                         <td
                           key={column.key}
@@ -208,6 +217,7 @@ export function DataTable<T>({
                             'px-3 py-2.5 text-sm text-ink align-top',
                             column.align === 'right' && 'text-right',
                             column.className,
+                            rowHref && column.key !== titleKey && ABOVE_ROW_LINK,
                           )}
                         >
                           {rowHref && column.key === titleKey ? (

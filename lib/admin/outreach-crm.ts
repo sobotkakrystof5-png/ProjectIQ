@@ -13,6 +13,7 @@ import {
   type EmailView,
 } from '@/lib/admin/outreach-crm-view'
 import type { TranscriptTurn } from '@/types/outreach-report'
+import { pgDate } from '@/lib/pg-date'
 
 /**
  * AI asistent jako CRM (R-120): Přehled, Kontakty a detail klienta nad
@@ -70,8 +71,7 @@ function arr<T = unknown>(v: unknown): T[] {
 }
 
 function day(v: unknown): string {
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v ?? '').slice(0, 10)
+  return pgDate(v) ?? ''
 }
 
 function toContactRow(r: Json): ContactRow {

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
+import { plural } from '@/lib/ws/plural'
 import { dayChip, dayLabel, groupSlotsByDay, slotMinutes, slotTime, type FreeSlot } from '@/lib/consultations/rules'
 
 /**
@@ -42,7 +43,7 @@ export function SlotPicker({
                 type="button"
                 onClick={() => onDayChange(d.day)}
                 aria-pressed={selected}
-                aria-label={`${dayLabel(d.day, today)}, ${d.slots.length} volných časů`}
+                aria-label={`${dayLabel(d.day, today)}, ${plural(d.slots.length, ['volný čas', 'volné časy', 'volných časů'])}`}
                 className={cn(
                   'flex min-h-[56px] min-w-[64px] shrink-0 flex-col items-center justify-center rounded-chip border px-3 text-sm transition-colors',
                   selected

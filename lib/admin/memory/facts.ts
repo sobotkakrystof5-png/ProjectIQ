@@ -119,7 +119,7 @@ function contactQueries(id: string): AdminQuery[] {
                     round(avg(p.price / nullif(p.time_invested, 0))
                           FILTER (WHERE p.time_invested > 0 AND p.price > 0), 0)::float AS sazba,
                     round(avg(EXTRACT(epoch FROM (p.closed_at - p.created_at)) / 86400)
-                          FILTER (WHERE p.closed_at IS NOT NULL), 1)::float AS dny
+                          FILTER (WHERE p.closed_at >= p.created_at), 1)::float AS dny
              FROM projects p WHERE ${family('p.contact_id')}`,
       params: [id],
     },
@@ -163,7 +163,7 @@ function globalQueries(): AdminQuery[] {
                     round(avg(p.price / nullif(p.time_invested, 0))
                           FILTER (WHERE p.time_invested > 0 AND p.price > 0), 0)::float AS sazba,
                     round(avg(EXTRACT(epoch FROM (p.closed_at - p.created_at)) / 86400)
-                          FILTER (WHERE p.closed_at IS NOT NULL), 1)::float AS dny
+                          FILTER (WHERE p.closed_at >= p.created_at), 1)::float AS dny
              FROM projects p WHERE ${recent}`,
       params: [],
     },
@@ -261,7 +261,7 @@ export function factLines(facts: AdminFacts): string[] {
   const lines: string[] = []
   if (facts.lastPrice !== null) lines.push(`Poslední cena ${Math.round(facts.lastPrice).toLocaleString('cs-CZ')} Kč`)
   if (facts.hourlyRate !== null) lines.push(`Obvyklá sazba ${Math.round(facts.hourlyRate).toLocaleString('cs-CZ')} Kč/h`)
-  if (facts.avgDaysToClose !== null) lines.push(`Hotovo obvykle za ${facts.avgDaysToClose} dní`)
+  if (facts.avgDaysToClose !== null) lines.push(`Hotovo obvykle za ${String(facts.avgDaysToClose).replace('.', ',')} dní`)
   if (facts.lastServiceType !== null) lines.push(`Naposledy ${facts.lastServiceType}`)
   if (facts.typicalSource !== null) {
     lines.push(`Nejčastěji přichází přes ${SOURCE_LABELS[facts.typicalSource] ?? facts.typicalSource}`)

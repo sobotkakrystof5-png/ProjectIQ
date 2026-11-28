@@ -4,6 +4,7 @@ import { availabilityQuery, mapAvailability, type RawAvailability } from '@/lib/
 import { addIsoDays, pragueWallClockToISO } from '@/lib/prague-time'
 import type { DayRange } from '@/lib/admin/calendar-window'
 import type { LeadStatus, ConsultationChannel, CalendarEventType } from '@/lib/types'
+import { pgDate } from '@/lib/pg-date'
 
 /**
  * Data kalendáře `/dashboard/calendar` (AD06 dávka, AD08 časové okno).
@@ -109,8 +110,7 @@ const notMissingSchema = (err: unknown) => {
 const iso = (instant: Date | string): string =>
   typeof instant === 'string' ? instant : instant.toISOString()
 
-const dayOnly = (value: Date | string): string =>
-  typeof value === 'string' ? value.slice(0, 10) : value.toISOString().slice(0, 10)
+const dayOnly = (value: Date | string): string => pgDate(value) ?? ''
 
 const dayParts = (day: string): [number, number, number] => {
   const [y, m, d] = day.split('-').map(Number)

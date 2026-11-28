@@ -15,6 +15,7 @@
  */
 
 import { formatPragueShortDateTime } from './prague-time'
+import { withPeriod } from '@/lib/ws/sentence'
 
 export type MessageChannel = 'sms' | 'email' | 'whatsapp'
 
@@ -104,7 +105,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     body: (ctx) =>
       lines(
         GREETING,
-        `potvrzuji náš termín ${when(ctx)}.${ctx.projectName ? ` Týká se zakázky ${ctx.projectName}.` : ''}`,
+        `potvrzuji náš termín ${when(ctx)}.${ctx.projectName ? ` Týká se zakázky ${withPeriod(ctx.projectName)}` : ''}`,
         'Kdyby se vám čas nehodil, napište mi a najdeme jiný.',
         EMAIL_SIGNATURE,
       ),

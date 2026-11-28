@@ -57,7 +57,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
       )
       break
     case 'invoice':
-      title = `Faktura ${item.invoice.number} je po splatnosti`
+      title = `${item.invoice.title} ${item.invoice.number} je po splatnosti`
       detail = `${item.projectName} · ${formatMoney(item.invoice.amount, item.invoice.currency)}${item.invoice.dueOn ? ` · splatná ${formatDate(item.invoice.dueOn)}` : ''}`
       end = (
         <Link href={`/klient/faktury#faktura-${item.invoice.id}`} className={action}>

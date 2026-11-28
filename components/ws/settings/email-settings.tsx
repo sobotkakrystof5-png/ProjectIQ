@@ -10,6 +10,7 @@ import { useWsAction, useWsUndoAction } from '@/components/ws/app/booking/use-ws
 import { saveEmailReplyTo, saveEmailSetting, saveNewsSetting, sendTestEmailAction } from '@/app/w/[business]/nastaveni/emaily/actions'
 import { BODY_MAX, MESSAGES, SUBJECT_MAX, TEMPLATE_VARS, type MessageType } from '@/lib/ws/email/catalog'
 import { previewCustomerEmail } from '@/lib/ws/email/compose'
+import { withPeriod } from '@/lib/ws/sentence'
 
 type Row = { type: MessageType; enabled: boolean; subject: string | null; body: string | null }
 
@@ -91,7 +92,7 @@ export function EmailSettings({
           Odpovědi zákazníků
         </h2>
         <p className="text-sm text-quiet">
-          E-maily odcházejí se jménem {brand.name}. Když zákazník odpoví, odpověď přijde sem.
+          E-maily odcházejí se jménem {withPeriod(brand.name)} Když zákazník odpoví, odpověď přijde sem.
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex min-w-[240px] flex-1 flex-col gap-1.5">

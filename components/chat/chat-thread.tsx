@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { pragueDayOf } from '@/lib/prague-time'
 import { CHAT_MAX_BODY, CHAT_MAX_FILES, CHAT_MAX_TOTAL_BYTES, REQUEST_STATUS_CHAT, type ChatMessage, type ChatReads } from '@/lib/chat/types'
 import { useVoice } from '@/components/chat/use-voice'
+import { splitLinks } from '@/lib/security/html'
 
 /**
  * Vlákno chatu u zakázky (KP15, R-122, R-123) — stejné pro klienta
@@ -152,7 +153,7 @@ export function ChatThread(props: ChatThreadProps) {
                       {m.replyTo.body || 'Příloha'}
                     </p>
                   )}
-                  {m.body && <p className="whitespace-pre-wrap break-words text-sm">{m.body}</p>}
+                  {m.body && <p className="whitespace-pre-wrap break-words text-sm"><LinkedText text={m.body} own={own} /></p>}
                   {m.approvalUrl && (
                     <a
                       href={m.approvalUrl}
@@ -505,5 +506,28 @@ function Composer({
       )}
       {error && <p role="alert" className="mt-1.5 text-sm text-danger">{error}</p>}
     </div>
+  )
+}
+
+/** Text zprávy s klikacími odkazy. Jen http(s), otevře se v novém okně. */
+function LinkedText({ text, own }: { text: string; own: boolean }) {
+  return (
+    <>
+      {splitLinks(text).map((part, i) =>
+        part.href ? (
+          <a
+            key={i}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className={cn('break-all underline underline-offset-2', own ? 'text-white' : 'text-navy-700')}
+          >
+            {part.text}
+          </a>
+        ) : (
+          <Fragment key={i}>{part.text}</Fragment>
+        ),
+      )}
+    </>
   )
 }

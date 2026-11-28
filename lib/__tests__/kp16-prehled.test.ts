@@ -230,7 +230,7 @@ describe('přehled klienta', () => {
       phases: [], current: null, money: null, invoices: [], consultations: [], unread: 0, survey: null, webLeads: null, ...over,
     })
     const invoice = (state: 'overdue' | 'open') => ({
-      id: `f-${state}`, number: '2026001', kind: 'issued' as const, issuedOn: '2026-11-01', dueOn: '2026-11-15', paidOn: null,
+      id: `f-${state}`, number: '2026001', title: 'Faktura', kind: 'issued' as const, issuedOn: '2026-11-01', dueOn: '2026-11-15', paidOn: null,
       amount: 1000, currency: 'CZK', state, hasPdf: true, payment: null,
     })
     const items = waitingItems(

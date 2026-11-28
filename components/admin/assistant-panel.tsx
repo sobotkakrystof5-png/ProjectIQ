@@ -7,6 +7,7 @@ import { AlertCircle, ArrowUpRight, Check, Loader2, Mic, Plus, Sparkles, Square,
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
+import { cn } from '@/lib/utils'
 import { applySuggestion, proposeSuggestion, undoSuggestion, type PlanView } from '@/app/ai-actions'
 import { contextRefFromPath, onAssistantOpen } from '@/lib/admin/assistant-open'
 import { HISTORY_MAX, TEXT_MAX } from '@/lib/ai/assistant-limits'
@@ -471,7 +472,12 @@ export function AssistantPanel() {
         onClick={openPanel}
         aria-label="Otevřít asistenta"
         title="Asistent"
-        className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-navy-700 text-white shadow-lg transition-transform hover:bg-navy-800 active:scale-95 lg:bottom-6 lg:right-6"
+        className={cn(
+          'fixed bottom-20 right-4 z-30 h-14 w-14 items-center justify-center rounded-full bg-navy-700 text-white shadow-lg transition-transform hover:bg-navy-800 active:scale-95 lg:bottom-6 lg:right-6',
+          // Ve Zprávách je na telefonu dole pole pro psaní a tlačítko by zakrylo
+          // „Poslat ke schválení" i odeslání. Asistent jde dál otevřít z hledání.
+          pathname?.startsWith('/dashboard/zpravy') ? 'hidden lg:flex' : 'flex',
+        )}
       >
         <Sparkles size={22} strokeWidth={1.5} aria-hidden="true" />
       </button>

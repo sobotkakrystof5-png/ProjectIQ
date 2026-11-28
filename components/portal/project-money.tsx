@@ -58,7 +58,7 @@ export function InvoiceRow({ invoice, projectName }: { invoice: PortalInvoice; p
       {projectName && <p className="mb-1 truncate text-xs font-medium text-quiet">{projectName}</p>}
       <div className="flex items-baseline justify-between gap-3">
         <p className="min-w-0 break-words font-medium text-ink">
-          Faktura <span className="font-num">{invoice.number}</span>
+          {invoice.title} <span className="font-num">{invoice.number}</span>
         </p>
         <span
           className={cn(

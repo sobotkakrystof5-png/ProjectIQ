@@ -20,6 +20,7 @@ import { MergeBox } from './customer-controls'
 import { CUSTOMER_MESSAGE_TYPES, fillTemplate, MESSAGES, type CustomerMessageType, type TemplateValues } from '@/lib/ws/email/catalog'
 import { formatPhone } from '@/lib/ws/format-phone'
 import { mailtoAddress } from '@/lib/ws/email/mailto'
+import { withPeriod } from '@/lib/ws/sentence'
 
 type Template = { type: CustomerMessageType; subject: string; body: string; enabled: boolean }
 
@@ -225,7 +226,7 @@ export function CustomerContactActions({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Napsat e-mail</DialogTitle>
-            <DialogDescription>E-mail odešleme jménem {businessName}. Odpověď přijde na váš e-mail.</DialogDescription>
+            <DialogDescription>E-mail odešleme jménem {withPeriod(businessName)} Odpověď přijde na váš e-mail.</DialogDescription>
           </DialogHeader>
           {loadingTemplates ? (
             <p className="text-sm text-quiet">Načítám šablony…</p>

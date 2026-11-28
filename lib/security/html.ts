@@ -97,6 +97,28 @@ export function linkifyHtml(text: string, linkStyle: string): string {
 }
 
 /**
+ * Text rozdělený na obyčejné části a odkazy — pro React, kde se nic
+ * neskládá do HTML. Stejné pravidlo jako `linkifyHtml`: jen http(s),
+ * interpunkce na konci věty k adrese nepatří, nebezpečná adresa zůstane textem.
+ */
+export type TextPart = { text: string; href?: string }
+
+export function splitLinks(text: string): TextPart[] {
+  const parts: TextPart[] = []
+  let last = 0
+  for (const match of text.matchAll(/https?:\/\/[^\s<>"']+/g)) {
+    const raw = match[0].replace(/[.,;:!?)\]]+$/, '')
+    const href = safeHttpUrl(raw)
+    const start = match.index ?? 0
+    if (start > last) parts.push({ text: text.slice(last, start) })
+    parts.push(href ? { text: raw, href } : { text: raw })
+    last = start + raw.length
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) })
+  return parts
+}
+
+/**
  * JSON, který se vkládá doprostřed `<script>` (JSON-LD, počáteční data).
  * `JSON.stringify` sám neescapuje `<`, takže `</script>` v hodnotě by
  * skript ukončil a zbytek by se vykreslil jako HTML. Escapuje se `< > &`

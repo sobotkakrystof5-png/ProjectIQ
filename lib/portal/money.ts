@@ -4,8 +4,9 @@ import { createHash } from 'crypto'
 import { invoiceState, type InvoiceState } from '@/lib/invoice-status'
 import { getPragueTodayISO } from '@/lib/prague-time'
 import { spaydPaymentString, variableSymbol, type PdfDocument, type PdfInvoice } from '@/lib/invoice-pdf/render'
-import { INVOICE_KINDS } from '@/lib/admin/invoice-kinds'
+import { INVOICE_KINDS, KIND_TITLES } from '@/lib/admin/invoice-kinds'
 import { portalDb, pq, type PortalRow } from './db'
+import { pgDate } from '@/lib/pg-date'
 
 // Peníze a faktury zakázky v klientském prostoru (KP13, migrace 122, R-125).
 // Čte jen projekce portal.project_money a portal.invoices přes portalDb(clientId)
@@ -25,6 +26,8 @@ export type PortalInvoiceKind = 'issued' | 'archived'
 export interface PortalInvoice {
   id: string
   number: string
+  /** Nadpis jako na PDF: Zálohová faktura, Částečná faktura… (R-143). */
+  title: string
   kind: PortalInvoiceKind
   issuedOn: string
   dueOn: string | null
@@ -44,11 +47,7 @@ function pgCode(err: unknown): string | undefined {
   return typeof err === 'object' && err !== null && 'code' in err && typeof err.code === 'string' ? err.code : undefined
 }
 
-const day = (v: unknown): string | null => {
-  if (v == null) return null
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v).slice(0, 10)
-}
+const day = (v: unknown): string | null => pgDate(v)
 const num = (v: unknown): number => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
@@ -178,6 +177,7 @@ export function invoiceFromRow(row: PortalRow, todayIso: string): PortalInvoice 
   return {
     id: String(row.id),
     number: String(row.number),
+    title: pdf?.document ? KIND_TITLES[pdf.document.kind] : 'Faktura',
     kind,
     issuedOn: day(row.issued_on) ?? '',
     dueOn: day(row.due_on),

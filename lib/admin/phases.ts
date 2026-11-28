@@ -10,6 +10,7 @@ import {
   type ServiceInput,
   type ServiceTemplate,
 } from '@/lib/admin/phase-model'
+import { pgDate } from '@/lib/pg-date'
 
 // Služby a etapy zakázky v adminu (KP12, migrace 121). Čte a píše vlastník
 // tabulek přes `adminDb`; do klientského prostoru se etapy dostanou triggerem
@@ -28,11 +29,7 @@ function isMissingMigration(err: unknown): boolean {
 }
 
 const iso = (v: unknown): string | null => (v == null ? null : new Date(String(v)).toISOString())
-const day = (v: unknown): string | null => {
-  if (v == null) return null
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v).slice(0, 10)
-}
+const day = (v: unknown): string | null => pgDate(v)
 
 // ─── Služby ──────────────────────────────────────────────────────────────────
 

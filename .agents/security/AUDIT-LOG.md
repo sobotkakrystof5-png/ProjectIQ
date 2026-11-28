@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-28 — review: opravy z testu klientského prostoru (R-156)
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: větev `admin/klient-opravy` — klikací odkazy v chatu (`splitLinks` v `lib/security/html.ts`, `components/chat/chat-thread.tsx`), pozvání do prostoru jednou transakcí (`app/portal-admin-actions.ts`), migrace 143 (`portal.project_display_name`, nová těla `portal.link_project` a `portal.sync_project`) a 144 (`public.consultation_cancellations`, nová těla `portal.book_consultation` a `portal.cancel_consultation`)
+Výsledek: 0 nálezů k opravě. Prošlo: odkaz v chatu vzniká jen z `safeHttpUrl` (http/https, bez řídicích znaků), text zůstává textem v Reactu, žádné HTML, `rel="noopener noreferrer nofollow"`; xss-guard test zelený. Nové a přepsané funkce mají připnutý `search_path`, `REVOKE ALL FROM PUBLIC`, podpisy beze změny, takže `portal_app` má dál jen práva ze `scripts/portal-grants.sql`; nová tabulka je bez osobních údajů (zakázka, číslo, čas) a `portal_app` do ní nevidí (test `klient-opravy`, 42501). Pozvání dál jen za `requireAuth()`, zápisy v jedné transakci, takže po chybě nezůstane prostor bez zakázky ani zakázka napůl propojená.
+Nálezy: žádné.
+Opraveno: —
+Zůstává: klient může v chatu poslat podvodný odkaz a teď je klikací (dřív se kopíroval). Admin ho vidí jako adresu, ne jako jiný text; přijato. Limit rezervací počítá zrušení po zakázce, takže člen může vyčerpat limit i ostatním členům téže firmy, jiné firmy ne.
+
 ## 2026-11-28 — review: Voice, přiřazení schůzky ke kontaktu z Macu (R-151)
 Spouštěč: před nasazením (`web-security-review`)
 Rozsah: `PATCH /api/public/voice/meetings/[id]`, `GET /api/public/voice/meetings/[id]/contacts`, `lib/admin/voice/meetings.ts` (`meetingContactSuggestions`, `searchMeetingContacts`, `setDeviceMeetingContact`), `transcriptCheck` v `lib/admin/voice/meeting-transcript.ts`

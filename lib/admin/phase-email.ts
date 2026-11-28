@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/admin/db'
 import { SIGNATURE } from '@/lib/admin/meeting-email'
 import { escapeHtml } from '@/lib/security/html'
 import { sendVizeonMail, type SendResult, type VizeonMail } from '@/lib/admin/vizeon-mail'
+import { pgDate } from '@/lib/pg-date'
 
 /**
  * E-mail klientovi, když Kryštof dokončí etapu (KP16, R-128, migrace 125).
@@ -98,11 +99,7 @@ function missing(err: unknown): boolean {
   return code === '42P01' || code === '42883' || code === '42703'
 }
 
-const day = (v: unknown): string | null => {
-  if (v == null) return null
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v).slice(0, 10)
-}
+const day = (v: unknown): string | null => pgDate(v)
 
 export type PhaseEmailOutcome = 'sent' | 'skipped' | 'failed'
 

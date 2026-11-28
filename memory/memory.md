@@ -2,7 +2,11 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-27 · **Navrhovač nabídek N2–N4 na produkci** (R-155): z hotového rozboru
+> **Poslední aktualizace:** 2026-11-28 · **Opravy z testu klientského prostoru** (R-156): pozvání čerstvé zakázky,
+> název zakázky u klienta, tlačítka v řádku výpisu, posun data o den, NPS v Profilu, „Vrátit" u konzultace a drobnosti.
+> Větev `admin/klient-opravy`, migrace 143 a 144 jen na testovacím Neonu; **nic na produkci**.
+>
+> Předchozí: 2026-11-27 · **Navrhovač nabídek N2–N4 na produkci** (R-155): z hotového rozboru
 > firmy vznikne sám návrh nabídky se třemi variantami. Cenu počítá server z cenových pravidel (tabulka pásem,
 > editor `/dashboard/nabidky/pravidla`), model dodá odhad hodnoty pro klienta a pozici v pásmu. Kryštof návrh
 > upraví u kontaktu a pošle e-mailem Nabídka s odkazem na stránku `/nabidka/<token>` (VIZEON), kde klient vybere
@@ -1920,10 +1924,30 @@ platí až po přijetí, cenu nikdy nenavrhují snížit. (5) Horní meze Plus a
 verze 2, nová veřejná stránka (DECISIONS #060), menu Práce › Nabídky. Nová cesta k ceně nabídky jde přes
 `lib/admin/offers/pricing.ts`, ne natvrdo jinde. Přepisy schůzek do rozboru dál nejdou (DECISIONS #056).
 Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, stránka pro klienta a vyhodnocení".
+### R-156 · Opravy z testu klientského prostoru: zakázka „firma · druh práce", zrušení konzultace si pamatuje přesuny (2026-11-28)
+**Rozhodnutí:** (1) Zakázka se v klientském prostoru jmenuje „firma · druh práce" (`service_type`), bez druhu
+práce jen jménem firmy (`portal.project_display_name`). (2) `projects.updated_at` má výchozí `now()` a kopie do
+`portal` bere `coalesce(updated_at, now())`; staré řádky se nepřepisují. (3) Pozvání do prostoru zakládá klienta,
+propojuje zakázku a vytváří pozvánku jednou transakcí (`adminDb.batch`). (4) Zrušení konzultace z prostoru si na
+den zapamatuje zakázku a počet přesunů (`consultation_cancellations`, bez osobních údajů); nová rezervace téže
+zakázky do 15 minut převezme počet přesunů a zrušení z poslední hodiny se počítají do limitu 10 rezervací za hodinu.
+**Proč:** Kryštof 2026-11-28 „oprav vše co zde nesedí" po testu 2026-11-27 (název navrhl agent, Kryštof vybral).
+Pozvání čerstvé zakázky padalo (23502), protože žádný INSERT do `projects` čas úpravy nenastavuje, a po pádu zůstala
+prázdná firma. „Vrátit" po zrušení vynulovalo strop pěti přesunů a smazané rezervace se nepočítaly do limitu.
+**Důsledek:** migrace 143 a 144 (aplikované jen na testovacím Neonu). Nový zápis do `portal.projects` bere název
+z `portal.project_display_name`. Sloupec `date` z databáze se převádí `pgDate` z `lib/pg-date.ts`, nikdy
+`toISOString().slice(0, 10)` (v Praze dá předchozí den). Testy prostoru, které chtějí produkční tvar `projects`,
+staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodnoty).
+
 ---
 
 ## 3. Otevřené problémy
 
+- [ ] **Opravy klientského prostoru (R-156) — nasadit:** větev `admin/klient-opravy` (worktree
+  `.claude/worktrees/klient-test-local`). Migrace 143 a 144 jsou jen na testovacím Neonu; na produkci je pouští
+  Kryštof nebo agent s jeho souhlasem, **143 před nasazením kódu** (bez ní pozvání čerstvé zakázky dál padá; kód
+  sám nic nerozbije). Po nasazení: pozvat do prostoru novou neuloženou zakázku, „Zaplaceno" ve výpisu faktur myší,
+  termín ve Zprávách, NPS v Profilu · od 2026-11-28
 - [ ] **Navrhovač nabídek N2–N4 (R-155) — vyzkoušet naostro:** ~~(1) migrace 142 na produkci~~ (2026-11-27, Neon MCP,
   v evidenci), ~~(2) sloučit do `main` a nasadit~~ (2026-11-27, `afe75fc`), (3) Kryštof: projít Nabídky › Cenová pravidla
   (hlavně horní meze Plus a e-shop, které doplnil agent), (4) první skutečná nabídka: rozbor firmy → koncept →
@@ -2431,6 +2455,44 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, str�
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-28 (opravy z testu klientského prostoru, R-156)
+- **chore** Test klientského prostoru 2026-11-27 na localhostu (worktree `.claude/worktrees/klient-test-local`,
+  simulace přihlášení `lib/local-test-auth.ts` jen lokálně, necommitnutá, testovací Neon): pozvánka, přehled, chat,
+  etapy, hlášení z Claude Code, faktury s PDF a QR, konzultace, poptávky z webu, hodnocení a oddělení cizí firmy
+  prošly; nálezy níž. Produkce beze změny.
+- **fix** Pozvání čerstvé zakázky do prostoru padalo (`projects.updated_at` NULL do NOT NULL v `portal.link_project`)
+  a nechávalo prázdnou firmu: výchozí `now()`, `coalesce` v `link_project` i `sync_project`, pozvání jednou transakcí.
+  Soubory: `migrations/143_portal_zakazka_nazev.sql`, `app/portal-admin-actions.ts`.
+- **fix** Zakázka se u klienta jmenovala jen jménem firmy, dvě zakázky jedné firmy nešly rozeznat: „firma · druh práce".
+  Migrace 143 (`portal.project_display_name`, přejmenuje i propojené zakázky).
+- **fix** „Zaplaceno" a další tlačítka v řádku výpisu (faktury i ostatní tabulky adminu) nešla myší: roztažený odkaz
+  řádku je překrýval. `components/admin/data-table.tsx` (`ABOVE_ROW_LINK`).
+- **fix** Datum ze sloupce `date` se v pražské zóně ukazovalo o den dřív (etapy a faktury v prostoru, PDF klienta,
+  termíny v kalendáři adminu, volno, reporty asistenta) a ve Zprávách „Thu Dec 31": `pgDate` v `lib/pg-date.ts`
+  místo `toISOString()` v `lib/portal/{phases,money}.ts`, `lib/admin/{phases,phase-email,availability,calendar,chat,
+  outreach-crm,outreach-reports}.ts`. Na Vercelu (UTC) se to neprojevovalo.
+- **fix** Karta NPS v Profilu ukazovala „—": četla jen starou `client_feedback`, teď i `project_surveys.nps`;
+  desetinná čárka. `app/dashboard/profil/page.tsx`.
+- **fix** „Vrátit" u zrušené konzultace vynulovalo počet přesunů a zrušené rezervace se nepočítaly do limitu.
+  Migrace 144 (`consultation_cancellations`, nová těla `portal.book_consultation` a `portal.cancel_consultation`).
+- **fix** Drobnosti: odkazy v chatu jsou klikací (`splitLinks` v `lib/security/html.ts`, jen http(s)); tvary „3 volné
+  časy", „1 člen · 2 zakázky"; tečka za jménem firmy „s.r.o." jen jednou (`lib/ws/sentence.ts`, 10 míst); druh faktury
+  u klienta („Zálohová faktura 2026007"); tlačítko asistenta na telefonu ve Zprávách schované (zakrývalo „Poslat ke
+  schválení"); paměť projektu nepočítá zakázky zapsané zpětně do průměrné doby („-26.7 dní").
+- **db** Migrace 143 a 144 **aplikované na produkci** 2026-11-28 (Neon MCP v jedné transakci na souhlas Kryštofa,
+  zapsané v `public.schema_migrations` s otiskem souboru; předtím ověřeno, že těla `link_project`, `sync_project`,
+  `book_consultation` a `cancel_consultation` na produkci odpovídají 122/095/123, potom md5 nových těl sedí na soubory,
+  `portal_app` dál spouští `book_`/`cancel_consultation`, `link_project` ani `consultation_cancellations` ne).
+  Testovací Neon taky. Na produkci měl `projects.updated_at` výchozí `now()` už předtím a žádná zakázka NULL, takže
+  pozvání čerstvé zakázky tam nepadalo (padalo jen na testovacím Neonu); 143 tam přidává jen název a `coalesce`.
+  Jediná zakázka v prostoru (BARINGOTKA) nemá druh práce, název se nezměnil.
+- **chore** Ověřeno: `npx tsc --noEmit`, celá sada 2 213 testů (padá jen `admin-supabase-auth` na lokální simulaci
+  přihlášení; s čistým `lib/auth.ts` 14/14), nové `klient-opravy.test.ts` (11, produkční tvar `projects`, bez migrací
+  spadne) a `klient-opravy-texty.test.ts`. Na localhostu proti testovacímu Neonu: pozvání zakázky s `updated_at` NULL
+  projde, „Zaplaceno" myší a Vrátit, termín 31. 12. ve Zprávách, NPS 9,0, tlačítko asistenta na 390 px, faktury
+  a výběr času u klienta, zrušení a Vrátit konzultace se 2 přesuny. Testovací data z 2026-11-27 zůstala, přibyla
+  zakázka „Ověření Pozvání s.r.o.".
 
 ### 2026-11-28 (ZakazIQ Voice — průvodce první schůzkou, server)
 - **feat** Server pro průvodce první schůzkou na Macu: `PATCH /api/public/voice/meetings/[id]` (přiřazení ke kontaktu,

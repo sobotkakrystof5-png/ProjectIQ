@@ -10,6 +10,7 @@ import { orderSlots } from '@/lib/ws/intake/schema'
 import { webFields } from '@/lib/ws/fields'
 import { pragueToday } from '@/lib/ws/time'
 import type { OrderAvailability } from './actions'
+import { withPeriod } from '@/lib/ws/sentence'
 
 // Objednávací stránka byznysu /r/[slug] (S11, R-016, plán „Odkaz, žádný kód“).
 // Bez přihlášení, ve stylu Dílků s barvou byznysu. Neznámý nebo archivovaný
@@ -29,7 +30,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const name = data.config.business.name
   return {
     title: `Objednat · ${name}`,
-    description: `Pošlete poptávku firmě ${name}. Termín vám potvrdí.`,
+    description: `Pošlete poptávku firmě ${withPeriod(name)} Termín vám potvrdí.`,
   }
 }
 

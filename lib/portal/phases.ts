@@ -1,5 +1,6 @@
 import 'server-only'
 import { portalDb, pq } from './db'
+import { pgDate } from '@/lib/pg-date'
 
 // Etapy zakázky v klientském prostoru (KP12, migrace 121). Čte projekce
 // portal.phases a portal.phase_tasks přes portalDb(clientId), RLS a výslovný
@@ -31,11 +32,7 @@ function pgCode(err: unknown): string | undefined {
 }
 
 const iso = (v: unknown): string | null => (v == null ? null : new Date(String(v)).toISOString())
-const day = (v: unknown): string | null => {
-  if (v == null) return null
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v).slice(0, 10)
-}
+const day = (v: unknown): string | null => pgDate(v)
 const status = (v: unknown): PortalPhaseStatus => (v === 'running' || v === 'done' ? v : 'waiting')
 
 export async function loadClientPhases(clientId: string, projectId: string): Promise<PortalPhase[]> {

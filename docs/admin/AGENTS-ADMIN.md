@@ -138,7 +138,7 @@ CREATE TABLE projects (
 | client_email | text | — | Email klienta — pro automatické notifikace o změně stavu |
 | project_url | text | — | Link na živou verzi projektu (např. Vercel deploy) — zobrazí se klientovi i v emailu |
 | created_at | timestamptz | now() | Datum vytvoření |
-| updated_at | timestamptz | — | Datum poslední úpravy (nastavuje server action) |
+| updated_at | timestamptz | `now()` od migrace 143 | Datum poslední úpravy (nastavuje server action); starší řádky můžou mít NULL, kopie do `portal` bere `coalesce(updated_at, now())` |
 | lead_origin | text | `'vizeon'` | Odkud poptávka přišla — `vizeon` / `alteno` / `prvotka` / `jiny`, CHECK (migrace 050 jako `business`, přejmenováno 102) |
 | lead_confirmed | boolean | false | Potvrzená poptávka z webu — jeden příznak místo dvojice (migrace 102) |
 | lead_confirmed_at | timestamptz | — | Kdy se potvrdila; zapisuje trigger, u historie před 102 je NULL |
@@ -198,6 +198,12 @@ Rezervace konzultací, odesílá klient z portálu přes `submitConsultation`. `
 | contact_id | uuid | FK → contacts.id, ON DELETE SET NULL (migrace 104) |
 | calendar_event_id | uuid | FK → calendar_events.id, ON DELETE SET NULL (migrace 105) — párová událost, viz níže |
 | created_at | timestamptz | Datum vytvoření rezervace |
+
+**Zrušení z prostoru (migrace 144, R-156).** `portal.cancel_consultation` před smazáním rezervace zapíše do
+`consultation_cancellations` (`project_id`, `move_count`, `cancelled_at`; bez osobních údajů, řádky starší než den
+mizí při dalším zrušení). `portal.book_consultation` počítá zrušení téže zakázky z poslední hodiny do limitu
+10 rezervací za hodinu a nová rezervace do 15 minut po zrušení převezme počet přesunů — „Vrátit" tak strop pěti
+přesunů nevynuluje.
 
 **Rezervace je od AD10 vidět i v Hovorech (migrace 105).** `submitConsultation` zapíše rezervaci,
 kalendářní událost a zrcadlený kontakt **v jedné transakci** (`adminDb.batch`): nejdřív rezervaci,

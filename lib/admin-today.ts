@@ -2,6 +2,7 @@
 // Čisté funkce bez DB — dotazy jsou v lib/admin-today-queries.ts.
 
 import type { ForeignTotal } from '@/lib/money-currency'
+import { withPeriod } from '@/lib/ws/sentence'
 
 export interface TodayRequest {
   id: string
@@ -138,7 +139,7 @@ export function pickFocus(data: TodayData, now: Date = new Date()): TodayFocus |
     return {
       kind: 'draft',
       title: `${total} ${plural(total, 'hlášení čeká', 'hlášení čekají', 'hlášení čeká')} na schválení`,
-      detail: `Nejdřív ${draft.clientName}. Klient je uvidí až po schválení.`,
+      detail: `Nejdřív ${withPeriod(draft.clientName)} Klient je uvidí až po schválení.`,
       href: draft.href,
       cta: 'Schválit hlášení',
     }

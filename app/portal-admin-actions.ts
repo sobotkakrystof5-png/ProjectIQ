@@ -4,12 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { z } from 'zod'
 import { adminActorEmail, requireAuth } from '@/lib/auth'
+import { randomUUID } from 'crypto'
 import { sql } from '@/lib/db'
+import { adminDb, q, type AdminQuery } from '@/lib/admin/db'
 import { vizeonMailConfigured } from '@/lib/admin/vizeon-mail'
 import { generateInviteCode, inviteExpiry, InviteConfigError } from '@/lib/portal/invite'
 import { PORTAL_INVITE_DELAY_MS } from '@/lib/portal/invite-delay'
 import { deliverPortalInvite, type PortalInviteDelivery } from '@/lib/portal/project-access'
 import { isAdminEmail } from '@/lib/supabase/config'
+import { withPeriod } from '@/lib/ws/sentence'
 
 // Správa klientských prostorů z adminu (KP05). Běží vlastníkem tabulek (lib/db),
 // ne rolí portal_app. Každá akce začíná requireAuth().
@@ -31,19 +34,33 @@ function appUrl(): string {
 }
 
 /** Pozvánka vázaná na e-mail. Kód se vrací jen tady, v databázi je jen jeho HMAC. */
+function prepareInvite(
+  clientId: string,
+  email: string,
+  role: 'owner' | 'member',
+  createdBy: string,
+): { query: AdminQuery; url: string; expiresAt: Date } {
+  const { code, hash } = generateInviteCode()
+  const expires = inviteExpiry()
+  return {
+    query: q`
+      INSERT INTO portal.invites (client_id, code_hash, email, role, created_by, expires_at)
+      VALUES (${clientId}, ${hash}, ${email}, ${role}, ${createdBy}, ${expires.toISOString()})
+      RETURNING id
+    `,
+    url: `${appUrl()}/klient/pozvanka/${code}`,
+    expiresAt: expires,
+  }
+}
+
 async function insertInvite(
   clientId: string,
   email: string,
   role: 'owner' | 'member',
 ): Promise<{ id: string; url: string; expiresAt: Date }> {
-  const { code, hash } = generateInviteCode()
-  const expires = inviteExpiry()
-  const rows = await sql`
-    INSERT INTO portal.invites (client_id, code_hash, email, role, created_by, expires_at)
-    VALUES (${clientId}, ${hash}, ${email}, ${role}, ${await adminEmail()}, ${expires.toISOString()})
-    RETURNING id
-  `
-  return { id: String((rows[0] as { id: string }).id), url: `${appUrl()}/klient/pozvanka/${code}`, expiresAt: expires }
+  const invite = prepareInvite(clientId, email, role, await adminEmail())
+  const [rows] = await adminDb.batch([invite.query])
+  return { id: String((rows[0] as { id: string }).id), url: invite.url, expiresAt: invite.expiresAt }
 }
 
 export async function createPortalClient(name: string): Promise<Result<{ id: string }>> {
@@ -174,6 +191,7 @@ export async function inviteToClientSpace(
     const linked = await sql`SELECT client_id FROM portal.projects WHERE id = ${p.data}`
     let clientId = (linked[0] as { client_id: string } | undefined)?.client_id ?? null
     let unlinkOnUndo = false
+    let newClient: { id: string; name: string } | null = null
 
     if (!clientId) {
       // Stejný člověk = stejný klient, ať se jedna firma nerozpadne na víc prostorů.
@@ -195,56 +213,66 @@ export async function inviteToClientSpace(
         const name = String((named[0] as { name: string } | undefined)?.name ?? '')
         return {
           success: false,
-          error: `Tenhle e-mail už má prostor firmy ${name}. Zakázku tam uvidí všichni lidé z toho prostoru.`,
+          error: `Tenhle e-mail už má prostor firmy ${withPeriod(name)} Zakázku tam uvidí všichni lidé z toho prostoru.`,
           confirmClient: { id: clientId, name },
         }
       }
       if (!clientId) {
         const name = nameSchema.safeParse(input?.company?.trim() || project.client_name)
         if (!name.success) return { success: false, error: name.error.issues[0].message }
-        const created = await sql`INSERT INTO portal.clients (name) VALUES (${name.data}) RETURNING id`
-        clientId = String((created[0] as { id: string }).id)
+        newClient = { id: randomUUID(), name: name.data }
+        clientId = newClient.id
       }
-      await sql`SELECT portal.link_project(${clientId}, ${p.data})`
       unlinkOnUndo = true
     }
 
-    const member = await sql`
-      SELECT 1 FROM portal.members
-      WHERE client_id = ${clientId} AND lower(email) = ${email} AND removed_at IS NULL
-    `
-    let delivery: PortalInviteDelivery
-    if (member.length) {
-      if (!unlinkOnUndo) return { success: false, error: 'Tenhle člověk už v prostoru je a zakázku vidí.' }
-      delivery = {
-        mode: 'new_project',
-        projectId: p.data,
-        clientId,
-        inviteId: null,
-        email,
-        url: `${base}/klient/projekt/${p.data}`,
-        projectTitle: project.title,
-        expiresAt: null,
-      }
-    } else {
+    // Nový klient ještě nikoho nemá, takže se na členy nemusí ptát.
+    const [member, owners] = newClient
+      ? [[], []]
+      : await Promise.all([
+          sql`SELECT 1 FROM portal.members WHERE client_id = ${clientId} AND lower(email) = ${email} AND removed_at IS NULL`,
+          sql`SELECT 1 FROM portal.members WHERE client_id = ${clientId} AND removed_at IS NULL`,
+        ])
+    if (member.length && !unlinkOnUndo) return { success: false, error: 'Tenhle člověk už v prostoru je a zakázku vidí.' }
+
+    // Založení klienta, propojení zakázky a pozvánka jdou jednou transakcí:
+    // když cokoli selže, nezůstane po pokusu prázdný prostor ani napůl
+    // propojená zakázka.
+    const writes: AdminQuery[] = []
+    if (newClient) writes.push(q`INSERT INTO portal.clients (id, name) VALUES (${newClient.id}, ${newClient.name})`)
+    if (unlinkOnUndo) writes.push(q`SELECT portal.link_project(${clientId}, ${p.data})`)
+    const invite = member.length ? null : prepareInvite(clientId, email, owners.length ? 'member' : 'owner', await adminEmail())
+    if (invite) {
       // Nová pozvánka nahradí starou na stejný e-mail; platí vždy jen poslední odkaz.
-      await sql`
+      writes.push(q`
         UPDATE portal.invites SET revoked_at = now()
         WHERE client_id = ${clientId} AND lower(email) = ${email} AND used_at IS NULL AND revoked_at IS NULL
-      `
-      const owners = await sql`SELECT 1 FROM portal.members WHERE client_id = ${clientId} AND removed_at IS NULL`
-      const invite = await insertInvite(clientId, email, owners.length ? 'member' : 'owner')
-      delivery = {
-        mode: 'invite',
-        projectId: p.data,
-        clientId,
-        inviteId: invite.id,
-        email,
-        url: invite.url,
-        projectTitle: project.title,
-        expiresAt: invite.expiresAt,
-      }
+      `)
+      writes.push(invite.query)
     }
+    const results = await adminDb.batch(writes)
+
+    const delivery: PortalInviteDelivery = invite
+      ? {
+          mode: 'invite',
+          projectId: p.data,
+          clientId,
+          inviteId: String((results[results.length - 1][0] as { id: string }).id),
+          email,
+          url: invite.url,
+          projectTitle: project.title,
+          expiresAt: invite.expiresAt,
+        }
+      : {
+          mode: 'new_project',
+          projectId: p.data,
+          clientId,
+          inviteId: null,
+          email,
+          url: `${base}/klient/projekt/${p.data}`,
+          projectTitle: project.title,
+          expiresAt: null,
+        }
 
     const emailScheduled = vizeonMailConfigured()
     if (emailScheduled) {

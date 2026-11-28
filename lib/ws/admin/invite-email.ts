@@ -9,6 +9,7 @@
 
 import { SIGNATURE } from '@/lib/admin/meeting-email'
 import { escapeHtml } from '@/lib/security/html'
+import { withPeriod } from '@/lib/ws/sentence'
 
 // E-mailové klienty CSS proměnné neumí — hodnoty tokenů Dílků zapsané napřímo
 // (výjimka z „barvy natvrdo" jen pro e-maily, stejně jako `lib/portal/invite-email.ts`).
@@ -40,7 +41,7 @@ export function renderWsInviteEmail(input: WsInviteEmailInput): { subject: strin
   const button = 'Nastavit přístup'
   const intro = [
     'Dobrý den,',
-    `připravil jsem vám ZakazIQ pro ${name}. Najdete v něm poptávky z webu, kalendář, zákazníky a faktury na jednom místě.`,
+    `připravil jsem vám ZakazIQ pro ${withPeriod(name)} Najdete v něm poptávky z webu, kalendář, zákazníky a faktury na jednom místě.`,
     'Stačí kliknout na tlačítko a nastavit si přístup. Pokud už máte přístup do klientského prostoru, přihlaste se stejným e-mailem a pozvánku jen přijměte.',
   ]
   const outro = [

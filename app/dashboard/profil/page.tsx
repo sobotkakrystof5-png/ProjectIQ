@@ -61,10 +61,17 @@ async function loadStats() {
       FROM consultation_slots
     `,
     sql`
+      -- Známka 0–10 z dotazníku (R-119, project_surveys.nps) a ze starého
+      -- hodnocení v portálu (client_feedback, už se nepíše). Přes to_jsonb,
+      -- ať to funguje i bez migrace 118.
       SELECT
-        COUNT(*)::int AS total,
-        ROUND(AVG(nps), 1)::numeric AS avg_nps
-      FROM client_feedback
+        COUNT(x.nps)::int AS total,
+        ROUND(AVG(x.nps), 1)::numeric AS avg_nps
+      FROM (
+        SELECT (to_jsonb(s) ->> 'nps')::numeric AS nps FROM project_surveys s
+        UNION ALL
+        SELECT f.nps::numeric FROM client_feedback f
+      ) x
     `,
     sql`
       SELECT
@@ -238,7 +245,7 @@ export default async function ProfilPage(props: {
                 ))}
               </div>
               <span className="text-sm font-semibold text-ink tabular-nums">
-                {overallRating.toFixed(1)}
+                {overallRating.toFixed(1).replace('.', ',')}
               </span>
               <span className="text-xs text-quiet">
                 / 5 · průměr z {surveys.total} {surveys.total === 1 ? 'hodnocení' : 'hodnocení'}
@@ -419,7 +426,7 @@ export default async function ProfilPage(props: {
               <span className="text-sm text-quiet">Průměrné NPS</span>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-semibold tabular-nums">
-                  {feedback.avg_nps !== null ? Number(feedback.avg_nps).toFixed(1) : '—'}
+                  {feedback.avg_nps !== null ? Number(feedback.avg_nps).toFixed(1).replace('.', ',') : '—'}
                 </span>
                 {feedback.avg_nps !== null && (
                   <span className={`text-xs font-medium ${npsColor}`}>({npsLabel})</span>

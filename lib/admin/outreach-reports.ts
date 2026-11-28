@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/admin/db'
 import type { ReportPayload } from '@/types/outreach-report'
 import { callRecord, callsUpsertQuery } from '@/lib/admin/outreach-calls'
 import type { AnalysisCall, DayReport, DayTrend } from '@/lib/admin/outreach-analysis'
+import { pgDate } from '@/lib/pg-date'
 
 /**
  * Denní reporty hovorů z Growth OS (R-118).
@@ -21,8 +22,7 @@ function iso(v: unknown): string | null {
 }
 
 function day(v: unknown): string {
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v).slice(0, 10)
+  return pgDate(v) ?? ''
 }
 
 function num(v: unknown): number | null {

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { listPortalClients } from '@/lib/portal/admin-queries'
 import { CreateClientForm } from '@/components/admin/portal-client-forms'
 import { formatDate } from '@/lib/utils'
+import { plural } from '@/lib/ws/plural'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ export default async function PortalClientsPage() {
                   >
                     <span className="font-medium text-ink">{c.name}</span>
                     <span className="font-num text-xs text-quiet">
-                      {c.members} členů · {c.projects} zakázek · od {formatDate(c.created_at)}
+                      {plural(c.members, ['člen', 'členové', 'členů'])} · {plural(c.projects, ['zakázka', 'zakázky', 'zakázek'])} · od {formatDate(c.created_at)}
                     </span>
                   </Link>
                 </li>

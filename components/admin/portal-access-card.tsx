@@ -13,9 +13,9 @@ import { inviteToClientSpace, revokeInvite, undoClientSpaceInvite } from '@/app/
 import { PORTAL_INVITE_DELAY_MS } from '@/lib/portal/invite-delay'
 import type { ProjectPortalAccess } from '@/lib/portal/project-access'
 import { formatDate } from '@/lib/utils'
+import { withPeriod } from '@/lib/ws/sentence'
 
 /** „Novák s.r.o." už tečku má, druhou za ni nepřidávat. */
-const withPeriod = (s: string): string => (s.trim().endsWith('.') ? s.trim() : `${s.trim()}.`)
 
 /**
  * Klientský prostor u zakázky (KP11, R-121): pozvat klienta jedním klikem,

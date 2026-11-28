@@ -8,6 +8,7 @@ import { createNotification } from '@/lib/notifications'
 import { sendVizeonMail } from '@/lib/admin/vizeon-mail'
 import { SIGNATURE } from '@/lib/admin/meeting-email'
 import { escapeHtml as esc } from '@/lib/security/html'
+import { pgDate } from '@/lib/pg-date'
 
 /**
  * Schránka Zprávy v adminu (KP15, R-122, R-123). Čte vlastníkem tabulek přes
@@ -91,7 +92,7 @@ export async function loadAdminThread(projectId: string): Promise<AdminThread | 
       clientName: String(h.client_name),
       status: String(h.status),
       progress: Number(h.progress ?? 0),
-      deadline: h.deadline ? String(h.deadline).slice(0, 10) : null,
+      deadline: pgDate(h.deadline),
       clientLastSeen: at(h.client_seen),
     },
     messages: toChatMessages(messageRows, requestRows),
