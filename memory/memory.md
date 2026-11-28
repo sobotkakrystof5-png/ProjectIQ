@@ -5,8 +5,9 @@
 > **Poslední aktualizace:** 2026-11-28 · **Navrhovač: firma zadaná v Nabídkách, ukázka a rozbor ceny** (R-160):
 > v Nabídkách se zadá web, IČO nebo název a ZakazIQ sám založí kontakt, pustí rozbor a připraví nabídku. U nabídky
 > se vybere cenová nabídka, ukázka webu (staví Growth OS, firma od robota ji má hotovou), nebo obojí, a předepsaný
-> e-mail odejde jedním kliknutím. Ke každé nabídce rozbor ceny jen pro Kryštofa. Na větvi `admin/nabidky-tok`,
-> **nenasazené**, migrace 145 nikde, strana Growth OS je zadání.
+> e-mail odejde jedním kliknutím. Ke každé nabídce rozbor ceny jen pro Kryštofa (pásmo podle přínosu za měsíc z R-157).
+> **Na produkci od 2026-11-28 (`6c66642`) i s migrací 145**; ukázku od robota jde poslat hned, novou ukázku Growth OS
+> zatím nepostaví (jeho strana je zadání, chybí `GROWTH_OS_DEMO_URL` a `GROWTH_OS_DEMO_KEY`). Za přihlášením nikdo neviděl.
 >
 > Předchozí: 2026-11-28 · **Ochrana proti SQL injection a prompt injection** (R-160, DECISIONS #062):
 > hlídací testy `sql-guard` a `prompt-guard` nad zdrojákem, escapování `LIKE` na jednom místě, cizí text pro model
@@ -255,9 +256,8 @@ skill `zakaziq-rozbor-firmy`, migrace 137. Na produkci od 2026-11-26, **zkouška
 stránka `/nabidka/<token>`, výsledek a vyhodnocení. **N3 doplněné 2026-11-28** (větev `admin/nabidky-n3`):
 podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty. **R-157 na produkci 2026-11-28** (pásmo podle
 přínosu za měsíc). **N4 na produkci od 2026-11-28 (R-158, `159b8de`):** rozbor se spouští sám
-(souhlas firmy, poptávka z webu) a vstupy nabídky ze schůzky ve Voice. **R-160 v kódu 2026-11-28** (větev `admin/nabidky-tok`): firma se zadá v Nabídkách, ukázka webu od Growth OS,
-odeslání nabídky, ukázky nebo obojího jedním kliknutím, rozbor ceny jen pro Kryštofa; čeká migrace 145, nasazení
-a strana Growth OS. Dál: první
+(souhlas firmy, poptávka z webu) a vstupy nabídky ze schůzky ve Voice. **R-160 na produkci od 2026-11-28 (`6c66642`, migrace 145):** firma se zadá v Nabídkách, ukázka webu od Growth OS,
+odeslání nabídky, ukázky nebo obojího jedním kliknutím, rozbor ceny jen pro Kryštofa; čeká strana Growth OS. Dál: první
 skutečná nabídka (Otevřené problémy) a první měsíční vyhodnocení, až nabídky poběží měsíc.
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
@@ -2138,9 +2138,8 @@ bezpečnost DECISIONS #061, plán oddíl 14.
   zvonek; bez webu → věta v upozornění o poptávce; firma od asistenta, která řekne ano → rozbor; kontakt se schůzkou
   ve Voice → u konceptu Ze schůzky → Načíst → Použít → Uložit. Hlídat spotřebu limitu předplatného (až 10
   automatických rozborů denně) a jestli spam z formulářů nezakládá kontakty · od 2026-11-28
-- [ ] **Navrhovač: nová nabídka a ukázka (R-160) — nasadit a dopojit:** kód na větvi `admin/nabidky-tok`
-  (worktree `.claude/worktrees/n1-zkouska`), na produkci není. Zbývá: (1) migrace 145 na produkci (aditivní, bez ní
-  jde poslat jen ukázka od robota), (2) push na `main` se souhlasem, (3) strana Growth OS podle zadání
+- [ ] **Navrhovač: nová nabídka a ukázka (R-160) — dopojit Growth OS a projít:** ~~(1) migrace 145 na produkci~~
+  (2026-11-28, Neon MCP, v evidenci), ~~(2) push na `main`~~ (2026-11-28, `6c66642`). Zbývá: (3) strana Growth OS podle zadání
   `new - area of zakaziq/prompty/admin/growth-os-ukazka-k-nabidce.md` (vstup pro žádost, stavba bez e-mailu,
   hlášení zpět), pak `GROWTH_OS_DEMO_URL` a `GROWTH_OS_DEMO_KEY` do Vercelu, (4) projít naživo: Nabídky › Nová
   nabídka s webem firmy → karta kontaktu → koncept → „Jak je cena složená" → u firmy s ukázkou od robota (Kovarson,
@@ -2616,7 +2615,9 @@ bezpečnost DECISIONS #061, plán oddíl 14.
   `components/admin/offers/proposal-{card,section}.tsx`.
 - **feat** Ukázka webu od Growth OS: `lib/admin/offers/demo.ts`, `POST /api/public/nabidky/ukazka`,
   `requestDemoAction`/`demoStatusAction`, upozornění `offer_demo`, úklid v cronu `send-reminders`.
-- **db** Migrace 145 `navrhovac_ukazka` — tabulka `offer_demos` (aplikována: ne, nikde).
+- **db** Migrace 145 `navrhovac_ukazka` — tabulka `offer_demos` (aplikována: produkce 2026-11-28 přes Neon MCP v jedné
+  transakci na souhlas Kryštofa, zapsaná v `public.schema_migrations` s otiskem souboru; ověřeno 10 sloupců, cizí klíč
+  s kaskádou, 2 indexy, 0 řádků; testovací Neon ne).
 - **docs** `docs/admin/AGENTS-ADMIN.md`, plán oddíl 14, `.env.example` a reference (`GROWTH_OS_DEMO_URL`,
   `GROWTH_OS_DEMO_KEY`), DECISIONS #061, STATE, AUDIT-LOG, zadání pro autopilota
   `new - area of zakaziq/prompty/admin/growth-os-ukazka-k-nabidce.md`.
@@ -2630,6 +2631,14 @@ bezpečnost DECISIONS #061, plán oddíl 14.
   zakázky za měsíc × cena zakázky, podle čeho se pásmo vybralo, za kolik měsíců tržby pokryjí cenu, rada zeptat se
   na počet zakázek; editor posílá do rozboru i rozpracovaný počet. Nové 3 testy v `navrhovac-analyza-ceny`.
   Hlídací test `sql-guard` z #062 našel ruční vzor `LIKE` v `contactByRobotWeb`, opraveno na `likeContains()`.
+- **chore** Ověřeno po přeskládání: `npx tsc --noEmit`, celá sada 2335 testů prošla (0 selhání), `npm run build`
+  (cesta `/api/public/nabidky/ukazka` v seznamu), `sync-agent-context --check`.
+- **chore** **Na produkci** 2026-11-28: migrace 145 přes Neon MCP, pak push `d3e6bba..6c66642` (fast-forward), nasazení
+  `dpl_48HR…` Ready (`fra1`). Veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200; `/dashboard`,
+  `/dashboard/nabidky`, `…/pravidla`, `/dashboard/kontakty` 307; `/nabidka/<uuid>` a `/p/<nesmysl>` 404;
+  `POST /api/public/nabidky/ukazka` bez klíče i se špatným klíčem 401, s `Origin` 403, GET 405; rozbory a cron bez
+  klíče 401; 30 min bez běhových chyb. Oprava skillu z N1 (falešné vady webu z cloudu) teď platí, úloha čte skill
+  z `main`. Pět konceptů ze zkoušky N1 zůstává (rozhodl Kryštof), text Reality Dvořák opraví ručně před odesláním.
 
 ### 2026-11-28 (ochrana proti SQL injection a prompt injection, R-159)
 - **feat** SQL: `lib/security/sql.ts` (`likeContains`, `likePrefix`, `pickAllowed`, `assertSqlIdentifier`), hledání
