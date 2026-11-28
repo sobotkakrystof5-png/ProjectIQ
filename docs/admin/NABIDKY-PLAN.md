@@ -9,7 +9,7 @@
 > Stav: **N0 hotové** (2026-11-25, pravidla v oddílu 5). **N1 na produkci** (2026-11-26, migrace 136 a 137),
 > naostro nevyzkoušené. **N2–N4 na produkci** (2026-11-27, `afe75fc`, migrace 142, R-155), naostro nevyzkoušené.
 > 2026-11-28 Kryštof potvrdil Plus a e-shop a rozhodl, že pásmo určuje **přínos webu za měsíc** (zakázky z webu
-> za měsíc × cena zakázky, R-157); v kódu na větvi `admin/nabidky-n3`, nenasazené.
+> za měsíc × cena zakázky, R-157); na produkci od 2026-11-28 (`eed30ca`), naostro nevyzkoušené.
 
 ## 1. Proč a co z toho má být
 

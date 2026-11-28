@@ -5,12 +5,13 @@
 > **Poslední aktualizace:** 2026-11-28 · **Cena nabídky podle přínosu webu za měsíc** (R-157): Kryštof potvrdil
 > horní meze Plus a rozdělení e-shopu a rozhodl, že pásmo ceny určuje zakázky z webu za měsíc × cena jedné zakázky
 > (bez počtu zakázek jako dřív cena zakázky). Editor nabídky má pole „Zakázek z webu za měsíc", pravidla druhou řadu
-> hranic. Bez migrace. Ověřeno testy, `tsc` a buildem; za přihlášením ne. Větev `admin/nabidky-n3`, nenasazené.
+> hranic. Bez migrace. **Na produkci od 2026-11-28 (`eed30ca`)** spolu s N3; veřejně ověřeno, bez běhových chyb,
+> za přihlášením nikdo neviděl.
 >
 > Předchozí: 2026-11-28 · **Navrhovač nabídek N3 doplněný** (R-155): v konceptu nabídky blok
 > Podobné nabídky (dřívější nabídky jiným firmám se stejným oborem nebo pásmem, s cenou a výsledkem) a ve vyhodnocení
 > `/dashboard/nabidky` úspěšnost podle podílu ceny z odhadovaného ročního přínosu. Bez migrace. Ověřeno testy, `tsc`,
-> buildem a vzhledem na dočasné stránce (390 a 1280 px); za přihlášením ne. Větev `admin/nabidky-n3`.
+> buildem a vzhledem na dočasné stránce (390 a 1280 px); za přihlášením ne. Na produkci od 2026-11-28 (`f2dc993`).
 >
 > Předchozí: 2026-11-28 · **Opravy z testu klientského prostoru** (R-156): pozvání čerstvé zakázky,
 > název zakázky u klienta, tlačítka v řádku výpisu, posun data o den, NPS v Profilu, „Vrátit" u konzultace a drobnosti.
@@ -1993,7 +1994,7 @@ při čtení (`normalizeInputs`). Upřesňuje R-147 a R-155 (pásmo už není je
   a název zakázky „firma · druh práce", odkaz ve zprávě chatu je klikací · od 2026-11-28
 - [ ] **Navrhovač nabídek N2–N4 (R-155) — vyzkoušet naostro:** ~~(1) migrace 142 na produkci~~ (2026-11-27, Neon MCP,
   v evidenci), ~~(2) sloučit do `main` a nasadit~~ (2026-11-27, `afe75fc`), ~~(3) projít Nabídky › Cenová pravidla~~
-  (2026-11-28: Plus a e-shop potvrzené, pásmo podle přínosu za měsíc R-157 v kódu na `admin/nabidky-n3`, čeká nasazení;
+  (2026-11-28: Plus a e-shop potvrzené, pásmo podle přínosu za měsíc R-157 na produkci od 2026-11-28 `eed30ca`;
   editor a formulář pravidel za přihlášením neviděné), (4) první skutečná nabídka: rozbor firmy → koncept →
   upravit → Poslat nabídku na vlastní e-mail → otevřít odkaz na telefonu → vybrat variantu → zvonek, (5) karta
   i stránka za přihlášením na 390 a 1280 px. Cloudová úloha čte skill z `main`, odhad hodnoty posílá od nasazení
@@ -2522,6 +2523,11 @@ při čtení (`normalizeInputs`). Upřesňuje R-147 a R-155 (pásmo už není je
 - **chore** Ověřeno: `npx tsc --noEmit`, `admin-navrhovac-nabidky.test.ts` 37/37 (7 nových: pásmo podle přínosu,
   záloha podle ceny zakázky, počet z odhadu, příklady z volby, hranice v pravidlech, ruční počet v editoru, starý
   koncept), testy rozboru, tříd adminu a XSS 83/83, `npm run build:check`. **Editor a pravidla v prohlížeči neviděné.**
+- **chore** **Na produkci** 2026-11-28: N3 a R-157 přeskládané na `main` (konflikty jen v paměti, obě strany zůstaly),
+  celá sada 2 231 testů, `tsc` a `npm run build:check` prošly; push `a269a83..eed30ca`, nasazení `dpl_84TW…` Ready
+  (`fra1`). Veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard/nabidky`, `…/pravidla`
+  a `/dashboard/kontakty` 307, `/nabidka/<uuid>` 404 s `noindex` a CSP, `/p/<nesmysl>` 404, cron 401; bez běhových
+  chyb. Uložená pravidla v produkci nejsou, platí nové výchozí. Cloudová úloha rozborů čte skill z `main` od teď.
 
 ### 2026-11-28 (navrhovač nabídek N3 — podobné nabídky a podíl z hodnoty, R-155)
 - **feat** Koncept nabídky na kartě kontaktu má blok **Podobné nabídky**: nejvýš tři dřívější odeslané nabídky
