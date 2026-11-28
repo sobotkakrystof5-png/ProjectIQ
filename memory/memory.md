@@ -2,7 +2,14 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-28 · **Cena nabídky podle přínosu webu za měsíc** (R-157): Kryštof potvrdil
+> **Poslední aktualizace:** 2026-11-28 · **Navrhovač nabídek N4** (R-158): rozbor firmy se spustí sám, když firma
+> od AI asistenta řekne ano a po poptávce z webu s webem firmy nebo firemním e-mailem (nejvýš 10 denně, kontakt
+> jednou za rok); když není podle čeho hledat, strop je vyčerpaný nebo úloha nic nenajde, přijde upozornění.
+> U konceptu nabídky blok Ze schůzky: poslední schůzka ze ZakazIQ Voice a návrhy vstupů s citací z přepisu,
+> použité až kliknutím. Bez migrace. Ověřeno testy, `tsc` a vzhledem na dočasné stránce (390 a 1280 px);
+> za přihlášením a naostro ne. Větev `admin/nabidky-n4`.
+>
+> Předchozí: 2026-11-28 · **Cena nabídky podle přínosu webu za měsíc** (R-157): Kryštof potvrdil
 > horní meze Plus a rozdělení e-shopu a rozhodl, že pásmo ceny určuje zakázky z webu za měsíc × cena jedné zakázky
 > (bez počtu zakázek jako dřív cena zakázky). Editor nabídky má pole „Zakázek z webu za měsíc", pravidla druhou řadu
 > hranic. Bez migrace. **Na produkci od 2026-11-28 (`eed30ca`)** spolu s N3; veřejně ověřeno, bez běhových chyb,
@@ -227,8 +234,11 @@ na Managed Agents byla na produkci (`7380078`, migrace 136), nikdy se nespustila
 skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Otevřené problémy), zkouška na 5 firmách
 (Kryštof souhlasil 2026-11-26). **N2–N4 na produkci od 2026-11-27 (`afe75fc`, R-155, migrace 142):** návrh nabídky,
 stránka `/nabidka/<token>`, výsledek a vyhodnocení. **N3 doplněné 2026-11-28** (větev `admin/nabidky-n3`):
-podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty. Dál: cenová pravidla s Kryštofem, první skutečná
-nabídka (Otevřené problémy) a první měsíční vyhodnocení, až nabídky poběží měsíc.
+podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty. **R-157 na produkci 2026-11-28** (pásmo podle
+přínosu za měsíc). **N4 dokončené v kódu 2026-11-28 (R-158, větev `admin/nabidky-n4`):** rozbor se spouští sám
+(souhlas firmy, poptávka z webu) a vstupy nabídky ze schůzky ve Voice. Zkouška N1 na 5 firmách je hotová na větvi
+`admin/nabidky-tok` (worktree `n1-zkouska`, `758d106`, jen dokumentace a skill), na `main` zatím není. Dál: první
+skutečná nabídka (Otevřené problémy) a první měsíční vyhodnocení, až nabídky poběží měsíc.
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
 (34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
@@ -1984,6 +1994,22 @@ zámečník 10 zakázek × 4 000 Kč → Doporučená 22 000 místo 14 000). Hra
 **Důsledek:** odhad poptávek a podílu v rozboru (skill `zakaziq-rozbor-firmy`) teď přímo hýbe cenou, proto
 v něm pokyn odhadovat střízlivě podle kapacity firmy. Bez migrace; koncepty uložené dřív dostanou počet zakázek
 při čtení (`normalizeInputs`). Upřesňuje R-147 a R-155 (pásmo už není jen podle ceny zakázky). Plán oddíl 5.3 a 12.
+
+### R-158 · Rozbor firmy se spouští sám, vstupy nabídky navrhne AI ze schůzky (2026-11-28)
+**Rozhodnutí:** (1) Rozbor firmy se spustí bez tlačítka, když firma od AI asistenta nově řekne ano, a po každé
+poptávce z webu vizeon.cz, alteno.cz a prvotka.cz. (2) Když není podle čeho hledat (poptávka bez webu firmy
+a bez e-mailu na vlastní doméně, kontakt bez webu a IČO), rozbor se nespustí a přijde upozornění; stejně když
+úloha o firmě nic spolehlivého nenajde nebo nedoběhne. (3) U konceptu nabídky AI z přepisu poslední schůzky ve
+Voice navrhne cenu jedné zakázky klienta, web / e-shop, jazyky, spěch a rozpočet, každé s citací; do nabídky jde
+až kliknutím. Výklad agenta: strop 10 automatických rozborů za 24 h uvnitř 15, kontakt sám nejvýš jednou za rok,
+u poptávky z webu jeden zvonek s větou místo dvou, firmy se souhlasem z doby před N4 se samy nespouštějí.
+**Proč:** Kryštof 2026-11-28 („když firma řekne ano i nová poptávka z webu, když nebude možné nic najít, vykašli
+se na to a dej mi oznámení v ZakazIQ"; u schůzek vybral „AI navrhne vstupy").
+**Důsledek:** **mění D-N1 z R-147** (dřív jen ručně). Poptávka z webu s webem firmy nově zakládá kontakt
+(`source = 'web'`) a napojí na něj poptávku; existujícímu kontaktu nic nedoplní (`fillMissing: false`). Přepis
+schůzky jde do modelu ze serveru, ne do cloudové úlohy s webem (DECISIONS #056, #058 doplnění). Rozbory ukrajují
+z limitu předplatného víc (zkouška N1: ~2–2,7 min a ~540 tisíc tokenů subagentů na rozbor). Technika
+`docs/admin/AGENTS-ADMIN.md` → N4, plán oddíl 13.
 ---
 
 ## 3. Otevřené problémy
@@ -2051,6 +2077,11 @@ při čtení (`normalizeInputs`). Upřesňuje R-147 a R-155 (pásmo už není je
   s vymyšlenými zařízeními (1280 a 390 px, bez přetečení, plochy ≥ 44 px, konzole bez chyb). Projít
   s přihlášením: Přidat zařízení → klíč ukázaný jednou, po obnovení stránky už ne → Zneplatnit → Zpět.
   Blok s klíčem okem nikdo neviděl (stejné třídy jako klíč webu, KP17) · od 2026-11-26
+- [ ] **Navrhovač N4 (R-158) — nasadit a projít naživo:** větev `admin/nabidky-n4` (worktree
+  `.claude/worktrees/nabidky-n4`). Projít: zkušební poptávka z vizeon.cz s webem firmy → kontakt, rozbor sám,
+  zvonek; bez webu → věta v upozornění o poptávce; firma od asistenta, která řekne ano → rozbor; kontakt se schůzkou
+  ve Voice → u konceptu Ze schůzky → Načíst → Použít → Uložit. Hlídat spotřebu limitu předplatného (až 10
+  automatických rozborů denně) a jestli spam z formulářů nezakládá kontakty · od 2026-11-28
 - [ ] **Navrhovač nabídek N1 (R-149) — dozapojit a vyzkoušet:** ~~migrace 137 a nasazení~~ (2026-11-26),
   ~~úloha „Rozbor firem pro nabídky" a `OFFER_RESEARCH_ROUTINE_ID`~~ (2026-11-26), ~~network secret v prostředí
   „ZakazIQ most Wispr"~~ (2026-11-27, klíč z Klíčenky, běh dostal 200), ~~spouštěč API a `OFFER_RESEARCH_FIRE_TOKEN`~~
@@ -2507,6 +2538,25 @@ při čtení (`normalizeInputs`). Upřesňuje R-147 a R-155 (pásmo už není je
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-28 (navrhovač nabídek N4 — rozbor sám a vstupy ze schůzky, R-158)
+- **feat** Rozbor firmy se spouští sám: po souhlasu firmy od asistenta (`consented` z `ingestOutreachLeads`,
+  `after()` v `app/api/public/outreach/route.ts`) a po poptávce z webu (`researchAfterWebLead` v `lib/web-leads.ts`,
+  kontaktní formulář i objednávka). Bez čeho hledat, při stropu (10 za 24 h) nebo vzdaném a nedoběhlém rozboru
+  upozornění `offer_research_skipped` / `offer_research_failed`; bez webu jen věta v upozornění o poptávce. Karta
+  rozboru ukáže „spuštěno samo". Skill `zakaziq-rozbor-firmy`: vzdát se, když o firmě nic spolehlivého není.
+  Soubory: `lib/admin/offers/{auto-research,research}.ts`, `lib/admin/outreach.ts`, `lib/notifications.ts`,
+  `components/{NotificationList,admin/offers/research-card}.tsx`. Bez migrace.
+- **feat** U konceptu nabídky blok Ze schůzky: poslední schůzka ze ZakazIQ Voice s kontaktem, „Načíst ze schůzky"
+  (model `smart`), návrhy s citací prověřené proti přepisu, „Použít" do editoru. Soubory:
+  `lib/admin/offers/{meeting-hints,meeting-hints-check}.ts`, `app/offer-meeting-actions.ts`,
+  `components/admin/offers/{meeting-hints,proposal-card,proposal-section}.tsx`.
+- **fix** `ensureContact(..., fillMissing: false)` pro poptávky z webu: kdo zná telefon klienta, nepřilepí na jeho
+  kontakt svůj e-mail (nález bezpečnostní kontroly, AUDIT-LOG 2026-11-28). DECISIONS #056 a #058 doplnění.
+- **chore** Ověřeno: `npx tsc --noEmit`, celá sada 2 252 testů (nový `admin-navrhovac-n4.test.ts`, 20 testů nad
+  PGlite s migracemi 136–139; test souhlasu v `admin-kontakt-jeden-zdroj`), vzhled bloku na dočasné stránce
+  s vymyšlenými daty na 390 a 1280 px (bez přetečení; stránka smazaná). Model ani úloha naostro nevolané.
+  Worktree `nabidky-n4` z `main`; worktree `nabidky-n3` mezitím použilo sezení R-157, N3 šlo na produkci s ním.
 
 ### 2026-11-28 (navrhovač nabídek — cena podle přínosu webu za měsíc, R-157)
 - **feat** Pásmo ceny nabídky určuje přínos webu za měsíc = zakázky z webu za měsíc × cena jedné zakázky (hranice

@@ -2025,3 +2025,37 @@ nabídky nesou snímek (`inputs.terms`, `sent_variants`) a nemění se.
 a `offer_review_period`, trigger na `projects`, `purge_offer_proposals()` (bez zakázky 12 měsíců, cron
 `client-retention`). Bez migrace se karta ani přehled neukáží, rozbor běží dál. Testy
 `lib/__tests__/admin-navrhovac-nabidky.test.ts`.
+
+## Navrhovač nabídek: samo spuštěný rozbor a vstupy ze schůzky (R-158, krok N4)
+
+Plán `docs/admin/NABIDKY-PLAN.md`, oddíl 13. Bez migrace.
+
+**Samo spuštěný rozbor** (`lib/admin/offers/auto-research.ts`). Mění D-N1: rozbor se spustí i bez tlačítka.
+- Firma od asistenta: `ingestOutreachLeads` vrací v `consented` kontakty firem, které ano řekly až v tomhle snímku
+  (`syncContacts`, příznak `newlyConsented`); `app/api/public/outreach/route.ts` je po odpovědi (`after()`) pošle
+  do `autoResearchAfterConsent`.
+- Poptávka z webu: `lib/web-leads.ts` (kontaktní formulář i objednávka) po odpovědi zavolá `researchAfterWebLead`.
+  Web z formuláře (`companyUrl` přes `safeHttpUrl`), jinak z e-mailu na vlastní doméně (`webFromEmail`). Bez webu
+  nic nezaloží; `webLeadResearchNote` připíše větu „Rozbor firmy se nespustil…" do upozornění `web_lead`. S webem
+  `ensureContact(..., source: 'web', fillMissing: false)` (existujícímu kontaktu nic nedoplní, DECISIONS #056 g),
+  `projects.contact_id` u poptávky a rozbor s `companyHint` = doména webu.
+- `autoStartResearch`: ticho, když kontakt (i sloučený) rozbor za 365 dní měl nebo ho má rozběhnutý; jinak
+  `hasSomethingToSearch` (web nebo IČO; firma od asistenta vždy), strop `AUTO_DAILY_LIMIT` 10 za 24 h (řádky
+  s `brief.trigger`) uvnitř `DAILY_RUN_LIMIT` 15, pak `startResearch` s `trigger`. Nespuštěný rozbor = upozornění
+  `offer_research_skipped` s odkazem na kontakt. `brief.trigger` do úlohy nejde (`briefForRoutine`); karta rozboru
+  ukáže „spuštěno samo po souhlasu firmy / po poptávce z webu".
+- Neúspěch: `failResearch` (`gave_up`) i `maintainOfferResearch` (`timeout`, `not_started`) volají
+  `notifyResearchFailed` → `offer_research_failed` (nejvýš 5 najednou). Skill `zakaziq-rozbor-firmy` se vzdá,
+  když o firmě nic spolehlivého nenajde.
+
+**Ze schůzky** (`lib/admin/offers/meeting-hints.ts`, `meeting-hints-check.ts`, `app/offer-meeting-actions.ts`,
+`components/admin/offers/meeting-hints.tsx`). `ProposalSection` ke konceptu načte `latestMeetingForContact`:
+poslední `voice_meetings` se `status = 'done'` a aspoň jednou promluvou `ok`, přiřazená ke kontaktu nebo kontaktu
+do něj sloučenému (bez tabulek Voice `null`). Blok ukáže název, datum, shrnutí a dohody z uloženého shrnutí.
+„Načíst ze schůzky" → `meetingHintsAction` → `hintsForProposal` (jen koncept) → `loadMeeting` → `extractMeetingHints`
+(role `smart`, `effort: low`, přepis v `<prepis>` přes `escapeTranscript`, výstup `{ hints: [{ field, value, quote }] }`).
+`checkHints` pustí jen pole `typical_job`, `kind`, `languages` (1–3), `rush` (`ano`), `budget`, každé jednou,
+s citací, která v přepisu je (`foldForQuote`, `quoteInTranscript`), a u částky jen číslo, které v citaci zaznělo
+(`quoteHasAmount` nad `sourceNumberValues` z Voice, i „60 tisíc"). Cena volání se přičte k `voice_meetings.cost_usd`.
+„Použít" nastaví pole editoru (`HintPatch`), rozpočet je jen pro informaci; uloží se s konceptem. Testy
+`lib/__tests__/admin-navrhovac-n4.test.ts`.

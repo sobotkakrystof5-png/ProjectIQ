@@ -11,7 +11,8 @@ import { createProposalAfterResearch } from './proposals'
  *
  * Po odevzdání se rovnou připraví návrh nabídky (`proposals.ts`, N2).
  *
- * Tok: Kryštof u kontaktu klikne → `startResearch` založí řádek ve frontě
+ * Tok: Kryštof u kontaktu klikne (nebo se rozbor spustí sám, `auto-research.ts`,
+ * R-158) → `startResearch` založí řádek ve frontě
  * (`queued`) a spustí cloudovou úlohu Claude Code (`fireRoutine`) → úloha si
  * přes `POST /api/public/rozbory` řádek vyzvedne (`claimResearch`, `running`),
  * pustí subagenty na web firmy a rešerši → výsledek pošle na

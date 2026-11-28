@@ -10,6 +10,8 @@
 > naostro nevyzkoušené. **N2–N4 na produkci** (2026-11-27, `afe75fc`, migrace 142, R-155), naostro nevyzkoušené.
 > 2026-11-28 Kryštof potvrdil Plus a e-shop a rozhodl, že pásmo určuje **přínos webu za měsíc** (zakázky z webu
 > za měsíc × cena zakázky, R-157); na produkci od 2026-11-28 (`eed30ca`), naostro nevyzkoušené.
+> **N4 dokončené v kódu 2026-11-28 (R-158):** rozbor se spouští sám (souhlas firmy od asistenta, poptávka z webu)
+> a u konceptu nabídky jsou návrhy vstupů ze schůzky ve Voice (oddíl 13).
 
 ## 1. Proč a co z toho má být
 
@@ -62,7 +64,8 @@ u dvou třetin nabídek za poslední 3 měsíce (měří N3).
 
 ## 4. Jak to funguje
 
-Spouštěč: tlačítko **„Připravit nabídku"** u kontaktu, u firmy od asistenta a v Hovorech (D-N1).
+Spouštěč: tlačítko **„Připravit nabídku"** u kontaktu, u firmy od asistenta a v Hovorech (D-N1). Od N4 (R-158)
+se rozbor spustí i sám: když firma od asistenta řekne ano a po poptávce z webu (oddíl 13).
 Na pozadí běží:
 
 1. **Rozbor webu**: stáhne web firmy (úvod a podstránky do limitu). Výstup: jestli web je, v jakém
@@ -292,10 +295,11 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | Prompt injection ze staženého webu | Agenti nemají zapisovací nástroje, výstup jen přes schéma |
 | Kotvení: Kryštof bere návrh bez přemýšlení | Předpoklady vždy viditelné; vyhodnocení v N3 |
 | Cena mimo pravidla | Spodní a horní hranice, kontrola na konci kroku 4 |
-| Náklady | Spouští se ručně (D-N1); strop počtu běhů za den |
+| Náklady | Strop 15 rozborů za den, z toho nejvýš 10 automatických (R-158); kontakt sám nejvýš jednou za rok |
 | Web firmy blokuje stahování | Rozbor pokračuje bez něj a řekne to; žádné obcházení |
 | Data u Anthropicu (běhy úlohy na claude.ai) | Do úlohy jdou jen veřejné firemní údaje; běhy zůstávají v účtu Kryštofa, DECISIONS #056 |
-| Rozbory ukrajují z limitu předplatného | Strop 15 za den, nejvýš 5 za běh, spouští se ručně (D-N1) |
+| Rozbory ukrajují z limitu předplatného | Strop 15 za den (automaticky nejvýš 10), nejvýš 5 za běh; jeden rozbor ~2–2,7 min a ~540 tisíc tokenů subagentů (zkouška N1 na 5 firmách 2026-11-28) |
+| Formulář na webu spustí rozbor cizí adresy | Jen za Turnstile a klíčem webu, úloha bez klíče k ZakazIQ, výstup přes `normalizeResult`, strop 10 automatických denně (DECISIONS #056 f) |
 
 ## 9. Kroky
 
@@ -305,13 +309,13 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
 | **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | v kódu 2026-11-27 (migrace 142 na produkci); stránka ověřená na 390 a 1280 px s vymyšlenými daty; porovnání s minulými nabídkami v oddílu 12.1 (6 nabídek z Gmailu, ne zakázky z databáze); na produkci od 2026-11-27 (`afe75fc`), čeká první skutečná nabídka |
 | **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | v kódu 2026-11-27; 2026-11-28 doplněné podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty (oddíl 6); čeká první vyhodnocení po měsíci provozu |
-| **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; přepisy schůzek do rozboru nejdou (DECISIONS #056), rozhodne Kryštof |
+| **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; **2026-11-28 (R-158)** automatické spuštění (souhlas firmy, poptávka z webu) a návrhy vstupů ze schůzky ve Voice (oddíl 13); naostro nevyzkoušené |
 
 ## 10. Rozhodnutí
 
 | # | Otázka | Rozhodnuto (2026-11-25) |
 |---|---|---|
-| D-N1 | Spouštět ručně, nebo automaticky po souhlasu firmy? | **Ručně tlačítkem** |
+| D-N1 | Spouštět ručně, nebo automaticky po souhlasu firmy? | ~~Ručně tlačítkem~~ → **i samo**: po souhlasu firmy od asistenta a po poptávce z webu; když není podle čeho hledat, upozornění (Kryštof 2026-11-28, R-158) |
 | D-N2 | Managed Agents, nebo vlastní řízení přes Messages API? | ~~Managed Agents~~ → **cloudová úloha Claude Code na předplatném**, spuštění tlačítkem + ranní průchod, vedoucí Opus, subagenti Sonnet (Kryštof 2026-11-26, R-149) |
 | D-N3 | Jakou zpětnou vazbu zapisovat? | **Výsledek nabídky a poslaná cena; hodiny ne**, cena se odvozuje z hodnoty pro klienta |
 | D-N4 | Co návrh ukáže? | **Cena a zdůvodnění**, bez rozpadu po položkách a hodin |
@@ -352,8 +356,8 @@ Výklad agenta (Kryštof může změnit, všechno je v cenových pravidlech v ad
   nebo pásmem, s poslanou cenou a výsledkem. Do výpočtu ceny nevstupují, učení jde dál přes návrhy úprav pravidel.
 - **Podíl z hodnoty** (2026-11-28): cena doporučené varianty proti středu odhadu ročního přínosu, skupiny pod 10 %,
   10–25 %, 25–50 % a 50 % a víc. Hranice zvolil agent.
-- **Přepisy schůzek** do rozboru nejdou (DECISIONS #056): úloze jdou jen veřejné údaje o firmě. Cenu zakázky
-  klienta z hovoru zapíše Kryštof do editoru nabídky.
+- **Přepisy schůzek** do rozboru nejdou (DECISIONS #056): úloze jdou jen veřejné údaje o firmě. Od N4 (R-158)
+  je u konceptu blok „Ze schůzky" (oddíl 13), návrh z přepisu se do editoru dostane kliknutím.
 
 ### 12.1 Pravidla proti dosavadním nabídkám (2026-11-27)
 
@@ -380,4 +384,27 @@ Co z toho plyne:
 - Věta o návratnosti se ukázala jen u malíře („ze tří zakázek"); u kavárny, restaurací a masáží by web
   zaplatily až desítky zakázek, takže se věta neukáže, jak má.
 - Spolehlivé porovnání přijde s N3: z poslaných nabídek a odpovědí klientů, ne z úvodních cen.
+
+## 13. N4: samo spuštěný rozbor a vstupy ze schůzky (2026-11-28, R-158)
+
+Kryštof 2026-11-28: rozbor ať se spustí sám, „když firma řekne ano i nová poptávka z webu; když nebude možné nic
+najít, vykašli se na to a dej mi oznámení v ZakazIQ". Ze schůzky ať AI navrhne vstupy nabídky. Technika
+v `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: samo spuštěný rozbor a vstupy ze schůzky (N4)".
+Výklad agenta (Kryštof může změnit):
+
+- **Firma od asistenta**: rozbor se spustí, jen když ano řekla v právě přijatém snímku z Growth OS. Firmy, které
+  souhlasily dřív, se samy nespustí.
+- **Poptávka z webu** (kontaktní formulář i objednávka z vizeon.cz, alteno.cz, prvotka.cz): hledá se podle webu
+  z formuláře, jinak podle e-mailu na vlastní doméně. Bez obojího se nic nezakládá a rozbor se nespustí; řekne to
+  věta v upozornění o poptávce (jeden zvonek, ne dva). S webem se najde nebo založí kontakt a poptávka se na něj
+  napojí; úloha jako firmu dostane doménu webu, ne jméno člověka.
+- **Strop** 10 automatických rozborů za 24 h uvnitř celkových 15, ať na tlačítko zbude místo. Kontakt dostane
+  automatický rozbor nejvýš jednou za rok (i přes sloučení kontaktů).
+- **Upozornění**: rozbor se nespustil (chybí web i IČO, strop), rozbor se nepovedl (úloha o firmě nic spolehlivého
+  nenašla, nebo nedoběhl). Úloha se má vzdát, když o firmě nic spolehlivého není (skill `zakaziq-rozbor-firmy`).
+- **Ze schůzky**: u konceptu nabídky poslední hotová schůzka ze ZakazIQ Voice přiřazená ke kontaktu (shrnutí
+  a dohody, když už jsou). „Načíst ze schůzky" pošle přepis modelu `smart` (bez nástrojů, ze serveru) a vrátí
+  cenu jedné zakázky klienta, web / e-shop, jazyky navíc, spěch a rozpočet klienta, každý s citací. Návrh projde,
+  jen když citace v přepisu opravdu je a částka v ní zazněla; „Použít" ho dá do editoru, rozpočet je jen pro
+  informaci. Cena volání se přičte ke schůzce (Voice › Přehled › náklady). Bez schůzky se blok neukáže.
 
