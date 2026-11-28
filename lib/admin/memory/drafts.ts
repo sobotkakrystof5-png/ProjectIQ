@@ -4,6 +4,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import { batchTolerant, q, type AdminRow } from '@/lib/admin/db'
 import { stripMarkers } from '@/lib/ai/markers'
+import { allSignals, injectionSignals } from '@/lib/ai/untrusted'
 import { aiModel, isAiConfigured } from '@/lib/ai/models'
 import { MEMORY_PROMPT } from '@/lib/ai/prompts'
 import { redactSensitive } from '@/lib/project-activity'
@@ -70,10 +71,13 @@ async function activityText(projectId: string): Promise<string> {
       WHERE project_id = ${projectId}
       ORDER BY created_at DESC LIMIT ${ACTIVITY_LIMIT}`,
   ])
-  const lines = (rows ?? []).map((r: AdminRow) => {
+  const lines = (rows ?? []).flatMap((r: AdminRow) => {
+    // Zpráva, která dává pokyny umělé inteligenci, do návrhu paměti nejde: ten
+    // se pak tiše čte do promptu asistenta (DECISIONS #062).
+    if (injectionSignals(`${r.title ?? ''}\n${r.body ?? ''}`).length > 0) return []
     const title = stripMarkers(redactSensitive(String(r.title ?? '')).text)
     const body = stripMarkers(redactSensitive(String(r.body ?? '')).text)
-    return `- ${title}: ${body}`.slice(0, 600)
+    return [`- ${title}: ${body}`.slice(0, 600)]
   })
   return lines.join('\n')
 }
@@ -107,12 +111,14 @@ export async function proposeMemoryDrafts(): Promise<MemoryDraftRun> {
 
       const draft = await askModel(model, candidate.name, text)
       if (!draft || !draft.remember || draft.text.trim() === '') continue
+      // Věta od modelu s pokynem, příkazem nebo heslem se neuloží ani jako návrh.
+      if (allSignals(draft.text).length > 0) continue
 
       const saved = await saveMemory({
         scope: 'project',
         refId: candidate.projectId,
         kind: draft.kind,
-        text: draft.text,
+        text: stripMarkers(draft.text),
         source: 'activity',
         model,
         // Nikdy potvrzené: větu od modelu musí vidět člověk.

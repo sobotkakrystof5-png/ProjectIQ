@@ -96,6 +96,7 @@
 | Emaily | `lib/email.ts` (+ `adminEmail()` v `lib/lead-origins.ts`) |
 | Veřejná API — auth, rate limit | `lib/api-auth.ts`, `lib/api-rate-limit.ts` |
 | Bezpečnostní hlavičky, CSP, CORS, rámování | `next.config.mjs`, `proxy.ts`, `lib/security/`, `.claude/security/` |
+| Ochrana proti SQL injection (parametry, escapování LIKE, hlídací test) a prompt injection (cizí text pro model, skryté znaky, značky, rozpoznání pokynů, zadání pro Claude Code) | `lib/security/sql.ts`, `lib/ai/untrusted.ts`, `lib/ai/markers.ts`, `lib/client-requests.ts` (`buildClaudeCodePrompt`, `requestRiskSignals`), `lib/security/__tests__/{sql-guard,prompt-guard}.test.ts`, `.claude/security/STATE.md` → Ochrana proti SQL injection a prompt injection, DECISIONS #062, R-159 |
 | Ochrana proti XSS (escapování, odkazy, hlídací test) a DDoS (brána, předbrány limitů, semafor PDF, strop těla, návrh pravidel Vercel WAF) | `lib/security/{html,client-ip,memory-limiter,semaphore,front-gate,request-body}.ts`, `lib/security/__tests__/xss-guard.test.ts`, `lib/api-rate-limit.ts`, `lib/ws/intake/rate-limit.ts`, `.claude/security/STATE.md` → Ochrana proti XSS a DDoS, DECISIONS #050, R-138 |
 | Crony | `vercel.json`, `app/api/cron/**` |
 | Osobní část adminu (dřív Hub) | `app/dashboard/{finance,projekty,startup}/**`, menu `lib/admin-nav.ts` |

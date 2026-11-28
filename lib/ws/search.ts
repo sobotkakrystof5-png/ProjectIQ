@@ -1,6 +1,7 @@
 import 'server-only'
 import { q, wsDb } from './db'
 import type { WsBusiness, WsContext } from './context'
+import { likeContains } from '@/lib/security/sql'
 
 // Hledání pro ⌘K: zákazníci (celý účet), poptávky a faktury (byznys).
 // Text hledání jde do ILIKE jako parametr; %, _ a \ se escapují, aby
@@ -14,7 +15,7 @@ export type SearchHit =
 export const SEARCH_MAX_LENGTH = 80
 const LIMIT = 6
 
-export const likePattern = (text: string): string => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+export const likePattern = (text: string): string => likeContains(text)
 
 export async function searchWorkspace(
   ctx: WsContext,

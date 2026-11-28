@@ -14,6 +14,7 @@ import {
 } from '@/lib/admin/outreach-crm-view'
 import type { TranscriptTurn } from '@/types/outreach-report'
 import { pgDate } from '@/lib/pg-date'
+import { likeContains } from '@/lib/security/sql'
 
 /**
  * AI asistent jako CRM (R-120): Přehled, Kontakty a detail klienta nad
@@ -231,7 +232,7 @@ export async function loadContacts(filter: ContactFilter, q: string | undefined,
     const like = `$${params.length}`
     const parts = [`company_name ILIKE ${like}`, `contact_name ILIKE ${like}`, `email ILIKE ${like}`, `city ILIKE ${like}`]
     if (search.digits) {
-      params.push(`%${search.digits}%`)
+      params.push(likeContains(search.digits))
       parts.push(`regexp_replace(coalesce(phone, ''), '\\D', '', 'g') LIKE $${params.length}`)
     }
     searchSql = `(${parts.join(' OR ')})`

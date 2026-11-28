@@ -2,7 +2,8 @@ import { requireAdminPage } from '@/lib/auth'
 import { batchTolerant } from '@/lib/admin/db'
 import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { buildTerminalCommand } from '@/lib/claude-code-handoff'
-import { buildClaudeCodePrompt, type ClientRequestRow } from '@/lib/client-requests'
+import { buildClaudeCodePrompt, requestRiskSignals, type ClientRequestRow } from '@/lib/client-requests'
+import { describeSignals } from '@/lib/ai/untrusted'
 import { ClientRequestCard, type ClientRequestCardData } from '@/components/ClientRequestCard'
 import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { PillNav } from '@/components/ws/app/toolbar'
@@ -87,6 +88,7 @@ export default async function PozadavkyPage({ searchParams: raw }: PageProps) {
       createdAt: new Date(r.created_at).toISOString(),
       prompt,
       terminalCommand: buildTerminalCommand(prompt),
+      risk: describeSignals(requestRiskSignals(r)) || null,
       phone: r.client_phone,
       email: r.client_email,
       portalUrl: r.public_token ? getPublicUrl(r.public_token) : null,

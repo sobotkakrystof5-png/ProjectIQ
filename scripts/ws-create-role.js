@@ -54,7 +54,12 @@ function grantStatements() {
 }
 
 // base64url = jen [A-Za-z0-9_-], bezpečné vložit do SQL literálu.
-const newPassword = () => crypto.randomBytes(32).toString('base64url')
+const newPassword = () => {
+  const password = crypto.randomBytes(32).toString('base64url')
+  // Pojistka pro budoucí úpravy: do DDL se heslo vkládá jako literál (parametr tam nejde).
+  if (!/^[A-Za-z0-9_-]{43}$/.test(password)) throw new Error('Heslo má neočekávaný tvar.')
+  return password
+}
 
 async function main() {
   loadEnvLocal()

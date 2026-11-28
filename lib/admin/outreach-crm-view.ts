@@ -9,6 +9,7 @@
 
 import type { AnalysisCall } from '@/lib/admin/outreach-analysis'
 import type { OutreachQueueRow } from '@/lib/admin/outreach-view'
+import { likeContains } from '@/lib/security/sql'
 
 // ─── Stavy z Growth OS ───────────────────────────────────────────────────────
 
@@ -74,9 +75,8 @@ export function parseContactFilter(raw: string | undefined): ContactFilter {
 export function searchPattern(raw: string | undefined): { like: string; digits: string | null } | null {
   const q = (raw ?? '').trim().slice(0, 80)
   if (!q) return null
-  const escaped = q.replace(/[\\%_]/g, (c) => `\\${c}`)
   const digits = q.replace(/\D/g, '')
-  return { like: `%${escaped}%`, digits: digits.length >= 3 ? digits : null }
+  return { like: likeContains(q), digits: digits.length >= 3 ? digits : null }
 }
 
 // ─── Klient ──────────────────────────────────────────────────────────────────

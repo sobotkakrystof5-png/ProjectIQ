@@ -40,7 +40,7 @@ Jedna Next.js 16 App Router aplikace (React 19, Turbopack, TypeScript strict, Ne
 
 ## B13. Bezpečnost
 
-Neoslabuj CSP (žádné nové `unsafe-inline`/`unsafe-eval` ve skriptech, wildcard ani mazání direktiv). Secrets jen server, žádné citlivé `NEXT_PUBLIC_`, `.env.local` necommituj ani nevypisuj; uniklý klíč rotuj a zaznamenej. Nedůvěryhodné HTML nikdy bez DOMPurify. Veřejné vstupy: serverová validace, limity, honeypot/captcha; webhooky: podpis a idempotence. CORS jen přesné originy, bez `*`/credentials; rámování jen `/r` pro povolené domény. Skript třetí strany nejdřív schval, zapiš CSP a při statickém načtení SRI. Ostatní bezpečnostní pravidla a checklist jsou závazné v referenci B13; bezpečnostní změnu zaznamenej do příslušného souboru `.claude/security/` ve stejném commitu.
+Neoslabuj CSP (žádné nové `unsafe-inline`/`unsafe-eval` ve skriptech, wildcard ani mazání direktiv). SQL jen parametry, `LIKE` přes `likeContains()`; cizí text pro model jen přes `lib/ai/untrusted.ts` (hlídají `sql-guard` a `prompt-guard`, #062). Secrets jen server, žádné citlivé `NEXT_PUBLIC_`, `.env.local` necommituj ani nevypisuj; uniklý klíč rotuj a zaznamenej. Nedůvěryhodné HTML nikdy bez DOMPurify. Veřejné vstupy: serverová validace, limity, honeypot/captcha; webhooky: podpis a idempotence. CORS jen přesné originy, bez `*`/credentials; rámování jen `/r` pro povolené domény. Skript třetí strany nejdřív schval, zapiš CSP a při statickém načtení SRI. Ostatní bezpečnostní pravidla a checklist jsou závazné v referenci B13; bezpečnostní změnu zaznamenej do příslušného souboru `.claude/security/` ve stejném commitu.
 
 ## B12. Ověření a Git
 

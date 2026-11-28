@@ -6,6 +6,7 @@ import { DEFAULT_LEAD_ORIGIN, LEAD_ORIGINS, toLeadOrigin } from '@/lib/lead-orig
 import type { TableParams } from '@/lib/admin-table'
 import { invoiceSql } from '@/lib/invoice-status'
 import type { InvoiceProjectOption, InvoiceRegistryItem } from '@/app/dashboard/finance/invoice-actions'
+import { likeContains } from '@/lib/security/sql'
 
 /**
  * Evidence faktur `/dashboard/faktury` (AD07).
@@ -95,7 +96,7 @@ function where(filters: InvoiceFilters): { sql: string; params: unknown[] } {
 
   const query = filters.query.trim()
   if (query) {
-    params.push(`%${query}%`)
+    params.push(likeContains(query))
     const like = `$${params.length}`
     parts.push(`(
       i.invoice_number ILIKE ${like}

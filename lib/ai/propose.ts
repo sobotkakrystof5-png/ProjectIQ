@@ -4,6 +4,7 @@ import { aiModel, isAiConfigured } from '@/lib/ai/models'
 import { PROPOSE_PROMPT, proposeCatalogue } from '@/lib/ai/prompts'
 import { loadAiContext, type ContextRef } from '@/lib/ai/context'
 import { stripMarkers } from '@/lib/ai/markers'
+import { injectionSignals } from '@/lib/ai/untrusted'
 import { type Suggestion } from '@/lib/ai/suggestion-schema'
 import { coerceLookups, coercePlan, type Lookup } from '@/lib/ai/plan-format'
 import { runLookups } from '@/lib/admin/assistant-lookups'
@@ -80,6 +81,16 @@ export function historyMessages(history: ChatTurn[] | undefined): Anthropic.Mess
   // Poslední replika historie musí být od asistenta — za ní jde nová věta.
   if (out.length > 0 && out[out.length - 1].role === 'user') out.pop()
   return out
+}
+
+/**
+ * Nese věta nebo historie známky pokynu pro AI (DECISIONS #062)? Do okénka jde
+ * vložit i zkopírovaný text klienta; pak se nic neprovede samo, stejně jako
+ * nad kontextem záznamu. Hledá se v syrovém textu (skryté znaky ještě jsou).
+ */
+export function chatLooksInjected(text: string, history: ChatTurn[] | undefined): boolean {
+  if (injectionSignals(text).length > 0) return true
+  return (history ?? []).slice(-HISTORY_MAX).some((turn) => injectionSignals(turn.content.slice(0, TEXT_MAX)).length > 0)
 }
 
 async function callModel(
@@ -160,8 +171,9 @@ export async function proposeAction(input: {
   const history = historyMessages(input.history)
   // Kontext zakázky i kontaktu nese texty, které mohl napsat klient (popis
   // poptávky z webu, poznámky, požadavky z portálu). Rozlišovat je po
-  // sloupcích by bylo křehké — kdo má kontext, nepouští nic samo.
-  const untrustedContext = context !== ''
+  // sloupcích by bylo křehké — kdo má kontext, nepouští nic samo. Totéž
+  // platí, když přehled firmy nebo rozhovor nese známky pokynu pro AI (#062).
+  const untrustedContext = context !== '' || snapshot.signals.length > 0 || chatLooksInjected(input.text, input.history)
 
   try {
     let tokensIn = 0
@@ -173,12 +185,12 @@ export async function proposeAction(input: {
      * dotazy (jen čtení) a model dostane druhou šanci už s nimi.
      */
     const ask = async (model: string): Promise<Round> => {
-      let round = await callModel(model, text, { snapshot, context, data }, history)
+      let round = await callModel(model, text, { snapshot: snapshot.text, context, data }, history)
       tokensIn += round.tokensIn
       tokensOut += round.tokensOut
       if (!data && round.lookups.length > 0) {
         data = await runLookups(round.lookups)
-        round = await callModel(model, text, { snapshot, context, data }, history)
+        round = await callModel(model, text, { snapshot: snapshot.text, context, data }, history)
         tokensIn += round.tokensIn
         tokensOut += round.tokensOut
       }

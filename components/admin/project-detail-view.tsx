@@ -46,7 +46,8 @@ import { getActiveAgentKey, isAgentKeyConfigured, maskAgentKey } from '@/lib/age
 import { buildAgentEnvBlock, buildClaudeMdBlock } from '@/lib/agent-setup'
 import { loadProjectActivity } from '@/lib/project-activity-queries'
 import { buildTerminalCommand } from '@/lib/claude-code-handoff'
-import { buildClaudeCodePrompt, type ClientRequestRow } from '@/lib/client-requests'
+import { buildClaudeCodePrompt, requestRiskSignals, type ClientRequestRow } from '@/lib/client-requests'
+import { describeSignals } from '@/lib/ai/untrusted'
 import { LEAD_ORIGINS, projectPath, toLeadOrigin } from '@/lib/lead-origins'
 import { buildJourney, journeySqlText, type JourneyFacts } from '@/lib/admin/journey'
 import { loadHandover } from '@/lib/admin/handover'
@@ -483,6 +484,7 @@ function RequestsTab({ project, rows: raw }: { project: Project; rows: AdminRow[
       createdAt: new Date(r.created_at).toISOString(),
       prompt,
       terminalCommand: buildTerminalCommand(prompt),
+      risk: describeSignals(requestRiskSignals(r)) || null,
       phone: project.client_phone,
       email: project.client_email,
       portalUrl: getPublicUrl(project.public_token),

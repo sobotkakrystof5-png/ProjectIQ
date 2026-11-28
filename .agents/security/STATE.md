@@ -3,7 +3,7 @@
 > Současný stav. Přepisuje se — historie je v ostatních souborech.
 > Čti na začátku každého sezení, které sahá na hlavičky, CSP, proxy, API nebo vstupy.
 
-**Poslední aktualizace:** 2026-11-27, **Workspace přes Supabase Auth, Clerk odstraněný** (DECISIONS #059, CSP-LOG v11, R-154): `/w` obnovuje session jako `/klient`, účet a roli dává jen `ws.members`, pozvánky vlastníka a povolení k registraci hlídá hook. V kódu na větvi `ws/supabase-auth`, migrace 141 neaplikovaná, nenasazeno.
+**Poslední aktualizace:** 2026-11-28, **ochrana proti SQL injection a prompt injection** (DECISIONS #062): hlídací testy nad AST (`sql-guard`, `prompt-guard`), escapování LIKE na jednom místě, cizí text pro model přes `lib/ai/untrusted.ts` (neviditelné znaky pryč, každá značka zneškodněná, rozpoznání pokynů pro AI), pevná pravidla v zadání pro Claude Code. Předchozí: 2026-11-27, **Workspace přes Supabase Auth, Clerk odstraněný** (DECISIONS #059, CSP-LOG v11, R-154): `/w` obnovuje session jako `/klient`, účet a roli dává jen `ws.members`, pozvánky vlastníka a povolení k registraci hlídá hook. V kódu na větvi `ws/supabase-auth`, migrace 141 neaplikovaná, nenasazeno.
 
 Předchozí: 2026-11-23, **ochrana proti XSS a DDoS** (DECISIONS #050; audit z 2026-11-20, do `main` sloučený 2026-11-23): jeden modul pro cizí text v HTML (`lib/security/html.ts`) + test, který hlídá nebezpečné vzory ve zdrojáku, brána na IP v `proxy.ts`, paměťová předbrána před databázovými limity, strop souběhu Chromia a strop těla u nahrávek. Firewall platformy (Vercel WAF) z kódu nenastavíš — pravidla jsou navržená níž a čekají na Kryštofa. Předchozí: 2026-11-15, **klientský prostor `/klient` přešel z vývojové instance Clerku na Supabase Auth** (e-mail a heslo, registrace jen přes hook s otiskem pozvánky, pozvánka vždy vázaná na e-mail; DECISIONS #031, AUDIT-LOG 2026-11-15) a portál `/p` dostal výměnu odkazu a omezení rezervace. Předchozí téhož dne: **přihlášení do adminu přešlo na Supabase Auth** (e-mail, heslo, TOTP; DECISIONS #029). NextAuth, `ADMIN_PASSWORD_HASH` a `bcryptjs` z repa odešly, cookie se session je zpevněná proti výchozímu stavu `@supabase/ssr` (`httpOnly`, 12 h místo 400 dní) a **CSP se nemění** — prohlížeč na Supabase nesahá. Zbývá vytvořit admin účet, doplnit env do Vercelu, vypnout veřejnou registraci a omezit délku session (Otevřené položky); naživo to nikdo nezkusil. Předchozí: 2026-11-14, **úplný audit od A do Z** (AUDIT-LOG 2026-11-14): živý sken produkce 30 prošlo / 3 varování / **0 chyb**, code review celého stromu (37 routů, 47 souborů server actions, CSP, CORS, nahrávání, SQL, rate limity, CI, 311 commitů historie). Opraveno: fail-open kontrola DNS v auditním skriptu (DECISIONS #028), 500 místo 404 na čtyřech veřejných odkazech adminu, chybějící strop těla na pěti veřejných JSON routech, pět tvarů tajemství, které pouštěl `redactSensitive()`, `Vary: Origin` a localhost v CORS leadů, `Secure` u cookie motivu, očištění názvu nahraného PDF, širší `Permissions-Policy`. **Skutečný stav DNS je horší, než tu dřív stálo** — viz sekce DNS. Předchozí: 2026-11-13 nasazení modernizace (celá AD00–AD18 je na produkci od 2026-11-14, `8210f04`)
 
@@ -194,10 +194,41 @@ vercel firewall publish
 
 **Při probíhajícím útoku** (`vercel firewall overview` ukáže provoz a zásahy): (1) zapnout `vercel firewall attack-mode enable --duration 1h` — **pozor, výzva zastaví i volání bez prohlížeče** (webhooky Stripe/Clerk/Resend, poptávky z webů klientů a z vizeon.cz, Growth OS, cron); jestli je Vercel propustí, jsem **neověřil**, takže po zapnutí hned zkontrolovat doručení webhooků a případně přidat `bypass` pravidlo pro `/api/stripe/webhook`, `/api/clerk/webhook`, `/api/resend/webhook`, `/api/resend/vizeon`, `/api/cron`; (2) jednotlivou IP zablokovat `vercel firewall ip-blocks block <ip>`; (3) když brána aplikace škodí legitimním lidem, vypnout `FRONT_GATE=off` ve Vercelu (účinné po dalším nasazení); (4) nepouštět `web-security-audit` v cyklu (po patnácti dotazech Vercel vrací challenge); (5) po útoku zapsat do `AUDIT-LOG.md`.
 
+## Ochrana proti SQL injection a prompt injection (2026-11-28, DECISIONS #062)
+
+### SQL injection
+
+Hodnota od uživatele jde do databáze **jen jako parametr**: tagovaná šablona (`sql`…, `q`…, `adminDb`…, `wsDb(…)`…) nebo `$n` s polem `params`. Do textu dotazu se skládá jen kód. Pod tím jsou role s RLS pro Workspace (`ws_app`) a klientský prostor (`portal_app`), funkce `SECURITY DEFINER` s pevným `search_path` (všech 65, ověřeno 2026-11-28) a dynamické SQL v migracích jen přes `format('%I')`, `regclass` a `USING`.
+
+| Vzor | Povoleno |
+|---|---|
+| `.unsafe(` | nikde |
+| `sql("…")`, `q("…")` jako obyčejná funkce | nikde, jen tagovaná šablona |
+| `${…}` v textu spouštěného dotazu (`.query(`, `{ text, params }`) | konstanta, `$n`, podmínka mezi dvěma doslovnými řetězci, fragment s doslovnými argumenty, jinak jen řádek v `REVIEWED` v `sql-guard.test.ts` s důvodem |
+| řazení podle adresy | jen whitelist v `parseTableParams` (`Object.hasOwn`) nebo `pickAllowed()` |
+| vzor pro `LIKE`/`ILIKE` | jen `likeContains()`/`likePrefix()` z `lib/security/sql.ts`; ruční `%${…}%` test odmítne |
+| heslo nebo identifikátor do DDL ve skriptu | jen ověřený tvar (`[A-Za-z0-9_-]{43}`, `assertSqlIdentifier`) |
+
+Slabé místo: **admin běží rolí vlastníka tabulek** (BYPASSRLS, DDL) — injekce by tam nebyla omezená rolí (Otevřené položky).
+
+### Prompt injection
+
+Každý cizí text, který jde k modelu (formuláře z webů, portál a chat klienta, PDF faktur, přepisy hovorů a schůzek, weby firem), projde `lib/ai/untrusted.ts`:
+
+| Vrstva | Co dělá | Kde |
+|---|---|---|
+| `stripHidden` | maže neviditelné znaky: Unicode „tag" znaky, variační selektory, nulové šířky, směr textu, řídicí znaky | všude, i v zadání pro Claude Code a v příkazu pro terminál |
+| `neutralizeTags` (= `stripMarkers`) | **každá** značka `<x>`, `<\|…\|>`, `[INST]`, `<<SYS>>` → `‹x›`, takže rámec dat nejde zavřít zevnitř | hodnoty před vložením do rámce |
+| `frame` / `cleanForPrompt` | rámec dává náš kód, obsah je vyčištěný a oříznutý | nové rámce |
+| `injectionSignals`, `agentRiskSignals` | hrubě pozná pokyn pro AI, falešnou roli, značku, skryté znaky, příkaz, hesla, odeslání dat | asistent (vypne samostatné provádění), požadavky klientů (varování), návrhy paměti (vynechání), rozbor hovorů (upozornění) |
+
+Model nemá nástroje: asistent vrací plán a ten prochází whitelistem executorů (#025, #032); co odchází ven (zpráva, faktura, storno, mazání), čeká na klepnutí. Zadání pro Claude Code z požadavku klienta má na začátku pevná pravidla od nás a Claude Code se spouští v režimu plánu. Hlídá to `lib/security/__tests__/prompt-guard.test.ts`: soubor, který volá model, musí čistit přes `lib/ai/untrusted` nebo `lib/ai/markers`, přímo nebo přes `escapeTranscript`/`escapeClientText` (výjimky: diktát a učení z oprav ve Voice), čtení PDF má v systémovém promptu pravidlo o nedůvěryhodném dokumentu, do rámce `<značka>\n${…}` jde jen vyčištěná hodnota, systémový prompt nikdy z těla požadavku.
+
 ## Otevřené položky
 
 | Položka | Proč | Kdo | Kdy |
 |---|---|---|---|
+| **Samostatná role pro admin bez DDL a BYPASSRLS** | admin čte i píše rolí vlastníka tabulek; kdyby se do adminu dostala SQL injection, mohla by mazat tabulky i obejít RLS klientů. Návrh: role `admin_app` s `SELECT/INSERT/UPDATE/DELETE` na `public`, `EXECUTE` na funkce, bez DDL; vlastník jen pro migrace (DECISIONS #062 (b)) | Kryštof (rozhodnutí) + Claude | před prvním placeným klientem |
 | ~~Vstup do Workspace je veřejně dosažitelný na dev Clerku~~ **v kódu vyřešeno 2026-11-27 (R-154, DECISIONS #059): registrace zavřená, Clerk pryč; platí až po nasazení** | **potvrzeno zvenku 2026-11-14:** `/w/registrace` vrací 200 a načítá `ultimate-chimp-4657.clerk.accounts.dev`; landing na ni vede tlačítkem (`components/marketing/content.ts` → `signUp`). Cizí člověk si založí účet, který přepnutí na produkční Clerk nepřežije, a projde „platbou" v sandboxu. Buď vstup schovat, dokud nebude Clerk i Stripe v produkčním režimu, nebo to vědomě nechat | Kryštof (rozhodnutí) | hned |
 | **SPF na apexu a `rua` v DMARC** | nejvážnější otevřená věc z auditu 2026-11-14: apex nemá SPF a DMARC je `p=none` bez reportů, přitom Workspace odesílá z adresy na apexu a doména má MX. Podvrhnout e-mail jménem `@zakaziq.cz` jde a nikdo se o tom nedozví. Hodnoty a cíle v sekci DNS | Kryštof (WEDOS) | hned |
 | **CAA a DNSSEC na apexu** | ověřeno autoritativně 2026-11-14: ani jedno. Bez CAA smí certifikát pro doménu vydat kdokoli | Kryštof (WEDOS) | před spuštěním |

@@ -1,5 +1,7 @@
 // Hledání v administraci (⌘K): čisté funkce. První verze jen přechod na stránku.
 
+import { likeContains } from '@/lib/security/sql'
+
 export const SEARCH_MIN_CHARS = 2
 export const SEARCH_MAX_CHARS = 80
 export const SEARCH_LIMIT_PER_KIND = 5
@@ -34,7 +36,7 @@ export function normalizeQuery(value: string): string {
 export function toLikePattern(query: string): string | null {
   const trimmed = query.trim().slice(0, SEARCH_MAX_CHARS)
   if (trimmed.length < SEARCH_MIN_CHARS) return null
-  return `%${trimmed.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+  return likeContains(trimmed)
 }
 
 export function filterPages(

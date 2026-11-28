@@ -2,6 +2,7 @@ import 'server-only'
 import { neon } from '@neondatabase/serverless'
 import type { TableParams } from '@/lib/admin-table'
 import type { WaitlistEntry } from '@/lib/types'
+import { likeContains } from '@/lib/security/sql'
 
 /**
  * Waitlist startupového projektu (AD07).
@@ -38,7 +39,7 @@ export async function loadWaitlist(dbUrl: string, params: TableParams, query: st
     const wsql = neon(dbUrl, { fetchOptions: { cache: 'no-store' } })
     const search = query.trim()
     const filter = search ? `WHERE email ILIKE $1 OR name ILIKE $1` : ''
-    const filterParams = search ? [`%${search}%`] : []
+    const filterParams = search ? [likeContains(search)] : []
 
     // `params.orderBy` je složené z `WAITLIST_SORT`, hodnoty z adresy jdou vždy parametrem.
     const [rows, counts] = await Promise.all([

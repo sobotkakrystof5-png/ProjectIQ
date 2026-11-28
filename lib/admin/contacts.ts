@@ -2,6 +2,7 @@ import 'server-only'
 import { adminDb, type AdminQuery, type AdminRow } from './db'
 import { normalizeDic, normalizeEmail, normalizeIco, normalizePhone, trimOrNull } from '@/lib/contacts/normalize'
 import type { TableParams } from '@/lib/admin-table'
+import { likeContains } from '@/lib/security/sql'
 
 /**
  * Kontakty `/dashboard/kontakty` (AD09).
@@ -97,7 +98,7 @@ function viewWhere(view: ContactView): string {
 /** Hledání: jméno, firma, e-mail a telefon (i jinak zapsaný). */
 function searchClause(search: string | null, from: number): { sql: string; params: unknown[] } {
   if (search === null) return { sql: '', params: [] }
-  const like = `%${search}%`
+  const like = likeContains(search)
   const phone = normalizePhone(search)
   const digits = search.replace(/\D/g, '')
   const params: unknown[] = [like]
@@ -107,7 +108,7 @@ function searchClause(search: string | null, from: number): { sql: string; param
     sql += ` OR c.phone = $${from + params.length - 1}`
   }
   if (digits.length >= 4) {
-    params.push(`%${digits}%`)
+    params.push(likeContains(digits))
     sql += ` OR regexp_replace(coalesce(c.phone, ''), '\\D', '', 'g') LIKE $${from + params.length - 1}`
   }
   return { sql: sql + ')', params }
@@ -557,7 +558,7 @@ export type ContactSuggestion = {
 export async function suggestContacts(raw: string, limit = 6): Promise<ContactSuggestion[]> {
   const q = raw.trim().slice(0, 80)
   if (q.length < 2) return []
-  const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+  const like = likeContains(q)
   const digits = q.replace(/\D/g, '')
   const [rows] = await adminDb.batch([
     {
@@ -568,7 +569,7 @@ export async function suggestContacts(raw: string, limit = 6): Promise<ContactSu
                      OR ($2::text IS NOT NULL AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') LIKE $2))
               ORDER BY last_seen_at DESC NULLS LAST, display_name
               LIMIT $3`,
-      params: [like, digits.length >= 3 ? `%${digits}%` : null, Math.min(Math.max(limit, 1), 10)],
+      params: [like, digits.length >= 3 ? likeContains(digits) : null, Math.min(Math.max(limit, 1), 10)],
     },
   ])
   return rows.map((r) => ({

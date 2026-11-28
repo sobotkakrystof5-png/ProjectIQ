@@ -7,7 +7,7 @@ import type { Action } from '@/lib/ai/suggestion-schema'
 import { pastActions, pragueNow, relativeTimes, timeContext } from '@/lib/ai/time-context'
 
 // `propose.ts` sahá na databázi přes přehled a kontext; tady se testuje jen skládání historie.
-vi.mock('@/lib/ai/workspace-snapshot', () => ({ loadWorkspaceSnapshot: async () => '' }))
+vi.mock('@/lib/ai/workspace-snapshot', () => ({ loadWorkspaceSnapshot: async () => ({ text: '', signals: [] }) }))
 vi.mock('@/lib/ai/context', () => ({ loadAiContext: async () => ({ text: '', label: null }) }))
 vi.mock('@/lib/admin/assistant-lookups', () => ({ runLookups: async () => '' }))
 

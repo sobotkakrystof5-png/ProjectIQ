@@ -2,7 +2,14 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-28 · **Navrhovač nabídek N4** (R-158): rozbor firmy se spustí sám, když firma
+> **Poslední aktualizace:** 2026-11-28 · **Ochrana proti SQL injection a prompt injection** (R-159, DECISIONS #062):
+> hlídací testy `sql-guard` a `prompt-guard` nad zdrojákem, escapování `LIKE` na jednom místě, cizí text pro model
+> přes `lib/ai/untrusted.ts` (neviditelné znaky pryč, každá značka zneškodněná, rozpoznání pokynů pro AI), pevná
+> pravidla a varování v zadání pro Claude Code. Opravené dvě skutečné díry (jméno z formuláře zavřelo přehled firmy
+> pro asistenta; skryté znaky z portálu prošly do zadání pro Claude Code). Na větvi `security/injekce`,
+> **nenasazeno**; testy 2283 prošlo, v prohlížeči neověřeno.
+>
+> Předchozí: 2026-11-28 · **Navrhovač nabídek N4** (R-158): rozbor firmy se spustí sám, když firma
 > od AI asistenta řekne ano a po poptávce z webu s webem firmy nebo firemním e-mailem (nejvýš 10 denně, kontakt
 > jednou za rok); když není podle čeho hledat, strop je vyčerpaný nebo úloha nic nenajde, přijde upozornění.
 > U konceptu nabídky blok Ze schůzky: poslední schůzka ze ZakazIQ Voice a návrhy vstupů s citací z přepisu,
@@ -2010,6 +2017,22 @@ se na to a dej mi oznámení v ZakazIQ"; u schůzek vybral „AI navrhne vstupy"
 schůzky jde do modelu ze serveru, ne do cloudové úlohy s webem (DECISIONS #056, #058 doplnění). Rozbory ukrajují
 z limitu předplatného víc (zkouška N1: ~2–2,7 min a ~540 tisíc tokenů subagentů na rozbor). Technika
 `docs/admin/AGENTS-ADMIN.md` → N4, plán oddíl 13.
+
+### R-159 · Ochrana proti SQL injection a prompt injection ve vrstvách (2026-11-28)
+**Rozhodnutí:** (1) Hodnota do databáze jen jako parametr, do textu dotazu jen kód; `LIKE` jen přes `likeContains()`
+(`lib/security/sql.ts`). (2) Každý cizí text pro jazykový model projde `lib/ai/untrusted.ts`: neviditelné znaky pryč,
+**každá** značka zneškodněná (`<x>` → `‹x›`, ne seznam známých), rozpoznání pokynů pro AI a nebezpečných žádostí
+pro agenta. (3) Rozpoznání nic neblokuje: vypne samostatné provádění asistenta, ukáže varování u požadavku klienta
+a v zadání pro Claude Code, vynechá zprávu z návrhu paměti. (4) Zadání pro Claude Code z textu klienta má vždy pevná
+bezpečnostní pravidla od našeho kódu. (5) Obojí hlídají testy nad zdrojákem (`sql-guard`, `prompt-guard`).
+**Proč:** zadání Kryštofa 2026-11-28 („ochraň appku před SQL injection a prompt injection, zaveď všechna možná
+opatření"). SQL injection v kódu nebyla; prompt injection měla dvě skutečné díry. Blokovat text se známkami pokynu
+by zahazovalo běžné věty klientů (falešný poplach), proto jen varování a klepnutí člověka.
+**Důsledek:** nový dotaz s `${…}` mimo tagovanou šablonu projde testem jen jako konstanta, nebo s řádkem v `REVIEWED`
+(`lib/security/__tests__/sql-guard.test.ts`). Nové volání modelu musí importovat `lib/ai/untrusted` nebo
+`lib/ai/markers` a hodnotu do rámce čistit (`prompt-guard.test.ts`). `stripMarkers` už značky nemaže, zneškodňuje je.
+Otevřené: samostatná role admina bez DDL (`.claude/security/STATE.md` → Otevřené položky). Bezpečnost DECISIONS #062.
+
 ---
 
 ## 3. Otevřené problémy
@@ -2537,6 +2560,29 @@ z limitu předplatného víc (zkouška N1: ~2–2,7 min a ~540 tisíc tokenů su
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-28 (ochrana proti SQL injection a prompt injection, R-159)
+- **feat** SQL: `lib/security/sql.ts` (`likeContains`, `likePrefix`, `pickAllowed`, `assertSqlIdentifier`), hledání
+  ve Fakturách, Kontaktech a waitlistu escapuje `%`/`_`, pět kopií escapování sloučených (`lib/admin-search.ts`,
+  `lib/ws/search.ts`, `lib/admin/voice/queries.ts`, `lib/admin/outreach-crm-view.ts`, `lib/admin/contacts.ts`), heslo
+  role do DDL s ověřeným tvarem (`scripts/{ws,portal}-create-role.js`), surové úryvky `lib/admin/demo-seed.ts`
+  zdvojují apostrof. Kontrola: ~75 proměnných vložení do SQL je kód, 65 funkcí `SECURITY DEFINER` má `search_path`,
+  dynamické SQL v migracích jen `%I`/`USING`.
+- **feat** Prompt injection: `lib/ai/untrusted.ts` (`stripHidden`, `neutralizeTags`, `cleanForPrompt`, `frame`,
+  `injectionSignals`, `agentRiskSignals`), `stripMarkers` zneškodní každou značku. Napojeno: přehled firmy a rozhovor
+  asistenta (známky = nic se neprovede samo; `lib/ai/{workspace-snapshot,propose,assistant,prompts}.ts`), požadavky
+  klientů a zadání pro Claude Code (`lib/client-request-ai.ts`, `lib/client-requests.ts` s pevnými pravidly
+  a varováním, `lib/claude-code-handoff.ts`, karta `components/ClientRequestCard.tsx`), přepis faktur z PDF
+  (`lib/invoice-ai.ts`, `lib/ws/money/ai.ts`), návrhy paměti (`lib/admin/memory/drafts.ts`), shrnutí schůzky
+  (`lib/admin/voice/meeting-summary.ts`), rozbor hovorů pro Claude Code (`lib/admin/outreach-analysis.ts`), výsledek
+  rozboru firmy (`lib/admin/offers/result.ts`), mantinely ve skillu `zakaziq-rozbor-firmy`.
+- **test** `lib/security/__tests__/sql-guard.test.ts` (12, i PGlite), `lib/security/__tests__/prompt-guard.test.ts` (7),
+  `lib/__tests__/ai-untrusted.test.ts` (42). Ověřeno: `npx tsc --noEmit` čisté, `npx vitest run` 2283 prošlo,
+  0 selhalo, `npm run build` prošel, `sync-agent-context --check` shodné; v prohlížeči neověřeno. Hlídací test hned
+  po přeskládání na `main` zachytil nové volání modelu v `lib/admin/offers/meeting-hints.ts` (N4) — čistí přes
+  `escapeTranscript`, takže je chráněné; test teď uznává i čisticí funkce. Bez migrace, bez nové
+  závislosti. Větev `security/injekce` (worktree `.claude/worktrees/injekce`), nenasazeno.
+- **docs** `.claude/security/{DECISIONS,STATE,AUDIT-LOG}.md` (#062), `AGENTS.md` B13, `docs/AGENTS-REFERENCE.md` B13.
 
 ### 2026-11-28 (navrhovač nabídek N4 — rozbor sám a vstupy ze schůzky, R-158)
 - **feat** Rozbor firmy se spouští sám: po souhlasu firmy od asistenta (`consented` z `ingestOutreachLeads`,

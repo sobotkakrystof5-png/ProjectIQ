@@ -7,6 +7,7 @@ import { CONSULT_MODES } from '@/lib/ai/consultants'
 import { HISTORY_MAX, TEXT_MAX } from '@/lib/ai/assistant-limits'
 import { loadAiContext, CONTEXT_KINDS } from '@/lib/ai/context'
 import { redactSensitive } from '@/lib/project-activity'
+import { stripMarkers } from '@/lib/ai/markers'
 
 /**
  * Konzultace s asistentem (AD14) — odpověď textem, nic se nikam nezapisuje.
@@ -42,7 +43,7 @@ export async function askAssistant(input: AssistantRequest): Promise<AssistantRe
 
   // Vstup se zakrývá dřív, než odejde k modelu i než se cokoli uloží:
   // do okénka asistenta se dá omylem vložit řádek z `.env` nebo klíč.
-  const text = redactSensitive(input.text).text
+  const text = stripMarkers(redactSensitive(input.text).text)
   const context = await loadAiContext(input.contextRef ?? null)
 
   const system: Anthropic.TextBlockParam[] = [
@@ -58,7 +59,7 @@ export async function askAssistant(input: AssistantRequest): Promise<AssistantRe
   const messages: Anthropic.MessageParam[] = [
     ...(input.history ?? []).map((m) => ({
       role: m.role,
-      content: redactSensitive(m.content).text,
+      content: stripMarkers(redactSensitive(m.content).text),
     })),
     { role: 'user' as const, content: text },
   ]

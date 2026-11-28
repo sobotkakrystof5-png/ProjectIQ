@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { safeHttpUrl, stripControlChars } from '@/lib/security/html'
+import { cleanForPrompt } from '@/lib/ai/untrusted'
 
 /**
  * Výsledek rozboru firmy (navrhovač nabídek, N1, R-147).
@@ -217,7 +218,9 @@ export const RESULT_JSON_SCHEMA = {
 
 /** Ořízne text na délku a zbaví ho řídicích znaků. Nikdy nevyhazuje. */
 const text = (max: number) =>
-  z.unknown().transform((v) => (typeof v === 'string' ? stripControlChars(v).replace(/\s+/g, ' ').trim().slice(0, max) : ''))
+  // Text složil agent z cizích webů: bez skrytých znaků a se zneškodněnými značkami,
+  // protože rozbor se dál čte do dalších kroků s modelem (DECISIONS #062).
+  z.unknown().transform((v) => (typeof v === 'string' ? cleanForPrompt(stripControlChars(v)).replace(/\s+/g, ' ').trim().slice(0, max) : ''))
 
 const optionalText = (max: number) => text(max).transform((v) => (v === '' ? null : v))
 

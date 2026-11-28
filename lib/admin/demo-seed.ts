@@ -47,19 +47,38 @@ const mark = (text: string) => `${DEMO_MARK} ${text}`
 /** Jen ukázkové řádky: `notes LIKE '%[ukázková data]%'`. */
 const marked = (column: string) => ({ sql: `${column} LIKE '%${DEMO_MARK}%'` })
 
+/**
+ * Do surového úryvku jdou jen hodnoty z tohoto souboru (datum ze skriptu, jména
+ * ukázkových firem). I tak se kontroluje tvar a apostrof se zdvojí — úryvek se
+ * nesmí stát cestou, kudy by do SQL prošel text zvenku (DECISIONS #062).
+ */
+const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`
+function isoDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('demo-seed: datum musí být YYYY-MM-DD')
+  return value
+}
+function clock(value: string): string {
+  if (!/^\d{2}:\d{2}$/.test(value)) throw new Error('demo-seed: čas musí být HH:MM')
+  return value
+}
+const int = (value: number): number => {
+  if (!Number.isInteger(value)) throw new Error('demo-seed: posun dní musí být celé číslo')
+  return value
+}
+
 /** Pražský čas z dneška + dní a hodiny. */
 const at = (today: string, days: number, time: string): Raw => ({
-  sql: `(('${today}'::date + ${days} * INTERVAL '1 day' + TIME '${time}') AT TIME ZONE 'Europe/Prague')`,
+  sql: `((${literal(isoDate(today))}::date + ${int(days)} * INTERVAL '1 day' + TIME ${literal(clock(time))}) AT TIME ZONE 'Europe/Prague')`,
 })
 
 /** Datum z dneška + dní. */
 const day = (today: string, days: number): Raw => ({
-  sql: `('${today}'::date + ${days} * INTERVAL '1 day')::date`,
+  sql: `(${literal(isoDate(today))}::date + ${int(days)} * INTERVAL '1 day')::date`,
 })
 
 /** Zakázka ukázky podle jména klienta. */
 const projectByClient = (name: string): Raw => ({
-  sql: `(SELECT id FROM projects WHERE notes LIKE '%${DEMO_MARK}%' AND client_name = '${name}' LIMIT 1)`,
+  sql: `(SELECT id FROM projects WHERE notes LIKE '%${DEMO_MARK}%' AND client_name = ${literal(name)} LIMIT 1)`,
 })
 
 /**

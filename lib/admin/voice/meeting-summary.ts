@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import { aiModel, isAiConfigured } from '@/lib/ai/models'
 import { stripControlChars } from '@/lib/security/html'
+import { cleanForPrompt, stripHidden } from '@/lib/ai/untrusted'
 import { llmCostUsd } from './costs'
 
 /**
@@ -54,7 +55,7 @@ Pravidla:
 - Dohody jsou jen to, na čem se obě strany shodly. Návrh, který druhá strana nepřijala, patří do otevřených otázek.
 - Když je přepis krátký nebo nedává smysl, napiš to jednou větou do summary a seznamy nech prázdné.`
 
-const clip = (value: string | undefined, max: number): string => stripControlChars(value ?? '').trim().slice(0, max)
+const clip = (value: string | undefined, max: number): string => stripControlChars(stripHidden(value ?? '')).trim().slice(0, max)
 
 const clipList = (values: string[] | undefined, max = 25): string[] =>
   (values ?? []).map((v) => clip(v, 600)).filter(Boolean).slice(0, max)
@@ -104,9 +105,13 @@ export function summaryText(s: MeetingSummary): string {
     .join('\n\n')
 }
 
-/** Značka v přepisu by mohla zavřít citaci a vložit vlastní instrukce. */
+/**
+ * Značka v přepisu by mohla zavřít citaci a vložit vlastní instrukce. Druhá
+ * strana schůzky je cizí člověk: vlastní rámec se maže, ostatní značky se
+ * zneškodní a zmizí neviditelné znaky (DECISIONS #062).
+ */
 export function escapeTranscript(text: string): string {
-  return text.replace(/<\/?\s*prepis\s*>/gi, '')
+  return cleanForPrompt(text.replace(/<\/?\s*prepis\s*>/gi, ''))
 }
 
 export type SummaryResult =

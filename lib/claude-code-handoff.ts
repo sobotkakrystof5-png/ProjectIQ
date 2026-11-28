@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { stripHidden } from '@/lib/ai/untrusted'
 
 // Předání zadání do Claude Code, úroveň 2 (KP09): příkaz pro terminál, který
 // otevře Claude Code se zadáním. Nic se nespouští samo, příkaz vkládá a spouští
@@ -13,12 +14,19 @@ import { randomBytes } from 'crypto'
 
 const DELIMITER_PREFIX = 'ZAKAZIQ_ZADANI_'
 
-/** Odstraní znaky, které by v terminálu dělaly neplechu (řídicí kromě nového řádku a tabulátoru). */
+/**
+ * Odstraní znaky, které by v terminálu dělaly neplechu (řídicí kromě nového
+ * řádku a tabulátoru), a všechny neviditelné znaky — i Unicode „tag" znaky
+ * a variační selektory, kterými jde do zadání pro agenta schovat celou větu,
+ * kterou člověk při čtení nevidí (DECISIONS #062).
+ */
 export function sanitizeForTerminal(text: string): string {
-  return text
-    .replace(/\r\n?/g, '\n')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/g, '')
+  return stripHidden(
+    text
+      .replace(/\r\n?/g, '\n')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/g, ''),
+  )
 }
 
 /** Oddělovač, který se v textu nevyskytuje jako samostatný řádek ani jako podřetězec. */

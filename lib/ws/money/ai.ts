@@ -6,6 +6,7 @@ import { dateSchema, amountSchema, currencySchema } from './schema'
 // Názvy modelů má celé repo na jednom místě (AD14): dřív tu byl natvrdo
 // zapsaný opus na tutéž extrakci, jakou v adminu dělá levnější model.
 import { aiModel, isAiConfigured } from '@/lib/ai/models'
+import { stripHidden } from '@/lib/ai/untrusted'
 const extract=z.object({number:z.string().max(80).nullable(),name:z.string().max(160).nullable(),address:z.string().max(400).nullable(),ico:z.string().max(8).nullable(),
  issuedOn:dateSchema.nullable(),dueOn:dateSchema.nullable(),amount:amountSchema.nullable(),currency:currencySchema.nullable()})
 export const aiConfigured=()=>isAiConfigured()
@@ -17,5 +18,8 @@ export async function extractReceivedPdf(base64:string) {
  output_config:{effort:'low',format:zodOutputFormat(extract)},
  messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},{type:'text',text:'Přepište pouze údaje faktury.'}]}]})
  if(!res.parsed_output)throw new Error('money_ai_empty')
- return extract.parse(res.parsed_output)
+ const out=extract.parse(res.parsed_output)
+ // Skryté znaky z PDF by se dostaly do dokladu, ale na obrazovce by nebyly vidět (DECISIONS #062).
+ const clean=(v:string|null)=>v===null?null:stripHidden(v).trim()||null
+ return {...out,number:clean(out.number),name:clean(out.name),address:clean(out.address),ico:clean(out.ico)}
 }

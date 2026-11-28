@@ -22,6 +22,7 @@ import {
   type HeatWeek,
 } from './stats'
 import { parseSettings, type VoiceSettings } from './store'
+import { likeContains } from '@/lib/security/sql'
 
 /**
  * ZakazIQ Voice (R-150): čtení pro admin `/dashboard/voice`, kartu na Dnes
@@ -326,7 +327,7 @@ export interface HistoryItem {
 }
 
 /** `%` a `_` z hledání jsou obyčejné znaky, ne zástupné (ILIKE … ESCAPE '\'). */
-export const likePattern = (query: string): string => `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+export const likePattern = (query: string): string => likeContains(query)
 
 /** Podmínka filtru pro výpis, počet i mazání podle hledání — jedna, ať se nerozejdou. */
 export function historyWhere(filter: HistoryFilter, first = 1): { sql: string; params: unknown[] } {

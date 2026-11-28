@@ -26,6 +26,8 @@ export interface ClientRequestCardData {
   prompt: string
   /** Příkaz pro terminál, který otevře Claude Code se zadáním (úroveň 2, KP09), složený na serveru. */
   terminalCommand?: string
+  /** Popis podezřelého obsahu (prompt injection, příkazy, hesla); null = nic. */
+  risk?: string | null
   /** Kontakt klienta ze zakázky — aby šlo zavolat, když je požadavek nejasný (AD10). */
   phone?: string | null
   email?: string | null
@@ -105,6 +107,11 @@ export function ClientRequestCard({ request }: { request: ClientRequestCardData 
         {request.unclear && (
           <p className="rounded-chip border border-dashed border-signal-line bg-signal-bg px-3 py-2 text-xs leading-relaxed text-signal-ink">
             <strong className="font-semibold">Nejasné, zeptejte se klienta:</strong> {request.unclear}
+          </p>
+        )}
+        {request.risk && (
+          <p role="note" className="rounded-chip border border-signal-line bg-signal-bg px-3 py-2 text-xs leading-relaxed text-signal-ink">
+            <strong className="font-semibold">Pozor, v textu klienta: {request.risk}.</strong> Zadání si před vložením do Claude Code přečtěte. Tyhle části se neplní a zadání na ně upozorní.
           </p>
         )}
         {request.aiStatus === 'failed' && (
