@@ -98,9 +98,11 @@ Bezpečnost `.claude/security/DECISIONS.md` #056.
 
 ### Cena běhu
 
-API se neplatí. Rozbor se počítá do limitu předplatného Claude stejně jako práce v Claude Code;
-kolik jeden rozbor z limitu ukousne, ukáže zkouška na 5 firmách. Původní odhad pro Managed Agents
-byl $0,5–2 za běh.
+API se neplatí. Rozbor se počítá do limitu předplatného Claude stejně jako práce v Claude Code.
+Změřeno na 5 firmách 2026-11-28 (oddíl 11.1): **jeden rozbor = 2–2,7 minuty běhu** (93–137 s od vyzvednutí
+po odevzdání), dva subagenti na Sonnetu dohromady **~540 tisíc tokenů** (každý ~270 tisíc, většinou čtení
+cache), k tomu vedoucí na Opusu (počet tokenů log neukazuje). Kolik procent limitu to je, ukazuje jen
+claude.ai/settings/usage; nezměřeno. Původní odhad pro Managed Agents byl $0,5–2 za běh.
 
 ## 5. Cenová pravidla (vyplní Kryštof v N0)
 
@@ -306,7 +308,7 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | Krok | Co | Hotovo, když | Stav |
 |---|---|---|---|
 | **N0** | Cenová pravidla (oddíl 5); k 14 zakázkám obor, co dostal, proč ta cena | Tabulka v oddílu 5 bez `[DOPLNIT]`, vzory zapsané | hotovo 2026-11-25 (dosavadní zakázky a nabídky jsou úvodní ceny, ne vzor) |
-| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
+| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | na produkci od 2026-11-26 (`b1e5133`, migrace 137); zkouška na 5 firmách 2026-11-28 prošla (5× odevzdáno, oddíl 11.1), u 3 z 5 falešná „vada webu" z cloudu → opravený skill; zbývá karta na 390 a 1280 px |
 | **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | v kódu 2026-11-27 (migrace 142 na produkci); stránka ověřená na 390 a 1280 px s vymyšlenými daty; porovnání s minulými nabídkami v oddílu 12.1 (6 nabídek z Gmailu, ne zakázky z databáze); na produkci od 2026-11-27 (`afe75fc`), čeká první skutečná nabídka |
 | **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | v kódu 2026-11-27; 2026-11-28 doplněné podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty (oddíl 6); čeká první vyhodnocení po měsíci provozu |
 | **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; **2026-11-28 (R-158)** automatické spuštění (souhlas firmy, poptávka z webu) a návrhy vstupů ze schůzky ve Voice (oddíl 13); na produkci od 2026-11-28 (`159b8de`), naostro nevyzkoušené |
@@ -335,6 +337,29 @@ Technika v `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: rozbor firmy
 - **Výsledek nesedí → úloha pošle opravu.** Vstup vrátí 422 a rozbor běží dál; po dvou pokusech úloha
   rozbor vzdá kódem `gave_up`.
 - Vedoucí běží na Opusu (model úlohy), subagenti na Sonnetu (`model: "sonnet"` v nástroji Agent).
+
+### 11.1 Zkouška na 5 firmách (2026-11-28)
+
+Pět firem od asistenta (Kryštof je schválil 2026-11-26), každá zvlášť: řádek ve frontě se zadáním
+složeným stejně jako `loadBriefForContact`, spuštění úlohy přes API trigger (bez tlačítka v adminu,
+prohlížeč nebyl připojený). Přístup k síti prostředí je od 2026-11-28 **Full**; s „Limited" první pokus
+2026-11-27 skončil `gave_up` (WebFetch hlásil ENOTFOUND na všechno kromě hledání).
+
+| Firma | Běh / aktivně | Subagenti (tokeny) | Nabídka (Základ / Doporučená / Plus) | Co sedí | Co nesedí |
+|---|---|---|---|---|---|
+| Reality Dvořák (Třebíč) | 162 s / 137 s | 277k + 269k | 22 000 / 33 000 / 50 000 Kč, pásmo 2 | IČO, sídlo, dotace z Hlídače státu, provize v oboru | web z cloudu 503 (odsud 200) → „web nedostupný" i v textu pro klienta |
+| Kovarson (Vsetín) | 140 s / 112 s | 273k + 269k | 24 000 / 38 000 / 53 000 Kč, pásmo 2 | poznal, že je to výrobce kotlů, ne instalatér (obor v databázi je špatně); ARES | „formulář vrací 404" (odsud 200); `kind` je web, i když má e-shop |
+| Truhlářství Matoušek (Chotýšany) | 132 s / 110 s | 271k + 275k | 13 000 / 19 000 / 32 000 Kč, pásmo 1 | ceník, služby, IČO z webu i ARES, rok 2010 v patičce | — |
+| Tesař Vostál (Kramolín) | 122 s / 93 s | 267k + 272k | 13 000 / 19 000 / 32 000 Kč, pásmo 1 předpokládané | IČO a sídlo z ARES, certifikát HTTPS opravdu nesedí | web jen přes `http://` (jede), nikdo to nezkusil → bez typické zakázky |
+| ELSTAR (Všenory) | ~150 s / 119 s | 268k + 272k | 15 000 / 22 000 / 35 000 Kč, pásmo 1 | služby, stará recenze, prázdná galerie, © 2010 | „formulář bez pole pro zprávu" (pole tam je, shrnutí WebFetch ho vynechalo) |
+
+Všech 5 se odevzdalo napoprvé (200), N2 hned připravilo koncept nabídky a do zvonku přišlo upozornění.
+Žádný podvržený pokyn na webech. **Hlavní nález:** část českých webů vrací serverům v cloudu chybu (503, 404)
+a WebFetch vrací jen shrnutí, ze kterého vypadávají části stránky. Rozbor to bral jako vady webu. Skill teď:
+zkusit `www` i bez, pak `curl` GET (i `http://`), nepovedené načtení jen jako „ověřit v prohlížeči", nikdy
+do textu pro klienta, a „něco chybí" jen podle HTML (DECISIONS #056 doplnění). Úloha si skill bere z GitHubu,
+oprava platí od dalšího běhu po pushi na `main`. Vedoucí i subagent už předtím volali `curl` na ARES a web
+firmy, i když to skill nedovoloval.
 
 ## 12. Jak jsou N2–N4 postavené (2026-11-27, R-155)
 

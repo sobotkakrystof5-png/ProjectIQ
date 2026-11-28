@@ -27,6 +27,12 @@
 > `/dashboard/nabidky` úspěšnost podle podílu ceny z odhadovaného ročního přínosu. Bez migrace. Ověřeno testy, `tsc`,
 > buildem a vzhledem na dočasné stránce (390 a 1280 px); za přihlášením ne. Na produkci od 2026-11-28 (`f2dc993`).
 >
+> Předchozí: 2026-11-28 · **Navrhovač nabídek N1 vyzkoušený na 5 firmách** (R-149): síť prostředí
+> je Full, všech 5 rozborů se odevzdalo (2–2,7 min, subagenti ~540 tisíc tokenů na rozbor) a N2 ke každému
+> připravilo koncept nabídky. U 3 z 5 rozbor vydával chybu z cloudu (503, 404, vynechané pole ve shrnutí WebFetch)
+> za vadu webu, jednou i v textu pro klienta; skill to teď nesmí a smí stránku přečíst `curl` GET (DECISIONS #056).
+> Výsledky v `docs/admin/NABIDKY-PLAN.md` oddíl 11.1. Kartu v prohlížeči nikdo neviděl.
+>
 > Předchozí: 2026-11-28 · **Opravy z testu klientského prostoru** (R-156): pozvání čerstvé zakázky,
 > název zakázky u klienta, tlačítka v řádku výpisu, posun data o den, NPS v Profilu, „Vrátit" u konzultace a drobnosti.
 > **Na produkci od 2026-11-28 (`eefdd68`) i s migracemi 143 a 144**; veřejně ověřeno, bez běhových chyb,
@@ -238,13 +244,12 @@ nahrávání, lišta s dílky, odeslání, vložení, historie a fronta, okno ja
 v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1:** karta „Rozbor firmy" u kontaktu; první verze
 na Managed Agents byla na produkci (`7380078`, migrace 136), nikdy se nespustila. **Přestavěno na cloudovou
 úlohu Claude Code na předplatném (R-149, 2026-11-26):** fronta, API trigger, dva vstupy `/api/public/rozbory`,
-skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Otevřené problémy), zkouška na 5 firmách
-(Kryštof souhlasil 2026-11-26). **N2–N4 na produkci od 2026-11-27 (`afe75fc`, R-155, migrace 142):** návrh nabídky,
+skill `zakaziq-rozbor-firmy`, migrace 137. Na produkci od 2026-11-26, **zkouška na 5 firmách 2026-11-28 prošla**
+(plán oddíl 11.1); zbývá karta na 390 a 1280 px. **N2–N4 na produkci od 2026-11-27 (`afe75fc`, R-155, migrace 142):** návrh nabídky,
 stránka `/nabidka/<token>`, výsledek a vyhodnocení. **N3 doplněné 2026-11-28** (větev `admin/nabidky-n3`):
 podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty. **R-157 na produkci 2026-11-28** (pásmo podle
 přínosu za měsíc). **N4 na produkci od 2026-11-28 (R-158, `159b8de`):** rozbor se spouští sám
-(souhlas firmy, poptávka z webu) a vstupy nabídky ze schůzky ve Voice. Zkouška N1 na 5 firmách je hotová na větvi
-`admin/nabidky-tok` (worktree `n1-zkouska`, `758d106`, jen dokumentace a skill), na `main` zatím není. Dál: první
+(souhlas firmy, poptávka z webu) a vstupy nabídky ze schůzky ve Voice. Dál: první
 skutečná nabídka (Otevřené problémy) a první měsíční vyhodnocení, až nabídky poběží měsíc.
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
@@ -2104,15 +2109,15 @@ Otevřené: samostatná role admina bez DDL (`.claude/security/STATE.md` → Ote
   zvonek; bez webu → věta v upozornění o poptávce; firma od asistenta, která řekne ano → rozbor; kontakt se schůzkou
   ve Voice → u konceptu Ze schůzky → Načíst → Použít → Uložit. Hlídat spotřebu limitu předplatného (až 10
   automatických rozborů denně) a jestli spam z formulářů nezakládá kontakty · od 2026-11-28
-- [ ] **Navrhovač nabídek N1 (R-149) — dozapojit a vyzkoušet:** ~~migrace 137 a nasazení~~ (2026-11-26),
-  ~~úloha „Rozbor firem pro nabídky" a `OFFER_RESEARCH_ROUTINE_ID`~~ (2026-11-26), ~~network secret v prostředí
-  „ZakazIQ most Wispr"~~ (2026-11-27, klíč z Klíčenky, běh dostal 200), ~~spouštěč API a `OFFER_RESEARCH_FIRE_TOKEN`~~
-  (2026-11-27, token i v Klíčence, nové nasazení `dpl_4JWC…` Ready), ~~přístup k síti „Full"~~ (2026-11-28, přepnul
-  Kryštof; při „Limited" první zkouška 2026-11-27 skončila `gave_up`, WebFetch na weby firem i ARES/justice.cz vracel
-  ENOTFOUND, celá cesta spuštění → vyzvednutí → odevzdání ale prošla za 80 s). Rozbory se zkouší bez prohlížeče: řádek
-  `queued` přes SQL (stejné zadání jako `loadBriefForContact`) a spuštění úlohy přes RemoteTrigger. Zbývá: (3) zkouška na 5 firmách
-  od asistenta (reality, instalatérství, truhlářství na Webnode, tesařství s webem jen z e-mailu, elektro) po jednom,
-  zapsat dobu a spotřebu limitu, (4) projít kartu na 390 a 1280 px · od 2026-11-26
+- [ ] **Navrhovač nabídek N1 (R-149) — zbývá karta a pár drobností:** ~~migrace 137 a nasazení~~, ~~klíče, úloha
+  a spouštěč~~, ~~přístup k síti Full~~ (2026-11-28, s Limited úloha `gave_up`), ~~zkouška na 5 firmách~~ (2026-11-28,
+  5× odevzdáno, plán oddíl 11.1). Zbývá: (1) projít kartu „Rozbor firmy" na 390 a 1280 px na produkci
+  (`/dashboard/kontakty/<id>` u pěti testovaných firem), (2) oprava skillu (falešné vady webu z cloudu) platí až po
+  pushi na `main` — ověřit dalším rozborem, že rozbor webu Reality Dvořák nebo tesaře už nehlásí jako nefunkční,
+  (3) obor „instalatérství" u Kovarsonu v `outreach_leads` je špatně (je to výrobce kotlů), (4) pět konceptů nabídek
+  z testu (stav `draft`) nechat, nebo smazat podle Kryštofa; před odesláním zkontrolovat text pro klienta
+  (u Reality Dvořák slibuje „spolehlivě dostupný web" kvůli falešné 503), (5) prostředí „ZakazIQ most Wispr"
+  nese rozbory, název je po R-145 zavádějící (přejmenovat, nemazat) · od 2026-11-26
 - [ ] **Oprava a stažení faktury (R-148) — nasadit a projít naživo:** ověřeno testy nad PGlite a `tsc`,
   v prohlížeči ne. Projít za přihlášením: detail 2026001 → Stáhnout PDF (uloží soubor), Opravit fakturu →
   formulář s údaji a poznámkou „Nahrazuje fakturu 2026001.“ → Vystavit opravenou → nová má další číslo,
@@ -2646,6 +2651,17 @@ Otevřené: samostatná role admina bez DDL (`.claude/security/STATE.md` → Ote
   PGlite se sloučeným kontaktem), `npm run build`, vzhled na dočasné stránce s vymyšlenými daty na 390 a 1280 px
   (bez přetečení, konzole bez chyb; stránka smazaná). Za přihlášením neověřeno, žádná nabídka zatím neodešla.
 - **chore** Worktree `.claude/worktrees/nabidky-n2` a větev `admin/nabidky-n2` smazané (vše v `main`).
+
+### 2026-11-28 (navrhovač nabídek N1 — zkouška na 5 firmách, R-149)
+- **chore** Přístup k síti prostředí „ZakazIQ most Wispr" (`env_015BA5…`) přepnul Kryštof na Full. Zkouška na 5 firmách
+  od asistenta (Reality Dvořák, Kovarson, Truhlářství Matoušek, Tesař Vostál, ELSTAR) po jednom: řádek ve frontě přes
+  Neon (zadání jako `loadBriefForContact`) a spuštění přes API trigger. Všech 5 odevzdáno napoprvé (200), 93–137 s
+  od vyzvednutí, subagenti 267–277 tisíc tokenů každý; N2 připravilo 5 konceptů nabídek (13 000–53 000 Kč za Plus).
+  Neúspěšný pokus z 2026-11-27 (`gave_up`, síť Limited) zůstal v `offer_research`. Tabulka v plánu oddíl 11.1.
+- **fix** Skill `zakaziq-rozbor-firmy`: stránka, kterou cloud nenačte (weby vracejí serverům v zahraničí 503 nebo 404),
+  není vada webu a nepatří do textu pro klienta; zkusit `www` i bez a `curl` GET (WebFetch `http://` přepíná na https);
+  „na webu chybí X" jen podle HTML, protože shrnutí WebFetch části stránky vynechává. Soubory:
+  `.claude/skills/zakaziq-rozbor-firmy/SKILL.md`, `.claude/security/DECISIONS.md` #056 doplnění, kopie v `.agents/`.
 
 ### 2026-11-28 (opravy z testu klientského prostoru, R-156)
 - **chore** Test klientského prostoru 2026-11-27 na localhostu (worktree `.claude/worktrees/klient-test-local`,
