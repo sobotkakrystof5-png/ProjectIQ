@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { verifyBearerApiKey, getClientIp } from '@/lib/api-auth'
 import { readJsonLimited } from '@/lib/security/request-body'
 import { isApiRateLimited, recordApiRequest } from '@/lib/api-rate-limit'
 import { createNotification } from '@/lib/notifications'
 import { ingestOutreachLeads, type OutreachEvent } from '@/lib/admin/outreach'
+import { autoResearchAfterConsent } from '@/lib/admin/offers/auto-research'
 import { outreachPayloadSchema } from '@/types/outreach'
 
 /**
@@ -89,6 +90,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       link: '/dashboard/ai-asistent?pohled=kontakty',
     })
   }
+
+  // Firmy, které nově řekly ano, dostanou rozbor pro nabídku samy (R-158). Po odpovědi:
+  // spuštění úlohy na claude.ai nesmí zdržet Growth OS ani shodit uložený snímek.
+  const consented = result.consented ?? []
+  if (consented.length > 0) after(() => autoResearchAfterConsent(consented))
 
   return NextResponse.json(
     { success: true, received: result.received, saved: result.saved, calls: result.calls, emails: result.emails },

@@ -3,10 +3,12 @@ import type { LeadEmailReadiness } from '@/components/LeadEmailDialog'
 import { listResearchForContact } from '@/lib/admin/offers/research'
 import { listProposalsForContact, listSimilarOffers, loadPricingRules, offerUrl } from '@/lib/admin/offers/proposals'
 import type { SimilarOffer } from '@/lib/admin/offers/similar'
+import { latestMeetingForContact, type OfferMeeting } from '@/lib/admin/offers/meeting-hints'
 
 /**
- * Nabídka na kartě kontaktu (navrhovač nabídek, N2–N3, R-155). Načte nabídky,
- * cenová pravidla, stav posledního rozboru a ke konceptu podobné nabídky.
+ * Nabídka na kartě kontaktu (navrhovač nabídek, N2–N4, R-155, R-158). Načte nabídky,
+ * cenová pravidla, stav posledního rozboru a ke konceptu podobné nabídky
+ * a poslední schůzku s klientem.
  * Bez migrace 142 se karta neukáže a zbytek stránky běží dál (stejně jako
  * rozbor bez 136/137).
  */
@@ -41,12 +43,20 @@ export async function ProposalSection({
         return []
       })
     : []
+  // Poslední schůzka s klientem (N4, R-158): taky jen podklad, bez ní karta běží dál.
+  const meeting: OfferMeeting | null = draft
+    ? await latestMeetingForContact(contactId).catch((err: unknown) => {
+        console.error('[navrhovac] schůzka ke konceptu se nenačetla:', err instanceof Error ? err.message.slice(0, 120) : 'unknown')
+        return null
+      })
+    : null
   return (
     <ProposalCard
       contactId={contactId}
       rules={rules}
       proposals={proposals.map((p) => ({ ...p, url: offerUrl(p.public_token) }))}
       similar={similar}
+      meeting={meeting}
       researchDoneId={latest?.status === 'done' ? latest.id : null}
       researchOpen={latest?.status === 'queued' || latest?.status === 'running'}
       mail={{ company, email, readiness }}

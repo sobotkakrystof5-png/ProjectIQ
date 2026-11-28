@@ -177,7 +177,15 @@ export type OutreachEvent = (
   leadId?: string
 }
 
-export type IngestResult = { received: number; saved: number; calls: number; emails: number; events: OutreachEvent[] }
+export type IngestResult = {
+  received: number
+  saved: number
+  calls: number
+  emails: number
+  events: OutreachEvent[]
+  /** Kontakty firem, které v tomhle snímku nově řekly ano: dostanou rozbor firmy samy (R-158). */
+  consented: string[]
+}
 
 function inQueue(p: { status: string; do_not_call: boolean; demo_views: number; replied: boolean; handled: boolean }): boolean {
   if (p.handled || p.do_not_call) return false
@@ -340,8 +348,8 @@ export async function ingestOutreachLeads(input: OutreachLeadPayload[], version 
     ...e,
     leadId: idByExternal.get(externalId),
   }))
-  await syncContacts(fresh, prev, idByExternal)
-  return { received: input.length, saved: savedIds.size, calls, emails, events }
+  const consented = await syncContacts(fresh, prev, idByExternal)
+  return { received: input.length, saved: savedIds.size, calls, emails, events, consented }
 }
 
 /** Strop propisů do Kontaktů na jednu dávku; zbytek dožene další snímek. */
@@ -351,12 +359,14 @@ const CONTACT_SYNC_LIMIT = 40
  * Firmy, které řekly ano, propojí s kontaktem a propíšou jejich e-mail
  * a telefon (R-141). Jen když je co dělat: nová firma v Kontaktech, nebo
  * Growth OS poslal jiný e-mail či telefon než minule. Selhání snímek nezruší.
+ * Vrací kontakty firem, které ano řekly až v tomhle snímku (R-158).
  */
 async function syncContacts(
   fresh: OutreachLeadPayload[],
   prev: Map<string, Prev>,
   idByExternal: Map<string, string>,
-): Promise<void> {
+): Promise<string[]> {
+  const consented: string[] = []
   let done = 0
   for (const lead of fresh) {
     if (done >= CONTACT_SYNC_LIMIT) break
@@ -375,11 +385,13 @@ async function syncContacts(
 
     done += 1
     try {
-      await syncOutreachContact(id, { email: before?.email ?? null, phone: before?.phone ?? null })
+      const contactId = await syncOutreachContact(id, { email: before?.email ?? null, phone: before?.phone ?? null })
+      if (contactId && newlyConsented) consented.push(contactId)
     } catch (err) {
       console.error('[outreach] propsání údajů firmy do Kontaktů selhalo', lead.external_id, (err as Error).message)
     }
   }
+  return consented
 }
 
 async function upsertLeads(records: ReturnType<typeof toRecord>[], v2: boolean): Promise<{ external_id: string; id: string }[]> {

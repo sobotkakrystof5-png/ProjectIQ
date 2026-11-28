@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-28 — review: navrhovač nabídek N4, automatický rozbor a návrhy ze schůzky (R-158)
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: větev `admin/nabidky-n4` — `lib/admin/offers/{auto-research,meeting-hints,meeting-hints-check}.ts`, hooky v `lib/web-leads.ts` (kontaktní formulář i objednávka) a `app/api/public/outreach/route.ts`, `app/offer-meeting-actions.ts`, `components/admin/offers/meeting-hints.tsx`, upozornění v `lib/admin/offers/research.ts`, `ensureContact` v `lib/admin/contacts.ts`
+Výsledek: 1 nález opravený. Prošlo: vstupy poptávek dál validuje Zod s délkami, web z formuláře jen přes `safeHttpUrl`, všechny dotazy parametrizované, nové akce za `requireAuth()` a s `uuid`, přepis jde modelu jako data a výstup přes Zod a kontrolu citací, citace i názvy firem v upozorněních se vykreslují jako text. Spuštění úlohy jde jen z `after()` a nikdy nevyhazuje, takže nezdrží ani neshodí odpověď webu a Growth OS.
+Nálezy: (1) `ensureContact` doplňuje existujícímu kontaktu chybějící e-mail a telefon; poptávka z webu by tak umožnila komukoli přilepit svůj e-mail na kontakt klienta, kterého zná jen podle telefonu (faktury a pozvánky by pak šly jemu).
+Opraveno: (1) `ensureContact(..., fillMissing: false)` pro poptávky z webu: kontakt se najde nebo založí, existujícímu se nic nedoplní; test `admin-navrhovac-n4` „poptávka z webu cizímu kontaktu nic nedoplní".
+Zůstává: kdo pošle formulář, přiměje úlohu číst adresu, kterou zadal, a ukrojí z limitu předplatného (strop 10 automatických rozborů denně); přijato v DECISIONS #056 (f), (g).
+
 ## 2026-11-28 — review: opravy z testu klientského prostoru (R-156)
 Spouštěč: před commitem (`web-security-review`)
 Rozsah: větev `admin/klient-opravy` — klikací odkazy v chatu (`splitLinks` v `lib/security/html.ts`, `components/chat/chat-thread.tsx`), pozvání do prostoru jednou transakcí (`app/portal-admin-actions.ts`), migrace 143 (`portal.project_display_name`, nová těla `portal.link_project` a `portal.sync_project`) a 144 (`public.consultation_cancellations`, nová těla `portal.book_consultation` a `portal.cancel_consultation`)

@@ -57,6 +57,9 @@ export function researchSetup(): ResearchSetup {
 /* Zadání                                                              */
 /* ------------------------------------------------------------------ */
 
+/** Co rozbor spustilo samo (R-158): souhlas firmy od asistenta, nebo poptávka z webu. Ruční spuštění nic. */
+export type AutoTrigger = 'outreach' | 'web_lead'
+
 export type OfferBrief = {
   company: string
   person: string | null
@@ -66,6 +69,8 @@ export type OfferBrief = {
   industry: string | null
   /** Starší rešerše z Growth OS (text od modelu, může být nepřesný). */
   prior: string[]
+  /** Spuštěno samo. Do úlohy nejde (`briefForRoutine`), jen pro kartu a strop automatiky. */
+  trigger?: AutoTrigger
 }
 
 /** Domény, ze kterých se web firmy odvodit nedá. */
@@ -90,8 +95,16 @@ const clean = (v: unknown, max: number): string | null => {
 /** Jméno, ze kterého je vidět e-mail, do zadání nepatří (kontakt bez jména se jmenuje adresou). */
 const notEmail = (v: string | null): string | null => (v !== null && v.includes('@') ? null : v)
 
-/** Zadání pro kontakt: kontakt (kořen sloučení) + nejnovější firma od asistenta, která na něj ukazuje. */
-export async function loadBriefForContact(contactId: string, webOverride?: string | null): Promise<OfferBrief | null> {
+/**
+ * Zadání pro kontakt: kontakt (kořen sloučení) + nejnovější firma od asistenta, která na něj ukazuje.
+ * `companyHint` je náhradní název firmy, když ho kontakt nemá (u poptávky z webu doména webu),
+ * ať úloha nehledá jméno člověka jako firmu.
+ */
+export async function loadBriefForContact(
+  contactId: string,
+  webOverride?: string | null,
+  companyHint?: string | null,
+): Promise<OfferBrief | null> {
   const [contacts, leads] = await adminDb.batch([
     {
       text: `SELECT c.display_name, c.company, c.email, c.ico
@@ -125,7 +138,11 @@ export async function loadBriefForContact(contactId: string, webOverride?: strin
     webFromEmail(c.email)
 
   const company =
-    notEmail(clean(c.company, 200)) ?? notEmail(clean(lead?.company_name, 200)) ?? notEmail(clean(c.display_name, 200)) ?? 'Firma'
+    notEmail(clean(c.company, 200)) ??
+    notEmail(clean(lead?.company_name, 200)) ??
+    notEmail(clean(companyHint, 200)) ??
+    notEmail(clean(c.display_name, 200)) ??
+    'Firma'
   const person = notEmail(clean(c.display_name, 200))
   return {
     company,
@@ -231,13 +248,14 @@ async function fireAndRecord(id: string, fire: FireRoutine): Promise<boolean> {
 }
 
 export async function startResearch(
-  input: { contactId: string; web?: string | null },
+  input: { contactId: string; web?: string | null; companyHint?: string | null; trigger?: AutoTrigger },
   fire: FireRoutine = fireRoutine,
 ): Promise<StartOutcome> {
   if (!intakeConfigured()) return { ok: false, error: 'not_connected' }
 
-  const brief = await loadBriefForContact(input.contactId, input.web)
-  if (brief === null) return { ok: false, error: 'not_found' }
+  const loaded = await loadBriefForContact(input.contactId, input.web, input.companyHint)
+  if (loaded === null) return { ok: false, error: 'not_found' }
+  const brief: OfferBrief = input.trigger ? { ...loaded, trigger: input.trigger } : loaded
 
   const today = await adminDb<{ n: number }>`
     SELECT count(*)::int AS n FROM offer_research WHERE created_at > now() - interval '24 hours'`
@@ -351,16 +369,36 @@ export async function submitResult(id: string, input: unknown): Promise<SubmitOu
   return { ok: true }
 }
 
+type FailedRow = { contact_id: string | null; company: string | null; error: string }
+
+/** Neúspěch rozboru do zvonku (R-158): rozbor se vzdal nebo nedoběhl, nabídka se sama nepřipraví. */
+export async function notifyResearchFailed(rows: FailedRow[]): Promise<void> {
+  const shown = rows.filter((r) => r.contact_id !== null).slice(0, 5)
+  for (const r of shown) {
+    await createNotification({
+      type: 'offer_research_failed',
+      title: `Rozbor firmy se nepovedl: ${(r.company ?? 'firma').slice(0, 120)}`,
+      body:
+        r.error === 'gave_up'
+          ? 'O firmě se nepodařilo najít nic spolehlivého. Nabídku připravte ručně, nebo na kartě kontaktu doplňte web a spusťte rozbor znovu.'
+          : 'Rozbor nedoběhl včas. Na kartě kontaktu ho můžete spustit znovu.',
+      link: `/dashboard/kontakty/${r.contact_id}`,
+    })
+  }
+}
+
 /** Úloha hlásí, že rozbor nedokáže dokončit. Text od úlohy se neukládá, jen kód. */
 export async function failResearch(id: string): Promise<SubmitOutcome> {
-  const rows = await adminDb<{ id: string }>`
+  const rows = await adminDb<FailedRow>`
     UPDATE offer_research
        SET status = 'failed', error = 'gave_up',
            active_seconds = greatest(0, extract(epoch FROM now() - coalesce(claimed_at, created_at)))::int,
            finished_at = now(), updated_at = now()
      WHERE id = ${id} AND status = 'running'
- RETURNING id::text`
-  return rows[0] ? { ok: true } : whyNotRunning(id)
+ RETURNING contact_id::text, brief->>'company' AS company, error`
+  if (!rows[0]) return whyNotRunning(id)
+  await notifyResearchFailed(rows)
+  return { ok: true }
 }
 
 /* ------------------------------------------------------------------ */
@@ -373,13 +411,14 @@ export async function failResearch(id: string): Promise<SubmitOutcome> {
  * pak smaže staré podle retence.
  */
 export async function maintainOfferResearch(): Promise<{ timedOut: number; purged: number }> {
-  const stuck = await adminDb<{ id: string }>`
+  const stuck = await adminDb<FailedRow>`
     UPDATE offer_research
        SET status = 'failed', error = CASE WHEN status = 'running' THEN 'timeout' ELSE 'not_started' END,
            finished_at = now(), updated_at = now()
      WHERE (status = 'running' AND coalesce(claimed_at, created_at) < now() - interval '1 minute' * ${RUN_TIMEOUT_MINUTES})
         OR (status = 'queued' AND created_at < now() - interval '1 hour' * ${QUEUE_TIMEOUT_HOURS})
- RETURNING id::text`
+ RETURNING contact_id::text, brief->>'company' AS company, error`
+  await notifyResearchFailed(stuck)
   const purged = await adminDb<{ n: number }>`SELECT purge_offer_research() AS n`
   return { timedOut: stuck.length, purged: purged[0]?.n ?? 0 }
 }

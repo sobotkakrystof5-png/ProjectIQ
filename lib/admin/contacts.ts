@@ -406,6 +406,12 @@ export type EnsureContactInput = {
   phone?: string | null
   source?: string
   seenAt?: string | null
+  /**
+   * Doplnit existujícímu kontaktu chybějící firmu, e-mail a telefon (výchozí ano, R-141).
+   * `false` pro vstupy zvenku bez ověření (poptávka z webu, R-158): kdo zná telefon
+   * klienta, nesmí na jeho kontakt přilepit svůj e-mail.
+   */
+  fillMissing?: boolean
 }
 
 /**
@@ -420,6 +426,12 @@ export async function ensureContact(input: EnsureContactInput): Promise<string |
   if (name === null) return null
 
   const found = await findContact(phone, email)
+  if (found !== null && input.fillMissing === false) {
+    await adminDb`
+      UPDATE contacts SET last_seen_at = greatest(coalesce(last_seen_at, 'epoch'::timestamptz), coalesce(${input.seenAt ?? null}::timestamptz, now()))
+       WHERE id = ${found}`
+    return found
+  }
   if (found !== null) {
     await adminDb.batch([
       {

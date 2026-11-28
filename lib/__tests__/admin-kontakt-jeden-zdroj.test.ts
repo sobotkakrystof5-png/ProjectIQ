@@ -160,6 +160,16 @@ describe('firma od AI asistenta', () => {
     expect(row?.email).toBe('jan@example.cz')
   })
 
+  it('firma, která nově řekla ano, je ve snímku mezi souhlasy jen jednou (rozbor se spustí sám, R-158)', async () => {
+    const at = () => new Date(Date.now() + ++tick * 1000).toISOString()
+    expect((await ingestOutreachLeads(snapshot({ status: 'no_answer', updated_at: at() }))).consented).toEqual([])
+    const second = await ingestOutreachLeads(snapshot({ updated_at: at() }))
+    const id = (await db.query<{ id: string }>(`SELECT id::text FROM outreach_leads WHERE external_id = 'vizeon-outreach:1'`)).rows[0].id
+    expect(second.consented).toEqual([(await contactOf(id)).id])
+    // Další snímek téže firmy (i s jiným telefonem) už nový souhlas není.
+    expect((await ingestOutreachLeads(snapshot({ updated_at: at(), phone: '+420777000009' }))).consented).toEqual([])
+  })
+
   it('bez souhlasu (nezvedl) do Kontaktů nejde', async () => {
     const id = await ingest({ status: 'no_answer' })
     expect(await contactOf(id)).toBeUndefined()

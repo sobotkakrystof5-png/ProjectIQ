@@ -10,6 +10,7 @@ import { Card, CardHead } from '@/components/admin/card'
 import { LeadEmailDialog, type LeadEmailReadiness } from '@/components/LeadEmailDialog'
 import { ProposalValueBox } from '@/components/admin/offers/proposal-value'
 import { SimilarOffers } from '@/components/admin/offers/similar-offers'
+import { MeetingHints } from '@/components/admin/offers/meeting-hints'
 import {
   createProposalAction,
   deleteProposalAction,
@@ -35,6 +36,7 @@ import {
 import { PROPOSAL_STATUS_LABEL, deviation, rulePrices, variantOf } from '@/lib/admin/offers/proposal-model'
 import type { ProposalRow } from '@/lib/admin/offers/proposals'
 import type { SimilarOffer } from '@/lib/admin/offers/similar'
+import type { OfferMeeting } from '@/lib/admin/offers/meeting-hints'
 import { OFFER_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { cn } from '@/lib/utils'
 
@@ -139,6 +141,7 @@ export function ProposalCard({
   rules,
   proposals: initial,
   similar,
+  meeting = null,
   researchDoneId,
   researchOpen,
   mail,
@@ -148,6 +151,8 @@ export function ProposalCard({
   proposals: ProposalWithUrl[]
   /** Ke konceptu: dřívější nabídky podobným firmám (N3). */
   similar: SimilarOffer[]
+  /** Ke konceptu: poslední schůzka s klientem ze ZakazIQ Voice (N4, R-158). */
+  meeting?: OfferMeeting | null
   /** Poslední hotový rozbor (pro „Navrhnout cenu"). */
   researchDoneId: string | null
   /** Rozbor čeká nebo běží: návrh vznikne sám, až doběhne. */
@@ -234,6 +239,7 @@ export function ProposalCard({
           mail={mail}
           contactId={contactId}
           similar={similar}
+          meeting={meeting}
           onSaved={replace}
           onRemove={() => remove(current)}
         />
@@ -288,6 +294,7 @@ function ProposalEditor({
   mail,
   contactId,
   similar,
+  meeting,
   onSaved,
   onRemove,
 }: {
@@ -296,6 +303,7 @@ function ProposalEditor({
   mail: { company: string; email: string | null; readiness: LeadEmailReadiness }
   contactId: string
   similar: SimilarOffer[]
+  meeting: OfferMeeting | null
   onSaved: (row: ProposalRow) => void
   onRemove: () => void
 }) {
@@ -383,6 +391,8 @@ function ProposalEditor({
       </div>
 
       <ProposalValueBox value={proposal.value} internal={proposal.internal} position={state.position} bandText={bandText} />
+
+      {meeting && <MeetingHints proposalId={proposal.id} meeting={meeting} onApply={set} />}
 
       <fieldset className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <legend className="sr-only">Z čeho se cena počítá</legend>

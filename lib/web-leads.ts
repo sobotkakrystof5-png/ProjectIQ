@@ -10,6 +10,7 @@ import { webLeadSchemaFor, type WebLeadPayload } from '@/types/web-lead'
 import { pragueWallClockToISO, formatPragueDateTime } from '@/lib/prague-time'
 import { sendBrandedEmail } from '@/lib/email'
 import { createNotification } from '@/lib/notifications'
+import { researchAfterWebLead, webLeadResearchNote } from '@/lib/admin/offers/auto-research'
 import {
   LEAD_ORIGINS, LEAD_ORIGIN_KEYS, LEADS_INBOX_PATH, bookingRateLimitKey, leadRateLimitKey, adminEmail,
   toLeadOrigin, type LeadOrigin,
@@ -152,12 +153,15 @@ export function bookingPostHandler(origin: LeadOrigin) {
           })
         }
 
+        const note = webLeadResearchNote(null, data.clientEmail)
         await createNotification({
           type: 'web_lead',
           title: `Nová poptávka z ${cfg.domain} — ${data.clientName}`,
-          body: `${data.projectType} · ${formatPragueDateTime(scheduledAtISO)}${data.message ? ' — ' + data.message : ''}`,
+          body: `${note ? note + ' ' : ''}${data.projectType} · ${formatPragueDateTime(scheduledAtISO)}${data.message ? ' — ' + data.message : ''}`,
           link: LEADS_INBOX_PATH,
         })
+        // Rozbor firmy pro nabídku se spustí sám (R-158); nikdy nevyhazuje.
+        await researchAfterWebLead({ projectId, name: data.clientName, email: data.clientEmail, phone: data.clientPhone ?? null })
       })
 
       return NextResponse.json(
@@ -244,12 +248,25 @@ export function webLeadPostHandler(origin: LeadOrigin) {
     // Nekritický vedlejší efekt — createNotification si chyby chytá sama a
     // nikdy nesmí shodit odpověď webu. `after()` ho pustí po odpovědi, ale
     // na rozdíl od plovoucí `void` promise ho zaručeně dokončí (AD08).
-    after(() => createNotification({
-      type: 'web_lead',
-      title: `Nová poptávka z ${cfg.domain} — ${data.name}`,
-      body: data.automationGoal ?? data.message ?? undefined,
-      link: LEADS_INBOX_PATH,
-    }))
+    // Po poptávce se sám spustí rozbor firmy pro nabídku (R-158). Když není
+    // podle čeho hledat, řekne to jedna věta v upozornění o poptávce.
+    after(async () => {
+      const note = webLeadResearchNote(data.companyUrl, data.email)
+      const text = data.automationGoal ?? data.message ?? null
+      await createNotification({
+        type: 'web_lead',
+        title: `Nová poptávka z ${cfg.domain} — ${data.name}`,
+        body: [note, text].filter(Boolean).join(' ') || undefined,
+        link: LEADS_INBOX_PATH,
+      })
+      await researchAfterWebLead({
+        projectId,
+        name: data.name,
+        email: data.email,
+        phone: data.phone ?? null,
+        companyUrl: data.companyUrl ?? null,
+      })
+    })
 
     return NextResponse.json({ success: true, id: projectId }, { status: 201 })
   }

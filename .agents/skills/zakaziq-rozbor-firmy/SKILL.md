@@ -119,6 +119,11 @@ curl -sS -X POST "https://www.zakaziq.cz/api/public/rozbory/<id>" \
 - **409** — rozbor už neběží (byl smazaný nebo ukončený); nic neopravuj, pokračuj dalším.
 - Když rozbor dokončit nejde (web i rejstříky nedostupné, druhý pokus po 422 neprošel), pošli
   `{"nepodarilo_se":"krátký důvod"}` na stejnou adresu.
+- **Když o firmě nic spolehlivého nenajdeš, vzdej to** a pošli `{"nepodarilo_se":"o firmě nic nenalezeno"}`: firma
+  nemá vlastní web ani profil, ARES ji pod názvem a městem nezná a jiný zdroj, že jde právě o ni, není. Nic si
+  nedomýšlej a nesestavuj výsledek z oboru naslepo. Kryštofovi přijde upozornění a nabídku připraví ručně. Rozbor
+  se často spouští sám (po souhlasu firmy s ukázkou nebo po poptávce z webu); u poptávky z webu je `firma` doména
+  webu a `kontaktni_osoba` člověk, který psal.
 
 ## 6. Další rozbor a konec
 

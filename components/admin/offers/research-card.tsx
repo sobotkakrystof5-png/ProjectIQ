@@ -52,6 +52,9 @@ const dateTime = (iso: string) =>
 function runMeta(row: ResearchRow): string {
   const parts = [dateTime(row.created_at)]
   if (row.active_seconds !== null && row.active_seconds > 0) parts.push(`${Math.max(1, Math.round(row.active_seconds / 60))} min`)
+  // Spuštěno samo (R-158): po souhlasu firmy s ukázkou, nebo po poptávce z webu.
+  if (row.brief.trigger === 'outreach') parts.push('spuštěno samo po souhlasu firmy')
+  if (row.brief.trigger === 'web_lead') parts.push('spuštěno samo po poptávce z webu')
   return parts.join(' · ')
 }
 

@@ -43,6 +43,10 @@ export type NotificationType =
   | 'meeting_invite_undelivered'
   /** Rozbor firmy pro navrhovač nabídek doběhl v Claude Code (R-149). */
   | 'offer_research_done'
+  /** Rozbor firmy se vzdal nebo nedoběhl (R-158). */
+  | 'offer_research_failed'
+  /** Rozbor firmy se sám nespustil: není podle čeho hledat, nebo je vyčerpaný denní strop (R-158). */
+  | 'offer_research_skipped'
   /** Klient poprvé otevřel stránku nabídky (N2, R-155). */
   | 'offer_opened'
   /** Klient na stránce nabídky vybral variantu (N2, R-155). */

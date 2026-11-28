@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Calendar, Star, ClipboardList, Inbox, ArrowRightLeft, Bell,
-  CheckCheck, ExternalLink, Sparkles, FileText, MessageSquarePlus, PhoneCall, MailWarning, ListChecks, Mic, Search, Eye, Tag, BarChart3,
+  CheckCheck, ExternalLink, Sparkles, FileText, MessageSquarePlus, PhoneCall, MailWarning, ListChecks, Mic, Search, SearchX, Eye, Tag, BarChart3,
 } from 'lucide-react'
 import { markNotificationRead, markAllNotificationsRead } from '@/app/notification-actions'
 import { cn } from '@/lib/utils'
@@ -40,6 +40,8 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   voice_cost_cap:        { icon: Mic,               color: ICON, label: 'Diktování' },
   meeting_invite_undelivered: { icon: MailWarning, color: ICON, label: 'Pozvánka nedorazila' },
   offer_research_done:   { icon: Search,            color: ICON, label: 'Rozbor firmy' },
+  offer_research_failed: { icon: SearchX,           color: ICON, label: 'Rozbor firmy se nepovedl' },
+  offer_research_skipped:{ icon: SearchX,           color: ICON, label: 'Rozbor firmy se nespustil' },
   offer_opened:          { icon: Eye,               color: ICON, label: 'Nabídka otevřená' },
   offer_chosen:          { icon: Tag,               color: ICON, label: 'Klient vybral variantu' },
   offer_review:          { icon: BarChart3,         color: ICON, label: 'Vyhodnocení nabídek' },
