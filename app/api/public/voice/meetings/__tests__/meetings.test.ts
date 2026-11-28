@@ -19,7 +19,8 @@ import { setAdminDbForTests } from '@/lib/admin/db'
 import { pgliteAdminDriver } from '@/lib/__tests__/helpers/admin-pglite'
 import { createDevice } from '@/lib/admin/voice/devices'
 import { GET as LIST, POST as CREATE } from '@/app/api/public/voice/meetings/route'
-import { DELETE, GET as DETAIL } from '@/app/api/public/voice/meetings/[id]/route'
+import { DELETE, GET as DETAIL, PATCH } from '@/app/api/public/voice/meetings/[id]/route'
+import { GET as CONTACTS } from '@/app/api/public/voice/meetings/[id]/contacts/route'
 import { POST as TURN } from '@/app/api/public/voice/meetings/[id]/turns/route'
 import { POST as FINISH } from '@/app/api/public/voice/meetings/[id]/finish/route'
 import { POST as SUMMARIZE } from '@/app/api/public/voice/meetings/[id]/summary/route'
@@ -86,7 +87,15 @@ const body = async (res: Response) => (await res.json()) as Record<string, any>
 beforeAll(async () => {
   db = new PGlite()
   await db.exec(`CREATE TABLE api_requests (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, endpoint text NOT NULL, ip text NOT NULL, created_at timestamptz DEFAULT now())`)
-  await db.exec(`CREATE TABLE contacts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), display_name text NOT NULL)`)
+  await db.exec(`CREATE TABLE contacts (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), display_name text NOT NULL, company text, email text, phone text,
+    merged_into uuid, last_seen_at timestamptz)`)
+  await db.exec(`CREATE TABLE client_leads (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), contact_id uuid)`)
+  await db.exec(`CREATE TABLE projects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), contact_id uuid)`)
+  await db.exec(`CREATE TABLE consultation_slots (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), contact_id uuid)`)
+  await db.exec(`CREATE TABLE calendar_events (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), title text NOT NULL, starts_at timestamptz NOT NULL, ends_at timestamptz NOT NULL,
+    lead_id uuid, project_id uuid, consultation_slot_id uuid, invite_to text)`)
   await db.exec(fs.readFileSync(path.join(ROOT, 'migrations/018_notifications.sql'), 'utf8'))
   await db.exec(fs.readFileSync(path.join(ROOT, 'migrations/138_zakaziq_voice.sql'), 'utf8'))
   const m139 = fs.readFileSync(path.join(ROOT, 'migrations/139_voice_schuzky.sql'), 'utf8')
@@ -116,7 +125,7 @@ beforeEach(async () => {
   fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => reply(url, init))
   vi.stubGlobal('fetch', fetchMock)
   vi.spyOn(console, 'error').mockImplementation(() => undefined)
-  await db.exec(`DELETE FROM api_requests; DELETE FROM voice_meetings`)
+  await db.exec(`DELETE FROM api_requests; DELETE FROM voice_meetings; DELETE FROM calendar_events; DELETE FROM client_leads; DELETE FROM contacts`)
 })
 
 afterEach(() => {
@@ -158,6 +167,8 @@ describe('schůzky přes /api/public/voice/meetings', () => {
     expect(meeting.status).toBe('done')
     expect(meeting.blocks.map((b: { label: string }) => b.label)).toEqual(['Kryštof', 'Klient'])
     expect(meeting.transcript).toBe('[0:00] Kryštof: Dobrý den, tady Kryštof z Prvotka.\n\n[0:04] Klient: Dobrý den, cena bude čtyřicet tisíc.')
+    // Kontrola po schůzce: obě strany slyšet, jedna promluva z mikrofonu byla ozvěna.
+    expect(meeting.check).toEqual({ meTurns: 1, otherTurns: 1, echoTurns: 1 })
 
     const sum = await SUMMARIZE(json(`http://localhost/api/public/voice/meetings/${id}/summary`, {}), ctx(id))
     expect(sum.status).toBe(200)
@@ -209,5 +220,48 @@ describe('schůzky přes /api/public/voice/meetings', () => {
     sttTexts = ['Teď už to jde.']
     const retried = await TURN(turnReq(id, { track: 'me', idx: 0, startMs: 0, durationMs: 2000, speechMs: 1500 }), ctx(id))
     expect((await body(retried)).text).toBe('Teď už to jde.')
+  })
+
+  it('kontakt z Macu: návrh z kalendáře, hledání bez e-mailu, přiřazení a odpojení', async () => {
+    const id = crypto.randomUUID()
+    await CREATE(json('http://localhost/api/public/voice/meetings', createBody(id)))
+    const [{ root }] = (await db.query<{ root: string }>(
+      `INSERT INTO contacts (display_name, company, email) VALUES ('Jan Horák', 'Ateliér Horák', 'jan@horak.example') RETURNING id::text AS root`,
+    )).rows
+    const [{ old }] = (await db.query<{ old: string }>(
+      `INSERT INTO contacts (display_name, email, merged_into) VALUES ('J. Horák', 'stary@horak.example', $1) RETURNING id::text AS old`, [root],
+    )).rows
+    await db.query(`INSERT INTO contacts (display_name, email) VALUES ('Petra Nováková', 'petra@example.cz')`)
+    // Událost v kalendáři ve stejný čas, přes Hovory na sloučený kontakt.
+    const [{ lead }] = (await db.query<{ lead: string }>(`INSERT INTO client_leads (contact_id) VALUES ($1) RETURNING id::text AS lead`, [old])).rows
+    await db.query(
+      `INSERT INTO calendar_events (title, starts_at, ends_at, lead_id) VALUES ('Schůzka', now() - interval '65 minutes', now() - interval '5 minutes', $1)`, [lead],
+    )
+    // Událost o den dřív se nenavrhne.
+    await db.query(`INSERT INTO calendar_events (title, starts_at, ends_at, invite_to) VALUES ('Včera', now() - interval '1 day', now() - interval '23 hours', 'petra@example.cz')`)
+
+    const url = (q = '') => new NextRequest(`http://localhost/api/public/voice/meetings/${id}/contacts${q}`, { headers: headers() })
+    const first = await body(await CONTACTS(url(), ctx(id)))
+    expect(first.suggested).toEqual([{ id: root, name: 'Jan Horák', company: 'Ateliér Horák' }])
+    expect(first.results).toEqual([])
+    const found = await body(await CONTACTS(url('?q=petra'), ctx(id)))
+    expect(found.results).toEqual([{ id: expect.any(String), name: 'Petra Nováková', company: null }])
+    expect(JSON.stringify(found)).not.toContain('@')
+    expect((await body(await CONTACTS(url('?q=p'), ctx(id)))).results).toEqual([])
+    expect((await CONTACTS(new NextRequest(`http://localhost/x?q=petra`, { headers: headers(otherKey) }), ctx(id))).status).toBe(404)
+
+    const patch = (contactId: unknown, k: string | null = key) =>
+      PATCH(json(`http://localhost/api/public/voice/meetings/${id}`, { contactId }, k, 'PATCH'), ctx(id))
+    // Sloučený kontakt se nahradí tím, do kterého patří.
+    const assigned = await patch(old)
+    expect(assigned.status).toBe(200)
+    expect((await body(assigned)).meeting.contactName).toBe('Jan Horák')
+    expect((await db.query(`SELECT contact_id::text AS c FROM voice_meetings WHERE id = $1`, [id])).rows[0]).toEqual({ c: root })
+    expect((await patch(crypto.randomUUID())).status).toBe(404)
+    expect((await body(await patch(crypto.randomUUID()))).code).toBe('CONTACT_NOT_FOUND')
+    expect((await patch(root, otherKey)).status).toBe(404)
+    expect((await patch('neni-uuid')).status).toBe(400)
+    const detached = await patch(null)
+    expect((await body(detached)).meeting.contactName).toBeNull()
   })
 })

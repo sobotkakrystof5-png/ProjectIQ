@@ -60,9 +60,12 @@ export function isEcho(me: MeetingTurnRow, others: MeetingTurnRow[]): boolean {
   return shared / mine.length >= ECHO_MIN_SHARED
 }
 
+const spokenTurns = (turns: MeetingTurnRow[]): MeetingTurnRow[] =>
+  turns.filter((t) => t.status === 'ok' && t.text && t.text.trim())
+
 /** Promluvy s textem → odstavce rozhovoru v pořadí, jak zazněly. */
 export function buildTranscript(turns: MeetingTurnRow[]): TranscriptBlock[] {
-  const spoken = turns.filter((t) => t.status === 'ok' && t.text && t.text.trim())
+  const spoken = spokenTurns(turns)
   const others = spoken.filter((t) => t.track === 'other')
   const kept = spoken.filter((t) => t.track === 'other' || !isEcho(t, others))
   kept.sort((a, b) => a.startMs - b.startMs || (a.track === b.track ? a.idx - b.idx : a.track === 'me' ? -1 : 1))
@@ -79,6 +82,25 @@ export function buildTranscript(turns: MeetingTurnRow[]): TranscriptBlock[] {
     }
   }
   return blocks
+}
+
+/**
+ * Kontrola po schůzce: kolik promluv s textem má každá strana a kolik promluv
+ * z mikrofonu přepis vynechal jako ozvěnu (hovor bez sluchátek). Mac podle toho
+ * ukáže, jestli slyšel obě strany.
+ */
+export interface TranscriptCheck {
+  meTurns: number
+  otherTurns: number
+  echoTurns: number
+}
+
+export function transcriptCheck(turns: MeetingTurnRow[]): TranscriptCheck {
+  const spoken = spokenTurns(turns)
+  const others = spoken.filter((t) => t.track === 'other')
+  const mine = spoken.filter((t) => t.track === 'me')
+  const echoTurns = mine.filter((t) => isEcho(t, others)).length
+  return { meTurns: mine.length - echoTurns, otherTurns: others.length, echoTurns }
 }
 
 /** Čas od začátku schůzky: „3:07", nad hodinu „1:03:07". */

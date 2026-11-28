@@ -1936,7 +1936,8 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, str�
   Uložit → koncept faktury té zakázky má nové sídlo), `/dashboard/faktury/nova` (výběr zakázky doplní vše včetně
   telefonu, PDF má e-mail a telefon odběratele), po vystavení má kontakt IČO a sídlo · Kryštof · od 2026-11-27
 - [ ] **Schůzky ve Voice (R-151) — vyzkoušet naostro:** na produkci od 2026-11-27 (`c10be81`, migrace 139), aplikace
-  na Macu nainstalovaná. Zbývá: zkušební online schůzka (Meet se sluchátky i bez nich, aspoň 10 minut): přepis obou stran, ozvěna bez sluchátek,
+  na Macu nainstalovaná. Od 2026-11-28 průvodce první schůzkou (kontrola obou stran, upozornění na ticho, přiřazení
+  ke kontaktu z Macu). Zbývá: zkušební online schůzka (Meet se sluchátky i bez nich, aspoň 10 minut): přepis obou stran, ozvěna bez sluchátek,
   Shrnout pomocí AI, přiřazení ke kontaktu v adminu, (5) co dělá tap při přepnutí výstupu (AirPods během hovoru —
   tap zůstane na původním zařízení). Fronta promluv bez sítě přežije jen do ukončení aplikace · od 2026-11-27
 - [ ] **ZakazIQ Voice — milník 1 naostro (VO04–VO06):** po certifikátu „ZakazIQ Voice vývoj" `make -C voice-mac run`
@@ -2430,6 +2431,17 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, str�
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-28 (ZakazIQ Voice — průvodce první schůzkou, server)
+- **feat** Server pro průvodce první schůzkou na Macu: `PATCH /api/public/voice/meetings/[id]` (přiřazení ke kontaktu,
+  kořen sloučeného kontaktu, jen schůzka zařízení), `GET …/[id]/contacts?q=` (návrh z kalendáře ±15 min a hledání,
+  jen id, jméno, firma), `check` v detailu schůzky (`transcriptCheck`: promluvy obou stran a ozvěna). Bez migrace.
+  Soubory: `lib/admin/voice/{meetings,meeting-transcript}.ts`, `app/api/public/voice/meetings/[id]/{route.ts,contacts/route.ts}`,
+  testy `meetings.test.ts`, `meeting-transcript.test.ts`. DECISIONS #058 doplnění (9)–(10), STATE.md.
+  Část pro Mac (kontrola obou stran, upozornění na ticho, sluchátka, přiřazení ke kontaktu) je v hlavní pracovní
+  složce, nainstalovaná, necommitnutá spolu s R-152.
+- **chore** Ověřeno: `npx tsc --noEmit`, vitest Voice a XSS 122 prošlo / 1 přeskočený, `web-security-review`
+  bez nálezu (AUDIT-LOG 2026-11-28). Skutečná schůzka neověřená.
 
 ### 2026-11-27 (navrhovač nabídek N2–N4, R-155)
 - **chore** Větev `admin/nabidky-n2` přeskládaná na `main` (`6f33b6e`) jedním commitem a přečíslovaná: R-153 → **R-155**,

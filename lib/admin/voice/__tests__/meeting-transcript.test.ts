@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTranscript, formatOffset, isEcho, transcriptText, transcriptWords, type MeetingTurnRow } from '../meeting-transcript'
+import { buildTranscript, formatOffset, isEcho, transcriptCheck, transcriptText, transcriptWords, type MeetingTurnRow } from '../meeting-transcript'
 
 // ZakazIQ Voice — schůzky (R-151): složení přepisu ze dvou stop.
 
@@ -64,5 +64,17 @@ describe('přepis schůzky', () => {
     expect(formatOffset(0)).toBe('0:00')
     expect(formatOffset(187_400)).toBe('3:07')
     expect(formatOffset(3_787_000)).toBe('1:03:07')
+  })
+
+  it('kontrola po schůzce spočítá promluvy obou stran a ozvěnu', () => {
+    const turns = [
+      turn('me', 0, 0, 3000, 'Dobrý den, slyšíme se?'),
+      turn('other', 0, 4000, 5000, 'Ano, cena bude čtyřicet tisíc korun.'),
+      turn('me', 1, 4200, 4500, 'cena bude čtyřicet tisíc korun'),
+      turn('me', 2, 12_000, 2000, null, 'empty'),
+      turn('other', 1, 15_000, 2000, 'Nashledanou.', 'error'),
+    ]
+    expect(transcriptCheck(turns)).toEqual({ meTurns: 1, otherTurns: 1, echoTurns: 1 })
+    expect(transcriptCheck([turn('me', 0, 0, 2000, 'Haló, slyšíte mě?')])).toEqual({ meTurns: 1, otherTurns: 0, echoTurns: 0 })
   })
 })

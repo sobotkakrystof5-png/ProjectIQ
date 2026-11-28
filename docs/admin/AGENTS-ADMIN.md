@@ -1788,7 +1788,10 @@ Tady jen to, co je v kódu.
   Server: `POST /api/public/voice/meetings` (založení, id z Macu), `POST …/[id]/turns` (multipart `meta` + `audio`
   do 768 kB, přepis s G1–G5, G12 a slovníkem, **bez čištění modelem**, `lib/admin/voice/meeting-turn.ts`),
   `POST …/[id]/finish`, `GET …/[id]` a `GET /meetings` (přepis a seznam), `POST …/[id]/summary` (Claude `smart`,
-  `lib/admin/voice/meeting-summary.ts`), `DELETE …/[id]`. Přepis skládá `buildTranscript`
+  `lib/admin/voice/meeting-summary.ts`), `DELETE …/[id]`, `PATCH …/[id]` (`{ contactId }`, přiřazení ke kontaktu z Macu,
+  sloučený kontakt se nahradí kořenem) a `GET …/[id]/contacts?q=` (návrh z kalendáře ±15 min a hledání, jen id, jméno
+  a firma; `meetingContactSuggestions`, `searchMeetingContacts`). Detail schůzky nese `check` (`transcriptCheck`:
+  promluvy obou stran a ozvěna) pro kontrolu po schůzce na Macu. Přepis skládá `buildTranscript`
   (`lib/admin/voice/meeting-transcript.ts`): promluvy podle času, téhož mluvčího s mezerou do 30 s v jednom odstavci,
   **ozvěna** (promluva z mikrofonu, která se z ≥ 50 % kryje s druhou stranou a má ≥ 60 % stejných slov) se vynechá.
   Admin: `/dashboard/voice?tab=schuzky&schuzka=<id>` (seznam, shrnutí, přepis, přiřazení ke kontaktu, přejmenování,

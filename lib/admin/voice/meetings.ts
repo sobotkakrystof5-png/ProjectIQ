@@ -3,13 +3,16 @@ import { adminDb, q, type AdminQuery } from '@/lib/admin/db'
 import {
   DEFAULT_SPEAKERS,
   buildTranscript,
+  transcriptCheck,
   transcriptText,
   transcriptWords,
   type MeetingTrack,
   type MeetingTurnRow,
   type SpeakerNames,
   type TranscriptBlock,
+  type TranscriptCheck,
 } from './meeting-transcript'
+import { suggestContacts } from '@/lib/admin/contacts'
 import type { MeetingCreateInput, MeetingTurnMeta, MeetingTurnOutcome } from './meeting-turn'
 import { parseStoredSummary, summaryText, type MeetingSummary } from './meeting-summary'
 
@@ -46,6 +49,8 @@ export interface MeetingDetail extends MeetingListItem {
   costUsd: number
   /** Promluvy, u kterých přepis selhal (Mac je pošle znovu). */
   failedTurns: number
+  /** Slyšel Mac obě strany? Kontrola po schůzce. */
+  check: TranscriptCheck
 }
 
 type MeetingRow = {
@@ -186,6 +191,7 @@ export async function loadMeeting(id: string, deviceId: string | null): Promise<
     summaryAt: iso(r.summary_at),
     costUsd: Number(r.cost_usd),
     failedTurns: turns.filter((t) => t.status === 'error').length,
+    check: transcriptCheck(turns),
   }
 }
 
@@ -221,4 +227,70 @@ export async function renameMeeting(id: string, title: string | null): Promise<b
     UPDATE voice_meetings SET title = ${title}, updated_at = now() WHERE id = ${id} RETURNING id
   `
   return rows.length > 0
+}
+
+/** Kontakt, jak ho vidí Mac: jen jméno a firma, ne e-mail ani telefon. */
+export interface MeetingContactOption {
+  id: string
+  name: string
+  company: string | null
+}
+
+/**
+ * Návrh kontaktu pro schůzku z Macu: kontakty u událostí v kalendáři, které se
+ * časem kryjí se schůzkou (±15 min), přes Hovory, zakázku, konzultaci nebo
+ * e-mail pozvánky. Sloučený kontakt se ukáže jako ten, do kterého patří.
+ */
+export async function meetingContactSuggestions(id: string, deviceId: string): Promise<MeetingContactOption[]> {
+  const rows = await adminDb<{ id: string; name: string; company: string | null }>`
+    SELECT c.id::text AS id, c.display_name AS name, c.company
+    FROM voice_meetings m
+    JOIN calendar_events e
+      ON e.starts_at < coalesce(m.ended_at, now()) + interval '15 minutes'
+     AND e.ends_at > m.started_at - interval '15 minutes'
+    LEFT JOIN client_leads l ON l.id = e.lead_id
+    LEFT JOIN projects p ON p.id = e.project_id
+    LEFT JOIN consultation_slots s ON s.id = e.consultation_slot_id
+    JOIN contacts c0
+      ON c0.id IN (l.contact_id, p.contact_id, s.contact_id)
+      OR (e.invite_to IS NOT NULL AND lower(c0.email) = lower(e.invite_to))
+    JOIN contacts c ON c.id = coalesce(c0.merged_into, c0.id)
+    WHERE m.id = ${id} AND m.device_id = ${deviceId} AND c.merged_into IS NULL
+    GROUP BY c.id, c.display_name, c.company
+    ORDER BY min(abs(extract(epoch FROM e.starts_at - m.started_at))), c.display_name
+    LIMIT 3
+  `
+  return rows.map((r) => ({ id: String(r.id), name: String(r.name), company: r.company ?? null }))
+}
+
+/** Hledání kontaktu z Macu (jméno, firma, e-mail, telefon); vrací jen jméno a firmu. */
+export async function searchMeetingContacts(query: string): Promise<MeetingContactOption[]> {
+  const found = await suggestContacts(query, 8)
+  return found.map((c) => ({ id: c.id, name: c.name, company: c.company }))
+}
+
+/**
+ * Přiřadí schůzku tohoto zařízení ke kontaktu (Mac). Sloučený kontakt se
+ * nahradí tím, do kterého patří. `null` = odpojit.
+ */
+export async function setDeviceMeetingContact(
+  id: string,
+  deviceId: string,
+  contactId: string | null,
+): Promise<'ok' | 'no-meeting' | 'no-contact'> {
+  if (contactId === null) {
+    const rows = await adminDb<{ id: string }>`
+      UPDATE voice_meetings SET contact_id = NULL, updated_at = now()
+      WHERE id = ${id} AND device_id = ${deviceId} RETURNING id
+    `
+    return rows.length ? 'ok' : 'no-meeting'
+  }
+  const rows = await adminDb<{ id: string }>`
+    UPDATE voice_meetings m SET contact_id = c.root, updated_at = now()
+    FROM (SELECT coalesce(merged_into, id) AS root FROM contacts WHERE id = ${contactId}) c
+    WHERE m.id = ${id} AND m.device_id = ${deviceId}
+    RETURNING m.id
+  `
+  if (rows.length) return 'ok'
+  return (await meetingOwnedBy(id, deviceId)) ? 'no-contact' : 'no-meeting'
 }

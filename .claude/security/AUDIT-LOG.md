@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-28 — review: Voice, přiřazení schůzky ke kontaktu z Macu (R-151)
+Spouštěč: před nasazením (`web-security-review`)
+Rozsah: `PATCH /api/public/voice/meetings/[id]`, `GET /api/public/voice/meetings/[id]/contacts`, `lib/admin/voice/meetings.ts` (`meetingContactSuggestions`, `searchMeetingContacts`, `setDeviceMeetingContact`), `transcriptCheck` v `lib/admin/voice/meeting-transcript.ts`
+Výsledek: 0 nálezů k opravě. Prošlo: oba vstupy přes `authorizeVoiceDevice` (hlavička `Origin` = 403, limit na IP, `write` 120/h a `stats` 240/h na zařízení); id schůzky i kontaktu `z.string().uuid()`, tělo PATCH `readJsonLimited` 16 kB a `.strict()`; vlastnictví schůzky přímo v SQL (`device_id`), cizí zařízení dostane 404 (test); dotaz `q` oříznutý na 80 znaků, hledání od 2 znaků, `suggestContacts` escapuje `%` a `_`, všechno SQL s parametry; odpověď hledání a návrhu jen id, jméno a firma (bez e-mailu a telefonu, test); chyby obecně, do logu jen `err.name`; selhání návrhu z kalendáře hledání neshodí; `check` nese jen počty promluv
+Nálezy: žádné
+Opraveno: —
+Zůstává: přijaté riziko v DECISIONS #058 (9) — ukradený klíč do zneplatnění vypíše jména a firmy kontaktů (až ~1 900 za hodinu)
+
 ## 2026-11-27 — review: Workspace přes Supabase Auth, odstranění Clerku (R-154)
 Spouštěč: před commitem (`web-security-review`)
 Rozsah: větev `ws/supabase-auth` — server actions přihlášení `app/w/auth-actions.ts` (heslo, kód z e-mailu, registrace, pozvánka, heslo, odhlášení), odkaz z e-mailu `app/w/auth/potvrzeni/route.ts`, stránka pozvánky, `lib/ws/context.ts` a `lib/ws/scope.ts` (identita a účet), hook `lib/supabase/signup-hook.ts`, úklid přístupů `lib/supabase/admin-users.ts`, pozvání z adminu `lib/ws/admin/invite.ts` + akce, migrace 141 (SECURITY DEFINER funkce, RLS, granty), `proxy.ts`, `lib/security/csp.ts`
