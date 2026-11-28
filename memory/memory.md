@@ -6,8 +6,8 @@
 > hlídací testy `sql-guard` a `prompt-guard` nad zdrojákem, escapování `LIKE` na jednom místě, cizí text pro model
 > přes `lib/ai/untrusted.ts` (neviditelné znaky pryč, každá značka zneškodněná, rozpoznání pokynů pro AI), pevná
 > pravidla a varování v zadání pro Claude Code. Opravené dvě skutečné díry (jméno z formuláře zavřelo přehled firmy
-> pro asistenta; skryté znaky z portálu prošly do zadání pro Claude Code). Na větvi `security/injekce`,
-> **nenasazeno**; testy 2283 prošlo, v prohlížeči neověřeno.
+> pro asistenta; skryté znaky z portálu prošly do zadání pro Claude Code). **Na produkci od 2026-11-28 (`90c4b15`)**,
+> bez migrace; testy 2313 prošlo, veřejně ověřeno, bez běhových chyb, za přihlášením nikdo neviděl.
 >
 > Předchozí: 2026-11-28 · **Navrhovač nabídek N4** (R-158): rozbor firmy se spustí sám, když firma
 > od AI asistenta řekne ano a po poptávce z webu s webem firmy nebo firemním e-mailem (nejvýš 10 denně, kontakt
@@ -2581,7 +2581,12 @@ Otevřené: samostatná role admina bez DDL (`.claude/security/STATE.md` → Ote
   0 selhalo, `npm run build` prošel, `sync-agent-context --check` shodné; v prohlížeči neověřeno. Hlídací test hned
   po přeskládání na `main` zachytil nové volání modelu v `lib/admin/offers/meeting-hints.ts` (N4) — čistí přes
   `escapeTranscript`, takže je chráněné; test teď uznává i čisticí funkce. Bez migrace, bez nové
-  závislosti. Větev `security/injekce` (worktree `.claude/worktrees/injekce`), nenasazeno.
+  závislosti.
+- **chore** **Na produkci** 2026-11-28: fast-forward `main` `fe931f4` → `90c4b15`, nasazení `dpl_28Uy…` Ready. Před
+  tím přeskládáno na `main` s N3/N4 (2313 testů, build). Veřejně: `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni`,
+  `/podminky` 200, `/dashboard/{pozadavky,faktury,kontakty}` 307, `/p/<nesmysl>` 404, `POST /api/public/leads` bez
+  klíče 401, cron 401, CSP a HSTS; 15 min bez běhových chyb. Za přihlášením (karta požadavku s varováním, asistent)
+  neověřeno. Worktree `.claude/worktrees/injekce` a větev `security/injekce` smazané.
 - **docs** `.claude/security/{DECISIONS,STATE,AUDIT-LOG}.md` (#062), `AGENTS.md` B13, `docs/AGENTS-REFERENCE.md` B13.
 
 ### 2026-11-28 (navrhovač nabídek N4 — rozbor sám a vstupy ze schůzky, R-158)
