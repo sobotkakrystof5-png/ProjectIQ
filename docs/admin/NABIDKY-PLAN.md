@@ -7,7 +7,7 @@
 > modelu. Rozhodnutí **R-147**.
 >
 > Stav: **N0 hotové** (2026-11-25, pravidla v oddílu 5). **N1 na produkci** (2026-11-26, migrace 136 a 137),
-> naostro nevyzkoušené. **N2–N4 v kódu** (2026-11-27, migrace 142 na produkci, R-155), naostro nevyzkoušené.
+> naostro nevyzkoušené. **N2–N4 na produkci** (2026-11-27, `afe75fc`, migrace 142, R-155), naostro nevyzkoušené.
 
 ## 1. Proč a co z toho má být
 
@@ -293,7 +293,7 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 |---|---|---|---|
 | **N0** | Cenová pravidla (oddíl 5); k 14 zakázkám obor, co dostal, proč ta cena | Tabulka v oddílu 5 bez `[DOPLNIT]`, vzory zapsané | hotovo 2026-11-25 (dosavadní zakázky a nabídky jsou úvodní ceny, ne vzor) |
 | **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | první verze (Managed Agents) na produkci 2026-11-26 a nikdy nespuštěná; přestavba na Claude Code v kódu 2026-11-26, čeká migrace 137, nasazení, nastavení úlohy a zkouška na 5 firmách |
-| **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | v kódu 2026-11-27 (migrace 142 na produkci); stránka ověřená na 390 a 1280 px s vymyšlenými daty; porovnání s minulými nabídkami v oddílu 12.1 (6 nabídek z Gmailu, ne zakázky z databáze); čeká nasazení a první skutečná nabídka |
+| **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | v kódu 2026-11-27 (migrace 142 na produkci); stránka ověřená na 390 a 1280 px s vymyšlenými daty; porovnání s minulými nabídkami v oddílu 12.1 (6 nabídek z Gmailu, ne zakázky z databáze); na produkci od 2026-11-27 (`afe75fc`), čeká první skutečná nabídka |
 | **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | v kódu 2026-11-27; první vyhodnocení po měsíci provozu |
 | **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; přepisy schůzek do rozboru nejdou (DECISIONS #056), rozhodne Kryštof |
 

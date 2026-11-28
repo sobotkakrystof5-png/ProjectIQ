@@ -2,14 +2,15 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-27 · **Navrhovač nabídek N2–N4 v kódu** (R-155): z hotového rozboru
+> **Poslední aktualizace:** 2026-11-27 · **Navrhovač nabídek N2–N4 na produkci** (R-155): z hotového rozboru
 > firmy vznikne sám návrh nabídky se třemi variantami. Cenu počítá server z cenových pravidel (tabulka pásem,
 > editor `/dashboard/nabidky/pravidla`), model dodá odhad hodnoty pro klienta a pozici v pásmu. Kryštof návrh
 > upraví u kontaktu a pošle e-mailem Nabídka s odkazem na stránku `/nabidka/<token>` (VIZEON), kde klient vybere
 > variantu. Výsledek se zapisuje sám (výběr, zakázka u kontaktu, 14 dní ticha), Kryštof kliká jen „odmítl"
 > a „smlouvá". Přehled `/dashboard/nabidky`: úspěšnost, cena podle pravidel ±10 %, měsíční návrhy úprav pravidel,
-> odhad poptávek proti skutečnosti z webu zakázky. Migrace 142 na produkci od 2026-11-27, větev `admin/nabidky-n2`
-> (worktree `.claude/worktrees/nabidky-n2`, přeskládaná na `main`). Ověřeno testy, buildem a vzhledem na dočasné stránce; naostro nic.
+> odhad poptávek proti skutečnosti z webu zakázky. **Na produkci od 2026-11-27 (`afe75fc`) i s migrací 142.**
+> Veřejně ověřeno (`/nabidka` 404 s `noindex`, admin 307), bez běhových chyb; za přihlášením a s první skutečnou
+> nabídkou nikdo nic neviděl.
 >
 > Předchozí: 2026-11-27 · **Celý projekt jen na Supabase, Clerk pryč** (R-154): Workspace `/w`
 > se přihlašuje heslem nebo kódem z e-mailu přes Supabase, účet a role jsou jen v `ws.members`, pozvání klienta
@@ -208,9 +209,9 @@ v oddílu 5, pásma 5.3, shoda s Kryštofem 2026-11-25). **N1:** karta „Rozbor
 na Managed Agents byla na produkci (`7380078`, migrace 136), nikdy se nespustila. **Přestavěno na cloudovou
 úlohu Claude Code na předplatném (R-149, 2026-11-26):** fronta, API trigger, dva vstupy `/api/public/rozbory`,
 skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Otevřené problémy), zkouška na 5 firmách
-(Kryštof souhlasil 2026-11-26). **N2–N4 v kódu 2026-11-27 (R-155)** na větvi `admin/nabidky-n2`
-(worktree `.claude/worktrees/nabidky-n2`): návrh nabídky, stránka `/nabidka/<token>`, výsledek a vyhodnocení,
-migrace 142 na produkci od 2026-11-27. Dál: nasazení a první skutečná nabídka (Otevřené problémy).
+(Kryštof souhlasil 2026-11-26). **N2–N4 na produkci od 2026-11-27 (`afe75fc`, R-155, migrace 142):** návrh nabídky,
+stránka `/nabidka/<token>`, výsledek a vyhodnocení. Dál: cenová pravidla s Kryštofem a první skutečná nabídka
+(Otevřené problémy).
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
 (34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
@@ -1923,12 +1924,12 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, str�
 
 ## 3. Otevřené problémy
 
-- [ ] **Navrhovač nabídek N2–N4 (R-155) — nasadit a vyzkoušet:** ~~(1) migrace 142 na produkci~~ (2026-11-27, Neon MCP,
-  v evidenci), (2) sloučit `admin/nabidky-n2` do `main` a nasadit, (3) Kryštof: projít Nabídky › Cenová pravidla
+- [ ] **Navrhovač nabídek N2–N4 (R-155) — vyzkoušet naostro:** ~~(1) migrace 142 na produkci~~ (2026-11-27, Neon MCP,
+  v evidenci), ~~(2) sloučit do `main` a nasadit~~ (2026-11-27, `afe75fc`), (3) Kryštof: projít Nabídky › Cenová pravidla
   (hlavně horní meze Plus a e-shop, které doplnil agent), (4) první skutečná nabídka: rozbor firmy → koncept →
   upravit → Poslat nabídku na vlastní e-mail → otevřít odkaz na telefonu → vybrat variantu → zvonek, (5) karta
-  i stránka za přihlášením na 390 a 1280 px. Cloudová úloha čte skill z `main`, takže odhad hodnoty začne posílat
-  až po nasazení; starší rozbory dají návrh jen z ceny zakázky · od 2026-11-27
+  i stránka za přihlášením na 390 a 1280 px. Cloudová úloha čte skill z `main`, odhad hodnoty posílá od nasazení
+  `afe75fc`; starší rozbory dají návrh jen z ceny zakázky · od 2026-11-27
 - [ ] **Fakturační údaje klienta (R-153) — průchod naživo:** kód na produkci od 2026-11-27 (`7cfd718`),
   migrace 140 taky (testovací Neon ji nemá). Ověřeno testy nad PGlite, `tsc` a vzhled obou formulářů na dočasné stránce
   s vymyšlenými daty (1280 a 390 px); za přihlášením ne. Projít: Kontakty › karta (Sídlo, Načíst z rejstříku,
@@ -2439,8 +2440,12 @@ Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nabídka, str�
   otevřeními v jedné transakci (se starým kódem padá). Soubory: `lib/admin/offers/proposals.ts`, test.
 - **fix** Věta pro klienta „Web se vám zaplatí ze dvou / ze tří zakázek" (dřív „z tří"). `lib/admin/offers/pricing.ts`.
 - **docs** Porovnání pravidel s 6 dosavadními nabídkami z Gmailu (plán, oddíl 12.1); zakázky z produkční databáze
-  agent číst nesměl. Ověřeno: `tsc`, celá sada 2204 prošlo / 0 selhalo (před opravami), testy navrhovače 28/28 po nich,
-  `npm run build`.
+  agent číst nesměl. Ověřeno: `tsc`, celá sada 2203 prošlo / 0 selhalo po přeskládání, `npm run build`.
+- **chore** **Na produkci** 2026-11-27: push `6f33b6e` → `afe75fc` z worktree (hlavní složka má rozdělané změny Voice),
+  nasazení `dpl_EYCP…` Ready ve 23:26, alias `www.zakaziq.cz`. Veřejně: `/`, `/login`, `/w/prihlaseni`,
+  `/klient/prihlaseni` 200; `/dashboard`, `/dashboard/nabidky`, `/dashboard/nabidky/pravidla`, `/dashboard/kontakty` 307;
+  `/nabidka/<uuid>` a `/nabidka/nesmysl` 404 s `X-Robots-Tag: noindex, nofollow` a vynucenou CSP; cron 401; od nasazení
+  žádná běhová chyba. Za přihlášením neověřeno.
 - **feat** N2: cenová pravidla (`lib/admin/offers/pricing.ts`, výchozí tabulka z plánu, editor
   `/dashboard/nabidky/pravidla`), návrh nabídky z rozboru (`proposal-model.ts`, `proposals.ts`), karta Nabídka na
   kartě kontaktu (`components/admin/offers/proposal-{section,card,value}.tsx`), e-mail Nabídka s odkazem
