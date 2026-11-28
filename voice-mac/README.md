@@ -97,6 +97,10 @@ terminálu nebo editoru. Skutečný stav ukáže jen spuštění přes `open` / 
 - Sluchátka pomůžou: bez nich mikrofon slyší druhou stranu i z reproduktorů (server takovou ozvěnu
   z přepisu vynechá, ale ne vždy).
 - Nahrávky leží jen do odeslání v `~/Library/Application Support/ZakazIQ Voice/meet/<id>/`.
+- **Nabídka u hovoru (R-152):** když Meet, Teams, Zoom, WhatsApp, FaceTime nebo prohlížeč začne používat
+  mikrofon, objeví se nad lištou „Nahrát a přepsat schůzku?" (Nahrát schůzku / Teď ne). Po konci hovoru se
+  zeptá „Hovor skončil?" a bez odpovědi nahrávání za 2 minuty ukončí. Název služby v prohlížeči (Google Meet)
+  pozná z názvu okna přes Zpřístupnění. Vypnout: Nastavení › Schůzky › Nabízet nahrání hovoru.
 
 ## Připojení
 

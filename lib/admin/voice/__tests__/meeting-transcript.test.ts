@@ -78,3 +78,4 @@ describe('přepis schůzky', () => {
     expect(transcriptCheck([turn('me', 0, 0, 2000, 'Haló, slyšíte mě?')])).toEqual({ meTurns: 1, otherTurns: 0, echoTurns: 0 })
   })
 })
+

@@ -1797,7 +1797,12 @@ Tady jen to, co je v kódu.
   `lib/admin/voice/meeting-summary.ts`), `DELETE …/[id]`, `PATCH …/[id]` (`{ contactId }`, přiřazení ke kontaktu z Macu,
   sloučený kontakt se nahradí kořenem) a `GET …/[id]/contacts?q=` (návrh z kalendáře ±15 min a hledání, jen id, jméno
   a firma; `meetingContactSuggestions`, `searchMeetingContacts`). Detail schůzky nese `check` (`transcriptCheck`:
-  promluvy obou stran a ozvěna) pro kontrolu po schůzce na Macu. Přepis skládá `buildTranscript`
+  promluvy obou stran a ozvěna) pro **kontrolu po schůzce** na Macu: `MeetingCheck` (Core) ukáže, jestli je slyšet
+  váš hlas i druhá strana, jestli to hrálo ze sluchátek (`OutputRoute` z Core Audio, `AudioOutput`) a kolik se
+  nepřepsalo; problém má tlačítko do Nastavení systému. Během schůzky `OtherSideWatch` po 90 s a 10 s vlastní řeči
+  upozorní kartou „Druhou stranu zatím neslyším", když zvuk počítače zůstal potichu (chybí povolení). Karta
+  „Začít schůzku" a Nastavení › Schůzky ukazují stav nahrávání zvuku systému z poslední schůzky
+  (`Preferences.systemAudioCheck`). Přepis skládá `buildTranscript`
   (`lib/admin/voice/meeting-transcript.ts`): promluvy podle času, téhož mluvčího s mezerou do 30 s v jednom odstavci,
   **ozvěna** (promluva z mikrofonu, která se z ≥ 50 % kryje s druhou stranou a má ≥ 60 % stejných slov) se vynechá.
   Admin: `/dashboard/voice?tab=schuzky&schuzka=<id>` (seznam, shrnutí, přepis, přiřazení ke kontaktu, přejmenování,
@@ -1806,6 +1811,17 @@ Tady jen to, co je v kódu.
   `lib/admin/voice/__tests__/meeting-{transcript,turn}.test.ts`, `app/api/public/voice/meetings/__tests__/meetings.test.ts`,
   `voice-mac/Tests/…/MeetingTests.swift`; ladicí `ZAKAZIQ_VOICE_MEETING_TEST=/složka` (jen debug) nahraje schůzku
   bez serveru do souborů.
+- **Nabídka nahrát hovor (R-152, jen Mac):** `CallWatcher` (`voice-mac/…/Meeting/CallWatcher.swift`) každé 2 s
+  zjistí přes `MicUsage` (Core Audio, seznam procesů s otevřeným vstupem, bez oprávnění), které aplikace na hovory
+  nebo prohlížeče drží mikrofon; pomocné procesy převede na hlavní aplikaci (`com.google.Chrome.helper` → Chrome,
+  `com.apple.WebKit.GPU` → Safari) a u prohlížeče pozná službu z názvu okna (`WindowTitles`, Zpřístupnění).
+  Rozhoduje čistý `CallDetector` (Core, `CallDetection.swift`, testy `CallDetectionTests.swift`): nabídka po 3 s
+  držení mikrofonu, jen jednou za hovor, schová se po 6 s bez mikrofonu nebo po minutě; hovor skončil po 15 s bez
+  mikrofonu → během nahrávání karta „Hovor skončil?", bez odpovědi po 2 min `meeting.stop()`. Hovor, který běžel
+  během nahrávání, se po něm znovu nenabízí; ruční nahrávání převezme hovor, který běží nebo začne. Karta
+  `CallPromptPanel` (nad lištou, bez focusu, schová kartu s přepisem diktátu). Volba `Preferences.watchCalls`
+  (Nastavení › Schůzky, výchozí ano). Nová aplikace na hovory = řádek v `CallCatalog.apps`; ladicí snímek karet
+  `ZAKAZIQ_VOICE_CALL_SNAPSHOT=/cesta.png` (jen debug). DECISIONS #058 doplnění (6)–(8).
 - **Aplikace na Macu (VO03, `voice-mac/`, postup v `voice-mac/README.md`):** Swift balíček bez cizích závislostí
   (nástroje Swift 6, jazykový režim 5, macOS 14), dva cíle: **`ZakazIQVoiceCore`** (logika bez rozhraní, kterou
   pokrývají testy) a **`ZakazIQVoice`** (aplikace, AppKit + SwiftUI). Sestavení `make -C voice-mac test app install`

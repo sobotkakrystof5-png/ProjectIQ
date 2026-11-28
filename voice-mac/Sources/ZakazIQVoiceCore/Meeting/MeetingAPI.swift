@@ -62,6 +62,25 @@ public struct MeetingListItemDTO: Decodable, Equatable, Sendable, Identifiable {
   public let turns: Int
 }
 
+/// Kontrola po schůzce ze serveru: promluvy s textem obou stran a ozvěna vynechaná z přepisu.
+public struct MeetingCheckDTO: Decodable, Equatable, Sendable {
+  public let meTurns: Int
+  public let otherTurns: Int
+  public let echoTurns: Int
+}
+
+/// Kontakt k přiřazení schůzky (jen jméno a firma).
+public struct MeetingContactDTO: Decodable, Equatable, Sendable, Identifiable, Hashable {
+  public let id: String
+  public let name: String
+  public let company: String?
+}
+
+public struct MeetingContactsDTO: Decodable, Equatable, Sendable {
+  public let suggested: [MeetingContactDTO]
+  public let results: [MeetingContactDTO]
+}
+
 public struct MeetingDetailDTO: Decodable, Equatable, Sendable, Identifiable {
   public let id: String
   public let title: String?
@@ -69,6 +88,7 @@ public struct MeetingDetailDTO: Decodable, Equatable, Sendable, Identifiable {
   public let durationMs: Int?
   public let status: String
   public let appName: String?
+  public let contactId: String?
   public let contactName: String?
   public let words: Int
   public let blocks: [MeetingBlockDTO]
@@ -76,6 +96,23 @@ public struct MeetingDetailDTO: Decodable, Equatable, Sendable, Identifiable {
   public let summary: MeetingSummaryDTO?
   public let summaryText: String?
   public let failedTurns: Int
+  /// Starší server ho neposílá.
+  public let check: MeetingCheckDTO?
+
+  /// Kontrola obou stran. Bez `check` ze serveru se počítá z odstavců přepisu (bez čísel).
+  public func evaluateCheck(note: MeetingRecordingNote?) -> MeetingCheck {
+    if let check {
+      return MeetingCheck.evaluate(
+        meTurns: check.meTurns, otherTurns: check.otherTurns, echoTurns: check.echoTurns,
+        failedTurns: failedTurns, note: note
+      )
+    }
+    return MeetingCheck.evaluate(
+      meTurns: blocks.filter { $0.speaker == .me }.count,
+      otherTurns: blocks.filter { $0.speaker == .other }.count,
+      echoTurns: 0, failedTurns: failedTurns, exact: false, note: note
+    )
+  }
 }
 
 struct MeetingEnvelope: Decodable { let meeting: MeetingDetailDTO }
@@ -154,6 +191,30 @@ extension VoiceAPI {
   public func summarizeMeeting(id: String) async -> Result<MeetingDetailDTO, VoiceError> {
     var request = VoiceClient.request(base: base, path: "meetings/\(id)/summary", key: key, method: "POST")
     request.timeoutInterval = Self.summaryTimeout
+    return await send(request, as: MeetingEnvelope.self).map(\.meeting)
+  }
+
+  /// Návrh kontaktu z kalendáře a s `query` (aspoň 2 znaky) i výsledky hledání.
+  public func meetingContacts(id: String, query: String) async -> Result<MeetingContactsDTO, VoiceError> {
+    var request = VoiceClient.request(base: base, path: "meetings/\(id)/contacts", key: key)
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty { request.url = Self.withQuery(request.url!, ["q": String(trimmed.prefix(80))]) }
+    return await send(request, as: MeetingContactsDTO.self)
+  }
+
+  /// Přiřadí schůzku ke kontaktu, `nil` ji odpojí. Vrátí schůzku s novým jménem druhé strany.
+  public func setMeetingContact(id: String, contactId: String?) async -> Result<MeetingDetailDTO, VoiceError> {
+    struct Body: Encodable {
+      let contactId: String?
+      func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(contactId, forKey: .contactId)
+      }
+      enum CodingKeys: String, CodingKey { case contactId }
+    }
+    var request = VoiceClient.request(base: base, path: "meetings/\(id)", key: key, method: "PATCH")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try? JSONEncoder().encode(Body(contactId: contactId))
     return await send(request, as: MeetingEnvelope.self).map(\.meeting)
   }
 

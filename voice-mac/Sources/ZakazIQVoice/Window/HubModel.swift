@@ -73,6 +73,8 @@ final class HubModel: ObservableObject {
   @Published var historyDays: Int { didSet { prefs.historyDays = historyDays } }
   /// Číst pole po vložení a posílat opravy (VO09). Vypnuté = nic se nečte.
   @Published var learnFromEdits: Bool { didSet { prefs.learnFromEdits = learnFromEdits } }
+  /// Nabízet nahrání schůzky, když začne hovor (R-152).
+  @Published var watchCalls: Bool { didSet { prefs.watchCalls = watchCalls } }
   /// Po diktátu ukázat přepis ke zkopírování, nebo ho vložit.
   @Published var afterDictation: AfterDictation { didSet { prefs.afterDictation = afterDictation } }
   /// Kde se pole po vložení nepodařilo přečíst (jen čísla, O aplikaci).
@@ -117,6 +119,7 @@ final class HubModel: ObservableObject {
     showBarWhenIdle = prefs.showBarWhenIdle
     historyDays = prefs.historyDays
     learnFromEdits = prefs.learnFromEdits
+    watchCalls = prefs.watchCalls
     afterDictation = prefs.afterDictation
     showOnboarding = !hubPrefs.onboardingDone
     meetings.toast = { [weak self] text in self?.show(text) }

@@ -24,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private lazy var meeting = MeetingController(dictation: dictation)
   private weak var meetingItem: NSMenuItem?
   private var transcript: TranscriptPanel?
+  /// Nabídka nahrát hovor (R-152).
+  private lazy var calls = CallWatcher(meeting: meeting, dictation: dictation)
+  private var callPrompt: CallPromptPanel?
   private var subscriptions = Set<AnyCancellable>()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -72,6 +75,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     startHotkey()
     dictation.startBackground()
     wireMeetings()
+    callPrompt = CallPromptPanel(model: calls.prompt)
+    calls.onPromptShown = { [weak self] in self?.dictation.transcript.hide() }
+    calls.start()
+    meeting.onSilentOther = { [weak self] app in self?.calls.showSilentOther(app: app) }
 
     if model.hasKey {
       Task { await model.testConnection() }
@@ -176,6 +183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     meeting.$elapsed
       .receive(on: RunLoop.main)
       .sink { model.elapsed = $0 }
+      .store(in: &subscriptions)
+    meeting.$route
+      .receive(on: RunLoop.main)
+      .sink { model.route = $0 }
       .store(in: &subscriptions)
     meeting.onShowMeeting = { [weak self] id in
       guard let self else { return }

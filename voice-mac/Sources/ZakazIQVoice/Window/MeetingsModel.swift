@@ -2,7 +2,8 @@ import AppKit
 import Combine
 import ZakazIQVoiceCore
 
-/// Záložka Schůzky v okně (R-151): seznam schůzek ze serveru, přepis, shrnutí od AI.
+/// Záložka Schůzky v okně (R-151): seznam schůzek ze serveru, přepis, shrnutí od AI,
+/// kontrola obou stran a přiřazení ke kontaktu (průvodce první schůzkou).
 @MainActor
 final class MeetingsModel: ObservableObject {
   @Published private(set) var list: [MeetingListItemDTO] = []
@@ -15,6 +16,32 @@ final class MeetingsModel: ObservableObject {
   @Published var recording = false
   @Published var finishing = false
   @Published var elapsed: TimeInterval = 0
+  /// Kam hraje zvuk běžící schůzky (zrcadlí `MeetingController.route`).
+  @Published var route: OutputRoute = .unknown
+  /// Kontrola před schůzkou: kam to hraje teď a co víme o nahrávání zvuku systému.
+  @Published private(set) var idleRoute: OutputRoute = .unknown
+  @Published private(set) var systemAudio: SystemAudioCheck?
+
+  /// Přiřazení ke kontaktu: návrh z kalendáře a výsledky hledání.
+  @Published private(set) var contacts: MeetingContactsDTO?
+  @Published private(set) var assigning = false
+  /// Starší server přiřazení z Macu neumí: zbude odkaz do adminu.
+  @Published private(set) var contactsUnavailable = false
+  /// Na co odpověděl poslední výsledek hledání (prázdný výsledek ukázat až k aktuálnímu dotazu).
+  @Published private(set) var searchedQuery = ""
+  /// Pole hledání. Hledá se jen při psaní, ne když dotaz vynuluje kód (`setQueryQuietly`).
+  @Published var contactQuery = "" {
+    didSet { if contactQuery != oldValue, !quietQuery { scheduleContactSearch() } }
+  }
+  private var searchTask: Task<Void, Never>?
+  private var quietQuery = false
+
+  private func setQueryQuietly(_ value: String) {
+    searchTask?.cancel()
+    quietQuery = true
+    contactQuery = value
+    quietQuery = false
+  }
 
   var startMeeting: (() -> Void)?
   var stopMeeting: (() -> Void)?
@@ -35,6 +62,8 @@ final class MeetingsModel: ObservableObject {
   }
 
   func refresh() async {
+    if isDemo { return }
+    updatePreflight()
     guard let api = api() else {
       error = "Chybí klíč zařízení. Vložte ho v Nastavení."
       return
@@ -52,14 +81,122 @@ final class MeetingsModel: ObservableObject {
   }
 
   func select(_ id: String) async {
+    if isDemo { return }
+    let changed = id != selected?.id
     selectedId = id
+    if changed {
+      contacts = nil
+      setQueryQuietly("")
+    }
     guard let api = api() else { return }
     switch await api.meeting(id: id) {
     case .success(let detail):
       selected = detail
       error = nil
+      if changed || contacts == nil { await loadContacts(query: "") }
     case .failure(let err):
       error = VoiceMessages.text(for: err)
+    }
+  }
+
+  // MARK: Kontrola
+
+  func updatePreflight() {
+    idleRoute = AudioOutput.currentRoute()
+    systemAudio = prefs.systemAudioCheck
+  }
+
+  /// Věty pod „Začít schůzku": sluchátka a povolení zvuku systému (průvodce první schůzkou).
+  var preflight: [(text: String, action: MeetingCheck.Action?)] {
+    var notes: [(String, MeetingCheck.Action?)] = []
+    if idleRoute == .speakers {
+      notes.append(("Teď to hraje z reproduktorů. Se sluchátky bude přepis přesnější.", nil))
+    }
+    switch systemAudio?.heard {
+    case .none:
+      notes.append(("Při první schůzce se macOS zeptá na nahrávání zvuku systému. Povolte ho, jinak se druhá strana nenahraje.", nil))
+    case .some(false):
+      notes.append(("Při poslední schůzce byl zvuk počítače potichu. Povolte ZakazIQ Voice nahrávání zvuku systému.", .openSystemAudioSettings))
+    case .some(true):
+      break
+    }
+    return notes
+  }
+
+  /// Slyšel Mac obě strany? U schůzek nahraných tímhle Macem ví i výstup a zvuk počítače.
+  func check(for meeting: MeetingDetailDTO) -> MeetingCheck {
+    meeting.evaluateCheck(note: isDemo ? demoNote : prefs.meetingNote(id: meeting.id))
+  }
+
+  // Ladicí snímek okna (`BarSnapshot`): bez sítě a bez zápisu do nastavení.
+  private(set) var isDemo = false
+  private var demoNote: MeetingRecordingNote?
+
+  #if DEBUG
+  func applyDemo(
+    detail: MeetingDetailDTO, contacts: MeetingContactsDTO, note: MeetingRecordingNote?, query: String = "",
+    idleRoute: OutputRoute = .unknown, systemAudio: SystemAudioCheck? = nil
+  ) {
+    isDemo = true
+    self.idleRoute = idleRoute
+    self.systemAudio = systemAudio
+    demoNote = note
+    selected = detail
+    selectedId = detail.id
+    self.contacts = contacts
+    setQueryQuietly(query)
+    searchedQuery = query
+  }
+  #endif
+
+  func open(_ action: MeetingCheck.Action) {
+    SystemSettingsLink.open(action)
+  }
+
+  // MARK: Kontakt
+
+  private func loadContacts(query: String) async {
+    guard let id = selectedId, let api = api() else { return }
+    switch await api.meetingContacts(id: id, query: query) {
+    case .success(let value):
+      guard id == selectedId else { return }
+      contacts = value
+      searchedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+      contactsUnavailable = false
+    case .failure(let err):
+      // 404 bez kódu ZakazIQ = server ten vstup ještě nemá.
+      if case .unexpectedResponse = err { contactsUnavailable = true }
+    }
+  }
+
+  private func scheduleContactSearch() {
+    searchTask?.cancel()
+    let query = contactQuery
+    searchTask = Task { [weak self] in
+      try? await Task.sleep(for: .milliseconds(300))
+      guard !Task.isCancelled else { return }
+      await self?.loadContacts(query: query)
+    }
+  }
+
+  /// Přiřadí schůzku ke kontaktu, `nil` ji odpojí. Druhá strana se pak v přepisu jmenuje podle kontaktu.
+  func assign(_ contact: MeetingContactDTO?) async {
+    guard let id = selectedId, let api = api() else { return }
+    assigning = true
+    defer { assigning = false }
+    switch await api.setMeetingContact(id: id, contactId: contact?.id) {
+    case .success(let detail):
+      selected = detail
+      error = nil
+      setQueryQuietly("")
+      toast?(contact.map { "Schůzka patří ke kontaktu \($0.name)" } ?? "Schůzka je bez kontaktu")
+      if case .success(let items) = await api.meetings() { list = items }
+    case .failure(let err):
+      if case .server("CONTACT_NOT_FOUND", _) = err {
+        error = "Kontakt se nenašel, zkuste ho vyhledat znovu."
+      } else {
+        error = VoiceMessages.text(for: err)
+      }
     }
   }
 

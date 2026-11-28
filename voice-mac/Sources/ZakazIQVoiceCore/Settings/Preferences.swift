@@ -73,11 +73,65 @@ public struct Preferences: @unchecked Sendable {
     nonmutating set { defaults.set(newValue.rawValue, forKey: Self.afterDictationKey) }
   }
 
+  static let watchCallsKey = "watchCalls"
+
+  /// Když začne hovor (Meet, Teams, Zoom, WhatsApp…), nabídnout nahrání schůzky a po jeho
+  /// konci ukončení (R-152). Výchozí ano.
+  public var watchCalls: Bool {
+    get { defaults.object(forKey: Self.watchCallsKey) as? Bool ?? true }
+    nonmutating set { defaults.set(newValue, forKey: Self.watchCallsKey) }
+  }
+
   static let learnFromEditsKey = "learnFromEdits"
 
   /// Posílat serveru opravy vloženého textu, aby se učil (VO09, D-V8). Výchozí ano.
   public var learnFromEdits: Bool {
     get { defaults.object(forKey: Self.learnFromEditsKey) as? Bool ?? true }
     nonmutating set { defaults.set(newValue, forKey: Self.learnFromEditsKey) }
+  }
+
+  // MARK: Schůzky — kontrola (průvodce první schůzkou)
+
+  static let systemAudioCheckKey = "systemAudioCheck"
+  static let meetingNotesKey = "meetingNotes"
+  /// Kolik schůzek si Mac pamatuje (výstup a jestli slyšel zvuk počítače).
+  public static let meetingNotesLimit = 30
+
+  /// Poslední zjištění o nahrávání zvuku systému: přinesl tap při schůzce zvuk, nebo jen ticho?
+  /// `nil` = zatím žádná schůzka (macOS se zeptá při první).
+  public var systemAudioCheck: SystemAudioCheck? {
+    get { defaults.data(forKey: Self.systemAudioCheckKey).flatMap { try? JSONDecoder().decode(SystemAudioCheck.self, from: $0) } }
+    nonmutating set { defaults.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: Self.systemAudioCheckKey) }
+  }
+
+  public func meetingNote(id: String) -> MeetingRecordingNote? {
+    meetingNotes().first { $0.id == id }?.note
+  }
+
+  public func setMeetingNote(_ note: MeetingRecordingNote, id: String) {
+    var notes = meetingNotes().filter { $0.id != id }
+    notes.insert(StoredMeetingNote(id: id, note: note), at: 0)
+    let limited = Array(notes.prefix(Self.meetingNotesLimit))
+    defaults.set(try? JSONEncoder().encode(limited), forKey: Self.meetingNotesKey)
+  }
+
+  private func meetingNotes() -> [StoredMeetingNote] {
+    defaults.data(forKey: Self.meetingNotesKey).flatMap { try? JSONDecoder().decode([StoredMeetingNote].self, from: $0) } ?? []
+  }
+}
+
+private struct StoredMeetingNote: Codable {
+  let id: String
+  let note: MeetingRecordingNote
+}
+
+/// Výsledek poslední schůzky pro řádek „Nahrávání zvuku systému" v Nastavení.
+public struct SystemAudioCheck: Codable, Equatable, Sendable {
+  public let heard: Bool
+  public let at: Date
+
+  public init(heard: Bool, at: Date) {
+    self.heard = heard
+    self.at = at
   }
 }

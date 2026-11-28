@@ -19,9 +19,15 @@ final class MeetingController: ObservableObject {
   @Published private(set) var elapsed: TimeInterval = 0
   /// Po konci: id schůzky k otevření v okně.
   @Published private(set) var lastMeetingId: String?
+  /// Kam hraje zvuk schůzky (sluchátka, reproduktory), zjištěno na začátku.
+  @Published private(set) var route: OutputRoute = .unknown
 
   /// Otevřít okno na schůzce (`AppDelegate`).
   var onShowMeeting: ((String?) -> Void)?
+  /// Druhou stranu zatím neslyšíme (zvuk počítače je potichu): karta nad lištou (`CallWatcher`).
+  /// Dostane název aplikace hovoru („Google Meet"), když je znám.
+  var onSilentOther: ((String?) -> Void)?
+  private var appLabel: String?
 
   private let prefs: Preferences
   private let store: SecretStore
@@ -37,6 +43,8 @@ final class MeetingController: ObservableObject {
   private var timer: Timer?
   private var warned = false
   private var createTask: Task<Void, Never>?
+  /// Slyší tap druhou stranu? Bez povolení Nahrávání zvuku systému dává jen ticho.
+  private var watch = OtherSideWatch()
 
   static let blockedText = "Probíhá schůzka, diktovat můžete po jejím konci"
 
@@ -48,6 +56,12 @@ final class MeetingController: ObservableObject {
   }
 
   var isActive: Bool { phase != .idle }
+
+  /// Jde schůzku nahrát (klíč zařízení a macOS 14.2+)? Hlídání hovorů bez toho nic nenabízí.
+  var canRecord: Bool {
+    guard #available(macOS 14.2, *) else { return false }
+    return makeAPI() != nil
+  }
 
   private func makeAPI() -> VoiceAPI? {
     guard let key = (try? store.read()) ?? nil else { return nil }
@@ -61,7 +75,8 @@ final class MeetingController: ObservableObject {
 
   // MARK: Začátek
 
-  func start() {
+  /// `app`: aplikace hovoru z nabídky (R-152); bez ní ta, která je zrovna vepředu.
+  func start(app source: FrontApp? = nil) {
     guard phase == .idle else { return }
     let bar = dictation.bar
     guard dictation.phase == .idle else {
@@ -99,11 +114,21 @@ final class MeetingController: ObservableObject {
     let other = TrackRecorder(track: .other, directory: dir, meetingStart: startMedia)
     for recorder in [me, other] {
       recorder.onTurn = { [weak self] turn in
-        DispatchQueue.main.async { self?.uploader.enqueue(turn, meetingId: id) }
+        DispatchQueue.main.async {
+          guard let self else { return }
+          self.uploader.enqueue(turn, meetingId: id)
+          if turn.track == .me { self.watch.myTurn(speechMs: turn.speechMs) }
+        }
       }
     }
     me.onLevel = { [weak self] level in
       DispatchQueue.main.async { self?.dictation.bar.meetingLevel(level) }
+    }
+    // Stačí vědět, že zvuk počítače jednou něco přinesl; na hlavní vlákno jen jednou.
+    let heard = OnceFlag()
+    other.onLevel = { [weak self] level in
+      guard level > 0, heard.set() else { return }
+      DispatchQueue.main.async { self?.watch.otherLevel(level) }
     }
 
     let systemCapture = SystemAudioCapture()
@@ -129,13 +154,20 @@ final class MeetingController: ObservableObject {
     mic = micCapture
     recorders = [me, other]
     warned = false
+    watch = OtherSideWatch()
+    route = AudioOutput.currentRoute()
     elapsed = 0
     phase = .recording
     dictation.blockedMessage = Self.blockedText
     bar.startMeeting()
     if prefs.sounds { NSSound(named: NSSound.Name("Tink"))?.play() }
+    if route == .speakers {
+      // Lišta se po hlášce vrátí do schůzky.
+      bar.show(BarMessage("Hraje to z reproduktorů. Se sluchátky bude přepis přesnější"))
+    }
 
-    let app = FrontApp.current()
+    let app = source ?? FrontApp.current()
+    appLabel = app?.name
     let startedAt = startedAt
     createTask = Task { [weak self] in
       // Bez sítě se schůzka nahrává dál; založí se, až to půjde, a pak odejdou promluvy.
@@ -170,6 +202,8 @@ final class MeetingController: ObservableObject {
     } else if !warned, elapsed >= MeetingLimits.maxDuration - MeetingLimits.warnBefore {
       warned = true
       dictation.bar.show(BarMessage("Za 5 minut schůzka skončí (nejvýš 2 hodiny)"))
+    } else if watch.shouldWarn(elapsed: elapsed) {
+      onSilentOther?(appLabel)
     }
   }
 
@@ -182,6 +216,7 @@ final class MeetingController: ObservableObject {
     timer = nil
     let duration = CACurrentMediaTime() - startMedia
     let endedAt = Date()
+    rememberCheck(id: id, duration: duration)
     mic?.stop()
     if #available(macOS 14.2, *) { (system as? SystemAudioCapture)?.stop() }
     mic = nil
@@ -233,10 +268,35 @@ final class MeetingController: ObservableObject {
     if sent { try? FileManager.default.removeItem(at: Self.meetingsDirectory.appendingPathComponent(id.uuidString.lowercased())) }
   }
 
+  /// Co ví jen Mac: výstup a jestli zvuk počítače něco přinesl (kontrola po schůzce, Nastavení).
+  private func rememberCheck(id: UUID, duration: TimeInterval) {
+    let note = MeetingRecordingNote(route: route, otherHeard: watch.heard)
+    prefs.setMeetingNote(note, id: id.uuidString.lowercased())
+    // Krátká schůzka bez zvuku nic nedokazuje (hovor ještě nezačal).
+    if watch.heard || duration >= OtherSideWatch.minElapsed {
+      prefs.systemAudioCheck = SystemAudioCheck(heard: watch.heard, at: Date())
+    }
+  }
+
   /// Ukončení aplikace během schůzky: zastavit zachytávání, ať zvuk systému neběží dál.
   func shutdown() {
     timer?.invalidate()
     mic?.stop()
     if #available(macOS 14.2, *) { (system as? SystemAudioCapture)?.stop() }
+  }
+}
+
+/// Příznak, který jde nastavit jen jednou (volá ho jedna sériová fronta stopy).
+private final class OnceFlag: @unchecked Sendable {
+  private var done = false
+  private let lock = NSLock()
+
+  /// `true` jen při prvním volání.
+  func set() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    if done { return false }
+    done = true
+    return true
   }
 }

@@ -205,7 +205,7 @@ Worktree má vlastní kopii `node_modules` (odkaz Turbopack při buildu odmítl)
 odbočená z `945ef61`; VO11 dělalo souběžně sezení `zakaziq-e2` na `admin/voice-okno` a je sloučené): klávesa fn,
 nahrávání, lišta s dílky, odeslání, vložení, historie a fronta, okno jako Wispr Flow. 80 testů, release bez varování.
 **Naostro na Macu nic z toho neběželo.** VO09 (opravy po vložení) dodalo `zakaziq-e2`, sloučené a napojené
-(`bb9d822`, 94 testů). Certifikát „ZakazIQ Voice vývoj" v Klíčence už je. Zbývá: nainstalovat a projít naostro
+(`bb9d822`, 94 testů). Certifikát „ZakazIQ Voice vývoj" v Klíčence už je. Od 2026-11-27 Mac sám nabídne nahrání schůzky, když začne hovor (R-152), naostro neověřeno. Zbývá: nainstalovat a projít naostro
 (Otevřené problémy), sloučit `admin/voice-mac` do `admin/zakaziq-voice` a VO12 se souhlasem Kryštofa.
 
 **Rozpracováno — navrhovač nabídek (R-147, od 2026-11-25):** plán `docs/admin/NABIDKY-PLAN.md`, větev
@@ -1871,6 +1871,23 @@ Promluvy se posílají během hovoru, aby byl přepis po konci hned.
 nové oprávnění na Macu (Nahrávání zvuku systému, macOS 14.2+). Zrušené Schůzky z Wispr Flow (R-145) se nevrací,
 tabulka `meeting_notes` s nimi nesouvisí. Bezpečnost DECISIONS #058, technika `docs/admin/AGENTS-ADMIN.md` → Schůzky.
 
+### R-152 · ZakazIQ Voice pozná hovor a nabídne nahrání schůzky (2026-11-27)
+**Rozhodnutí:** (1) Mac pozná hovor podle toho, že aplikace na hovory (Zoom, Teams, WhatsApp, FaceTime, Slack,
+Discord, Webex, Telegram…) nebo prohlížeč začne brát zvuk z mikrofonu (Core Audio, bez nového oprávnění); u prohlížeče
+pozná službu (Google Meet, Teams, Zoom…) z názvu okna přes Zpřístupnění. Kalendář se nečte. (2) Po 3 s se nad lištou
+ukáže „Nahrát a přepsat schůzku?" s Nahrát schůzku / Teď ne; **nahrávat začne až po kliknutí**. Teď ne platí do konce
+hovoru, karta zmizí po minutě nebo když aplikace mikrofon pustí. Prohlížeč se nabízí i bez poznané služby (hlavička
+jen „Chrome"). (3) Když se nahrává a aplikace hovoru pustí mikrofon na 15 s, karta „Hovor skončil?" s Ukončit /
+Nahrávat dál; **bez odpovědi nahrávání po 2 minutách skončí**. (4) Přepínač Nastavení › Schůzky › Nabízet nahrání
+hovoru, výchozí zapnutý.
+**Proč:** Kryštof 2026-11-27 („jako ve Wispr Flow: když zahájím schůzku přes Meet nebo Teams s externím účastníkem,
+ať se nabídne nahrání a přepis"). Mikrofon v aplikaci hovoru pozná i hovor bez události v kalendáři (WhatsApp, rychlý
+Meet) a nechce další oprávnění. Konec po 2 minutách, protože zapomenutý tap nahrává všechno, co Mac přehraje, až 2 h
+(DECISIONS #058 b). Body (2) prohlížeč bez služby a (3) dvě minuty zvolil agent, Kryštof je může změnit.
+**Důsledek:** jen Mac, server ani migrace beze změny (do schůzky jde jako aplikace název služby). Logika `CallDetector`
+v `ZakazIQVoiceCore` s testy, hlídání `CallWatcher`, `MicUsage`, karta `CallPromptPanel`. Nová aplikace na hovory =
+řádek v `CallCatalog.apps`. Navazuje na R-151; tap dál běží jen po kliknutí. DECISIONS #058 doplnění (6)–(8).
+
 ### R-153 · Fakturační údaje klienta na jednom místě, propis oběma směry (2026-11-27)
 **Rozhodnutí:** (1) Po výběru zakázky ve formuláři nové faktury se doplní jméno, sídlo, IČO, DIČ, e-mail a telefon
 odběratele: poslední nestornovaná faktura téhož kontaktu → kontakt → zakázka; sídlo (a bez minulé faktury i právní
@@ -1959,6 +1976,12 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
   s vymyšlenými daty (1280 a 390 px); za přihlášením ne. Projít: Kontakty › karta (Sídlo, Načíst z rejstříku,
   Uložit → koncept faktury té zakázky má nové sídlo), `/dashboard/faktury/nova` (výběr zakázky doplní vše včetně
   telefonu, PDF má e-mail a telefon odběratele), po vystavení má kontakt IČO a sídlo · Kryštof · od 2026-11-27
+- [ ] **Nabídka nahrát hovor (R-152) — vyzkoušet naostro:** aplikace nainstalovaná 2026-11-27, ověřeno jen testy
+  a snímkem karet. Projít: Meet v Chrome (karta do ~5 s od zapnutí mikrofonu, hlavička „Google Meet"), Teams, Zoom,
+  WhatsApp, Meet v Safari (proces WebKitu), Teď ne (do konce hovoru se neozve), Nahrát schůzku (lišta s časem, ve
+  schůzce aplikace „Google Meet"), odchod z hovoru → do ~20 s „Hovor skončil?", Nahrávat dál, bez odpovědi konec za
+  2 min. Hlídat falešné nabídky (prohlížeč s mikrofonem bez hovoru) a jestli Meet při ztlumení mikrofon nepouští
+  (pak by se ptal na konec uprostřed hovoru) · od 2026-11-27
 - [ ] **Schůzky ve Voice (R-151) — vyzkoušet naostro:** na produkci od 2026-11-27 (`c10be81`, migrace 139), aplikace
   na Macu nainstalovaná. Od 2026-11-28 průvodce první schůzkou (kontrola obou stran, upozornění na ticho, přiřazení
   ke kontaktu z Macu), server na produkci od 2026-11-28 (`89eb51c`). Zbývá: zkušební online schůzka (Meet se sluchátky i bez nich, aspoň 10 minut): přepis obou stran, ozvěna bez sluchátek,
@@ -2000,14 +2023,15 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
   s vymyšlenými zařízeními (1280 a 390 px, bez přetečení, plochy ≥ 44 px, konzole bez chyb). Projít
   s přihlášením: Přidat zařízení → klíč ukázaný jednou, po obnovení stránky už ne → Zneplatnit → Zpět.
   Blok s klíčem okem nikdo neviděl (stejné třídy jako klíč webu, KP17) · od 2026-11-26
-- [ ] **Navrhovač nabídek N1 (R-149) — zapojit a vyzkoušet:** (1) migrace 137 na produkci a nasazení,
-  (2) v prostředí `env_015BA5…` (dřív most Wispr Flow) vyměnit network secret pro `www.zakaziq.cz` za nový
-  `OFFER_RESEARCH_API_KEY` (typ Bearer) a tentýž klíč dát do Vercelu, (3) cloudová úloha „Rozbor firem pro nabídky"
-  (Opus, rozvrh 7:00, bez konektorů) s API triggerem, jeho klíč do Vercelu jako `OFFER_RESEARCH_FIRE_TOKEN`
-  a id jako `OFFER_RESEARCH_ROUTINE_ID`, (4) zkouška na 5 firmách s webem (Kryštof 2026-11-26 schválil pět firem
-  od asistenta: reality, instalatérství, truhlářství na Webnode, tesařství s webem jen z e-mailu, elektro) po jednom;
-  ověřit, že WebSearch a WebFetch v běhu úlohy fungují (dokumentace to neříká), a zapsat dobu a spotřebu limitu,
-  (5) projít kartu na 390 a 1280 px · od 2026-11-26
+- [ ] **Navrhovač nabídek N1 (R-149) — dozapojit a vyzkoušet:** ~~migrace 137 a nasazení~~ (2026-11-26),
+  ~~úloha „Rozbor firem pro nabídky" a `OFFER_RESEARCH_ROUTINE_ID`~~ (2026-11-26), ~~network secret v prostředí
+  „ZakazIQ most Wispr"~~ (2026-11-27, klíč z Klíčenky, běh dostal 200), ~~spouštěč API a `OFFER_RESEARCH_FIRE_TOKEN`~~
+  (2026-11-27, token i v Klíčence, nové nasazení `dpl_4JWC…` Ready), ~~přístup k síti „Full"~~ (2026-11-28, přepnul
+  Kryštof; při „Limited" první zkouška 2026-11-27 skončila `gave_up`, WebFetch na weby firem i ARES/justice.cz vracel
+  ENOTFOUND, celá cesta spuštění → vyzvednutí → odevzdání ale prošla za 80 s). Rozbory se zkouší bez prohlížeče: řádek
+  `queued` přes SQL (stejné zadání jako `loadBriefForContact`) a spuštění úlohy přes RemoteTrigger. Zbývá: (3) zkouška na 5 firmách
+  od asistenta (reality, instalatérství, truhlářství na Webnode, tesařství s webem jen z e-mailu, elektro) po jednom,
+  zapsat dobu a spotřebu limitu, (4) projít kartu na 390 a 1280 px · od 2026-11-26
 - [ ] **Oprava a stažení faktury (R-148) — nasadit a projít naživo:** ověřeno testy nad PGlite a `tsc`,
   v prohlížeči ne. Projít za přihlášením: detail 2026001 → Stáhnout PDF (uloží soubor), Opravit fakturu →
   formulář s údaji a poznámkou „Nahrazuje fakturu 2026001.“ → Vystavit opravenou → nová má další číslo,
@@ -2498,16 +2522,29 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
   a výběr času u klienta, zrušení a Vrátit konzultace se 2 přesuny. Testovací data z 2026-11-27 zůstala, přibyla
   zakázka „Ověření Pozvání s.r.o.".
 
-### 2026-11-28 (ZakazIQ Voice — průvodce první schůzkou, server)
+### 2026-11-28 (ZakazIQ Voice — průvodce první schůzkou)
+- **feat** Mac pohlídá postup první schůzky sám (Kryštof vybral „Aplikace to pohlídá sama"): pozná reproduktory
+  a doporučí sluchátka (nabídka nahrávání, lišta po začátku, karta Začít schůzku), připomene povolení nahrávání
+  zvuku systému, během schůzky po 90 s a 10 s vlastní řeči upozorní kartou „Druhou stranu zatím neslyším"
+  s tlačítkem do Nastavení, po konci **Kontrola** (váš hlas, druhá strana, bez sluchátek a vynechaná ozvěna, část
+  přepisu chybí) a **Kontakt** přímo na Macu (návrh z kalendáře ve stejný čas, hledání, Změnit, Odpojit). Nastavení
+  › Schůzky má řádek Nahrávání zvuku systému. Soubory: `voice-mac/Sources/ZakazIQVoiceCore/Meeting/{MeetingCheck,MeetingAPI}.swift`,
+  `Core/Settings/Preferences.swift`, `ZakazIQVoice/Meeting/{AudioOutput,MeetingController,CallPrompt,CallWatcher}.swift`,
+  `Window/{MeetingsModel,MeetingsView,HubSettingsView}.swift`, `App/AppDelegate.swift`, `Bar/BarSnapshot.swift`
+  (ladicí `ZAKAZIQ_VOICE_MEETING_SNAPSHOT`), test `MeetingCheckTests.swift`.
 - **feat** Server pro průvodce první schůzkou na Macu: `PATCH /api/public/voice/meetings/[id]` (přiřazení ke kontaktu,
   kořen sloučeného kontaktu, jen schůzka zařízení), `GET …/[id]/contacts?q=` (návrh z kalendáře ±15 min a hledání,
   jen id, jméno, firma), `check` v detailu schůzky (`transcriptCheck`: promluvy obou stran a ozvěna). Bez migrace.
   Soubory: `lib/admin/voice/{meetings,meeting-transcript}.ts`, `app/api/public/voice/meetings/[id]/{route.ts,contacts/route.ts}`,
   testy `meetings.test.ts`, `meeting-transcript.test.ts`. DECISIONS #058 doplnění (9)–(10), STATE.md.
-  Část pro Mac (kontrola obou stran, upozornění na ticho, sluchátka, přiřazení ke kontaktu) je v hlavní pracovní
-  složce, nainstalovaná, necommitnutá spolu s R-152.
+  Část pro Mac (bod výš) byla do 2026-11-28 jen v hlavní pracovní složce, nainstalovaná, necommitnutá spolu s R-152;
+  do `main` ji 2026-11-28 přeneslo sezení s opravami klientského prostoru (viz chore níž).
 - **chore** Ověřeno: `npx tsc --noEmit`, vitest Voice a XSS 122 prošlo / 1 přeskočený, `web-security-review`
   bez nálezu (AUDIT-LOG 2026-11-28). Skutečná schůzka neověřená.
+- **chore** Část pro Mac (R-152 nabídka nahrát hovor a průvodce schůzkou) a doplnění DECISIONS #058 (6)–(8)
+  přenesené 2026-11-28 z necommitnuté hlavní složky do `main` (snímek nad `43932de` přeskládaný na `main`; kód
+  shodný s hlavní složkou, v paměti zůstaly novější záznamy z `main`, 6 už opravených problémů z testu klientského
+  prostoru vypadlo). Ověřeno: `make -C voice-mac test` 141, `npx vitest run` 2 222, `npx tsc --noEmit`.
 - **chore** **Na produkci** 2026-11-28: `89eb51c`, nasazení `dpl_8GNP…` Ready (`fra1`). Veřejně: `PATCH …/meetings/<id>`
   a `GET …/<id>/contacts` bez klíče 401, s `Origin` 403, `/` a `/login` 200, `/dashboard/voice` 307; bez běhových chyb.
 
@@ -2571,6 +2608,25 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
   s `next`, neplatná pozvánka → vysvětlení, stránky 390 a 1280 px bez chyb v konzoli. `web-security-review`:
   1 nález opravený (AUDIT-LOG). **Přihlášení naostro proti Supabase nikdo nezkusil.**
 
+### 2026-11-27 (test klientského prostoru na localhostu)
+- **chore** Test klientského prostoru: automatické testy 3× po sobě (20 souborů, 247 testů) prošly, v náhodném pořadí padají, protože scénáře v souboru na sebe navazují. Průchod na localhostu ve worktree `.claude/worktrees/klient-test-local` s dočasnou náhradou přihlášení (necommitovat) proti testovacímu Neonu: pozvánka, přehled, chat se schválením a zadáním, etapy a „Mám hotovo“, hlášení z Claude Code se zakrytím klíče, faktury (zálohová zaplacená, částečná storno, PDF s QR), ruční záloha, konzultace s přesunem a zrušením, poptávky z webu, hodnocení, oddělení cizí firmy (404/403), 390 px. Nálezy v Otevřených problémech. Produkce beze změny.
+- **db** Testovací Neon: migrace 097–099, 120 a 128–140 aplikované spouštěčem, role `portal_app` má nové heslo (bylo jen v `.env.local` worktree, ten je od 2026-11-28 smazaný; pro lokální `/klient` znovu `node scripts/portal-create-role.js --rotate`). Zůstala testovací data: TEST Klient s.r.o., Cizí Firma a.s., služby Web/E-shop/Design/Automatizace, profil dodavatele TESTSTUDIO s ukázkovým IBANem, faktury 2026007–2026008.
+
+### 2026-11-27 (napojení vizeon.cz → ZakazIQ, R-136)
+- **fix** Web VIZEON (jeho repo, `e66dcd3`, na produkci `dpl_7Zsv…`): poptávka bez tokenu Cloudflare Turnstile
+  (skript se nenačetl kvůli blokátoru nebo síti, ověření selhalo v prohlížeči) se už neodmítá 422, jde jen e-mailem
+  „Možná spam“ ke kontrole, do ZakazIQ ne; odmítnutý token dál 422 s odkazem na info@vizeon.cz; formulář na
+  skript, který se nenačetl, nečeká 10 s. Soubory webu: `lib/turnstile.ts`, `app/api/contact/route.ts`,
+  `components/Turnstile.tsx`, `CLAUDE.md`. ZakazIQ beze změny kódu.
+- **chore** Ověřeno: lokálně 9 případů serveru (s tokenem, bez, odmítnutý, bez Turnstile, robot, past, telefon)
+  a 3 průchody prohlížečem (ověření projde, skript zablokovaný, ověření selže) s testovacími klíči Cloudflare;
+  `tsc`, `next build`. Na produkci: bez tokenu → 202, záložní e-mail dorazil do Gmailu; s tokenem (viditelný
+  Chrome) → 202, poptávka v `projects` (`lead_pending`, `vizeon_web`) i upozornění ve zvonku, pak smazaná.
+  Před opravou od 22. 11. do ZakazIQ nedorazila žádná poptávka z formuláře.
+- **chore** Záložní e-mail webu odesílá z `VIZEON Kontakt <info@vizeon.cz>` místo `onboarding@resend.dev`
+  (Vercel webu, Production: `RESEND_CONTACT_FROM`; web `ce88c49`, `dpl_6MZG…`). Ověřeno naostro: Resend odeslal,
+  e-mail dorazil do Gmailu od info@vizeon.cz.
+
 ### 2026-11-27 (fakturační údaje klienta — R-153)
 - **feat** Formulář nové faktury po výběru zakázky doplní odběratele (jméno, sídlo, IČO, DIČ, e-mail, telefon):
   minulá nestornovaná faktura klienta → kontakt → zakázka, sídlo podle IČO z ARES. Ručně přepsané pole zůstane,
@@ -2597,6 +2653,24 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
   a `npm run build` prošly; veřejně `/`, `/login`, `/w/prihlaseni`, `/klient/prihlaseni` 200, `/dashboard`,
   `/dashboard/faktury/nova` a `/dashboard/kontakty` 307, `/p/<nesmysl>` 404, 15 min bez běhových chyb.
 
+### 2026-11-27 (navrhovač nabídek — klíč úlohy rozborů, R-149)
+- **chore** Ranní běh úlohy `trig_0119arhhHEx28n3LRHf7k8FG` (6:04 UTC) dostal od `/api/public/rozbory` 401: prostředí
+  „ZakazIQ most Wispr" posílalo starý klíč mostu Wispr Flow. Network secret pro `www.zakaziq.cz` vyměněný za
+  `OFFER_RESEARCH_API_KEY` z Klíčenky (Chrome, vloženo ze schránky, nikde nevypsané; hlavička
+  `Authorization: Bearer`). Ruční spuštění úlohy v 15:01 UTC: vyzvednutí 200, fronta prázdná. Pak spouštěč API
+  na úloze, token do Vercelu (`OFFER_RESEARCH_FIRE_TOKEN`, sensitive) a do Klíčenky, nové nasazení stejného `main`
+  (`2e9217e`, Ready). Bez změny kódu. Přístup k síti zůstal „Limited" (přepnutí agentovi automatický režim zakázal).
+
+### 2026-11-27 (ZakazIQ Voice — nabídka nahrát hovor, R-152)
+- **feat** Mac pozná hovor (aplikace na hovory nebo prohlížeč drží mikrofon, služba z názvu okna) a nad lištou nabídne
+  „Nahrát a přepsat schůzku?"; během nahrávání po konci hovoru „Hovor skončil?", bez odpovědi konec za 2 min.
+  Přepínač Nastavení › Schůzky. Soubory: `voice-mac/Sources/ZakazIQVoiceCore/Meeting/CallDetection.swift`,
+  `ZakazIQVoiceCore/Settings/Preferences.swift`, `ZakazIQVoice/Meeting/{CallWatcher,CallPrompt,MicUsage}.swift`,
+  `Meeting/MeetingController.swift` (`start(app:)`, `canRecord`), `App/AppDelegate.swift`,
+  `Window/{HubModel,HubSettingsView}.swift`, `Bar/BarSnapshot.swift`, test `CallDetectionTests.swift`. Bez změny serveru.
+- **chore** Ověřeno: `swift test` 130/130 (16 nových), Core Audio vrací procesy s mikrofonem bez oprávnění (zkušební
+  skript: Chrome helper, WebKit GPU, WhatsApp), snímek tří karet, `make run` se stejným certifikátem, aplikace v klidu
+  0 % CPU. **Skutečný hovor neověřený.**
 
 ### 2026-11-27 (ZakazIQ Voice — přepis přes Groq)
 - **chore** Přepis diktátů a schůzek jde od 2026-11-27 přes Groq `whisper-large-v3-turbo` ($0,04 za hodinu zvuku

@@ -8,6 +8,14 @@ import ZakazIQVoiceCore
 @MainActor
 enum BarSnapshot {
   static func runIfRequested() -> Bool {
+    if let path = ProcessInfo.processInfo.environment["ZAKAZIQ_VOICE_MEETING_SNAPSHOT"], !path.isEmpty {
+      renderMeetingChecks(to: path)
+      return true
+    }
+    if let path = ProcessInfo.processInfo.environment["ZAKAZIQ_VOICE_CALL_SNAPSHOT"], !path.isEmpty {
+      renderCallPrompts(to: path)
+      return true
+    }
     if let path = ProcessInfo.processInfo.environment["ZAKAZIQ_VOICE_TRANSCRIPT_SNAPSHOT"], !path.isEmpty {
       renderTranscriptInWindow(to: path)
       return true
@@ -88,6 +96,81 @@ enum BarSnapshot {
     window.contentView = hosting
     window.orderFrontRegardless()
     RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+    hosting.layoutSubtreeIfNeeded()
+    guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
+    hosting.cacheDisplay(in: hosting.bounds, to: rep)
+    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    window.orderOut(nil)
+  }
+
+  /// Karty nabídky u hovoru (R-152) pod sebou ve skutečném okně.
+  /// `ZAKAZIQ_VOICE_CALL_SNAPSHOT=/cesta.png`.
+  private static func renderCallPrompts(to path: String) {
+    DilkyFont.register()
+    let prompts: [CallPromptModel.Prompt] = [
+      .init(kind: .start, label: "Google Meet"),
+      .init(kind: .start, label: "Chrome", note: "Hraje to z reproduktorů. Se sluchátky bude přepis přesnější."),
+      .init(kind: .end, label: "Microsoft Teams"),
+      .init(kind: .silentOther, label: "Google Meet"),
+    ]
+    let view = VStack(spacing: 0) {
+      ForEach(Array(prompts.enumerated()), id: \.offset) { _, prompt in
+        CallPromptCard(prompt: prompt, primary: {}, secondary: {})
+      }
+    }
+    let hosting = NSHostingView(rootView: view)
+    let size = hosting.fittingSize
+    let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: size.width, height: size.height), styleMask: [.borderless], backing: .buffered, defer: false)
+    window.backgroundColor = NSColor(hex: 0x7F93B8)
+    hosting.frame = NSRect(origin: .zero, size: size)
+    window.contentView = hosting
+    window.orderFrontRegardless()
+    RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+    hosting.layoutSubtreeIfNeeded()
+    guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
+    hosting.cacheDisplay(in: hosting.bounds, to: rep)
+    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    window.orderOut(nil)
+  }
+
+  /// Okno Schůzky po konci schůzky: kontrola obou stran a přiřazení ke kontaktu, dvě varianty
+  /// vedle sebe (chybí druhá strana bez sluchátek / všechno v pořádku s kontaktem).
+  /// `ZAKAZIQ_VOICE_MEETING_SNAPSHOT=/cesta.png`.
+  private static func renderMeetingChecks(to path: String) {
+    DilkyFont.register()
+    func detail(_ extra: String, blocks: String) -> MeetingDetailDTO {
+      let raw = #"{"id":"6a1f","title":"Nový web pro Ateliér Horák","startedAt":"2026-11-28T09:10:00.000Z","durationMs":1520000,"status":"done","appName":"Google Meet","words":312,"blocks":"# + blocks + #","transcript":"","summary":null,"summaryText":null,"failedTurns":2,"# + extra + "}"
+      return try! JSONDecoder().decode(MeetingDetailDTO.self, from: Data(raw.utf8))
+    }
+    let meOnly = #"[{"speaker":"me","label":"Kryštof","startMs":0,"endMs":4000,"text":"Dobrý den, slyšíte mě? Tak jsem rád, že to vyšlo."},{"speaker":"me","label":"Kryštof","startMs":64000,"endMs":70000,"text":"Posílám vám odkaz na návrh, podívejte se prosím."}]"#
+    let both = #"[{"speaker":"me","label":"Kryštof","startMs":0,"endMs":4000,"text":"Dobrý den, slyšíte mě?"},{"speaker":"other","label":"Jan Horák","startMs":5000,"endMs":9000,"text":"Ano, dobrý den. Mám připravené fotky na web."}]"#
+    let problem = MeetingsModel()
+    problem.applyDemo(
+      detail: detail(#""contactId":null,"contactName":null,"check":{"meTurns":14,"otherTurns":0,"echoTurns":0}"#, blocks: meOnly),
+      contacts: try! JSONDecoder().decode(MeetingContactsDTO.self, from: Data(#"{"suggested":[{"id":"c1","name":"Jan Horák","company":"Ateliér Horák"}],"results":[{"id":"c2","name":"Petra Horáková","company":null},{"id":"c1","name":"Jan Horák","company":"Ateliér Horák"}]}"#.utf8)),
+      note: MeetingRecordingNote(route: .speakers, otherHeard: false),
+      query: "horák",
+      idleRoute: .speakers,
+      systemAudio: SystemAudioCheck(heard: false, at: Date())
+    )
+    let fine = MeetingsModel()
+    fine.applyDemo(
+      detail: detail(#""contactId":"c1","contactName":"Jan Horák","check":{"meTurns":41,"otherTurns":37,"echoTurns":12}"#, blocks: both),
+      contacts: try! JSONDecoder().decode(MeetingContactsDTO.self, from: Data(#"{"suggested":[],"results":[]}"#.utf8)),
+      note: MeetingRecordingNote(route: .speakers, otherHeard: true)
+    )
+    let view = HStack(alignment: .top, spacing: 0) {
+      MeetingsView(model: problem).frame(width: 720, height: 1180)
+      MeetingsView(model: fine).frame(width: 720, height: 1180)
+    }
+    .background(Dilky.ground)
+    let hosting = NSHostingView(rootView: view)
+    let size = CGSize(width: 1440, height: 1180)
+    let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: size.width, height: size.height), styleMask: [.borderless], backing: .buffered, defer: false)
+    hosting.frame = NSRect(origin: .zero, size: size)
+    window.contentView = hosting
+    window.orderFrontRegardless()
+    RunLoop.main.run(until: Date().addingTimeInterval(1.0))
     hosting.layoutSubtreeIfNeeded()
     guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
     hosting.cacheDisplay(in: hosting.bounds, to: rep)

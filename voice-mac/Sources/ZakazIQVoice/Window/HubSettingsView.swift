@@ -11,6 +11,7 @@ struct HubSettingsView: View {
     HubPage {
       HubPageHeader(title: "Nastavení")
       dictationCard
+      meetingsCard
       connectionCard
       privacyCard
       permissionsCard
@@ -64,6 +65,48 @@ struct HubSettingsView: View {
       Divider().overlay(Dilky.navy100)
       microphoneRow
     }
+  }
+
+  // MARK: Schůzky
+
+  private var meetingsCard: some View {
+    HubCard(title: "Schůzky") {
+      HubToggleRow(
+        title: "Nabízet nahrání hovoru",
+        detail: "Když začne hovor v Meetu, Teams, Zoomu nebo WhatsAppu, nabídne nahrání a přepis. Po konci hovoru nabídne nahrávání ukončit.",
+        isOn: $hub.watchCalls
+      )
+      Divider().overlay(Dilky.navy100)
+      systemAudioRow
+    }
+  }
+
+  /// Nahrávání zvuku systému nemá veřejný dotaz na stav; ví se až ze schůzky (přinesl tap zvuk?).
+  private var systemAudioRow: some View {
+    let check = Preferences().systemAudioCheck
+    return HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Nahrávání zvuku systému").font(DilkyFont.sans(14, weight: 500))
+        Text(Self.systemAudioDetail(check)).font(DilkyFont.sans(12)).foregroundStyle(Dilky.quiet).fixedSize(horizontal: false, vertical: true)
+      }
+      Spacer()
+      if check?.heard == true {
+        HStack(spacing: 6) {
+          Circle().fill(Dilky.navy700).frame(width: 7, height: 7)
+          Text("Funguje").font(DilkyFont.sans(13, weight: 500)).foregroundStyle(Dilky.navy700)
+        }
+      } else {
+        Button("Otevřít Nastavení") { SystemSettingsLink.openSystemAudio() }.buttonStyle(HubSecondaryButton(compact: true))
+      }
+    }
+    .frame(minHeight: 52)
+  }
+
+  static func systemAudioDetail(_ check: SystemAudioCheck?) -> String {
+    guard let check else { return "Aby šla nahrát druhá strana schůzky. macOS se zeptá při první schůzce." }
+    return check.heard
+      ? "Druhá strana schůzky se nahrává."
+      : "Při poslední schůzce byl zvuk počítače potichu. Povolte ZakazIQ Voice nahrávání zvuku systému."
   }
 
   private var microphoneRow: some View {
