@@ -2,7 +2,12 @@
 
 > Co se děje, proč je to takhle a co se stalo. Formát a pravidla zápisu: [`pravidla.md`](pravidla.md). Stručné instrukce: [`../AGENTS.md`](../AGENTS.md); technická fakta: [`../docs/AGENTS-REFERENCE.md`](../docs/AGENTS-REFERENCE.md).
 >
-> **Poslední aktualizace:** 2026-11-28 · **Opravy z testu klientského prostoru** (R-156): pozvání čerstvé zakázky,
+> **Poslední aktualizace:** 2026-11-28 · **Navrhovač nabídek N3 doplněný** (R-155): v konceptu nabídky blok
+> Podobné nabídky (dřívější nabídky jiným firmám se stejným oborem nebo pásmem, s cenou a výsledkem) a ve vyhodnocení
+> `/dashboard/nabidky` úspěšnost podle podílu ceny z odhadovaného ročního přínosu. Bez migrace. Ověřeno testy, `tsc`,
+> buildem a vzhledem na dočasné stránce (390 a 1280 px); za přihlášením ne. Větev `admin/nabidky-n3`.
+>
+> Předchozí: 2026-11-28 · **Opravy z testu klientského prostoru** (R-156): pozvání čerstvé zakázky,
 > název zakázky u klienta, tlačítka v řádku výpisu, posun data o den, NPS v Profilu, „Vrátit" u konzultace a drobnosti.
 > **Na produkci od 2026-11-28 (`eefdd68`) i s migracemi 143 a 144**; veřejně ověřeno, bez běhových chyb,
 > za přihlášením nikdo neviděl.
@@ -215,8 +220,9 @@ na Managed Agents byla na produkci (`7380078`, migrace 136), nikdy se nespustila
 úlohu Claude Code na předplatném (R-149, 2026-11-26):** fronta, API trigger, dva vstupy `/api/public/rozbory`,
 skill `zakaziq-rozbor-firmy`, migrace 137. Dál: nasazení, úloha a klíče (Otevřené problémy), zkouška na 5 firmách
 (Kryštof souhlasil 2026-11-26). **N2–N4 na produkci od 2026-11-27 (`afe75fc`, R-155, migrace 142):** návrh nabídky,
-stránka `/nabidka/<token>`, výsledek a vyhodnocení. Dál: cenová pravidla s Kryštofem a první skutečná nabídka
-(Otevřené problémy).
+stránka `/nabidka/<token>`, výsledek a vyhodnocení. **N3 doplněné 2026-11-28** (větev `admin/nabidky-n3`):
+podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty. Dál: cenová pravidla s Kryštofem, první skutečná
+nabídka (Otevřené problémy) a první měsíční vyhodnocení, až nabídky poběží měsíc.
 
 **Další krok — opravy z auditu (od 2026-11-24):** pracovní seznam `plans/ukoly-z-auditu.md`
 (34 ověřených nálezů v balících A–K, audit `plans/README.md`). **Na produkci od 2026-11-25 (`718e985`)**:
@@ -2479,6 +2485,20 @@ staví na `lib/__tests__/klient-opravy.test.ts` (`updated_at` bez výchozí hodn
 ## 4. Changelog
 
 *Nejnovější nahoře. Starší měsíce → `archiv/YYYY-MM.md` (viz pravidla §4).*
+
+### 2026-11-28 (navrhovač nabídek N3 — podobné nabídky a podíl z hodnoty, R-155)
+- **feat** Koncept nabídky na kartě kontaktu má blok **Podobné nabídky**: nejvýš tři dřívější odeslané nabídky
+  jiným firmám se stejným oborem nebo pásmem (24 měsíců), s doporučenou cenou, vybranou variantou, cenou zakázky
+  a výsledkem. Jen vzor, ceny nemění; bez referenčních cen, konceptů a téhož (i sloučeného) kontaktu. Soubory:
+  `lib/admin/offers/similar.ts`, `listSimilarOffers` v `lib/admin/offers/proposals.ts`,
+  `components/admin/offers/{similar-offers,proposal-section,proposal-card}.tsx`. Bez migrace.
+- **feat** Vyhodnocení `/dashboard/nabidky` ukazuje úspěšnost podle podílu ceny doporučené varianty z odhadovaného
+  ročního přínosu (`value.yearly`): pod 10 %, 10–25 %, 25–50 %, 50 % a víc (plán, oddíl 6). Soubory:
+  `lib/admin/offers/review.ts` (`shareOf`, `shareBucket`, `shares`), `app/dashboard/nabidky/page.tsx`.
+- **chore** Ověřeno: `npx tsc --noEmit`, celá sada 2206 testů (3 nové v `admin-navrhovac-nabidky.test.ts`, jeden nad
+  PGlite se sloučeným kontaktem), `npm run build`, vzhled na dočasné stránce s vymyšlenými daty na 390 a 1280 px
+  (bez přetečení, konzole bez chyb; stránka smazaná). Za přihlášením neověřeno, žádná nabídka zatím neodešla.
+- **chore** Worktree `.claude/worktrees/nabidky-n2` a větev `admin/nabidky-n2` smazané (vše v `main`).
 
 ### 2026-11-28 (opravy z testu klientského prostoru, R-156)
 - **chore** Test klientského prostoru 2026-11-27 na localhostu (worktree `.claude/worktrees/klient-test-local`,

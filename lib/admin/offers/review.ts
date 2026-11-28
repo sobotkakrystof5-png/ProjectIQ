@@ -1,4 +1,4 @@
-import { VARIANT_KEYS, VARIANT_NAMES, bandLabel, roundThousands, type PricingRules, type RuleChange, type VariantKey } from './pricing'
+import { VARIANT_KEYS, VARIANT_NAMES, bandLabel, roundThousands, type PricingRules, type Range, type RuleChange, type VariantKey } from './pricing'
 import { deviation, variantOf, type ProposalStatus, type ProposalVariant } from './proposal-model'
 
 /**
@@ -32,6 +32,8 @@ export type ReviewRow = {
   project_id: string | null
   final_price_czk: number | null
   inquiries: { min: number; max: number } | null
+  /** Odhad, kolik web klientovi za rok přinese (z rozboru), pro podíl ceny z hodnoty. */
+  yearly: Range | null
   /** Počítání poptávek z webu zakázky (KP17): od kdy a kolik za prvních 6 a 12 měsíců. */
   web: { start: string; n6: number; n12: number } | null
 }
@@ -46,6 +48,45 @@ export type BandStats = {
   accepted: number
   rate: number | null
   diffs: Record<VariantKey, Diff[]>
+}
+
+/**
+ * Podíl ceny z hodnoty (plán, oddíl 6): cena doporučené varianty proti
+ * středu odhadu, kolik web klientovi za rok přinese. Hranice jsou výklad
+ * agenta, Kryštof je může změnit.
+ */
+export type ShareBucket = 'under10' | 'to25' | 'to50' | 'over50'
+export const SHARE_BUCKETS: ShareBucket[] = ['under10', 'to25', 'to50', 'over50']
+export const SHARE_BUCKET_LABEL: Record<ShareBucket, string> = {
+  under10: 'pod 10 % ročního přínosu',
+  to25: '10–25 % ročního přínosu',
+  to50: '25–50 % ročního přínosu',
+  over50: '50 % ročního přínosu a víc',
+}
+
+export type ShareStats = {
+  bucket: ShareBucket
+  label: string
+  sent: number
+  resolved: number
+  accepted: number
+  rate: number | null
+}
+
+/** Podíl ceny doporučené varianty z odhadovaného ročního přínosu, nebo `null`, když odhad chybí. */
+export function shareOf(row: Pick<ReviewRow, 'yearly' | 'sent_variants' | 'recommended'>): number | null {
+  if (row.yearly === null || row.sent_variants === null) return null
+  const mid = (row.yearly.min + row.yearly.max) / 2
+  const price = variantOf(row.sent_variants, row.recommended)?.price
+  if (!(mid > 0) || price === undefined || !(price > 0)) return null
+  return price / mid
+}
+
+export function shareBucket(share: number): ShareBucket {
+  if (share < 0.1) return 'under10'
+  if (share < 0.25) return 'to25'
+  if (share < 0.5) return 'to50'
+  return 'over50'
 }
 
 export type ActualComparison = {
@@ -76,6 +117,8 @@ export type OfferReview = {
   withinTen: { hit: number; total: number }
   medianDeviation: number | null
   bands: BandStats[]
+  /** Úspěšnost podle podílu ceny z hodnoty; jen skupiny, kam něco spadlo. */
+  shares: ShareStats[]
   actual: ActualComparison[]
 }
 
@@ -124,7 +167,18 @@ export function evaluateOffers(rows: ReviewRow[], rules: PricingRules, now: Date
   let total = 0
   const recDeviations: number[] = []
   const groups = new Map<string, BandStats>()
+  const shareGroups = new Map<ShareBucket, ShareStats>()
   for (const row of learn) {
+    const share = shareOf(row)
+    if (share !== null) {
+      const bucket = shareBucket(share)
+      const g = shareGroups.get(bucket) ?? { bucket, label: SHARE_BUCKET_LABEL[bucket], sent: 0, resolved: 0, accepted: 0, rate: null }
+      g.sent++
+      if (row.status === 'accepted') g.accepted++
+      if (row.status === 'accepted' || row.status === 'declined' || row.status === 'no_reply') g.resolved++
+      shareGroups.set(bucket, g)
+    }
+
     const key = row.kind === 'eshop' ? 'eshop' : String(row.band ?? 'x')
     if (row.kind !== 'eshop' && row.band === null) continue
     let group = groups.get(key)
@@ -177,6 +231,10 @@ export function evaluateOffers(rows: ReviewRow[], rules: PricingRules, now: Date
     withinTen: { hit, total },
     medianDeviation: median(recDeviations),
     bands,
+    shares: SHARE_BUCKETS.flatMap((b) => {
+      const g = shareGroups.get(b)
+      return g ? [{ ...g, rate: g.resolved > 0 ? g.accepted / g.resolved : null }] : []
+    }),
     actual: rows.map((r) => compareActual(r, now)).filter((x): x is ActualComparison => x !== null),
   }
 }

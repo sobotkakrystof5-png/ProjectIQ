@@ -1993,8 +1993,17 @@ a `offer_research.project_id`); 14 dní bez odpovědi = `no_reply` (`maintainOff
 `send-reminders`). Kryštof kliká jen **Odmítl** a **Smlouvá** (Zpět v toastu), **Prodloužit** a **Cena kvůli
 referenci** (z takové se navrhovač neučí).
 
+**Podobné nabídky (N3).** V konceptu nad variantami blok **Podobné nabídky**: nejvýš tři dřívější odeslané
+nabídky jiným firmám stejného druhu (web / e-shop) se stejným oborem nebo pásmem, za 24 měsíců, s doporučenou
+cenou, vybranou variantou, cenou zakázky a výsledkem (`listSimilarOffers` v `proposals.ts`, výběr a pořadí
+`pickSimilar` v `lib/admin/offers/similar.ts`: obor i pásmo > jedno z nich, s výsledkem před čekající, novější
+dřív). Vynechá referenční ceny, koncepty a nabídky téhož kontaktu i kontaktů s ním sloučených. Jen vzor, ceny
+nemění; bez shody se blok neukáže, chyba dotazu kartu nezastaví (`components/admin/offers/similar-offers.tsx`).
+
 **Vyhodnocení (N3, N4).** `/dashboard/nabidky` (menu Práce › Nabídky): poslední 3 měsíce (`evaluateOffers`
-v `lib/admin/offers/review.ts`: úspěšnost, doporučená cena poslaná ±10 % od pravidel, otevření, pásma), návrhy
+v `lib/admin/offers/review.ts`: úspěšnost, doporučená cena poslaná ±10 % od pravidel, otevření, pásma
+a **podíl z hodnoty**: cena doporučené varianty proti středu odhadu `value.yearly`, skupiny pod 10 %, 10–25 %,
+25–50 % a 50 % a víc, `shareOf`, `shareBucket`; nabídka bez odhadu přínosu se do nich nepočítá), návrhy
 úprav pravidel a odhad proti skutečnosti. Návrhy (`offer_rule_suggestions`, `suggestRuleChanges`): úspěšnost
 pásma nad 60 % (≥ 4 s výsledkem) → zvednout o 10 %; varianta opakovaně (≥ 3, dvě třetiny) poslaná o víc než
 10 % jinak → posunout rozmezí o medián rozdílu; celková úspěšnost pod 20 % → postřeh, kde to vázne (cena se

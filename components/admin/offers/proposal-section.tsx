@@ -1,12 +1,14 @@
 import { ProposalCard } from '@/components/admin/offers/proposal-card'
 import type { LeadEmailReadiness } from '@/components/LeadEmailDialog'
 import { listResearchForContact } from '@/lib/admin/offers/research'
-import { listProposalsForContact, loadPricingRules, offerUrl } from '@/lib/admin/offers/proposals'
+import { listProposalsForContact, listSimilarOffers, loadPricingRules, offerUrl } from '@/lib/admin/offers/proposals'
+import type { SimilarOffer } from '@/lib/admin/offers/similar'
 
 /**
  * Nabídka na kartě kontaktu (navrhovač nabídek, N2–N3, R-155). Načte nabídky,
- * cenová pravidla a stav posledního rozboru. Bez migrace 142 se karta neukáže
- * a zbytek stránky běží dál (stejně jako rozbor bez 136/137).
+ * cenová pravidla, stav posledního rozboru a ke konceptu podobné nabídky.
+ * Bez migrace 142 se karta neukáže a zbytek stránky běží dál (stejně jako
+ * rozbor bez 136/137).
  */
 export async function ProposalSection({
   contactId,
@@ -31,11 +33,20 @@ export async function ProposalSection({
   if (data === null) return null
   const [proposals, { rules }, research] = data
   const latest = research[0] ?? null
+  const draft = proposals[0]?.status === 'draft' ? proposals[0] : null
+  // Podobné nabídky jsou jen vzor: když se nenačtou, karta běží dál bez nich.
+  const similar: SimilarOffer[] = draft
+    ? await listSimilarOffers(draft, rules).catch((err: unknown) => {
+        console.error('[navrhovac] podobné nabídky se nenačetly:', err instanceof Error ? err.message.slice(0, 120) : 'unknown')
+        return []
+      })
+    : []
   return (
     <ProposalCard
       contactId={contactId}
       rules={rules}
       proposals={proposals.map((p) => ({ ...p, url: offerUrl(p.public_token) }))}
+      similar={similar}
       researchDoneId={latest?.status === 'done' ? latest.id : null}
       researchOpen={latest?.status === 'queued' || latest?.status === 'running'}
       mail={{ company, email, readiness }}

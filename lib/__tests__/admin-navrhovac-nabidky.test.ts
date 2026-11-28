@@ -46,7 +46,8 @@ import {
   offerEmailLines,
   type ProposalVariant,
 } from '@/lib/admin/offers/proposal-model'
-import { compareActual, evaluateOffers, previousPeriod, slug, suggestRuleChanges, type ReviewRow } from '@/lib/admin/offers/review'
+import { compareActual, evaluateOffers, previousPeriod, shareBucket, slug, suggestRuleChanges, type ReviewRow } from '@/lib/admin/offers/review'
+import { pickSimilar, type SimilarCandidate } from '@/lib/admin/offers/similar'
 import { submitResult } from '@/lib/admin/offers/research'
 import {
   acceptSuggestion,
@@ -54,6 +55,7 @@ import {
   createSuggestions,
   getProposal,
   listProposalsForContact,
+  listSimilarOffers,
   loadPricingRules,
   loadPublicOffer,
   maintainOfferProposals,
@@ -319,6 +321,7 @@ function reviewRow(over: Partial<ReviewRow> = {}): ReviewRow {
     project_id: null,
     final_price_czk: null,
     inquiries: null,
+    yearly: null,
     web: null,
     ...over,
   }
@@ -363,6 +366,66 @@ describe('vyhodnocení nabídek a návrhy pravidel', () => {
     const s = suggestRuleChanges(evaluateOffers(rows, R), R, '2026-11')
     expect(s.some((x) => x.fingerprint === 'insight:n4:studny:under:2026-11')).toBe(true)
     expect(slug('Výroba nábytku')).toBe('vyroba-nabytku')
+  })
+
+  it('podíl ceny z hodnoty: doporučená cena proti středu ročního přínosu', () => {
+    expect([0.05, 0.1, 0.24, 0.25, 0.49, 0.5, 2].map(shareBucket)).toEqual(['under10', 'to25', 'to25', 'to50', 'to50', 'over50', 'over50'])
+    const rows = [
+      // 26 000 z 200 000 = 13 %
+      reviewRow({ yearly: { min: 150_000, max: 250_000 } }),
+      reviewRow({ status: 'declined', yearly: { min: 150_000, max: 250_000 } }),
+      // 26 000 ze 40 000 = 65 %
+      reviewRow({ status: 'no_reply', yearly: { min: 40_000, max: 40_000 } }),
+      // bez odhadu přínosu a referenční cena se nepočítají
+      reviewRow(),
+      reviewRow({ reference_price: true, yearly: { min: 40_000, max: 40_000 } }),
+    ]
+    const review = evaluateOffers(rows, R)
+    expect(review.shares).toEqual([
+      { bucket: 'to25', label: '10–25 % ročního přínosu', sent: 2, resolved: 2, accepted: 1, rate: 0.5 },
+      { bucket: 'over50', label: '50 % ročního přínosu a víc', sent: 1, resolved: 1, accepted: 0, rate: 0 },
+    ])
+  })
+
+  it('podobné nabídky: obor nebo pásmo, bez téhož kontaktu, referenčních cen a konceptů', () => {
+    const own = crypto.randomUUID()
+    const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+    const base = (over: Partial<SimilarCandidate>): SimilarCandidate => ({
+      id: crypto.randomUUID(),
+      contact_id: crypto.randomUUID(),
+      company: 'Firma',
+      industry: 'Studny',
+      kind: 'web',
+      band: 1,
+      status: 'accepted',
+      sent_at: day(10),
+      recommended: 'doporucena',
+      sent_variants: [variant('zaklad', 15_000, 15_000), variant('doporucena', 22_000, 22_000), variant('plus', 35_000, 35_000)],
+      chosen_variant: 'plus',
+      final_price_czk: 35_000,
+      reference_price: false,
+      ...over,
+    })
+    const candidates = [
+      base({ company: 'Jen obor', band: 2, status: 'declined', chosen_variant: null, final_price_czk: null }),
+      base({ company: 'Jen pásmo', industry: 'Truhlářství', sent_at: day(3) }),
+      base({ company: 'Obojí starší', sent_at: day(60) }),
+      base({ company: 'Obojí čeká', status: 'sent', chosen_variant: null, final_price_czk: null, sent_at: day(1) }),
+      base({ company: 'Týž kontakt', contact_id: own }),
+      base({ company: 'Referenční', reference_price: true }),
+      base({ company: 'Koncept', status: 'draft', sent_at: null }),
+      base({ company: 'E-shop', kind: 'eshop' }),
+      base({ company: 'Nic společného', industry: 'Kadeřnictví', band: 3 }),
+    ]
+    const out = pickSimilar({ kind: 'web', band: 1, industry: 'studny', contactIds: [own] }, candidates, R)
+    expect(out.map((o) => o.company)).toEqual(['Obojí starší', 'Obojí čeká', 'Jen pásmo'])
+    expect(out[0]).toMatchObject({ match: 'both', recommendedPrice: 22_000, chosen: { name: 'plus', price: 35_000 }, finalPrice: 35_000 })
+    expect(out[2].match).toBe('band')
+    expect(pickSimilar({ kind: 'web', band: 1, industry: 'Studny', contactIds: [own] }, candidates, R, 10).map((o) => o.company)).toContain(
+      'Jen obor',
+    )
+    // E-shopy si jsou podobné všechny (jedno pásmo).
+    expect(pickSimilar({ kind: 'eshop', band: null, industry: null, contactIds: [] }, candidates, R).map((o) => o.company)).toEqual(['E-shop'])
   })
 
   it('předchozí měsíc v Praze', () => {
@@ -607,6 +670,21 @@ describe('nabídky nad databází (migrace 136, 137, 142)', () => {
     expect(first?.period).toBe(previousPeriod(now))
     expect(await runMonthlyOfferReview(now)).toBeNull()
     expect(notifications.filter((n) => n.type === 'offer_review')).toHaveLength(1)
+  })
+
+  it('podobné nabídky nad databází: odeslaná nabídka jiné firmě ano, sloučený kontakt ne', async () => {
+    await db.query(`DELETE FROM offer_proposals`)
+    const other = await contact('Studny Dvořák')
+    await send(await proposalFor(other))
+    const c = await contact('Studny Novák 2')
+    const merged = await contact('Studny Novák, starý kontakt')
+    await db.query(`UPDATE contacts SET merged_into = $1 WHERE id = $2`, [c, merged])
+    await send(await proposalFor(merged))
+    const draft = (await getProposal(await proposalFor(c)))!
+    expect(draft.status).toBe('draft')
+    const similar = await listSimilarOffers(draft, R)
+    expect(similar.map((s) => s.contactId)).toEqual([other])
+    expect(similar[0]).toMatchObject({ match: 'both', status: 'sent', recommendedPrice: 38_000 })
   })
 
   it('N4 nad databází: poptávky z webu zakázky proti odhadu', async () => {

@@ -17,6 +17,7 @@ import {
   type ProposalVariant,
 } from './proposal-model'
 import { readStoredResult } from './result'
+import { pickSimilar, type SimilarCandidate, type SimilarOffer } from './similar'
 import { evaluateOffers, periodLabel, previousPeriod, suggestRuleChanges, type OfferReview, type ReviewRow, type SuggestionPayload } from './review'
 
 /**
@@ -419,7 +420,7 @@ async function loadReviewRows(): Promise<ReviewRow[]> {
   const sql = `
     SELECT p.id::text, p.company, p.contact_id::text, p.status, p.sent_at, p.kind, p.band, p.industry,
            p.reference_price, p.recommended, p.sent_variants, p.opened_at, p.project_id::text, p.final_price_czk,
-           p.value -> 'inquiries' AS inquiries, k.start, e.n6, e.n12
+           p.value -> 'inquiries' AS inquiries, p.value -> 'yearly' AS yearly, k.start, e.n6, e.n12
       FROM offer_proposals p
       LEFT JOIN LATERAL (SELECT min(created_at) AS start FROM project_web_keys WHERE project_id = p.project_id) k ON true
       LEFT JOIN LATERAL (
@@ -438,7 +439,7 @@ async function loadReviewRows(): Promise<ReviewRow[]> {
     ;[raw] = (await adminDb.batch([
       {
         text: `SELECT id::text, company, contact_id::text, status, sent_at, kind, band, industry, reference_price, recommended,
-                      sent_variants, opened_at, project_id::text, final_price_czk, value -> 'inquiries' AS inquiries,
+                      sent_variants, opened_at, project_id::text, final_price_czk, value -> 'inquiries' AS inquiries, value -> 'yearly' AS yearly,
                       NULL::timestamptz AS start, 0 AS n6, 0 AS n12
                  FROM offer_proposals WHERE sent_at IS NOT NULL AND sent_at > now() - interval '24 months'`,
         params: [],
@@ -461,8 +462,16 @@ async function loadReviewRows(): Promise<ReviewRow[]> {
     project_id: (r.project_id as string | null) ?? null,
     final_price_czk: (r.final_price_czk as number | null) ?? null,
     inquiries: (r.inquiries as { min: number; max: number } | null) ?? null,
+    yearly: readRange(r.yearly),
     web: r.start ? { start: new Date(r.start as string).toISOString(), n6: Number(r.n6 ?? 0), n12: Number(r.n12 ?? 0) } : null,
   }))
+}
+
+/** Rozmezí z `value` (jsonb); cokoli jiného než dvě čísla = `null`. */
+function readRange(raw: unknown): { min: number; max: number } | null {
+  const r = raw as { min?: unknown; max?: unknown } | null
+  if (!r || typeof r.min !== 'number' || typeof r.max !== 'number' || !Number.isFinite(r.min) || !Number.isFinite(r.max)) return null
+  return { min: r.min, max: r.max }
 }
 
 export async function loadOfferReview(now: Date = new Date()): Promise<{ review: OfferReview; rules: PricingRules }> {
@@ -591,6 +600,46 @@ export async function undoSuggestion(id: string): Promise<boolean> {
   await adminDb`
     UPDATE offer_rule_suggestions SET status = 'pending', decided_at = NULL, payload = payload - 'before' WHERE id = ${id}`
   return true
+}
+
+/**
+ * Podobné odeslané nabídky jiným firmám ke konceptu (N3): stejný obor nebo pásmo,
+ * za posledních 24 měsíců. Výběr a pořadí dělá `pickSimilar`.
+ */
+export async function listSimilarOffers(p: ProposalRow, rules: PricingRules): Promise<SimilarOffer[]> {
+  const [raw, familyRows] = (await adminDb.batch([
+    {
+      text: `SELECT id::text, contact_id::text, company, industry, kind, band, status, sent_at, recommended,
+                    sent_variants, chosen_variant, final_price_czk, reference_price
+               FROM offer_proposals
+              WHERE sent_at IS NOT NULL AND sent_at > now() - interval '24 months'
+                AND NOT reference_price AND kind = $1 AND id <> $2
+              ORDER BY sent_at DESC LIMIT 200`,
+      params: [p.kind, p.id],
+    },
+    {
+      text: `SELECT id::text FROM contacts
+              WHERE coalesce(merged_into, id) = (SELECT coalesce(merged_into, id) FROM contacts WHERE id = $1)`,
+      params: [p.contact_id],
+    },
+  ])) as [Record<string, unknown>[], { id: string }[]]
+  const family = familyRows.map((r) => r.id)
+  const candidates: SimilarCandidate[] = raw.map((r) => ({
+    id: r.id as string,
+    contact_id: r.contact_id as string,
+    company: r.company as string,
+    industry: (r.industry as string | null) ?? null,
+    kind: r.kind as 'web' | 'eshop',
+    band: (r.band as number | null) ?? null,
+    status: r.status as ProposalStatus,
+    sent_at: r.sent_at ? new Date(r.sent_at as string).toISOString() : null,
+    recommended: r.recommended as VariantKey,
+    sent_variants: (r.sent_variants as ProposalVariant[] | null) ?? null,
+    chosen_variant: (r.chosen_variant as VariantKey | null) ?? null,
+    final_price_czk: (r.final_price_czk as number | null) ?? null,
+    reference_price: r.reference_price === true,
+  }))
+  return pickSimilar({ kind: p.kind, band: p.band, industry: p.industry, contactIds: [p.contact_id, ...family] }, candidates, rules)
 }
 
 /** Seznam nabídek pro přehled. */

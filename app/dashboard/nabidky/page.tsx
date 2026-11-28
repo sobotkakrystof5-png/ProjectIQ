@@ -13,8 +13,8 @@ export const metadata: Metadata = { title: 'Nabídky' }
 export const dynamic = 'force-dynamic'
 
 /**
- * Nabídky z navrhovače (R-147, R-155): jak se daří za poslední 3 měsíce (N3),
- * návrhy úprav cenových pravidel, odhad poptávek proti skutečnosti (N4)
+ * Nabídky z navrhovače (R-147, R-155): jak se daří za poslední 3 měsíce (N3)
+ * po pásmech i podle podílu ceny z hodnoty, návrhy úprav cenových pravidel, odhad poptávek proti skutečnosti (N4)
  * a seznam nabídek. Nabídka sama vzniká a odchází na kartě kontaktu.
  */
 
@@ -115,6 +115,24 @@ function Body({
                 </li>
               ))}
             </ul>
+          )}
+          {review.shares.length > 0 && (
+            <div className="mt-5">
+              <p className="text-sm font-semibold text-ink">Podle podílu z hodnoty</p>
+              <p className="text-xs text-quiet">
+                Cena doporučené varianty proti tomu, co web klientovi podle rozboru přinese za rok.
+              </p>
+              <ul className="mt-2 flex flex-col divide-y divide-navy-100 text-sm">
+                {review.shares.map((s) => (
+                  <li key={s.bucket} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span className="text-ink">{s.label}</span>
+                    <span className="font-num text-quiet">
+                      {s.sent} odesláno · {s.accepted} z {s.resolved} přijato
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </Card>
 

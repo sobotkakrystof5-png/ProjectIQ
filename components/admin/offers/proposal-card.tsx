@@ -9,6 +9,7 @@ import { toast } from '@/components/ui/toast'
 import { Card, CardHead } from '@/components/admin/card'
 import { LeadEmailDialog, type LeadEmailReadiness } from '@/components/LeadEmailDialog'
 import { ProposalValueBox } from '@/components/admin/offers/proposal-value'
+import { SimilarOffers } from '@/components/admin/offers/similar-offers'
 import {
   createProposalAction,
   deleteProposalAction,
@@ -31,6 +32,7 @@ import {
 } from '@/lib/admin/offers/pricing'
 import { PROPOSAL_STATUS_LABEL, deviation, rulePrices, variantOf } from '@/lib/admin/offers/proposal-model'
 import type { ProposalRow } from '@/lib/admin/offers/proposals'
+import type { SimilarOffer } from '@/lib/admin/offers/similar'
 import { OFFER_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { cn } from '@/lib/utils'
 
@@ -123,6 +125,7 @@ export function ProposalCard({
   contactId,
   rules,
   proposals: initial,
+  similar,
   researchDoneId,
   researchOpen,
   mail,
@@ -130,6 +133,8 @@ export function ProposalCard({
   contactId: string
   rules: PricingRules
   proposals: ProposalWithUrl[]
+  /** Ke konceptu: dřívější nabídky podobným firmám (N3). */
+  similar: SimilarOffer[]
   /** Poslední hotový rozbor (pro „Navrhnout cenu"). */
   researchDoneId: string | null
   /** Rozbor čeká nebo běží: návrh vznikne sám, až doběhne. */
@@ -215,6 +220,7 @@ export function ProposalCard({
           rules={rules}
           mail={mail}
           contactId={contactId}
+          similar={similar}
           onSaved={replace}
           onRemove={() => remove(current)}
         />
@@ -268,6 +274,7 @@ function ProposalEditor({
   rules,
   mail,
   contactId,
+  similar,
   onSaved,
   onRemove,
 }: {
@@ -275,6 +282,7 @@ function ProposalEditor({
   rules: PricingRules
   mail: { company: string; email: string | null; readiness: LeadEmailReadiness }
   contactId: string
+  similar: SimilarOffer[]
   onSaved: (row: ProposalRow) => void
   onRemove: () => void
 }) {
@@ -396,6 +404,8 @@ function ProposalEditor({
           Spěch, rychleji než běžný termín (+{rules.rushPercent} %)
         </label>
       </fieldset>
+
+      <SimilarOffers offers={similar} />
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={recalc} className={quietBtn}>
