@@ -19,6 +19,7 @@ import { verifyCronSecret } from '@/lib/api-auth'
 import { CHANNEL_LABELS, type ConsultationChannel } from '@/lib/types'
 import { adminEmail } from '@/lib/lead-origins'
 import { maintainOfferProposals, runMonthlyOfferReview } from '@/lib/admin/offers/proposals'
+import { maintainOfferDemos } from '@/lib/admin/offers/demo'
 
 export const dynamic = 'force-dynamic'
 
@@ -269,7 +270,9 @@ export async function GET(req: NextRequest) {
     }),
     // Nabídky (R-155): 14 dní bez odpovědi = „neodpověděl", jednou za měsíc vyhodnocení
     // s návrhy úprav cenových pravidel. Nic se nemění samo, návrhy čekají na kliknutí.
+    // Ukázka webu, na kterou Growth OS neodpověděl do dvou hodin, je nedoběhlá (R-160).
     maintainOfferProposals()
+      .then(() => maintainOfferDemos())
       .then(() => runMonthlyOfferReview())
       .catch((err) => {
         console.error('[cron] Nabídky selhaly:', err instanceof Error ? err.message.slice(0, 120) : 'unknown')

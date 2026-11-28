@@ -243,6 +243,14 @@ async function checkPublish(id: string, contactId?: string): Promise<PublishChec
   return { ok: true, row }
 }
 
+/** Nabídka, když patří kontaktu (nebo kontaktu, do kterého je sloučený). Jinak `null`. */
+export async function proposalForContact(id: string, contactId: string): Promise<ProposalRow | null> {
+  const check = await checkPublish(id, contactId)
+  if (check.ok) return check.row
+  if (check.error !== 'needs_confirmation') return null
+  return getProposal(id)
+}
+
 /**
  * Smí nabídka odejít? Cena nad stropem jen s potvrzením (pravidla, oddíl 5)
  * a jen kontaktu, ke kterému patří (adresu e-mailu čte server sám).

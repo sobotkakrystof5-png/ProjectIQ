@@ -45,6 +45,7 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; color: stri
   offer_opened:          { icon: Eye,               color: ICON, label: 'Nabídka otevřená' },
   offer_chosen:          { icon: Tag,               color: ICON, label: 'Klient vybral variantu' },
   offer_review:          { icon: BarChart3,         color: ICON, label: 'Vyhodnocení nabídek' },
+  offer_demo:            { icon: Eye,               color: ICON, label: 'Ukázka webu' },
 }
 
 function timeAgo(iso: string): string {

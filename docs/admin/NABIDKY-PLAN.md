@@ -308,7 +308,7 @@ Smazání kontaktu bere rozbor s sebou (trigger, jako paměť v R-101). Úklid v
 | Krok | Co | Hotovo, když | Stav |
 |---|---|---|---|
 | **N0** | Cenová pravidla (oddíl 5); k 14 zakázkám obor, co dostal, proč ta cena | Tabulka v oddílu 5 bez `[DOPLNIT]`, vzory zapsané | hotovo 2026-11-25 (dosavadní zakázky a nabídky jsou úvodní ceny, ne vzor) |
-| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | na produkci od 2026-11-26 (`b1e5133`, migrace 137); zkouška na 5 firmách 2026-11-28 prošla (5× odevzdáno, oddíl 11.1), u 3 z 5 falešná „vada webu" z cloudu → opravený skill; zbývá karta na 390 a 1280 px |
+| **N1** | Rozbor webu a rešerše jako karta u kontaktu, zatím bez ceny; migrace, běh v Claude Code na předplatném (R-149), retence, bezpečnost | Na 5 skutečných firmách rozbor se zdroji, změřený čas běhu a spotřeba limitu | na produkci od 2026-11-26 (`b1e5133`, migrace 137); zkouška na 5 firmách 2026-11-28 prošla (5× odevzdáno, oddíl 11.1), u 3 z 5 falešná „vada webu" z cloudu → opravený skill; zbývá karta na 390 a 1280 px. Od 2026-11-28 i zadání firmy přímo v Nabídkách (R-160, oddíl 14) |
 | **N2** | Odhad hodnoty, tři varianty, stránka nabídky ve značce VIZEON (odkaz v e-mailu, klient vybere variantu tlačítkem „Beru tuhle variantu", Kryštof vidí otevření a výběr) | Na 5 minulých zakázkách návrh porovnaný se skutečnou cenou; stránka nabídky na telefonu i počítači | v kódu 2026-11-27 (migrace 142 na produkci); stránka ověřená na 390 a 1280 px s vymyšlenými daty; porovnání s minulými nabídkami v oddílu 12.1 (6 nabídek z Gmailu, ne zakázky z databáze); na produkci od 2026-11-27 (`afe75fc`), čeká první skutečná nabídka |
 | **N3** | Výsledek nabídky na jedno klepnutí, měsíční vyhodnocení | První vyhodnocení po měsíci provozu | v kódu 2026-11-27; 2026-11-28 doplněné podobné nabídky u konceptu a úspěšnost podle podílu z hodnoty (oddíl 6); čeká první vyhodnocení po měsíci provozu |
 | **N4** | Skutečná hodnota z poptávek přes web klienta (KP17), přepisy schůzek jako vstup, případně automatika | Podle nákladů z N1 a počtu napojených webů | porovnání s poptávkami z webu v kódu 2026-11-27; **2026-11-28 (R-158)** automatické spuštění (souhlas firmy, poptávka z webu) a návrhy vstupů ze schůzky ve Voice (oddíl 13); na produkci od 2026-11-28 (`159b8de`), naostro nevyzkoušené |
@@ -432,4 +432,32 @@ Výklad agenta (Kryštof může změnit):
   cenu jedné zakázky klienta, web / e-shop, jazyky navíc, spěch a rozpočet klienta, každý s citací. Návrh projde,
   jen když citace v přepisu opravdu je a částka v ní zazněla; „Použít" ho dá do editoru, rozpočet je jen pro
   informaci. Cena volání se přičte ke schůzce (Voice › Přehled › náklady). Bez schůzky se blok neukáže.
+
+## 14. Nová nabídka, ukázka a rozbor ceny (2026-11-28, R-160)
+
+Kryštof 2026-11-28: „tvořič chci spouštět tak, že nahraju firmu, agenti ji prohledají a určí nabídku v ZakazIQ sami,
+klient chce ukázku, pošli ukázku v našem stylu a celý e-mail, a mně osobně analýzu, jak nakombinovat pricing".
+Vybral: zadání v Nabídky › Nová nabídka, ukázku od Growth OS, odeslání až po kliknutí s volbou nabídka / ukázka /
+obojí a analýzu u každé nabídky. Technika `docs/admin/AGENTS-ADMIN.md` → „Navrhovač nabídek: nová nabídka pro firmu,
+ukázka webu a rozbor ceny".
+
+**Jak to teče:**
+
+1. Nabídky › Nová nabídka: web, IČO nebo název (e-mail a telefon volitelně). ZakazIQ firmu najde mezi kontakty,
+   nebo ji založí, a pustí rozbor (cloudová úloha, 2–3 minuty).
+2. Po rozboru vznikne sám koncept nabídky se třemi cenami (N2) a zazvoní zvonek.
+3. Na kartě nabídky: „Jak je cena složená" jen pro Kryštofa (pásmo podle přínosu za měsíc z R-157, čísla variant, záloha, první rok se správou,
+   návratnost, jak poskládat, kde ustoupit rozsahem) a panel „Co poslat klientovi".
+4. Ukázka: firma od robota ji má hotovou. Jinak „Vyžádat ukázku", Growth OS ji postaví (obvykle do 20 minut)
+   a zvonek ohlásí, že je hotová.
+5. „Odeslat e-mail": předepsaný text (nabídka, ukázka, nebo obojí) jde upravit a odejde jedním kliknutím
+   z krystof@vizeon.cz. Nic neodchází samo.
+
+**Odchylky a výklad agenta:**
+
+- Analýzu ceny počítá server z pravidel, ne model, stejně jako ceny (R-155). Pravidla vyjednávání z oddílu 5:
+  za stejný rozsah stejná cena, níž jde jen rozsah.
+- Ukázka pro firmu z nabídky se staví v Growth OS bez e-mailu klientovi; e-mail posílá ZakazIQ. Firma z nabídky
+  nesmí dostat hovor robota (zadání pro autopilota).
+- „Jedním kliknutím" je tlačítko Odeslat u předepsaného e-mailu na kartě, bez okna navíc.
 

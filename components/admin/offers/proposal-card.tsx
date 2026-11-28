@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Calculator, Copy, ExternalLink, Loader2, RotateCw, Send, Tag, Trash2 } from 'lucide-react'
+import { Calculator, Copy, ExternalLink, Loader2, RotateCw, Tag, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toast'
 import { Card, CardHead } from '@/components/admin/card'
-import { LeadEmailDialog, type LeadEmailReadiness } from '@/components/LeadEmailDialog'
+import type { LeadEmailReadiness } from '@/components/LeadEmailDialog'
+import { PricingAnalysisBox } from '@/components/admin/offers/pricing-analysis-box'
+import { SendPanel } from '@/components/admin/offers/send-panel'
 import { ProposalValueBox } from '@/components/admin/offers/proposal-value'
 import { SimilarOffers } from '@/components/admin/offers/similar-offers'
 import { MeetingHints } from '@/components/admin/offers/meeting-hints'
@@ -28,6 +30,7 @@ import {
   jobBandLabel,
   paybackJobs,
   paybackSentence,
+  roundThousands,
   type OfferKind,
   type Position,
   type PricingRules,
@@ -37,6 +40,8 @@ import { PROPOSAL_STATUS_LABEL, deviation, rulePrices, variantOf } from '@/lib/a
 import type { ProposalRow } from '@/lib/admin/offers/proposals'
 import type { SimilarOffer } from '@/lib/admin/offers/similar'
 import type { OfferMeeting } from '@/lib/admin/offers/meeting-hints'
+import type { DemoView } from '@/lib/admin/offers/demo'
+import { pricingAnalysis } from '@/lib/admin/offers/pricing-analysis'
 import { OFFER_STATUS_TONE, toneVariant } from '@/lib/admin-status'
 import { cn } from '@/lib/utils'
 
@@ -145,6 +150,7 @@ export function ProposalCard({
   researchDoneId,
   researchOpen,
   mail,
+  demo,
 }: {
   contactId: string
   rules: PricingRules
@@ -153,6 +159,8 @@ export function ProposalCard({
   similar: SimilarOffer[]
   /** Ke konceptu: poslední schůzka s klientem ze ZakazIQ Voice (N4, R-158). */
   meeting?: OfferMeeting | null
+  /** Ukázka webu k nejnovější nabídce (R-160). */
+  demo: DemoView
   /** Poslední hotový rozbor (pro „Navrhnout cenu"). */
   researchDoneId: string | null
   /** Rozbor čeká nebo běží: návrh vznikne sám, až doběhne. */
@@ -237,6 +245,7 @@ export function ProposalCard({
           proposal={current}
           rules={rules}
           mail={mail}
+          demo={demo}
           contactId={contactId}
           similar={similar}
           meeting={meeting}
@@ -250,6 +259,9 @@ export function ProposalCard({
           key={current.id}
           proposal={current}
           rules={rules}
+          mail={mail}
+          demo={demo}
+          contactId={contactId}
           onChange={replace}
           onRemove={() => remove(current)}
           onNew={current.research_id ? () => create(current.research_id as string) : null}
@@ -292,6 +304,7 @@ function ProposalEditor({
   proposal,
   rules,
   mail,
+  demo,
   contactId,
   similar,
   meeting,
@@ -301,6 +314,7 @@ function ProposalEditor({
   proposal: ProposalWithUrl
   rules: PricingRules
   mail: { company: string; email: string | null; readiness: LeadEmailReadiness }
+  demo: DemoView
   contactId: string
   similar: SimilarOffer[]
   meeting: OfferMeeting | null
@@ -311,7 +325,6 @@ function ProposalEditor({
   const [state, setState] = useState<EditState>(() => stateFrom(proposal))
   const [saved, setSaved] = useState<EditState>(() => stateFrom(proposal))
   const [pending, startTransition] = useTransition()
-  const [mailOpen, setMailOpen] = useState(false)
   const dirty = JSON.stringify(state) !== JSON.stringify(saved)
 
   const job = digits(state.typicalJob)
@@ -361,14 +374,63 @@ function ProposalEditor({
       if (await persist()) toast.success('Uloženo')
     })
 
-  const send = () =>
-    startTransition(async () => {
-      if (overCap && !state.overCapConfirmed) {
-        toast.error('Potvrďte cenu nad 50 000 Kč', { description: 'Zaškrtněte potvrzení pod variantami.' })
-        return
-      }
-      if (await persist()) setMailOpen(true)
-    })
+  /** Před odesláním z panelu: potvrzená cena nad stropem a uložené změny. */
+  async function beforeSend(): Promise<boolean> {
+    if (overCap && !state.overCapConfirmed) {
+      toast.error('Potvrďte cenu nad 50 000 Kč', { description: 'Zaškrtněte potvrzení pod variantami.' })
+      return false
+    }
+    return persist()
+  }
+
+  // Rozbor ceny z toho, co je teď v editoru (i neuložené), ať čísla sedí s variantami.
+  const analysis = useMemo(() => {
+    const jobChanged = job !== proposal.inputs.typicalJobCzk
+    const jobsChanged = jobs !== (proposal.inputs.jobsPerMonth ?? null)
+    const typicalJob = jobChanged ? (job === null ? null : { min: job, max: job }) : proposal.value.typicalJob
+    // Ručně změněná cena nebo počet zakázek: roční přínos jako v uloženém konceptu (zakázky × 12 × cena zakázky).
+    const yearly =
+      !jobChanged && !jobsChanged
+        ? proposal.value.yearly
+        : jobs !== null && typicalJob
+          ? { min: roundThousands(jobs * 12 * typicalJob.min), max: roundThousands(jobs * 12 * typicalJob.max) }
+          : null
+    return pricingAnalysis(
+      {
+        kind: state.kind,
+        band: band === null ? null : band.band,
+        rulesVersion: proposal.rules_version,
+        inputs: {
+          ...proposal.inputs,
+          typicalJobCzk: job,
+          jobSource: job === null ? 'none' : jobChanged ? 'manual' : proposal.inputs.jobSource,
+          jobsPerMonth: jobs,
+          jobsSource: jobs === null ? 'none' : jobsChanged ? 'manual' : proposal.inputs.jobsSource,
+          bandBasis: band?.basis ?? null,
+          position: state.position,
+          rush: state.rush,
+          languages: state.languages,
+          assumedBand: band?.assumed ?? false,
+        },
+        value:
+          jobChanged || jobsChanged
+            ? { ...proposal.value, typicalJob, jobConfidence: jobChanged ? (job === null ? 'low' : 'high') : proposal.value.jobConfidence, yearly }
+            : proposal.value,
+        variants: state.variants.map((v) => ({
+          key: v.key,
+          name: variantOf(proposal.variants, v.key)?.name ?? v.key,
+          price: digits(v.price) ?? 0,
+          proposed: proposedByRules[v.key],
+          includes: v.includes.split('\n').map((l) => l.trim()).filter((l) => l !== ''),
+        })),
+        recommended: state.recommended,
+        managementMonthly: proposal.management_monthly,
+        depositPercent: proposal.deposit_percent,
+        internal: proposal.internal,
+      },
+      rules,
+    )
+  }, [rules, proposal, state, job, jobs, band, proposedByRules])
 
   const copyLink = () =>
     startTransition(async () => {
@@ -544,29 +606,31 @@ function ProposalEditor({
         </span>
       </label>
 
+      <PricingAnalysisBox analysis={analysis} recommended={state.recommended} />
+
+      <SendPanel
+        proposalId={proposal.id}
+        contactId={contactId}
+        company={mail.company}
+        email={mail.email}
+        mailReady={mail.readiness.mail}
+        offerUrl={proposal.url}
+        recommendedPrice={recPrice}
+        offerSent={false}
+        demo={demo}
+        beforeSend={beforeSend}
+      />
+
       <div className="flex flex-wrap items-center gap-3 border-t border-navy-100 pt-4">
-        {mail.email ? (
-          <button type="button" onClick={send} disabled={pending} className={primaryBtn}>
-            {pending ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Send size={16} strokeWidth={1.75} aria-hidden />}
-            Poslat nabídku
-          </button>
-        ) : (
-          <button type="button" onClick={copyLink} disabled={pending} className={primaryBtn}>
-            <Copy size={16} strokeWidth={1.75} aria-hidden />
-            Zkopírovat odkaz
-          </button>
-        )}
         {dirty && (
           <button type="button" onClick={save} disabled={pending} className={quietBtn}>
             Uložit změny
           </button>
         )}
-        {mail.email && (
-          <button type="button" onClick={copyLink} disabled={pending} className={quietBtn}>
-            <Copy size={15} strokeWidth={1.75} aria-hidden />
-            Zkopírovat odkaz
-          </button>
-        )}
+        <button type="button" onClick={copyLink} disabled={pending} className={quietBtn}>
+          <Copy size={15} strokeWidth={1.75} aria-hidden />
+          Zkopírovat odkaz
+        </button>
         <a href={`/dashboard/nabidky/${proposal.id}/nahled`} target="_blank" rel="noopener" className={quietBtn}>
           <ExternalLink size={15} strokeWidth={1.75} aria-hidden />
           Náhled
@@ -576,17 +640,7 @@ function ProposalEditor({
           Smazat
         </button>
       </div>
-      {!mail.email && <p className="text-xs text-quiet">Kontakt nemá e-mail. Odkaz pošlete jinak, třeba SMS nebo WhatsAppem.</p>}
-
-      {mailOpen && mail.email && (
-        <LeadEmailDialog
-          target={{ kind: 'contact', id: contactId, company: mail.company, email: mail.email }}
-          readiness={mail.readiness}
-          offer={{ id: proposal.id, url: proposal.url, price: recPrice }}
-          onSent={() => router.refresh()}
-          onClose={() => setMailOpen(false)}
-        />
-      )}
+      <p className="text-xs text-quiet">Zkopírovaný odkaz nabídku rovnou zveřejní, pošlete ho třeba SMS nebo WhatsAppem.</p>
     </div>
   )
 }
@@ -598,6 +652,9 @@ function ProposalEditor({
 function ProposalSent({
   proposal,
   rules,
+  mail,
+  demo,
+  contactId,
   onChange,
   onRemove,
   onNew,
@@ -605,6 +662,9 @@ function ProposalSent({
 }: {
   proposal: ProposalWithUrl
   rules: PricingRules
+  mail: { company: string; email: string | null; readiness: LeadEmailReadiness }
+  demo: DemoView
+  contactId: string
   onChange: (row: ProposalRow | null) => void
   onRemove: () => void
   onNew: (() => void) | null
@@ -623,6 +683,26 @@ function ProposalSent({
         : proposal.inputs.bandBasis === 'job'
           ? jobBandLabel(rules, proposal.band)
           : bandLabel(rules, proposal.band)
+  const recommended = variantOf(variants, proposal.recommended)
+  const analysis = useMemo(
+    () =>
+      pricingAnalysis(
+        {
+          kind: proposal.kind,
+          band: proposal.band,
+          rulesVersion: proposal.rules_version,
+          inputs: proposal.inputs,
+          value: proposal.value,
+          variants,
+          recommended: proposal.recommended,
+          managementMonthly: proposal.management_monthly,
+          depositPercent: proposal.deposit_percent,
+          internal: proposal.internal,
+        },
+        rules,
+      ),
+    [proposal, variants, rules],
+  )
 
   const mark = (outcome: 'declined' | 'negotiating') =>
     startTransition(async () => {
@@ -724,6 +804,22 @@ function ProposalSent({
           </div>
         ))}
       </div>
+
+      <PricingAnalysisBox analysis={analysis} recommended={proposal.recommended} />
+
+      {proposal.project_id === null && (
+        <SendPanel
+          proposalId={proposal.id}
+          contactId={contactId}
+          company={mail.company}
+          email={mail.email}
+          mailReady={mail.readiness.mail}
+          offerUrl={proposal.url}
+          recommendedPrice={recommended?.price ?? 0}
+          offerSent
+          demo={demo}
+        />
+      )}
 
       <details>
         <summary className="cursor-pointer text-sm text-quiet">Odhad hodnoty a předpoklady</summary>

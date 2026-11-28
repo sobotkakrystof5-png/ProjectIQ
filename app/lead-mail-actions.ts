@@ -13,7 +13,8 @@ import {
   recordMailSent,
 } from '@/lib/admin/lead-mail-target'
 import { pragueWallClockToISO } from '@/lib/prague-time'
-import { canPublish, publishProposal } from '@/lib/admin/offers/proposals'
+import { canPublish, proposalForContact, publishProposal } from '@/lib/admin/offers/proposals'
+import { loadDemo, markDemoSent } from '@/lib/admin/offers/demo'
 
 /**
  * „Poslat e-mail" (R-132): tři šablony — Portfolio, Nabídka a Schůzka
@@ -52,6 +53,15 @@ const schema = z.discriminatedUnion('template', [
   z.object({ template: z.literal('portfolio'), target, subject, body }),
   // `offerId` = nabídka z navrhovače (R-155): po odeslání se zapíše jako odeslaná a odkaz začne fungovat.
   z.object({ template: z.literal('nabidka'), target, subject, body, offerId: z.string().regex(UUID).optional() }),
+  // Ukázka webu k nabídce z navrhovače (R-160), s cenovou nabídkou, nebo bez ní.
+  z.object({
+    template: z.literal('ukazka'),
+    target,
+    subject,
+    body,
+    proposalId: z.string().regex(UUID),
+    includeOffer: z.boolean(),
+  }),
   z.object({
     template: z.literal('schuzka'),
     target,
@@ -99,8 +109,20 @@ export async function sendLeadEmail(raw: unknown): Promise<LeadEmailResult> {
     return { ok: true, message: `E-mail se schůzkou odeslán (${result.when}).` }
   }
 
+  // Ukázka jde jen kontaktu, ke kterému nabídka patří, a jen hotová (odkaz z navrhy.vizeon.cz).
+  let demoUrl: string | null = null
+  if (data.template === 'ukazka') {
+    if (data.target.kind !== 'contact') return { ok: false, error: 'Ukázku posílejte z karty kontaktu.' }
+    const proposal = await proposalForContact(data.proposalId, data.target.id)
+    if (!proposal) return { ok: false, error: 'Nabídka k tomuhle kontaktu nepatří. Obnovte stránku.' }
+    const { demo } = await loadDemo(proposal.id, data.target.id)
+    if (demo?.status !== 'ready' || !demo.url) return { ok: false, error: 'Ukázka ještě není hotová.' }
+    demoUrl = demo.url
+  }
+
   // Nabídka z navrhovače jde jen kontaktu, ke kterému patří, a cena nad stropem jen potvrzená.
-  const offerId = data.template === 'nabidka' ? data.offerId : undefined
+  const offerId =
+    data.template === 'nabidka' ? data.offerId : data.template === 'ukazka' && data.includeOffer ? data.proposalId : undefined
   if (offerId) {
     if (data.target.kind !== 'contact') return { ok: false, error: 'Nabídku z navrhovače posílejte z karty kontaktu.' }
     const check = await canPublish(offerId, data.target.id)
@@ -125,6 +147,13 @@ export async function sendLeadEmail(raw: unknown): Promise<LeadEmailResult> {
     )
     revalidatePath(`/dashboard/kontakty/${data.target.id}`)
     revalidatePath('/dashboard/nabidky')
+  }
+
+  if (data.template === 'ukazka' && demoUrl) {
+    await markDemoSent(data.proposalId, demoUrl).catch((err) =>
+      console.error('[navrhovac] Odeslání ukázky se nezapsalo:', (err as Error).message.slice(0, 120)),
+    )
+    revalidatePath(`/dashboard/kontakty/${data.target.id}`)
   }
 
   // E-mail už odešel, takže zápis do historie nesmí vrátit chybu.

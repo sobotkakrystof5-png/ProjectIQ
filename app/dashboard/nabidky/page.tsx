@@ -4,6 +4,7 @@ import { PageHeader, PageShell } from '@/components/ws/app/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHead } from '@/components/admin/card'
 import { SuggestionsPanel } from '@/components/admin/offers/suggestions-panel'
+import { NewOfferForm } from '@/components/admin/offers/new-offer-form'
 import { requireAdminPage } from '@/lib/auth'
 import { listRecentProposals, listSuggestions, loadOfferReview } from '@/lib/admin/offers/proposals'
 import { PROPOSAL_STATUS_LABEL, variantOf } from '@/lib/admin/offers/proposal-model'
@@ -13,9 +14,11 @@ export const metadata: Metadata = { title: 'Nabídky' }
 export const dynamic = 'force-dynamic'
 
 /**
- * Nabídky z navrhovače (R-147, R-155): jak se daří za poslední 3 měsíce (N3)
- * po pásmech i podle podílu ceny z hodnoty, návrhy úprav cenových pravidel, odhad poptávek proti skutečnosti (N4)
- * a seznam nabídek. Nabídka sama vzniká a odchází na kartě kontaktu.
+ * Nabídky z navrhovače (R-147, R-155, R-160): nová nabídka pro firmu (web,
+ * IČO nebo název → rozbor → návrh se připraví sám), jak se daří za poslední
+ * 3 měsíce (N3) po pásmech i podle podílu ceny z hodnoty, návrhy úprav cenových
+ * pravidel, odhad poptávek proti skutečnosti (N4) a seznam nabídek. Nabídka
+ * odchází z karty kontaktu.
  */
 
 const czk = (n: number) => `${n.toLocaleString('cs-CZ')} Kč`
@@ -48,7 +51,7 @@ export default async function NabidkyPage() {
     <PageShell width="wide">
       <PageHeader
         title="Nabídky"
-        subtitle="Cena podle hodnoty pro klienta. Nabídku připravíte a pošlete na kartě kontaktu."
+        subtitle="Zadejte firmu. Agenti ji prohledají, nabídka se připraví sama a pošlete ji z karty kontaktu."
         subtitleFont="sans"
         action={
           <Link
@@ -85,9 +88,17 @@ function Body({
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex min-w-0 flex-col gap-8">
         <Card>
+          <CardHead
+            title="Nová nabídka"
+            hint="Rozbor webu a firmy z veřejných zdrojů trvá pár minut. Pak se spočítají tři varianty podle vašich cenových pravidel."
+          />
+          <NewOfferForm />
+        </Card>
+
+        <Card>
           <CardHead title="Poslední 3 měsíce" hint="Zdravá úspěšnost je 30–50 % přijatých nabídek. Referenční ceny se nepočítají." />
           {review.sent === 0 ? (
-            <p className="text-sm text-quiet">Zatím žádná odeslaná nabídka. Připravte ji u kontaktu z rozboru firmy.</p>
+            <p className="text-sm text-quiet">Zatím žádná odeslaná nabídka. Začněte firmou nahoře.</p>
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <Stat label="Odesláno" value={String(review.sent)} note={review.pending > 0 ? `čeká ${review.pending}` : undefined} />

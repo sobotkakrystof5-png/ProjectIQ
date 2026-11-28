@@ -2059,3 +2059,49 @@ s citací, která v přepisu je (`foldForQuote`, `quoteInTranscript`), a u čás
 (`quoteHasAmount` nad `sourceNumberValues` z Voice, i „60 tisíc"). Cena volání se přičte k `voice_meetings.cost_usd`.
 „Použít" nastaví pole editoru (`HintPatch`), rozpočet je jen pro informaci; uloží se s konceptem. Testy
 `lib/__tests__/admin-navrhovac-n4.test.ts`.
+
+## Navrhovač nabídek: nová nabídka pro firmu, ukázka webu a rozbor ceny (R-160)
+
+**Nová nabídka.** Stránka `/dashboard/nabidky` má nahoře formulář (`components/admin/offers/new-offer-form.tsx`):
+web, IČO, název, e-mail, telefon, stačí jedno z prvních tří. `startOfferForFirmAction` (`app/offer-research-actions.ts`)
+→ `startOfferForFirm` (`lib/admin/offers/new-firm.ts`): kontrola vstupu (`parseFirmInput`: web na https s ověřeným
+hostitelem, IČO s kontrolní číslicí, e-mail a telefon normalizované), jméno z ARES, když chybí (nedostupný ARES nic
+neblokuje, neznámé IČO bez webu = chyba), jinak z domény. Kontakt se hledá podle telefonu a e-mailu (`findContact`),
+pak IČO, pak webu firmy od robota (`outreach_leads.website` → `contact_id`), až pak vzniká nový (`source = 'nabidka'`).
+IČO se doplní jen na prázdné místo. Pak `startResearch` s webem z formuláře; strop 15 rozborů denně platí dál.
+Po odeslání formulář vede na kartu kontaktu, kde se rozbor a po něm sám koncept nabídky ukážou.
+
+**Rozbor ceny jen pro Kryštofa.** `pricingAnalysis` (`lib/admin/offers/pricing-analysis.ts`, čistá funkce, čte ji
+server i prohlížeč) z nabídky a pravidel: u každé varianty cena, cena podle pravidel a odchylka, rozmezí v pásmu,
+záloha a doplatek (`deposit_percent`), první rok se správou (`price + 12 × management_monthly`), kolik zakázek
+klienta ji zaplatí, o kolik je dražší než předchozí a co přidává. K tomu věty: odkud ceny jsou (cena zakázky,
+zakázky za měsíc a přínos za měsíc, z čeho se pásmo vybralo podle R-157 z `inputs.bandBasis` (u starších nabídek
+odvozené), pozice a její důvod, příplatky, jiná verze pravidel), za kolik měsíců tržby z webu pokryjí cenu, jak nabídku poskládat (kotva Plus, hlavní argument
+Doporučené, správa, záloha, podíl z ročního odhadu), když smlouvá (ubírat rozsah, ne cenu: o stupeň níž a co
+odpadne, Plus a co přidá) a co ověřit (cena zakázky, počet zakázek za měsíc, potvrzení nad stropem, otázky na
+klienta z rozboru).
+Karta `components/admin/offers/pricing-analysis-box.tsx`, u konceptu počítaná z rozpracovaných hodnot editoru,
+u odeslané nabídky z odeslaných cen. Na stránku nabídky z toho nejde nic.
+
+**Co poslat.** Panel `components/admin/offers/send-panel.tsx` na kartě nabídky nahradil tlačítko „Poslat nabídku"
+s oknem: zaškrtávátka **Cenová nabídka** a **Ukázka webu**, předepsaný e-mail (`buildProposalMail`
+v `lib/admin/lead-mail-templates.ts`: jen nabídka = dosavadní text Nabídka, s ukázkou předmět „Návrh nového webu
+pro …" a odkaz na ukázku, s obojím i odkaz na nabídku a doporučená cena), „Upravit text" a jedno tlačítko
+**Odeslat e-mail**. Odesílá `sendLeadEmail`: jen nabídka = šablona `nabidka` s `offerId` (beze změny), s ukázkou
+šablona `ukazka` (`proposalId`, `includeOffer`): nabídka musí patřit kontaktu (`proposalForContact`), ukázka být
+hotová; po odeslání `publishProposal` (když je i nabídka) a `markDemoSent`. Panel je i u odeslané nabídky
+(nabídku jde poslat znovu, ukázku dodatečně), dokud z ní nevznikla zakázka.
+
+**Ukázka webu.** Staví ji Growth OS (vizeon-autopilot) na navrhy.vizeon.cz. `lib/admin/offers/demo.ts`:
+- `loadDemo`: řádek v `offer_demos` (migrace 145), jinak hotová ukázka od robota (`outreach_leads.demo_url`
+  kořene kontaktu). Bez migrace 145 ukázka od robota funguje, vyžádat novou nejde.
+- `requestDemo`: `POST` na `GROWTH_OS_DEMO_URL` s Bearer `GROWTH_OS_DEMO_KEY` (jen https, bez přesměrování, 8 s).
+  Posílá jen název, e-mail a telefon kontaktu, web, město, obor a shrnutí firmy z rozboru. Druhá žádost neodejde,
+  dokud první neskončí nebo nevyprší, nejvýš 5 na nabídku. Kontakt bez e-mailu ukázku nedostane.
+- Výsledek: `POST /api/public/nabidky/ukazka` (Bearer `GROWTH_OS_API_KEY`) → `recordDemoResult`, jen k vyžádané
+  nabídce (`source = 'build'`), odkaz jen `https://navrhy.vizeon.cz/<slug>/` (`demoUrlOk`), upozornění
+  `offer_demo` do zvonku. Karta čekající ukázky se ptá každých 30 s (`demoStatusAction`).
+- Denní cron `send-reminders` → `maintainOfferDemos`: žádost bez výsledku po 2 h = `failed`/`timeout`.
+
+Strana Growth OS (vstup pro žádost, stavba bez e-mailu a hlášení zpět) je zadání
+`new - area of zakaziq/prompty/admin/growth-os-ukazka-k-nabidce.md`. Bezpečnost DECISIONS #061.

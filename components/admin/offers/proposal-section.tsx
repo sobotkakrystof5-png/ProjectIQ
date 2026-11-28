@@ -4,6 +4,7 @@ import { listResearchForContact } from '@/lib/admin/offers/research'
 import { listProposalsForContact, listSimilarOffers, loadPricingRules, offerUrl } from '@/lib/admin/offers/proposals'
 import type { SimilarOffer } from '@/lib/admin/offers/similar'
 import { latestMeetingForContact, type OfferMeeting } from '@/lib/admin/offers/meeting-hints'
+import { loadDemo, type DemoView } from '@/lib/admin/offers/demo'
 
 /**
  * Nabídka na kartě kontaktu (navrhovač nabídek, N2–N4, R-155, R-158). Načte nabídky,
@@ -50,6 +51,14 @@ export async function ProposalSection({
         return null
       })
     : null
+  // Ukázka webu k nejnovější nabídce (R-160). Chyba ukázky kartu nabídky neschová.
+  const current = proposals[0] ?? null
+  const demo: DemoView = current
+    ? await loadDemo(current.id, contactId).catch((err: unknown) => {
+        console.error('[navrhovac] ukázka se nenačetla:', err instanceof Error ? err.message.slice(0, 120) : 'unknown')
+        return { demo: null, canRequest: false }
+      })
+    : { demo: null, canRequest: false }
   return (
     <ProposalCard
       contactId={contactId}
@@ -60,6 +69,7 @@ export async function ProposalSection({
       researchDoneId={latest?.status === 'done' ? latest.id : null}
       researchOpen={latest?.status === 'queued' || latest?.status === 'running'}
       mail={{ company, email, readiness }}
+      demo={demo}
     />
   )
 }

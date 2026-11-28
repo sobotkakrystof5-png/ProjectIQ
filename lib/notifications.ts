@@ -53,6 +53,8 @@ export type NotificationType =
   | 'offer_chosen'
   /** Měsíční vyhodnocení nabídek a návrhy úprav cenových pravidel (N3, R-155). */
   | 'offer_review'
+  /** Ukázka webu k nabídce je hotová, nebo se nepostavila (R-160). */
+  | 'offer_demo'
 
 export async function createNotification(params: {
   type: NotificationType

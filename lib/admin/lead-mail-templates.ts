@@ -71,6 +71,43 @@ export function buildOfferBody(price?: string | null, offerUrl?: string | null):
     .join('\n\n')
 }
 
+/** Předmět e-mailu s ukázkou webu, stejný jako u ukázek od robota (Growth OS). */
+export const demoSubject = (company: string) => `Návrh nového webu pro ${company.trim() || 'vás'}`
+
+/**
+ * E-mail k nabídce z navrhovače (R-160): jen cenová nabídka, jen ukázka webu,
+ * nebo obojí. Kryštof volí na kartě nabídky, text jde před odesláním upravit.
+ * Ukázka bez nabídky je krátký dopis s odkazem, s nabídkou k ní přibude
+ * odkaz na stránku nabídky a doporučená cena. Odkazy na konci řádku bez tečky.
+ */
+export function buildProposalMail(parts: {
+  company: string
+  offerUrl: string | null
+  price: string | null
+  demoUrl: string | null
+}): { subject: string; body: string } {
+  const price = parts.price?.trim() || null
+  if (!parts.demoUrl) {
+    return { subject: NABIDKA_SUBJECT, body: buildOfferBody(price, parts.offerUrl) }
+  }
+  const company = parts.company.trim()
+  const lines: (string | null)[] = [
+    'Dobrý den,',
+    `připravil jsem pro vás ukázku, jak by mohl vypadat nový web${company ? ` pro ${company}` : ''}: ${parts.demoUrl}`,
+    'Je to první verze, kterou doladíme podle vás: texty, fotky, barvy i to, co chcete zákazníkům ukázat jako první.',
+  ]
+  if (parts.offerUrl) {
+    lines.push(`Co by web stál, najdete v nabídce ve třech variantách: ${parts.offerUrl}`)
+    lines.push(`${price ? `Doporučuji variantu za ${price}. ` : ''}Variantu si vyberete jedním kliknutím přímo v nabídce.`)
+  }
+  lines.push('Když budete mít otázku, stačí odpovědět na tenhle e-mail.')
+  lines.push(EMAIL_SIGNATURE)
+  return {
+    subject: demoSubject(company),
+    body: lines.filter((line): line is string => line !== null).join('\n\n'),
+  }
+}
+
 export type LeadMailContext = {
   /** Dnešek v Praze (`YYYY-MM-DD`) — do textu portfolia. */
   todayISO: string

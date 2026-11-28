@@ -21,6 +21,7 @@ import {
   type ProposalRow,
 } from '@/lib/admin/offers/proposals'
 import { pragueYearMonth } from '@/lib/admin/offers/review'
+import { loadDemo, requestDemo, type DemoView, type RequestOutcome } from '@/lib/admin/offers/demo'
 
 /**
  * Navrhovač nabídek, kroky N2–N4 (R-147, R-155): úprava návrhu, odeslání,
@@ -202,4 +203,42 @@ export async function runReviewNowAction(): Promise<{ created: number }> {
   const { created } = await createSuggestions(pragueYearMonth(new Date()))
   revalidatePath('/dashboard/nabidky')
   return { created }
+}
+
+/* ------------------------------------------------------------------ */
+/* Ukázka webu k nabídce (R-160)                                       */
+/* ------------------------------------------------------------------ */
+
+export type DemoActionResult = { ok: true; view: DemoView } | { ok: false; error: string }
+
+const DEMO_ERROR_TEXT: Record<Exclude<RequestOutcome, { ok: true }>['error'], string> = {
+  not_connected: 'Ukázky zatím nejde vyžádat: ZakazIQ ještě není napojený na Growth OS.',
+  not_found: 'Nabídka nenalezena. Obnovte stránku.',
+  no_email: 'Kontakt nemá e-mail. Doplňte ho, ukázka se posílá e-mailem.',
+  already: 'Ukázka se už staví. Počkejte, až bude hotová.',
+  limit: 'Ukázku k téhle nabídce už nejde vyžádat znovu. Připravte novou nabídku.',
+  dispatch_failed: 'Growth OS žádost nepřijal. Zkuste to prosím za chvíli znovu.',
+}
+
+/** „Vyžádat ukázku": požádá Growth OS o stavbu ukázkového webu k nabídce. */
+export async function requestDemoAction(proposalId: string): Promise<DemoActionResult> {
+  await requireAuth()
+  const id = uuid.safeParse(proposalId)
+  if (!id.success) return { ok: false, error: DEMO_ERROR_TEXT.not_found }
+  const row = await getProposal(id.data)
+  if (!row) return { ok: false, error: DEMO_ERROR_TEXT.not_found }
+  const out = await requestDemo(row.id)
+  if (!out.ok) return { ok: false, error: DEMO_ERROR_TEXT[out.error] }
+  refresh(row.contact_id)
+  return { ok: true, view: await loadDemo(row.id, row.contact_id) }
+}
+
+/** Stav ukázky pro kartu, která čeká na Growth OS. */
+export async function demoStatusAction(proposalId: string): Promise<DemoView | null> {
+  await requireAuth()
+  const id = uuid.safeParse(proposalId)
+  if (!id.success) return null
+  const row = await getProposal(id.data)
+  if (!row) return null
+  return loadDemo(row.id, row.contact_id)
 }

@@ -16,6 +16,14 @@ Zůstává: co zůstává a proč
 
 ---
 
+## 2026-11-28 — review: navrhovač nabídek, nová nabídka a ukázka webu (R-160)
+Spouštěč: před commitem (`web-security-review`)
+Rozsah: větev `admin/nabidky-tok` — `POST /api/public/nabidky/ukazka`, `lib/admin/offers/demo.ts` (žádost do Growth OS, zápis výsledku, údržba), `lib/admin/offers/new-firm.ts` a `startOfferForFirmAction`, šablona `ukazka` v `app/lead-mail-actions.ts`, `components/admin/offers/send-panel.tsx`, migrace 145
+Výsledek: 0 nálezů k opravě. Prošlo: vstup s limitem na IP, `Origin` = 403, klíč `verifyBearerApiKey` v konstantním čase, `readJsonLimited` 2 kB, Zod `strict`, odkaz jen z navrhy.vizeon.cz (regex i `safeHttpUrl`, test na `navrhy.vizeon.cz.evil.cz`, cizí doménu, vnořenou cestu a `javascript:`); zápis jen k nabídce, ke které ZakazIQ ukázku vyžádal (test 404), ukázku od robota přepsat nejde (test). Klíč `GROWTH_OS_DEMO_KEY` jen na serveru (`server-only`, žádné `NEXT_PUBLIC_`), odchozí volání jen https, `redirect: 'error'`, 8 s, odpověď se nečte. E-mail: adresa z databáze, kontrola, že nabídka patří kontaktu, ukázka hotová, prostý text, předmět na jednom řádku. Odkaz na ukázku na kartě jen po `demoUrlOk`, `rel="noopener noreferrer"`. Nová nabídka jen za `requireAuth()`, Zod s délkami, ILIKE dostává jen hostitele po kontrole znaků `[a-z0-9.-]`, SQL s parametry. CSP beze změny (prohlížeč ukázku jen otevírá v nové kartě, na Growth OS volá server).
+Nálezy: po přeskládání na `main` hlídací test `sql-guard` (#062) našel ruční vzor `LIKE` v `contactByRobotWeb` (`lib/admin/offers/new-firm.ts`); hostitel byl ověřený a výsledek se porovnával přesně, zneužít to nešlo.
+Opraveno: vzor přes `likeContains()`.
+Zůstává: přijatá rizika DECISIONS #061 (klíče, shrnutí od modelu jde do autopilota jako data). Strana Growth OS (vstup pro žádost, stavba bez e-mailu, hlášení zpět) zatím není: zadání `new - area of zakaziq/prompty/admin/growth-os-ukazka-k-nabidce.md`.
+
 ## 2026-11-28 — review: ochrana proti SQL injection a prompt injection (R-159)
 Spouštěč: zadání Kryštofa („zaveď všechna možná opatření proti SQL injection a prompt injection")
 Rozsah: všechny dotazy do databáze v `app/`, `lib/`, `components/` a `scripts/` (AST sken netagovaných šablon, ~75 proměnných vložení do spouštěného SQL, 65 funkcí `SECURITY DEFINER`, dynamické SQL v migracích, hledání přes LIKE), všech 9 míst, kde aplikace volá jazykový model, zadání pro Claude Code (požadavky klientů, chat, rozbor hovorů), cloudová úloha rozboru firem; pak `web-security-review` nad diffem větve `security/injekce`.
